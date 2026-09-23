@@ -181,7 +181,6 @@ import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.ScriptBasedMapping;
@@ -755,15 +754,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .build();
     }
 
-    Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
-        conf.getClass(
-            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            ScriptBasedMapping.class, DNSToSwitchMapping.class);
-    DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
-        dnsToSwitchMappingClass, conf);
-    dnsToSwitchMapping =
-        ((newInstance instanceof CachedDNSToSwitchMapping) ? newInstance
-            : new CachedDNSToSwitchMapping(newInstance));
+    dnsToSwitchMapping = createDNSToSwitchMapping(conf);
 
     if (configurator.getScmNodeManager() != null) {
       scmNodeManager = configurator.getScmNodeManager();
@@ -2219,10 +2210,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     String primordialNode = SCMHAUtils.getPrimordialSCM(configuration);
     // primordialNode can be nodeId too . If it is then return hostname.
     if (HddsUtils.getSCMNodeIds(configuration).contains(primordialNode)) {
-      List<SCMNodeDetails> localAndPeerNodes =
-          new ArrayList<>(scmHANodeDetails.getPeerNodeDetails());
-      localAndPeerNodes.add(getSCMHANodeDetails().getLocalNodeDetails());
-      for (SCMNodeDetails nodes : localAndPeerNodes) {
+      for (SCMNodeDetails nodes : scmHANodeDetails.getAllNodeDetails()) {
         if (nodes.getNodeId().equals(primordialNode)) {
           return nodes.getHostName();
         }
@@ -2371,6 +2359,14 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.debug("Node resolution did not yield any result for {}", hostname);
       return null;
     }
+  }
+
+  static DNSToSwitchMapping createDNSToSwitchMapping(OzoneConfiguration conf) {
+    Class<? extends DNSToSwitchMapping> mappingClass =
+        conf.getClass(
+            ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            ScriptBasedMapping.class, DNSToSwitchMapping.class);
+    return ReflectionUtils.newInstance(mappingClass, conf);
   }
 
 }

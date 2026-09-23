@@ -75,7 +75,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       }
       xceiverClientSpi = getXceiverClientFactory().acquireClientForReadData(pipeline);
       ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClientSpi, blockID, token, pipeline.getReplicaIndexes());
+          .getBlock(xceiverClientSpi, blockID, token, pipeline);
 
       chunks = response.getBlockData().getChunksList();
     } finally {

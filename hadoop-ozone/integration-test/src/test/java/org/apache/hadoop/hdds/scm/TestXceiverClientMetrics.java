@@ -24,12 +24,14 @@ import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -40,7 +42,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -74,7 +75,6 @@ public class TestXceiverClientMetrics {
   }
 
   @Test
-  @Flaky("HDDS-11646")
   public void testMetrics(@TempDir Path metaDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HDDS_METADATA_DIR_NAME, metaDir.toString());
@@ -105,57 +105,71 @@ public class TestXceiverClientMetrics {
       assertCounter("CreateContainerLatencyNumOps", 1L, containerMetrics);
 
       breakFlag = false;
-      latch = new CountDownLatch(1);
+      int numSenderThreads = 10;
+      latch = new CountDownLatch(numSenderThreads);
+      List<CompletableFuture<ContainerCommandResponseProto>> computeResults =
+          Collections.synchronizedList(new ArrayList<>());
+      AtomicReference<Exception> firstSenderError = new AtomicReference<>();
 
-      int numRequest = 10;
-      List<CompletableFuture<ContainerCommandResponseProto>> computeResults
-          = new ArrayList<>();
-      // start new thread to send async requests
-      Thread sendThread = new Thread(() -> {
-        while (!breakFlag) {
+      for (int i = 0; i < numSenderThreads; i++) {
+        Thread sendThread = new Thread(() -> {
           try {
-            // use async interface for testing pending metrics
-            for (int i = 0; i < numRequest; i++) {
-              BlockID blockID = ContainerTestHelper.
-                  getTestBlockID(container.getContainerInfo().getContainerID());
-              ContainerProtos.ContainerCommandRequestProto smallFileRequest;
-
-              smallFileRequest = ContainerTestHelper.getWriteSmallFileRequest(
-                  client.getPipeline(), blockID, 1024);
-              CompletableFuture<ContainerProtos.ContainerCommandResponseProto>
-                  response =
-                  client.sendCommandAsync(smallFileRequest).getResponse();
-              computeResults.add(response);
+            while (!breakFlag) {
+              try {
+                BlockID blockID = ContainerTestHelper.getTestBlockID(
+                    container.getContainerInfo().getContainerID());
+                ContainerCommandRequestProto smallFileRequest =
+                    ContainerTestHelper.getWriteSmallFileRequest(
+                        client.getPipeline(), blockID, 1024);
+                computeResults.add(
+                    client.sendCommandAsync(smallFileRequest).getResponse());
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                firstSenderError.compareAndSet(null, e);
+                break;
+              } catch (Exception e) {
+                firstSenderError.compareAndSet(null, e);
+                try {
+                  Thread.sleep(50);
+                } catch (InterruptedException ie) {
+                  Thread.currentThread().interrupt();
+                  break;
+                }
+              }
             }
-
-            Thread.sleep(1000);
-          } catch (Exception ignored) {
+          } finally {
+            latch.countDown();
           }
+        });
+        sendThread.start();
+      }
+
+      try {
+        GenericTestUtils.waitFor(() -> {
+          // check if pending metric count is increased
+          MetricsRecordBuilder metric = getMetrics(XceiverClientMetrics.SOURCE_NAME);
+          long pendingOps = getLongCounter("PendingOps", metric);
+          long pendingPutSmallFileOps = getLongCounter("numPendingPutSmallFile", metric);
+
+          if (pendingOps > 0 && pendingPutSmallFileOps > 0) {
+            // reset break flag
+            breakFlag = true;
+            return true;
+          } else {
+            return false;
+          }
+        }, 10, 60000);
+      } catch (TimeoutException e) {
+        Exception senderError = firstSenderError.get();
+        if (senderError != null) {
+          e.addSuppressed(senderError);
         }
+        throw e;
+      } finally {
+        breakFlag = true;
+        latch.await();
+      }
 
-        latch.countDown();
-      });
-      sendThread.start();
-
-      GenericTestUtils.waitFor(() -> {
-        // check if pending metric count is increased
-        MetricsRecordBuilder metric =
-            getMetrics(XceiverClientMetrics.SOURCE_NAME);
-        long pendingOps = getLongCounter("PendingOps", metric);
-        long pendingPutSmallFileOps =
-            getLongCounter("numPendingPutSmallFile", metric);
-
-        if (pendingOps > 0 && pendingPutSmallFileOps > 0) {
-          // reset break flag
-          breakFlag = true;
-          return true;
-        } else {
-          return false;
-        }
-      }, 100, 60000);
-
-      // blocking until we stop sending async requests
-      latch.await();
       // Wait for all futures being done.
       GenericTestUtils.waitFor(() -> {
         for (CompletableFuture future : computeResults) {
@@ -167,6 +181,12 @@ public class TestXceiverClientMetrics {
         return true;
       }, 100, 60000);
 
+      GenericTestUtils.waitFor(() -> {
+        MetricsRecordBuilder metric = getMetrics(XceiverClientMetrics.SOURCE_NAME);
+        long pendingOps = getLongCounter("PendingOps", metric);
+        long pendingPutSmallFileOps = getLongCounter("numPendingPutSmallFile", metric);
+        return pendingOps == 0 && pendingPutSmallFileOps == 0;
+      }, 10, 5000);
       // the counter value of pending metrics should be decreased to 0
       containerMetrics = getMetrics(XceiverClientMetrics.SOURCE_NAME);
       assertCounter("PendingOps", 0L, containerMetrics);

@@ -24,9 +24,8 @@ import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
-import org.apache.hadoop.metrics2.lib.MutableStat;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.ConcurrentMutableStat;
 
 /**
  * This class is for maintaining the various Ozone Manager Lock Metrics.
@@ -37,26 +36,24 @@ public final class OMLockMetrics implements MetricsSource {
   private static final String SOURCE_NAME =
       OMLockMetrics.class.getSimpleName();
 
-  private final MetricsRegistry registry;
-  private final MutableStat readLockWaitingTimeMsStat;
-  private final MutableStat readLockHeldTimeMsStat;
-  private final MutableStat writeLockWaitingTimeMsStat;
-  private final MutableStat writeLockHeldTimeMsStat;
+  private final ConcurrentMutableStat readLockWaitingTimeMsStat;
+  private final ConcurrentMutableStat readLockHeldTimeMsStat;
+  private final ConcurrentMutableStat writeLockWaitingTimeMsStat;
+  private final ConcurrentMutableStat writeLockHeldTimeMsStat;
 
   private OMLockMetrics() {
-    registry = new MetricsRegistry(SOURCE_NAME);
-    readLockWaitingTimeMsStat = registry.newStat("ReadLockWaitingTime",
+    readLockWaitingTimeMsStat = new ConcurrentMutableStat("ReadLockWaitingTime",
         "Time (in milliseconds) spent waiting for acquiring the read lock",
-        "Ops", "Time", true);
-    readLockHeldTimeMsStat = registry.newStat("ReadLockHeldTime",
+        "Ops", "Time", false);
+    readLockHeldTimeMsStat = new ConcurrentMutableStat("ReadLockHeldTime",
         "Time (in milliseconds) spent holding the read lock",
-        "Ops", "Time", true);
-    writeLockWaitingTimeMsStat = registry.newStat("WriteLockWaitingTime",
+        "Ops", "Time", false);
+    writeLockWaitingTimeMsStat = new ConcurrentMutableStat("WriteLockWaitingTime",
         "Time (in milliseconds) spent waiting for acquiring the write lock",
-        "Ops", "Time", true);
-    writeLockHeldTimeMsStat = registry.newStat("WriteLockHeldTime",
+        "Ops", "Time", false);
+    writeLockHeldTimeMsStat = new ConcurrentMutableStat("WriteLockHeldTime",
         "Time (in milliseconds) spent holding the write lock",
-        "Ops", "Time", true);
+        "Ops", "Time", false);
   }
 
   /**
