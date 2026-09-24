@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.s3.signature.SignatureTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EmptySource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -82,13 +83,17 @@ public class TestSignedChunksInputStream {
   }
 
   @ParameterizedTest
-  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
-  void consumesFinalChunkTerminatorWithoutValidator(boolean buffered, boolean empty) throws IOException {
+  @CsvSource({"false, false, false", "false, true, false", "true, false, false", "true, true, false",
+      "false, false, true", "false, true, true", "true, false, true", "true, true, true"})
+  void consumesFramingWithoutValidator(boolean buffered, boolean empty, boolean trailer) throws IOException {
     String payload = empty ? "" : "data";
     String body = (empty ? "" : "4;chunk-signature=" + FAKE_SIGNATURE + "\r\ndata\r\n")
-        + "0;chunk-signature=" + FAKE_SIGNATURE + "\r\n\r\n";
-    ByteArrayInputStream original = new ByteArrayInputStream(body.getBytes(UTF_8));
-    try (SignedChunksInputStream stream = new SignedChunksInputStream(original, KEY_PATH)) {
+        + "0;chunk-signature=" + FAKE_SIGNATURE + "\r\n"
+        + (trailer ? "x-amz-checksum-crc32c:sOO8/Q==\r\nx-amz-trailer-signature:" + FAKE_SIGNATURE + "\r\n" : "")
+        + "\r\n";
+    ByteArrayInputStream original = new ByteArrayInputStream((body + "after-trailer").getBytes(UTF_8));
+    try (SignedChunksInputStream stream = new SignedChunksInputStream(
+        original, KEY_PATH, trailer ? TrailerHeader.CRC32C : TrailerHeader.NONE)) {
       if (buffered) {
         assertThat(IOUtils.toString(stream, UTF_8)).isEqualTo(payload);
       } else {
@@ -97,7 +102,42 @@ public class TestSignedChunksInputStream {
         }
       }
       assertThat(stream.read()).isEqualTo(-1);
+      assertThat(IOUtils.toString(original, UTF_8)).isEqualTo("after-trailer");
+    }
+  }
+
+  @ParameterizedTest
+  @EmptySource
+  @ValueSource(strings = {
+      "x-amz-checksum-crc32c:sOO8/Q==",
+      "x-amz-checksum-crc32c:sOO8/Q==\r\n",
+      "x-amz-checksum-crc32c:sOO8/Q==\r\nx-amz-trailer-signature:" + TRAILER_SIGNATURE,
+      "x-amz-checksum-crc32c:sOO8/Q==\r\nx-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n",
+      "x-amz-checksum-crc32c:sOO8/Q==\r\nx-amz-trailer-signature:not-hex\r\n\r\n",
+      "malformed-header\r\nx-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n\r\n",
+      "x-amz-checksum-sha256:checksum\r\nx-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n\r\n"
+  })
+  void toleratesMalformedTrailersWithoutValidator(String trailers) throws IOException {
+    String body = "4;chunk-signature=" + FAKE_SIGNATURE + "\r\ndata\r\n"
+        + "0;chunk-signature=" + FAKE_SIGNATURE + "\r\n" + trailers;
+    ByteArrayInputStream original = new ByteArrayInputStream(body.getBytes(UTF_8));
+    try (SignedChunksInputStream stream = new SignedChunksInputStream(original, KEY_PATH, TrailerHeader.CRC32C)) {
+      assertThat(IOUtils.toString(stream, UTF_8)).isEqualTo("data");
+      assertThat(stream.read()).isEqualTo(-1);
       assertThat(original.available()).isZero();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void rejectsOversizedTrailerLine(boolean verify) throws IOException {
+    String body = trailerBody().replace("x-amz-checksum-crc32c:sOO8/Q==", repeat('a', 8 * 1024 + 1));
+    try (SignedChunksInputStream stream = new SignedChunksInputStream(
+        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, TrailerHeader.CRC32C)) {
+      if (verify) {
+        stream.attachValidator(newTrailerValidator());
+      }
+      assertInvalidBody(stream, "Chunk or trailing header line is too long");
     }
   }
 

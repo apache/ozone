@@ -66,7 +66,7 @@ import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
  * <p>
  * If a {@link ChunksValidator} is supplied, the signature of each chunk is verified (in real time, without
  * buffering the whole chunk) as the payload is read. Without a validator the stream only strips the chunk
- * signatures format and returns the payload.
+ * signatures format and returns the payload. Trailer contents are consumed without validation.
  * </p>
  *
  * Reference:
@@ -92,6 +92,35 @@ public class SignedChunksInputStream extends InputStream {
   private static final Pattern TRAILER_SIGNATURE_PATTERN =
       Pattern.compile("x-amz-trailer-signature:([0-9A-Fa-f]{64})", Pattern.CASE_INSENSITIVE);
   private static final int MAX_LINE_LENGTH = 8 * 1024;
+
+  private final InputStream originalStream;
+
+  /** Identifies the object in the S3 error response for a malformed body. */
+  private final String keyPath;
+
+  /** Verifies each chunk signature, or {@code null} to skip verification. */
+  private ChunksValidator validator;
+
+  /** SHA-256 of the current chunk payload; {@code null} when not verifying. */
+  private MessageDigest chunkDigest;
+
+  /** Signature parsed from the current chunk header line. */
+  private String chunkSignature;
+
+  /** Checksum header declared by x-amz-trailer, or NONE for a regular signed stream. */
+  private final TrailerHeader trailerHeader;
+
+  /**
+   * Size of the chunk payload. If zero, the signature line should be parsed to
+   * retrieve the subsequent chunk payload size.
+   */
+  private int remainingData = 0;
+
+  /**
+   * Every chunked uploads (multiple chunks) contains an additional final zero-byte
+   * chunk. This can be used as the end-of-file marker.
+   */
+  private boolean isFinalChunkEncountered = false;
 
   /** Supported checksum trailers, or no trailer for a regular signed stream. */
   public enum TrailerHeader {
@@ -126,35 +155,6 @@ public class SignedChunksInputStream extends InputStream {
       throw ex;
     }
   }
-
-  private final InputStream originalStream;
-
-  /** Identifies the object in the S3 error response for a malformed body. */
-  private final String keyPath;
-
-  /** Verifies each chunk signature, or {@code null} to skip verification. */
-  private ChunksValidator validator;
-
-  /** SHA-256 of the current chunk payload; {@code null} when not verifying. */
-  private MessageDigest chunkDigest;
-
-  /** Signature parsed from the current chunk header line. */
-  private String chunkSignature;
-
-  /** Checksum header declared by x-amz-trailer, or NONE for a regular signed stream. */
-  private final TrailerHeader trailerHeader;
-
-  /**
-   * Size of the chunk payload. If zero, the signature line should be parsed to
-   * retrieve the subsequent chunk payload size.
-   */
-  private int remainingData = 0;
-
-  /**
-   * Every chunked uploads (multiple chunks) contains an additional final zero-byte
-   * chunk. This can be used as the end-of-file marker.
-   */
-  private boolean isFinalChunkEncountered = false;
 
   public SignedChunksInputStream(InputStream inputStream, String keyPath) {
     this(inputStream, keyPath, TrailerHeader.NONE);
@@ -352,6 +352,14 @@ public class SignedChunksInputStream extends InputStream {
   }
 
   private void validateTrailer() throws IOException {
+    if (validator == null) {
+      // Consume trailers through their blank-line terminator, tolerating EOF as for unverified chunks.
+      String line;
+      do {
+        line = readLine(true);
+      } while (StringUtils.isNotEmpty(line));
+      return;
+    }
     String trailerLine = readLine(true);
     if (trailerLine == null || trailerLine.isEmpty()) {
       throw invalidBody("Missing trailing checksum header");
@@ -374,9 +382,7 @@ public class SignedChunksInputStream extends InputStream {
     if (!matcher.matches()) {
       throw invalidBody("Invalid trailing signature");
     }
-    if (validator != null) {
-      validator.validateTrailer(matcher.group(1), DigestUtils.sha256Hex(name + ":" + value + "\n"));
-    }
+    validator.validateTrailer(matcher.group(1), DigestUtils.sha256Hex(name + ":" + value + "\n"));
     // AWS SDKs terminate the trailer section with a blank line after the signature.
     if (!"".equals(readLine(true))) {
       throw invalidBody("Invalid trailer terminator");
@@ -392,7 +398,7 @@ public class SignedChunksInputStream extends InputStream {
     while (true) {
       int current = originalStream.read();
       if (current == -1) {
-        if (trailingHeader && line.length() > 0) {
+        if (trailingHeader && validator != null && line.length() > 0) {
           throw invalidBody("Truncated trailing header");
         }
         if (!trailingHeader) {
