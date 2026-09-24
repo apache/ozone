@@ -25,7 +25,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,8 +56,11 @@ import org.apache.hadoop.ozone.container.common.transport.server.ratis.Container
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.RatisServerConfiguration;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
+import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.apache.ratis.statemachine.impl.StatemachineImplTestUtil;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -169,7 +171,7 @@ public class TestContainerStateMachine {
         (ContainerStateMachine) OzoneTestHelper.getStateMachine(cluster);
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
-    assertNull(StatemachineImplTestUtil.findLatestSnapshot(storage));
+    long lastAppliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();
 
     // Write 10 keys. Num snapshots should be equal to config value.
     for (int i = 1; i <= 10; i++) {
@@ -185,6 +187,8 @@ public class TestContainerStateMachine {
       }
     }
 
+    waitForSnapshotAfter(storage, lastAppliedIndex);
+
     RatisServerConfiguration ratisServerConfiguration =
         conf.getObject(RatisServerConfiguration.class);
 
@@ -197,6 +201,7 @@ public class TestContainerStateMachine {
         .isLessThanOrEqualTo(1);
 
     // Write 10 more keys. Num Snapshots should remain the same.
+    lastAppliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();
     for (int i = 11; i <= 20; i++) {
       try (OzoneOutputStream key =
           objectStore.getVolume(volumeName).getBucket(bucketName)
@@ -209,11 +214,23 @@ public class TestContainerStateMachine {
         key.write(("ratis" + i).getBytes(UTF_8));
       }
     }
+    waitForSnapshotAfter(storage, lastAppliedIndex);
+
     files = parentPath.toFile().listFiles();
     assertThat(files).isNotNull();
     numSnapshots = files.length;
     assertThat(Math.abs(ratisServerConfiguration.getNumSnapshotsRetained() - numSnapshots))
         .isLessThanOrEqualTo(1);
+  }
+
+  private static void waitForSnapshotAfter(SimpleStateMachineStorage storage,
+      long index) throws Exception {
+    CheckedSupplier<Boolean, IOException> snapshotAdvanced = () -> {
+      SingleFileSnapshotInfo snapshot =
+          StatemachineImplTestUtil.findLatestSnapshot(storage);
+      return snapshot != null && snapshot.getTermIndex().getIndex() > index;
+    };
+    GenericTestUtils.waitFor(snapshotAdvanced, 100, 30_000);
   }
 
   static Path getSnapshotPath(SimpleStateMachineStorage storage)
