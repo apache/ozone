@@ -89,6 +89,10 @@ if ! execute_command_in_container scm1.org timeout 15s ozone sh volume list 1>/d
 fi
 echo "Testing ratis transaction repair completed successfully."
 
+# Run against a checkpoint in the SCM container, where no OM process is running.
+execute_robot_test ${SCM} -v OM_DB:${OZONE_DIR}/compose/ozonesecure-ha/data/${OM}/metadata/om.db \
+  repair/om-update-transaction.robot
+
 execute_robot_test ${OM} kinit.robot
 
 echo "Creating test keys to verify om compaction"

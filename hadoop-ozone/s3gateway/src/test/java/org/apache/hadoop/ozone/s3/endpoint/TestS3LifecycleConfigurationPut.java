@@ -321,6 +321,24 @@ public class TestS3LifecycleConfigurationPut {
         HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
   }
 
+  @Test
+  public void testPutLifecycleConfigurationWithExpirationDaysOverflowReportsSpecificMessage() throws Exception {
+    // A day count that overflows a 32-bit int must be rejected, not silently wrapped to an
+    // unrelated positive value that then gets persisted.
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.put("bucket1", withExpirationDaysOverflow()));
+    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+    assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
+    assertEquals("Invalid lifecycle configuration: Days value "
+        + "'3323232323232323232323232323232323232323232' is not a valid integer", ex.getErrorMessage());
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationWithAbortDaysAfterInitiationOverflow() throws Exception {
+    testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withAbortDaysAfterInitiationOverflow,
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
+  }
+
   private static InputStream onePrefix() {
     String xml = ("<LifecycleConfiguration xmlns=\"http://s3.amazonaws" +
         ".com/doc/2006-03-01/\">" +
@@ -768,6 +786,34 @@ public class TestS3LifecycleConfigurationPut {
         "<Status>Enabled</Status>" +
         "<AbortIncompleteMultipartUpload>" +
         "<DaysAfterInitiation>-1</DaysAfterInitiation>" +
+        "</AbortIncompleteMultipartUpload>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withExpirationDaysOverflow() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>overflow-days</ID>" +
+        "<Prefix>prefix/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration><Days>3323232323232323232323232323232323232323232</Days></Expiration>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withAbortDaysAfterInitiationOverflow() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>overflow-abort</ID>" +
+        "<Prefix>uploads/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<AbortIncompleteMultipartUpload>" +
+        "<DaysAfterInitiation>3323232323232323232323232323232323232323232</DaysAfterInitiation>" +
         "</AbortIncompleteMultipartUpload>" +
         "</Rule>" +
         "</LifecycleConfiguration>";
