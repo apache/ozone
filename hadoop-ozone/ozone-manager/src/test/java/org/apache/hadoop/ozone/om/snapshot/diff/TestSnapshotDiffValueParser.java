@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -38,7 +39,15 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.Retention;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Rule;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class TestSnapshotDiffValueParser {
   private static final String VOLUME = "volume";
@@ -121,6 +130,45 @@ class TestSnapshotDiffValueParser {
     byte[] latestLocationRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(latestLocationChanged);
     assertFalse(Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(locationCountRaw),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(latestLocationRaw)));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("objectLockChanges")
+  void testKeyInfoObjectLockSignature(String name, OmKeyInfo before, OmKeyInfo after, boolean same) throws Exception {
+    byte[] beforeRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(before);
+    byte[] afterRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(after);
+    assertEquals(same, before.isKeyInfoSame(after, false, false, false, false, true));
+    assertEquals(same, Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(beforeRaw),
+        SnapshotDiffValueParser.computeKeyInfoCompareSignature(afterRaw)));
+  }
+
+  private static Stream<Arguments> objectLockChanges() {
+    OmKeyInfo keyInfo = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
+        createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
+        Collections.singletonList(createKeyLocationGroup(1L)));
+    Rule rule = Rule.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE)
+        .setTimeUnit(TimeUnit.DAYS).setDuration(1).build();
+    OmKeyInfo retained = keyInfo.toBuilder().setRetentionDate(1_800_000_000_000L)
+        .setRetentionConfig(new Retention(rule, null)).setLegalHold(true).build();
+    return Stream.of(
+        Arguments.of("unchanged absent fields", keyInfo, keyInfo.copyObject(), true),
+        Arguments.of("unchanged Object Lock fields", retained, retained.copyObject(), true),
+        Arguments.of("retention date added", keyInfo, keyInfo.toBuilder().setRetentionDate(0L).build(), false),
+        Arguments.of("retention date changed", retained,
+            retained.toBuilder().setRetentionDate(1_800_000_000_001L).build(), false),
+        Arguments.of("retention config added", keyInfo,
+            keyInfo.toBuilder().setRetentionConfig(new Retention(rule, null)).build(), false),
+        Arguments.of("retention rule changed", retained, retained.toBuilder()
+            .setRetentionConfig(new Retention(
+                rule.toBuilder().setRetentionMode(RetentionMode.COMPLIANCE).build(), null))
+            .build(), false),
+        Arguments.of("event hold added", retained, retained.toBuilder()
+            .setRetentionConfig(new Retention(rule, EventHold.newBuilder().setEnabled(true).setRule(rule).build()))
+            .build(), false),
+        Arguments.of("legal hold enabled", keyInfo, keyInfo.toBuilder().setLegalHold(true).build(), false),
+        Arguments.of("legal hold disabled", retained, retained.toBuilder().setLegalHold(false).build(), false),
+        Arguments.of("legal hold absent versus false", keyInfo,
+            keyInfo.toBuilder().setLegalHold(false).build(), false));
   }
 
   @Test

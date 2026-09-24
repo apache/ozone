@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -53,6 +54,37 @@ import org.junit.jupiter.api.Test;
  * Test OmKeyInfo.
  */
 public class TestOmKeyInfo {
+
+  @Test
+  public void objectLockProtobufConversionAndCopy() {
+    OzoneManagerProtocolProtos.Rule rule = OzoneManagerProtocolProtos.Rule.newBuilder()
+        .setRetentionMode(OzoneManagerProtocolProtos.RetentionMode.GOVERNANCE)
+        .setTimeUnit(OzoneManagerProtocolProtos.TimeUnit.YEARS).setDuration(1).build();
+    Retention retention = new Retention(rule,
+        OzoneManagerProtocolProtos.EventHold.newBuilder().setEnabled(true).setRule(rule).build());
+    OmKeyInfo key = createOmKeyInfo(RatisReplicationConfig.getInstance(THREE)).toBuilder()
+        .setRetentionDate(1_800_000_000_000L).setRetentionConfig(retention).setLegalHold(true).build();
+    OzoneManagerProtocolProtos.KeyInfo proto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
+    OmKeyInfo decoded = OmKeyInfo.getFromProtobuf(proto);
+    for (OmKeyInfo value : new OmKeyInfo[]{decoded, key.copyObject(), key.toBuilder().build()}) {
+      assertEquals(key.getRetentionDate(), value.getRetentionDate());
+      assertEquals(retention, value.getRetentionConfig());
+      assertEquals(Boolean.TRUE, value.getLegalHold());
+    }
+    OmKeyInfo legacy = OmKeyInfo.getFromProtobuf(proto.toBuilder()
+        .clearRetentionDate().clearRetentionConfig().clearLegalHold().build());
+    assertNull(legacy.getRetentionDate());
+    assertNull(legacy.getRetentionConfig());
+    assertNull(legacy.getLegalHold());
+    OzoneManagerProtocolProtos.KeyInfo legacyProto = legacy.getProtobuf(ClientVersion.CURRENT_VERSION);
+    assertFalse(legacyProto.hasRetentionDate());
+    assertFalse(legacyProto.hasRetentionConfig());
+    assertFalse(legacyProto.hasLegalHold());
+    OmKeyInfo holdOff = legacy.toBuilder().setLegalHold(false).build();
+    OzoneManagerProtocolProtos.KeyInfo holdOffProto = holdOff.getProtobuf(ClientVersion.CURRENT_VERSION);
+    assertTrue(holdOffProto.hasLegalHold());
+    assertEquals(Boolean.FALSE, OmKeyInfo.getFromProtobuf(holdOffProto).getLegalHold());
+  }
 
   @Test
   public void protobufConversion() throws IOException {
