@@ -137,6 +137,9 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         reportFromDatanode.getDatanodeDetails();
     boolean processed = false;
     try {
+      if (!reportFromDatanode.startProcessing()) {
+        return;
+      }
       final DatanodeInfo datanodeInfo = getNodeManager().getNode(dnFromReport.getID());
       if (datanodeInfo == null) {
         getLogger().warn("Datanode not found: {}", dnFromReport);

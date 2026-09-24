@@ -110,6 +110,7 @@ import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServerSideTranslatorPB;
 import org.apache.hadoop.security.authorize.PolicyProvider;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -387,7 +388,11 @@ public class SCMDatanodeProtocolServer implements
         OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION_DEFAULT
             .toLong(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
     return new SCMFullContainerReportLeaseManager(maxLeases, leaseDurationMs,
-        System::currentTimeMillis, scm.getContainerManager().getMetrics());
+        Time::monotonicNow, scm.getContainerManager().getMetrics());
+  }
+
+  void removeDatanode(DatanodeDetails datanode) {
+    fcrLeaseManager.removeDatanode(datanode);
   }
 
   private SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode claimLeasedFCR(
@@ -412,7 +417,7 @@ public class SCMDatanodeProtocolServer implements
       return new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
           datanodeDetails, containerReport, claim.isRegistrationReport(),
           processed -> fcrLeaseManager.completeLease(
-              datanodeDetails, leaseId, processed));
+              datanodeDetails, leaseId, processed), claim::startProcessing);
     }
 
     LOG.warn("Ignoring full container report from datanode {} with invalid "

@@ -179,7 +179,9 @@
     <value>5m</value>
     <tag>OZONE, SCM, CONTAINER</tag>
     <description>The time SCM waits for a datanode to send a full container
-      report after granting a full container report lease.</description>
+      report after granting a full container report lease. Once the report
+      arrives, the same duration limits how long it may wait to start
+      processing.</description>
   </property>
   <property>
     <name>hdds.datanode.dir</name>

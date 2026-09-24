@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -524,6 +525,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   default void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
 
+  }
+
+  default void setDatanodeRemovedHandler(
+      Consumer<DatanodeDetails> datanodeRemovedHandler) {
   }
 
   int openContainerLimit(List<DatanodeDetails> datanodes);

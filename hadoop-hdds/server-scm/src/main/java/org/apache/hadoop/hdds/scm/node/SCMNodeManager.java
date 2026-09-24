@@ -44,6 +44,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -145,6 +146,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
   private final NonWritableNodeFilter nonWritableNodeFilter;
   private final int numContainerPerVolume;
+  private Consumer<DatanodeDetails> datanodeRemovedHandler = ignored -> { };
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -2101,6 +2103,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     try {
       NodeStatus nodeStatus = this.getNodeStatus(datanodeDetails);
       if (datanodeDetails.isDecommissioned() || nodeStatus.isDead()) {
+        datanodeRemovedHandler.accept(datanodeDetails);
         if (clusterMap.contains(datanodeDetails)) {
           clusterMap.remove(datanodeDetails);
         }
@@ -2163,5 +2166,11 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     // DN software matches SCM and DN apparent version <= SCM apparent version: DN can register and will be given a
     //  finalize command if needed.
     return false;
+  }
+
+  @Override
+  public void setDatanodeRemovedHandler(
+      Consumer<DatanodeDetails> handler) {
+    datanodeRemovedHandler = Objects.requireNonNull(handler);
   }
 }
