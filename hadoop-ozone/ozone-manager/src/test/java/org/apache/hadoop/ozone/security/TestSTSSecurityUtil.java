@@ -450,6 +450,78 @@ public class TestSTSSecurityUtil {
   }
 
   @Test
+  public void testEnsureResolvedStsFieldsInvariantsSuccessWithLegacyResolvedFields() throws Exception {
+    final String tokenString = createStsTokenString();
+
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setSessionToken(tokenString)
+        .setResolvedStsSessionPolicy(SESSION_POLICY)
+        .setResolvedStsRoleArn(ROLE_ARN)
+        .setResolvedStsOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setResolvedStsTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setResolvedStsSecretKeyId(secretKeyId.toString())
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsRejectsPartialAssumedRoleFields() throws Exception {
+    final String tokenString = createStsTokenString();
+
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setSessionToken(tokenString)
+        .setResolvedStsSessionPolicy(SESSION_POLICY)
+        .setResolvedStsRoleArn(ROLE_ARN)
+        .setResolvedStsOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setResolvedStsTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setResolvedStsSecretKeyId(secretKeyId.toString())
+        .setResolvedStsAssumedRoleId(ASSUMED_ROLE_ID)
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureResolvedStsFieldsInvariants(request))
+        .isInstanceOf(OMException.class)
+        .hasMessageContaining("Resolved STS assumed-role fields must both be present or both be absent");
+  }
+
+  @Test
+  public void testEnsureResolvedStsFieldsInvariantsRejectsPartialAssumedRoleUserArnOnly() throws Exception {
+    final String tokenString = createStsTokenString();
+
+    final S3Authentication s3Auth = S3Authentication.newBuilder()
+        .setSessionToken(tokenString)
+        .setResolvedStsSessionPolicy(SESSION_POLICY)
+        .setResolvedStsRoleArn(ROLE_ARN)
+        .setResolvedStsOriginalAccessKeyId(ORIGINAL_ACCESS_KEY)
+        .setResolvedStsTempAccessKeyId(TEMP_ACCESS_KEY)
+        .setResolvedStsSecretKeyId(secretKeyId.toString())
+        .setResolvedStsAssumedRoleUserArn(ASSUMED_ROLE_USER_ARN)
+        .build();
+
+    final OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.CreateBucket)
+        .setClientId("client-id")
+        .setS3Authentication(s3Auth)
+        .build();
+
+    assertThatThrownBy(() -> STSSecurityUtil.ensureResolvedStsFieldsInvariants(request))
+        .isInstanceOf(OMException.class)
+        .hasMessageContaining("Resolved STS assumed-role fields must both be present or both be absent");
+  }
+
+  @Test
   public void testEnsureResolvedStsFieldsInvariantsMissingSessionToken() {
     final S3Authentication s3Auth = S3Authentication.newBuilder()
         .setResolvedStsSessionPolicy(SESSION_POLICY)

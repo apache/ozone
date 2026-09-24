@@ -226,6 +226,12 @@ public final class STSSecurityUtil {
     if (!hasAllResolvedStsFields(s3Auth)) {
       throw new OMException("Resolved STS fields must be present when sessionToken is present", INVALID_TOKEN);
     }
+
+    if (hasPartialResolvedStsAssumedRoleFields(s3Auth)) {
+      throw new OMException(
+          "Resolved STS assumed-role fields must both be present or both be absent when sessionToken is present",
+          INVALID_TOKEN);
+    }
   }
 
   private static boolean hasAnyResolvedStsField(S3Authentication s3Auth) {
@@ -236,10 +242,15 @@ public final class STSSecurityUtil {
   }
 
   private static boolean hasAllResolvedStsFields(S3Authentication s3Auth) {
+    // Assumed-role id/ARN are optional here: they are used for GetCallerIdentity, not apply-path ACL,
+    // and may be absent in Ratis log entries committed by a pre-upgrade OM leader during rolling upgrade.
     return s3Auth.hasResolvedStsSessionPolicy() && s3Auth.hasResolvedStsRoleArn() &&
         s3Auth.hasResolvedStsOriginalAccessKeyId() && s3Auth.hasResolvedStsTempAccessKeyId() &&
-        s3Auth.hasResolvedStsSecretKeyId() && s3Auth.hasResolvedStsAssumedRoleId() &&
-        s3Auth.hasResolvedStsAssumedRoleUserArn();
+        s3Auth.hasResolvedStsSecretKeyId();
+  }
+
+  private static boolean hasPartialResolvedStsAssumedRoleFields(S3Authentication s3Auth) {
+    return s3Auth.hasResolvedStsAssumedRoleId() != s3Auth.hasResolvedStsAssumedRoleUserArn();
   }
 
   /**
@@ -307,8 +318,9 @@ public final class STSSecurityUtil {
    * {@code creationTime} and {@code expiry} are set to {@link Instant#MAX} so that a revocation or expiry
    * check against this identifier is deterministic and never treats it as issued before a stored cutoff.</p>
    *
-   * <p>Call {@link #ensureResolvedStsFieldsInvariants(OMRequest)} first: it is what guarantees the resolved
-   * fields read here are actually present.</p>
+   * <p>Call {@link #ensureResolvedStsFieldsInvariants(OMRequest)} first: it guarantees the five core resolved
+   * fields (session policy, role ARN, original/temp access key IDs, secret key ID) are present. Assumed-role
+   * id/ARN may be absent on legacy Ratis log entries; when present, both must be set.</p>
    */
   public static STSTokenIdentifier rehydrateStsTokenIdentifier(S3Authentication s3Auth) {
     if (!s3Auth.hasSessionToken() || s3Auth.getSessionToken().isEmpty()) {

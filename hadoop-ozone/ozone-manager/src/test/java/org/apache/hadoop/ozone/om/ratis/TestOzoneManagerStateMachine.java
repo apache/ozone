@@ -456,6 +456,44 @@ public class TestOzoneManagerStateMachine {
   }
 
   @Test
+  public void testRunCommandSetsStsThreadLocalWithLegacyResolvedFields() throws Exception {
+    when(om.isSecurityEnabled()).thenReturn(true);
+
+    final OMRequest request = sampleWriteRequest().toBuilder()
+        .setS3Authentication(legacyStsS3Authentication())
+        .build();
+    final TermIndex ti = TermIndex.valueOf(1, 5);
+
+    final OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+
+    final OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+    when(clientResponse.getOmLockDetails()).thenReturn(null);
+
+    doAnswer(invocation -> {
+      assertNotNull(OzoneManager.getStsTokenIdentifier(),
+          "Expected STS ThreadLocal to be set during handler.handleWriteRequest");
+      assertEquals("tempAccessKeyId", OzoneManager.getStsTokenIdentifier().getTempAccessKeyId());
+      assertEquals("originalAccessKeyId", OzoneManager.getStsTokenIdentifier().getOriginalAccessKeyId());
+      assertEquals("roleArn", OzoneManager.getStsTokenIdentifier().getRoleArn());
+      assertEquals("sessionPolicy", OzoneManager.getStsTokenIdentifier().getSessionPolicy());
+      assertEquals("", OzoneManager.getStsTokenIdentifier().getAssumedRoleId());
+      assertEquals("", OzoneManager.getStsTokenIdentifier().getAssumedRoleUserArn());
+      return clientResponse;
+    }).when(handler).handleWriteRequest(eq(request), any(), eq(doubleBuffer));
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertNotNull(result);
+    assertTrue(result.getSuccess());
+    assertNull(OzoneManager.getStsTokenIdentifier(), "Expected STS ThreadLocal to be cleared after runCommand");
+  }
+
+  @Test
   public void testRunCommandMissingResolvedStsFieldsReturnsErrorResponse() throws Exception {
     when(om.isSecurityEnabled()).thenReturn(true);
 
@@ -1290,6 +1328,18 @@ public class TestOzoneManagerStateMachine {
         .setResolvedStsSecretKeyId("secretKeyId")
         .setResolvedStsAssumedRoleId("assumedRoleId")
         .setResolvedStsAssumedRoleUserArn("assumedRoleUserArn")
+        .build();
+  }
+
+  private OzoneManagerProtocolProtos.S3Authentication legacyStsS3Authentication() {
+    return OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+        .setAccessId("accessId")
+        .setSessionToken("sessionToken")
+        .setResolvedStsSessionPolicy("sessionPolicy")
+        .setResolvedStsRoleArn("roleArn")
+        .setResolvedStsOriginalAccessKeyId("originalAccessKeyId")
+        .setResolvedStsTempAccessKeyId("tempAccessKeyId")
+        .setResolvedStsSecretKeyId("secretKeyId")
         .build();
   }
 
