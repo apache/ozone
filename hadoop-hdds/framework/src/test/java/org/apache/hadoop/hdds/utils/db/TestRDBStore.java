@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -40,12 +39,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -279,37 +276,11 @@ public class TestRDBStore {
   }
 
   @Test
-  public void testCheckpointAfterCloseReturnsNull(@TempDir File cpDir) throws Exception {
-    insertRandomData(rdbStore, 1);
-    rdbStore.close();
+  public void testCheckpointAfterDbClose(@TempDir File cpDir) throws Exception {
+    RocksDatabase db = rdbStore.getDb();
+    db.close();
 
-    assertNull(rdbStore.getCheckpoint(cpDir.getAbsolutePath(), false));
-  }
-
-  @Test
-  public void testCheckpointConcurrentWithClose(@TempDir File cpRoot) throws Exception {
-    insertRandomData(rdbStore, 1);
-    CountDownLatch firstCheckpoint = new CountDownLatch(1);
-    AtomicInteger attempts = new AtomicInteger();
-    ExecutorService executor = Executors.newSingleThreadExecutor();
-    try {
-      Future<?> checkpointer = executor.submit(() -> {
-        while (!rdbStore.isClosed()) {
-          File parent = new File(cpRoot, "cp-" + attempts.incrementAndGet());
-          assertTrue(parent.mkdirs());
-          rdbStore.getCheckpoint(parent.getAbsolutePath(), false);
-          firstCheckpoint.countDown();
-        }
-        return null;
-      });
-
-      assertTrue(firstCheckpoint.await(10, TimeUnit.SECONDS));
-      rdbStore.close();
-
-      checkpointer.get(30, TimeUnit.SECONDS);
-    } finally {
-      executor.shutdownNow();
-    }
+    assertThrows(RocksDatabaseException.class, () -> db.createCheckpoint(cpDir.toPath().resolve("cp")));
   }
 
   @Test
