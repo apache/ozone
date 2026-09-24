@@ -26,12 +26,21 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 DIAGNOSTIC_FILE="$REPORT_DIR/diagnostics.txt"
 OUTPUT_LOG=$(mktemp)
 
-MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipDocs -DskipRecon -DskipTests'
+MAVEN_OPTIONS='-B -fae --no-transfer-progress -Perrorprone -DskipDocs -DskipRecon -DskipShade -DskipTests'
 MAVEN_DIAGNOSTIC_PATTERN='^\[(ERROR|WARNING)\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
 JAVAC_DIAGNOSTIC_PATTERN='^.*:[0-9]+: (error|warning): \[[^]]+\]'
 MAVEN_ERROR_PATTERN='^\[ERROR\] .*:\[[0-9]+,[0-9]+\] \[[^]]+\]'
 JAVAC_ERROR_PATTERN='^.*:[0-9]+: error: \[[^]]+\]'
 ERROR_DIAGNOSTIC_PATTERN="${MAVEN_ERROR_PATTERN}|${JAVAC_ERROR_PATTERN}"
+
+# timestamp prefix breaks diagnostic patterns
+MAVEN_OPTIONS="$MAVEN_OPTIONS -Dorg.slf4j.simpleLogger.showDateTime=false"
+# compiler output is not shown when getting results from local cache
+MAVEN_OPTIONS="$MAVEN_OPTIONS -Ddevelocity.cache.local.enabled=false"
+
+if [[ "${CI:-}" == "true" ]]; then
+  MAVEN_OPTIONS="$MAVEN_OPTIONS --activate-profiles CI"
+fi
 
 declare -i rc
 

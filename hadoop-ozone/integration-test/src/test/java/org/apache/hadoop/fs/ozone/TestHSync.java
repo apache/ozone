@@ -492,6 +492,8 @@ public class TestHSync {
         // Create key2 without hsync
         try (FSDataOutputStream os1 = fs.create(key2, true)) {
           os1.write(1);
+          // Wait for double buffer flush to avoid flakiness because RDB iterator bypasses table cache
+          cluster.getOzoneManager().awaitDoubleBufferFlush();
           // There should be 2 key in openFileTable
           assertThat(getOpenKeyInfo(BUCKET_LAYOUT))
               .extracting(OmKeyInfo::getKeyName)
@@ -586,6 +588,8 @@ public class TestHSync {
       try (FSDataOutputStream os = fs.create(key1, true)) {
         os.write(1);
         os.hsync();
+        // Wait for double buffer flush to avoid flakiness because RDB iterator bypasses table cache
+        cluster.getOzoneManager().awaitDoubleBufferFlush();
         // There should be 1 key in openFileTable
         assertThat(getOpenKeyInfo(BUCKET_LAYOUT))
             .extracting(OmKeyInfo::getKeyName)

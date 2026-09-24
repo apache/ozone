@@ -54,7 +54,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachin
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -67,10 +67,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
+  private OzoneConfiguration conf;
 
-  @BeforeAll
-  static void setup(@TempDir File testDir) {
+  @BeforeEach
+  void setup(@TempDir File testDir) {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
