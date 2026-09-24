@@ -23,4 +23,5 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=repro
 ERROR_PATTERN='ERROR.*mismatch'
 
-source "${DIR}"/_build.sh verify artifact:compare "$@"
+# install populates the local repo reference that artifact:compare rebuilds against
+source "${DIR}"/_build.sh install artifact:compare "$@"

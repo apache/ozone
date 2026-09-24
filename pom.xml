@@ -1905,6 +1905,14 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-source-plugin</artifactId>
           <version>${maven-source-plugin.version}</version>
+          <configuration>
+            <archive>
+              <manifest>
+                <addDefaultImplementationEntries>false</addDefaultImplementationEntries>
+                <addDefaultSpecificationEntries>false</addDefaultSpecificationEntries>
+              </manifest>
+            </archive>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -2227,6 +2235,9 @@
           <groupId>com.googlecode.maven-download-plugin</groupId>
           <artifactId>download-maven-plugin</artifactId>
           <version>${download-maven-plugin.version}</version>
+          <configuration>
+            <readTimeOut>120000</readTimeOut>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>org.cyclonedx</groupId>

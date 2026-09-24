@@ -54,10 +54,26 @@ if [[ -f hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh ]]; then
   ozone_java_setup
 fi
 
-mvn ${MAVEN_OPTIONS} clean
-
-if [[ ${ITERATIONS} -gt 1 ]] && [[ ${OZONE_REPO_CACHED} == "false" ]]; then
-  mvn ${MAVEN_OPTIONS} -DskipTests install
+MAVEN_LIFECYCLE="verify"
+PL_ARGS=()
+if [[ "${OZONE_REPO_CACHED}" == "true" ]]; then
+  MAVEN_LIFECYCLE="test"
+  if [[ "${CHECK}" == "integration" ]]; then
+    # test-* profiles configure Surefire on the root POM; matching tests can live in any module
+    # (e.g. test-om in ozone-manager and ozone-integration-test). Use full-reactor mvn test.
+    # hadoop-native-lib is bound on ozone-main (inherited=false).
+    if [[ "$*" == *"-Phadoop-native-lib"* ]]; then
+      if ! mvn ${MAVEN_OPTIONS} -pl :ozone-main -Phadoop-native-lib generate-resources; then
+        echo "Failed to populate target/native-lib (hadoop-native-lib profile)" >&2
+        exit 1
+      fi
+    fi
+  fi
+else
+  mvn ${MAVEN_OPTIONS} clean
+  if [[ ${ITERATIONS} -gt 1 ]]; then
+    mvn ${MAVEN_OPTIONS} -DskipTests install
+  fi
 fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
@@ -77,7 +93,9 @@ for i in $(seq 1 ${ITERATIONS}); do
     mkdir -p "${REPORT_DIR}"
   fi
 
-  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" verify \
+  # shellcheck disable=SC2068
+  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" \
+      ${PL_ARGS[@]+"${PL_ARGS[@]}"} "$@" ${MAVEN_LIFECYCLE} \
       | tee "${REPORT_DIR}/output.log"
   irc=$?
 
