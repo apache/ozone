@@ -138,7 +138,7 @@ load bats-assert/load.bash
 @test "integration and unit: test-only change" {
   run dev-support/ci/selective_ci_checks.sh bf59f31a7e5fcad1acc85e1228d77c22ee7f036c
 
-  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd"]'
+  assert_output -p 'basic-checks=["rat","author","checkstyle","errorprone","findbugs","pmd"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
@@ -150,7 +150,7 @@ load bats-assert/load.bash
 @test "contract test" {
   run dev-support/ci/selective_ci_checks.sh c0a6ffd6dda7432f57e38bcf3f5ababdd7999e26
 
-  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd"]'
+  assert_output -p 'basic-checks=["rat","author","checkstyle","errorprone","findbugs","pmd"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
