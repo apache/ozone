@@ -59,9 +59,9 @@ public class S3GetSecretRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final OMRequest omRequest = super.preExecute(ozoneManager);
 
-    final GetS3SecretRequest s3GetSecretRequest =
-        getOmRequest().getGetS3SecretRequest();
+    final GetS3SecretRequest s3GetSecretRequest = omRequest.getGetS3SecretRequest();
 
     // The proto field kerberosID is effectively accessId w/ Multi-Tenancy
     //
@@ -83,10 +83,7 @@ public class S3GetSecretRequest extends OMClientRequest {
     // way S3Secret created by leader, will be replicated across all
     // OMs. With this approach, original GetS3Secret request from
     // client does not need any proto changes.
-    OMRequest.Builder omRequest = OMRequest.newBuilder()
-        .setUserInfo(getUserInfo())
-        .setCmdType(getOmRequest().getCmdType())
-        .setClientId(getOmRequest().getClientId());
+    final OMRequest.Builder omRequestBuilder = omRequest.toBuilder();
 
     // createIfNotExist defaults to true if not specified.
     boolean createIfNotExist = !s3GetSecretRequest.hasCreateIfNotExist()
@@ -98,7 +95,7 @@ public class S3GetSecretRequest extends OMClientRequest {
                     .setKerberosID(accessId)  // See Note 1 above
                     .setCreateIfNotExist(createIfNotExist)
                     .build();
-    omRequest.setGetS3SecretRequest(newGetS3SecretRequest);
+    omRequestBuilder.setGetS3SecretRequest(newGetS3SecretRequest);
 
     // When createIfNotExist is true, pass UpdateGetS3SecretRequest message;
     // otherwise, just use GetS3SecretRequest message.
@@ -113,14 +110,12 @@ public class S3GetSecretRequest extends OMClientRequest {
                       .setAwsSecret(s3Secret)
                       .build();
 
-      omRequest.setUpdateGetS3SecretRequest(updateGetS3SecretRequest);
+      omRequestBuilder.setUpdateGetS3SecretRequest(updateGetS3SecretRequest);
+    } else {
+      omRequestBuilder.clearUpdateGetS3SecretRequest();
     }
 
-    if (getOmRequest().hasTraceID()) {
-      omRequest.setTraceID(getOmRequest().getTraceID());
-    }
-
-    return omRequest.build();
+    return omRequestBuilder.build();
   }
 
   @Override

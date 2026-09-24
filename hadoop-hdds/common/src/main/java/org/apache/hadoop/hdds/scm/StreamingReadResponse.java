@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
@@ -27,6 +29,11 @@ import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
  */
 public class StreamingReadResponse {
 
+  private final Object readyLock = new Object();
+  /** Set once the call has terminated; guarded by {@link #readyLock}. */
+  private boolean terminated;
+  /** The failure that terminated the call, or null if it completed normally; guarded by {@link #readyLock}. */
+  private Throwable terminationCause;
   private final DatanodeDetails dn;
   private final ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> requestObserver;
   private final String name;
@@ -46,6 +53,51 @@ public class StreamingReadResponse {
 
   public ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> getRequestObserver() {
     return requestObserver;
+  }
+
+  /** Registered as the request stream's {@code onReadyHandler}. */
+  public void signalReady() {
+    synchronized (readyLock) {
+      readyLock.notifyAll();
+    }
+  }
+
+  /**
+   * Called when the call has terminated, so that {@link #awaitReady(long)} fails immediately instead of waiting
+   * for the timeout: a terminated stream never becomes ready and gRPC no longer invokes the {@code onReadyHandler}.
+   *
+   * @param cause the error that terminated the call, or null if it completed normally.
+   */
+  public void signalTerminated(Throwable cause) {
+    synchronized (readyLock) {
+      terminated = true;
+      terminationCause = cause;
+      readyLock.notifyAll();
+    }
+  }
+
+  /**
+   * Wait until the request stream can accept another message.
+   *
+   * @return true if the stream is ready, false if the timeout expired first.
+   * @throws IOException if the call terminated before the stream became ready.
+   */
+  public boolean awaitReady(long timeoutNanos) throws InterruptedException, IOException {
+    final long deadlineNanos = System.nanoTime() + timeoutNanos;
+    synchronized (readyLock) {
+      while (!requestObserver.isReady()) {
+        if (terminated) {
+          throw new IOException("Stream " + name + " terminated while waiting for it to become ready",
+              terminationCause);
+        }
+        final long remainingNanos = deadlineNanos - System.nanoTime();
+        if (remainingNanos <= 0) {
+          return false;
+        }
+        TimeUnit.NANOSECONDS.timedWait(readyLock, remainingNanos);
+      }
+    }
+    return true;
   }
 
   @Override

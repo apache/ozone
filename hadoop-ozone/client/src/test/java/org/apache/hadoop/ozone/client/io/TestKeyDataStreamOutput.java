@@ -227,7 +227,7 @@ class TestKeyDataStreamOutput {
     }
   }
 
-//  @Test - skipped as it fails now
+  @Test
   void hsyncWithBlockErrorDoesNotCallOmHsync() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     // First putBlock will fail
