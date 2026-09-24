@@ -190,6 +190,10 @@ public class QuotaRepairTask {
           = OzoneManagerProtocolProtos.BucketQuotaCount.newBuilder();
       bucketCountBuilder.setVolName(updatedBuckedInfo.getVolumeName());
       bucketCountBuilder.setBucketName(updatedBuckedInfo.getBucketName());
+      // Carry the scanned bucket identity so the apply can drop this delta if
+      // the bucket is deleted and recreated under the same name before the
+      // repair transaction commits.
+      bucketCountBuilder.setBucketObjectID(updatedBuckedInfo.getObjectID());
       bucketCountBuilder.setDiffUsedBytes(updatedBuckedInfo.getUsedBytes() - oriBucketInfo.getUsedBytes());
       bucketCountBuilder.setDiffUsedNamespace(
           updatedBuckedInfo.getUsedNamespace() - oriBucketInfo.getUsedNamespace());
