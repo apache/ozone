@@ -2039,6 +2039,41 @@ public class TestReplicationManager {
   }
 
   @Test
+  public void testInflightReconstructionCountDecrementsWhenAddOpExpires()
+      throws IOException, NodeNotFoundException {
+    rmConf.setReconstructionGlobalLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    mockReplicationCommandCounts(dn -> 0, dn -> 0);
+
+    ContainerInfo container = ReplicationTestUtil.createContainerInfo(
+        repConfig, 1, HddsProtos.LifeCycleState.CLOSED, 10, 20);
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        1L, Collections.emptyList(),
+        ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails(),
+            MockDatanodeDetails.randomDatanodeDetails()),
+        ECUnderReplicationHandler.integers2ByteString(ImmutableList.of(1, 2)),
+        (ECReplicationConfig) repConfig);
+
+    rm.sendThrottledReconstructionCommand(container, cmd);
+    assertEquals(2, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+    assertEquals(1, rm.getInflightReconstructionCount());
+
+    ContainerReplicaOp firstAdd = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        cmd.getTargetDatanodes().get(0), 1, cmd, Long.MAX_VALUE, 0);
+    rm.opCompleted(firstAdd, container.containerID(), true);
+    assertEquals(1, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+    assertEquals(1, rm.getInflightReconstructionCount());
+
+    ContainerReplicaOp secondAdd = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        cmd.getTargetDatanodes().get(1), 2, cmd, Long.MAX_VALUE, 0);
+    rm.opCompleted(secondAdd, container.containerID(), true);
+    assertEquals(0, rm.getReconstructionPendingFragmentCount(cmd.getId()));
+    assertEquals(0, rm.getInflightReconstructionCount());
+  }
+
+  @Test
   public void testReconstructionWithNoFragmentsDoesNotReserveSlot()
       throws NodeNotFoundException, IOException {
     rmConf.setReconstructionGlobalLimit(10);
