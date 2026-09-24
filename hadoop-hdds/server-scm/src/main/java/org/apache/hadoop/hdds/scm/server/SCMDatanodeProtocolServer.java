@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
@@ -400,36 +401,35 @@ public class SCMDatanodeProtocolServer implements
     DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(
         heartbeat.getDatanodeDetails());
     ContainerReportsProto containerReport = heartbeat.getContainerReport();
+    FullContainerReportLeaseProto lease =
+        containerReport.getFullContainerReportLease();
     OptionalLong currentTerm = scmContext == null
         ? OptionalLong.empty() : scmContext.getTermOfLeaderIfReady();
     SCMFullContainerReportLeaseManager.LeaseClaim claim = null;
     if (currentTerm.isPresent()
-        && currentTerm.getAsLong()
-        == containerReport.getFullContainerReportLeaseTerm()) {
+        && currentTerm.getAsLong() == lease.getTerm()) {
       claim = fcrLeaseManager.claimLease(datanodeDetails,
           currentTerm.getAsLong(),
-          containerReport.getFullContainerReportLeaseId());
+          lease.getId());
     } else {
       fcrLeaseManager.recordInvalidLeaseReport();
     }
     if (claim != null) {
-      long leaseId = containerReport.getFullContainerReportLeaseId();
       return new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
           datanodeDetails, containerReport, claim.isRegistrationReport(),
           processed -> fcrLeaseManager.completeLease(
-              datanodeDetails, leaseId, processed), claim::startProcessing);
+              datanodeDetails, lease.getId(), processed),
+          claim::startProcessing);
     }
 
     LOG.warn("Ignoring full container report from datanode {} with invalid "
             + "lease id {} and term {}.", datanodeDetails.getUuidString(),
-        containerReport.getFullContainerReportLeaseId(),
-        containerReport.getFullContainerReportLeaseTerm());
+        lease.getId(), lease.getTerm());
     return null;
   }
 
   private boolean hasFullContainerReportLease(ContainerReportsProto report) {
-    return report.hasFullContainerReportLeaseId()
-        || report.hasFullContainerReportLeaseTerm();
+    return report.hasFullContainerReportLease();
   }
 
   private void addFCRLeaseIfRequested(SCMHeartbeatRequestProto heartbeat,
@@ -448,8 +448,10 @@ public class SCMDatanodeProtocolServer implements
     long leaseId = fcrLeaseManager.requestLease(datanodeDetails,
         term.getAsLong());
     if (leaseId != 0) {
-      builder.setFullContainerReportLeaseId(leaseId)
-          .setFullContainerReportLeaseTerm(term.getAsLong());
+      builder.setFullContainerReportLease(
+          FullContainerReportLeaseProto.newBuilder()
+              .setId(leaseId)
+              .setTerm(term.getAsLong()));
     }
   }
 

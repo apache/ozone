@@ -700,22 +700,22 @@ public class TestStorageContainerManager {
       do {
         first = requestFullContainerReportLease(
             scm, datanodes.get(0).getDatanodeDetails());
-        if (!first.hasFullContainerReportLeaseId()) {
+        if (!first.hasFullContainerReportLease()) {
           Thread.sleep(100L);
         }
-      } while (!first.hasFullContainerReportLeaseId()
+      } while (!first.hasFullContainerReportLease()
           && System.nanoTime() < deadline);
       SCMHeartbeatResponseProto second = requestFullContainerReportLease(
           scm, datanodes.get(1).getDatanodeDetails());
 
-      assertTrue(first.hasFullContainerReportLeaseId());
-      assertFalse(second.hasFullContainerReportLeaseId());
+      assertTrue(first.hasFullContainerReportLease());
+      assertFalse(second.hasFullContainerReportLease());
 
       Thread.sleep(1_100L);
 
       SCMHeartbeatResponseProto afterExpiry = requestFullContainerReportLease(
           scm, datanodes.get(1).getDatanodeDetails());
-      assertTrue(afterExpiry.hasFullContainerReportLeaseId());
+      assertTrue(afterExpiry.hasFullContainerReportLease());
     }
   }
 

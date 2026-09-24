@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
@@ -57,8 +58,7 @@ public class EndpointStateMachine
   private VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
   private boolean isPassive;
-  private long fullContainerReportLeaseId;
-  private long fullContainerReportLeaseTerm;
+  private FullContainerReportLeaseProto fullContainerReportLease;
   private final ExecutorService executorService;
 
   private static final String RECON_TYPE = "Recon";
@@ -124,29 +124,27 @@ public class EndpointStateMachine
   }
 
   public boolean hasFullContainerReportLease() {
-    return fullContainerReportLeaseId != 0;
+    return fullContainerReportLease != null;
   }
 
-  public long getFullContainerReportLeaseId() {
-    return fullContainerReportLeaseId;
+  public void setFullContainerReportLease(
+      FullContainerReportLeaseProto lease) {
+    fullContainerReportLease = lease;
   }
 
-  public long getFullContainerReportLeaseTerm() {
-    return fullContainerReportLeaseTerm;
-  }
-
-  public void setFullContainerReportLease(long leaseId, long leaseTerm) {
-    this.fullContainerReportLeaseId = leaseId;
-    this.fullContainerReportLeaseTerm = leaseTerm;
+  public FullContainerReportLeaseProto takeFullContainerReportLease() {
+    FullContainerReportLeaseProto lease = fullContainerReportLease;
+    fullContainerReportLease = null;
+    return lease;
   }
 
   public void clearFullContainerReportLease() {
-    fullContainerReportLeaseId = 0;
-    fullContainerReportLeaseTerm = 0;
+    fullContainerReportLease = null;
   }
 
   public void clearFullContainerReportLeaseIfStale(long term) {
-    if (hasFullContainerReportLease() && term > fullContainerReportLeaseTerm) {
+    if (hasFullContainerReportLease()
+        && term > fullContainerReportLease.getTerm()) {
       clearFullContainerReportLease();
     }
   }

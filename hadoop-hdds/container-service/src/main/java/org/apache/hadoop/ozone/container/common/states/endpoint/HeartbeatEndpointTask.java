@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -154,7 +155,7 @@ public class HeartbeatEndpointTask
           .sendHeartbeat(request);
       if (response.getFullContainerReportLeaseRejected()
           && request.hasContainerReport()
-          && request.getContainerReport().hasFullContainerReportLeaseId()) {
+          && request.getContainerReport().hasFullContainerReportLease()) {
         context.putBackFullContainerReport(rpcEndpoint.getAddress());
       }
       processResponse(response, datanodeDetailsProto);
@@ -165,7 +166,7 @@ public class HeartbeatEndpointTask
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
       if (requestBuilder.hasContainerReport()
-          && requestBuilder.getContainerReport().hasFullContainerReportLeaseId()) {
+          && requestBuilder.getContainerReport().hasFullContainerReportLease()) {
         context.putBackFullContainerReport(rpcEndpoint.getAddress());
       }
       rpcEndpoint.logIfNeeded(ex);
@@ -248,17 +249,14 @@ public class HeartbeatEndpointTask
   }
 
   private Message attachFullContainerReportLease(Message report) {
-    if (report instanceof ContainerReportsProto
-        && rpcEndpoint.hasFullContainerReportLease()) {
-      ContainerReportsProto leasedReport = ((ContainerReportsProto) report)
-          .toBuilder()
-          .setFullContainerReportLeaseId(
-              rpcEndpoint.getFullContainerReportLeaseId())
-          .setFullContainerReportLeaseTerm(
-              rpcEndpoint.getFullContainerReportLeaseTerm())
-          .build();
-      rpcEndpoint.clearFullContainerReportLease();
-      return leasedReport;
+    if (report instanceof ContainerReportsProto) {
+      FullContainerReportLeaseProto lease =
+          rpcEndpoint.takeFullContainerReportLease();
+      if (lease != null) {
+        return ((ContainerReportsProto) report).toBuilder()
+            .setFullContainerReportLease(lease)
+            .build();
+      }
     }
     return report;
   }
@@ -339,11 +337,10 @@ public class HeartbeatEndpointTask
       rpcEndpoint.clearFullContainerReportLeaseIfStale(response.getTerm());
       context.updateTermOfLeaderSCM(response.getTerm());
     }
-    if (response.hasFullContainerReportLeaseId()
-        && response.getFullContainerReportLeaseId() != 0) {
+    if (response.hasFullContainerReportLease()
+        && response.getFullContainerReportLease().getId() != 0) {
       rpcEndpoint.setFullContainerReportLease(
-          response.getFullContainerReportLeaseId(),
-          response.getFullContainerReportLeaseTerm());
+          response.getFullContainerReportLease());
     }
     // Verify the response is indeed for this datanode.
     for (SCMCommandProto commandResponseProto : response.getCommandsList()) {

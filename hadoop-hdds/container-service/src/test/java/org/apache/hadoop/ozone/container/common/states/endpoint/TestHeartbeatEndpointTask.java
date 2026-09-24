@@ -46,6 +46,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -287,8 +288,10 @@ public class TestHeartbeatEndpointTask {
                     ((SCMHeartbeatRequestProto)invocation.getArgument(0))
                         .getDatanodeDetails().getUuid())
                 .setTerm(7L)
-                .setFullContainerReportLeaseId(99L)
-                .setFullContainerReportLeaseTerm(7L)
+                .setFullContainerReportLease(
+                    FullContainerReportLeaseProto.newBuilder()
+                        .setId(99L)
+                        .setTerm(7L))
                 .build());
 
     DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()
@@ -329,9 +332,9 @@ public class TestHeartbeatEndpointTask {
     SCMHeartbeatRequestProto secondHeartbeat = argument.getValue();
     assertTrue(secondHeartbeat.hasContainerReport());
     assertEquals(99L, secondHeartbeat.getContainerReport()
-        .getFullContainerReportLeaseId());
+        .getFullContainerReportLease().getId());
     assertEquals(7L, secondHeartbeat.getContainerReport()
-        .getFullContainerReportLeaseTerm());
+        .getFullContainerReportLease().getTerm());
     assertFalse(secondHeartbeat.getRequestFullContainerReportLease());
   }
 
@@ -427,7 +430,11 @@ public class TestHeartbeatEndpointTask {
         .setVersion(1)
         .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString())
         .build());
-    endpointStateMachine.setFullContainerReportLease(99L, 7L);
+    endpointStateMachine.setFullContainerReportLease(
+        FullContainerReportLeaseProto.newBuilder()
+            .setId(99L)
+            .setTerm(7L)
+            .build());
     HDDSLayoutVersionManager layoutVersionManager =
         mock(HDDSLayoutVersionManager.class);
     when(layoutVersionManager.getSoftwareLayoutVersion())
@@ -491,7 +498,11 @@ public class TestHeartbeatEndpointTask {
         .setVersion(1)
         .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString())
         .build());
-    endpointStateMachine.setFullContainerReportLease(99L, 7L);
+    endpointStateMachine.setFullContainerReportLease(
+        FullContainerReportLeaseProto.newBuilder()
+            .setId(99L)
+            .setTerm(7L)
+            .build());
     HDDSLayoutVersionManager layoutVersionManager =
         mock(HDDSLayoutVersionManager.class);
     when(layoutVersionManager.getSoftwareLayoutVersion())
