@@ -364,7 +364,7 @@ jobs:
     if: |
       needs.build-info.outputs.test-classes != '' &&
       needs.build-info.outputs.needs-integration-tests != 'true'
-    uses: ./.github/workflows/check.yml
+    uses: $/.github/workflows/check.yml
     secrets:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
