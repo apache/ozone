@@ -1565,6 +1565,24 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
+  public void testUpdateJobStatusToDoneSkipsSupersededJob() throws IOException {
+    SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
+    String liveJobId = UUID.randomUUID().toString();
+    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey,
+        new SnapshotDiffJob(0L, liveJobId, IN_PROGRESS, ctx.volumeName, ctx.bucketName,
+            ctx.fromSnapshotName, ctx.toSnapshotName, false, false, 0L, null, 0.0, null));
+
+    // A superseded task's publish is ignored, the live job's own publish goes through.
+    snapshotDiffManager.updateJobStatusToDone(ctx.diffJobKey, UUID.randomUUID().toString(), 5L, "staleKey");
+    assertEquals(IN_PROGRESS, snapshotDiffManager.getSnapDiffJobTable().get(ctx.diffJobKey).getStatus());
+
+    snapshotDiffManager.updateJobStatusToDone(ctx.diffJobKey, liveJobId, 5L, "liveKey");
+    SnapshotDiffJob done = snapshotDiffManager.getSnapDiffJobTable().get(ctx.diffJobKey);
+    assertEquals(DONE, done.getStatus());
+    assertEquals("liveKey", done.getLargestEntryKey());
+  }
+
+  @Test
   public void testSubmitSnapshotDiffResubmitsWhenPreviouslyRejected()
       throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
