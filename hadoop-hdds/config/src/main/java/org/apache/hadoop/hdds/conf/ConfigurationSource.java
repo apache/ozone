@@ -157,6 +157,14 @@ public interface ConfigurationSource {
   }
 
   /**
+   * Returns whether a property has an explicitly configured value.
+   * By default, any non-null value is explicit; implementations may distinguish default resources.
+   */
+  default boolean isExplicitlySet(String key) {
+    return get(key) != null;
+  }
+
+  /**
    * Create a Configuration object and inject the required configuration values.
    *
    * @param configurationClass The class where the fields are annotated with

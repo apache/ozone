@@ -34,23 +34,18 @@ public enum ValidationCondition {
    * Classifies validations that has to run after an upgrade until the cluster
    * is in a pre-finalized state.
    */
-  CLUSTER_NEEDS_FINALIZATION {
-    @Override
-    public boolean shouldApply(OMRequest req, ValidationContext ctx) {
-      return ctx.versionManager().needsFinalization();
-    }
-  },
+  CLUSTER_NEEDS_FINALIZATION,
 
   /**
    * Classifies validations that has to run, when the client uses an older
    * protocol version than the server.
    */
-  OLDER_CLIENT_REQUESTS {
-    @Override
-    public boolean shouldApply(OMRequest req, ValidationContext ctx) {
-      return req.getVersion() < ClientVersion.CURRENT_VERSION;
-    }
-  };
+  OLDER_CLIENT_REQUESTS;
 
-  public abstract boolean shouldApply(OMRequest req, ValidationContext ctx);
+  public boolean shouldApply(OMRequest req, ValidationContext ctx) {
+    return switch (this) {
+    case CLUSTER_NEEDS_FINALIZATION -> ctx.versionManager().needsFinalization();
+    case OLDER_CLIENT_REQUESTS -> req.getVersion() < ClientVersion.CURRENT_VERSION;
+    };
+  }
 }

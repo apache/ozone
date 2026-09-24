@@ -128,8 +128,15 @@ public final class S3Consts {
   // tag limit for bucket
   public static final int TAG_BUCKET_NUM_LIMIT = 50;
 
-  /** Request header carrying the list of object attributes to return. */
+  // Request header carrying the list of object attributes to return.
   public static final String OBJECT_ATTRIBUTES_HEADER = "x-amz-object-attributes";
+
+  // Pagination headers for GetObjectAttributes ObjectParts.
+  public static final String MAX_PARTS_HEADER = "x-amz-max-parts";
+  public static final String PART_NUMBER_MARKER_HEADER = "x-amz-part-number-marker";
+
+  // Maximum number of parts returned in one GetObjectAttributes response.
+  public static final int GET_OBJECT_ATTRIBUTES_MAX_PARTS_LIMIT = 1000;
 
   //Never Constructed
   private S3Consts() {
