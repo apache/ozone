@@ -86,6 +86,7 @@ public class ContainerReportQueue
             dataList.remove(i);
             --capacity;
             droppedCount.incrementAndGet();
+            reportInfo.complete(false);
             isReportRemoved = true;
             break;
           }
@@ -312,6 +313,9 @@ public class ContainerReportQueue
   @Override
   public void clear() {
     synchronized (this) {
+      dataMap.values().stream()
+          .flatMap(Collection::stream)
+          .forEach(report -> report.complete(false));
       orderingQueue.clear();
       dataMap.clear();
       capacity = 0;

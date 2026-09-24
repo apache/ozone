@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
@@ -225,6 +226,27 @@ public class TestStateContext {
         StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME);
     expectedReportCount.remove(
         StateContext.CONTAINER_REPORTS_PROTO_NAME);
+  }
+
+  @Test
+  public void testPutBackFullContainerReportForOneEndpoint()
+      throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9002);
+    context.addEndpoint(scm1);
+    context.addEndpoint(scm2);
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+
+    context.getAllAvailableReports(scm1);
+    context.getAllAvailableReports(scm2);
+    assertFalse(context.isFullContainerReportReady(scm1));
+    assertFalse(context.isFullContainerReportReady(scm2));
+
+    context.putBackFullContainerReport(scm1);
+
+    assertTrue(context.isFullContainerReportReady(scm1));
+    assertFalse(context.isFullContainerReportReady(scm2));
   }
 
   void batchRefreshfullReports(StateContext ctx, String reportName, int count) {

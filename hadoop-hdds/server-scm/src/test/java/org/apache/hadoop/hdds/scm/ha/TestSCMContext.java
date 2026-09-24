@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.OptionalLong;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.junit.jupiter.api.Test;
 
@@ -38,16 +39,19 @@ public class TestSCMContext {
 
     // become leader
     scmContext.updateLeaderAndTerm(true, 10);
+    assertEquals(OptionalLong.empty(), scmContext.getTermOfLeaderIfReady());
     scmContext.setLeaderReady();
     assertTrue(scmContext.isLeader());
     assertTrue(scmContext.isLeaderReady());
     assertEquals(scmContext.getTermOfLeader(), 10);
+    assertEquals(OptionalLong.of(10), scmContext.getTermOfLeaderIfReady());
 
 
     // step down
     scmContext.updateLeaderAndTerm(false, 0);
     assertFalse(scmContext.isLeader());
     assertFalse(scmContext.isLeaderReady());
+    assertEquals(OptionalLong.empty(), scmContext.getTermOfLeaderIfReady());
   }
 
   @Test
