@@ -43,7 +43,7 @@ import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
@@ -68,15 +68,15 @@ public class TestStorageContainerServiceProviderImpl {
       @Override
       protected void configure() {
         try {
-          StorageContainerLocationProtocol mockScmClient = mock(
-              StorageContainerLocationProtocol.class);
+          StorageContainerLocationInternalInterface mockScmClient = mock(
+              StorageContainerLocationInternalInterface.class);
           ReconUtils reconUtils =  new ReconUtils();
           OzoneConfiguration conf = new OzoneConfiguration();
           conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getPath());
           pipelineID = PipelineID.randomId().getProtobuf();
           when(mockScmClient.getPipeline(pipelineID))
               .thenReturn(mock(Pipeline.class));
-          bind(StorageContainerLocationProtocol.class)
+          bind(StorageContainerLocationInternalInterface.class)
               .toInstance(mockScmClient);
           bind(StorageContainerServiceProvider.class)
               .to(StorageContainerServiceProviderImpl.class);
@@ -94,8 +94,8 @@ public class TestStorageContainerServiceProviderImpl {
   public void testGetPipelines() throws IOException {
     StorageContainerServiceProvider scmProvider =
         injector.getInstance(StorageContainerServiceProvider.class);
-    StorageContainerLocationProtocol scmClient =
-        injector.getInstance(StorageContainerLocationProtocol.class);
+    StorageContainerLocationInternalInterface scmClient =
+        injector.getInstance(StorageContainerLocationInternalInterface.class);
     scmProvider.getPipelines();
     verify(scmClient, times(1)).listPipelines();
   }
@@ -104,8 +104,8 @@ public class TestStorageContainerServiceProviderImpl {
   public void testGetPipeline() throws IOException {
     StorageContainerServiceProvider scmProvider =
         injector.getInstance(StorageContainerServiceProvider.class);
-    StorageContainerLocationProtocol scmClient =
-        injector.getInstance(StorageContainerLocationProtocol.class);
+    StorageContainerLocationInternalInterface scmClient =
+        injector.getInstance(StorageContainerLocationInternalInterface.class);
     Pipeline pipeline = scmProvider.getPipeline(pipelineID);
     assertNotNull(pipeline);
     verify(scmClient, times(1))
@@ -120,8 +120,8 @@ public class TestStorageContainerServiceProviderImpl {
   public void testGetSCMDBSnapshotConnectsToLeader() throws Exception {
     StorageContainerServiceProvider scmProvider =
         injector.getInstance(StorageContainerServiceProvider.class);
-    StorageContainerLocationProtocol scmClient =
-        injector.getInstance(StorageContainerLocationProtocol.class);
+    StorageContainerLocationInternalInterface scmClient =
+        injector.getInstance(StorageContainerLocationInternalInterface.class);
 
     when(scmClient.getScmInfo()).thenReturn(new ScmInfo.Builder()
         .setClusterId("CID-6a1b5b1e-3f5a-4b5c-8f6d-2a1c3e4f5a6b")

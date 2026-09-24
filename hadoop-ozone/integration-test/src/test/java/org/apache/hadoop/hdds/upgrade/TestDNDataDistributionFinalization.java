@@ -33,7 +33,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -66,7 +66,7 @@ public class TestDNDataDistributionFinalization {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestDNDataDistributionFinalization.class);
 
-  private StorageContainerLocationProtocol scmClient;
+  private StorageContainerLocationInternalInterface scmClient;
   private MiniOzoneHAClusterImpl cluster;
 
   private static final int NUM_DATANODES = 3;
