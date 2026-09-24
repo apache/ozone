@@ -207,7 +207,8 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Verifies that malformed SCM addresses during completion callbacks are caught and logged without breaking existing proxies.
+   * Verifies that malformed SCM addresses during completion callbacks are caught
+   * and logged without breaking existing proxies.
    */
   @Test
   void testReloadScmProxiesOnReconfigCatchesMalformedAddress() {
@@ -286,7 +287,8 @@ public class TestOmSCMNodesReconfiguration {
         new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
     String originalValue = conf.get(scmNodesKey);
 
-    // Addresses with existing ports form invalid authorities, throwing IllegalArgumentException over ConfigurationException.
+    // Addresses with existing ports form invalid authorities,
+    // throwing IllegalArgumentException over ConfigurationException.
     conf.set(newAddrKey, "127.0.0.1:9999");
     List<String> withBadAddress = new ArrayList<>(before);
     withBadAddress.add(newNodeId);
@@ -303,7 +305,8 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Verifies that adding an SCM before setting its address rolls back initially, then succeeds when retried after setting the address.
+   * Verifies that adding an SCM before setting its address rolls back initially,
+   * then succeeds when retried after setting the address.
    */
   @Test
   void testReconfigureAddScmNodeNodesBeforeAddress() throws Exception {
