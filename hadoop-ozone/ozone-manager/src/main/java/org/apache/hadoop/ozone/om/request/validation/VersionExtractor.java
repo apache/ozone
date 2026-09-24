@@ -40,8 +40,8 @@ public enum VersionExtractor {
   public Versioned extractVersion(OMRequest req, ValidationContext ctx) {
     return switch (this) {
     case LAYOUT_VERSION_EXTRACTOR -> {
-      LayoutVersionManager layoutVersionManager = ctx.versionManager();
-      yield ctx.versionManager().getFeature(layoutVersionManager.getMetadataLayoutVersion());
+      LayoutVersionManager versionManager = ctx.versionManager();
+      yield versionManager.getFeature(versionManager.getMetadataLayoutVersion());
     }
     case CLIENT_VERSION_EXTRACTOR -> req.getVersion() > ClientVersion.CURRENT_VERSION
         ? ClientVersion.FUTURE_VERSION
