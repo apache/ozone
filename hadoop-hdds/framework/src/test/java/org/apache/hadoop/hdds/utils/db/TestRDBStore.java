@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -32,12 +33,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -257,6 +265,73 @@ public class TestRDBStore {
     checkpoint.cleanupCheckpoint();
     assertFalse(Files.exists(
         checkpoint.getCheckpointLocation()));
+  }
+
+  @Test
+  public void testCheckpointAfterManagerClose(@TempDir File cpDir) throws Exception {
+    insertRandomData(rdbStore, 1);
+    RDBCheckpointManager manager = new RDBCheckpointManager(rdbStore.getDb(), "test");
+    manager.close();
+
+    RocksDBCheckpoint checkpoint = manager.createCheckpoint(cpDir.getAbsolutePath());
+    assertNotNull(checkpoint);
+    assertTrue(Files.exists(checkpoint.getCheckpointLocation()));
+  }
+
+  @Test
+  public void testCheckpointAfterCloseReturnsNull(@TempDir File cpDir) throws Exception {
+    insertRandomData(rdbStore, 1);
+    rdbStore.close();
+
+    assertNull(rdbStore.getCheckpoint(cpDir.getAbsolutePath(), false));
+  }
+
+  @Test
+  public void testCheckpointConcurrentWithClose(@TempDir File cpRoot) throws Exception {
+    insertRandomData(rdbStore, 1);
+    CountDownLatch firstCheckpoint = new CountDownLatch(1);
+    AtomicInteger attempts = new AtomicInteger();
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> checkpointer = executor.submit(() -> {
+        while (!rdbStore.isClosed()) {
+          File parent = new File(cpRoot, "cp-" + attempts.incrementAndGet());
+          assertTrue(parent.mkdirs());
+          rdbStore.getCheckpoint(parent.getAbsolutePath(), false);
+          firstCheckpoint.countDown();
+        }
+        return null;
+      });
+
+      assertTrue(firstCheckpoint.await(10, TimeUnit.SECONDS));
+      rdbStore.close();
+
+      checkpointer.get(30, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testConcurrentCheckpoints(@TempDir File cpRoot) throws Exception {
+    insertRandomData(rdbStore, 1);
+    int threads = 4;
+    ExecutorService executor = Executors.newFixedThreadPool(threads);
+    try {
+      List<Future<DBCheckpoint>> futures = new ArrayList<>();
+      for (int i = 0; i < threads; i++) {
+        File parent = new File(cpRoot, "cp-" + i);
+        assertTrue(parent.mkdirs());
+        futures.add(executor.submit(() -> rdbStore.getCheckpoint(parent.getAbsolutePath(), false)));
+      }
+      for (Future<DBCheckpoint> future : futures) {
+        DBCheckpoint checkpoint = future.get(30, TimeUnit.SECONDS);
+        assertNotNull(checkpoint);
+        assertTrue(Files.exists(checkpoint.getCheckpointLocation()));
+      }
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @Test

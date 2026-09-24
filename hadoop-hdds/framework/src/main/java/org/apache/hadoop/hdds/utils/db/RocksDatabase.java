@@ -239,34 +239,15 @@ public final class RocksDatabase implements Closeable {
     return isClosed.get();
   }
 
-  /**
-   * Represents a checkpoint of the db.
-   *
-   * @see ManagedCheckpoint
-   */
-  final class RocksCheckpoint implements Closeable {
-    private final ManagedCheckpoint checkpoint;
-
-    private RocksCheckpoint() {
-      this.checkpoint = ManagedCheckpoint.create(db);
-    }
-
-    public void createCheckpoint(Path path) throws RocksDatabaseException {
-      try (UncheckedAutoCloseable ignored = acquire()) {
-        checkpoint.get().createCheckpoint(path.toString());
-      } catch (RocksDBException e) {
-        closeOnError(e);
-        throw toRocksDatabaseException(this, "createCheckpoint " + path, e);
-      }
-    }
-
-    public long getLatestSequenceNumber() throws RocksDatabaseException {
-      return RocksDatabase.this.getLatestSequenceNumber();
-    }
-
-    @Override
-    public void close() throws RocksDatabaseException {
-      checkpoint.close();
+  /** @return the latest sequence number after the checkpoint is created. */
+  long createCheckpoint(Path path) throws RocksDatabaseException {
+    try (UncheckedAutoCloseable ignored = acquire();
+        ManagedCheckpoint checkpoint = ManagedCheckpoint.create(db)) {
+      checkpoint.get().createCheckpoint(path.toString());
+      return db.get().getLatestSequenceNumber();
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      throw toRocksDatabaseException(this, "createCheckpoint " + path, e);
     }
   }
 
@@ -595,10 +576,6 @@ public final class RocksDatabase implements Closeable {
     try (UncheckedAutoCloseable ignored = acquire()) {
       return db.get().getLiveFilesMetaData();
     }
-  }
-
-  RocksCheckpoint createCheckpoint() {
-    return new RocksCheckpoint();
   }
 
   /**
