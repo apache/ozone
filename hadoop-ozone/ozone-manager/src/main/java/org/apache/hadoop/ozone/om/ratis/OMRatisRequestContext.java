@@ -97,7 +97,7 @@ public final class OMRatisRequestContext implements AutoCloseable {
     Objects.requireNonNull(ozoneManager, "ozoneManager");
     OMRequest.Builder requestBuilder = request.toBuilder()
         .setUserInfo(OMClientRequest.getAuthenticatedUserInfo(request));
-    S3AuthenticationContext.captureInto(requestBuilder);
+    S3AuthenticationContext.captureInto(requestBuilder, ozoneManager);
     return requestBuilder.build();
   }
 

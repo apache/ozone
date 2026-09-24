@@ -2435,6 +2435,9 @@ message S3Authentication {
     // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
     // in finer-grained STS permissions.
     optional string s3Action = 10;
+    // Resolved so GetCallerIdentity can return the assumed-role identity from the session token.
+    optional string resolvedStsAssumedRoleId = 11;
+    optional string resolvedStsAssumedRoleUserArn = 12;
 }
 
 message RecoverLeaseRequest {

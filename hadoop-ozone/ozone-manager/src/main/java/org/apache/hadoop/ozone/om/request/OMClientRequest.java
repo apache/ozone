@@ -56,7 +56,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutV
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.S3AuthenticationContext;
-import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -129,19 +128,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
 
     if (requestBuilder.hasS3Authentication()) {
-      final OzoneManagerProtocolProtos.S3Authentication s3Auth = requestBuilder.getS3Authentication();
-      final boolean hasSessionToken = s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty();
-      final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
-
-      // This should not happen, so explicitly throw an error.  An existing sessionToken
-      // implies prior STS validation must have populated the ThreadLocal.
-      if (ozoneManager.isSecurityEnabled() && hasSessionToken && stsTokenIdentifier == null) {
-        throw new OMException(
-            "S3Authentication has session token but no STS token identifier in OzoneManager ThreadLocal",
-            OMException.ResultCodes.INVALID_REQUEST);
-      }
-
-      S3AuthenticationContext.captureInto(requestBuilder);
+      S3AuthenticationContext.captureInto(requestBuilder, ozoneManager);
     }
 
     omRequest = requestBuilder.build();
