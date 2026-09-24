@@ -152,6 +152,39 @@ public class TestStreamBlockInputStream {
   }
 
   @Test
+  public void testPositionedReadDoesNotReleasePermitWhenInitStreamReadFails() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setMaxReadRetryCount(0);
+    BlockID blockID = new BlockID(1L, 18L);
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(invocation -> {
+      StreamingReaderSpi reader = invocation.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      throw new IOException("initStreamRead failed");
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+    doNothing().when(xceiverClientFactory).releaseClientForReadData(any(), anyBoolean());
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, 64L, pipeline, null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer dst = ByteBuffer.allocate(16);
+      assertThrows(IOException.class, () -> sbis.readPositioned(0, dst));
+    }
+
+    verify(xceiverClient, never()).completeStreamRead();
+    verify(requestObserver, times(1)).onCompleted();
+  }
+
+  @Test
   public void testConcurrentPositionedRead() throws Exception {
     byte[] data = TestChunkInputStream.generateRandomData(SOURCE_SIZE);
     try (StreamBlockInputStream sbis = newStreamForData(data)) {

@@ -229,8 +229,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     try {
       final OneShotReader reader = new OneShotReader(client);
       readerRef.set(reader);
-      client.initStreamRead(blockID, reader, failedStreamingDatanodes);
+      boolean streamInitialized = false;
       try {
+        client.initStreamRead(blockID, reader, failedStreamingDatanodes);
+        streamInitialized = true;
         final StreamingReadResponse response = reader.getResponse();
         if (response == null) {
           throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
@@ -255,15 +257,17 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
         return copied > 0 ? copied : EOF;
       } finally {
-        closePreadReader(reader);
+        closePreadReader(reader, streamInitialized);
       }
     } finally {
       factory.releaseClientForReadData(client, false);
     }
   }
 
-  private void closePreadReader(OneShotReader reader) {
-    reader.onCompleted();
+  private void closePreadReader(OneShotReader reader, boolean releasePermit) {
+    if (releasePermit) {
+      reader.onCompleted();
+    }
     final StreamingReadResponse response = reader.getResponse();
     if (response == null) {
       return;
@@ -626,7 +630,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
    * positioned reads.
    */
   abstract class AbstractStreamingReader implements StreamingReaderSpi {
-    private final String name = StreamBlockInputStream.this.name + "-reader" + READER_ID.getAndIncrement();
+    private final String name =
+        StreamBlockInputStream.this.name + "-reader" + READER_ID.getAndIncrement();
 
     /** Response queue: poll is blocking while offer is non-blocking. */
     private final BlockingQueue<ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>();
