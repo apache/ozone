@@ -2297,6 +2297,7 @@
               <prefix>$HDDS_LIB_JARS_DIR</prefix>
               <outputFilterFile>true</outputFilterFile>
               <includeScope>runtime</includeScope>
+              <excludeArtifactIds>infer-annotation</excludeArtifactIds>
               <skip>${classpath.skip}</skip>
             </configuration>
           </execution>
@@ -2310,6 +2311,7 @@
               <outputDirectory>${project.build.directory}/share/ozone/lib</outputDirectory>
               <includeScope>runtime</includeScope>
               <skip>${classpath.skip}</skip>
+              <excludeArtifactIds>infer-annotation</excludeArtifactIds>
             </configuration>
           </execution>
         </executions>
