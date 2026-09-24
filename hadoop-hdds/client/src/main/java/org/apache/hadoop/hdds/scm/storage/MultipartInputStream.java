@@ -197,40 +197,19 @@ public class MultipartInputStream extends ExtendedInputStream {
   @Override
   public boolean readFully(long position, ByteBuffer buffer) throws IOException {
     if (isStreamBlockInputStream) {
-      return readFullyStreamBlock(position, buffer);
+      return readFullyStatelessStreamBlock(position, buffer);
     }
     return readFullyStateless(position, buffer);
   }
 
   /**
-   * Positioned read for the StreamBlock path. This emulates a positioned read
-   * with seek-read-restore on the shared stream cursor, so it is synchronized
-   * to keep concurrent callers from corrupting each other's position.
+   * Stateless positioned read for the StreamBlock path. Routes the read across part
+   * {@link StreamBlockInputStream}s without seeking or mutating the shared cursor.
    */
-  private synchronized boolean readFullyStreamBlock(long position,
-      ByteBuffer buffer) throws IOException {
-    final long oldPos = getPos();
-    seek(position);
-    try {
-      int remainingBeforeRead = buffer.remaining();
-      if (remainingBeforeRead == 0) {
-        return true;
-      }
-      read(new ByteBufferReader(buffer) {
-        @Override
-        int readImpl(InputStream inputStream) throws IOException {
-          return Preconditions.assertInstanceOf(inputStream, StreamBlockInputStream.class)
-              .readFully(getBuffer(), false);
-        }
-      });
-      if (remainingBeforeRead - buffer.remaining() == 0) {
-        throw new EOFException("EOF encountered at pos: " + position +
-            " for key: " + key);
-      }
-    } finally {
-      seek(oldPos);
-    }
-    return true;
+  private boolean readFullyStatelessStreamBlock(long position, ByteBuffer buffer) throws IOException {
+    return readFullyStatelessAtParts(position, buffer,
+        (index, partOffset, dst) ->
+            ((StreamBlockInputStream) partStreams.get(index)).readPositioned(partOffset, dst));
   }
 
   /**
@@ -248,6 +227,20 @@ public class MultipartInputStream extends ExtendedInputStream {
     if (!statelessPositionedReadSupported) {
       return false;
     }
+    return readFullyStatelessAtParts(position, buffer,
+        (index, partOffset, dst) ->
+            ((BlockInputStream) partStreams.get(index)).readPositioned(partOffset, dst));
+  }
+
+  /**
+   * Shared stateless positioned-read loop across parts. {@code partReader} reads from
+   * the part at {@code index} starting at {@code partOffset}.
+   */
+  private boolean readFullyStatelessAtParts(long position, ByteBuffer buffer,
+      PartPositionedReader partReader) throws IOException {
+    if (!buffer.hasRemaining()) {
+      return true;
+    }
 
     long pos = position;
     int bytesRead = 0;
@@ -260,9 +253,8 @@ public class MultipartInputStream extends ExtendedInputStream {
             " for key: " + key);
       }
       int idx = binarySearchOffsetIndex(partOffsets, pos);
-      BlockInputStream part = (BlockInputStream) partStreams.get(idx);
       long partPos = pos - partOffsets[idx];
-      int n = part.readPositioned(partPos, buffer);
+      int n = partReader.readPositioned(idx, partPos, buffer);
       if (n <= 0) {
         if (bytesRead > 0) {
           return true;
@@ -274,6 +266,11 @@ public class MultipartInputStream extends ExtendedInputStream {
       pos += n;
     }
     return true;
+  }
+
+  @FunctionalInterface
+  private interface PartPositionedReader {
+    int readPositioned(int index, long partOffset, ByteBuffer buffer) throws IOException;
   }
 
   static int binarySearchOffsetIndex(long[] offsets, long pos) {

@@ -21,7 +21,13 @@ import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.primitives.Bytes;
 import java.nio.ByteBuffer;
@@ -41,6 +47,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.junit.jupiter.api.Test;
+import org.mockito.invocation.InvocationOnMock;
 
 /**
  * Tests for {@link MultipartInputStream}'s functionality.
@@ -74,6 +81,49 @@ public class TestMultipartInputStream {
   }
 
   @Test
+  public void testStreamBlockPositionedReadPartialAtEof() throws Exception {
+    int fileLen = 1024;
+    byte[] partData = generateRandomData(fileLen);
+    StreamBlockInputStream part = stubStreamBlockPart(partData);
+    try (MultipartInputStream multipartStream =
+        new MultipartInputStream("test-key", Collections.singletonList(part))) {
+      multipartStream.initialize();
+      assertTrue(multipartStream.isStreamBlockInputStream());
+      int position = 12;
+      int expectedBytes = fileLen - position;
+      ByteBuffer buffer = ByteBuffer.allocate(expectedBytes * 2);
+      assertTrue(multipartStream.readFully(position, buffer));
+      assertEquals(expectedBytes, buffer.position());
+      verify(part, never()).seek(anyLong());
+    }
+  }
+
+  @Test
+  public void testStreamBlockConcurrentPositionedRead() throws Exception {
+    byte[] part0Data = generateRandomData(PART_SIZE);
+    byte[] part1Data = generateRandomData(PART_SIZE);
+    byte[] keyData = Bytes.concat(part0Data, part1Data);
+
+    StreamBlockInputStream part0 = stubStreamBlockPart(part0Data);
+    StreamBlockInputStream part1 = stubStreamBlockPart(part1Data);
+    List<StreamBlockInputStream> parts = new ArrayList<>();
+    parts.add(part0);
+    parts.add(part1);
+    try (MultipartInputStream multipartStream = new MultipartInputStream("test-key", parts)) {
+      multipartStream.initialize();
+      assertTrue(multipartStream.isStreamBlockInputStream());
+      PositionedReadTestHelper.runConcurrentPositionedReads(keyData,
+          (offset, buf) -> {
+            if (!multipartStream.readFully(offset, buf)) {
+              throw new AssertionError("stateless readFully returned false at " + offset);
+            }
+          });
+      verify(part0, never()).seek(anyLong());
+      verify(part1, never()).seek(anyLong());
+    }
+  }
+
+  @Test
   public void testConcurrentPositionedRead() throws Exception {
     byte[] part0Data = generateRandomData(PART_SIZE);
     byte[] part1Data = generateRandomData(PART_SIZE);
@@ -103,6 +153,25 @@ public class TestMultipartInputStream {
             }
           });
     }
+  }
+
+  private static StreamBlockInputStream stubStreamBlockPart(byte[] partData) throws Exception {
+    StreamBlockInputStream part = mock(StreamBlockInputStream.class);
+    when(part.getLength()).thenReturn((long) partData.length);
+    doAnswer(invocation -> readPositionedFrom(partData, invocation)).when(part)
+        .readPositioned(anyLong(), any(ByteBuffer.class));
+    return part;
+  }
+
+  private static int readPositionedFrom(byte[] data, InvocationOnMock invocation) {
+    long offset = invocation.getArgument(0);
+    ByteBuffer dst = invocation.getArgument(1);
+    if (offset < 0 || offset >= data.length) {
+      return -1;
+    }
+    int toCopy = Math.min(dst.remaining(), data.length - (int) offset);
+    dst.put(data, (int) offset, toCopy);
+    return toCopy;
   }
 
   private static BlockInputStream createBlockStream(BlockID blockID, byte[] blockData,
