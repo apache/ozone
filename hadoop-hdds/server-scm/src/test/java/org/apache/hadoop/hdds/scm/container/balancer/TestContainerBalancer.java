@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,20 +38,27 @@ import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +76,7 @@ public class TestContainerBalancer {
 
   private ContainerBalancer containerBalancer;
   private StorageContainerManager scm;
+  private NodeManager nodeManager;
   private ContainerBalancerConfiguration balancerConfiguration;
   private Map<String, ByteString> serviceToConfigMap = new HashMap<>();
   private OzoneConfiguration conf;
@@ -95,6 +105,9 @@ public class TestContainerBalancer {
     GenericTestUtils.setLogLevel(ContainerBalancer.class, Level.DEBUG);
 
     when(scm.getScmNodeManager()).thenReturn(mock(NodeManager.class));
+    nodeManager = scm.getScmNodeManager();
+    List<DatanodeInfo> eligibleDatanodes = createEligibleDatanodes(10);
+    when(nodeManager.getNodes(IN_SERVICE, HEALTHY)).thenReturn(eligibleDatanodes);
     when(scm.getScmContext()).thenReturn(SCMContext.emptyContext());
     when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getStatefulServiceStateManager()).thenReturn(serviceStateManager);
@@ -296,12 +309,11 @@ public class TestContainerBalancer {
 
   @Test
   public void testStartBalancerWithInvalidNodes() throws Exception {
-    NodeManager nm = scm.getScmNodeManager();
     String validHost = "1.2.3.4";
     String invalidHost = "invalid-host-name";
 
-    when(nm.getNodesByAddress(invalidHost)).thenReturn(Collections.emptyList());
-    when(nm.getNodesByAddress(validHost)).thenReturn(Collections.singletonList(mock(DatanodeDetails.class)));
+    when(nodeManager.getNodesByAddress(invalidHost)).thenReturn(Collections.emptyList());
+    when(nodeManager.getNodesByAddress(validHost)).thenReturn(Collections.singletonList(mock(DatanodeDetails.class)));
 
     // Test invalid includeNodes
     balancerConfiguration.setIncludeNodes(invalidHost);
@@ -321,7 +333,7 @@ public class TestContainerBalancer {
 
     // Test a valid case
     balancerConfiguration.setExcludeNodes("");
-    balancerConfiguration.setIncludeNodes(validHost);
+    balancerConfiguration.setIncludeNodes("");
     assertDoesNotThrow(() -> startBalancer(balancerConfiguration));
     assertSame(ContainerBalancerTask.Status.RUNNING, containerBalancer.getBalancerStatus());
 
@@ -369,6 +381,93 @@ public class TestContainerBalancer {
     assertEquals(ContainerBalancerStopReason.SCM_STATE_CHANGE.getMessage(),
         statusInfo.getStopMessage());
     assertNotNull(statusInfo.getStoppedAt());
+  }
+
+  /**
+   * Tests new startup validation for conflicting include/exclude lists.
+   */
+  @Test
+  public void testRejectConflictingIncludeExcludeLists() throws Exception {
+    when(nodeManager.getNodesByAddress("dn0"))
+        .thenReturn(Collections.singletonList(mock(DatanodeDetails.class)));
+    when(nodeManager.getNodesByAddress("dn1"))
+        .thenReturn(Collections.singletonList(mock(DatanodeDetails.class)));
+    balancerConfiguration.setIncludeNodes("dn0,dn1");
+    balancerConfiguration.setExcludeNodes("dn0,dn1");
+
+    InvalidContainerBalancerConfigurationException ex =
+        assertThrows(InvalidContainerBalancerConfigurationException.class,
+            () -> containerBalancer.startBalancer(balancerConfiguration));
+    assertThat(ex.getMessage()).contains(
+        "include-datanodes is a subset of exclude-datanodes");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    balancerConfiguration.setIncludeNodes("");
+    balancerConfiguration.setExcludeNodes("");
+    balancerConfiguration.setIncludeContainers("1, 2");
+    balancerConfiguration.setExcludeContainers("1,2,3");
+    ex = assertThrows(InvalidContainerBalancerConfigurationException.class,
+        () -> containerBalancer.startBalancer(balancerConfiguration));
+    assertThat(ex.getMessage()).contains(
+        "include-containers is a subset of exclude-containers");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+  }
+
+  /**
+   * Tests new startup validation for include-containers, datanode pool, and
+   * size limits.
+   */
+  @Test
+  public void testRejectInvalidStartupConfiguration() throws Exception {
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(scm.getContainerManager()).thenReturn(containerManager);
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenThrow(new ContainerNotFoundException(ContainerID.valueOf(1)));
+
+    balancerConfiguration.setIncludeContainers("1");
+    InvalidContainerBalancerConfigurationException ex =
+        assertThrows(InvalidContainerBalancerConfigurationException.class,
+            () -> containerBalancer.startBalancer(balancerConfiguration));
+    assertThat(ex.getMessage()).contains("do not exist in SCM");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    balancerConfiguration.setIncludeContainers("");
+    List<DatanodeInfo> fiveDatanodes = createEligibleDatanodes(5);
+    when(nodeManager.getNodes(IN_SERVICE, HEALTHY)).thenReturn(fiveDatanodes);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(20);
+    ex = assertThrows(InvalidContainerBalancerConfigurationException.class,
+        () -> containerBalancer.startBalancer(balancerConfiguration));
+    assertThat(ex.getMessage()).contains("at least 2 are required for a source and target datanode pair.");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeEnteringTarget(200 * OzoneConsts.GB);
+    ex = assertThrows(InvalidContainerBalancerConfigurationException.class,
+        () -> containerBalancer.startBalancer(balancerConfiguration));
+    assertThat(ex.getMessage()).contains(
+        "hdds.container.balancer.size.entering.target.max should be less than or "
+            + "equal to hdds.container.balancer.size.moved.max.per.iteration");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+
+    balancerConfiguration.setMaxSizeEnteringTarget(100 * OzoneConsts.GB);
+    balancerConfiguration.setMaxSizeLeavingSource(200 * OzoneConsts.GB);
+    ex = assertThrows(InvalidContainerBalancerConfigurationException.class,
+        () -> containerBalancer.startBalancer(balancerConfiguration));
+    assertThat(ex.getMessage()).contains(
+        "hdds.container.balancer.size.leaving.source.max should be less than or "
+            + "equal to hdds.container.balancer.size.moved.max.per.iteration");
+    assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
+  }
+
+  private static List<DatanodeInfo> createEligibleDatanodes(int count) {
+    List<DatanodeInfo> datanodes = new ArrayList<>(count);
+    for (int i = 0; i < count; i++) {
+      DatanodeInfo datanode = mock(DatanodeInfo.class);
+      when(datanode.getHostName()).thenReturn("dn" + i);
+      when(datanode.getIpAddress()).thenReturn("10.0.0." + i);
+      datanodes.add(datanode);
+    }
+    return datanodes;
   }
 
   private void startBalancer(ContainerBalancerConfiguration config)

@@ -302,6 +302,7 @@ function ozone_suppress_shell_log
       OZONE_LOGLEVEL=OFF
       OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"
       OZONE_OPTS="${OZONE_OPTS} -Dslf4j.internal.verbosity=ERROR"
+      OZONE_OPTS="-Djava.util.logging.config.file='${OZONE_CONF_DIR}/shell-logging.properties' ${OZONE_OPTS}"
     fi
   fi
 }

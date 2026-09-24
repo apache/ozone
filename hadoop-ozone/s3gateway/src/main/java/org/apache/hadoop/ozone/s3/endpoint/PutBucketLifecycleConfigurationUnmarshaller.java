@@ -17,64 +17,14 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
-
-import java.io.InputStream;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Type;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.ext.MessageBodyReader;
-import javax.xml.XMLConstants;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.UnmarshallerHandler;
-import javax.xml.parsers.SAXParserFactory;
-import org.xml.sax.InputSource;
-import org.xml.sax.XMLReader;
-
 /**
- * Custom unmarshaller to read Lifecycle configuration namespace.
+ * Custom unmarshaller to read Lifecycle configuration.
  */
 public class PutBucketLifecycleConfigurationUnmarshaller
-    implements MessageBodyReader<S3LifecycleConfiguration>  {
-
-  private final JAXBContext context;
-  private final XMLReader xmlReader;
+    extends MessageUnmarshaller<S3LifecycleConfiguration> {
 
   public PutBucketLifecycleConfigurationUnmarshaller() {
-    try {
-      context = JAXBContext.newInstance(S3LifecycleConfiguration.class);
-      SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
-      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-      xmlReader = saxParserFactory.newSAXParser().getXMLReader();
-    } catch (Exception ex) {
-      throw new AssertionError("Can not instantiate " +
-          "PutBucketLifecycleConfiguration parser", ex);
-    }
+    super(S3LifecycleConfiguration.class);
   }
 
-  @Override
-  public boolean isReadable(Class<?> type, Type genericType,
-      Annotation[] annotations, MediaType mediaType) {
-    return type.equals(S3LifecycleConfiguration.class);
-  }
-
-  @Override
-  public S3LifecycleConfiguration readFrom(Class<S3LifecycleConfiguration> type,
-      Type genericType, Annotation[] annotations, MediaType mediaType,
-      MultivaluedMap<String, String> httpHeaders, InputStream inputStream)
-      throws WebApplicationException {
-    try {
-      UnmarshallerHandler unmarshallerHandler =
-          context.createUnmarshaller().getUnmarshallerHandler();
-      XmlNamespaceFilter filter = new XmlNamespaceFilter(S3_XML_NAMESPACE);
-      filter.setContentHandler(unmarshallerHandler);
-      filter.setParent(xmlReader);
-      filter.parse(new InputSource(inputStream));
-      return (S3LifecycleConfiguration)(unmarshallerHandler.getResult());
-    } catch (Exception e) {
-      throw new WebApplicationException("Can't parse request body to XML.", e);
-    }
-  }
 }

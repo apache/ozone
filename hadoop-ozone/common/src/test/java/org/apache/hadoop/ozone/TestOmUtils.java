@@ -38,11 +38,13 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -217,6 +219,56 @@ public class TestOmUtils {
   }
 
   @Test
+  void getOmSocketAddressIpv6HostPort() throws UnknownHostException {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::10]:100");
+
+    assertEquals("[2001:db8::10]:100", OmUtils.getOmRpcAddress(conf));
+    InetSocketAddress addr = OmUtils.getOmAddress(conf);
+    assertEquals(InetAddress.getByName("2001:db8::10"), addr.getAddress());
+    assertEquals(100, addr.getPort());
+  }
+
+  @Test
+  void getOmSocketAddressIpv6Host() throws UnknownHostException {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::10]");
+
+    int defaultPort = OMConfigKeys.OZONE_OM_PORT_DEFAULT;
+    assertEquals("[2001:db8::10]:" + defaultPort,
+        OmUtils.getOmRpcAddress(conf));
+    InetSocketAddress addr = OmUtils.getOmAddress(conf);
+    assertEquals(InetAddress.getByName("2001:db8::10"), addr.getAddress());
+    assertEquals(defaultPort, addr.getPort());
+  }
+
+  @Test
+  void getOmRpcAddressIpv6ForConfigKey() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    String addressKey = OZONE_OM_ADDRESS_KEY + ".service.node";
+    conf.set(addressKey, "[2001:db8::10]:100");
+
+    assertEquals("[2001:db8::10]:100",
+        OmUtils.getOmRpcAddress(conf, addressKey));
+  }
+
+  @Test
+  void getOmPeerHttpAddressesIpv6() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String serviceId = "service";
+    String nodeId = "node";
+    conf.set(ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY, serviceId, nodeId),
+        "[2001:db8::10]:100");
+    conf.set(ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY, serviceId, nodeId),
+        "[2001:db8::10]:200");
+
+    assertEquals("[2001:db8::10]:100",
+        OmUtils.getHttpAddressForOMPeerNode(conf, serviceId, nodeId, "fallback"));
+    assertEquals("[2001:db8::10]:200",
+        OmUtils.getHttpsAddressForOMPeerNode(conf, serviceId, nodeId, "fallback"));
+  }
+
+  @Test
   void getOmSocketAddressEmpty() {
     final OzoneConfiguration conf = new OzoneConfiguration();
     // Assert that we are able to use default configs if no value is specified.
@@ -381,6 +433,25 @@ public class TestOmUtils {
             cmdType + " returns true for shouldSendToFollower but false for "
                 + "isReadOnly. Requests eligible for follower read must be "
                 + "read-only.");
+      }
+    }
+  }
+
+  @Test
+  public void testResolveOmHostAcceptsIpv6Literal() {
+    // A bracketed or bare IPv6 literal must parse into a host:port authority.
+    // Before HDDS-15775 the bare form made createSocketAddr throw
+    // IllegalArgumentException ("not a valid host:port authority"). Reachability
+    // is environment-dependent, so an IOException here is acceptable; only the
+    // parse failure must not happen.
+    for (String host : new String[] {"::1", "[::1]"}) {
+      try {
+        OmUtils.resolveOmHost(host, 9862);
+      } catch (IllegalArgumentException e) {
+        fail("IPv6 literal '" + host + "' should parse into an address: "
+            + e.getMessage());
+      } catch (IOException ignored) {
+        // Unresolved or unreachable in the test environment is acceptable.
       }
     }
   }

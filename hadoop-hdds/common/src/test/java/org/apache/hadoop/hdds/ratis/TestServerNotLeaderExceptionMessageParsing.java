@@ -19,7 +19,12 @@ package org.apache.hadoop.hdds.ratis;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.Test;
 
 /** Class to test {@link ServerNotLeaderException} parsing. **/
@@ -73,6 +78,23 @@ class TestServerNotLeaderExceptionMessageParsing {
         ".convertToNotLeaderException(ServerNotLeaderException.java)";
     snle = new ServerNotLeaderException(message);
     assertNull(snle.getSuggestedLeader());
+  }
+
+  @Test
+  public void testIpv6SuggestedLeader() {
+    RaftPeer suggestedLeader = RaftPeer.newBuilder()
+        .setId("scm2")
+        .setAddress("[2001:db8::1]:9894")
+        .build();
+    NotLeaderException notLeaderException = mock(NotLeaderException.class);
+    when(notLeaderException.getSuggestedLeader()).thenReturn(suggestedLeader);
+
+    ServerNotLeaderException converted = ServerNotLeaderException.convertToNotLeaderException(
+        notLeaderException, RaftPeerId.valueOf("scm1"), "9863", "2001:db8::2", "SCM");
+    assertEquals("[2001:db8::1]:9863", converted.getSuggestedLeader());
+
+    ServerNotLeaderException parsed = new ServerNotLeaderException(converted.getMessage());
+    assertEquals("[2001:db8::1]:9863", parsed.getSuggestedLeader());
   }
 
 }

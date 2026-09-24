@@ -204,8 +204,15 @@ public class DatanodeStateMachine implements Closeable {
         .stateContext(context)
         .datanodeConfig(dnConf)
         .replicationConfig(replicationConfig)
+        .containerSet(container.getContainerSet())
+        .volumeSet(container.getVolumeSet())
         .clock(clock)
         .build();
+
+    container.getVolumeSet().setFailedVolumeListener(() -> {
+      container.handleVolumeFailures();
+      supervisor.shutdownFailedVolumePools(container.getVolumeSet());
+    });
 
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
@@ -391,6 +398,18 @@ public class DatanodeStateMachine implements Closeable {
       LOG.error("DatanodeStateMachine Shutdown due to an critical error");
       hddsDatanodeStopService.stopService();
     }
+  }
+
+  /**
+   * Terminates the datanode when startup cannot make progress and the state
+   * machine loop cannot drive the shutdown itself (for example when container
+   * initialization has stalled on a thread that ignores interruption). Invoked
+   * from the {@link org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer}
+   * startup watchdog. Enters JVM shutdown directly rather than the synchronous
+   * stop service, whose stop() could itself block on the same failing disk.
+   */
+  public void triggerFatalShutdown(String reason) {
+    ExitUtils.terminate(1, reason, LOG);
   }
 
   public void handleFatalVolumeFailures() {

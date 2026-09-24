@@ -171,6 +171,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-annotation-processing</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-docs</artifactId>
       <scope>provided</scope>
     </dependency>
@@ -255,6 +260,7 @@
           </annotationProcessorPaths>
           <annotationProcessors>
             <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
+            <annotationProcessor>org.apache.ozone.annotations.CliOptionStyleProcessor</annotationProcessor>
             <annotationProcessor>org.apache.ozone.annotations.ReplicateAnnotationProcessor</annotationProcessor>
           </annotationProcessors>
         </configuration>

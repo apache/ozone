@@ -46,6 +46,7 @@ import java.security.cert.X509Certificate;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -68,6 +69,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertific
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.bouncycastle.asn1.x509.GeneralName;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -194,6 +196,49 @@ public class TestDefaultCAServer {
     assertEquals(caInReturnedBundle.getSubjectX500Principal(),
         signedCert.getIssuerX500Principal());
 
+  }
+
+  /**
+   * Tests that an internal-suffix DNS name in the CSR is retained as a
+   * dNSName Subject Alternative Name in the issued certificate.
+   * @throws Exception - on ERROR.
+   */
+  @Test
+  public void testRequestCertificateRetainsInternalDnsName() throws Exception {
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
+    KeyPair keyPair =
+        new HDDSKeyGenerator(securityConfig).generateKey();
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("scm1.lxd")
+        .setCA(false)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject("Ozone Cluster")
+        .setConfiguration(securityConfig)
+        .setKey(keyPair)
+        .build()
+        .generateCSR();
+
+    CertificateServer testCA = new DefaultCAServer("testCA",
+        clusterId, scmId, caStore,
+        new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    testCA.init(securityConfig, CAType.ROOT);
+
+    Future<CertPath> holder = testCA.requestCertificate(
+        csr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM,
+        String.valueOf(System.nanoTime()));
+    assertTrue(holder.isDone());
+    X509Certificate signedCert =
+        CertificateCodec.firstCertificateFrom(holder.get());
+
+    Collection<List<?>> subjectAlternativeNames =
+        signedCert.getSubjectAlternativeNames();
+    assertNotNull(subjectAlternativeNames);
+    assertTrue(subjectAlternativeNames.stream().anyMatch(
+        san -> ((Integer) san.get(0)) == GeneralName.dNSName
+            && "scm1.lxd".equals(san.get(1))));
   }
 
   /**

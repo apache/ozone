@@ -184,6 +184,18 @@ public class OmConfig extends ReconfigurableConfig {
   )
   private long followerReadLocalLeaseTimeMs;
 
+  @Config(key = "ozone.om.block.write.sort.datanodes.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.OM, ConfigTag.PERFORMANCE},
+      description = "If true, OM sorts the streaming-write pipeline (nearest " +
+          "datanode first) locally using its cached cluster topology, instead " +
+          "of asking SCM to sort on every allocateBlock. Defaults to false so " +
+          "SCM performs the sort. Enable this to offload the sort from SCM " +
+          "when multiple OM services share a single SCM service."
+  )
+  private boolean sortDatanodesForWriteEnabled;
+
   public long getRatisBasedFinalizationTimeout() {
     return ratisBasedFinalizationTimeout;
   }
@@ -222,6 +234,10 @@ public class OmConfig extends ReconfigurableConfig {
 
   public void setAllowLeaderSkipLinearizableRead(boolean newValue) {
     allowLeaderSkipLinearizableRead = newValue;
+  }
+
+  public boolean isSortDatanodesForWriteEnabled() {
+    return sortDatanodesForWriteEnabled;
   }
 
   public boolean isFollowerReadLocalLeaseEnabled() {

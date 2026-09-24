@@ -39,6 +39,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -64,6 +65,7 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.api.types.OMDBReprocessResponse;
 import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -675,6 +677,44 @@ public class TestOzoneManagerServiceProviderImpl {
     when(reconTaskStatusUpdaterManager.getTaskStatusUpdater(anyString())).thenAnswer(inv ->
         new ReconTaskStatusUpdater(mock(ReconTaskStatusDao.class), (String) inv.getArgument(0)));
     return reconTaskStatusUpdaterManager;
+  }
+
+  @Test
+  public void testTriggerTaskRebuild() throws Exception {
+    ReconTaskController reconTaskController = mock(ReconTaskController.class);
+    ReconTaskStatusUpdaterManager taskStatusUpdaterManager = mock(ReconTaskStatusUpdaterManager.class);
+    ReconUtils reconUtils = new ReconUtils();
+
+    // Test 1: Successful queue (OM DB is loaded)
+    ReconOMMetadataManager loadedOmMgr = mock(ReconOMMetadataManager.class);
+    when(loadedOmMgr.getStore()).thenReturn(mock(RDBStore.class));
+    OzoneManagerServiceProviderImpl serviceProvider = new OzoneManagerServiceProviderImpl(
+        configuration, loadedOmMgr, reconTaskController,
+        reconUtils, ozoneManagerProtocol, reconContext, taskStatusUpdaterManager);
+
+    when(reconTaskController.queueReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_OM_DB_REBUILD))
+        .thenReturn(ReconTaskController.ReInitializationResult.SUCCESS);
+
+    OMDBReprocessResponse response = serviceProvider.triggerTaskRebuild();
+    assertEquals(OMDBReprocessResponse.Status.ACCEPTED, response.getStatus());
+
+    // Test 2: Buffer full / retry
+    when(reconTaskController.queueReInitializationEvent(
+        ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_OM_DB_REBUILD))
+        .thenReturn(ReconTaskController.ReInitializationResult.RETRY_LATER);
+
+    response = serviceProvider.triggerTaskRebuild();
+    assertEquals(OMDBReprocessResponse.Status.RETRY, response.getStatus());
+
+    // Test 3: No OM DB loaded (store is null) -> RETRY, nothing queued
+    ReconTaskController noDbController = mock(ReconTaskController.class);
+    serviceProvider = new OzoneManagerServiceProviderImpl(
+        configuration, mock(ReconOMMetadataManager.class), noDbController,
+        reconUtils, ozoneManagerProtocol, reconContext, taskStatusUpdaterManager);
+    response = serviceProvider.triggerTaskRebuild();
+    assertEquals(OMDBReprocessResponse.Status.RETRY, response.getStatus());
+    verify(noDbController, never()).queueReInitializationEvent(any());
   }
 
   private BucketLayout getBucketLayout() {

@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersi
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
@@ -142,6 +143,12 @@ public class ChunkManagerDispatcher implements ChunkManager {
     // will be updated while deleting the block from the DB
 
     selectHandler(container).deleteChunks(container, blockData);
+  }
+
+  @Override
+  public RandomAccessFile getShortCircuitFd(Container container, BlockID blockID)
+      throws StorageContainerException {
+    return selectHandler(container).getShortCircuitFd(container, blockID);
   }
 
   @Override

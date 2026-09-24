@@ -152,7 +152,7 @@
                 <goals>
                   <goal>java</goal>
                 </goals>
-                <phase>initialize</phase>
+                <phase>generate-resources</phase>
                 <configuration>
                   <mainClass>org.apache.hadoop.hdds.utils.db.managed.JniLibNamePropertyWriter</mainClass>
                   <arguments>
@@ -171,7 +171,7 @@
                 <goals>
                   <goal>read-project-properties</goal>
                 </goals>
-                <phase>initialize</phase>
+                <phase>generate-resources</phase>
                 <configuration>
                   <files>
                     <file>${project.build.directory}/propertyFile.txt</file>
@@ -214,7 +214,7 @@
                 <goals>
                   <goal>wget</goal>
                 </goals>
-                <phase>generate-sources</phase>
+                <phase>initialize</phase>
                 <configuration>
                   <url>https://github.com/facebook/rocksdb/archive/refs/tags/v${rocksdb.source.version}.tar.gz</url>
                   <outputFileName>rocksdb-v${rocksdb.source.version}.tar.gz</outputFileName>
