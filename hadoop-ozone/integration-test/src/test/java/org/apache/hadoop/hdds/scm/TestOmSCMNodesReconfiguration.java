@@ -49,12 +49,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Test the OM's SCM nodes reconfiguration wiring: the SCM node list and the
- * per-node SCM addresses must be reconfigurable on a running OM so that the OM
- * can reload its SCM failover proxies without a restart. The proxy-level
- * add/remove behavior is covered by
- * {@link org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase}'s unit
- * tests; this verifies the OM-side registration and callback end to end.
+ * Tests the OM's SCM nodes reconfiguration wiring: the SCM node list and the
+ * per-node SCM addresses must be reconfigurable on a running OM, reloading its
+ * SCM failover proxies without a restart. Proxy-level add/remove behavior is
+ * covered by {@link org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase}
+ * unit tests; this verifies the OM-side registration and callbacks end to end.
  */
 @Timeout(300)
 public class TestOmSCMNodesReconfiguration {
@@ -122,10 +121,8 @@ public class TestOmSCMNodesReconfiguration {
 
   /**
    * Reconfiguring the SCM node list on a running OM must reload the SCM failover
-   * proxies to the new membership. Dropping one SCM from the list has to shrink
-   * the proxy node set for both the block and container providers; the reload
-   * reads the list from the (freshly written) configuration, so reconfiguring to
-   * a genuinely different value is what exercises the wiring.
+   * proxies to the new membership. Dropping one SCM has to shrink the proxy node
+   * set for both the block and container providers.
    */
   @Test
   void testReconfigureScmNodesReloadsProxies() throws Exception {
@@ -162,13 +159,11 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Changing only a per-node SCM address (no node-list change) must reload the
-   * OM's SCM failover proxies against the new endpoint. The address keys are
-   * registered as a prefix with no per-key reload function, so an address-only
-   * change is applied by the reconfiguration-complete callback, not the
-   * per-property path. Drive that callback directly: the async {@code reconfig
-   * start} path reads ozone-site.xml from disk, which a mini-cluster does not
-   * rewrite, so it cannot be exercised end to end here.
+   * Changing only a per-node SCM address must reload the OM's SCM failover proxies
+   * against the new endpoint. Address keys are prefix-registered with no per-key
+   * reload, so the change is applied by the reconfiguration-complete callback. We
+   * drive that callback directly: the async {@code reconfig start} path reads
+   * ozone-site.xml from disk, which a mini-cluster does not rewrite.
    */
   @Test
   void testReconfigureScmAddressReloadsProxies() throws Exception {
@@ -264,9 +259,9 @@ public class TestOmSCMNodesReconfiguration {
 
   /**
    * Adding an SCM to the node list without first setting its address must fail
-   * the reconfiguration (so it is reported FAILED and can be retried) and must
-   * leave the live configuration and the SCM proxies unchanged -- the node list
-   * must never keep an SCM without a resolvable address.
+   * the reconfiguration (reported FAILED, retriable) and leave the live
+   * configuration and SCM proxies unchanged: the node list must never keep an
+   * SCM without a resolvable address.
    */
   @Test
   void testReconfigureScmNodesFailsWhenAddressMissing() {
@@ -296,12 +291,10 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Adding an SCM whose address is malformed (an explicit host:port value, which
-   * cannot be reassembled into a valid socket address) must fail the same way as a
-   * missing address: resolving the membership throws IllegalArgumentException, so
-   * the reload failure is caught, the node list is rolled back, and the SCM proxies
-   * are left unchanged. This guards the widened catch that would otherwise let the
-   * live configuration keep a node with an unusable address.
+   * Adding an SCM whose address is malformed (a host:port value that cannot be
+   * reassembled into a valid socket address) must fail like a missing address:
+   * resolving the membership throws IllegalArgumentException, so the node list is
+   * rolled back and the SCM proxies are left unchanged. Guards the widened catch.
    */
   @Test
   void testReconfigureScmNodesFailsWhenAddressMalformed() {
@@ -338,13 +331,11 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Adding an SCM, applying the keys in "nodes before address" order (the order
-   * a real {@code reconfig start} batch may use). Applying the node list before
-   * the new SCM's address cannot resolve the node, so that property fails and is
-   * rolled back and the node is not added; once the address is set, reapplying
-   * the node list adds it. This mirrors the datanode, which skips an SCM whose
-   * address is not resolvable yet, so adding a node is retriable rather than
-   * silently leaving a node without an address in the configuration.
+   * Adding an SCM in "nodes before address" order (an order a real
+   * {@code reconfig start} batch may use). Applying the node list first cannot
+   * resolve the new node, so that property fails and is rolled back; once the
+   * address is set, reapplying the node list adds it. Adding a node is thus
+   * retriable rather than silently keeping a node without an address.
    */
   @Test
   void testReconfigureAddScmNodeNodesBeforeAddress() throws Exception {

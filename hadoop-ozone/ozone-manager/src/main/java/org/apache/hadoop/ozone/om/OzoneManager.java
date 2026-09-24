@@ -6099,38 +6099,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Validate and publish a reconfigured SCM node list
-   * ({@code ozone.scm.nodes.<serviceId>}) and reload the block and container SCM
-   * failover proxies so the OM can reach a newly added SCM without a restart.
+   * Validate a reconfigured SCM node list ({@code ozone.scm.nodes.<serviceId>}),
+   * publish it, and reload the block and container SCM failover proxies so the OM
+   * can reach a newly added SCM without a restart.
    *
-   * The reload reads the node list and the per-node address keys
-   * ({@code ozone.scm.address.<serviceId>.<nodeId>}) from the same live
-   * configuration. If the new list references an SCM whose address is not set
-   * yet, the reload fails: the previous node list is restored and the exception
-   * is rethrown so the reconfiguration is reported FAILED and can be retried.
-   * This keeps the live configuration from holding an SCM node without a
-   * resolvable address (which would break {@code getServiceList()}). Adding an
-   * SCM therefore needs its address key stored before the node list is applied:
-   * the per-property order within a {@code reconfig start} batch is not
-   * guaranteed, and if the node list is applied first this callback cannot
-   * resolve the new node, rolls the node list back, and the
-   * reconfiguration-complete callback ({@link #reloadScmProxiesOnReconfig}) then
-   * reloads the previous membership. In that case the new SCM is picked up only
-   * on a second {@code reconfig start}, once its address key is stored.
+   * The reload resolves each node's address key
+   * ({@code ozone.scm.address.<serviceId>.<nodeId>}) from the same live config. If
+   * a referenced address is not set yet, the reload fails: the previous node list
+   * is restored and the exception rethrown so the reconfiguration is reported
+   * FAILED, keeping the config from holding a node with no resolvable address.
+   * Adding an SCM therefore needs its address stored before the node list: batch
+   * property order is not guaranteed, and if the node list is applied first it is
+   * rolled back here and {@link #reloadScmProxiesOnReconfig} reloads the previous
+   * membership, so the SCM is picked up only on a second {@code reconfig start}.
    *
-   * Scope: only the block and container proxies are reloaded. The secure-mode
-   * SCM security and secret-key proxy providers are not reloaded and continue to
-   * use the node list captured at startup.
+   * Only the block and container proxies are reloaded; the secure-mode SCM
+   * security and secret-key providers keep the node list captured at startup.
    */
   private String reconfScmNodes(String value) {
     if (StringUtils.isBlank(value)) {
       throw new IllegalArgumentException("Reconfiguration failed since setting an empty SCM nodes "
           + "configuration is not allowed");
     }
-    // ReconfigurableBase stores the new value into the configuration only after
-    // this callback returns, but reloadScmNodes() rebuilds the SCM proxies from
-    // that same live configuration. Publish the new node list first so the
-    // reload sees the intended membership.
+    // ReconfigurableBase stores the new value only after this callback returns,
+    // but reloadScmNodes() rebuilds the proxies from that live config, so publish
+    // the node list first.
     String scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY,
         HddsUtils.getScmServiceId(configuration));
     String previous = configuration.get(scmNodesKey);
@@ -6139,12 +6132,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       scmClient.reloadScmNodes();
       LOG.info("Reloaded SCM proxy configuration for {} : {}", scmNodesKey, value);
     } catch (RuntimeException e) {
-      // A referenced SCM address is missing or malformed (an unset address throws
-      // ConfigurationException, a bad host:port throws IllegalArgumentException from
-      // NetUtils.createSocketAddr), so the new membership cannot be resolved. Restore
-      // the previous node list so the live configuration never keeps a node without a
-      // resolvable address, and rethrow so the reconfiguration is reported FAILED and
-      // can be retried once the address key is fixed.
+      // The membership cannot be resolved (unset address -> ConfigurationException,
+      // bad host:port -> IllegalArgumentException). Restore the previous node list
+      // so the config never keeps an unresolvable node, and rethrow to report FAILED.
       if (previous == null) {
         configuration.unset(scmNodesKey);
       } else {
@@ -6157,14 +6147,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * Reconfiguration-complete callback that reloads the block and container SCM
-   * failover proxies once a batch that touched the SCM node list or any per-node
-   * SCM address has been fully applied. Because it runs after every property in
-   * the batch is stored, an address-only change takes effect (the per-property
-   * path only fires for the node list). A newly added SCM is picked up here only
-   * when its address key was already stored as the node list was applied; if the
-   * node list was applied first {@link #reconfScmNodes} rolls it back, so this
-   * callback reloads the previous membership and the node is added on a later
-   * {@code reconfig start}.
+   * failover proxies once a batch touching the SCM node list or any per-node SCM
+   * address is fully applied. Running after every property is stored lets an
+   * address-only change take effect (the per-property path fires only for the node
+   * list). A newly added SCM is picked up only when its address was already stored
+   * as the node list was applied; if the node list was applied first
+   * {@link #reconfScmNodes} rolls it back, so this reloads the previous membership
+   * and the node is added on a later {@code reconfig start}.
    */
   @VisibleForTesting
   public void reloadScmProxiesOnReconfig(Map<String, Boolean> changedProperties,
@@ -6184,12 +6173,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         LOG.info("Reloaded SCM failover proxies after reconfiguration of {} / {}*",
             scmNodesKey, scmAddressPrefix);
       } catch (RuntimeException e) {
-        // A complete callback must not break the chain: the remaining callbacks
-        // (tracing, logging) still need to run. A bad node list is already
-        // reported FAILED by reconfScmNodes; here we catch any reload failure
-        // (unset address -> ConfigurationException, malformed host:port ->
-        // IllegalArgumentException) and only log, so an address-only change that
-        // cannot be resolved leaves the previous proxies in place.
+        // A complete callback must not break the chain (tracing, logging still
+        // run). A bad node list is already reported FAILED by reconfScmNodes; here
+        // we catch any reload failure and only log, keeping the previous proxies.
         LOG.warn("Failed to reload SCM failover proxies after reconfiguration of {} / {}*; "
             + "keeping the previous SCM proxy configuration", scmNodesKey, scmAddressPrefix, e);
       }

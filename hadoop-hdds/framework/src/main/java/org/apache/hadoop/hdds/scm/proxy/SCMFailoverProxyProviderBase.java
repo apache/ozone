@@ -181,11 +181,9 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   }
 
   /**
-   * Parse the SCM node list and resolve each node's address from the current
-   * configuration into a fresh, unshared holder. This does the DNS resolution
-   * and touches no shared provider state, so callers may run it without holding
-   * the provider monitor. Throws when the configuration is incomplete (a node in
-   * the list has no address), leaving any existing state for the caller to keep.
+   * Resolve the node list and each node's address into a fresh, unshared holder,
+   * touching no shared provider state so callers can run it without the monitor.
+   * Throws when a node in the list has no address, leaving existing state intact.
    */
   private ScmProxyConfig buildConfigs() {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
@@ -215,22 +213,18 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   }
 
   /**
-   * Reload the SCM node list and their addresses from the (already updated)
-   * configuration so a newly added SCM can be reached without a restart. Cached
-   * proxies for removed nodes, or nodes whose address changed, are stopped so
-   * the next call dials the fresh address; if the new configuration is
-   * incomplete this throws and leaves the current state intact.
+   * Reload the SCM node list and addresses from the (already updated)
+   * configuration so a newly added SCM is reachable without a restart. Proxies
+   * for removed nodes or changed addresses are stopped; an incomplete
+   * configuration throws and leaves current state intact.
    *
-   * This only refreshes the provider's own node set and cached proxies. The
-   * Hadoop {@code RetryInvocationHandler} wrapping this provider keeps using the
-   * proxy it last fetched and re-fetches only on a failover, so a removed SCM
-   * that is still reachable can keep serving in-flight calls until the next
-   * failover; the updated endpoint is guaranteed only from the next fetch.
+   * Only this provider's node set and cached proxies change. The wrapping
+   * {@code RetryInvocationHandler} keeps its last-fetched proxy until the next
+   * failover, so a removed-but-reachable SCM may still serve in-flight calls.
    */
   public void changeConfig() {
-    // Resolve the new SCM addresses (DNS) before taking the monitor: a slow or
-    // dead resolver for a freshly added SCM hostname must not block concurrent
-    // SCM calls. Mirrors refreshProxyAddressIfChanged.
+    // Resolve addresses (DNS) before taking the monitor so a slow resolver for a
+    // new SCM does not block concurrent calls. Mirrors refreshProxyAddressIfChanged.
     ScmProxyConfig newConfig = buildConfigs();
 
     Map<String, ProxyInfo<T>> staleProxies = new HashMap<>();
@@ -240,9 +234,8 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
       scmProxyInfoMap.clear();
       scmProxyInfoMap.putAll(newConfig.proxyInfoMap);
 
-      // Keep the current proxy pointer valid: if the node it referenced was
-      // removed (or the list shrank), fall back to the first node; otherwise
-      // keep pointing to the same node but re-sync the index to the rebuilt list.
+      // Keep the current proxy pointer valid: fall back to the first node if the
+      // one it referenced was removed, otherwise re-sync its index to the new list.
       if (!scmNodeIds.contains(currentProxySCMNodeId)) {
         currentProxyIndex = 0;
         currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
@@ -250,18 +243,15 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
         currentProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
       }
 
-      // A pending failover target (set on a retriable-no-failover error) may name
-      // a node that this reload removed; clear it so performFailover does not
-      // point at a node absent from the rebuilt proxy map, which would NPE in
-      // createSCMProxy on the next failover.
+      // Drop a pending failover target that this reload removed, so the next
+      // performFailover does not point at a node absent from the proxy map (NPE).
       if (updatedLeaderNodeID != null
           && !scmProxyInfoMap.containsKey(updatedLeaderNodeID)) {
         updatedLeaderNodeID = null;
       }
 
-      // Evict cached proxies for removed nodes or changed addresses under the
-      // monitor, but defer the actual RPC.stopProxy until the monitor is
-      // released (it may block on socket teardown).
+      // Evict proxies for removed nodes or changed addresses under the monitor,
+      // but defer RPC.stopProxy until it is released (it may block on teardown).
       for (Map.Entry<String, SCMProxyInfo> entry : oldProxyInfoMap.entrySet()) {
         String nodeId = entry.getKey();
         SCMProxyInfo newInfo = scmProxyInfoMap.get(nodeId);
@@ -288,10 +278,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
         protocolClass.getSimpleName(), newConfig.nodeIds.size(), newConfig.proxyInfoMap.values());
   }
 
-  /**
-   * Parsed SCM node list and resolved addresses, built without touching shared
-   * provider state so the work can happen outside the provider monitor.
-   */
+  /** Parsed node list and resolved addresses, built without touching shared state. */
   private static final class ScmProxyConfig {
     private final List<String> nodeIds;
     private final Map<String, SCMProxyInfo> proxyInfoMap;

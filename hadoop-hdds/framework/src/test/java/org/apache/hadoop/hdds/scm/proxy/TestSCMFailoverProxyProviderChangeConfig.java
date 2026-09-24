@@ -34,10 +34,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Verifies that {@link SCMFailoverProxyProviderBase#changeConfig()} reloads the
- * SCM node list from an updated configuration (the dynamic SCM reconfiguration
- * scenario), adding and removing nodes and keeping the current proxy pointer
- * valid, while leaving the previous state intact if the new configuration is
- * incomplete.
+ * SCM node list from an updated configuration: adding and removing nodes, keeping
+ * the current proxy pointer valid, and leaving prior state intact if the new
+ * configuration is incomplete.
  */
 public class TestSCMFailoverProxyProviderChangeConfig {
 
@@ -87,10 +86,8 @@ public class TestSCMFailoverProxyProviderChangeConfig {
     SCMBlockLocationFailoverProxyProvider provider =
         new SCMBlockLocationFailoverProxyProvider(conf);
 
-    // changeCurrentProxy advances to the *next* node in the ring, so pass the
-    // node immediately before scm3 to land the current proxy on scm3 -- the node
-    // about to be removed -- and confirm it before reloading so the removal path
-    // is actually exercised.
+    // changeCurrentProxy advances to the *next* node, so pass the node before
+    // scm3 to land the current proxy on scm3 (the node about to be removed).
     List<String> before = provider.getSCMNodeIds();
     int size = before.size();
     int scm3Index = before.indexOf("scm3");
@@ -122,10 +119,8 @@ public class TestSCMFailoverProxyProviderChangeConfig {
     // With no configuration change the cached proxy is reused.
     assertSame(first, provider.getProxy());
 
-    // Change the current node's address. changeConfig must evict the stale proxy
-    // so the next getProxy() rebuilds against the new endpoint. This is the
-    // provider-level guarantee behind dynamic SCM reconfiguration; the wrapping
-    // RetryInvocationHandler still re-fetches only on failover.
+    // Change the current node's address: changeConfig must evict the stale proxy
+    // so the next getProxy() rebuilds against the new endpoint.
     setAddress(conf, current, "127.0.0.3");
     provider.changeConfig();
 
@@ -141,9 +136,8 @@ public class TestSCMFailoverProxyProviderChangeConfig {
     SCMBlockLocationFailoverProxyProvider provider =
         new SCMBlockLocationFailoverProxyProvider(conf);
 
-    // Node list references scm3 but its address has not been set yet. This
-    // mimics reconfiguring the node list before the new node's address; the
-    // reload must fail and leave the previous node set intact for a retry.
+    // Node list references scm3 but its address is not set yet, so the reload
+    // must fail and leave the previous node set intact for a retry.
     conf.set(ConfUtils.addSuffix(OZONE_SCM_NODES_KEY, SERVICE_ID),
         "scm1,scm2,scm3");
     assertThrows(ConfigurationException.class, provider::changeConfig);
