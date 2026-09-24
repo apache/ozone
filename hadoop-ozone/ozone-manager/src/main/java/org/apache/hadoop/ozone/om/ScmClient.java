@@ -159,10 +159,8 @@ public class ScmClient {
   }
 
   /**
-   * Reload the SCM node list and addresses for both the block and container
-   * SCM clients after a dynamic reconfiguration, so the OM can reach a newly
-   * added SCM without a restart. No-op when the providers are not available
-   * (e.g. clients created directly with mocks in tests).
+   * Reloads block/container SCM proxies on reconfiguration without an OM restart.
+   * No-op if providers are unavailable (e.g., test mocks).
    */
   public void reloadScmNodes() {
     if (blockProxyProvider != null) {

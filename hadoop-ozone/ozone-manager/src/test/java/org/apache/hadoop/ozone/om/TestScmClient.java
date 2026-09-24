@@ -230,8 +230,7 @@ public class TestScmClient {
 
   @Test
   public void testReloadScmNodesIsNoOpWithoutProviders() {
-    // The 3-arg constructor leaves both providers null (e.g. clients created
-    // directly with mocks); reloading must not fail.
+    // Ignore reload when providers are null (e.g., in unit tests).
     assertDoesNotThrow(scmClient::reloadScmNodes);
   }
 

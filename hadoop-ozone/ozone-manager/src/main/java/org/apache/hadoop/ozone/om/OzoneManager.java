@@ -590,10 +590,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_READ_BLACKLIST_USERS, this::reconfOzoneReadBlacklistUsers)
             .register(OZONE_READ_BLACKLIST_GROUPS, this::reconfOzoneReadBlacklistGroups);
 
-    // Allow the SCM node list and the per-node SCM addresses to be reconfigured
-    // so that a newly added SCM can be reached without restarting the OM. The
-    // address keys are registered as a prefix since the new node's key does not
-    // exist at startup and cannot be registered by name in advance.
+    // Allow dynamic SCM node/address reconfiguration without restarting OM.
+    // Address keys use prefix matching to discover new nodes added after startup.
     String scmServiceId = HddsUtils.getScmServiceId(conf);
     if (scmServiceId != null) {
       reconfigurationHandler
@@ -680,9 +678,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Honor property 'hadoop.security.token.service.use_ip'
     omRpcAddressTxt = new Text(SecurityUtil.buildTokenService(omNodeRpcAddr));
 
-    // Keep references to the SCM proxy providers so the OM can dynamically
-    // reload the SCM node list / addresses on reconfiguration (see
-    // reconfScmNodes) without a restart.
+    // Retain SCM proxy providers so OM can dynamically reload nodes/addresses without restarting.
     final SCMContainerLocationFailoverProxyProvider scmContainerProxyProvider =
         new SCMContainerLocationFailoverProxyProvider(configuration, null);
     final StorageContainerLocationProtocol scmContainerClient =
@@ -6099,31 +6095,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Validate a reconfigured SCM node list ({@code ozone.scm.nodes.<serviceId>}),
-   * publish it, and reload the block and container SCM failover proxies so the OM
-   * can reach a newly added SCM without a restart.
-   *
-   * The reload resolves each node's address key
-   * ({@code ozone.scm.address.<serviceId>.<nodeId>}) from the same live config. If
-   * a referenced address is not set yet, the reload fails: the previous node list
-   * is restored and the exception rethrown so the reconfiguration is reported
-   * FAILED, keeping the config from holding a node with no resolvable address.
-   * Adding an SCM therefore needs its address stored before the node list: batch
-   * property order is not guaranteed, and if the node list is applied first it is
-   * rolled back here and {@link #reloadScmProxiesOnReconfig} reloads the previous
-   * membership, so the SCM is picked up only on a second {@code reconfig start}.
-   *
-   * Only the block and container proxies are reloaded; the secure-mode SCM
-   * security and secret-key providers keep the node list captured at startup.
+   * Validates/reloads SCM node list and proxies (block/container) without an OM restart.
+   * Rolls back on missing node addresses. Requires address configs to be set prior to node list.
    */
   private String reconfScmNodes(String value) {
     if (StringUtils.isBlank(value)) {
       throw new IllegalArgumentException("Reconfiguration failed since setting an empty SCM nodes "
           + "configuration is not allowed");
     }
-    // ReconfigurableBase stores the new value only after this callback returns,
-    // but reloadScmNodes() rebuilds the proxies from that live config, so publish
-    // the node list first.
+    // Publish the node list early so reloadScmNodes() sees it in the live config before the callback finishes.
     String scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY,
         HddsUtils.getScmServiceId(configuration));
     String previous = configuration.get(scmNodesKey);
@@ -6132,9 +6112,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       scmClient.reloadScmNodes();
       LOG.info("Reloaded SCM proxy configuration for {} : {}", scmNodesKey, value);
     } catch (RuntimeException e) {
-      // The membership cannot be resolved (unset address -> ConfigurationException,
-      // bad host:port -> IllegalArgumentException). Restore the previous node list
-      // so the config never keeps an unresolvable node, and rethrow to report FAILED.
+      // Restore previous node list on resolution failure and rethrow to signal FAILED.
       if (previous == null) {
         configuration.unset(scmNodesKey);
       } else {
@@ -6146,14 +6124,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Reconfiguration-complete callback that reloads the block and container SCM
-   * failover proxies once a batch touching the SCM node list or any per-node SCM
-   * address is fully applied. Running after every property is stored lets an
-   * address-only change take effect (the per-property path fires only for the node
-   * list). A newly added SCM is picked up only when its address was already stored
-   * as the node list was applied; if the node list was applied first
-   * {@link #reconfScmNodes} rolls it back, so this reloads the previous membership
-   * and the node is added on a later {@code reconfig start}.
+   * Callback that reloads SCM block and container proxies after reconfiguration finishes.
+   * Ensures address-only changes take effect and applies newly added nodes if pre-configured.
    */
   @VisibleForTesting
   public void reloadScmProxiesOnReconfig(Map<String, Boolean> changedProperties,
@@ -6173,9 +6145,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         LOG.info("Reloaded SCM failover proxies after reconfiguration of {} / {}*",
             scmNodesKey, scmAddressPrefix);
       } catch (RuntimeException e) {
-        // A complete callback must not break the chain (tracing, logging still
-        // run). A bad node list is already reported FAILED by reconfScmNodes; here
-        // we catch any reload failure and only log, keeping the previous proxies.
+        // Catch and log reload failures to keep existing proxies and avoid breaking the callback chain.
         LOG.warn("Failed to reload SCM failover proxies after reconfiguration of {} / {}*; "
             + "keeping the previous SCM proxy configuration", scmNodesKey, scmAddressPrefix, e);
       }

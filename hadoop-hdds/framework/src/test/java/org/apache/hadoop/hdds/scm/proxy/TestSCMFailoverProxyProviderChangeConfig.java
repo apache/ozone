@@ -86,8 +86,7 @@ public class TestSCMFailoverProxyProviderChangeConfig {
     SCMBlockLocationFailoverProxyProvider provider =
         new SCMBlockLocationFailoverProxyProvider(conf);
 
-    // changeCurrentProxy advances to the *next* node, so pass the node before
-    // scm3 to land the current proxy on scm3 (the node about to be removed).
+    // Pass the preceding node so changeCurrentProxy advances to scm3 (to be removed).
     List<String> before = provider.getSCMNodeIds();
     int size = before.size();
     int scm3Index = before.indexOf("scm3");

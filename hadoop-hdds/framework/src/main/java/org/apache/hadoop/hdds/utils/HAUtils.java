@@ -137,9 +137,8 @@ public final class HAUtils {
   }
 
   /**
-   * Create a scm block client backed by the given proxy provider. The caller
-   * keeps the provider reference so it can dynamically reload the SCM node list
-   * (see {@link SCMFailoverProxyProviderBase#changeConfig()}).
+   * Creates an SCM block client using the provided proxy provider.
+   * Retains the provider reference to support dynamic SCM node updates.
    */
   public static ScmBlockLocationProtocol getScmBlockClient(
       OzoneConfiguration conf,
@@ -158,9 +157,8 @@ public final class HAUtils {
   }
 
   /**
-   * Create a scm container client backed by the given proxy provider. The
-   * caller keeps the provider reference so it can dynamically reload the SCM
-   * node list (see {@link SCMFailoverProxyProviderBase#changeConfig()}).
+   * Creates an SCM container client using the provided proxy provider.
+   * Retains the provider reference to support dynamic SCM node updates.
    */
   public static StorageContainerLocationProtocol getScmContainerClient(
       ConfigurationSource conf,

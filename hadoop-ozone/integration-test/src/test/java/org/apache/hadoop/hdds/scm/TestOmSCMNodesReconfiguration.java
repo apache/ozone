@@ -82,8 +82,7 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * The SCM node list and each SCM's address (registered as a prefix) must be
-   * reconfigurable on the OM.
+   * Ensures SCM node list and address prefix configurations are reconfigurable on the OM.
    */
   @Test
   void testScmNodesAndAddressReconfigurableOnOm() throws Exception {
@@ -95,8 +94,7 @@ public class TestOmSCMNodesReconfiguration {
     assertTrue(handler.isPropertyReconfigurable(scmNodesKey));
     assertTrue(handler.listReconfigureProperties().contains(scmNodesKey));
 
-    // The per-node SCM address keys are registered as a prefix, so any node's
-    // address key is reconfigurable even though it was not registered by name.
+    // Register address prefix so dynamically added nodes can be reconfigured.
     for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
       String scmAddrKey = ConfUtils.addKeySuffixes(
           OZONE_SCM_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
@@ -105,8 +103,7 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Setting an empty SCM node list must be rejected, leaving the OM's SCM
-   * proxies untouched.
+   * Verifies that an empty SCM node list is rejected without modifying existing proxies.
    */
   @Test
   void testReconfigureScmNodesToBlankThrows() {
@@ -120,9 +117,7 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Reconfiguring the SCM node list on a running OM must reload the SCM failover
-   * proxies to the new membership. Dropping one SCM has to shrink the proxy node
-   * set for both the block and container providers.
+   * Verifies that reconfiguring SCM nodes dynamically updates block and container failover proxies.
    */
   @Test
   void testReconfigureScmNodesReloadsProxies() throws Exception {
@@ -136,8 +131,7 @@ public class TestOmSCMNodesReconfiguration {
         new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
     assertEquals(3, before.size());
 
-    // Drop one SCM from the OM's view. Its address stays in the configuration,
-    // so the reload of the remaining nodes succeeds.
+    // Remove one SCM; its lingering address configuration allows reloading the remaining nodes.
     String dropped = before.get(before.size() - 1);
     List<String> remaining = new ArrayList<>(before.subList(0, before.size() - 1));
     Set<String> expected = new HashSet<>(remaining);
@@ -152,18 +146,13 @@ public class TestOmSCMNodesReconfiguration {
     assertEquals(expected, afterBlock);
     assertFalse(afterContainer.contains(dropped));
 
-    // Comparing node ids alone would not catch a proxy that was stopped but
-    // left in use, so drive a live RPC through the rebuilt proxies.
+    // Perform live RPCs to verify rebuilt proxies rather than just checking node IDs.
     assertNotNull(scmClient.getContainerClient().getScmInfo());
     assertNotNull(scmClient.getBlockClient().getScmInfo());
   }
 
   /**
-   * Changing only a per-node SCM address must reload the OM's SCM failover proxies
-   * against the new endpoint. Address keys are prefix-registered with no per-key
-   * reload, so the change is applied by the reconfiguration-complete callback. We
-   * drive that callback directly: the async {@code reconfig start} path reads
-   * ozone-site.xml from disk, which a mini-cluster does not rewrite.
+   * Verifies that updating a per-node SCM address reloads failover proxies via the completion callback.
    */
   @Test
   void testReconfigureScmAddressReloadsProxies() throws Exception {
@@ -174,8 +163,7 @@ public class TestOmSCMNodesReconfiguration {
     String scmAddrKey = ConfUtils.addKeySuffixes(
         OZONE_SCM_ADDRESS_KEY, scmServiceId, nodeId);
 
-    // Point one SCM at a different resolvable address on the OM's live
-    // configuration -- the same instance the proxy providers read.
+    // Update SCM address in OM's live configuration read by proxy providers.
     OzoneConfiguration conf = om.getConfiguration();
     conf.set(scmAddrKey, "127.0.0.2");
 
@@ -190,10 +178,7 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * The reconfiguration-complete callback must reload the SCM proxies only when
-   * the batch touched the SCM node list or a per-node SCM address. A batch that
-   * reports only an unrelated key must leave the proxies untouched, even if the
-   * live SCM address configuration has drifted, so nothing is applied.
+   * Verifies that proxies are reloaded only when reconfiguration touches SCM node lists or addresses.
    */
   @Test
   void testReloadScmProxiesOnReconfigIgnoresUnrelatedKey() {
@@ -222,10 +207,7 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * A malformed per-node SCM address in a batch reported to the complete callback
-   * must not escape: the callback catches the resolution failure and only logs,
-   * leaving the previous proxies in place, so the reconfiguration-complete chain
-   * (tracing, logging) is not broken.
+   * Verifies that malformed SCM addresses during completion callbacks are caught and logged without breaking existing proxies.
    */
   @Test
   void testReloadScmProxiesOnReconfigCatchesMalformedAddress() {
@@ -240,9 +222,7 @@ public class TestOmSCMNodesReconfiguration {
     Set<String> before =
         new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
 
-    // An address that already carries a port cannot be rebuilt into a valid
-    // host:port authority, so resolving the membership throws
-    // IllegalArgumentException.
+    // Addresses with duplicate ports produce invalid host:port authorities and throw IllegalArgumentException.
     conf.set(scmAddrKey, "127.0.0.1:9999");
     Map<String, Boolean> changed = new HashMap<>();
     changed.put(scmAddrKey, true);
@@ -258,10 +238,7 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Adding an SCM to the node list without first setting its address must fail
-   * the reconfiguration (reported FAILED, retriable) and leave the live
-   * configuration and SCM proxies unchanged: the node list must never keep an
-   * SCM without a resolvable address.
+   * Verifies that adding an SCM without a resolved address fails reconfiguration and keeps proxies unchanged.
    */
   @Test
   void testReconfigureScmNodesFailsWhenAddressMissing() {
@@ -291,10 +268,7 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Adding an SCM whose address is malformed (a host:port value that cannot be
-   * reassembled into a valid socket address) must fail like a missing address:
-   * resolving the membership throws IllegalArgumentException, so the node list is
-   * rolled back and the SCM proxies are left unchanged. Guards the widened catch.
+   * Verifies that adding an SCM with a malformed address rolls back node changes and leaves proxies unchanged.
    */
   @Test
   void testReconfigureScmNodesFailsWhenAddressMalformed() {
@@ -312,9 +286,7 @@ public class TestOmSCMNodesReconfiguration {
         new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
     String originalValue = conf.get(scmNodesKey);
 
-    // An address that already carries a port cannot be rebuilt into a valid
-    // host:port authority, so resolving the new membership throws
-    // IllegalArgumentException rather than ConfigurationException.
+    // Addresses with existing ports form invalid authorities, throwing IllegalArgumentException over ConfigurationException.
     conf.set(newAddrKey, "127.0.0.1:9999");
     List<String> withBadAddress = new ArrayList<>(before);
     withBadAddress.add(newNodeId);
@@ -331,11 +303,7 @@ public class TestOmSCMNodesReconfiguration {
   }
 
   /**
-   * Adding an SCM in "nodes before address" order (an order a real
-   * {@code reconfig start} batch may use). Applying the node list first cannot
-   * resolve the new node, so that property fails and is rolled back; once the
-   * address is set, reapplying the node list adds it. Adding a node is thus
-   * retriable rather than silently keeping a node without an address.
+   * Verifies that adding an SCM before setting its address rolls back initially, then succeeds when retried after setting the address.
    */
   @Test
   void testReconfigureAddScmNodeNodesBeforeAddress() throws Exception {
@@ -354,8 +322,7 @@ public class TestOmSCMNodesReconfiguration {
     after.add(newNodeId);
     String requested = String.join(",", after);
 
-    // 1. Node list applied first, before the new SCM's address: the reload
-    //    cannot resolve the node, so the property fails and is rolled back.
+    // 1. Unresolvable node list fails and rolls back when applied before the new address.
     assertThrows(ReconfigurationException.class,
         () -> handler.reconfigureProperty(scmNodesKey, requested));
     assertFalse(new HashSet<>(
