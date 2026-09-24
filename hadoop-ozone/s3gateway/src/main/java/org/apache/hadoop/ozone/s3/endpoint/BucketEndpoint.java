@@ -352,6 +352,11 @@ public class BucketEndpoint extends BucketOperationHandler {
       throw newError(S3ErrorTable.MALFORMED_XML, bucketName);
     }
 
+    // Deleting a specific version is not implemented; ignoring VersionId would delete the current object instead.
+    if (request.getObjects() != null && request.getObjects().stream().anyMatch(o -> o.getVersionId() != null)) {
+      throw newError(S3ErrorTable.NOT_IMPLEMENTED, bucketName);
+    }
+
     final OzoneBucket bucket;
     try {
       bucket = getVolume().getBucket(bucketName);
@@ -456,6 +461,7 @@ public class BucketEndpoint extends BucketOperationHandler {
         .add(new ListMultipartUploadsHandler())
         .add(new BucketTaggingHandler())
         .add(new BucketLifecycleHandler())
+        .add(new BucketNotImplementedHandler())
         .add(new BucketCrudHandler())
         .add(this)
         .build();

@@ -155,6 +155,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         .add(new ObjectTaggingHandler())
         .add(new ObjectAttributesHandler())
         .add(new MultipartKeyHandler())
+        .add(new ObjectNotImplementedHandler())
         .add(this)
         .build();
     handler = new AuditingObjectOperationHandler(chain);
