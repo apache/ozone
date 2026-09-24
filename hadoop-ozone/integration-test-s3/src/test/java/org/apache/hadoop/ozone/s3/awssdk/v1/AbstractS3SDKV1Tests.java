@@ -54,8 +54,10 @@ import com.amazonaws.services.s3.model.CopyPartResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.DeleteBucketTaggingConfigurationRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
+import com.amazonaws.services.s3.model.GetBucketAccelerateConfigurationRequest;
 import com.amazonaws.services.s3.model.GetBucketLifecycleConfigurationRequest;
 import com.amazonaws.services.s3.model.GetBucketTaggingConfigurationRequest;
+import com.amazonaws.services.s3.model.GetObjectAclRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectTaggingRequest;
 import com.amazonaws.services.s3.model.GetObjectTaggingResult;
@@ -162,6 +164,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -1394,11 +1397,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     SetObjectAclRequest setObjectAclRequest = new SetObjectAclRequest(bucketName, keyName, aclList);
 
-    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
-        () -> s3Client.setObjectAcl(setObjectAclRequest));
-    assertEquals("NotImplemented", ase.getErrorCode());
-    assertEquals(501, ase.getStatusCode());
-    assertEquals(ErrorType.Service, ase.getErrorType());
+    assertNotImplemented(() -> s3Client.setObjectAcl(setObjectAclRequest));
 
     // Ensure that the object content remains unchanged
     ObjectMetadata updatedObjectMetadata = s3Client.getObjectMetadata(bucketName, keyName);
@@ -1414,6 +1413,27 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       }
       assertEquals(content, bos.toString("UTF-8"));
     }
+  }
+
+  @Test
+  public void testGetObjectAclNotImplemented() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+    s3Client.putObject(
+        bucketName, keyName, new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)), new ObjectMetadata());
+
+    assertNotImplemented(() -> s3Client.getObjectAcl(new GetObjectAclRequest(bucketName, keyName)));
+  }
+
+  @Test
+  public void testGetBucketAccelerateConfigurationNotImplemented() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    assertNotImplemented(
+        () -> s3Client.getBucketAccelerateConfiguration(new GetBucketAccelerateConfigurationRequest(bucketName)));
   }
 
   @Test
@@ -2561,19 +2581,20 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
       }
     }
 
-    @Test
-    public void testPresignedUrlGetObjectTorrentNotImplemented() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"annotation", "torrent"})
+    public void testPresignedUrlGetObjectSubresourceNotImplemented(String subresource) throws Exception {
       final String keyName = getKeyName();
 
       InputStream is = new ByteArrayInputStream(CONTENT.getBytes(StandardCharsets.UTF_8));
       s3Client.putObject(BUCKET_NAME, keyName, is, new ObjectMetadata());
 
-      // AmazonS3 (SDK v1) has no getObjectTorrent API, so exercise the same HTTP behavior
-      // via a presigned URL with the torrent query parameter, as with other request shapes
+      // AmazonS3 (SDK v1) has no getObjectTorrent or listObjectAnnotations API, so exercise the same HTTP behavior
+      // via a presigned URL with the subresource query parameter, as with other request shapes
       // the typed v1 API doesn't expose.
       GeneratePresignedUrlRequest generatePresignedUrlRequest =
           new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.GET).withExpiration(expiration);
-      generatePresignedUrlRequest.addRequestParameter("torrent", "");
+      generatePresignedUrlRequest.addRequestParameter(subresource, "");
       URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
 
       HttpURLConnection connection = null;
@@ -2975,6 +2996,13 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
   private String getKeyName(String ignored) {
     return uniqueObjectName();
+  }
+
+  private static void assertNotImplemented(Executable request) {
+    final AmazonServiceException ase = assertThrows(AmazonServiceException.class, request);
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), ase.getErrorCode());
+    assertEquals(501, ase.getStatusCode());
+    assertEquals(ErrorType.Service, ase.getErrorType());
   }
 
   private String multipartUpload(String bucketName, String key, File file, long partSize, String contentType,

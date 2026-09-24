@@ -761,6 +761,21 @@ public abstract class EndpointBase {
     }
   }
 
+  /**
+   * Rejects the request with {@code NotImplemented} if it has any of the {@code subresources}.
+   *
+   * @return null if the request has none of the {@code subresources}
+   */
+  Response rejectNotImplemented(S3RequestContext s3RequestContext, Set<String> subresources, String resource) {
+    for (String subresource : subresources) {
+      if (queryParams().get(subresource) != null) {
+        s3RequestContext.setAction(S3GAction.NOT_IMPLEMENTED);
+        throw newError(S3ErrorTable.NOT_IMPLEMENTED, resource);
+      }
+    }
+    return null;
+  }
+
   protected ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket) throws OS3Exception {
     String storageType = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
     String storageConfig = getHeaders().getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);

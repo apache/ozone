@@ -168,6 +168,7 @@ import software.amazon.awssdk.services.s3.model.MetadataDirective;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectAttributes;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
+import software.amazon.awssdk.services.s3.model.ObjectLockLegalHoldStatus;
 import software.amazon.awssdk.services.s3.model.PutBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.PutBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -677,16 +678,82 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     s3Client.createBucket(b -> b.bucket(bucketName));
     s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
 
-    S3Exception exception = assertThrows(S3Exception.class,
-        () -> s3Client.getObjectTorrent(b -> b.bucket(bucketName).key(keyName)));
-
-    assertEquals(501, exception.statusCode());
-    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), exception.awsErrorDetails().errorCode());
-    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getErrorMessage(), exception.awsErrorDetails().errorMessage());
+    assertNotImplemented(() -> s3Client.getObjectTorrent(b -> b.bucket(bucketName).key(keyName)));
 
     // object must be untouched
     HeadObjectResponse headObjectResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName));
     assertEquals(content.length(), headObjectResponse.contentLength());
+  }
+
+  @Test
+  public void testGetObjectAclNotImplemented() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("bar"));
+
+    assertNotImplemented(() -> s3Client.getObjectAcl(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testGetBucketAccelerateConfigurationNotImplemented() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    assertNotImplemented(() -> s3Client.getBucketAccelerateConfiguration(b -> b.bucket(bucketName)));
+  }
+
+  @Test
+  public void testListObjectAnnotationsNotImplemented() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("bar"));
+
+    assertNotImplemented(() -> s3Client.listObjectAnnotations(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteBucketMetadataTableConfigurationNotImplemented() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    assertNotImplemented(() -> s3Client.deleteBucketMetadataTableConfiguration(b -> b.bucket(bucketName)));
+
+    // the empty bucket must not be deleted
+    assertDoesNotThrow(() -> s3Client.headBucket(b -> b.bucket(bucketName)));
+  }
+
+  @Test
+  public void testDeleteObjectsWithVersionIdNotImplemented() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("bar"));
+
+    assertNotImplemented(
+        () -> s3Client.deleteObjects(
+            b -> b.bucket(bucketName).delete(d -> d.objects(ObjectIdentifier.builder().key(keyName)
+                .versionId("nonexistent").build()))));
+
+    // the current object must not be deleted
+    assertDoesNotThrow(() -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testPutObjectLegalHoldNotImplemented() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    assertNotImplemented(
+        () -> s3Client.putObjectLegalHold(
+            b -> b.bucket(bucketName).key(keyName).legalHold(h -> h.status(ObjectLockLegalHoldStatus.ON))));
+
+    // the object must not be overwritten with the request body
+    assertEquals(content, s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String());
   }
 
   @Test
@@ -3098,6 +3165,13 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
   private String getKeyName(String ignored) {
     return uniqueObjectName();
+  }
+
+  private static void assertNotImplemented(Executable request) {
+    final S3Exception exception = assertThrows(S3Exception.class, request);
+    assertEquals(501, exception.statusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), exception.awsErrorDetails().errorCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getErrorMessage(), exception.awsErrorDetails().errorMessage());
   }
 
   private String multipartUpload(String bucketName, String key, File file, int partSize,

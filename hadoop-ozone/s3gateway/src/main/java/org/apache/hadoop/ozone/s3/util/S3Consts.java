@@ -181,6 +181,41 @@ public final class S3Consts {
     public static final String UPLOADS = "uploads";
     public static final String LIFECYCLE = "lifecycle";
     public static final String ATTRIBUTES = "attributes";
+    public static final String VERSION_ID = "versionId";
+
+    // Subresources of S3 APIs that are not implemented. They are only recognized so that the
+    // request can be rejected with NotImplemented instead of falling through to another operation.
+    // See BucketNotImplementedHandler and ObjectNotImplementedHandler.
+    public static final String ABAC = "abac";
+    public static final String ACCELERATE = "accelerate";
+    public static final String ANALYTICS = "analytics";
+    public static final String ANNOTATION = "annotation";
+    public static final String CORS = "cors";
+    public static final String ENCRYPTION = "encryption";
+    public static final String INTELLIGENT_TIERING = "intelligent-tiering";
+    public static final String INVENTORY = "inventory";
+    public static final String LEGAL_HOLD = "legal-hold";
+    public static final String LOGGING = "logging";
+    public static final String METADATA_ANNOTATION_TABLE = "metadataAnnotationTable";
+    public static final String METADATA_CONFIGURATION = "metadataConfiguration";
+    public static final String METADATA_INVENTORY_TABLE = "metadataInventoryTable";
+    public static final String METADATA_JOURNAL_TABLE = "metadataJournalTable";
+    public static final String METADATA_TABLE = "metadataTable";
+    public static final String METRICS = "metrics";
+    public static final String NOTIFICATION = "notification";
+    public static final String OBJECT_LOCK = "object-lock";
+    public static final String OWNERSHIP_CONTROLS = "ownershipControls";
+    public static final String POLICY = "policy";
+    public static final String POLICY_STATUS = "policyStatus";
+    public static final String PUBLIC_ACCESS_BLOCK = "publicAccessBlock";
+    public static final String RENAME_OBJECT = "renameObject";
+    public static final String REPLICATION = "replication";
+    public static final String REQUEST_PAYMENT = "requestPayment";
+    public static final String RETENTION = "retention";
+    public static final String SESSION = "session";
+    public static final String VERSIONING = "versioning";
+    public static final String VERSIONS = "versions";
+    public static final String WEBSITE = "website";
 
     private QueryParams() {
       // no instances

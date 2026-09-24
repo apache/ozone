@@ -75,6 +75,8 @@ public final class S3GActionIamMapper {
       return "PutObjectTagging";
     case DELETE_OBJECT_TAGGING:
       return "DeleteObjectTagging";
+    case GET_OBJECT_ACL:
+      return "GetObjectAcl";
     case PUT_OBJECT_ACL:
       return "PutObjectAcl";
     case COPY_OBJECT:

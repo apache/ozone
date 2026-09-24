@@ -32,6 +32,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -44,6 +45,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -85,6 +87,16 @@ public class TestObjectTaggingDelete {
 
     assertTrue(client.getObjectStore().getS3Bucket(BUCKET_NAME)
         .getKey(KEY_WITH_TAG).getTags().isEmpty());
+  }
+
+  @Test
+  public void testDeleteTaggingWithVersionIdIsNotImplemented() throws IOException {
+    rest.queryParamsForTest().set(QueryParams.VERSION_ID, "nonexistent");
+
+    assertErrorResponse(NOT_IMPLEMENTED, () -> deleteTagging(rest, BUCKET_NAME, KEY_WITH_TAG));
+    assertEquals(
+        ImmutableMap.of("tag1", "value1", "tag2", "value2"),
+        client.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_WITH_TAG).getTags());
   }
 
   @Test
