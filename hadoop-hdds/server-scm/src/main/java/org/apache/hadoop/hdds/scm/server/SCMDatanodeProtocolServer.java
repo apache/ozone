@@ -251,7 +251,10 @@ public class SCMDatanodeProtocolServer implements
             layoutInfo);
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
-      if (!containerReportsProto.getFullContainerReportDeferred()) {
+      if (containerReportsProto.getFullContainerReportDeferred()) {
+        fcrLeaseManager.markFullContainerReportDeferred(datanodeDetails);
+      } else {
+        fcrLeaseManager.clearFullContainerReportDeferred(datanodeDetails);
         eventPublisher.fireEvent(CONTAINER_REPORT,
             new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
                 datanodeDetails, containerReportsProto, true));
@@ -311,11 +314,29 @@ public class SCMDatanodeProtocolServer implements
   @Override
   public SCMHeartbeatResponseProto sendHeartbeat(
       SCMHeartbeatRequestProto heartbeat) throws IOException, TimeoutException {
-    SCMHeartbeatRequestProto heartbeatToDispatch = filterInvalidLeasedFCR(
-        heartbeat);
+    SCMHeartbeatRequestProto heartbeatToDispatch = heartbeat;
+    SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode leasedReport =
+        null;
+    boolean leasedReportRejected = false;
+    if (heartbeat.hasContainerReport()
+        && hasFullContainerReportLease(heartbeat.getContainerReport())) {
+      leasedReport = claimLeasedFCR(heartbeat);
+      if (leasedReport == null) {
+        leasedReportRejected = true;
+        heartbeatToDispatch = heartbeat.toBuilder().clearContainerReport().build();
+      }
+    }
     List<SCMCommandProto> cmdResponses = new ArrayList<>();
-    for (SCMCommand<?> cmd : heartbeatDispatcher.dispatch(heartbeatToDispatch)) {
-      cmdResponses.add(getCommandResponse(cmd, scm));
+    try {
+      for (SCMCommand<?> cmd :
+          heartbeatDispatcher.dispatch(heartbeatToDispatch, leasedReport)) {
+        cmdResponses.add(getCommandResponse(cmd, scm));
+      }
+    } catch (RuntimeException | Error ex) {
+      if (leasedReport != null) {
+        leasedReport.completeIfNotDispatched();
+      }
+      throw ex;
     }
     final OptionalLong term = getTermIfLeader();
     boolean auditSuccess = true;
@@ -329,6 +350,7 @@ public class SCMDatanodeProtocolServer implements
               .setDatanodeUUID(heartbeat.getDatanodeDetails().getUuid())
               .addAllCommands(cmdResponses);
       term.ifPresent(builder::setTerm);
+      builder.setFullContainerReportLeaseRejected(leasedReportRejected);
       addFCRLeaseIfRequested(heartbeat, builder);
       return builder.build();
     } catch (Exception ex) {
@@ -358,32 +380,36 @@ public class SCMDatanodeProtocolServer implements
         System::currentTimeMillis, scm.getContainerManager().getMetrics());
   }
 
-  private SCMHeartbeatRequestProto filterInvalidLeasedFCR(
+  private SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode claimLeasedFCR(
       SCMHeartbeatRequestProto heartbeat) {
-    if (!heartbeat.hasContainerReport() ||
-        !hasFullContainerReportLease(heartbeat.getContainerReport())) {
-      return heartbeat;
-    }
-
     DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(
         heartbeat.getDatanodeDetails());
     ContainerReportsProto containerReport = heartbeat.getContainerReport();
-    if (fcrLeaseManager.checkLease(datanodeDetails,
-        containerReport.getFullContainerReportLeaseTerm(),
-        containerReport.getFullContainerReportLeaseId())) {
-      fcrLeaseManager.removeLease(datanodeDetails);
-      if (scm.getContainerManager().getMetrics() != null) {
-        scm.getContainerManager().getMetrics()
-            .incNumFCRReportsProcessedWithLease();
-      }
-      return heartbeat;
+    OptionalLong currentTerm = scmContext == null
+        ? OptionalLong.empty() : scmContext.getTermOfLeaderIfReady();
+    SCMFullContainerReportLeaseManager.LeaseClaim claim = null;
+    if (currentTerm.isPresent()
+        && currentTerm.getAsLong()
+        == containerReport.getFullContainerReportLeaseTerm()) {
+      claim = fcrLeaseManager.claimLease(datanodeDetails,
+          currentTerm.getAsLong(),
+          containerReport.getFullContainerReportLeaseId());
+    } else {
+      fcrLeaseManager.recordInvalidLeaseReport();
+    }
+    if (claim != null) {
+      long leaseId = containerReport.getFullContainerReportLeaseId();
+      return new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
+          datanodeDetails, containerReport, claim.isRegistrationReport(),
+          processed -> fcrLeaseManager.completeLease(
+              datanodeDetails, leaseId, processed));
     }
 
     LOG.warn("Ignoring full container report from datanode {} with invalid "
             + "lease id {} and term {}.", datanodeDetails.getUuidString(),
         containerReport.getFullContainerReportLeaseId(),
         containerReport.getFullContainerReportLeaseTerm());
-    return heartbeat.toBuilder().clearContainerReport().build();
+    return null;
   }
 
   private boolean hasFullContainerReportLease(ContainerReportsProto report) {
@@ -393,12 +419,11 @@ public class SCMDatanodeProtocolServer implements
 
   private void addFCRLeaseIfRequested(SCMHeartbeatRequestProto heartbeat,
       SCMHeartbeatResponseProto.Builder builder) {
-    if (!heartbeat.getRequestFullContainerReportLease() || scmContext == null
-        || !scmContext.isLeaderReady()) {
+    if (!heartbeat.getRequestFullContainerReportLease() || scmContext == null) {
       return;
     }
 
-    OptionalLong term = getTermIfLeader();
+    OptionalLong term = scmContext.getTermOfLeaderIfReady();
     if (!term.isPresent()) {
       return;
     }

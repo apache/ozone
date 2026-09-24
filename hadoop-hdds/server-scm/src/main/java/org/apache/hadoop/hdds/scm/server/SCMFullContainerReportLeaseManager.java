@@ -34,6 +34,8 @@ public class SCMFullContainerReportLeaseManager {
   private final LongSupplier clock;
   private final SCMContainerManagerMetrics metrics;
   private final Map<String, Lease> pendingLeases = new HashMap<>();
+  private final Map<String, Long> deferredRegistrationReports = new HashMap<>();
+  private long nextDeferredRegistrationId;
 
   public SCMFullContainerReportLeaseManager(int maxOutstandingLeases,
       long leaseExpiryMs, LongSupplier clock, SCMContainerManagerMetrics metrics) {
@@ -47,7 +49,14 @@ public class SCMFullContainerReportLeaseManager {
     incrementLeaseRequests();
     pruneExpiredLeases();
     removeLeasesFromOtherTerms(term);
-    pendingLeases.remove(datanode.getUuidString());
+    String datanodeId = datanode.getUuidString();
+    Lease existingLease = pendingLeases.get(datanodeId);
+    if (existingLease != null && existingLease.claimed) {
+      incrementLeasesRejected();
+      updateOutstandingLeaseMetric();
+      return 0;
+    }
+    pendingLeases.remove(datanodeId);
 
     if (pendingLeases.size() >= maxOutstandingLeases) {
       incrementLeasesRejected();
@@ -56,24 +65,26 @@ public class SCMFullContainerReportLeaseManager {
     }
 
     long leaseId = nextLeaseId();
-    pendingLeases.put(datanode.getUuidString(),
-        new Lease(leaseId, term, clock.getAsLong()));
+    long deferredRegistrationId =
+        deferredRegistrationReports.getOrDefault(datanodeId, 0L);
+    pendingLeases.put(datanodeId,
+        new Lease(leaseId, term, clock.getAsLong(), deferredRegistrationId));
     incrementLeasesGranted();
     updateOutstandingLeaseMetric();
     return leaseId;
   }
 
-  public synchronized boolean checkLease(DatanodeDetails datanode, long term,
+  public synchronized LeaseClaim claimLease(DatanodeDetails datanode, long term,
       long leaseId) {
     if (leaseId == 0) {
       incrementInvalidLeaseReports();
-      return false;
+      return null;
     }
 
     Lease lease = pendingLeases.get(datanode.getUuidString());
-    if (lease == null) {
+    if (lease == null || lease.claimed) {
       incrementInvalidLeaseReports();
-      return false;
+      return null;
     }
 
     if (isExpired(lease)) {
@@ -81,7 +92,7 @@ public class SCMFullContainerReportLeaseManager {
       incrementLeaseExpired();
       incrementInvalidLeaseReports();
       updateOutstandingLeaseMetric();
-      return false;
+      return null;
     }
 
     if (lease.term != term) {
@@ -90,20 +101,59 @@ public class SCMFullContainerReportLeaseManager {
         updateOutstandingLeaseMetric();
       }
       incrementInvalidLeaseReports();
-      return false;
+      return null;
     }
 
     if (lease.leaseId != leaseId) {
       incrementInvalidLeaseReports();
-      return false;
+      return null;
     }
 
-    return true;
+    lease.claimed = true;
+    return new LeaseClaim(lease.deferredRegistrationId != 0);
   }
 
-  public synchronized void removeLease(DatanodeDetails datanode) {
-    pendingLeases.remove(datanode.getUuidString());
+  public synchronized void completeLease(DatanodeDetails datanode,
+      long leaseId, boolean reportProcessed) {
+    String datanodeId = datanode.getUuidString();
+    Lease lease = pendingLeases.get(datanodeId);
+    if (lease == null || lease.leaseId != leaseId) {
+      return;
+    }
+    pendingLeases.remove(datanodeId);
+    if (reportProcessed) {
+      if (lease.deferredRegistrationId != 0
+          && deferredRegistrationReports.getOrDefault(datanodeId, 0L)
+          == lease.deferredRegistrationId) {
+        deferredRegistrationReports.remove(datanodeId);
+      }
+      incrementReportsProcessedWithLease();
+    }
     updateOutstandingLeaseMetric();
+  }
+
+  public synchronized void markFullContainerReportDeferred(
+      DatanodeDetails datanode) {
+    long deferredRegistrationId = ++nextDeferredRegistrationId;
+    if (deferredRegistrationId == 0) {
+      deferredRegistrationId = ++nextDeferredRegistrationId;
+    }
+    String datanodeId = datanode.getUuidString();
+    deferredRegistrationReports.put(datanodeId, deferredRegistrationId);
+    Lease lease = pendingLeases.get(datanodeId);
+    if (lease != null && !lease.claimed) {
+      pendingLeases.remove(datanodeId);
+      updateOutstandingLeaseMetric();
+    }
+  }
+
+  public synchronized void clearFullContainerReportDeferred(
+      DatanodeDetails datanode) {
+    deferredRegistrationReports.remove(datanode.getUuidString());
+  }
+
+  public synchronized void recordInvalidLeaseReport() {
+    incrementInvalidLeaseReports();
   }
 
   public synchronized int getOutstandingLeaseCount() {
@@ -125,7 +175,8 @@ public class SCMFullContainerReportLeaseManager {
         .iterator();
     boolean removed = false;
     while (iterator.hasNext()) {
-      if (isExpired(iterator.next().getValue())) {
+      Lease lease = iterator.next().getValue();
+      if (!lease.claimed && isExpired(lease)) {
         iterator.remove();
         incrementLeaseExpired();
         removed = true;
@@ -141,7 +192,8 @@ public class SCMFullContainerReportLeaseManager {
         .iterator();
     boolean removed = false;
     while (iterator.hasNext()) {
-      if (iterator.next().getValue().term != term) {
+      Lease lease = iterator.next().getValue();
+      if (!lease.claimed && lease.term != term) {
         iterator.remove();
         removed = true;
       }
@@ -185,6 +237,12 @@ public class SCMFullContainerReportLeaseManager {
     }
   }
 
+  private void incrementReportsProcessedWithLease() {
+    if (metrics != null) {
+      metrics.incNumFCRReportsProcessedWithLease();
+    }
+  }
+
   private void updateOutstandingLeaseMetric() {
     if (metrics != null) {
       metrics.setNumFCRLeasesOutstanding(pendingLeases.size());
@@ -195,11 +253,27 @@ public class SCMFullContainerReportLeaseManager {
     private final long leaseId;
     private final long term;
     private final long createdAtMs;
+    private final long deferredRegistrationId;
+    private boolean claimed;
 
-    private Lease(long leaseId, long term, long createdAtMs) {
+    private Lease(long leaseId, long term, long createdAtMs,
+        long deferredRegistrationId) {
       this.leaseId = leaseId;
       this.term = term;
       this.createdAtMs = createdAtMs;
+      this.deferredRegistrationId = deferredRegistrationId;
+    }
+  }
+
+  static final class LeaseClaim {
+    private final boolean registrationReport;
+
+    private LeaseClaim(boolean registrationReport) {
+      this.registrationReport = registrationReport;
+    }
+
+    boolean isRegistrationReport() {
+      return registrationReport;
     }
   }
 }

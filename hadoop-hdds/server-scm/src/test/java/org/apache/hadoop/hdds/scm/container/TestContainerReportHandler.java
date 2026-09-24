@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainerReports;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
@@ -46,6 +47,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -165,6 +167,34 @@ public class TestContainerReportHandler {
     if (dbStore != null) {
       dbStore.close();
     }
+  }
+
+  @Test
+  public void testCompletesProcessedReport() {
+    DatanodeDetails datanode =
+        nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    AtomicReference<Boolean> processed = new AtomicReference<>();
+    ContainerReportFromDatanode report = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance(), false,
+        processed::set);
+
+    new ContainerReportHandler(nodeManager, containerManager)
+        .onMessage(report, publisher);
+
+    assertEquals(Boolean.TRUE, processed.get());
+  }
+
+  @Test
+  public void testCompletesUnknownDatanodeReportAsUnprocessed() {
+    AtomicReference<Boolean> processed = new AtomicReference<>();
+    ContainerReportFromDatanode report = new ContainerReportFromDatanode(
+        randomDatanodeDetails(),
+        ContainerReportsProto.getDefaultInstance(), false, processed::set);
+
+    new ContainerReportHandler(nodeManager, containerManager)
+        .onMessage(report, publisher);
+
+    assertEquals(Boolean.FALSE, processed.get());
   }
 
   static Stream<Arguments> containerAndReplicaStates() {

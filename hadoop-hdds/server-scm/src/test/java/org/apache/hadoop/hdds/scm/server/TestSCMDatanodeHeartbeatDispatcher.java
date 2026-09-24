@@ -20,8 +20,12 @@ package org.apache.hadoop.hdds.scm.server;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.INCREMENTAL_CONTAINER_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REGISTRATION_CONT_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -30,11 +34,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -137,6 +143,100 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     assertEquals(2, eventReceived.get());
 
 
+  }
+
+  @Test
+  public void testContainerReportDispatcherUsesProvidedReport() {
+    AtomicBoolean providedReportDispatched = new AtomicBoolean();
+    AtomicBoolean registrationReportDispatched = new AtomicBoolean();
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.isNodeRegistered(any())).thenReturn(true);
+    EventPublisher publisher = new EventPublisher() {
+      @Override
+      public <PAYLOAD, EVENT extends Event<PAYLOAD>> void fireEvent(
+          EVENT event, PAYLOAD payload) {
+        if (event.equals(CONTAINER_REPORT)) {
+          providedReportDispatched.set(((ContainerReportFromDatanode) payload).isRegister());
+        } else if (event.equals(NODE_REGISTRATION_CONT_REPORT)) {
+          registrationReportDispatched.set(true);
+        }
+      }
+    };
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(nodeManager, publisher);
+    DatanodeDetails datanode = randomDatanodeDetails();
+    ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
+    ContainerReportFromDatanode providedReport =
+        new ContainerReportFromDatanode(datanode, report, true);
+    SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage())
+        .setContainerReport(report)
+        .build();
+
+    dispatcher.dispatch(heartbeat, providedReport);
+
+    assertTrue(providedReportDispatched.get());
+    assertTrue(registrationReportDispatched.get());
+  }
+
+  @Test
+  public void testContainerReportDispatcherCompletesUndispatchedReport() {
+    AtomicBoolean completed = new AtomicBoolean();
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.isNodeRegistered(any())).thenReturn(false);
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(nodeManager,
+            mock(EventPublisher.class));
+    DatanodeDetails datanode = randomDatanodeDetails();
+    ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
+    ContainerReportFromDatanode providedReport =
+        new ContainerReportFromDatanode(datanode, report, false,
+            processed -> completed.set(!processed));
+    SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage())
+        .setContainerReport(report)
+        .build();
+
+    dispatcher.dispatch(heartbeat, providedReport);
+
+    assertTrue(completed.get());
+  }
+
+  @Test
+  public void testDispatchedContainerReportKeepsCompletionOwnership() {
+    AtomicBoolean completed = new AtomicBoolean();
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.isNodeRegistered(any())).thenReturn(true);
+    EventPublisher publisher = new EventPublisher() {
+      @Override
+      public <PAYLOAD, EVENT extends Event<PAYLOAD>> void fireEvent(
+          EVENT event, PAYLOAD payload) {
+        if (event.equals(INCREMENTAL_CONTAINER_REPORT)) {
+          throw new IllegalStateException("ICR dispatch failed");
+        }
+      }
+    };
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(nodeManager, publisher);
+    DatanodeDetails datanode = randomDatanodeDetails();
+    ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
+    ContainerReportFromDatanode providedReport =
+        new ContainerReportFromDatanode(datanode, report, false,
+            processed -> completed.set(true));
+    SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage())
+        .setContainerReport(report)
+        .addIncrementalContainerReport(
+            IncrementalContainerReportProto.getDefaultInstance())
+        .build();
+
+    assertThrows(IllegalStateException.class,
+        () -> dispatcher.dispatch(heartbeat, providedReport));
+    providedReport.completeIfNotDispatched();
+
+    assertFalse(completed.get());
+    providedReport.complete(true);
+    assertTrue(completed.get());
   }
 
   /**

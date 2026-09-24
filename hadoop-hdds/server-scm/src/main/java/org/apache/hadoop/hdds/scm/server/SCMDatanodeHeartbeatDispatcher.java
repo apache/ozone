@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.CMD_STATUS_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.INCREMENTAL_CONTAINER_REPORT;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REGISTRATION_CONT_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_ACTIONS;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.PIPELINE_REPORT;
@@ -31,6 +32,8 @@ import com.google.protobuf.Message;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
@@ -81,6 +84,11 @@ public final class SCMDatanodeHeartbeatDispatcher {
    * @return list of SCMCommand
    */
   public List<SCMCommand<?>> dispatch(SCMHeartbeatRequestProto heartbeat) {
+    return dispatch(heartbeat, null);
+  }
+
+  public List<SCMCommand<?>> dispatch(SCMHeartbeatRequestProto heartbeat,
+      ContainerReportFromDatanode fullContainerReport) {
     DatanodeDetails datanodeDetails =
         DatanodeDetails.getFromProtoBuf(heartbeat.getDatanodeDetails());
     List<SCMCommand<?>> commands;
@@ -90,6 +98,9 @@ public final class SCMDatanodeHeartbeatDispatcher {
     if (!nodeManager.isNodeRegistered(datanodeDetails)) {
       LOG.info("SCM received heartbeat from an unregistered datanode {}. " +
           "Asking datanode to re-register.", datanodeDetails);
+      if (fullContainerReport != null) {
+        fullContainerReport.complete(false);
+      }
       DatanodeID dnID = datanodeDetails.getID();
       nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
 
@@ -127,11 +138,16 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
       if (heartbeat.hasContainerReport()) {
         LOG.debug("Dispatching Container Report.");
-        eventPublisher.fireEvent(
-            CONTAINER_REPORT,
-            new ContainerReportFromDatanode(
-                datanodeDetails,
-                heartbeat.getContainerReport()));
+        if (fullContainerReport != null && fullContainerReport.isRegister()) {
+          eventPublisher.fireEvent(NODE_REGISTRATION_CONT_REPORT,
+              new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(
+                  datanodeDetails, heartbeat.getContainerReport()));
+        }
+        ContainerReportFromDatanode report = fullContainerReport != null
+            ? fullContainerReport : new ContainerReportFromDatanode(
+                datanodeDetails, heartbeat.getContainerReport());
+        eventPublisher.fireEvent(CONTAINER_REPORT, report);
+        report.markDispatched();
 
       }
 
@@ -272,6 +288,9 @@ public final class SCMDatanodeHeartbeatDispatcher {
     ContainerReportType getType();
 
     void mergeReport(ContainerReport val);
+
+    default void complete(boolean processed) {
+    }
   }
 
   /**
@@ -299,16 +318,26 @@ public final class SCMDatanodeHeartbeatDispatcher {
     private long createTime = Time.monotonicNow();
     // Used to identify whether container reporting is from a registration.
     private boolean isRegister = false;
+    private final Consumer<Boolean> completion;
+    private final AtomicBoolean completed = new AtomicBoolean();
+    private final AtomicBoolean dispatched = new AtomicBoolean();
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {
-      super(datanodeDetails, report);
+      this(datanodeDetails, report, false);
     }
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report, boolean isRegister) {
+      this(datanodeDetails, report, isRegister, processed -> { });
+    }
+
+    public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
+        ContainerReportsProto report, boolean isRegister,
+        Consumer<Boolean> completion) {
       super(datanodeDetails, report);
       this.isRegister = isRegister;
+      this.completion = completion;
     }
 
     @Override
@@ -333,6 +362,23 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public boolean isRegister() {
       return isRegister;
+    }
+
+    @Override
+    public void complete(boolean processed) {
+      if (completed.compareAndSet(false, true)) {
+        completion.accept(processed);
+      }
+    }
+
+    void markDispatched() {
+      dispatched.set(true);
+    }
+
+    void completeIfNotDispatched() {
+      if (!dispatched.get()) {
+        complete(false);
+      }
     }
 
     @Override

@@ -161,6 +161,11 @@ public class HeartbeatEndpointTask
       LOG.debug("Sending heartbeat message : {}", request);
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
           .sendHeartbeat(request);
+      if (response.getFullContainerReportLeaseRejected()
+          && request.hasContainerReport()
+          && request.getContainerReport().hasFullContainerReportLeaseId()) {
+        context.putBackFullContainerReport(rpcEndpoint.getAddress());
+      }
       processResponse(response, datanodeDetailsProto);
       rpcEndpoint.setLastSuccessfulHeartbeat(ZonedDateTime.now());
       rpcEndpoint.zeroMissedCount();
@@ -168,6 +173,10 @@ public class HeartbeatEndpointTask
       Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
+      if (requestBuilder.hasContainerReport()
+          && requestBuilder.getContainerReport().hasFullContainerReportLeaseId()) {
+        context.putBackFullContainerReport(rpcEndpoint.getAddress());
+      }
       rpcEndpoint.logIfNeeded(ex);
       maybeRefreshScmAddress(ex);
     } finally {
@@ -220,10 +229,9 @@ public class HeartbeatEndpointTask
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
     boolean fcrReady = context.isFullContainerReportReady(
         rpcEndpoint.getAddress());
-    boolean waitForFCRLease = fcrReady
-        && rpcEndpoint.supportsFullContainerReportLease()
+    boolean waitForFCRLease = rpcEndpoint.supportsFullContainerReportLease()
         && !rpcEndpoint.hasFullContainerReportLease();
-    if (waitForFCRLease) {
+    if (fcrReady && waitForFCRLease) {
       requestBuilder.setRequestFullContainerReportLease(true);
     }
 

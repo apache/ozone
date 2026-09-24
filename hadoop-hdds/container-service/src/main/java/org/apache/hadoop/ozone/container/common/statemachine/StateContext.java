@@ -397,6 +397,13 @@ public class StateContext {
         && mp.get(CONTAINER_REPORTS_PROTO_NAME).get();
   }
 
+  public void putBackFullContainerReport(HostAndPort endpoint) {
+    Map<String, AtomicBoolean> reports = isFullReportReadyToBeSent.get(endpoint);
+    if (reports != null) {
+      reports.get(CONTAINER_REPORTS_PROTO_NAME).set(true);
+    }
+  }
+
   /**
    * Gets a point in time snapshot of all containers, any pending incremental
    * container reports (ICR) for containers will be included in this report

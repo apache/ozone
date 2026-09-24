@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
@@ -181,6 +182,21 @@ public final class SCMContext {
       }
 
       return isLeaderReady;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  /**
+   * Returns the current term only when this SCM is the leader and is ready.
+   */
+  public OptionalLong getTermOfLeaderIfReady() {
+    lock.readLock().lock();
+    try {
+      if (term == INVALID_TERM) {
+        return OptionalLong.of(term);
+      }
+      return isLeader && isLeaderReady ? OptionalLong.of(term) : OptionalLong.empty();
     } finally {
       lock.readLock().unlock();
     }

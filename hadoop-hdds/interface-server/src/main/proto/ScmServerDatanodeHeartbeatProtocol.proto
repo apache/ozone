@@ -159,6 +159,7 @@ message SCMHeartbeatResponseProto {
   optional int64 term = 3;
   optional uint64 fullContainerReportLeaseId = 4 [default = 0];
   optional int64 fullContainerReportLeaseTerm = 5 [default = -1];
+  optional bool fullContainerReportLeaseRejected = 6 [default = false];
 }
 
 message SCMNodeAddressList {
