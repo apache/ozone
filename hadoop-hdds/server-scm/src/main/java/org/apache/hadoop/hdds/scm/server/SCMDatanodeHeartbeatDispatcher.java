@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -319,6 +320,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
     // Used to identify whether container reporting is from a registration.
     private boolean isRegister = false;
     private final Consumer<Boolean> completion;
+    private final BooleanSupplier processingPermit;
     private final AtomicBoolean completed = new AtomicBoolean();
     private final AtomicBoolean dispatched = new AtomicBoolean();
 
@@ -335,9 +337,16 @@ public final class SCMDatanodeHeartbeatDispatcher {
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report, boolean isRegister,
         Consumer<Boolean> completion) {
+      this(datanodeDetails, report, isRegister, completion, () -> true);
+    }
+
+    public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
+        ContainerReportsProto report, boolean isRegister,
+        Consumer<Boolean> completion, BooleanSupplier processingPermit) {
       super(datanodeDetails, report);
       this.isRegister = isRegister;
       this.completion = completion;
+      this.processingPermit = processingPermit;
     }
 
     @Override
@@ -362,6 +371,10 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public boolean isRegister() {
       return isRegister;
+    }
+
+    public boolean startProcessing() {
+      return processingPermit.getAsBoolean();
     }
 
     @Override

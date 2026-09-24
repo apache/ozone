@@ -461,6 +461,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     datanodeProtocolServer = new SCMDatanodeProtocolServer(conf, this,
         eventQueue, scmContext);
+    scmNodeManager.setDatanodeRemovedHandler(
+        datanodeProtocolServer::removeDatanode);
     blockProtocolServer = new SCMBlockProtocolServer(conf, this);
     clientProtocolServer = new SCMClientProtocolServer(conf, this,
         reconfigurationHandler);

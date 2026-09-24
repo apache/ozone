@@ -197,6 +197,21 @@ public class TestContainerReportHandler {
     assertEquals(Boolean.FALSE, processed.get());
   }
 
+  @Test
+  public void testCompletesReportWithoutProcessingWhenPermitIsRevoked() {
+    DatanodeDetails datanode =
+        nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    AtomicReference<Boolean> processed = new AtomicReference<>();
+    ContainerReportFromDatanode report = new ContainerReportFromDatanode(
+        datanode, ContainerReportsProto.getDefaultInstance(), false,
+        processed::set, () -> false);
+
+    new ContainerReportHandler(nodeManager, containerManager)
+        .onMessage(report, publisher);
+
+    assertEquals(Boolean.FALSE, processed.get());
+  }
+
   static Stream<Arguments> containerAndReplicaStates() {
     // Replication types to test
     List<HddsProtos.ReplicationType> replicationTypes = Arrays.asList(

@@ -68,6 +68,7 @@ import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -244,6 +245,25 @@ public class TestSCMNodeManager {
       assertEquals(hbProcessedBefore + registeredNodes,
           getLongCounter("NumHBProcessed", getMetrics(SCMNodeMetrics.SOURCE_NAME)),
           "All scheduled heartbeats should have been processed.");
+    }
+  }
+
+  @Test
+  public void testRemoveNodeInvokesDatanodeRemovedHandler() throws Exception {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      DatanodeDetails datanode = randomDatanodeDetails();
+      registerNode(nodeManager, datanode);
+      nodeManager.setNodeOperationalState(datanode,
+          HddsProtos.NodeOperationalState.DECOMMISSIONED);
+      datanode.setPersistedOpState(
+          HddsProtos.NodeOperationalState.DECOMMISSIONED);
+      AtomicReference<DatanodeDetails> removed = new AtomicReference<>();
+      nodeManager.setDatanodeRemovedHandler(removed::set);
+
+      nodeManager.removeNode(datanode);
+
+      assertThat(removed).hasValue(datanode);
+      assertFalse(nodeManager.isNodeRegistered(datanode));
     }
   }
 
