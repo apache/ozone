@@ -40,7 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
-import org.apache.hadoop.hdds.scm.cli.ContainerBalancerDryRunSubcommand;
+import org.apache.hadoop.hdds.scm.cli.ContainerBalancerEstimateSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
@@ -170,7 +170,7 @@ class TestContainerBalancerSubCommand {
   private ContainerBalancerStopSubcommand stopCmd;
   private ContainerBalancerStartSubcommand startCmd;
   private ContainerBalancerStatusSubcommand statusCmd;
-  private ContainerBalancerDryRunSubcommand dryRunCmd;
+  private ContainerBalancerEstimateSubcommand estimateCmd;
   private GenericTestUtils.PrintStreamCapturer out;
   private GenericTestUtils.PrintStreamCapturer err;
   private AtomicBoolean verbose;
@@ -381,7 +381,7 @@ class TestContainerBalancerSubCommand {
       }
     };
     parseSubcommand(startCmd);
-    dryRunCmd = new ContainerBalancerDryRunSubcommand();
+    estimateCmd = new ContainerBalancerEstimateSubcommand();
     out = GenericTestUtils.captureOut();
     err = GenericTestUtils.captureErr();
   }
@@ -836,13 +836,13 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
-  void testContainerBalancerDryRunSubcommandDefaultShowsMediumProfile() throws IOException {
+  void testContainerBalancerEstimateSubcommandDefaultShowsMediumProfile() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
 
-    parseSubcommand(dryRunCmd);
-    dryRunCmd.execute(scmClient);
+    parseSubcommand(estimateCmd);
+    estimateCmd.execute(scmClient);
 
     String output = out.get();
     assertThat(output)
@@ -864,13 +864,13 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
-  void testContainerBalancerDryRunSubcommandAllShowsAllProfiles() throws IOException {
+  void testContainerBalancerEstimateSubcommandAllShowsAllProfiles() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
 
-    parseSubcommand(dryRunCmd, "--all");
-    dryRunCmd.execute(scmClient);
+    parseSubcommand(estimateCmd, "--all");
+    estimateCmd.execute(scmClient);
 
     String output = out.get();
     String[] blocks = output.split("Profile:");
@@ -912,56 +912,56 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
-  void testContainerBalancerDryRunSubcommandInvalidThresholdFails() throws IOException {
+  void testContainerBalancerEstimateSubcommandInvalidThresholdFails() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
-    parseSubcommand(dryRunCmd, "-t", "-1");
-    IOException ex = assertThrows(IOException.class, () -> dryRunCmd.execute(scmClient));
+    parseSubcommand(estimateCmd, "-t", "-1");
+    IOException ex = assertThrows(IOException.class, () -> estimateCmd.execute(scmClient));
     assertThat(ex.getMessage()).contains("Threshold should be specified in the range [0.0, 100.0).");
   }
 
   @Test
-  void testContainerBalancerDryRunSubcommandInvalidDatanodePercentageFails() throws IOException {
+  void testContainerBalancerEstimateSubcommandInvalidDatanodePercentageFails() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
-    parseSubcommand(dryRunCmd, "-d", "0");
-    IOException ex = assertThrows(IOException.class, () -> dryRunCmd.execute(scmClient));
+    parseSubcommand(estimateCmd, "-d", "0");
+    IOException ex = assertThrows(IOException.class, () -> estimateCmd.execute(scmClient));
     assertThat(ex.getMessage()).contains(
         "Max Datanodes Percentage To Involve Per Iteration should be specified in the range (0, 100]");
   }
 
   @Test
-  void testContainerBalancerDryRunSubcommandInvalidMaxSizeFails() throws IOException {
+  void testContainerBalancerEstimateSubcommandInvalidMaxSizeFails() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
-    parseSubcommand(dryRunCmd, "-s", "0");
-    IOException ex = assertThrows(IOException.class, () -> dryRunCmd.execute(scmClient));
+    parseSubcommand(estimateCmd, "-s", "0");
+    IOException ex = assertThrows(IOException.class, () -> estimateCmd.execute(scmClient));
     assertThat(ex.getMessage()).contains(
         "Max Size To Move Per Iteration In GB must be positive.");
   }
 
   @Test
-  void testContainerBalancerDryRunSubcommandInvalidProfileFails() throws IOException {
+  void testContainerBalancerEstimateSubcommandInvalidProfileFails() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
 
-    parseSubcommand(dryRunCmd, "--profile", "turbo");
-    IOException ex = assertThrows(IOException.class, () -> dryRunCmd.execute(scmClient));
+    parseSubcommand(estimateCmd, "--profile", "turbo");
+    IOException ex = assertThrows(IOException.class, () -> estimateCmd.execute(scmClient));
     assertThat(ex.getMessage()).contains("Invalid profile: turbo");
   }
 
   @Test
-  void testContainerBalancerDryRunSubcommandWithProfileShowsOneProfile() throws IOException {
+  void testContainerBalancerEstimateSubcommandWithProfileShowsOneProfile() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
 
-    parseSubcommand(dryRunCmd, "--profile", "FAST");
-    dryRunCmd.execute(scmClient);
+    parseSubcommand(estimateCmd, "--profile", "FAST");
+    estimateCmd.execute(scmClient);
 
     String output = out.get();
     assertThat(output).contains("Profile: FAST");
@@ -975,13 +975,13 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
-  void testContainerBalancerDryRunSubcommandCliOverrideUsesResolvedValuesInOutput() throws IOException {
+  void testContainerBalancerEstimateSubcommandCliOverrideUsesResolvedValuesInOutput() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
 
-    parseSubcommand(dryRunCmd, "--profile", "slow", "-e", "6");
-    dryRunCmd.execute(scmClient);
+    parseSubcommand(estimateCmd, "--profile", "slow", "-e", "6");
+    estimateCmd.execute(scmClient);
 
     assertThat(out.get())
         .contains("Max entering target:      " + byteDesc(6L * GB) + " / node")
@@ -989,14 +989,14 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
-  void testContainerBalancerDryRunSubcommandPartialFailureWhenMaxMoveOverrideConflictsWithFastPreset()
+  void testContainerBalancerEstimateSubcommandPartialFailureWhenMaxMoveOverrideConflictsWithFastPreset()
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
         .thenReturn(buildImbalancedCluster());
 
-    parseSubcommand(dryRunCmd, "--all", "-s", "70", "-t", "5");
-    dryRunCmd.execute(scmClient);
+    parseSubcommand(estimateCmd, "--all", "-s", "70", "-t", "5");
+    estimateCmd.execute(scmClient);
 
     String output = out.get();
     String[] blocks = output.split("Profile:");
@@ -1033,7 +1033,7 @@ class TestContainerBalancerSubCommand {
   }
 
   /**
-   * Imbalanced cluster for dry-run CLI tests.
+   * Imbalanced cluster for estimate CLI tests.
    *
    * <p>With default 10% threshold: 14 targets, 42 sources, 14 neutral (70 eligible).
    */

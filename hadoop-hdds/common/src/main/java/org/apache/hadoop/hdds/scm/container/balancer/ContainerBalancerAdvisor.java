@@ -51,7 +51,7 @@ public final class ContainerBalancerAdvisor {
    * Per-profile validation failures are returned with {@link ContainerBalancerEstimation#succeeded()} false
    * instead of aborting other profiles.
    */
-  public static List<ContainerBalancerEstimation> estimateDryRun(OzoneConfiguration conf, AdvisorRequest request) {
+  public static List<ContainerBalancerEstimation> estimate(OzoneConfiguration conf, AdvisorRequest request) {
     Objects.requireNonNull(conf, "conf");
     Objects.requireNonNull(request, "request");
     List<DatanodeUsageInfoProto> nodes = Objects.requireNonNull(request.nodes, "nodes");

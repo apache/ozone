@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.junit.jupiter.api.Test;
 
-/** Tests for {@link ContainerBalancerAdvisor} dry-run estimation. */
+/** Tests for {@link ContainerBalancerAdvisor} estimation. */
 public final class TestContainerBalancerAdvisor {
 
   @Test
@@ -48,9 +48,9 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testEstimateDryRunDefaultReturnsMediumProfile() {
+  void testEstimateDefaultReturnsMediumProfile() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimateDryRun(
+    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimate(
         conf,
         new ContainerBalancerAdvisor.AdvisorRequest().setNodes(buildCluster(70, 14, 14)));
 
@@ -63,9 +63,9 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testEstimateDryRunAllProfilesReturnsThreeProfiles() {
+  void testEstimateAllProfilesReturnsThreeProfiles() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimateDryRun(
+    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimate(
         conf,
         new ContainerBalancerAdvisor.AdvisorRequest()
             .setNodes(buildCluster(70, 14, 14))
@@ -92,14 +92,14 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testEstimateDryRunSingleProfileFast() {
+  void testEstimateSingleProfileFast() {
     OzoneConfiguration conf = new OzoneConfiguration();
     ContainerBalancerConfiguration balancerConfig = conf.getObject(ContainerBalancerConfiguration.class);
     long expectedCycleTimeMillis = ContainerBalancerAdvisor.computeCycleTimeMillis(
         balancerConfig.getMoveTimeout().toMillis(),
         balancerConfig.getBalancingInterval().toMillis());
 
-    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimateDryRun(
+    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimate(
         conf,
         new ContainerBalancerAdvisor.AdvisorRequest()
             .setNodes(buildCluster(70, 14, 14))
@@ -124,17 +124,17 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testEstimateDryRunRespectsThresholdOverride() {
+  void testEstimateRespectsThresholdOverride() {
     OzoneConfiguration conf = new OzoneConfiguration();
     List<DatanodeUsageInfoProto> nodes = buildCluster(70, 14, 14);
 
-    long defaultThresholdBytesToMove = ContainerBalancerAdvisor.estimateDryRun(
+    long defaultThresholdBytesToMove = ContainerBalancerAdvisor.estimate(
             conf,
             new ContainerBalancerAdvisor.AdvisorRequest().setNodes(nodes))
         .get(0)
         .getBytesToMove();
 
-    long tighterThresholdBytesToMove = ContainerBalancerAdvisor.estimateDryRun(
+    long tighterThresholdBytesToMove = ContainerBalancerAdvisor.estimate(
             conf,
             new ContainerBalancerAdvisor.AdvisorRequest()
                 .setNodes(nodes)
@@ -146,9 +146,9 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testEstimateDryRunRespectsExplicitMaxDatanodesPercentageOverride() {
+  void testEstimateRespectsExplicitMaxDatanodesPercentageOverride() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimateDryRun(
+    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimate(
         conf,
         new ContainerBalancerAdvisor.AdvisorRequest()
             .setNodes(buildCluster(70, 14, 14))
@@ -160,11 +160,11 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testEstimateDryRunRespectsMaxSizeLeavingSourceOverride() {
+  void testEstimateRespectsMaxSizeLeavingSourceOverride() {
     OzoneConfiguration conf = new OzoneConfiguration();
     List<DatanodeUsageInfoProto> nodes = buildCluster(70, 14, 14);
 
-    ContainerBalancerEstimation baseline = ContainerBalancerAdvisor.estimateDryRun(
+    ContainerBalancerEstimation baseline = ContainerBalancerAdvisor.estimate(
             conf,
             new ContainerBalancerAdvisor.AdvisorRequest()
                 .setNodes(nodes)
@@ -172,7 +172,7 @@ public final class TestContainerBalancerAdvisor {
         .get(0);
 
     long overriddenLeavingSource = 10L * OzoneConsts.GB;
-    ContainerBalancerEstimation overridden = ContainerBalancerAdvisor.estimateDryRun(
+    ContainerBalancerEstimation overridden = ContainerBalancerAdvisor.estimate(
             conf,
             new ContainerBalancerAdvisor.AdvisorRequest()
                 .setNodes(nodes)
@@ -189,9 +189,9 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testEstimateDryRunReturnsFailedResultWhenMaxMoveOverrideConflictsWithFastPreset() {
+  void testEstimateReturnsFailedResultWhenMaxMoveOverrideConflictsWithFastPreset() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimateDryRun(
+    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimate(
         conf,
         new ContainerBalancerAdvisor.AdvisorRequest()
             .setNodes(buildCluster(70, 14, 14))
@@ -210,40 +210,40 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testEstimateDryRunFailsWhenNodesNull() {
+  void testEstimateFailsWhenNodesNull() {
     OzoneConfiguration conf = new OzoneConfiguration();
     assertThrows(NullPointerException.class, () ->
-        ContainerBalancerAdvisor.estimateDryRun(
+        ContainerBalancerAdvisor.estimate(
             conf,
             new ContainerBalancerAdvisor.AdvisorRequest()));
   }
 
   @Test
-  void testEstimateDryRunFailsWhenNodesEmpty() {
+  void testEstimateFailsWhenNodesEmpty() {
     OzoneConfiguration conf = new OzoneConfiguration();
     assertThrows(IllegalArgumentException.class, () ->
-        ContainerBalancerAdvisor.estimateDryRun(
+        ContainerBalancerAdvisor.estimate(
             conf,
             new ContainerBalancerAdvisor.AdvisorRequest().setNodes(new ArrayList<>())));
   }
 
   @Test
-  void testEstimateDryRunFailsWhenClusterBalanced() {
+  void testEstimateFailsWhenClusterBalanced() {
     OzoneConfiguration conf = new OzoneConfiguration();
     List<DatanodeUsageInfoProto> balanced = new ArrayList<>();
     balanced.add(proto("dn-1", OzoneConsts.TB, (long) (0.70 * OzoneConsts.TB)));
     balanced.add(proto("dn-2", OzoneConsts.TB, (long) (0.70 * OzoneConsts.TB)));
 
     assertThrows(IllegalArgumentException.class, () ->
-        ContainerBalancerAdvisor.estimateDryRun(
+        ContainerBalancerAdvisor.estimate(
             conf,
             new ContainerBalancerAdvisor.AdvisorRequest().setNodes(balanced)));
   }
 
   @Test
-  void testEstimateDryRunFailsWhenEnteringTargetTooSmall() {
+  void testEstimateFailsWhenEnteringTargetTooSmall() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimateDryRun(
+    List<ContainerBalancerEstimation> results = ContainerBalancerAdvisor.estimate(
         conf,
         new ContainerBalancerAdvisor.AdvisorRequest()
             .setNodes(buildCluster(70, 14, 14))
@@ -254,7 +254,7 @@ public final class TestContainerBalancerAdvisor {
   }
 
   /**
-   * Builds an imbalanced cluster for dry-run tests.
+   * Builds an imbalanced cluster for balancer estimate tests.
    *
    * <p>With default 10% threshold and {@code buildCluster(70, 14, 14)}:
    * <ul>

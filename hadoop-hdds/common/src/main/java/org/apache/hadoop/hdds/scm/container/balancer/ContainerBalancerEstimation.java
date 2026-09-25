@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import java.util.Objects;
 
 /**
- * Dry-run estimate for a single container balancer profile.
+ * Estimate for a single container balancer profile.
  */
 public final class ContainerBalancerEstimation {
 

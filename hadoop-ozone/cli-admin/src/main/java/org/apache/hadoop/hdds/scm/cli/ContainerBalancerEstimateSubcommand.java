@@ -39,13 +39,13 @@ import picocli.CommandLine.Option;
  * without starting the balancer.
  */
 @Command(
-    name = "dry-run",
+    name = "estimate",
     description = "Estimate container balancer bytes to move, iterations, per iteration bytes " +
-        "and upper-bound duration without starting it. Balancer limits and profile presets are read from " +
-        "the local Ozone configuration (including ozone-site.xml), datanode usage is fetched from SCM.",
+        "and upper-bound duration without starting it. Throttling profiles (SLOW, MEDIUM, FAST) use built-in presets," +
+            " datanode usage is fetched from SCM.",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
-public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
+public class ContainerBalancerEstimateSubcommand extends ScmSubcommand {
 
   private static final double PLANNING_ITERATION_BUFFER = 1.3d;
 
@@ -67,7 +67,7 @@ public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
     ContainerBalancerAdvisor.AdvisorRequest request = buildRequest(nodes);
     List<ContainerBalancerEstimation> estimations;
     try {
-      estimations = ContainerBalancerAdvisor.estimateDryRun(conf, request);
+      estimations = ContainerBalancerAdvisor.estimate(conf, request);
     } catch (IllegalArgumentException e) {
       throw new IOException(e.getMessage(), e);
     }
@@ -94,7 +94,7 @@ public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
 
   private ContainerBalancerAdvisor.AdvisorRequest buildRequest(List<DatanodeUsageInfoProto> nodes) throws IOException {
     ContainerBalancerAdvisor.AdvisorRequest request = new ContainerBalancerAdvisor.AdvisorRequest().setNodes(nodes);
-    configOptions.applyToDryRunRequest(request);
+    configOptions.applyToEstimateRequest(request);
 
     if (profileSelection != null) {
       if (profileSelection.allProfiles) {
@@ -161,7 +161,7 @@ public class ContainerBalancerDryRunSubcommand extends ScmSubcommand {
   static class ProfileSelection {
     @Option(names = {"--profile"},
         description = "Throttling profile: SLOW, MEDIUM, or FAST profiles. When set, only this profile is estimated. "
-            + "When omitted, dry-run estimates the MEDIUM profile.")
+            + "When omitted, the MEDIUM profile is estimated.")
     private Optional<String> profileName;
 
     @Option(names = {"--all"},
