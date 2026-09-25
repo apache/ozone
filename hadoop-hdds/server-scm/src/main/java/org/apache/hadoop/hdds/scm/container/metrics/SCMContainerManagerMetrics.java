@@ -22,7 +22,6 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
-import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
@@ -48,13 +47,6 @@ public final class SCMContainerManagerMetrics {
   private @Metric MutableCounterLong numContainerReportsProcessedFailed;
   private @Metric MutableCounterLong numICRReportsProcessedSuccessful;
   private @Metric MutableCounterLong numICRReportsProcessedFailed;
-  private @Metric MutableCounterLong numFCRLeaseRequests;
-  private @Metric MutableCounterLong numFCRLeasesGranted;
-  private @Metric MutableCounterLong numFCRLeasesRejected;
-  private @Metric MutableCounterLong numFCRLeaseExpired;
-  private @Metric MutableCounterLong numFCRReportsRejectedInvalidLease;
-  private @Metric MutableCounterLong numFCRReportsProcessedWithLease;
-  private @Metric MutableGaugeLong numFCRLeasesOutstanding;
 
   private SCMContainerManagerMetrics() {
   }
@@ -113,34 +105,6 @@ public final class SCMContainerManagerMetrics {
     this.numICRReportsProcessedFailed.incr();
   }
 
-  public void incNumFCRLeaseRequests() {
-    this.numFCRLeaseRequests.incr();
-  }
-
-  public void incNumFCRLeasesGranted() {
-    this.numFCRLeasesGranted.incr();
-  }
-
-  public void incNumFCRLeasesRejected() {
-    this.numFCRLeasesRejected.incr();
-  }
-
-  public void incNumFCRLeaseExpired() {
-    this.numFCRLeaseExpired.incr();
-  }
-
-  public void incNumFCRReportsRejectedInvalidLease() {
-    this.numFCRReportsRejectedInvalidLease.incr();
-  }
-
-  public void incNumFCRReportsProcessedWithLease() {
-    this.numFCRReportsProcessedWithLease.incr();
-  }
-
-  public void setNumFCRLeasesOutstanding(long count) {
-    this.numFCRLeasesOutstanding.set(count);
-  }
-
   public long getNumContainerReportsProcessedSuccessful() {
     return numContainerReportsProcessedSuccessful.value();
   }
@@ -155,34 +119,6 @@ public final class SCMContainerManagerMetrics {
 
   public long getNumICRReportsProcessedFailed() {
     return numICRReportsProcessedFailed.value();
-  }
-
-  public long getNumFCRLeaseRequests() {
-    return numFCRLeaseRequests.value();
-  }
-
-  public long getNumFCRLeasesGranted() {
-    return numFCRLeasesGranted.value();
-  }
-
-  public long getNumFCRLeasesRejected() {
-    return numFCRLeasesRejected.value();
-  }
-
-  public long getNumFCRLeaseExpired() {
-    return numFCRLeaseExpired.value();
-  }
-
-  public long getNumFCRReportsRejectedInvalidLease() {
-    return numFCRReportsRejectedInvalidLease.value();
-  }
-
-  public long getNumFCRReportsProcessedWithLease() {
-    return numFCRReportsProcessedWithLease.value();
-  }
-
-  public long getNumFCRLeasesOutstanding() {
-    return numFCRLeasesOutstanding.value();
   }
 
   public long getNumSuccessfulCreateContainers() {

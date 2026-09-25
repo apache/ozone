@@ -21,6 +21,8 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
+import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.junit.jupiter.api.Test;
@@ -45,23 +47,24 @@ class TestSCMFullContainerReportLeaseManager {
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
 
-    long firstLease = leaseManager.requestLease(firstDn, 7L);
-    long secondLease = leaseManager.requestLease(secondDn, 7L);
+    long firstLease = requireLease(leaseManager, firstDn, 7L);
+    OptionalLong secondLease = leaseManager.requestLease(secondDn, 7L);
 
     assertThat(firstLease).isNotZero();
-    assertThat(secondLease).isZero();
+    assertThat(secondLease).isEmpty();
     assertThat(leaseManager.getOutstandingLeaseCount()).isEqualTo(1);
 
     SCMFullContainerReportLeaseManager.LeaseClaim claim =
-        leaseManager.claimLease(firstDn, 7L, firstLease);
+        requireClaim(leaseManager, firstDn, 7L, firstLease);
     assertThat(claim).isNotNull();
-    assertThat(leaseManager.claimLease(firstDn, 7L, firstLease)).isNull();
+    assertThat(leaseManager.claimLease(firstDn, OptionalLong.of(7L), 7L,
+        firstLease)).isEmpty();
     assertThat(leaseManager.getOutstandingLeaseCount()).isEqualTo(1);
-    assertThat(leaseManager.requestLease(secondDn, 7L)).isZero();
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
 
-    leaseManager.completeLease(firstDn, firstLease, true);
+    claim.complete(true);
 
-    long secondLeaseAfterRelease = leaseManager.requestLease(secondDn, 7L);
+    long secondLeaseAfterRelease = requireLease(leaseManager, secondDn, 7L);
     assertThat(secondLeaseAfterRelease).isNotZero();
     assertThat(leaseManager.getOutstandingLeaseCount()).isEqualTo(1);
   }
@@ -74,15 +77,15 @@ class TestSCMFullContainerReportLeaseManager {
     DatanodeDetails wrongTermDatanode = randomDatanodeDetails();
     DatanodeDetails expiredDatanode = randomDatanodeDetails();
 
-    long wrongTermLease = leaseManager.requestLease(wrongTermDatanode, 3L);
-    long expiredLease = leaseManager.requestLease(expiredDatanode, 3L);
+    long wrongTermLease = requireLease(leaseManager, wrongTermDatanode, 3L);
+    long expiredLease = requireLease(leaseManager, expiredDatanode, 3L);
 
-    assertThat(leaseManager.claimLease(wrongTermDatanode, 4L,
-        wrongTermLease)).isNull();
+    assertThat(leaseManager.claimLease(wrongTermDatanode,
+        OptionalLong.of(4L), 3L, wrongTermLease)).isEmpty();
 
     now.addAndGet(101L);
-    assertThat(leaseManager.claimLease(expiredDatanode, 3L,
-        expiredLease)).isNull();
+    assertThat(leaseManager.claimLease(expiredDatanode,
+        OptionalLong.of(3L), 3L, expiredLease)).isEmpty();
     assertThat(leaseManager.getOutstandingLeaseCount()).isZero();
   }
 
@@ -94,13 +97,15 @@ class TestSCMFullContainerReportLeaseManager {
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
 
-    long oldTermLease = leaseManager.requestLease(firstDn, 3L);
-    long newTermLease = leaseManager.requestLease(secondDn, 4L);
+    long oldTermLease = requireLease(leaseManager, firstDn, 3L);
+    long newTermLease = requireLease(leaseManager, secondDn, 4L);
 
     assertThat(oldTermLease).isNotZero();
     assertThat(newTermLease).isNotZero();
-    assertThat(leaseManager.claimLease(firstDn, 3L, oldTermLease)).isNull();
-    assertThat(leaseManager.claimLease(secondDn, 4L, newTermLease)).isNotNull();
+    assertThat(leaseManager.claimLease(firstDn, OptionalLong.of(3L), 3L,
+        oldTermLease)).isEmpty();
+    assertThat(leaseManager.claimLease(secondDn, OptionalLong.of(4L), 4L,
+        newTermLease)).isPresent();
   }
 
   @Test
@@ -111,25 +116,25 @@ class TestSCMFullContainerReportLeaseManager {
     DatanodeDetails datanode = randomDatanodeDetails();
 
     leaseManager.markFullContainerReportDeferred(datanode);
-    long firstLease = leaseManager.requestLease(datanode, 7L);
+    long firstLease = requireLease(leaseManager, datanode, 7L);
     SCMFullContainerReportLeaseManager.LeaseClaim firstClaim =
-        leaseManager.claimLease(datanode, 7L, firstLease);
+        requireClaim(leaseManager, datanode, 7L, firstLease);
 
     assertThat(firstClaim).isNotNull();
     assertThat(firstClaim.isRegistrationReport()).isTrue();
 
-    leaseManager.completeLease(datanode, firstLease, false);
-    long retryLease = leaseManager.requestLease(datanode, 7L);
+    firstClaim.complete(false);
+    long retryLease = requireLease(leaseManager, datanode, 7L);
     SCMFullContainerReportLeaseManager.LeaseClaim retryClaim =
-        leaseManager.claimLease(datanode, 7L, retryLease);
+        requireClaim(leaseManager, datanode, 7L, retryLease);
 
     assertThat(retryClaim).isNotNull();
     assertThat(retryClaim.isRegistrationReport()).isTrue();
 
-    leaseManager.completeLease(datanode, retryLease, true);
-    long laterLease = leaseManager.requestLease(datanode, 7L);
+    retryClaim.complete(true);
+    long laterLease = requireLease(leaseManager, datanode, 7L);
     SCMFullContainerReportLeaseManager.LeaseClaim laterClaim =
-        leaseManager.claimLease(datanode, 7L, laterLease);
+        requireClaim(leaseManager, datanode, 7L, laterLease);
 
     assertThat(laterClaim).isNotNull();
     assertThat(laterClaim.isRegistrationReport()).isFalse();
@@ -143,16 +148,16 @@ class TestSCMFullContainerReportLeaseManager {
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
 
-    long firstLease = leaseManager.requestLease(firstDn, 7L);
+    long firstLease = requireLease(leaseManager, firstDn, 7L);
     now.addAndGet(99L);
     SCMFullContainerReportLeaseManager.LeaseClaim claim =
-        leaseManager.claimLease(firstDn, 7L, firstLease);
+        requireClaim(leaseManager, firstDn, 7L, firstLease);
     assertThat(claim).isNotNull();
-    assertThat(leaseManager.requestLease(secondDn, 7L)).isZero();
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
 
     now.addAndGet(100L);
 
-    assertThat(leaseManager.requestLease(secondDn, 7L)).isNotZero();
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isPresent();
     assertThat(claim.startProcessing()).isFalse();
     assertThat(leaseManager.getOutstandingLeaseCount()).isEqualTo(1);
   }
@@ -165,17 +170,17 @@ class TestSCMFullContainerReportLeaseManager {
     DatanodeDetails firstDn = randomDatanodeDetails();
     DatanodeDetails secondDn = randomDatanodeDetails();
 
-    long firstLease = leaseManager.requestLease(firstDn, 7L);
+    long firstLease = requireLease(leaseManager, firstDn, 7L);
     SCMFullContainerReportLeaseManager.LeaseClaim claim =
-        leaseManager.claimLease(firstDn, 7L, firstLease);
+        requireClaim(leaseManager, firstDn, 7L, firstLease);
     assertThat(claim).isNotNull();
     assertThat(claim.startProcessing()).isTrue();
 
     now.addAndGet(100L);
 
-    assertThat(leaseManager.requestLease(secondDn, 7L)).isZero();
-    leaseManager.completeLease(firstDn, firstLease, true);
-    assertThat(leaseManager.requestLease(secondDn, 7L)).isNotZero();
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
+    claim.complete(true);
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isPresent();
   }
 
   @Test
@@ -187,14 +192,14 @@ class TestSCMFullContainerReportLeaseManager {
     DatanodeDetails secondDn = randomDatanodeDetails();
     DatanodeDetails thirdDn = randomDatanodeDetails();
 
-    long firstLease = leaseManager.requestLease(firstDn, 7L);
-    assertThat(leaseManager.requestLease(secondDn, 7L)).isZero();
-    assertThat(leaseManager.requestLease(thirdDn, 7L)).isZero();
+    long firstLease = requireLease(leaseManager, firstDn, 7L);
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
+    assertThat(leaseManager.requestLease(thirdDn, 7L)).isEmpty();
 
-    leaseManager.completeLease(firstDn, firstLease, true);
+    requireClaim(leaseManager, firstDn, 7L, firstLease).complete(true);
 
-    assertThat(leaseManager.requestLease(thirdDn, 7L)).isZero();
-    assertThat(leaseManager.requestLease(secondDn, 7L)).isNotZero();
+    assertThat(leaseManager.requestLease(thirdDn, 7L)).isEmpty();
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isPresent();
   }
 
   @Test
@@ -206,15 +211,15 @@ class TestSCMFullContainerReportLeaseManager {
     DatanodeDetails staleDn = randomDatanodeDetails();
     DatanodeDetails activeDn = randomDatanodeDetails();
 
-    long firstLease = leaseManager.requestLease(firstDn, 7L);
-    assertThat(leaseManager.requestLease(staleDn, 7L)).isZero();
-    assertThat(leaseManager.requestLease(activeDn, 7L)).isZero();
+    long firstLease = requireLease(leaseManager, firstDn, 7L);
+    assertThat(leaseManager.requestLease(staleDn, 7L)).isEmpty();
+    assertThat(leaseManager.requestLease(activeDn, 7L)).isEmpty();
     now.addAndGet(99L);
-    assertThat(leaseManager.requestLease(activeDn, 7L)).isZero();
-    leaseManager.completeLease(firstDn, firstLease, true);
+    assertThat(leaseManager.requestLease(activeDn, 7L)).isEmpty();
+    requireClaim(leaseManager, firstDn, 7L, firstLease).complete(true);
     now.incrementAndGet();
 
-    assertThat(leaseManager.requestLease(activeDn, 7L)).isNotZero();
+    assertThat(leaseManager.requestLease(activeDn, 7L)).isPresent();
   }
 
   @Test
@@ -226,16 +231,16 @@ class TestSCMFullContainerReportLeaseManager {
     DatanodeDetails staleDn = randomDatanodeDetails();
     DatanodeDetails activeDn = randomDatanodeDetails();
 
-    long firstLease = leaseManager.requestLease(firstDn, 7L);
-    assertThat(leaseManager.requestLease(staleDn, 7L)).isZero();
-    assertThat(leaseManager.requestLease(activeDn, 7L)).isZero();
+    long firstLease = requireLease(leaseManager, firstDn, 7L);
+    assertThat(leaseManager.requestLease(staleDn, 7L)).isEmpty();
+    assertThat(leaseManager.requestLease(activeDn, 7L)).isEmpty();
     now.addAndGet(99L);
-    assertThat(leaseManager.requestLease(activeDn, 7L)).isZero();
-    leaseManager.completeLease(firstDn, firstLease, true);
+    assertThat(leaseManager.requestLease(activeDn, 7L)).isEmpty();
+    requireClaim(leaseManager, firstDn, 7L, firstLease).complete(true);
     now.incrementAndGet();
 
-    assertThat(leaseManager.requestLease(staleDn, 7L)).isZero();
-    assertThat(leaseManager.requestLease(activeDn, 7L)).isNotZero();
+    assertThat(leaseManager.requestLease(staleDn, 7L)).isEmpty();
+    assertThat(leaseManager.requestLease(activeDn, 7L)).isPresent();
   }
 
   @Test
@@ -247,18 +252,35 @@ class TestSCMFullContainerReportLeaseManager {
     DatanodeDetails nextDn = randomDatanodeDetails();
 
     leaseManager.markFullContainerReportDeferred(removedDn);
-    assertThat(leaseManager.requestLease(removedDn, 7L)).isNotZero();
+    assertThat(leaseManager.requestLease(removedDn, 7L)).isPresent();
 
     leaseManager.removeDatanode(removedDn);
 
-    long nextLease = leaseManager.requestLease(nextDn, 7L);
+    long nextLease = requireLease(leaseManager, nextDn, 7L);
     assertThat(nextLease).isNotZero();
-    leaseManager.completeLease(nextDn, nextLease, true);
+    requireClaim(leaseManager, nextDn, 7L, nextLease).complete(true);
 
-    long newLease = leaseManager.requestLease(removedDn, 7L);
+    long newLease = requireLease(leaseManager, removedDn, 7L);
     SCMFullContainerReportLeaseManager.LeaseClaim claim =
-        leaseManager.claimLease(removedDn, 7L, newLease);
+        requireClaim(leaseManager, removedDn, 7L, newLease);
     assertThat(claim).isNotNull();
     assertThat(claim.isRegistrationReport()).isFalse();
+  }
+
+  private static long requireLease(
+      SCMFullContainerReportLeaseManager leaseManager,
+      DatanodeDetails datanode, long term) {
+    OptionalLong lease = leaseManager.requestLease(datanode, term);
+    assertThat(lease).isPresent();
+    return lease.getAsLong();
+  }
+
+  private static SCMFullContainerReportLeaseManager.LeaseClaim requireClaim(
+      SCMFullContainerReportLeaseManager leaseManager,
+      DatanodeDetails datanode, long term, long leaseId) {
+    Optional<SCMFullContainerReportLeaseManager.LeaseClaim> claim =
+        leaseManager.claimLease(datanode, OptionalLong.of(term), term, leaseId);
+    assertThat(claim).isPresent();
+    return claim.get();
   }
 }

@@ -35,7 +35,7 @@ class TestContainerReportQueue {
     AtomicReference<Boolean> firstReportProcessed = new AtomicReference<>();
     ContainerReportFromDatanode firstReport = new ContainerReportFromDatanode(
         datanode, ContainerReportsProto.getDefaultInstance(), false,
-        firstReportProcessed::set);
+        lifecycle(firstReportProcessed));
     ContainerReportFromDatanode secondReport = new ContainerReportFromDatanode(
         datanode, ContainerReportsProto.getDefaultInstance());
 
@@ -51,11 +51,26 @@ class TestContainerReportQueue {
     AtomicReference<Boolean> reportProcessed = new AtomicReference<>();
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
         randomDatanodeDetails(), ContainerReportsProto.getDefaultInstance(),
-        false, reportProcessed::set);
+        false, lifecycle(reportProcessed));
     queue.add(report);
 
     queue.clear();
 
     assertThat(reportProcessed).hasValue(false);
+  }
+
+  private static ContainerReportProcessingLifecycle lifecycle(
+      AtomicReference<Boolean> processed) {
+    return new ContainerReportProcessingLifecycle() {
+      @Override
+      public boolean startProcessing() {
+        return true;
+      }
+
+      @Override
+      public void complete(boolean reportProcessed) {
+        processed.set(reportProcessed);
+      }
+    };
   }
 }

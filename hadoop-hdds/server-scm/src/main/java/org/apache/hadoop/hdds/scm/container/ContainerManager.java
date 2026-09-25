@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
-import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.db.Table;
 
@@ -232,10 +231,6 @@ public interface ContainerManager {
    */
   // Is it possible to remove this from the Interface?
   void notifyContainerReportProcessing(boolean isFullReport, boolean success);
-
-  default SCMContainerManagerMetrics getMetrics() {
-    return null;
-  }
 
   /**
    * Deletes a container from SCM.

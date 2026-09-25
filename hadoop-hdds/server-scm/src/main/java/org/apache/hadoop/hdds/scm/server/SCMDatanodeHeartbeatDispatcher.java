@@ -31,8 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
@@ -330,10 +328,20 @@ public final class SCMDatanodeHeartbeatDispatcher {
     private long createTime = Time.monotonicNow();
     // Used to identify whether container reporting is from a registration.
     private boolean isRegister = false;
-    private final Consumer<Boolean> completion;
-    private final BooleanSupplier processingPermit;
+    private final ContainerReportProcessingLifecycle processingLifecycle;
     private final AtomicBoolean completed = new AtomicBoolean();
     private final AtomicBoolean dispatched = new AtomicBoolean();
+    private static final ContainerReportProcessingLifecycle
+        UNRESTRICTED_PROCESSING = new ContainerReportProcessingLifecycle() {
+          @Override
+          public boolean startProcessing() {
+            return true;
+          }
+
+          @Override
+          public void complete(boolean processed) {
+          }
+        };
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report) {
@@ -342,22 +350,15 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report, boolean isRegister) {
-      this(datanodeDetails, report, isRegister, processed -> { });
+      this(datanodeDetails, report, isRegister, UNRESTRICTED_PROCESSING);
     }
 
     public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
         ContainerReportsProto report, boolean isRegister,
-        Consumer<Boolean> completion) {
-      this(datanodeDetails, report, isRegister, completion, () -> true);
-    }
-
-    public ContainerReportFromDatanode(DatanodeDetails datanodeDetails,
-        ContainerReportsProto report, boolean isRegister,
-        Consumer<Boolean> completion, BooleanSupplier processingPermit) {
+        ContainerReportProcessingLifecycle processingLifecycle) {
       super(datanodeDetails, report);
       this.isRegister = isRegister;
-      this.completion = completion;
-      this.processingPermit = processingPermit;
+      this.processingLifecycle = Objects.requireNonNull(processingLifecycle);
     }
 
     @Override
@@ -385,13 +386,13 @@ public final class SCMDatanodeHeartbeatDispatcher {
     }
 
     public boolean startProcessing() {
-      return processingPermit.getAsBoolean();
+      return processingLifecycle.startProcessing();
     }
 
     @Override
     public void complete(boolean processed) {
       if (completed.compareAndSet(false, true)) {
-        completion.accept(processed);
+        processingLifecycle.complete(processed);
       }
     }
 

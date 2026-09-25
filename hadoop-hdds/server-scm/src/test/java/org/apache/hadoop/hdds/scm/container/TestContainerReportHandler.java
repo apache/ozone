@@ -48,6 +48,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -70,6 +71,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.ContainerReportProcessingLifecycle;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -176,7 +178,7 @@ public class TestContainerReportHandler {
     AtomicReference<Boolean> processed = new AtomicReference<>();
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
         datanode, ContainerReportsProto.getDefaultInstance(), false,
-        processed::set);
+        lifecycle(() -> true, processed));
 
     new ContainerReportHandler(nodeManager, containerManager)
         .onMessage(report, publisher);
@@ -189,7 +191,8 @@ public class TestContainerReportHandler {
     AtomicReference<Boolean> processed = new AtomicReference<>();
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
         randomDatanodeDetails(),
-        ContainerReportsProto.getDefaultInstance(), false, processed::set);
+        ContainerReportsProto.getDefaultInstance(), false,
+        lifecycle(() -> true, processed));
 
     new ContainerReportHandler(nodeManager, containerManager)
         .onMessage(report, publisher);
@@ -204,12 +207,27 @@ public class TestContainerReportHandler {
     AtomicReference<Boolean> processed = new AtomicReference<>();
     ContainerReportFromDatanode report = new ContainerReportFromDatanode(
         datanode, ContainerReportsProto.getDefaultInstance(), false,
-        processed::set, () -> false);
+        lifecycle(() -> false, processed));
 
     new ContainerReportHandler(nodeManager, containerManager)
         .onMessage(report, publisher);
 
     assertEquals(Boolean.FALSE, processed.get());
+  }
+
+  private static ContainerReportProcessingLifecycle lifecycle(
+      BooleanSupplier processingPermit, AtomicReference<Boolean> processed) {
+    return new ContainerReportProcessingLifecycle() {
+      @Override
+      public boolean startProcessing() {
+        return processingPermit.getAsBoolean();
+      }
+
+      @Override
+      public void complete(boolean reportProcessed) {
+        processed.set(reportProcessed);
+      }
+    };
   }
 
   static Stream<Arguments> containerAndReplicaStates() {

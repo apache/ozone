@@ -54,6 +54,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -137,6 +138,7 @@ public class SCMDatanodeProtocolServer implements
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
+  private final SCMFullContainerReportLeaseMetrics fcrLeaseMetrics;
   private final SCMFullContainerReportLeaseManager fcrLeaseManager;
   private ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type> protocolMessageMetrics;
 
@@ -156,6 +158,8 @@ public class SCMDatanodeProtocolServer implements
     this.scm = scm;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
+    this.fcrLeaseMetrics = scmContext == null
+        ? null : SCMFullContainerReportLeaseMetrics.create();
     this.fcrLeaseManager = createFCRLeaseManager(conf);
 
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
@@ -389,8 +393,7 @@ public class SCMDatanodeProtocolServer implements
         OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION_DEFAULT
             .toLong(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
     return new SCMFullContainerReportLeaseManager(maxLeases, leaseDurationMs,
-        Time::monotonicNow, scm.getContainerManager() == null
-            ? null : scm.getContainerManager().getMetrics());
+        Time::monotonicNow, fcrLeaseMetrics);
   }
 
   void removeDatanode(DatanodeDetails datanode) {
@@ -405,21 +408,14 @@ public class SCMDatanodeProtocolServer implements
     FullContainerReportLeaseProto lease =
         containerReport.getFullContainerReportLease();
     OptionalLong currentTerm = getFCRLeaseTerm();
-    SCMFullContainerReportLeaseManager.LeaseClaim claim = null;
-    if (currentTerm.isPresent()
-        && currentTerm.getAsLong() == lease.getTerm()) {
-      claim = fcrLeaseManager.claimLease(datanodeDetails,
-          currentTerm.getAsLong(),
-          lease.getId());
-    } else {
-      fcrLeaseManager.recordInvalidLeaseReport();
-    }
-    if (claim != null) {
+    Optional<SCMFullContainerReportLeaseManager.LeaseClaim> claim =
+        fcrLeaseManager.claimLease(datanodeDetails, currentTerm,
+            lease.getTerm(), lease.getId());
+    if (claim.isPresent()) {
+      SCMFullContainerReportLeaseManager.LeaseClaim leaseClaim = claim.get();
       return new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(
-          datanodeDetails, containerReport, claim.isRegistrationReport(),
-          processed -> fcrLeaseManager.completeLease(
-              datanodeDetails, lease.getId(), processed),
-          claim::startProcessing);
+          datanodeDetails, containerReport, leaseClaim.isRegistrationReport(),
+          leaseClaim);
     }
 
     LOG.warn("Ignoring full container report from datanode {} with invalid "
@@ -445,12 +441,12 @@ public class SCMDatanodeProtocolServer implements
 
     DatanodeDetails datanodeDetails = DatanodeDetails.getFromProtoBuf(
         heartbeat.getDatanodeDetails());
-    long leaseId = fcrLeaseManager.requestLease(datanodeDetails,
+    OptionalLong leaseId = fcrLeaseManager.requestLease(datanodeDetails,
         term.getAsLong());
-    if (leaseId != 0) {
+    if (leaseId.isPresent()) {
       builder.setFullContainerReportLease(
           FullContainerReportLeaseProto.newBuilder()
-              .setId(leaseId)
+              .setId(leaseId.getAsLong())
               .setTerm(term.getAsLong()));
     }
   }
@@ -591,6 +587,9 @@ public class SCMDatanodeProtocolServer implements
     }
     IOUtils.cleanupWithLogger(LOG, scm.getScmNodeManager());
     protocolMessageMetrics.unregister();
+    if (fcrLeaseMetrics != null) {
+      fcrLeaseMetrics.unregister();
+    }
   }
 
   @Override
