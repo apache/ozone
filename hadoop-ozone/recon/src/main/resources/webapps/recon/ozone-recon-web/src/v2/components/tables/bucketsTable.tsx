@@ -79,11 +79,8 @@ function renderBucketLayout(bucketLayout: BucketLayout) {
   return <Tag color={color}>{bucketLayout}</Tag>;
 };
 
-// StandaloneReplicationConfig serializes replicationType as STANDALONE, while the
-// ReplicationType enum name is STAND_ALONE, so both spellings are mapped here
 const REPLICATION_TYPE_LABELS: Record<string, string> = {
   RATIS: 'Ratis',
-  STAND_ALONE: 'Standalone',
   STANDALONE: 'Standalone'
 };
 

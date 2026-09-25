@@ -122,7 +122,7 @@ export interface EcInfo {
 // StandaloneReplicationConfig serializes its replicationType as STANDALONE,
 // without the underscore used by the ReplicationType enum name STAND_ALONE
 export interface StandaloneInfo {
-  replicationType: 'STANDALONE' | 'STAND_ALONE';
+  replicationType: 'STANDALONE';
   replicationFactor: string;
   requiredNodes: number;
   minimumNodes: number;
