@@ -21,6 +21,8 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
@@ -120,6 +122,116 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     assertThrows(
         OMException.class, () -> doPreExecute(createRenameKeyRequest(
             volumeName, bucketName, invalidFromKeyName, toKeyName)));
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithToKeyAsExistingDirectory()
+      throws Exception {
+    // case-4) toKey is an existing directory, so the source is renamed as a
+    // sub-path of it: <toKeyName>/fromKey.
+    OmKeyInfo toKeyDirInfo = addToKeyAsDirectory();
+    addKeyToTable(fromKeyInfo);
+
+    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
+        volumeName, bucketName, fromKeyName, toKeyName));
+    OMClientResponse response = getOMKeyRenameRequest(modifiedOmRequest)
+        .validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+
+    // Source is gone and the key now hangs off the toKey directory.
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getDbPathKey(fromKeyParentInfo.getObjectID(), "fromKey")));
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getDbPathKey(toKeyDirInfo.getObjectID(), "fromKey")));
+
+    // Both the source parent and the destination directory are bumped. Here the
+    // destination parent is the toKey directory itself, not toKeyParentInfo.
+    long modificationTime = modifiedOmRequest.getRenameKeyRequest()
+        .getKeyArgs().getModificationTime();
+    assertEquals(modificationTime, omMetadataManager.getDirectoryTable()
+        .get(getDBKeyName(fromKeyParentInfo)).getModificationTime());
+    assertEquals(modificationTime, omMetadataManager.getDirectoryTable()
+        .get(dbToKey).getModificationTime());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithNewToKeyAlreadyExists()
+      throws Exception {
+    // case-5) toKey is an existing directory but <toKeyName>/fromKey is already
+    // taken, so the rename is rejected and nothing is mutated.
+    OmKeyInfo toKeyDirInfo = addToKeyAsDirectory();
+    addKeyToTable(fromKeyInfo);
+    addKeyToTable(getOmKeyInfo(new Path(toKeyName, "fromKey").toString())
+        .setParentObjectID(toKeyDirInfo.getObjectID())
+        .build());
+
+    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
+        volumeName, bucketName, fromKeyName, toKeyName));
+    OMClientResponse response = getOMKeyRenameRequest(modifiedOmRequest)
+        .validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS,
+        response.getOMResponse().getStatus());
+    assertUnchangedOnFailure();
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithToKeyAsExistingFile()
+      throws Exception {
+    // case-6) toKey exists and is a file, so the rename is rejected and nothing
+    // is mutated.
+    addKeyToTable(fromKeyInfo);
+    addKeyToTable(getOmKeyInfo(toKeyName)
+        .setParentObjectID(toKeyParentInfo.getObjectID())
+        .build());
+
+    OMRequest modifiedOmRequest = doPreExecute(createRenameKeyRequest(
+        volumeName, bucketName, fromKeyName, toKeyName));
+    OMClientResponse response = getOMKeyRenameRequest(modifiedOmRequest)
+        .validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS,
+        response.getOMResponse().getStatus());
+    assertUnchangedOnFailure();
+  }
+
+  /**
+   * Turns toKeyName itself into a directory, so a rename to it resolves as
+   * case-4 instead of case-7.
+   */
+  private OmKeyInfo addToKeyAsDirectory() throws Exception {
+    OmKeyInfo toKeyDirInfo = getOmKeyInfo(toKeyName)
+        .setParentObjectID(toKeyParentInfo.getObjectID())
+        .build();
+    OMRequestTestUtils.addDirKeyToDirTable(false,
+        OMFileRequest.getDirectoryInfo(toKeyDirInfo), volumeName, bucketName,
+        txnLogId, omMetadataManager);
+    return toKeyDirInfo;
+  }
+
+  /**
+   * A rejected rename must leave the source in place and both parent
+   * directories' modification times untouched.
+   */
+  private void assertUnchangedOnFailure() throws IOException {
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getDbPathKey(fromKeyParentInfo.getObjectID(), "fromKey")));
+    assertEquals(fromKeyParentInfo.getModificationTime(), omMetadataManager
+        .getDirectoryTable().get(getDBKeyName(fromKeyParentInfo))
+        .getModificationTime());
+    assertEquals(toKeyParentInfo.getModificationTime(), omMetadataManager
+        .getDirectoryTable().get(getDBKeyName(toKeyParentInfo))
+        .getModificationTime());
+  }
+
+  private String getDbPathKey(long parentObjectId, String fileName)
+      throws IOException {
+    return omMetadataManager.getOzonePathKey(
+        omMetadataManager.getVolumeId(volumeName),
+        omMetadataManager.getBucketId(volumeName, bucketName),
+        parentObjectId, fileName);
   }
 
   @Test

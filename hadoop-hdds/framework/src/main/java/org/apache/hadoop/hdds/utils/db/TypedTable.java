@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
@@ -43,6 +44,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.rocksdb.ByteBufferGetStatus;
 
 /**
@@ -215,6 +217,34 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
       return null;
     } else {
       return getFromTable(key);
+    }
+  }
+
+  /**
+   * Same cache semantics as {@link #get(Object)}, except that a value read from the store is decoded
+   * by {@code fromPersistedValue} directly from the buffer it was read into, so the fields the caller
+   * does not need are never decoded and no VALUE object is built.
+   */
+  @Override
+  public <R> R getProjected(KEY key, Function<VALUE, R> fromCachedValue,
+      CheckedFunction<CodecBuffer, R, CodecException> fromPersistedValue)
+      throws RocksDatabaseException, CodecException {
+    final CacheResult<VALUE> cacheResult = cache.lookup(new CacheKey<>(key));
+
+    if (cacheResult.getCacheStatus() == EXISTS) {
+      return fromCachedValue.apply(cacheResult.getValue().getCacheValue());
+    } else if (cacheResult.getCacheStatus() == NOT_EXIST) {
+      return null;
+    } else if (supportCodecBuffer) {
+      return getFromTable(key, this::getFromTable, fromPersistedValue);
+    } else {
+      final byte[] valueBytes = rawTable.get(encodeKey(key));
+      if (valueBytes == null) {
+        return null;
+      }
+      try (CodecBuffer buffer = CodecBuffer.wrap(valueBytes)) {
+        return fromPersistedValue.apply(buffer);
+      }
     }
   }
 
@@ -466,6 +496,13 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   private VALUE getFromTable(KEY key,
       CheckedBiFunction<CodecBuffer, CodecBuffer, Integer, RocksDatabaseException> get)
       throws RocksDatabaseException, CodecException {
+    return getFromTable(key, get, valueCodec::fromCodecBuffer);
+  }
+
+  private <R> R getFromTable(KEY key,
+      CheckedBiFunction<CodecBuffer, CodecBuffer, Integer, RocksDatabaseException> get,
+      CheckedFunction<CodecBuffer, R, CodecException> decoder)
+      throws RocksDatabaseException, CodecException {
     try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
       for (; ;) {
         final Integer required;
@@ -482,7 +519,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           for (; ;) {
             if (required == outValue.readableBytes()) {
               // buffer size is big enough
-              return valueCodec.fromCodecBuffer(outValue);
+              return decoder.apply(outValue);
             }
             // buffer size too small, try increasing the capacity.
             if (!outValue.setCapacity(required)) {
