@@ -61,9 +61,11 @@ if [[ "${OZONE_REPO_CACHED}" == "true" ]]; then
   if [[ "${CHECK}" == "integration" ]]; then
     # test-* profiles configure Surefire on the root POM; matching tests can live in any module
     # (e.g. test-om in ozone-manager and ozone-integration-test). Use full-reactor mvn test.
-    # Exclude Hadoop 2/3 FS adapter modules: they need a full shade/generate-sources build to compile
-    # main sources; with ozone-repo reuse we only run test (not verify/package).
-    PL_ARGS=(-pl \!:ozone-filesystem-hadoop2,\!:ozone-filesystem-hadoop3)
+    # test-filesystem runs without -DskipShade (see integration.sh), so Hadoop 2/3 FS adapter modules
+    # are in the reactor but cannot compile main sources without verify/shade; skip them for mvn test.
+    if [[ "$*" == *"-Ptest-filesystem"* ]]; then
+      PL_ARGS=(-pl \!:ozone-filesystem-hadoop2,\!:ozone-filesystem-hadoop3)
+    fi
     # hadoop-native-lib is bound on ozone-main (inherited=false).
     if [[ "$*" == *"-Phadoop-native-lib"* ]]; then
       # Bootstrap must not inherit --fail-never from the main test invocation.
