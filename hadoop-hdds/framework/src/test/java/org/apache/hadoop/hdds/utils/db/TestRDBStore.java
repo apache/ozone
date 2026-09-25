@@ -272,7 +272,7 @@ public class TestRDBStore {
 
     RocksDBCheckpoint checkpoint = manager.createCheckpoint(cpDir.getAbsolutePath());
     assertNotNull(checkpoint);
-    assertTrue(Files.exists(checkpoint.getCheckpointLocation()));
+    assertThat(checkpoint.getCheckpointLocation()).exists();
   }
 
   @Test
@@ -298,7 +298,7 @@ public class TestRDBStore {
       for (Future<DBCheckpoint> future : futures) {
         DBCheckpoint checkpoint = future.get(30, TimeUnit.SECONDS);
         assertNotNull(checkpoint);
-        assertTrue(Files.exists(checkpoint.getCheckpointLocation()));
+        assertThat(checkpoint.getCheckpointLocation()).exists();
       }
     } finally {
       executor.shutdownNow();

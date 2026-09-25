@@ -241,13 +241,14 @@ public final class RocksDatabase implements Closeable {
 
   /** @return the latest sequence number after the checkpoint is created. */
   long createCheckpoint(Path path) throws RocksDatabaseException {
+    final String checkpointPath = path.toString();
     try (UncheckedAutoCloseable ignored = acquire();
         ManagedCheckpoint checkpoint = ManagedCheckpoint.create(db)) {
-      checkpoint.get().createCheckpoint(path.toString());
+      checkpoint.get().createCheckpoint(checkpointPath);
       return db.get().getLatestSequenceNumber();
     } catch (RocksDBException e) {
       closeOnError(e);
-      throw toRocksDatabaseException(this, "createCheckpoint " + path, e);
+      throw toRocksDatabaseException(this, "createCheckpoint " + checkpointPath, e);
     }
   }
 
