@@ -735,6 +735,14 @@ Assume Role Should Fail For Too Short Role Arn
 Assume Role Should Fail For Too Short Role Session Name
     Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  role_session_name=a
 
+Assume Role Should Fail For Invalid Duration
+    # AWS CLI rejects out-of-range DurationSeconds before the request is sent, so use curl.
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=43201  expected_message=must be a number between 900 and 43200 seconds
+    # Check duration that overflows integer as well
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=43200100000  expected_message=must be a number between 900 and 43200 seconds
+    # Whitespace-only DurationSeconds must be rejected
+    Assume Role Should Fail Using Curl  perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=ValidationError  expected_http_code=400  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  duration_seconds=${SPACE}${SPACE}${SPACE}${SPACE}${SPACE}  expected_message=must be a number between 900 and 43200 seconds
+
 Assume Role With ExternalId Should Fail As UnsupportedOperation
     Assume Role Should Fail       perm_access_key_id=${PERMANENT_ACCESS_KEY_ID}  perm_secret_key=${PERMANENT_SECRET_KEY}  expected_error=UnsupportedOperation  expected_http_code=501  role_arn=${ICEBERG_ALL_ACCESS_ROLE_OBS_ARN}  extra_cli_args=--external-id test-external-id
 
