@@ -81,6 +81,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
@@ -716,6 +717,44 @@ public class TestStorageContainerManager {
       SCMHeartbeatResponseProto afterExpiry = requestFullContainerReportLease(
           scm, datanodes.get(1).getDatanodeDetails());
       assertTrue(afterExpiry.hasFullContainerReportLease());
+    }
+  }
+
+  @Test
+  void testFullContainerReportLeaseOnFollower() throws Exception {
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newHABuilder(new OzoneConfiguration())
+        .setOMServiceId("om-service-test")
+        .setSCMServiceId("scm-service-test")
+        .setNumOfOzoneManagers(1)
+        .setNumOfStorageContainerManagers(3)
+        .setNumOfActiveSCMs(3)
+        .setNumDatanodes(1)
+        .build()) {
+      cluster.waitForClusterToBeReady();
+      StorageContainerManager follower = cluster.getStorageContainerManagers()
+          .stream()
+          .filter(scm -> !scm.checkLeader())
+          .findFirst()
+          .orElseThrow(() -> new AssertionError("Expected a follower SCM"));
+      DatanodeDetails datanode = cluster.getHddsDatanodes().get(0)
+          .getDatanodeDetails();
+      cluster.shutdownHddsDatanodes();
+
+      SCMHeartbeatResponseProto response =
+          requestFullContainerReportLease(follower, datanode);
+
+      assertTrue(response.hasFullContainerReportLease());
+      FullContainerReportLeaseProto lease =
+          response.getFullContainerReportLease();
+      assertEquals(SCMContext.INVALID_TERM, lease.getTerm());
+
+      SCMHeartbeatRequestProto report = SCMHeartbeatRequestProto.newBuilder()
+          .setDatanodeDetails(datanode.getProtoBufMessage())
+          .setContainerReport(ContainerReportsProto.newBuilder()
+              .setFullContainerReportLease(lease))
+          .build();
+      assertFalse(follower.getDatanodeProtocolServer().sendHeartbeat(report)
+          .getFullContainerReportLeaseRejected());
     }
   }
 

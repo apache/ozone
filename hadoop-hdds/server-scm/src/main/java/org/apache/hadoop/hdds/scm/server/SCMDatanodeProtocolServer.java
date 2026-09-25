@@ -389,7 +389,8 @@ public class SCMDatanodeProtocolServer implements
         OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION_DEFAULT
             .toLong(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
     return new SCMFullContainerReportLeaseManager(maxLeases, leaseDurationMs,
-        Time::monotonicNow, scm.getContainerManager().getMetrics());
+        Time::monotonicNow, scm.getContainerManager() == null
+            ? null : scm.getContainerManager().getMetrics());
   }
 
   void removeDatanode(DatanodeDetails datanode) {
@@ -403,8 +404,7 @@ public class SCMDatanodeProtocolServer implements
     ContainerReportsProto containerReport = heartbeat.getContainerReport();
     FullContainerReportLeaseProto lease =
         containerReport.getFullContainerReportLease();
-    OptionalLong currentTerm = scmContext == null
-        ? OptionalLong.empty() : scmContext.getTermOfLeaderIfReady();
+    OptionalLong currentTerm = getFCRLeaseTerm();
     SCMFullContainerReportLeaseManager.LeaseClaim claim = null;
     if (currentTerm.isPresent()
         && currentTerm.getAsLong() == lease.getTerm()) {
@@ -438,7 +438,7 @@ public class SCMDatanodeProtocolServer implements
       return;
     }
 
-    OptionalLong term = scmContext.getTermOfLeaderIfReady();
+    OptionalLong term = getFCRLeaseTerm();
     if (!term.isPresent()) {
       return;
     }
@@ -453,6 +453,19 @@ public class SCMDatanodeProtocolServer implements
               .setId(leaseId)
               .setTerm(term.getAsLong()));
     }
+  }
+
+  private OptionalLong getFCRLeaseTerm() {
+    if (scmContext == null) {
+      return OptionalLong.empty();
+    }
+
+    OptionalLong leaderTerm = scmContext.getTermOfLeaderIfReady();
+    if (leaderTerm.isPresent()) {
+      return leaderTerm;
+    }
+    return scmContext.isLeader()
+        ? OptionalLong.empty() : OptionalLong.of(SCMContext.INVALID_TERM);
   }
 
   private OptionalLong getTermIfLeader() {

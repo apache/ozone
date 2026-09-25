@@ -177,8 +177,7 @@ message SCMHeartbeatResponseProto {
   // Same as term in SCMCommandProto
   optional int64 term = 3;
   optional FullContainerReportLeaseProto fullContainerReportLease = 4;
-  reserved 5;
-  optional bool fullContainerReportLeaseRejected = 6 [default = false];
+  optional bool fullContainerReportLeaseRejected = 5 [default = false];
 }
 
 message SCMNodeAddressList {
@@ -229,8 +228,7 @@ message MetadataStorageReportProto {
 message ContainerReportsProto {
   repeated ContainerReplicaProto reports = 1;
   optional FullContainerReportLeaseProto fullContainerReportLease = 2;
-  reserved 3;
-  optional bool fullContainerReportDeferred = 4 [default = false];
+  optional bool fullContainerReportDeferred = 3 [default = false];
 }
 
 message IncrementalContainerReportProto {
