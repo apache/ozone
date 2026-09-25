@@ -915,6 +915,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(2L, rocksCount3.longValue(), "Expected RocksDB bin 1024 to have count 2 for vol2/bucket1");
 
     // --- Now test the query endpoints of the utilization service ---
+    verifyFileCountQueries();
+  }
+
+  /**
+   * Verify the filtering behaviour of the fileCount endpoint against the
+   * bins written by {@link #testGetFileCounts()}: vol1/bucket1:1024,
+   * vol1/bucket1:131072 and vol2/bucket1:1024, each with count 2.
+   */
+  private void verifyFileCountQueries() {
     Response response = utilizationEndpoint.getFileCounts(null, null, 0);
     List<FileCountBySize> resultSet =
         (List<FileCountBySize>) response.getEntity();
@@ -952,6 +961,32 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
 
+    // Test for "fileSize" query param on its own.
+    response = utilizationEndpoint.getFileCounts(null, null, 131072);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(1, resultSet.size());
+    assertTrue(resultSet.stream().allMatch(o -> o.getVolume().equals("vol1") &&
+        o.getBucket().equals("bucket1") && o.getFileSize() == 131072L));
+
+    // Test for "volume" + "fileSize" query params, without bucket.
+    response = utilizationEndpoint.getFileCounts("vol1", null, 131072);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(1, resultSet.size());
+    assertTrue(resultSet.stream().allMatch(o -> o.getVolume().equals("vol1") &&
+        o.getFileSize() == 131072L));
+
+    // Test for "bucket" + "fileSize" query params, without volume.
+    response = utilizationEndpoint.getFileCounts(null, "bucket1", 1024);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(2, resultSet.size());
+    assertTrue(resultSet.stream().allMatch(o -> o.getBucket().equals("bucket1") &&
+        o.getFileSize() == 1024L));
+
+    // Test for a fileSize that is not a bin upper bound, without volume and bucket.
+    response = utilizationEndpoint.getFileCounts(null, null, 1310725);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(0, resultSet.size());
+
     // Test for "volume" + "bucket" + "fileSize" query params.
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 131072);
     resultSet = (List<FileCountBySize>) response.getEntity();
@@ -960,7 +995,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertTrue(o.getVolume().equals("vol1") && o.getBucket().equals("bucket1") &&
         o.getFileSize() == 131072);
 
-    // Test for non-existent fileSize.
+    // Test for a fileSize that is not a bin boundary. It is mapped to bin 131072.
+    response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 100000);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(1, resultSet.size());
+    o = resultSet.get(0);
+    assertEquals("vol1", o.getVolume());
+    assertEquals("bucket1", o.getBucket());
+    assertEquals(131072L, o.getFileSize());
+    assertEquals(2L, o.getCount());
+
+    // Test for a fileSize that is mapped to an empty bin.
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 1310725);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());

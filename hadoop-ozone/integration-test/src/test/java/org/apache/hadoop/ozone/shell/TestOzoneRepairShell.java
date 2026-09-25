@@ -173,7 +173,8 @@ public class TestOzoneRepairShell {
       // verify quota trigger is completed having non-zero lastRunFinishedTime
       cmd.execute("om", "quota", "status", "--service-host", om);
       try {
-        return out.get().contains("\"lastRunFinishedTime\":\"\"");
+        String status = out.get();
+        return status.contains("lastRunFinishedTime") && !status.contains("\"lastRunFinishedTime\":\"\"");
       } catch (Exception ex) {
         // do nothing
       }

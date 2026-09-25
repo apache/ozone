@@ -17,27 +17,37 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.apache.hadoop.hdds.DatanodeVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.util.StringUtils.byteDesc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.scm.cli.ContainerBalancerEstimateSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -160,6 +170,7 @@ class TestContainerBalancerSubCommand {
   private ContainerBalancerStopSubcommand stopCmd;
   private ContainerBalancerStartSubcommand startCmd;
   private ContainerBalancerStatusSubcommand statusCmd;
+  private ContainerBalancerEstimateSubcommand estimateCmd;
   private GenericTestUtils.PrintStreamCapturer out;
   private GenericTestUtils.PrintStreamCapturer err;
   private AtomicBoolean verbose;
@@ -369,6 +380,8 @@ class TestContainerBalancerSubCommand {
         return verbose.get();
       }
     };
+    parseSubcommand(startCmd);
+    estimateCmd = new ContainerBalancerEstimateSubcommand();
     out = GenericTestUtils.captureOut();
     err = GenericTestUtils.captureErr();
   }
@@ -574,7 +587,7 @@ class TestContainerBalancerSubCommand {
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-        null, null, null, null, null, null, null, null, null, null, null, null, null, null))
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(
             StorageContainerLocationProtocolProtos
                 .StartContainerBalancerResponseProto.newBuilder()
@@ -590,7 +603,7 @@ class TestContainerBalancerSubCommand {
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-        null, null, null, null, null, null, null, null, null, null, null, null, null, null))
+        any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(StorageContainerLocationProtocolProtos
             .StartContainerBalancerResponseProto.newBuilder()
             .setStart(false)
@@ -820,5 +833,248 @@ class TestContainerBalancerSubCommand {
     assertThat(out.get())
         .contains("Failed to move containers                          3")
         .contains("Failed container moves                             (no breakdown available)");
+  }
+
+  @Test
+  void testContainerBalancerEstimateSubcommandDefaultShowsMediumProfile() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(estimateCmd);
+    estimateCmd.execute(scmClient);
+
+    String output = out.get();
+    assertThat(output)
+        .contains("No profile specified, using the default.")
+        .contains("Profile: MEDIUM");
+    assertThat(output).doesNotContain("Profile: SLOW");
+    assertThat(output).doesNotContain("Profile: FAST");
+    assertThat(output.split("Profile:")).hasSize(2);
+    assertThat(output)
+        .contains("Based on:")
+        .contains("Threshold:                10.0%")
+        .contains("Datanode involvement:     20%")
+        .contains("Bytes to move:")
+        .contains("Per iteration (estimate): ~" + byteDesc(26L * GB * 7))
+        .contains("planning estimate:")
+        .contains("upper bound")
+        .contains("assumes full move timeout + interval each cycle")
+        .doesNotContain("Estimation failed:");
+  }
+
+  @Test
+  void testContainerBalancerEstimateSubcommandAllShowsAllProfiles() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(estimateCmd, "--all");
+    estimateCmd.execute(scmClient);
+
+    String output = out.get();
+    String[] blocks = output.split("Profile:");
+    assertThat(blocks).hasSize(4);
+
+    String slow = blocks[1];
+    assertThat(slow)
+        .contains("Based on:")
+        .contains("Threshold:                10.0%")
+        .contains("Datanode involvement:     10%")
+        .contains("Bytes to move:")
+        .contains("Per iteration (estimate): ~" + byteDesc(30L * GB))
+        .contains("planning estimate:")
+        .contains("upper bound")
+        .contains("assumes full move timeout + interval each cycle")
+        .doesNotContain("Estimation failed:");
+
+    String medium = blocks[2];
+    assertThat(medium)
+        .contains("Based on:")
+        .contains("Threshold:                10.0%")
+        .contains("Datanode involvement:     20%")
+        .contains("Bytes to move:")
+        .contains("Per iteration (estimate): ~" + byteDesc(26L * GB * 7))
+        .contains("planning estimate:")
+        .contains("upper bound")
+        .doesNotContain("Estimation failed:");
+
+    String fast = blocks[3];
+    assertThat(fast)
+        .contains("Based on:")
+        .contains("Threshold:                10.0%")
+        .contains("Datanode involvement:     40%")
+        .contains("Bytes to move:")
+        .contains("Per iteration (estimate): ~" + byteDesc(500L * GB))
+        .contains("planning estimate:")
+        .contains("upper bound")
+        .doesNotContain("Estimation failed:");
+  }
+
+  @Test
+  void testContainerBalancerEstimateSubcommandInvalidThresholdFails() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+    parseSubcommand(estimateCmd, "-t", "-1");
+    IOException ex = assertThrows(IOException.class, () -> estimateCmd.execute(scmClient));
+    assertThat(ex.getMessage()).contains("Threshold should be specified in the range [0.0, 100.0).");
+  }
+
+  @Test
+  void testContainerBalancerEstimateSubcommandInvalidDatanodePercentageFails() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+    parseSubcommand(estimateCmd, "-d", "0");
+    IOException ex = assertThrows(IOException.class, () -> estimateCmd.execute(scmClient));
+    assertThat(ex.getMessage()).contains(
+        "Max Datanodes Percentage To Involve Per Iteration should be specified in the range (0, 100]");
+  }
+
+  @Test
+  void testContainerBalancerEstimateSubcommandInvalidMaxSizeFails() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+    parseSubcommand(estimateCmd, "-s", "0");
+    IOException ex = assertThrows(IOException.class, () -> estimateCmd.execute(scmClient));
+    assertThat(ex.getMessage()).contains(
+        "Max Size To Move Per Iteration In GB must be positive.");
+  }
+
+  @Test
+  void testContainerBalancerEstimateSubcommandInvalidProfileFails() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(estimateCmd, "--profile", "turbo");
+    IOException ex = assertThrows(IOException.class, () -> estimateCmd.execute(scmClient));
+    assertThat(ex.getMessage()).contains("Invalid profile: turbo");
+  }
+
+  @Test
+  void testContainerBalancerEstimateSubcommandWithProfileShowsOneProfile() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(estimateCmd, "--profile", "FAST");
+    estimateCmd.execute(scmClient);
+
+    String output = out.get();
+    assertThat(output).contains("Profile: FAST");
+    assertThat(output).doesNotContain("Profile: SLOW");
+    assertThat(output).doesNotContain("Profile: MEDIUM");
+    assertThat(output.split("Profile:")).hasSize(2);
+    assertThat(output)
+        .contains("Datanode involvement:     40%")
+        .contains("Per iteration (estimate): ~" + byteDesc(500L * GB))
+        .contains("Estimated duration:       upper bound");
+  }
+
+  @Test
+  void testContainerBalancerEstimateSubcommandCliOverrideUsesResolvedValuesInOutput() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(estimateCmd, "--profile", "slow", "-e", "6");
+    estimateCmd.execute(scmClient);
+
+    assertThat(out.get())
+        .contains("Max entering target:      " + byteDesc(6L * GB) + " / node")
+        .contains("Per iteration (estimate): ~" + byteDesc(18L * GB));
+  }
+
+  @Test
+  void testContainerBalancerEstimateSubcommandPartialFailureWhenMaxMoveOverrideConflictsWithFastPreset()
+      throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(estimateCmd, "--all", "-s", "70", "-t", "5");
+    estimateCmd.execute(scmClient);
+
+    String output = out.get();
+    String[] blocks = output.split("Profile:");
+    assertThat(blocks).hasSize(4);
+
+    String slow = blocks[1];
+    assertThat(slow)
+        .contains("Based on:")
+        .contains("Threshold:                5.0%")
+        .contains("Max per iteration:        " + byteDesc(70L * GB))
+        .contains("Bytes to move:")
+        .contains("Per iteration (estimate): ~" + byteDesc(30L * GB))
+        .doesNotContain("Estimation failed:");
+
+    String medium = blocks[2];
+    assertThat(medium)
+        .contains("Based on:")
+        .contains("Threshold:                5.0%")
+        .contains("Max per iteration:        " + byteDesc(70L * GB))
+        .contains("Bytes to move:")
+        .contains("Per iteration (estimate): ~" + byteDesc(70L * GB))
+        .doesNotContain("Estimation failed:");
+
+    String fast = blocks[3];
+    assertThat(fast)
+        .contains("Based on:")
+        .contains("Threshold:                5.0%")
+        .contains("Max entering target:      " + byteDesc(100L * GB) + " / node")
+        .contains("Max per iteration:        " + byteDesc(70L * GB))
+        .contains("Estimation failed: max-size-entering-target must be less than or equal to "
+            + "max-size-to-move-per-iteration.")
+        .doesNotContain("Bytes to move:")
+        .doesNotContain("Per iteration (estimate):");
+  }
+
+  /**
+   * Imbalanced cluster for estimate CLI tests.
+   *
+   * <p>With default 10% threshold: 14 targets, 42 sources, 14 neutral (70 eligible).
+   */
+  private static List<HddsProtos.DatanodeUsageInfoProto> buildImbalancedCluster() {
+    return buildCluster(70, 14, 14);
+  }
+
+  private static List<HddsProtos.DatanodeUsageInfoProto> buildCluster(
+      int totalNodes, int underUtilNodeCount, int midUtilNodeCount) {
+    List<HddsProtos.DatanodeUsageInfoProto> nodes = new ArrayList<>(totalNodes);
+    long capacity = OzoneConsts.TB;
+    for (int i = 0; i < underUtilNodeCount; i++) {
+      nodes.add(datanodeUsageProto("under-" + i, capacity, (long) (capacity * 0.95)));
+    }
+    for (int i = 0; i < midUtilNodeCount; i++) {
+      nodes.add(datanodeUsageProto("mid-" + i, capacity, (long) (capacity * 0.60)));
+    }
+    int overUtil = totalNodes - underUtilNodeCount - midUtilNodeCount;
+    for (int i = 0; i < overUtil; i++) {
+      nodes.add(datanodeUsageProto("over-" + i, capacity, (long) (capacity * 0.35)));
+    }
+    return nodes;
+  }
+
+  private static HddsProtos.DatanodeUsageInfoProto datanodeUsageProto(
+      String hostname, long capacity, long remaining) {
+    DatanodeDetails datanode = DatanodeDetails.newBuilder()
+        .setHostName(hostname)
+        .setIpAddress("127.0.0.1")
+        .setUuid(UUID.randomUUID())
+        .build();
+    return HddsProtos.DatanodeUsageInfoProto.newBuilder()
+        .setNode(datanode.toProto(DEFAULT_VERSION.toProtoValue()))
+        .setCapacity(capacity)
+        .setRemaining(remaining)
+        .setUsed(capacity - remaining)
+        .build();
+  }
+
+  /** Picocli must parse args so @Mixin, @Option, and @Spec fields are injected. */
+  private static void parseSubcommand(Object subcommand, String... args) {
+    new CommandLine(subcommand).parseArgs(args);
   }
 }

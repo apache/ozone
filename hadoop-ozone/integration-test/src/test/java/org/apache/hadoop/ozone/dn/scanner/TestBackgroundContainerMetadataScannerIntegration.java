@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.dn.scanner;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.OPEN;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CONTAINER_DIR;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_CONTAINER_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_METADATA_DIR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
-import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerMetadataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -53,11 +53,11 @@ class TestBackgroundContainerMetadataScannerIntegration
   private final GenericTestUtils.LogCapturer logCapturer =
       GenericTestUtils.LogCapturer.log4j2(ContainerLogger.LOG_NAME);
 
-  static Collection<TestContainerCorruptions> supportedCorruptionTypes() {
-    return TestContainerCorruptions.getAllParamsExcept(
-        TestContainerCorruptions.MISSING_BLOCK,
-        TestContainerCorruptions.CORRUPT_BLOCK,
-        TestContainerCorruptions.TRUNCATED_BLOCK);
+  static Collection<ContainerTestCorruptions> supportedCorruptionTypes() {
+    return ContainerTestCorruptions.getAllParamsExcept(
+        ContainerTestCorruptions.MISSING_BLOCK,
+        ContainerTestCorruptions.CORRUPT_BLOCK,
+        ContainerTestCorruptions.TRUNCATED_BLOCK);
   }
 
   @BeforeAll
@@ -90,7 +90,7 @@ class TestBackgroundContainerMetadataScannerIntegration
    */
   @ParameterizedTest
   @MethodSource("supportedCorruptionTypes")
-  void testCorruptionDetected(TestContainerCorruptions corruption)
+  void testCorruptionDetected(ContainerTestCorruptions corruption)
       throws Exception {
     // Write data to an open and closed container.
     long closedContainerID = writeDataThenCloseContainer();
