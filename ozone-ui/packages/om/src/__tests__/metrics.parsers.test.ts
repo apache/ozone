@@ -19,6 +19,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseOmMetrics, type OMMetricsBean } from '../api/metrics';
 
+// All keys use the exact JMX names OM exposes (see OMMetrics.java).
 const bean: OMMetricsBean = {
   name: 'Hadoop:service=OzoneManager,name=OMMetrics',
   'tag.Hostname': 'node1',
@@ -26,6 +27,7 @@ const bean: OMMetricsBean = {
   NumBuckets: 2,
   NumKeys: 485,
   TotalDataCommitted: 62259,
+  // Key — cross-category aggregate plus per-op counters.
   NumKeyOps: 2895,
   NumKeyAllocate: 965,
   NumKeyAllocateFails: 0,
@@ -58,36 +60,138 @@ describe('parseOmMetrics — summary', () => {
 describe('parseOmMetrics — Key operations', () => {
   const key = parseOmMetrics(bean).byType.Key;
 
-  it('joins plural request names to their singular failure counterpart', () => {
-    const commit = key.operations.find((o) => o.name === 'Commit');
-    const del = key.operations.find((o) => o.name === 'Delete');
+  it('joins a request counter to its failure counter into one row', () => {
+    const commit = key.operations.find((o) => o.name === 'Commits');
+    const del = key.operations.find((o) => o.name === 'Deletes');
     expect(commit).toMatchObject({ requests: 965, failures: 0, status: 'Active' });
-    // Deletes has 5 DeleteFails → Warning.
+    // NumKeyDeletes has 5 NumKeyDeleteFails → Warning.
     expect(del).toMatchObject({ requests: 965, failures: 5, status: 'Warning' });
   });
 
-  it('keeps a request name that has no failure counterpart', () => {
-    const get = parseOmMetrics(bean).byType.Get;
-    expect(get.operations.map((o) => o.name)).toContain('ServiceLists');
-  });
-
-  it('surfaces a failure-only operation (0 requests) with Warning status', () => {
-    const list = key.operations.find((o) => o.name === 'List');
+  it('surfaces a request with 0 count but nonzero failures as Warning', () => {
+    const list = key.operations.find((o) => o.name === 'Lists');
     expect(list).toMatchObject({ requests: 0, failures: 100, status: 'Warning' });
   });
 
   it('omits operations with no activity (0 requests, 0 failures)', () => {
     // NumKeyHSyncs = 0 with no failures → not shown.
-    expect(key.operations.find((o) => o.name === 'HSync')).toBeUndefined();
+    expect(key.operations.find((o) => o.name === 'HSyncs')).toBeUndefined();
   });
 
-  it('uses Num<Type>Ops for totalRequests', () => {
-    expect(key.totalRequests).toBe(2895);
+  it('never treats the aggregate NumKeyOps as an operation', () => {
+    expect(key.operations.find((o) => o.name === 'Ops')).toBeUndefined();
   });
 
   it('sorts operations by requests descending', () => {
     const requests = key.operations.map((o) => o.requests);
     expect(requests).toEqual([...requests].sort((a, b) => b - a));
+  });
+});
+
+describe('parseOmMetrics — total requests are the sum of shown operations (not NumKeyOps)', () => {
+  it('excludes the cross-category NumKeyOps aggregate from the total', () => {
+    const { byType } = parseOmMetrics({
+      NumKeyOps: 9999, // superset counter (Get/FSO/MPU); must not be the total
+      NumKeyCommits: 10,
+      NumKeyDeletes: 5,
+    });
+    expect(byType.Key.totalRequests).toBe(15);
+    const chartSum = byType.Key.operations
+      .filter((o) => o.requests > 0)
+      .reduce((sum, o) => sum + o.requests, 0);
+    expect(byType.Key.totalRequests).toBe(chartSum);
+  });
+});
+
+describe('parseOmMetrics — GetKeyInfo failure (misspelled JMX name)', () => {
+  // OM exposes the GetKeyInfo failure counter as `GetNumGetKeyInfoFails` (its Java
+  // field is misnamed), so it does not start with `Num`.
+  const { byType } = parseOmMetrics({ NumGetKeyInfo: 1200, GetNumGetKeyInfoFails: 7 });
+
+  it('joins GetNumGetKeyInfoFails onto the NumGetKeyInfo row', () => {
+    const getInfo = byType.Get.operations.filter((o) => o.name === 'KeyInfo');
+    expect(getInfo).toHaveLength(1);
+    expect(getInfo[0]).toMatchObject({ requests: 1200, failures: 7, status: 'Warning' });
+  });
+});
+
+describe('parseOmMetrics — CheckAccess (-es plural) pairs into one row', () => {
+  const { byType } = parseOmMetrics({
+    NumVolumeCheckAccesses: 30,
+    NumVolumeCheckAccessFails: 4,
+  });
+
+  it('does not split NumVolumeCheckAccesses / NumVolumeCheckAccessFails into two rows', () => {
+    expect(byType.Volume.operations).toHaveLength(1);
+    expect(byType.Volume.operations[0]).toMatchObject({
+      name: 'CheckAccesses',
+      requests: 30,
+      failures: 4,
+      status: 'Warning',
+    });
+  });
+});
+
+describe('parseOmMetrics — NumTrashFails is an aggregate failure, not a request', () => {
+  const { byType } = parseOmMetrics({
+    NumTrashRenames: 12,
+    NumTrashFails: 3,
+  });
+
+  it('shows NumTrashFails as a failure-only Warning row (not a request named "Fails")', () => {
+    expect(byType.Trash.operations.find((o) => o.name === 'Fails')).toBeUndefined();
+    const trashFail = byType.Trash.operations.find((o) => o.name === 'Trash');
+    expect(trashFail).toMatchObject({ requests: 0, failures: 3, status: 'Warning' });
+  });
+
+  it('excludes the failure count from the request total', () => {
+    expect(byType.Trash.totalRequests).toBe(12);
+  });
+});
+
+describe('parseOmMetrics — snapshot state counts do not inflate requests', () => {
+  // NumSnapshotActive/Deleted/CacheSize are state/gauge counts, not requests, and OM
+  // exposes no NumSnapshotOps.
+  const { byType } = parseOmMetrics({
+    NumSnapshotCreates: 8,
+    NumSnapshotCreateFails: 1,
+    NumSnapshotActive: 5,
+    NumSnapshotDeleted: 2,
+    NumSnapshotCacheSize: 4,
+  });
+
+  it('shows only the request operation and ignores the state counts', () => {
+    expect(byType.Snapshot.operations).toHaveLength(1);
+    expect(byType.Snapshot.operations[0]).toMatchObject({
+      name: 'Creates',
+      requests: 8,
+      failures: 1,
+    });
+  });
+
+  it('keeps the total equal to the request count (8), not 8+5+2+4', () => {
+    expect(byType.Snapshot.totalRequests).toBe(8);
+  });
+});
+
+describe('parseOmMetrics — Ratis read-path metrics are surfaced', () => {
+  const { byType } = parseOmMetrics({
+    NumLinearizableRead: 5000,
+    NumLeaderSkipLinearizableRead: 120,
+    NumFollowerReadLocalLeaseSuccess: 800,
+  });
+
+  it('includes Linearizable / Leader / Follower categories', () => {
+    expect(byType.Linearizable).toMatchObject({ enabled: true });
+    expect(byType.Linearizable.operations[0]).toMatchObject({ name: 'Read', requests: 5000 });
+    expect(byType.Leader.operations[0]).toMatchObject({
+      name: 'SkipLinearizableRead',
+      requests: 120,
+    });
+    expect(byType.Follower.operations[0]).toMatchObject({
+      name: 'ReadLocalLeaseSuccess',
+      requests: 800,
+    });
   });
 });
 
@@ -100,8 +204,9 @@ describe('parseOmMetrics — enabled flag', () => {
   });
 
   it('disables types with no metrics in the bean', () => {
-    expect(byType.Snapshot.enabled).toBe(false);
-    expect(byType.Snapshot.operations).toHaveLength(0);
+    const empty = parseOmMetrics({ NumKeys: 485 }).byType;
+    expect(empty.Snapshot.enabled).toBe(false);
+    expect(empty.Snapshot.operations).toHaveLength(0);
   });
 });
 
@@ -123,16 +228,11 @@ describe('parseOmMetrics — parsing safety', () => {
     expect(Object.values(byType).every((t) => t.operations.length === 0)).toBe(true);
   });
 
-  it('shows a failure-only operation type and marks it enabled', () => {
+  it('surfaces a failure whose request counter is absent as a failure-only row', () => {
     const { byType } = parseOmMetrics({ NumRecoverLeaseFails: 3 });
     expect(byType.Recover.enabled).toBe(true);
     expect(byType.Recover.operations).toEqual([
       expect.objectContaining({ name: 'Lease', requests: 0, failures: 3, status: 'Warning' }),
     ]);
-  });
-
-  it('falls back to summing requests when Num<Type>Ops is absent', () => {
-    const { byType } = parseOmMetrics({ NumGetServiceLists: 990, NumGetAcl: 10 });
-    expect(byType.Get.totalRequests).toBe(1000);
   });
 });

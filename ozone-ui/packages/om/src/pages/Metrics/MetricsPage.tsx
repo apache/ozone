@@ -79,7 +79,17 @@ const MetricsContent: React.FC = () => {
   const { data: bean, isEmpty } = useSuspenseJmxBean<OMMetricsBean>(OM_METRICS_QUERY);
   const { summary, byType } = useMemo(() => parseOmMetrics(bean), [bean]);
 
-  const firstEnabled = METRIC_TYPES.find((t) => byType[t]?.enabled);
+  // All types in a stable order: the known METRIC_TYPES first, then any extra type
+  // discovered in the bean (so a new OM metric category still appears), deduped.
+  const orderedTypes = useMemo(() => {
+    const known = METRIC_TYPES.filter((t) => byType[t]);
+    const extra = Object.keys(byType)
+      .filter((t) => !(METRIC_TYPES as readonly string[]).includes(t))
+      .sort();
+    return [...known, ...extra];
+  }, [byType]);
+
+  const firstEnabled = orderedTypes.find((t) => byType[t]?.enabled);
   const [selectedType, setSelectedType] = useState<string>(firstEnabled ?? 'Key');
   const selected = byType[selectedType] ?? byType.Key;
 
@@ -95,11 +105,11 @@ const MetricsContent: React.FC = () => {
     [selected]
   );
 
-  // Active types first (preserving METRIC_TYPES order), then the greyed-out
-  // inactive ones — so the dropdown surfaces the types that have data.
+  // Active types first (preserving the stable order), then the greyed-out inactive
+  // ones — so the dropdown surfaces the types that have data.
   const options = [
-    ...METRIC_TYPES.filter((type) => byType[type]?.enabled),
-    ...METRIC_TYPES.filter((type) => !byType[type]?.enabled),
+    ...orderedTypes.filter((type) => byType[type]?.enabled),
+    ...orderedTypes.filter((type) => !byType[type]?.enabled),
   ].map((type) => ({
     value: type,
     label: type,
