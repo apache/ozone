@@ -150,6 +150,38 @@ class TestRatisDataStreamBlockInputStream {
   }
 
   /**
+   * A reader that asks for at least half the window per read (like Parquet's 8 MB buffers) gets exactly what it asks
+   * for, including a smaller last read, since read-ahead would be wasted at its next seek. After the seek, a reader of
+   * small pieces gets read-ahead again.
+   */
+  @Test
+  void largeReadsAreNotReadAhead() throws Exception {
+    final byte[] block = block(64);
+    final Streams streams = new Streams(block);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 16)) {
+      final ByteBuffer large = ByteBuffer.allocate(8);
+      in.read(large);
+      large.clear();
+      in.read(large);
+      final ByteBuffer small = ByteBuffer.allocate(4);
+      in.read(small);
+      assertArrayEquals(Arrays.copyOfRange(block, 16, 20), small.array());
+      assertEquals(1, streams.maxOpen);
+
+      in.seek(32);
+      for (int i = 0; i < 3; i++) {
+        small.clear();
+        in.read(small);
+      }
+      assertArrayEquals(Arrays.copyOfRange(block, 40, 44), small.array());
+    }
+
+    assertEquals(Arrays.asList("0+8", "8+8", "16+4", "32+4", "36+8", "44+8"), streams.ranges());
+  }
+
+  /**
    * A request is closed as soon as its data is consumed, without waiting for its terminal reply: the reply would
    * otherwise keep the stream, and the netty buffer it was decoded from, until the next read or seek.
    */

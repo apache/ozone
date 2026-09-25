@@ -64,6 +64,8 @@ import org.slf4j.LoggerFactory;
  * sequential reader requests at most {@code ozone.client.ratis.stream.read.window-size} bytes ahead of its position,
  * as two pipelined requests of half the window each: the datanode keeps sending the second while the reader consumes
  * the first. This bounds both the bytes wasted when the reader stops or seeks and the replies buffered per stream.
+ * A reader that asks for at least half the window in one read (Parquet reads a run of column chunks in 8 MB buffers)
+ * already reads in large pieces, so it gets exactly what it asks for until its next seek.
  */
 public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
   private static final Logger LOG =
@@ -91,6 +93,8 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
   private long position;
   /** Set once a request has been consumed to its end without a seek, so the reader is reading sequentially. */
   private boolean sequential;
+  /** Set when a read since the last seek asked for at least {@link #readAheadRequestSize}: no read-ahead then. */
+  private boolean largeReads;
   private boolean closed;
 
   public RatisDataStreamBlockInputStream(BlockID blockID, long length,
@@ -194,6 +198,7 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
       position = pos;
       discardBufferedData();
       sequential = false;
+      largeReads = false;
     }
   }
 
@@ -219,8 +224,9 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
 
   private ByteBuffer readBlock(int length, boolean preRead) throws IOException {
     int leaderRedirects = 0;
+    largeReads |= length >= readAheadRequestSize;
     while (position < blockLength) {
-      final boolean readAhead = preRead && sequential;
+      final boolean readAhead = preRead && sequential && !largeReads;
       if (current == null) {
         current = openRequest(position,
             requestLength(blockLength, position, length, readAhead, readAheadRequestSize));
@@ -409,6 +415,7 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
   private synchronized void releaseClient(boolean invalidateClient) {
     discardBufferedData();
     sequential = false;
+    largeReads = false;
     if (xceiverClient != null) {
       closeRequests();
       xceiverClientFactory.releaseClient(xceiverClient, invalidateClient, true);
