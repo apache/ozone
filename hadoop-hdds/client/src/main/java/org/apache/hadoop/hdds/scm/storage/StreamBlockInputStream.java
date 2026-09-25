@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -585,8 +584,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       try {
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
         if (verifyChecksum) {
-          ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
-          Checksum.verifyChecksum(data, checksumData, 0);
+          Checksum.validateChecksums(data, readBlock.getOffset(), 0, readBlock.getChunkInfoListList());
         }
         offerToQueue(readBlock);
       } catch (Exception e) {
@@ -598,7 +596,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         LOG.warn("Failed to process block {} response at offset={}, size={}: {}, {}",
             getBlockID().getContainerBlockID(),
             offset, data.size(), StringUtils.bytes2Hex(data.asReadOnlyByteBuffer(), 10),
-            readBlock.getChecksumData(), e);
+            readBlock.getChunkInfoListList(), e);
         if (r != null) {
           r.getRequestObserver().onError(e);
         }
@@ -672,10 +670,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     private void offerToQueue(ReadBlockResponseProto item) {
       if (LOG.isTraceEnabled()) {
-        final ContainerProtos.ChecksumData checksumData = item.getChecksumData();
-        LOG.trace("{}: enqueue response offset {}, length {}, numChecksums {}, bytesPerChecksum={}",
-            name, item.getOffset(), item.getData().size(),
-            checksumData.getChecksumsList().size(), checksumData.getBytesPerChecksum());
+        LOG.trace("{}: enqueue response offset {}, length {}, chunks {}",
+            name, item.getOffset(), item.getData().size(), item.getChunkInfoListCount());
       }
       final boolean offered = responseQueue.offer(item);
       Preconditions.assertTrue(offered, () -> "Failed to offer " + item);

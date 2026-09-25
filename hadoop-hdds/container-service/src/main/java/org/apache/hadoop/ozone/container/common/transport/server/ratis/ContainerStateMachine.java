@@ -1077,8 +1077,7 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     ByteString data = ByteString.EMPTY;
     final ReadBlockResponseProto firstReadBlock = first.getReadBlock();
-    final ContainerProtos.ChecksumData.Builder checksum =
-        firstReadBlock.getChecksumData().toBuilder().clearChecksums();
+    final List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>();
     for (ContainerCommandResponseProto response : responses) {
       if (response.getResult() != ContainerProtos.Result.SUCCESS
           || !response.hasReadBlock()) {
@@ -1086,13 +1085,19 @@ public class ContainerStateMachine extends BaseStateMachine {
       }
       final ReadBlockResponseProto readBlock = response.getReadBlock();
       data = data.concat(readBlock.getData());
-      checksum.addAllChecksums(readBlock.getChecksumData().getChecksumsList());
+      for (ContainerProtos.ChunkInfo chunk : readBlock.getChunkInfoListList()) {
+        // A chunk spanning two consecutive responses is listed by both.
+        if (chunks.isEmpty() || chunks.get(chunks.size() - 1).getOffset() != chunk.getOffset()) {
+          chunks.add(chunk);
+        }
+      }
     }
 
     return first.toBuilder()
         .setReadBlock(firstReadBlock.toBuilder()
             .setData(data)
-            .setChecksumData(checksum))
+            .clearChunkInfoList()
+            .addAllChunkInfoList(chunks))
         .build();
   }
 

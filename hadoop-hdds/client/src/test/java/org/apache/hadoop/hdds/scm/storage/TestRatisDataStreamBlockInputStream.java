@@ -40,8 +40,6 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumData;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
@@ -339,8 +337,7 @@ class TestRatisDataStreamBlockInputStream {
         .setResult(Result.SUCCESS)
         .setReadBlock(ReadBlockResponseProto.newBuilder()
             .setOffset(offset)
-            .setData(ByteString.EMPTY)
-            .setChecksumData(ChecksumData.newBuilder().setType(ChecksumType.NONE).setBytesPerChecksum(0)))
+            .setData(ByteString.EMPTY))
         .build();
     final byte[] metadata = response.toByteArray();
     final ByteBuffer frame = ByteBuffer.allocate(Integer.BYTES + metadata.length + data.length);

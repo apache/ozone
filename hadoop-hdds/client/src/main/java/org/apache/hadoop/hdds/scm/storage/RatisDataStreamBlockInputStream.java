@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.client.api.DataStreamInput;
 import org.apache.ratis.client.impl.ClientProtoUtils;
@@ -324,9 +323,7 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
       final ByteBuffer dataBuffer = readBlockData.getData() != null ?
           readBlockData.getData() : readBlock.getData().asReadOnlyByteBuffer();
       if (verifyChecksum) {
-        final ChecksumData checksumData =
-            ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
-        Checksum.verifyChecksum(dataBuffer.duplicate(), checksumData, 0);
+        Checksum.validateChecksums(dataBuffer, readBlock.getOffset(), 0, readBlock.getChunkInfoListList());
       }
 
       final long blockOffset = readBlock.getOffset();
