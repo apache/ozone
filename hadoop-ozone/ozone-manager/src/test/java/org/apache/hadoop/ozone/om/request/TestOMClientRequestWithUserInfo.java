@@ -145,6 +145,7 @@ public class TestOMClientRequestWithUserInfo {
   }
 
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testUserInfoInCaseOfGrpcTransport() throws Exception {
     OMRequest s3SignedOMRequest = createRequestWithS3Credentials("AccessId",
         "Signature", "StringToSign");
@@ -236,6 +237,8 @@ public class TestOMClientRequestWithUserInfo {
       final String originalAccessKeyId = "AKIAORIGINAL";
       final String roleArn = "arn:aws:iam::123456789012:role/test-role";
       final String sessionPolicy = "test-session-policy";
+      final String assumedRoleId = "AROATEST123456789:testsess";
+      final String assumedRoleUserArn = "arn:aws:sts::123456789012:assumed-role/test-role/testsess";
       final UUID secretKeyId = UUID.randomUUID();
 
       final STSTokenIdentifier stsTokenIdentifier = mock(STSTokenIdentifier.class);
@@ -244,6 +247,8 @@ public class TestOMClientRequestWithUserInfo {
       when(stsTokenIdentifier.getOriginalAccessKeyId()).thenReturn(originalAccessKeyId);
       when(stsTokenIdentifier.getTempAccessKeyId()).thenReturn(accessId);
       when(stsTokenIdentifier.getSecretKeyId()).thenReturn(secretKeyId);
+      when(stsTokenIdentifier.getAssumedRoleId()).thenReturn(assumedRoleId);
+      when(stsTokenIdentifier.getAssumedRoleUserArn()).thenReturn(assumedRoleUserArn);
 
       final S3Authentication s3Authentication = S3Authentication.newBuilder()
           .setAccessId(accessId)
@@ -255,6 +260,8 @@ public class TestOMClientRequestWithUserInfo {
           .setResolvedStsOriginalAccessKeyId("client-original-access-key-id")
           .setResolvedStsTempAccessKeyId("client-temp-access-key-id")
           .setResolvedStsSecretKeyId("client-secret-key-id")
+          .setResolvedStsAssumedRoleId("client-assumed-role-id")
+          .setResolvedStsAssumedRoleUserArn("client-assumed-role-user-arn")
           .build();
 
       OzoneManager.setS3Auth(s3Authentication);
@@ -281,6 +288,8 @@ public class TestOMClientRequestWithUserInfo {
         assertEquals(originalAccessKeyId, modifiedS3Auth.getResolvedStsOriginalAccessKeyId());
         assertEquals(accessId, modifiedS3Auth.getResolvedStsTempAccessKeyId());
         assertEquals(secretKeyId.toString(), modifiedS3Auth.getResolvedStsSecretKeyId());
+        assertEquals(assumedRoleId, modifiedS3Auth.getResolvedStsAssumedRoleId());
+        assertEquals(assumedRoleUserArn, modifiedS3Auth.getResolvedStsAssumedRoleUserArn());
       } finally {
         OzoneManager.setStsTokenIdentifier(null);
         OzoneManager.setS3Auth(null);

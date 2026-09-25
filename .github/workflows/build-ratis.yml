@@ -58,7 +58,7 @@ on:
         description: "Arguments for building with Ratis"
         value: ${{ jobs.summary.outputs.build-args }}
 env:
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Daether.connector.http.retryHandler.count=10
 permissions: { }
 jobs:
   ratis:
@@ -82,7 +82,7 @@ jobs:
             !~/.m2/repository/org/apache/ratis
           key: ratis-dependencies-${{ hashFiles('**/pom.xml') }}
       - name: Setup java
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: 'temurin'
           java-version: 25

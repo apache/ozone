@@ -17,8 +17,6 @@
 
 set -eu
 
-apk add --no-cache jq >/dev/null
-
 realm="${POLARIS_REALM:-POLARIS}"
 catalog_name="${POLARIS_CATALOG_NAME:-quickstart_catalog}"
 storage_location="${POLARIS_STORAGE_LOCATION:-s3://iceberg-obs/polaris-smoke}"

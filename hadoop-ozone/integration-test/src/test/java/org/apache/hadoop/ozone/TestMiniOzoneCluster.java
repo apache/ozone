@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -27,28 +29,37 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test cases for mini ozone cluster.
@@ -56,10 +67,10 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
+  private OzoneConfiguration conf;
 
-  @BeforeAll
-  static void setup(@TempDir File testDir) {
+  @BeforeEach
+  void setup(@TempDir File testDir) {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
@@ -101,6 +112,126 @@ public class TestMiniOzoneCluster {
         assertTrue(client.isConnected(pipeline.getFirstNode()));
       }
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDatanodesStartWithLatestLayoutVersion(boolean withCustomHostnames)
+      throws Exception {
+    MiniOzoneCluster.Builder builder =
+        MiniOzoneCluster.newBuilder(new OzoneConfiguration(conf))
+            .setNumDatanodes(1)
+            .setStartDataNodes(false);
+    if (withCustomHostnames) {
+      builder.setHosts(new String[] {"host0.test"});
+    }
+    cluster = builder.build();
+
+    OzoneConfiguration dnConf = cluster.getHddsDatanodes().get(0).getConf();
+    assertEquals(maxLayoutVersion(),
+        new DatanodeLayoutStorage(dnConf).getLayoutVersion(),
+        "Datanode must start at the latest metadata layout version. A "
+            + "datanode.id file written before the datanode starts makes it "
+            + "come up pre-finalized, as if upgraded from an older install.");
+  }
+
+  @Test
+  void testClientDefaultsWithIndividualFlags() {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean("ozone.client.stream.buffer.flush.delay", false);
+    config.setBoolean(OzoneClientConfig.OZONE_READ_SHORT_CIRCUIT, true);
+
+    MiniOzoneCluster.newBuilder(config);
+
+    OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
+    assertThat(clientConfig.getStreamBufferSize()).isEqualTo(1024 * 1024);
+    assertThat(clientConfig.getStreamBufferFlushSize()).isEqualTo(1024 * 1024);
+    assertThat(clientConfig.getStreamBufferMaxSize()).isEqualTo(2 * 1024 * 1024);
+    assertThat(clientConfig.getDataStreamMinPacketSize()).isEqualTo(256 * 1024);
+    assertThat(clientConfig.getDataStreamBufferFlushSize()).isEqualTo(4 * 1024 * 1024);
+    assertThat(clientConfig.getStreamWindowSize()).isEqualTo(8 * 1024 * 1024);
+    assertThat(clientConfig.isStreamBufferFlushDelay()).isFalse();
+    assertThat(clientConfig.isShortCircuitEnabled()).isTrue();
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "ozone.client.stream.buffer.size, 4MB",
+      "ozone.client.stream.buffer.flush.size, 8MB",
+      "ozone.client.stream.buffer.max.size, 64MB",
+      "ozone.client.stream.buffer.increment, 2MB"
+  })
+  void testClientDefaultsPreserveStreamBuffers(String key, String value) {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(key, value);
+    OzoneClientConfig original = config.getObject(OzoneClientConfig.class);
+
+    MiniOzoneCluster.newBuilder(config);
+    MiniOzoneCluster.newBuilder(config);
+
+    OzoneClientConfig actual = config.getObject(OzoneClientConfig.class);
+    assertThat(actual.getStreamBufferSize()).isEqualTo(original.getStreamBufferSize());
+    assertThat(actual.getStreamBufferFlushSize()).isEqualTo(original.getStreamBufferFlushSize());
+    assertThat(actual.getStreamBufferMaxSize()).isEqualTo(original.getStreamBufferMaxSize());
+    assertThat(config.get(key)).isEqualTo(value);
+    assertThat(actual.getDataStreamBufferFlushSize()).isEqualTo(4 * 1024 * 1024);
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "ozone.client.datastream.min.packet.size, 8MB",
+      "ozone.client.datastream.buffer.flush.size, 32MB",
+      "ozone.client.datastream.window.size, 128MB"
+  })
+  void testClientDefaultsPreserveDataStreamBuffers(String key, String value) {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(key, value);
+    OzoneClientConfig original = config.getObject(OzoneClientConfig.class);
+
+    MiniOzoneCluster.newBuilder(config);
+    MiniOzoneCluster.newBuilder(config);
+
+    OzoneClientConfig actual = config.getObject(OzoneClientConfig.class);
+    assertThat(actual.getDataStreamMinPacketSize()).isEqualTo(original.getDataStreamMinPacketSize());
+    assertThat(actual.getDataStreamBufferFlushSize()).isEqualTo(original.getDataStreamBufferFlushSize());
+    assertThat(actual.getStreamWindowSize()).isEqualTo(original.getStreamWindowSize());
+    assertThat(config.get(key)).isEqualTo(value);
+    assertThat(actual.getStreamBufferSize()).isEqualTo(1024 * 1024);
+  }
+
+  @Test
+  void testClientDefaultsCanBeOverridden() {
+    OzoneConfiguration config = new OzoneConfiguration();
+    MiniOzoneCluster.newBuilder(config);
+
+    ClientConfigForTesting.newBuilder(StorageUnit.MB).setChunkSize(2).applyTo(config);
+
+    OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
+    assertThat(clientConfig.getStreamBufferSize()).isEqualTo(2 * 1024 * 1024);
+    assertThat(clientConfig.getStreamBufferFlushSize()).isEqualTo(2 * 1024 * 1024);
+    assertThat(clientConfig.getStreamBufferMaxSize()).isEqualTo(4 * 1024 * 1024);
+    assertThat(clientConfig.getDataStreamMinPacketSize()).isEqualTo(512 * 1024);
+    assertThat(clientConfig.getDataStreamBufferFlushSize()).isEqualTo(8 * 1024 * 1024);
+    assertThat(clientConfig.getStreamWindowSize()).isEqualTo(16 * 1024 * 1024);
+  }
+
+  @Test
+  void testClientDefaultsPreserveSiteXmlBuffers(@TempDir File testDir) throws IOException {
+    Configuration site = new Configuration(false);
+    site.set("ozone.client.stream.buffer.size", "4MB");
+    File ozoneSite = new File(testDir, "ozone-site.xml");
+    try (OutputStream out = Files.newOutputStream(ozoneSite.toPath())) {
+      site.writeXml(out);
+    }
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.addResource(ozoneSite.toURI().toURL());
+
+    MiniOzoneCluster.newBuilder(config);
+
+    OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
+    assertThat(clientConfig.getStreamBufferSize()).isEqualTo(4 * 1024 * 1024);
+    assertThat(clientConfig.getStreamBufferFlushSize()).isEqualTo(16 * 1024 * 1024);
+    assertThat(clientConfig.getStreamBufferMaxSize()).isEqualTo(32 * 1024 * 1024);
   }
 
   @Test
