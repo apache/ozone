@@ -213,6 +213,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
+import org.apache.hadoop.hdds.server.http.HttpServerConfigurationException;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.FaultInjector;
@@ -833,9 +834,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     @Override
     public void run() {
-      LOG.info("Warming up {} EDEKs... (initialDelay={}, "
-              + "retryInterval={}, maxRetries={})", keyNames.length, initialDelay, retryInterval,
-          maxRetries);
+      LOG.info("Warming up {} EDEKs: {} (initialDelay={}, "
+              + "retryInterval={}, maxRetries={})", keyNames.length, Arrays.asList(keyNames),
+          initialDelay, retryInterval, maxRetries);
       try {
         Thread.sleep(initialDelay);
       } catch (InterruptedException ie) {
@@ -2050,13 +2051,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         stsTokenCleanupInterval, TimeUnit.MILLISECONDS, stsTokenCleanupTimeout, this);
     revokedSTSTokenCleanupService.start();
 
-    try {
-      httpServer = new OzoneManagerHttpServer(configuration, this);
-      httpServer.start();
-    } catch (Exception ex) {
-      // Allow OM to start as Http Server failure is not fatal.
-      LOG.error("OM HttpServer failed to start.", ex);
-    }
+    startHttpServer();
 
     omRpcServer.start();
     isOmRpcServerRunning = true;
@@ -2077,6 +2072,25 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     omState = State.RUNNING;
     auditMap.put("NewOmState", omState.name());
     SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.STARTUP, auditMap));
+  }
+
+  /**
+   * Starts the OM web server, shared by {@link #start()} and {@link #restart()}.
+   *
+   * @throws HttpServerConfigurationException if the HTTP server is misconfigured. Such a failure
+   *     will never succeed on retry, so it aborts start-up rather than silently leaving OM without
+   *     a web server. Every other start-up failure is logged and tolerated.
+   */
+  private void startHttpServer() {
+    try {
+      httpServer = new OzoneManagerHttpServer(configuration, this);
+      httpServer.start();
+    } catch (HttpServerConfigurationException ex) {
+      throw ex;
+    } catch (Exception ex) {
+      // Allow OM to start as Http Server failure is not fatal.
+      LOG.error("OM HttpServer failed to start.", ex);
+    }
   }
 
   /**
@@ -2136,13 +2150,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (isOmGrpcServerEnabled) {
       omS3gGrpcServer = getOmS3gGrpcServer(configuration);
     }
-    try {
-      httpServer = new OzoneManagerHttpServer(configuration, this);
-      httpServer.start();
-    } catch (Exception ex) {
-      // Allow OM to start as Http Server failure is not fatal.
-      LOG.error("OM HttpServer failed to start.", ex);
-    }
+    startHttpServer();
     omRpcServer.start();
     isOmRpcServerRunning = true;
 

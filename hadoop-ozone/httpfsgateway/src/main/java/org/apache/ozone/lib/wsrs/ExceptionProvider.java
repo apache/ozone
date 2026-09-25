@@ -17,8 +17,12 @@
 
 package org.apache.ozone.lib.wsrs;
 
-import javax.ws.rs.core.Response;
-import javax.ws.rs.ext.ExceptionMapper;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.ext.ExceptionMapper;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.util.HttpExceptionUtils;
 import org.slf4j.Logger;
@@ -36,7 +40,18 @@ public class ExceptionProvider implements ExceptionMapper<Throwable> {
 
   protected Response createResponse(Response.Status status,
                                     Throwable throwable) {
-    return HttpExceptionUtils.createJerseyExceptionResponse(status, throwable);
+    // Mirror hadoop-common's HttpExceptionUtils JSON error contract so WebHDFS
+    // clients can reconstruct the remote exception. hadoop's helper returns a
+    // javax.ws.rs Response, so build the jakarta.ws.rs equivalent directly while
+    // reusing its public JSON key constants (the client-side parser reads the
+    // same ones), keeping the contract tied at compile time.
+    Map<String, Object> error = new LinkedHashMap<>();
+    error.put(HttpExceptionUtils.ERROR_MESSAGE_JSON, getOneLineMessage(throwable));
+    error.put(HttpExceptionUtils.ERROR_EXCEPTION_JSON, throwable.getClass().getSimpleName());
+    error.put(HttpExceptionUtils.ERROR_CLASSNAME_JSON, throwable.getClass().getName());
+    Map<String, Object> json = Collections.singletonMap(HttpExceptionUtils.ERROR_JSON, error);
+    return Response.status(status).type(MediaType.APPLICATION_JSON)
+        .entity(json).build();
   }
 
   protected String getOneLineMessage(Throwable throwable) {

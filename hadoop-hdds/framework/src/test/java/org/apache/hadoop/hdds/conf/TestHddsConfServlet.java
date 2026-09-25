@@ -27,16 +27,16 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Strings;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.ws.rs.core.HttpHeaders;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Map;
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.ws.rs.core.HttpHeaders;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.hadoop.hdds.JsonTestUtils;
@@ -59,6 +59,8 @@ public class TestHddsConfServlet {
   private static final Map<String, String> TEST_FORMATS = new HashMap<>();
   private static final String TEST_KEY = "testconfservlet.key";
   private static final String TEST_VAL = "testval";
+  private static final String TAG_SECRET_KEY = "ozone.test.test.password";
+  private static final String TAG_SECRET_VALUE = "must-not-appear-in-tag-output";
 
   @BeforeAll
   public static void setup() {
@@ -167,6 +169,11 @@ public class TestHddsConfServlet {
 
   private String getResultWithCmd(OzoneConfiguration conf, String cmd)
       throws Exception {
+    return getResultWithCmd(conf, cmd, ConfigTag.DEBUG.toString());
+  }
+
+  private String getResultWithCmd(OzoneConfiguration conf, String cmd, String tags)
+      throws Exception {
     StringWriter sw = null;
     PrintWriter pw = null;
     HddsConfServlet service = null;
@@ -182,7 +189,7 @@ public class TestHddsConfServlet {
       when(request.getHeader(HttpHeaders.ACCEPT)).
           thenReturn(TEST_FORMATS.get(null));
       when(request.getParameter("cmd")).thenReturn(cmd);
-      when(request.getParameter("tags")).thenReturn(ConfigTag.DEBUG.toString());
+      when(request.getParameter("tags")).thenReturn(tags);
       HttpServletResponse response = mock(HttpServletResponse.class);
       sw = new StringWriter();
       pw = new PrintWriter(sw);
@@ -200,6 +207,81 @@ public class TestHddsConfServlet {
       if (service != null) {
         service.destroy();
       }
+    }
+  }
+
+  /**
+   * "/conf" must not expose values of keys matching hadoop.security.sensitive-config-keys
+   * ("password$" among them) in any format. The XML branch used
+   * {@code Configuration.writeXml(name, out)}, whose two-argument overload passes a null
+   * Configuration and so skips ConfigRedactor entirely, emitting secrets in clear text.
+   *
+   * <p>Asserts the absence of the value rather than the presence of a redaction marker, so the
+   * test pins the security property and not Hadoop's wording, and asserts the key is still listed
+   * so a dump that simply omitted the property could not pass.
+   */
+  @Test
+  public void testSensitiveValuesAreRedactedInAllFormats() throws Exception {
+    final String secretKey = "test.ssl.keystore.password";
+    final String secretValue = "must-not-appear-in-conf-output";
+    OzoneConfiguration conf = getPropertiesConf();
+    conf.set(secretKey, secretValue);
+
+    for (String format : TEST_FORMATS.keySet()) {
+      String result = dumpAllProperties(conf, format);
+      assertThat(result)
+          .as("%s dump must still list the sensitive key", format)
+          .contains(secretKey);
+      assertThat(result)
+          .as("%s dump must not expose the sensitive value", format)
+          .doesNotContain(secretValue);
+    }
+  }
+
+  /**
+   * "/conf?cmd=getPropertyByTag" must redact too. The SECURITY tag covers
+   * ssl.server.keystore.password / .keypassword / ssl.server.truststore.password in
+   * ozone-default.xml, so an operator value for any of them would otherwise be serialised in clear
+   * text to anyone past the instrumentation gate - which defaults to any authenticated user.
+   *
+   * <p>Asserts the key is still listed, so a response that simply dropped the property could not
+   * pass, and that the value is gone.
+   */
+  @Test
+  public void testSensitiveValuesAreRedactedInTagOutput() throws Exception {
+    OzoneConfiguration conf = getPropertiesConf();
+    conf.getObject(OzoneTestConfig.class);
+
+    String result = getResultWithCmd(conf, "getPropertyByTag", ConfigTag.SECURITY.toString());
+
+    assertThat(result)
+        .as("tag output must still list the sensitive key")
+        .contains(TAG_SECRET_KEY);
+    assertThat(result)
+        .as("tag output must not expose the sensitive value")
+        .doesNotContain(TAG_SECRET_VALUE);
+  }
+
+  /** Drives the servlet for a full configuration dump and returns the response body. */
+  private String dumpAllProperties(OzoneConfiguration conf, String format) throws Exception {
+    HddsConfServlet service = new HddsConfServlet();
+    try (StringWriter sw = new StringWriter(); PrintWriter pw = new PrintWriter(sw)) {
+      ServletContext context = mock(ServletContext.class);
+      service.init(mock(ServletConfig.class));
+      when(context.getAttribute(HttpServer2.CONF_CONTEXT_ATTRIBUTE)).thenReturn(conf);
+      when(service.getServletContext()).thenReturn(context);
+
+      HttpServletRequest request = mock(HttpServletRequest.class);
+      when(request.getHeader(HttpHeaders.ACCEPT)).thenReturn(TEST_FORMATS.get(format));
+      when(request.getParameter("name")).thenReturn(null);
+
+      HttpServletResponse response = mock(HttpServletResponse.class);
+      when(response.getWriter()).thenReturn(pw);
+
+      service.doGet(request, response);
+      return sw.toString().trim();
+    } finally {
+      service.destroy();
     }
   }
 
@@ -292,5 +374,13 @@ public class TestHddsConfServlet {
         description = "Test get config by tag",
         tags = ConfigTag.DEBUG)
     private String testTag = "value1";
+
+    @Config(
+        key = "ozone.test.test.password",
+        defaultValue = TAG_SECRET_VALUE,
+        type = ConfigType.STRING,
+        description = "Test that SECURITY-tagged secrets are redacted",
+        tags = ConfigTag.SECURITY)
+    private String testSecret = TAG_SECRET_VALUE;
   }
 }

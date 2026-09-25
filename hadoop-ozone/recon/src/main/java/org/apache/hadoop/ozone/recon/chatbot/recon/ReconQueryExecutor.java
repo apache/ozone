@@ -20,11 +20,11 @@ package org.apache.hadoop.ozone.recon.chatbot.recon;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotUtils;
 

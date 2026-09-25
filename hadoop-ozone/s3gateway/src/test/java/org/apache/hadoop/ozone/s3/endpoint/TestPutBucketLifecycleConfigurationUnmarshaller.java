@@ -23,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import jakarta.ws.rs.WebApplicationException;
 import java.io.ByteArrayInputStream;
-import javax.ws.rs.WebApplicationException;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 

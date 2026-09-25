@@ -12,9 +12,19 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<beans xmlns="http://java.sun.com/xml/ns/javaee"
+<!--
+  bean-discovery-mode is "all" on purpose; do not change it to the CDI 4
+  default "annotated" without first annotating the beans below. The default
+  only discovers classes that carry a bean-defining annotation, and several S3
+  Gateway beans carry none: OzoneClientCache, MultiDeleteRequestUnmarshaller
+  and CompleteMultipartUploadRequestUnmarshaller are @jakarta.inject.Singleton,
+  which is a pseudo-scope, not a bean-defining annotation. Under "annotated"
+  they would silently go undiscovered and S3G startup would fail, so a switch
+  requires first giving each of them a normal scope such as @ApplicationScoped.
+-->
+<beans xmlns="https://jakarta.ee/xml/ns/jakartaee"
        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-       xsi:schemaLocation="
-      http://java.sun.com/xml/ns/javaee
-      http://java.sun.com/xml/ns/javaee/beans_1_0.xsd">
+       xsi:schemaLocation="https://jakarta.ee/xml/ns/jakartaee
+      https://jakarta.ee/xml/ns/jakartaee/beans_4_0.xsd"
+       version="4.0" bean-discovery-mode="all">
 </beans>

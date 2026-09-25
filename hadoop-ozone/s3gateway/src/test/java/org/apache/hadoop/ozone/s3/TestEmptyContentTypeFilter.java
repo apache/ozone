@@ -24,10 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.servlet.http.HttpServletRequest;
 import org.apache.hadoop.ozone.s3.EmptyContentTypeFilter.EnumerationWrapper;
 import org.junit.jupiter.api.Test;
 

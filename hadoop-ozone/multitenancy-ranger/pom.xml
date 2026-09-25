@@ -69,9 +69,31 @@
           <artifactId>jersey-bundle</artifactId>
         </exclusion>
         <exclusion>
+          <!-- Legacy JAXB 3.0.0 impl (via ugsync-util): carries the same
+               org.glassfish.jaxb.core.* classes as the jakarta JAXB 4.0.x
+               runtime other modules bring, so shipping both duplicates
+               jaxb-core in the dist. jaxb-runtime below supplies the 4.0.x
+               impl. -->
+          <groupId>com.sun.xml.bind</groupId>
+          <artifactId>jaxb-core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.sun.xml.bind</groupId>
+          <artifactId>jaxb-impl</artifactId>
+        </exclusion>
+        <exclusion>
           <!-- depend on jcl-over-slf4j instead -->
           <groupId>commons-logging</groupId>
           <artifactId>commons-logging</artifactId>
+        </exclusion>
+        <exclusion>
+          <!-- ranger-audit-core pulls aircompressor 0.27, whose
+               io.airlift.compress.* classes collide with the incompatible
+               2.0.3 that iceberg-core requires and uses; ranger-audit-core
+               itself does not reference aircompressor, so exclude the unused
+               0.27 and let the dist ship a single 2.0.3 copy. -->
+          <groupId>io.airlift</groupId>
+          <artifactId>aircompressor</artifactId>
         </exclusion>
         <exclusion>
           <groupId>javax.activation</groupId>
@@ -156,6 +178,11 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
       <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.glassfish.jaxb</groupId>
+      <artifactId>jaxb-runtime</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

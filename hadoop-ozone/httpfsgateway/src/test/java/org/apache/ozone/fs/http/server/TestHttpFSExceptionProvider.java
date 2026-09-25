@@ -19,8 +19,8 @@ package org.apache.ozone.fs.http.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.ozone.lib.service.FileSystemAccessException;
 import org.junit.jupiter.api.Test;

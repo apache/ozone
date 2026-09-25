@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
+import jakarta.annotation.PreDestroy;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
@@ -38,7 +39,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.PreDestroy;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.Archiver;

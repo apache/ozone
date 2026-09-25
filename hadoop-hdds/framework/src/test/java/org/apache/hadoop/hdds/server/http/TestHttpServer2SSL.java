@@ -176,6 +176,35 @@ public class TestHttpServer2SSL {
     }
   }
 
+  /**
+   * Jetty 12's SecureRequestCustomizer defaults to sniHostCheck=true, which
+   * rejects any HTTPS request whose host is not carried by the served
+   * certificate with a 400 "Invalid SNI". The test keystore certificate is
+   * CN=localhost with no SubjectAlternativeName, so the "localhost" name it
+   * covers is served, but the 127.0.0.1 IP literal it does not cover -- which,
+   * being an IP address, carries no SNI -- would be rejected under that default.
+   * HttpServer2 disables the check to preserve Jetty 9.4 behaviour (which served
+   * such requests with the default certificate), so both are served with 200.
+   */
+  @Test
+  public void testIpLiteralServedWithNonMatchingCertificate() throws Exception {
+    HttpServer2 server = buildServer(null, null, null);
+    server.start();
+    try {
+      InetSocketAddress addr = server.getConnectorAddress(0);
+      SSLSocketFactory factory = createSocketFactory(null, null);
+      // The name the certificate covers is served (sanity check).
+      assertEquals(HttpURLConnection.HTTP_OK,
+          connectWithFactory(factory, "localhost", addr));
+      // The IP literal the certificate does not cover is served too: without
+      // the host-check opt-out this would fail with a 400 "Invalid SNI".
+      assertEquals(HttpURLConnection.HTTP_OK,
+          connectWithFactory(factory, "127.0.0.1", addr));
+    } finally {
+      server.stop();
+    }
+  }
+
   @Test
   public void testEnabledProtocolAppliedWhenConfigUnset() throws Exception {
     OzoneConfiguration serverConf = new OzoneConfiguration(conf);
@@ -285,7 +314,12 @@ public class TestHttpServer2SSL {
    * and returns the HTTP response code.
    */
   private int connectWithFactory(SSLSocketFactory factory, InetSocketAddress addr) throws IOException {
-    URL url = new URL("https://localhost:" + addr.getPort() + "/jmx");
+    return connectWithFactory(factory, "localhost", addr);
+  }
+
+  private int connectWithFactory(SSLSocketFactory factory, String host, InetSocketAddress addr)
+      throws IOException {
+    URL url = new URL("https://" + host + ":" + addr.getPort() + "/jmx");
     HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
     conn.setSSLSocketFactory(factory);
     conn.setHostnameVerifier((hostname, session) -> true);

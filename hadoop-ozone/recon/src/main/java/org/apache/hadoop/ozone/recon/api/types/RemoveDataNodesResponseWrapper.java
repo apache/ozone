@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import jakarta.xml.bind.annotation.XmlElement;
 import java.util.HashMap;
 import java.util.Map;
-import javax.xml.bind.annotation.XmlElement;
 
 /**
  * Class that represents the API Response structure of Datanodes.

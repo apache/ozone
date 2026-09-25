@@ -17,10 +17,10 @@
 
 package org.apache.ozone.lib.wsrs;
 
+import jakarta.ws.rs.core.StreamingOutput;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import javax.ws.rs.core.StreamingOutput;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.ozone.fs.http.server.FSOperations;

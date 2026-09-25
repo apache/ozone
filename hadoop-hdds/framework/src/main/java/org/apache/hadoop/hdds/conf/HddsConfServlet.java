@@ -19,6 +19,10 @@ package org.apache.hadoop.hdds.conf;
 
 import static org.apache.hadoop.hdds.conf.OzoneConfiguration.getConfigurationResourceFiles;
 
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Writer;
@@ -26,14 +30,11 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.ConfServlet.BadFormatException;
+import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -106,7 +107,11 @@ public class HddsConfServlet extends HttpServlet {
             OzoneConfiguration.dumpConfiguration(getConfFromContext(), name, out);
             break;
           case XML:
-            getConfFromContext().writeXml(name, out);
+            // Pass the configuration as the redactor: the two-argument writeXml overload passes a
+            // null Configuration, which skips ConfigRedactor and emits sensitive values
+            // (hadoop.security.sensitive-config-keys) in clear text.
+            OzoneConfiguration xmlConf = getConfFromContext();
+            xmlConf.writeXml(name, out, xmlConf);
             break;
           default:
             throw new BadFormatException("Bad format: " + format);
@@ -138,6 +143,9 @@ public class HddsConfServlet extends HttpServlet {
 
       Map<String, String> descriptionMap = buildDescriptionMap(config);
       Map<String, Map<String, OzoneConfiguration.Property>> propMap = new HashMap<>();
+      // Tags such as SECURITY cover keystore and truststore passwords, so the values need the same
+      // ConfigRedactor treatment the full dump above gets.
+      ConfigRedactor redactor = new ConfigRedactor(config);
 
       for (String tag : tags.split(",")) {
         if (config.isPropertyTag(tag)) {
@@ -145,7 +153,7 @@ public class HddsConfServlet extends HttpServlet {
           Map<String, OzoneConfiguration.Property> metadataMap = new HashMap<>();
 
           for (String propName : properties.stringPropertyNames()) {
-            String value = properties.getProperty(propName);
+            String value = redactor.redact(propName, properties.getProperty(propName));
             String description = descriptionMap.getOrDefault(propName, "");
             OzoneConfiguration.Property property = new OzoneConfiguration.Property();
             property.setName(propName);

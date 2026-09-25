@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 
+import jakarta.ws.rs.HttpMethod;
+import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
-import javax.ws.rs.HttpMethod;
-import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint.ObjectRequestContext;
 import org.apache.hadoop.ozone.s3.util.S3Consts;

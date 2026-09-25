@@ -54,6 +54,76 @@ ozone.http.filter.initializers | org.apache.hadoop.security.AuthenticationFilter
 After that, individual component needs to configure properly to completely enable
 SPNEGO or SIMPLE authentication.
 
+### Filter initializer compatibility
+
+Ozone's HTTP servers run on Jetty 12 (EE10, `jakarta.servlet`). Filters registered
+through `ozone.http.filter.initializers` must use `jakarta.servlet.Filter`, or must
+belong to one of these bridged `javax.servlet` families:
+
+* `AuthenticationFilter` (hadoop-auth: Kerberos/SPNEGO and simple authentication)
+* `StaticUserFilter` (static user for unsecured consoles)
+* `CrossOriginFilter` (CORS response headers)
+* `RestCsrfPreventionFilter` (CSRF prevention)
+
+Any other `javax.servlet.Filter` — including Hadoop's `XFrameOptionsFilter` and
+site-specific wrapper filters — is not bridgeable. Registering one causes the
+daemon (OM, SCM, Datanode, S3G, Recon, HttpFS) to **abort start-up**.
+
+Subclasses of the four families above are accepted, because Hadoop's own bridged filters are
+subclasses — `ProxyUserAuthenticationFilter`, `DelegationTokenAuthenticationFilter`, and the
+HttpFS and Recon authentication filters built on them. If you register a site-specific
+subclass, note what the bridge carries back into the jakarta chain from a request the filter
+wraps and forwards downstream: **only the authentication result** — `getRemoteUser`,
+`getUserPrincipal`, `getAuthType` and `isUserInRole`. Request attributes the filter sets do
+propagate, and a forwarded response wrapper fails the request with an error rather than being
+dropped, but any **other** override on that forwarded request — a substituted header,
+parameter, or remote address — is **silently lost**. All four bridged families, and Hadoop's
+subclasses of them, override only the principal methods, so this affects custom subclasses
+only.
+
+**Upgrade note:** before the Jetty 12 migration, a failed HTTP server start was logged
+and the daemon continued without a web UI. After it, the daemon refuses to start so
+that a misconfigured filter is never silently skipped. If your cluster sets
+`ozone.http.filter.initializers` to a custom filter, migrate it to
+`jakarta.servlet.Filter` before upgrading.
+
+### Jetty 12 URI compliance
+
+Jetty 12 answers `400 Bad Request` for ambiguous URI constructs that Jetty 9.4 accepted:
+empty path segments (e.g., `bucket//key`), ambiguous percent-encodings, encoded path
+separators, and suspicious path characters (a decoded backslash, `DEL`, or a C0 control
+byte).
+
+Because S3 object keys and WebHDFS paths legitimately contain these sequences, the **S3
+Gateway REST endpoint** and **HttpFS** relax exactly those four checks, so they keep serving
+the URIs they served before the migration. Every other Ozone HTTP server — OM, SCM, Datanode,
+Recon, and the S3 Gateway's web-admin and STS endpoints — uses the Jetty 12 defaults and
+answers `400 Bad Request` for such URIs.
+
+Genuinely illegal URI characters that RFC 3986 forbids in unencoded form — such as `[`, `]`,
+`{`, `}`, and `|` — are rejected with `400 Bad Request` on every server, including the two
+that relax the ambiguity checks. Conforming S3 and WebHDFS clients already percent-encode
+these characters; a client that sends them unencoded must be updated before upgrading.
+
+### HttpFS `/conf` response media type
+
+`GET /conf` is served by Ozone's own `HddsConfServlet` on every HTTP server. OM, SCM, Datanode,
+Recon, and the S3 Gateway already registered that servlet before the Jetty 12 migration, so only
+**HttpFS** -- which until now fell through to Hadoop's `ConfServlet` -- changes, and only for the
+XML form of the response:
+
+Accept header | Before (HttpFS) | After
+-----------------------------------|--------------------------------------|-------------------
+contains `json` | `application/json;charset=utf-8` | `application/json;charset=utf-8`
+anything else, or absent | `text/xml;charset=utf-8` | `application/xml;charset=utf-8`
+
+The format is still chosen from the `Accept` header alone, and the documents themselves are
+unchanged -- both servlets render them with Hadoop's `Configuration.dumpConfiguration` and
+`Configuration.writeXml`. Clients that parse the header are unaffected; monitoring or scripts that
+compare the XML `Content-Type` against a literal string need updating. HttpFS additionally gains
+the Ozone-only `/conf?cmd=getOzoneTags` and `/conf?cmd=getPropertyByTag&tags=...` commands, which
+Hadoop's servlet did not serve.
+
 ### Enable SPNEGO authentication for OM HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
