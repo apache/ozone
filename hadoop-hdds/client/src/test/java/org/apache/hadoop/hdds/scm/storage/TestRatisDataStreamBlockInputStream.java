@@ -182,6 +182,41 @@ class TestRatisDataStreamBlockInputStream {
   }
 
   /**
+   * Read-ahead starts at 128 KB and doubles with each request the reader consumes, up to half the window, so a short
+   * run of small reads before a seek requests little beyond what it reads, while a long scan soon reads ahead fully.
+   */
+  @Test
+  void readAheadStartsSmallAndDoubles() throws Exception {
+    final int kb = 1 << 10;
+    final byte[] block = block(1088 * kb);
+    final Streams streams = new Streams(block);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 1024 * kb)) {
+      final ByteBuffer small = ByteBuffer.allocate(4 * kb);
+      for (int i = 0; i < 3; i++) {
+        small.clear();
+        in.read(small);
+      }
+      in.seek(0);
+      final ByteBuffer out = ByteBuffer.allocate(block.length);
+      final ByteBuffer chunk = ByteBuffer.allocate(64 * kb);
+      while (in.read(chunk) > 0) {
+        chunk.flip();
+        out.put(chunk);
+        chunk.clear();
+      }
+      assertArrayEquals(block, out.array());
+    }
+
+    assertEquals(Arrays.asList(
+        // three 4 KB reads, then a seek: the read-ahead is two 128 KB requests
+        "0+4096", "4096+131072", "135168+131072",
+        // 64 KB reads to the end of the block: the read-ahead doubles up to 512 KB
+        "0+65536", "65536+131072", "196608+131072", "327680+262144", "589824+524288"), streams.ranges());
+  }
+
+  /**
    * A request is closed as soon as its data is consumed, without waiting for its terminal reply: the reply would
    * otherwise keep the stream, and the netty buffer it was decoded from, until the next read or seek.
    */

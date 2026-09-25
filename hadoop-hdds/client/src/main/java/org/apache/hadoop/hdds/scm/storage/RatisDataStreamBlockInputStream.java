@@ -64,6 +64,9 @@ import org.slf4j.LoggerFactory;
  * sequential reader requests at most {@code ozone.client.ratis.stream.read.window-size} bytes ahead of its position,
  * as two pipelined requests of half the window each: the datanode keeps sending the second while the reader consumes
  * the first. This bounds both the bytes wasted when the reader stops or seeks and the replies buffered per stream.
+ * The read-ahead starts at {@link #INITIAL_READ_AHEAD} and doubles with each request the reader consumes, so a short
+ * run of small reads (such as Parquet reading its page indexes) wastes little at its next seek, while a long scan
+ * (such as HBase reading 64 KB blocks) soon reads ahead the full half window.
  * A reader that asks for at least half the window in one read (Parquet reads a run of column chunks in 8 MB buffers)
  * already reads in large pieces, so it gets exactly what it asks for until its next seek.
  */
@@ -71,6 +74,8 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
   private static final Logger LOG =
       LoggerFactory.getLogger(RatisDataStreamBlockInputStream.class);
   private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
+  /** The first read-ahead request of a sequential run, before it doubles up to {@link #readAheadRequestSize}. */
+  static final long INITIAL_READ_AHEAD = 128 << 10;
 
   private final BlockID blockID;
   private final long blockLength;
@@ -95,6 +100,8 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
   private boolean sequential;
   /** Set when a read since the last seek asked for at least {@link #readAheadRequestSize}: no read-ahead then. */
   private boolean largeReads;
+  /** The size of the next read-ahead request; 0 until the reader reads sequentially. */
+  private long readAheadSize;
   private boolean closed;
 
   public RatisDataStreamBlockInputStream(BlockID blockID, long length,
@@ -199,6 +206,7 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
       discardBufferedData();
       sequential = false;
       largeReads = false;
+      readAheadSize = 0;
     }
   }
 
@@ -227,13 +235,16 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     largeReads |= length >= readAheadRequestSize;
     while (position < blockLength) {
       final boolean readAhead = preRead && sequential && !largeReads;
+      if (readAhead && readAheadSize == 0) {
+        readAheadSize = Math.min(INITIAL_READ_AHEAD, readAheadRequestSize);
+      }
       if (current == null) {
         current = openRequest(position,
-            requestLength(blockLength, position, length, readAhead, readAheadRequestSize));
+            requestLength(blockLength, position, length, readAhead, readAheadSize));
       }
       if (readAhead && next == null && current.end < blockLength) {
         next = openRequest(current.end,
-            requestLength(blockLength, current.end, 0, true, readAheadRequestSize));
+            requestLength(blockLength, current.end, 0, true, readAheadSize));
       }
 
       final ReferenceCountedObject<DataStreamReply> ref = readReply(current);
@@ -273,6 +284,9 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     current = next;
     next = null;
     sequential = true;
+    if (readAheadSize > 0) {
+      readAheadSize = Math.min(2 * readAheadSize, readAheadRequestSize);
+    }
   }
 
   private ReadRequest openRequest(long offset, long length) throws IOException {
@@ -416,6 +430,7 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     discardBufferedData();
     sequential = false;
     largeReads = false;
+    readAheadSize = 0;
     if (xceiverClient != null) {
       closeRequests();
       xceiverClientFactory.releaseClient(xceiverClient, invalidateClient, true);
@@ -448,11 +463,11 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
 
   /**
    * @return the length of a request at {@code offset}: exactly the {@code length} the caller asked for, since a read
-   *     after a seek may be followed by another seek; at least {@code readAheadRequestSize} when reading ahead
+   *     after a seek may be followed by another seek; at least {@code readAheadSize} when reading ahead
    */
   static long requestLength(long blockLength, long offset, int length, boolean readAhead,
-      long readAheadRequestSize) {
-    final long wanted = readAhead ? Math.max(length, readAheadRequestSize) : Math.max(1L, length);
+      long readAheadSize) {
+    final long wanted = readAhead ? Math.max(length, readAheadSize) : Math.max(1L, length);
     return Math.min(blockLength - offset, wanted);
   }
 
