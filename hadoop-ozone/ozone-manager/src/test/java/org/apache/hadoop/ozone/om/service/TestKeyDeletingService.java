@@ -1386,6 +1386,8 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Delete snap1. Which also sets the snap2 to be deep cleaned.
       writeClient.deleteSnapshot(volumeName, bucketName, snap1);
+      // SnapshotDeletingService silently skips snap1 until its delete is flushed, and the 1h interval never retries.
+      om.awaitDoubleBufferFlush();
       keyManager.getSnapshotDeletingService().runPeriodicalTaskNow();
       // Wait for changes to the snap2 to be flushed.
       GenericTestUtils.waitFor(
