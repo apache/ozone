@@ -18,6 +18,7 @@
 package org.apache.ozone.fs.http.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -36,6 +37,8 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
+import org.apache.hadoop.hdds.server.http.HttpServerConfigurationException;
+import org.apache.hadoop.hdds.server.http.TestHttpServer2;
 import org.eclipse.jetty.http.UriCompliance;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Server;
@@ -237,6 +240,74 @@ public class TestHttpFSServerWebServer {
       webServer.stop();
       restore(saved);
     }
+  }
+
+  /**
+   * HttpFS is the one Ozone HTTP server whose {@code /conf} endpoint changes with the migration:
+   * OM, SCM, the datanode, Recon and the S3 Gateway already registered Ozone's own
+   * {@code HddsConfServlet} over the default one, while HttpFS fell through to hadoop's
+   * {@code ConfServlet}. The XML media type therefore changes -- {@code application/xml;charset=utf-8}
+   * where Jetty 9.4 put hadoop's {@code text/xml;charset=utf-8} on the wire -- while the JSON one is
+   * unchanged. The SecuringOzoneHTTP pages document both strings, so pin them here, header value and
+   * all: hadoop's servlet set {@code "text/xml; charset=utf-8"} with a space, which Jetty rewrote, so
+   * the source literal is not what a client saw. The request also exercises the
+   * {@code OzoneConfiguration} cast in
+   * {@code HddsConfServlet.getConfFromContext()}, which holds only because HttpFS builds its
+   * server from an {@code OzoneConfiguration}.
+   */
+  @Test
+  public void confServletServesOzoneMediaTypes(@TempDir Path baseDir) throws Exception {
+    Map<String, String> saved = new HashMap<>();
+    HttpFSServerWebServer webServer = configureWebServer(baseDir, true, saved);
+    try {
+      webServer.start();
+      URL servletUrl = webServer.getUrl();
+      String confUrl = new URL(servletUrl.getProtocol(), servletUrl.getHost(),
+          servletUrl.getPort(), "/conf").toString();
+
+      // No "json" in the Accept header (the JDK client sends text/html and */*), so XML.
+      HttpURLConnection xml = openConnection(confUrl);
+      assertEquals(HttpURLConnection.HTTP_OK, xml.getResponseCode());
+      assertEquals("application/xml;charset=utf-8", xml.getContentType(),
+          "XML Content-Type must match the documented string");
+      assertTrue(readBody(xml).contains("<configuration>"),
+          "XML dump must carry the configuration document");
+      xml.disconnect();
+
+      HttpURLConnection json = openConnection(confUrl);
+      json.setRequestProperty("Accept", "application/json");
+      assertEquals(HttpURLConnection.HTTP_OK, json.getResponseCode());
+      assertEquals("application/json;charset=utf-8", json.getContentType(),
+          "JSON Content-Type must match the documented string");
+      assertTrue(readBody(json).contains("\"properties\""),
+          "JSON dump must carry the properties array");
+      json.disconnect();
+    } finally {
+      webServer.stop();
+      restore(saved);
+    }
+  }
+
+  /**
+   * HttpFS reads {@code ozone.http.filter.initializers} from an
+   * {@link OzoneConfiguration}, so an operator entry in ozone-site.xml reaches it just as it
+   * reaches OM, SCM, the datanode, Recon and the S3 Gateway -- its own
+   * {@code HttpFSAuthenticationFilter} is registered separately and the filter it strips from
+   * that list is only the hadoop authentication initializer. A non-bridgeable javax filter (one
+   * {@code ServletElementsFactory} cannot adapt to Jetty EE10) must therefore abort HttpFS
+   * start-up rather than leave the gateway serving without it.
+   *
+   * <p>HttpFS builds its web server in the constructor and {@code main} calls that constructor
+   * outside any {@code try}, so the exception propagates with no catch clause needed -- the same
+   * shape as the S3 Gateway. This test pins that: the constructor, not {@code start()}, throws.
+   */
+  @Test
+  public void constructorThrowsOnNonBridgeableFilter() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HttpServer2.FILTER_INITIALIZER_PROPERTY,
+        TestHttpServer2.NonBridgeableFilterInitializer.class.getName());
+    assertThrows(HttpServerConfigurationException.class,
+        () -> new HttpFSServerWebServer(conf, new Configuration(false)));
   }
 
   /**

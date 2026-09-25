@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.server.http;
 
+import static org.apache.hadoop.fs.CommonConfigurationKeys.HADOOP_HTTP_STATIC_USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -30,9 +31,12 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -44,12 +48,17 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.http.FilterContainer;
 import org.apache.hadoop.http.FilterInitializer;
+import org.apache.hadoop.http.lib.StaticUserWebFilter;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
+import org.apache.hadoop.security.http.CrossOriginFilter;
+import org.apache.hadoop.security.http.RestCsrfPreventionFilter;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
@@ -64,6 +73,12 @@ import org.junit.jupiter.api.io.TempDir;
  * Testing HttpServer2.
  */
 public class TestHttpServer2 {
+
+  /** Key {@link #rawGet} stores the status line under; not a legal HTTP/1.1 header name. */
+  private static final String STATUS_LINE = ":status";
+
+  /** A user agent the CSRF filter's default browser-useragents-regex matches. */
+  private static final String BROWSER_USER_AGENT = "Mozilla/5.0 (bridge-test)";
 
   /**
    * Test hadoop.http.idle_timeout.ms correctly loaded, and not being default
@@ -427,6 +442,125 @@ public class TestHttpServer2 {
   }
 
   /**
+   * Drives hadoop's real {@code StaticUserFilter} through the bridge on an embedded server. It reads
+   * its user from the filter config and forwards a javax request wrapper overriding both
+   * {@code getRemoteUser} and {@code getUserPrincipal}, so it pins the same identity overlay the
+   * auth filters rely on -- on an unsecured cluster this filter is the only thing giving the web UI
+   * a user, and a bridge that dropped the wrapper would leave it with none.
+   */
+  @Test
+  public void testStaticUserFilterRunsThroughBridge() throws Exception {
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .build();
+
+    Map<String, String> params = new HashMap<>();
+    params.put(HADOOP_HTTP_STATIC_USER, "dr.who");
+    server.addGlobalFilter("static",
+        StaticUserWebFilter.StaticUserFilter.class.getName(), params);
+    server.addServlet("identity", "/identity", IdentityServlet.class);
+    server.start();
+    try {
+      HttpURLConnection conn = connectTo("http://localhost:"
+          + server.getConnectorAddress(0).getPort() + "/identity", null);
+      assertEquals(HttpURLConnection.HTTP_OK, conn.getResponseCode());
+      // The user reaching the servlet also proves the filter got its init parameter through
+      // JakartaToJavaxFilterConfig: without it the filter would set a null user.
+      assertEquals("dr.who/dr.who", readBody(conn),
+          "both the remote user and the principal must be bridged onto the jakarta request");
+    } finally {
+      server.stop();
+    }
+  }
+
+  /**
+   * Drives hadoop's real {@code CrossOriginFilter} through the bridge on an embedded server. Unlike
+   * the auth filters it wraps nothing: it reads request headers off the javax request view and sets
+   * the {@code Access-Control-*} headers on the javax response view, so it is the response side of
+   * the bridge that this pins. The second request shows the filter really read {@code Origin}
+   * through the bridge rather than emitting the headers unconditionally.
+   */
+  @Test
+  public void testCrossOriginFilterRunsThroughBridge() throws Exception {
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .build();
+
+    Map<String, String> params = new HashMap<>();
+    params.put(CrossOriginFilter.ALLOWED_ORIGINS, "http://allowed.example.com");
+    params.put(CrossOriginFilter.ALLOWED_METHODS, "GET,POST");
+    params.put(CrossOriginFilter.ALLOWED_HEADERS, "X-Requested-With");
+    params.put(CrossOriginFilter.MAX_AGE, "900");
+    server.addGlobalFilter("cors", CrossOriginFilter.class.getName(), params);
+    server.addServlet("ok", "/ok", OkServlet.class);
+    server.start();
+    try {
+      int port = server.getConnectorAddress(0).getPort();
+
+      Map<String, String> allowed = rawGet("/ok", port,
+          "Origin", "http://allowed.example.com",
+          "Access-Control-Request-Method", "GET",
+          "Access-Control-Request-Headers", "X-Requested-With");
+      assertThat(allowed.get(STATUS_LINE)).contains("200");
+      assertEquals("http://allowed.example.com", allowed.get("Access-Control-Allow-Origin"));
+      assertEquals("true", allowed.get("Access-Control-Allow-Credentials"));
+      assertEquals("GET,POST", allowed.get("Access-Control-Allow-Methods"));
+      assertEquals("X-Requested-With", allowed.get("Access-Control-Allow-Headers"));
+      assertEquals("900", allowed.get("Access-Control-Max-Age"));
+
+      Map<String, String> denied = rawGet("/ok", port, "Origin", "http://denied.example.com");
+      assertThat(denied.get(STATUS_LINE)).contains("200");
+      assertNull(denied.get("Access-Control-Allow-Origin"),
+          "an origin outside allowed-origins must get no CORS headers");
+    } finally {
+      server.stop();
+    }
+  }
+
+  /**
+   * Drives hadoop's real {@code RestCsrfPreventionFilter} through the bridge on an embedded server,
+   * with its default parameters. It is the one bridged filter that both inspects the request method
+   * and refuses the request itself, so it pins {@code getMethod} and {@code getHeader} on the javax
+   * request view together with {@code sendError} on the javax response view. Each of the three
+   * requests turns on a different one of those: the rejection needs the User-Agent and custom
+   * header reads plus sendError, and the GET is admitted only because {@code getMethod} reports a
+   * method in methods-to-ignore.
+   */
+  @Test
+  public void testRestCsrfPreventionFilterRunsThroughBridge() throws Exception {
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .build();
+
+    server.addGlobalFilter("csrf", RestCsrfPreventionFilter.class.getName(), new HashMap<>());
+    server.addServlet("ok", "/ok", OkServlet.class);
+    server.start();
+    try {
+      String base = "http://localhost:" + server.getConnectorAddress(0).getPort() + "/ok";
+
+      assertEquals(HttpURLConnection.HTTP_BAD_REQUEST,
+          postAsBrowser(base, null).getResponseCode(),
+          "a browser POST without the CSRF header must be refused by the filter");
+      assertEquals(HttpURLConnection.HTTP_OK,
+          postAsBrowser(base, "").getResponseCode(),
+          "the same POST carrying the CSRF header must reach the servlet");
+
+      HttpURLConnection get = connectTo(base, null);
+      get.setRequestProperty("User-Agent", BROWSER_USER_AGENT);
+      assertEquals(HttpURLConnection.HTTP_OK, get.getResponseCode(),
+          "GET is in methods-to-ignore, so it needs no CSRF header");
+    } finally {
+      server.stop();
+    }
+  }
+
+  /**
    * Exercises the {@code /logLevel} servlet end to end on an embedded server.
    * The servlet was reimplemented with inlined ServletUtil helpers during the
    * jakarta port, so a broken registration, content type or parameter trimming
@@ -514,6 +648,70 @@ public class TestHttpServer2 {
   }
 
   /**
+   * A bridgeable javax filter can still fail to initialize at start time rather than at build time
+   * -- {@code AuthenticationFilter} configured for kerberos with a missing keytab is the real case.
+   * Jetty's filter initialization propagates out of {@code webServer.start()}, so the bridge's
+   * translation of the delegate's javax {@code ServletException} into a jakarta one is what
+   * {@code HttpServer2.start()} finally wraps as an {@code IOException}. Without that translation
+   * the filter's failure is lost and the daemon comes up serving requests through an
+   * un-initialized authentication filter.
+   *
+   * <p>The type matters as much as the failure: {@code IOException} is what the services treat as
+   * non-fatal (no web UI, process still up), not {@link HttpServerConfigurationException}, which
+   * they let abort start-up. A keytab that is missing now may well be in place on the next attempt,
+   * so this is not the deterministic misconfiguration that warrants aborting.
+   *
+   * <p>Both namespaces are asserted on the chain, since that pins the translation itself rather
+   * than merely that some exception carried the message: the jakarta wrapper Jetty saw, and the
+   * delegate's javax exception kept as its cause, which is the only thing telling an operator what
+   * was actually misconfigured.
+   */
+  @Test
+  public void testBridgedFilterFailingInitFailsStart() throws Exception {
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .build();
+    server.addGlobalFilter("auth", FailingAuthFilter.class.getName(), new HashMap<>());
+
+    try {
+      IOException ex = assertThrows(IOException.class, server::start);
+      assertThat(causeChainOf(ex))
+          .contains("jakarta.servlet.ServletException: " + FailingAuthFilter.FAILURE_MESSAGE)
+          .contains("javax.servlet.ServletException: " + FailingAuthFilter.FAILURE_MESSAGE);
+    } finally {
+      server.stop();
+    }
+  }
+
+  /** Every message in the throwable's cause chain, joined, for asserting a message survived. */
+  private static String causeChainOf(Throwable t) {
+    StringBuilder sb = new StringBuilder();
+    for (Throwable c = t; c != null; c = c.getCause()) {
+      sb.append(c).append('\n');
+      if (c.getCause() == c) {
+        break;
+      }
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Allowlisted for bridging by {@code ServletElementsFactory} because it extends
+   * {@code AuthenticationFilter}, but it cannot initialize. Throwing directly keeps the test off
+   * any real kerberos configuration, whose failure message is environment-dependent.
+   */
+  public static class FailingAuthFilter extends AuthenticationFilter {
+    static final String FAILURE_MESSAGE = "Keytab does not exist: /no/such.keytab";
+
+    @Override
+    public void init(javax.servlet.FilterConfig filterConfig) throws javax.servlet.ServletException {
+      throw new javax.servlet.ServletException(FAILURE_MESSAGE);
+    }
+  }
+
+  /**
    * "/conf" is registered by {@link HttpServer2#addDefaultServlets()}, so no service-specific code
    * puts it on the server any more and nothing but a wire request proves it is still reachable --
    * a dropped or duplicated registration would otherwise fail no test. Driving it on a running
@@ -574,6 +772,52 @@ public class TestHttpServer2 {
     return conn;
   }
 
+  /**
+   * GETs {@code path} over a bare socket with the given name/value request headers, and returns the
+   * response headers keyed case-insensitively plus the status line under {@link #STATUS_LINE}.
+   * The CORS cases cannot use {@code HttpURLConnection}: {@code Origin} and both
+   * {@code Access-Control-Request-*} headers are on its restricted list and are dropped silently,
+   * so the filter would never see a cross-origin request.
+   */
+  private static Map<String, String> rawGet(String path, int port, String... headers) throws IOException {
+    Map<String, String> response = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+    StringBuilder request = new StringBuilder("GET ").append(path)
+        .append(" HTTP/1.1\r\nHost: localhost\r\n");
+    for (int i = 0; i < headers.length; i += 2) {
+      request.append(headers[i]).append(": ").append(headers[i + 1]).append("\r\n");
+    }
+    request.append("Connection: close\r\n\r\n");
+    try (Socket socket = new Socket("localhost", port)) {
+      socket.setSoTimeout(5000);
+      socket.getOutputStream().write(request.toString().getBytes(StandardCharsets.UTF_8));
+      socket.getOutputStream().flush();
+      BufferedReader in = new BufferedReader(
+          new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+      response.put(STATUS_LINE, in.readLine());
+      for (String line = in.readLine(); line != null && !line.isEmpty(); line = in.readLine()) {
+        int colon = line.indexOf(':');
+        response.put(line.substring(0, colon).trim(), line.substring(colon + 1).trim());
+      }
+    }
+    return response;
+  }
+
+  /**
+   * POSTs to {@code url} as a browser (the CSRF filter only guards browser user agents), carrying
+   * the filter's custom header when {@code csrfHeader} is non-null.
+   */
+  private static HttpURLConnection postAsBrowser(String url, String csrfHeader) throws IOException {
+    HttpURLConnection conn = connectTo(url, null);
+    conn.setRequestMethod("POST");
+    conn.setRequestProperty("User-Agent", BROWSER_USER_AGENT);
+    if (csrfHeader != null) {
+      conn.setRequestProperty(RestCsrfPreventionFilter.HEADER_DEFAULT, csrfHeader);
+    }
+    conn.setDoOutput(true);
+    conn.getOutputStream().close();
+    return conn;
+  }
+
   private static int statusOf(String url) throws IOException {
     HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
     conn.setConnectTimeout(5000);
@@ -615,6 +859,22 @@ public class TestHttpServer2 {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
       resp.setStatus(HttpServletResponse.SC_OK);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) {
+      resp.setStatus(HttpServletResponse.SC_OK);
+    }
+  }
+
+  /** Servlet that echoes the remote user and principal a bridged filter established. */
+  public static class IdentityServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp)
+        throws IOException {
+      resp.setContentType("text/plain");
+      resp.getWriter().write(req.getRemoteUser() + "/"
+          + (req.getUserPrincipal() == null ? "" : req.getUserPrincipal().getName()));
     }
   }
 

@@ -43,6 +43,9 @@ package org.apache.hadoop.hdds.server.http;
  *       constructor failure in a {@code ProvisionException} that a plain {@code catch} misses.</li>
  *   <li>{@code Gateway.call()} (S3 Gateway) -- constructs its servers outside any {@code try}, so
  *       this propagates with no catch clause needed.</li>
+ *   <li>{@code HttpFSServerWebServer} (HttpFS) -- builds its server in the constructor, which
+ *       {@code main()} calls outside any {@code try}, so this likewise propagates with no catch
+ *       clause needed.</li>
  * </ul>
  */
 public class HttpServerConfigurationException extends IllegalArgumentException {

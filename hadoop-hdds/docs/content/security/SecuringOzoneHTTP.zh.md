@@ -59,7 +59,9 @@ Ozone 的 HTTP 服务运行在 Jetty 12（EE10，`jakarta.servlet`）上。通�
 * `CrossOriginFilter`（CORS 响应头）
 * `RestCsrfPreventionFilter`（CSRF 防护）
 
-其他任何 `javax.servlet.Filter` 实现——包括 Hadoop 的 `XFrameOptionsFilter` 及站点自定义的包装过滤器——均不可桥接。注册此类过滤器将导致守护进程（OM、SCM、Datanode、S3G、Recon）**启动中止**。
+其他任何 `javax.servlet.Filter` 实现——包括 Hadoop 的 `XFrameOptionsFilter` 及站点自定义的包装过滤器——均不可桥接。注册此类过滤器将导致守护进程（OM、SCM、Datanode、S3G、Recon、HttpFS）**启动中止**。
+
+上述四个系列的子类也被接受，因为 Hadoop 自身已桥接的过滤器就是子类——`ProxyUserAuthenticationFilter`、`DelegationTokenAuthenticationFilter`，以及基于它们构建的 HttpFS 和 Recon 认证过滤器。如果您注册站点自定义的子类，请注意桥接会将过滤器包装并向下游传递的请求中的哪些内容带回 jakarta 链：**仅限认证结果**——`getRemoteUser`、`getUserPrincipal`、`getAuthType` 和 `isUserInRole`。过滤器设置的请求属性（attribute）会传递，而向下游传递的响应包装器会以错误方式使请求失败（而非被丢弃）；但该转发请求上的**其他任何**覆写——替换的请求头、参数或远程地址——都会被**静默丢弃**。上述四个已桥接系列，以及 Hadoop 对它们的子类，均仅覆写上述认证相关方法，因此此限制只影响自定义子类。
 
 **升级注意事项：** 在迁移到 Jetty 12 之前，HTTP 服务启动失败仅会被记录日志，守护进程会在没有 Web UI 的情况下继续运行。迁移后，守护进程将拒绝启动，以确保配置错误的过滤器不会被静默跳过。如果您的集群将 `ozone.http.filter.initializers` 设置为自定义过滤器，请在升级前将其迁移至 `jakarta.servlet.Filter`。
 
@@ -70,6 +72,17 @@ Jetty 12 会拒绝 Jetty 9.4 曾接受的语义模糊的 URI 结构，并返回 
 由于 S3 对象键和 WebHDFS 路径本身就可能包含这些序列，**S3 Gateway REST 端点**和 **HttpFS** 放宽了上述四项检查，因此它们仍能提供迁移前所能提供的 URI。其他所有 Ozone HTTP 服务——OM、SCM、Datanode、Recon，以及 S3 Gateway 的 web 管理端点和 STS 端点——均使用 Jetty 12 的默认设置，对此类 URI 返回 `400 Bad Request`。
 
 RFC 3986 明确禁止以未编码形式出现在 URI 中的非法字符——例如 `[`、`]`、`{`、`}` 和 `|`——在所有服务上都会被拒绝并返回 `400 Bad Request`，包括上述放宽了模糊性检查的两个服务。符合规范的 S3 和 WebHDFS 客户端已对这些字符进行百分号编码；如果客户端以未编码形式发送这些字符，则必须在升级前更新客户端。
+
+### HttpFS `/conf` 响应的媒体类型
+
+迁移后，所有 HTTP 服务的 `GET /conf` 均由 Ozone 自己的 `HddsConfServlet` 提供。OM、SCM、Datanode、Recon 以及 S3 Gateway 在 Jetty 12 迁移之前就已注册该 servlet，因此只有 **HttpFS** 会发生变化——它此前一直回落到 Hadoop 的 `ConfServlet`——而且变化仅限于响应的 XML 形式：
+
+Accept 请求头 | 变更前（HttpFS） | 变更后
+-----------------------------------|--------------------------------------|-------------------
+包含 `json` | `application/json;charset=utf-8` | `application/json;charset=utf-8`
+其他值或未设置 | `text/xml;charset=utf-8` | `application/xml;charset=utf-8`
+
+响应格式仍然仅依据 `Accept` 请求头选择，文档内容本身没有变化——两个 servlet 都使用 Hadoop 的 `Configuration.dumpConfiguration` 和 `Configuration.writeXml` 生成内容。解析该响应头的客户端不受影响；但按字面字符串比较 XML 响应头 `Content-Type` 的监控或脚本需要更新。此外，HttpFS 还新增了 Hadoop 的 servlet 未提供的、仅 Ozone 支持的 `/conf?cmd=getOzoneTags` 和 `/conf?cmd=getPropertyByTag&tags=...` 命令。
 
 ### 为 OM HTTP 启用 SPNEGO 身份验证
 参数 | 值

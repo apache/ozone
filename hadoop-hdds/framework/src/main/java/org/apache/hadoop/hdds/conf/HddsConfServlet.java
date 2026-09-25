@@ -34,6 +34,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.ConfServlet.BadFormatException;
+import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.server.JsonUtils;
@@ -142,6 +143,9 @@ public class HddsConfServlet extends HttpServlet {
 
       Map<String, String> descriptionMap = buildDescriptionMap(config);
       Map<String, Map<String, OzoneConfiguration.Property>> propMap = new HashMap<>();
+      // Tags such as SECURITY cover keystore and truststore passwords, so the values need the same
+      // ConfigRedactor treatment the full dump above gets.
+      ConfigRedactor redactor = new ConfigRedactor(config);
 
       for (String tag : tags.split(",")) {
         if (config.isPropertyTag(tag)) {
@@ -149,7 +153,7 @@ public class HddsConfServlet extends HttpServlet {
           Map<String, OzoneConfiguration.Property> metadataMap = new HashMap<>();
 
           for (String propName : properties.stringPropertyNames()) {
-            String value = properties.getProperty(propName);
+            String value = redactor.redact(propName, properties.getProperty(propName));
             String description = descriptionMap.getOrDefault(propName, "");
             OzoneConfiguration.Property property = new OzoneConfiguration.Property();
             property.setName(propName);

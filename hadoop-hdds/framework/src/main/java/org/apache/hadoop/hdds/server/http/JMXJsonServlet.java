@@ -64,13 +64,13 @@ import org.slf4j.LoggerFactory;
  *     or the admin access check silently switches to hadoop's HttpServer2;
  *   - the mBeanServer and jsonFactory fields are narrowed from protected to private;
  *   - Ozone checkstyle formatting is applied (e.g. MBeanAttributeInfo[] array
- *     syntax, indexOf(char) literals, Javadoc punctuation).
- *
- * Caveat inherited from upstream: the class Javadoc below promises 400/404 for a
- * malformed query or a missing attribute, but the servlet flushes the JSON body
- * before it calls setStatus, so the response is already committed at 200 and the
- * error surfaces only as "result":"ERROR" in the body (see TestJMXJsonServlet).
- * Left as-is to avoid diverging from upstream behaviour.
+ *     syntax, indexOf(char) literals, Javadoc punctuation);
+ *   - the class Javadoc below describes the error reporting the servlet actually
+ *     performs. Upstream's Javadoc promises 400 BAD REQUEST for a malformed query
+ *     and 404 SC_NOT_FOUND for a missing attribute, neither of which a client ever
+ *     sees, because the body is committed before setStatus runs (see
+ *     TestJMXJsonServlet). The behaviour is left as upstream's -- only the Javadoc
+ *     diverges, so do not restore upstream's wording on a re-sync.
  */
 /**
  * Provides Read only web access to JMX.
@@ -99,12 +99,21 @@ import org.slf4j.LoggerFactory;
  * </code> will return the cluster id of the namenode mxbean.
  * </p>
  * <p>
- * If the <code>qry</code> or the <code>get</code> parameter is not formatted
- * correctly then a 400 BAD REQUEST http response code will be returned.
+ * Failures are reported in the response body, not by the http response code. The
+ * servlet writes and closes the JSON body before it reaches any
+ * <code>setStatus</code> call, so the response is already committed at 200 OK: the
+ * 400 BAD REQUEST it sets for a malformed <code>qry</code> or <code>get</code>
+ * parameter, and the 404 SC_NOT_FOUND it sets for an attribute that cannot be
+ * found, never reach the client.
  * </p>
  * <p>
- * If a resouce such as a mbean or attribute can not be found,
- * a 404 SC_NOT_FOUND http response code will be returned.
+ * A <code>get</code> value that does not split into
+ * <code>MXBeanName::AttributeName</code>, and an attribute that does not exist on
+ * the bean, are reported as <code>"result":"ERROR"</code> with a
+ * <code>"message"</code> naming the cause. A <code>qry</code> that is not a valid
+ * {@link ObjectName} fails before any bean is written, so the body is an empty JSON
+ * object with no <code>result</code> member at all. Callers must therefore inspect
+ * the body rather than the status.
  * </p>
  * The return format is JSON and in the form
  *  <pre><code>

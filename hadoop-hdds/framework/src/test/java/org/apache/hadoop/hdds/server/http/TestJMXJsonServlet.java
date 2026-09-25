@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.server.http;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,9 +28,13 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.security.authorize.AccessControlList;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -43,7 +48,9 @@ import org.junit.jupiter.api.Test;
  * streams and flushes the JSON body before it calls setStatus, so a bad or
  * unknown get request is already committed at HTTP 200: its error surfaces as
  * {@code "result":"ERROR"} in the body rather than as a 400/404 wire status,
- * and that is what these tests assert. The JSONP {@code callback} parameter of
+ * and that is what these tests assert. A malformed {@code qry} does not get even
+ * that far -- it fails before the beans array is written, so the body carries no
+ * error member at all. The JSONP {@code callback} parameter of
  * the original servlet is not present in the fork, so it is not exercised
  * here.</p>
  */
@@ -120,6 +127,21 @@ public class TestJMXJsonServlet {
   }
 
   @Test
+  void testQueryWithBadFormat() throws Exception {
+    // The other half of the 400 the servlet sets and never sends: an ObjectName
+    // that does not parse throws before any bean is written, so the response is
+    // committed at 200 with an empty JSON object -- there is not even a
+    // "result":"ERROR" member to inspect. The class Javadoc documents this, so
+    // pin it.
+    HttpURLConnection conn = get("/jmx?qry=java.lang:type");
+    assertEquals(HttpURLConnection.HTTP_OK, conn.getResponseCode());
+    String body = readBody(conn);
+    assertReNotFind("\"beans\"\\s*:", body);
+    assertReNotFind("\"result\"\\s*:", body);
+    assertEquals("{ }", body.trim(), "malformed qry must yield an empty JSON object");
+  }
+
+  @Test
   void testTraceRequest() throws Exception {
     HttpURLConnection conn = (HttpURLConnection)
         new URL(baseUrl, "/jmx").openConnection();
@@ -129,9 +151,68 @@ public class TestJMXJsonServlet {
     assertEquals(HttpURLConnection.HTTP_BAD_METHOD, conn.getResponseCode());
   }
 
+  /**
+   * The servlet gates every response on
+   * {@code hadoop.security.instrumentation.requires.admin}, which is off by default and so is left
+   * permissive by every other test here. Its own server, because the shared one above must stay
+   * permissive for them.
+   *
+   * <p>/jmx exposes the daemon's full MBean surface, so a fork that dropped or inverted the guard
+   * would publish it to any caller while all the body-shape tests above still passed. Simple
+   * (pseudo) auth stands in for kerberos -- it selects the user per request with no KDC -- and
+   * anonymous access is left on so all three outcomes of the guard are reachable from one server:
+   * an unauthenticated caller, an authenticated caller outside the admin ACL, and an admin.
+   */
+  @Test
+  void testInstrumentationRequiresAdmin() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(
+        CommonConfigurationKeysPublic.HADOOP_SECURITY_INSTRUMENTATION_REQUIRES_ADMIN, true);
+    // Without this the admin check short-circuits to "everybody is an admin".
+    conf.setBoolean(CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, true);
+    HttpServer2 adminOnly = new HttpServer2.Builder()
+        .setConf(conf)
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .setACL(new AccessControlList("jmxadmin"))
+        .build();
+
+    Map<String, String> params = new HashMap<>();
+    params.put("type", "simple");
+    params.put("simple.anonymous.allowed", "true");
+    params.put("signature.secret", "jmx-admin-test-secret");
+    adminOnly.addGlobalFilter("auth",
+        "org.apache.hadoop.security.authentication.server.AuthenticationFilter",
+        params);
+    adminOnly.start();
+    try {
+      URL adminOnlyUrl = new URL("http://localhost:"
+          + adminOnly.getConnectorAddress(0).getPort() + "/");
+
+      HttpURLConnection anonymous = get(adminOnlyUrl, "/jmx");
+      assertEquals(HttpURLConnection.HTTP_FORBIDDEN, anonymous.getResponseCode(),
+          "an unauthenticated caller must not reach the MBean dump");
+      assertReNotFind("\"beans\"\\s*:", readBody(anonymous));
+
+      assertEquals(HttpURLConnection.HTTP_FORBIDDEN,
+          get(adminOnlyUrl, "/jmx?user.name=intruder").getResponseCode(),
+          "a caller outside the admin ACL must not reach the MBean dump");
+
+      HttpURLConnection admin = get(adminOnlyUrl, "/jmx?user.name=jmxadmin");
+      assertEquals(HttpURLConnection.HTTP_OK, admin.getResponseCode());
+      assertReFind("\"beans\"\\s*:", readBody(admin));
+    } finally {
+      adminOnly.stop();
+    }
+  }
+
   private static HttpURLConnection get(String path) throws IOException {
+    return get(baseUrl, path);
+  }
+
+  private static HttpURLConnection get(URL base, String path) throws IOException {
     HttpURLConnection conn =
-        (HttpURLConnection) new URL(baseUrl, path).openConnection();
+        (HttpURLConnection) new URL(base, path).openConnection();
     conn.setConnectTimeout(5000);
     conn.setReadTimeout(5000);
     return conn;
@@ -153,5 +234,10 @@ public class TestJMXJsonServlet {
   private static void assertReFind(String re, String value) {
     assertTrue(Pattern.compile(re).matcher(value).find(),
         "'" + re + "' does not match " + value);
+  }
+
+  private static void assertReNotFind(String re, String value) {
+    assertFalse(Pattern.compile(re).matcher(value).find(),
+        "'" + re + "' unexpectedly matches " + value);
   }
 }

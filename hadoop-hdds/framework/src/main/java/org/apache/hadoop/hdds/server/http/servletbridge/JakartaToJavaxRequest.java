@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  * class were narrowed to only what the authentication filters happen to call.
  *
  * <p>The methods those callers use (headers, cookies, method, URL/URI, remote address, attributes,
- * scheme, body) delegate to the wrapped jakarta request. Async, upgrade, session and dispatcher
+ * scheme, body, servlet context) delegate to the wrapped jakarta request. Async, upgrade, session and dispatcher
  * operations throw {@link UnsupportedOperationException}, as do the Servlet-API multipart
  * accessors {@code getPart}/{@code getParts} -- which does not prevent multipart <em>parsing</em>,
  * since commons-fileupload reads the raw input stream rather than calling those accessors.
@@ -403,7 +403,10 @@ public class JakartaToJavaxRequest implements HttpServletRequest {
 
   @Override
   public ServletContext getServletContext() {
-    throw new UnsupportedOperationException("getServletContext is not supported on the request bridge");
+    // Bridged rather than refused: the javax view of the context already exists for
+    // JakartaToJavaxFilterConfig, and a javax filter reaching the context through the
+    // request instead of its config sees the same attributes either way.
+    return new JakartaToJavaxServletContext(delegate.getServletContext());
   }
 
   @Override

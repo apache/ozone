@@ -2232,9 +2232,15 @@
       StaticUserFilter, CrossOriginFilter (CORS response headers) and
       RestCsrfPreventionFilter. A filter that wraps the request or response and
       forwards the wrapper downstream (for example XFrameOptionsFilter) is not
-      supported, because the bridge does not carry that wrapper. A javax.servlet
-      filter outside the supported set aborts HTTP server startup, so provide
-      jakarta.servlet.Filter implementations for any other filter.
+      supported, because the bridge does not carry that wrapper. Subclasses of
+      those four filters are supported, but the bridge carries only the
+      authentication result (getRemoteUser, getUserPrincipal, getAuthType,
+      isUserInRole) of a request a subclass forwards downstream: any other
+      override on that request, such as a substituted header, parameter or remote
+      address, is silently dropped, while a forwarded response wrapper fails the
+      request. A javax.servlet filter outside the supported set aborts HTTP
+      server startup, so provide jakarta.servlet.Filter implementations for any
+      other filter.
     </description>
   </property>
   <property>

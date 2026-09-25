@@ -58,7 +58,11 @@ public class ReconService implements MiniOzoneCluster.Service {
     configureRecon(conf);
 
     reconServer = new ReconServer();
-    reconServer.execute(NO_ARGS);
+    // execute() reports a start-up abort only through its exit code: it catches the failure, prints
+    // one line to stderr and returns non-zero. Discarding it leaves the cluster with no Recon web
+    // server, and the test fails later on an unrelated connection error instead.
+    final int exitCode = reconServer.execute(NO_ARGS);
+    Preconditions.assertTrue(exitCode == 0, () -> "Recon failed to start, exit code " + exitCode);
   }
 
   @Override
