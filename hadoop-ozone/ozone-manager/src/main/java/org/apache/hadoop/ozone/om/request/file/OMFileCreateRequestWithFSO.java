@@ -65,7 +65,6 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
   }
 
   @Override
-  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
 
@@ -77,16 +76,10 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
     String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
 
-    // if isRecursive is true, file would be created even if parent
-    // directories does not exist.
-    boolean isRecursive = createFileRequest.getIsRecursive();
     if (LOG.isDebugEnabled()) {
       LOG.debug("File create for : " + volumeName + "/" + bucketName + "/"
-          + keyName + ":" + isRecursive);
+          + keyName + ":" + createFileRequest.getIsRecursive());
     }
-
-    // if isOverWrite is true, file would be over written.
-    boolean isOverWrite = createFileRequest.getIsOverwrite();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumCreateFile();
@@ -94,10 +87,6 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
 
     boolean acquiredLock = false;
-
-    OmBucketInfo omBucketInfo = null;
-    final List<OmKeyLocationInfo> locations = new ArrayList<>();
-    List<OmDirectoryInfo> missingParentInfos;
     int numKeysCreated = 0;
 
     OMClientResponse omClientResponse = null;
@@ -112,114 +101,20 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
                 OMException.ResultCodes.NOT_A_FILE);
       }
 
-      // acquire lock
+      PreparedFileCreate prepared =
+          prepareFileCreate(ozoneManager, createFileRequest, trxnLogIndex);
+      numKeysCreated = prepared.missingParentInfos.size();
+
+      // Phase 2 (bucket write lock): re-check the overwrite invariant, then apply the cache
+      // mutations and publish the quota copy. The lock is held only for this mutation tail, so
+      // bucket read-lock holders still observe each transaction atomically (all mutations or none),
+      // but are no longer blocked for the Phase 1 path walk.
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
 
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-
-      final long volumeId = omMetadataManager.getVolumeId(volumeName);
-      final long bucketId = omMetadataManager
-              .getBucketId(volumeName, bucketName);
-
-      OmKeyInfo dbFileInfo = null;
-
-      OMFileRequest.OMPathInfoWithFSO pathInfoFSO =
-              OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager,
-                      volumeName, bucketName, keyName, Paths.get(keyName));
-
-      if (pathInfoFSO.getDirectoryResult()
-              == OMFileRequest.OMDirectoryResult.FILE_EXISTS) {
-        String dbFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-                pathInfoFSO.getLastKnownParentId(),
-                pathInfoFSO.getLeafNodeName());
-        dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
-                omMetadataManager, dbFileKey, keyName);
-      }
-
-      // check if the file or directory already existed in OM
-      checkDirectoryResult(keyName, isOverWrite,
-              pathInfoFSO.getDirectoryResult());
-
-      if (!isRecursive) {
-        checkAllParentsExist(keyArgs, pathInfoFSO);
-      }
-
-      // do open key
-      OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
-          omMetadataManager.getBucketKey(volumeName, bucketName));
-      // add all missing parents to dir table
-
-      missingParentInfos = getAllMissingParentDirInfo(
-          ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
-
-      // total number of keys created.
-      numKeysCreated = missingParentInfos.size();
-
-      final ReplicationConfig repConfig = OzoneConfigUtil
-          .resolveReplicationConfigPreference(keyArgs.getType(),
-              keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
-              bucketInfo.getDefaultReplicationConfig(),
-              ozoneManager);
-
-      OmKeyInfo omFileInfo = prepareFileInfo(omMetadataManager, keyArgs,
-              dbFileInfo, keyArgs.getDataSize(), locations,
-              getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
-              bucketInfo, pathInfoFSO, trxnLogIndex,
-              pathInfoFSO.getLeafNodeObjectId(),
-          repConfig, ozoneManager.getConfig());
-      validateEncryptionKeyInfo(bucketInfo, keyArgs);
-
-      long openVersion = omFileInfo.getLatestVersionLocations().getVersion();
-      long clientID = createFileRequest.getClientID();
-      String dbOpenFileName = omMetadataManager
-          .getOpenFileName(volumeId, bucketId,
-                  pathInfoFSO.getLastKnownParentId(),
-                  pathInfoFSO.getLeafNodeName(), clientID);
-
-      // Append new blocks
-      List<OmKeyLocationInfo> newLocationList = keyArgs.getKeyLocationsList()
-          .stream().map(OmKeyLocationInfo::getFromProtobuf)
-          .collect(Collectors.toList());
-      omFileInfo.appendNewBlocks(newLocationList, false);
-
-      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
-      // check bucket and volume quota
-      long preAllocatedSpace =
-          newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
-              .getRequiredNodes();
-      checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
-          preAllocatedSpace);
-      checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
-      omBucketInfo.incrUsedNamespace(numKeysCreated);
-
-      // Add to cache entry can be done outside of lock for this openKey.
-      // Even if bucket gets deleted, when commitKey we shall identify if
-      // bucket gets deleted.
-      OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
-          dbOpenFileName, omFileInfo, keyName, trxnLogIndex);
-
-      // Add cache entries for the prefix directories.
-      // Skip adding for the file key itself, until Key Commit.
-      OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager, volumeId,
-              bucketId, trxnLogIndex, missingParentInfos, null);
-
-      omMetadataManager.getBucketTable().addCacheEntry(
-          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
-
-      // Prepare response. Sets user given full key name in the 'keyName'
-      // attribute in response object.
-      int clientVersion = getOmRequest().getVersion();
-      omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
-          .setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
-              keyArgs.getLatestVersionLocation()))
-          .setID(clientID)
-          .setOpenVersion(openVersion).build())
-          .setCmdType(Type.CreateFile);
-      omClientResponse = new OMFileCreateResponseWithFSO(omResponse.build(),
-              omFileInfo, missingParentInfos, clientID,
-              omBucketInfo.copyObject(), volumeId);
+      omClientResponse = applyFileCreate(omMetadataManager, createFileRequest,
+          prepared, trxnLogIndex, omResponse);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
@@ -239,14 +134,213 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       }
     }
 
-    // Audit Log outside the lock
+    auditAndLogResult(ozoneManager, createFileRequest, auditMap, exception, result, numKeysCreated);
+
+    return omClientResponse;
+  }
+
+  /**
+   * Phase 1 (no bucket lock): resolves the path and prepares the open-file entry, the missing parent
+   * directories and the quota delta. All of this reads committed state only. The OM apply path is
+   * single-threaded (OzoneManagerStateMachine uses a single-thread executor), so no other transaction
+   * can change what these reads observe before Phase 2 mutates; the double-buffer flush/cleanup
+   * threads only materialize already-committed epochs and never alter a key's visible value.
+   * <p>
+   * Keeping this walk out of the bucket write lock is the point of HDDS-16289: it stops the lone apply
+   * thread from gating readers of a hot bucket (getBucketInfo/getFileStatus/lookupKey) during the
+   * per-segment path resolution. If OM ever applies transactions in parallel per bucket/key, these
+   * reads must be re-validated under the lock in {@link #applyFileCreate}.
+   */
+  private PreparedFileCreate prepareFileCreate(OzoneManager ozoneManager,
+      CreateFileRequest createFileRequest, long trxnLogIndex) throws IOException {
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    KeyArgs keyArgs = createFileRequest.getKeyArgs();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String keyName = keyArgs.getKeyName();
+    // if isOverWrite is true, file would be over written.
+    boolean isOverWrite = createFileRequest.getIsOverwrite();
+
+    validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager
+            .getBucketId(volumeName, bucketName);
+
+    OmKeyInfo dbFileInfo = null;
+
+    OMFileRequest.OMPathInfoWithFSO pathInfoFSO =
+            OMFileRequest.verifyDirectoryKeysInPath(omMetadataManager,
+                    volumeName, bucketName, keyName, Paths.get(keyName));
+
+    final String dbFileKey = omMetadataManager.getOzonePathKey(volumeId,
+            bucketId, pathInfoFSO.getLastKnownParentId(),
+            pathInfoFSO.getLeafNodeName());
+    if (pathInfoFSO.getDirectoryResult()
+            == OMFileRequest.OMDirectoryResult.FILE_EXISTS) {
+      dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
+              omMetadataManager, dbFileKey, keyName);
+    }
+
+    // check if the file or directory already existed in OM
+    checkDirectoryResult(keyName, isOverWrite,
+            pathInfoFSO.getDirectoryResult());
+
+    // if isRecursive is true, file would be created even if parent
+    // directories does not exist.
+    if (!createFileRequest.getIsRecursive()) {
+      checkAllParentsExist(keyArgs, pathInfoFSO);
+    }
+
+    // do open key
+    // Read-only copy, used here only to inherit ACLs, encryption and replication defaults. The quota
+    // read-modify-publish in Phase 2 takes its own getBucketInfoForUpdate copy under the lock.
+    OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+        omMetadataManager.getBucketKey(volumeName, bucketName));
+    // add all missing parents to dir table
+
+    List<OmDirectoryInfo> missingParentInfos = getAllMissingParentDirInfo(
+        ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
+
+    final ReplicationConfig repConfig = OzoneConfigUtil
+        .resolveReplicationConfigPreference(keyArgs.getType(),
+            keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
+            bucketInfo.getDefaultReplicationConfig(),
+            ozoneManager);
+
+    OmKeyInfo omFileInfo = prepareFileInfo(omMetadataManager, keyArgs,
+            dbFileInfo, keyArgs.getDataSize(), new ArrayList<>(),
+            getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
+            bucketInfo, pathInfoFSO, trxnLogIndex,
+            pathInfoFSO.getLeafNodeObjectId(),
+        repConfig, ozoneManager.getConfig());
+    validateEncryptionKeyInfo(bucketInfo, keyArgs);
+
+    String dbOpenFileName = omMetadataManager
+        .getOpenFileName(volumeId, bucketId,
+                pathInfoFSO.getLastKnownParentId(),
+                pathInfoFSO.getLeafNodeName(), createFileRequest.getClientID());
+
+    // Key of the leaf in the file table, for the Phase 2 re-check. Built from the parent id
+    // getAllMissingParentDirInfo left on pathInfoFSO, so it addresses the leaf even when intermediate
+    // directories were missing and this transaction creates them. dbFileKey above predates that call
+    // and can still name the deepest pre-existing ancestor, which is a different directory.
+    final String dbLeafFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+        pathInfoFSO.getLastKnownParentId(), pathInfoFSO.getLeafNodeName());
+
+    // Append new blocks
+    List<OmKeyLocationInfo> newLocationList = keyArgs.getKeyLocationsList()
+        .stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+    omFileInfo.appendNewBlocks(newLocationList, false);
+
+    final long preAllocatedSpace =
+        newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
+            .getRequiredNodes();
+
+    return new PreparedFileCreate(volumeId, bucketId, dbLeafFileKey, omFileInfo,
+        missingParentInfos, dbOpenFileName, preAllocatedSpace);
+  }
+
+  /**
+   * Phase 2 (under the bucket write lock): re-checks the overwrite guard resolved in Phase 1, then
+   * applies the open-file and directory cache entries and the bucket quota charge and publishes the
+   * bucket copy.
+   */
+  private OMClientResponse applyFileCreate(OMMetadataManager omMetadataManager,
+      CreateFileRequest createFileRequest, PreparedFileCreate prepared, long trxnLogIndex,
+      OMResponse.Builder omResponse) throws IOException {
+    KeyArgs keyArgs = createFileRequest.getKeyArgs();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String keyName = keyArgs.getKeyName();
+
+    // Cheap O(1) re-check of the overwrite guard resolved in Phase 1. Under serial apply this always
+    // holds; it is a tripwire that fails safe (as checkDirectoryResult would) rather than silently
+    // overwriting if that invariant is ever broken by a concurrent writer.
+    if (!createFileRequest.getIsOverwrite() && OMFileRequest.getOmKeyInfoFromFileTable(false,
+        omMetadataManager, prepared.dbLeafFileKey, keyName) != null) {
+      throw new OMException("File " + keyName + " already exists",
+          OMException.ResultCodes.FILE_ALREADY_EXISTS);
+    }
+
+    OmBucketInfo omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
+    // check bucket and volume quota
+    checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
+        prepared.preAllocatedSpace);
+    final int numKeysCreated = prepared.missingParentInfos.size();
+    checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
+    omBucketInfo.incrUsedNamespace(numKeysCreated);
+
+    OMFileRequest.addOpenFileTableCacheEntry(omMetadataManager,
+        prepared.dbOpenFileName, prepared.omFileInfo, keyName, trxnLogIndex);
+
+    // Add cache entries for the prefix directories.
+    // Skip adding for the file key itself, until Key Commit.
+    OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager, prepared.volumeId,
+            prepared.bucketId, trxnLogIndex, prepared.missingParentInfos, null);
+
+    omMetadataManager.getBucketTable().addCacheEntry(
+        omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
+    // Prepare response. Sets user given full key name in the 'keyName'
+    // attribute in response object.
+    int clientVersion = getOmRequest().getVersion();
+    long openVersion = prepared.omFileInfo.getLatestVersionLocations().getVersion();
+    omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()
+        .setKeyInfo(prepared.omFileInfo.getNetworkProtobuf(keyName, clientVersion,
+            keyArgs.getLatestVersionLocation()))
+        .setID(createFileRequest.getClientID())
+        .setOpenVersion(openVersion).build())
+        .setCmdType(Type.CreateFile);
+    return new OMFileCreateResponseWithFSO(omResponse.build(),
+            prepared.omFileInfo, prepared.missingParentInfos, createFileRequest.getClientID(),
+            omBucketInfo.copyObject(), prepared.volumeId);
+  }
+
+  /**
+   * Phase 1 output of {@link #prepareFileCreate}, consumed by {@link #applyFileCreate} under the
+   * bucket write lock: the resolved path keys, the open file and missing parent directories to cache,
+   * and the quota deltas to charge.
+   */
+  private static final class PreparedFileCreate {
+    private final long volumeId;
+    private final long bucketId;
+    private final String dbLeafFileKey;
+    private final OmKeyInfo omFileInfo;
+    private final List<OmDirectoryInfo> missingParentInfos;
+    private final String dbOpenFileName;
+    private final long preAllocatedSpace;
+
+    PreparedFileCreate(long volumeId, long bucketId, String dbLeafFileKey, OmKeyInfo omFileInfo,
+        List<OmDirectoryInfo> missingParentInfos, String dbOpenFileName, long preAllocatedSpace) {
+      this.volumeId = volumeId;
+      this.bucketId = bucketId;
+      this.dbLeafFileKey = dbLeafFileKey;
+      this.omFileInfo = omFileInfo;
+      this.missingParentInfos = missingParentInfos;
+      this.dbOpenFileName = dbOpenFileName;
+      this.preAllocatedSpace = preAllocatedSpace;
+    }
+  }
+
+  /**
+   * Emits the audit log and the result log outside the bucket lock.
+   */
+  private void auditAndLogResult(OzoneManager ozoneManager, CreateFileRequest createFileRequest,
+      Map<String, String> auditMap, Exception exception, Result result, int numKeysCreated) {
     markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.CREATE_FILE, auditMap, exception,
         getOmRequest().getUserInfo()));
 
+    KeyArgs keyArgs = createFileRequest.getKeyArgs();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String keyName = keyArgs.getKeyName();
+
     switch (result) {
     case SUCCESS:
-      omMetrics.incNumKeys(numKeysCreated);
+      ozoneManager.getMetrics().incNumKeys(numKeysCreated);
       LOG.debug("File created. Volume:{}, Bucket:{}, Key:{}", volumeName,
           bucketName, keyName);
       break;
@@ -258,7 +352,5 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
       LOG.error("Unrecognized Result for OMFileCreateRequest: {}",
           createFileRequest);
     }
-
-    return omClientResponse;
   }
 }

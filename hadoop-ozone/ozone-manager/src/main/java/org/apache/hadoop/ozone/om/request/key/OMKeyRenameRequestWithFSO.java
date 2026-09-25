@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -70,7 +69,6 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   }
 
   @Override
-  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
 
@@ -81,12 +79,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
     String fromKeyName = keyArgs.getKeyName();
-    String toKeyName = renameKeyRequest.getToKeyName();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyRenames();
-
-    AuditLogger auditLogger = ozoneManager.getAuditLogger();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
             getOmRequest());
@@ -95,7 +90,6 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     Exception exception = null;
-    OmKeyInfo fromKeyValue;
     Result result;
     try {
       if (fromKeyName.isEmpty()) {
@@ -103,109 +97,23 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
                 OMException.ResultCodes.INVALID_KEY_NAME);
       }
 
-      mergeOmLockDetails(omMetadataManager.getLock()
-          .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
-      acquiredLock = getOmLockDetails().isLockAcquired();
+      PreparedRename prepared = prepareRename(ozoneManager, renameKeyRequest);
 
-      // Validate bucket and volume exists or not.
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+      if (prepared != null) {
+        // Phase 2 (bucket write lock): re-check the source, then apply the cache mutations. The lock
+        // is held only for this mutation tail, so bucket read-lock holders still observe each
+        // transaction atomically (all mutations or none), but are no longer blocked for the Phase 1
+        // path walks.
+        mergeOmLockDetails(omMetadataManager.getLock()
+            .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
+        acquiredLock = getOmLockDetails().isLockAcquired();
 
-      // Check if fromKey exists
-      OzoneFileStatus fromKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(
-          omMetadataManager, volumeName, bucketName, fromKeyName, 0,
-          ozoneManager.getDefaultReplicationConfig());
-
-      // case-1) fromKeyName should exist, otw throws exception
-      if (fromKeyFileStatus == null) {
-        // TODO: Add support for renaming open key
-        throw new OMException("Key not found " + fromKeyName, KEY_NOT_FOUND);
+        omClientResponse = renameKey(prepared, fromKeyName,
+            keyArgs.getModificationTime(), ozoneManager, omResponse,
+            trxnLogIndex);
       }
 
-      if (renameKeyRequest.hasUpdateID()) {
-        if (fromKeyFileStatus.getKeyInfo().getUpdateID() != renameKeyRequest.getUpdateID()) {
-          throw new OMException("UpdateID does not match. Key: " + fromKeyName +
-              ", Expected UpdateID: " + fromKeyFileStatus.getKeyInfo().getUpdateID() +
-              ", Given UpdateID: " + renameKeyRequest.getUpdateID(), OMException.ResultCodes.UPDATE_ID_NOT_MATCH);
-        }
-      }
-
-      if (fromKeyFileStatus.getKeyInfo().isHsync()) {
-        throw new OMException("Open file cannot be renamed since it is " +
-            "hsync'ed: volumeName=" + volumeName + ", bucketName=" +
-            bucketName + ", key=" + fromKeyName, RENAME_OPEN_FILE);
-      }
-
-      // source existed
-      fromKeyValue = fromKeyFileStatus.getKeyInfo();
-      boolean isRenameDirectory = fromKeyFileStatus.isDirectory();
-
-      // case-2) Cannot rename a directory to its own subdirectory
-      OMFileRequest.verifyToDirIsASubDirOfFromDirectory(fromKeyName,
-              toKeyName, fromKeyFileStatus.isDirectory());
-
-      OzoneFileStatus toKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(
-          omMetadataManager, volumeName, bucketName, toKeyName, 0,
-          ozoneManager.getDefaultReplicationConfig());
-
-      // Check if toKey exists.
-      if (toKeyFileStatus != null) {
-        // Destination exists and following are different cases:
-        OmKeyInfo toKeyValue = toKeyFileStatus.getKeyInfo();
-
-        if (fromKeyValue.getKeyName().equals(toKeyValue.getKeyName())) {
-          // case-3) If src == destin then check source and destin of same type
-          // (a) If dst is a file then return true.
-          // (b) Otherwise throws exception.
-          // TODO: Discuss do we need to throw exception for file as well.
-          if (toKeyFileStatus.isFile()) {
-            result = Result.SUCCESS;
-          } else {
-            throw new OMException("Key already exists " + toKeyName,
-                    OMException.ResultCodes.KEY_ALREADY_EXISTS);
-          }
-        } else if (toKeyFileStatus.isDirectory()) {
-          // case-4) If dst is a directory then rename source as sub-path of it
-          // For example: rename /source to /dst will lead to /dst/source
-          String fromFileName = OzoneFSUtils.getFileName(fromKeyName);
-          String newToKeyName = OzoneFSUtils.appendFileNameToKeyPath(toKeyName,
-                  fromFileName);
-          OzoneFileStatus newToOzoneFileStatus =
-              OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
-                  volumeName, bucketName, newToKeyName, 0,
-                  ozoneManager.getDefaultReplicationConfig());
-
-          if (newToOzoneFileStatus != null) {
-            // case-5) If new destin '/dst/source' exists then throws exception
-            throw new OMException(String.format(
-                    "Failed to rename %s to %s, file already exists or not " +
-                            "empty!", fromKeyName, newToKeyName),
-                    OMException.ResultCodes.KEY_ALREADY_EXISTS);
-          }
-
-          omClientResponse = renameKey(toKeyValue, newToKeyName, fromKeyValue,
-              fromKeyName, isRenameDirectory, keyArgs.getModificationTime(),
-              ozoneManager, omResponse, trxnLogIndex);
-          result = Result.SUCCESS;
-        } else {
-          // case-6) If destination is a file type and if exists then throws
-          // key already exists exception.
-          throw new OMException("Failed to rename, key already exists "
-                  + toKeyName, OMException.ResultCodes.KEY_ALREADY_EXISTS);
-        }
-      } else {
-        // Destination doesn't exist and the cases are:
-        // case-7) Check whether dst parent dir exists or not. If parent
-        // doesn't exist then throw exception, otw the source can be renamed to
-        // destination path.
-        OmKeyInfo toKeyParent = OMFileRequest.getKeyParentDir(volumeName,
-                bucketName, toKeyName, ozoneManager, omMetadataManager);
-
-        omClientResponse = renameKey(toKeyParent, toKeyName, fromKeyValue,
-            fromKeyName, isRenameDirectory, keyArgs.getModificationTime(),
-            ozoneManager, omResponse, trxnLogIndex);
-
-        result = Result.SUCCESS;
-      }
+      result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {
       result = Result.FAILURE;
       exception = ex;
@@ -221,26 +129,162 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       }
     }
 
-    markForAudit(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
-            exception, getOmRequest().getUserInfo()));
-
-    switch (result) {
-    case SUCCESS:
-      LOG.debug("Rename Key is successfully completed for volume:{} bucket:{}" +
-                      " fromKey:{} toKey:{}. ", volumeName, bucketName,
-              fromKeyName, toKeyName);
-      break;
-    case FAILURE:
-      ozoneManager.getMetrics().incNumKeyRenameFails();
-      LOG.error("Rename key failed for volume:{} bucket:{} fromKey:{} " +
-                      "toKey:{}. Exception: {}.", volumeName, bucketName,
-              fromKeyName, toKeyName, exception.getMessage());
-      break;
-    default:
-      LOG.error("Unrecognized Result for OMKeyRenameRequest: {}",
-              renameKeyRequest);
-    }
+    auditAndLogResult(ozoneManager, renameKeyRequest, auditMap, exception, result);
     return omClientResponse;
+  }
+
+  /**
+   * Phase 1 (no bucket lock): resolves the source, the destination and both parent directories. All
+   * of this reads committed state only. The OM apply path is single-threaded
+   * (OzoneManagerStateMachine uses a single-thread executor), so no other transaction can change what
+   * these reads observe before Phase 2 mutates; the double-buffer flush/cleanup threads only
+   * materialize already-committed epochs and never alter a key's visible value.
+   * <p>
+   * Keeping these walks out of the bucket write lock is the point of HDDS-16289: it stops the lone
+   * apply thread from gating readers of a hot bucket (getBucketInfo/getFileStatus/lookupKey) while the
+   * path is resolved segment by segment. If OM ever applies transactions in parallel per bucket/key,
+   * these reads must be re-validated under the lock in {@link #renameKey}.
+   *
+   * @return the resolved rename, or {@code null} when there is nothing to apply (case-3, source and
+   *         destination are the same file), in which case the caller takes no lock at all
+   */
+  private PreparedRename prepareRename(OzoneManager ozoneManager, RenameKeyRequest renameKeyRequest)
+      throws IOException {
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    KeyArgs keyArgs = renameKeyRequest.getKeyArgs();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String fromKeyName = keyArgs.getKeyName();
+    String toKeyName = renameKeyRequest.getToKeyName();
+
+    // Validate bucket and volume exists or not.
+    validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+
+    // Check if fromKey exists
+    OzoneFileStatus fromKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(
+        omMetadataManager, volumeName, bucketName, fromKeyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
+
+    // case-1) fromKeyName should exist, otw throws exception
+    if (fromKeyFileStatus == null) {
+      // TODO: Add support for renaming open key
+      throw new OMException("Key not found " + fromKeyName, KEY_NOT_FOUND);
+    }
+
+    if (renameKeyRequest.hasUpdateID()) {
+      if (fromKeyFileStatus.getKeyInfo().getUpdateID() != renameKeyRequest.getUpdateID()) {
+        throw new OMException("UpdateID does not match. Key: " + fromKeyName +
+            ", Expected UpdateID: " + fromKeyFileStatus.getKeyInfo().getUpdateID() +
+            ", Given UpdateID: " + renameKeyRequest.getUpdateID(), OMException.ResultCodes.UPDATE_ID_NOT_MATCH);
+      }
+    }
+
+    if (fromKeyFileStatus.getKeyInfo().isHsync()) {
+      throw new OMException("Open file cannot be renamed since it is " +
+          "hsync'ed: volumeName=" + volumeName + ", bucketName=" +
+          bucketName + ", key=" + fromKeyName, RENAME_OPEN_FILE);
+    }
+
+    // source existed
+    OmKeyInfo fromKeyValue = fromKeyFileStatus.getKeyInfo();
+    boolean isRenameDirectory = fromKeyFileStatus.isDirectory();
+
+    // case-2) Cannot rename a directory to its own subdirectory
+    OMFileRequest.verifyToDirIsASubDirOfFromDirectory(fromKeyName,
+            toKeyName, fromKeyFileStatus.isDirectory());
+
+    OzoneFileStatus toKeyFileStatus = OMFileRequest.getOMKeyInfoIfExists(
+        omMetadataManager, volumeName, bucketName, toKeyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
+
+    // Resolved rename target: the parent directory the source moves under, and the destination name.
+    OmKeyInfo renameToParent;
+    String renameToKeyName;
+
+    // Check if toKey exists.
+    if (toKeyFileStatus != null) {
+      // Destination exists and following are different cases:
+      OmKeyInfo toKeyValue = toKeyFileStatus.getKeyInfo();
+
+      if (fromKeyValue.getKeyName().equals(toKeyValue.getKeyName())) {
+        // case-3) If src == destin then check source and destin of same type
+        // (a) If dst is a file then return true.
+        // (b) Otherwise throws exception.
+        // TODO: Discuss do we need to throw exception for file as well.
+        if (!toKeyFileStatus.isFile()) {
+          throw new OMException("Key already exists " + toKeyName,
+                  OMException.ResultCodes.KEY_ALREADY_EXISTS);
+        }
+        // Nothing to apply, so the caller skips the write lock entirely.
+        return null;
+      } else if (toKeyFileStatus.isDirectory()) {
+        // case-4) If dst is a directory then rename source as sub-path of it
+        // For example: rename /source to /dst will lead to /dst/source
+        String fromFileName = OzoneFSUtils.getFileName(fromKeyName);
+        String newToKeyName = OzoneFSUtils.appendFileNameToKeyPath(toKeyName,
+                fromFileName);
+        OzoneFileStatus newToOzoneFileStatus =
+            OMFileRequest.getOMKeyInfoIfExists(omMetadataManager,
+                volumeName, bucketName, newToKeyName, 0,
+                ozoneManager.getDefaultReplicationConfig());
+
+        if (newToOzoneFileStatus != null) {
+          // case-5) If new destin '/dst/source' exists then throws exception
+          throw new OMException(String.format(
+                  "Failed to rename %s to %s, file already exists or not " +
+                          "empty!", fromKeyName, newToKeyName),
+                  OMException.ResultCodes.KEY_ALREADY_EXISTS);
+        }
+
+        renameToParent = toKeyValue;
+        renameToKeyName = newToKeyName;
+      } else {
+        // case-6) If destination is a file type and if exists then throws
+        // key already exists exception.
+        throw new OMException("Failed to rename, key already exists "
+                + toKeyName, OMException.ResultCodes.KEY_ALREADY_EXISTS);
+      }
+    } else {
+      // Destination doesn't exist and the cases are:
+      // case-7) Check whether dst parent dir exists or not. If parent
+      // doesn't exist then throw exception, otw the source can be renamed to
+      // destination path.
+      renameToParent = OMFileRequest.getKeyParentDir(volumeName,
+              bucketName, toKeyName, ozoneManager, omMetadataManager);
+      renameToKeyName = toKeyName;
+    }
+
+    // The source's parent directory also gets its modification time bumped, so resolve it here
+    // instead of inside renameKey: that keeps the last path walk out of the write lock, and it makes
+    // this walk's KEY_RENAME_ERROR precede every cache mutation rather than follow the destination
+    // parent's.
+    OmKeyInfo fromKeyParent = OMFileRequest.getKeyParentDir(volumeName,
+            bucketName, fromKeyName, ozoneManager, omMetadataManager);
+
+    return new PreparedRename(fromKeyValue, isRenameDirectory, renameToParent, renameToKeyName,
+        fromKeyParent);
+  }
+
+  /**
+   * Phase 1 output of {@link #prepareRename}, consumed by {@link #renameKey} under the bucket write
+   * lock: the resolved source, the destination parent and name, and the source's parent whose
+   * modification time is bumped with it.
+   */
+  private static final class PreparedRename {
+    private final OmKeyInfo fromKeyValue;
+    private final boolean isRenameDirectory;
+    private final OmKeyInfo renameToParent;
+    private final String renameToKeyName;
+    private final OmKeyInfo fromKeyParent;
+
+    PreparedRename(OmKeyInfo fromKeyValue, boolean isRenameDirectory, OmKeyInfo renameToParent,
+        String renameToKeyName, OmKeyInfo fromKeyParent) {
+      this.fromKeyValue = fromKeyValue;
+      this.isRenameDirectory = isRenameDirectory;
+      this.renameToParent = renameToParent;
+      this.renameToKeyName = renameToKeyName;
+      this.fromKeyParent = fromKeyParent;
+    }
   }
 
   @Override
@@ -271,11 +315,19 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     return resolvedArgs;
   }
 
-  @SuppressWarnings("parameternumber")
-  private OMClientResponse renameKey(OmKeyInfo toKeyParent, String toKeyName,
-      OmKeyInfo fromKeyValue, String fromKeyName, boolean isRenameDirectory,
-      long modificationTime, OzoneManager ozoneManager,
-      OMResponse.Builder omResponse, long trxnLogIndex) throws IOException {
+  /**
+   * Phase 2 (under the bucket write lock): re-checks the source resolved by {@link #prepareRename},
+   * then applies the dir-or-key table cache entries, the parent modification times and the bucket
+   * copy.
+   */
+  private OMClientResponse renameKey(PreparedRename prepared, String fromKeyName,
+      long modificationTime, OzoneManager ozoneManager, OMResponse.Builder omResponse,
+      long trxnLogIndex) throws IOException {
+    final OmKeyInfo toKeyParent = prepared.renameToParent;
+    final String toKeyName = prepared.renameToKeyName;
+    final OmKeyInfo fromKeyParent = prepared.fromKeyParent;
+    final boolean isRenameDirectory = prepared.isRenameDirectory;
+    OmKeyInfo fromKeyValue = prepared.fromKeyValue;
     final OMMetadataManager ommm = ozoneManager.getMetadataManager();
     final long volumeId = ommm.getVolumeId(fromKeyValue.getVolumeName());
     final long bucketId = ommm.getBucketId(fromKeyValue.getVolumeName(),
@@ -290,11 +342,20 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     } else {
       toKeyFileName = OzoneFSUtils.getFileName(toKeyName);
     }
-    OmKeyInfo fromKeyParent = null;
     OMMetadataManager metadataMgr = ozoneManager.getMetadataManager();
     Table<String, OmDirectoryInfo> dirTable = metadataMgr.getDirectoryTable();
     String bucketKey = metadataMgr.getBucketKey(
         fromKeyValue.getVolumeName(), fromKeyValue.getBucketName());
+
+    // Cheap O(1) re-check of the source resolved in Phase 1 without the bucket lock. Under serial
+    // apply this always holds; it is a tripwire that fails safe, the same way the Phase 1 existence
+    // check does, if that invariant is ever broken by a concurrent writer.
+    final boolean fromKeyStillExists = isRenameDirectory
+        ? dirTable.get(dbFromKey) != null
+        : metadataMgr.getKeyTable(getBucketLayout()).get(dbFromKey) != null;
+    if (!fromKeyStillExists) {
+      throw new OMException("Key not found " + fromKeyName, KEY_NOT_FOUND);
+    }
 
     OmKeyInfo.Builder fromKeyBuilder = fromKeyValue.toBuilder()
         .setUpdateID(trxnLogIndex);
@@ -312,8 +373,6 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     // Set modification time
     omBucketInfo = setModificationTime(ommm, omBucketInfo, toKeyParent, volumeId, bucketId,
         modificationTime, dirTable, trxnLogIndex);
-    fromKeyParent = OMFileRequest.getKeyParentDir(fromKeyValue.getVolumeName(),
-        fromKeyValue.getBucketName(), fromKeyName, ozoneManager, metadataMgr);
     if (fromKeyParent == null && omBucketInfo == null) {
       // Get omBucketInfo only when needed to reduce unnecessary DB IO
       omBucketInfo = metadataMgr.getBucketTable().get(bucketKey);
@@ -425,5 +484,37 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   @Override
   protected String extractSrcKey(KeyArgs keyArgs) throws OMException {
     return validateAndNormalizeKey(keyArgs.getKeyName());
+  }
+
+  /**
+   * Emits the audit log and the result log outside the bucket lock.
+   */
+  private void auditAndLogResult(OzoneManager ozoneManager, RenameKeyRequest renameKeyRequest,
+      Map<String, String> auditMap, Exception exception, Result result) {
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.RENAME_KEY, auditMap,
+            exception, getOmRequest().getUserInfo()));
+
+    KeyArgs keyArgs = renameKeyRequest.getKeyArgs();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String fromKeyName = keyArgs.getKeyName();
+    String toKeyName = renameKeyRequest.getToKeyName();
+
+    switch (result) {
+    case SUCCESS:
+      LOG.debug("Rename Key is successfully completed for volume:{} bucket:{}" +
+                      " fromKey:{} toKey:{}. ", volumeName, bucketName,
+              fromKeyName, toKeyName);
+      break;
+    case FAILURE:
+      ozoneManager.getMetrics().incNumKeyRenameFails();
+      LOG.error("Rename key failed for volume:{} bucket:{} fromKey:{} " +
+                      "toKey:{}. Exception: {}.", volumeName, bucketName,
+              fromKeyName, toKeyName, exception.getMessage());
+      break;
+    default:
+      LOG.error("Unrecognized Result for OMKeyRenameRequest: {}",
+              renameKeyRequest);
+    }
   }
 }
