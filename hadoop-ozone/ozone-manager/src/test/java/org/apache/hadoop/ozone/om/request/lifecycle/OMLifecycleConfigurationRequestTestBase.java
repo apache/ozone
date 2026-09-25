@@ -58,7 +58,7 @@ import org.mockito.Mockito;
  * Base test class for Lifecycle configuration request.
  */
 @SuppressWarnings("visibilitymodifier")
-public class TestOMLifecycleConfigurationRequest {
+class OMLifecycleConfigurationRequestTestBase {
 
   @TempDir
   private File tempDir;
