@@ -221,6 +221,13 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
                 pathInfoFSO.getLastKnownParentId(),
                 pathInfoFSO.getLeafNodeName(), createFileRequest.getClientID());
 
+    // Key of the leaf in the file table, for the Phase 2 re-check. Built from the parent id
+    // getAllMissingParentDirInfo left on pathInfoFSO, so it addresses the leaf even when intermediate
+    // directories were missing and this transaction creates them. dbFileKey above predates that call
+    // and can still name the deepest pre-existing ancestor, which is a different directory.
+    final String dbLeafFileKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
+        pathInfoFSO.getLastKnownParentId(), pathInfoFSO.getLeafNodeName());
+
     // Append new blocks
     List<OmKeyLocationInfo> newLocationList = keyArgs.getKeyLocationsList()
         .stream().map(OmKeyLocationInfo::getFromProtobuf)
@@ -231,7 +238,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
         newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
             .getRequiredNodes();
 
-    return new PreparedFileCreate(volumeId, bucketId, dbFileKey, omFileInfo,
+    return new PreparedFileCreate(volumeId, bucketId, dbLeafFileKey, omFileInfo,
         missingParentInfos, dbOpenFileName, preAllocatedSpace);
   }
 
@@ -252,7 +259,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
     // holds; it is a tripwire that fails safe (as checkDirectoryResult would) rather than silently
     // overwriting if that invariant is ever broken by a concurrent writer.
     if (!createFileRequest.getIsOverwrite() && OMFileRequest.getOmKeyInfoFromFileTable(false,
-        omMetadataManager, prepared.dbFileKey, keyName) != null) {
+        omMetadataManager, prepared.dbLeafFileKey, keyName) != null) {
       throw new OMException("File " + keyName + " already exists",
           OMException.ResultCodes.FILE_ALREADY_EXISTS);
     }
@@ -299,17 +306,17 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
   private static final class PreparedFileCreate {
     private final long volumeId;
     private final long bucketId;
-    private final String dbFileKey;
+    private final String dbLeafFileKey;
     private final OmKeyInfo omFileInfo;
     private final List<OmDirectoryInfo> missingParentInfos;
     private final String dbOpenFileName;
     private final long preAllocatedSpace;
 
-    PreparedFileCreate(long volumeId, long bucketId, String dbFileKey, OmKeyInfo omFileInfo,
+    PreparedFileCreate(long volumeId, long bucketId, String dbLeafFileKey, OmKeyInfo omFileInfo,
         List<OmDirectoryInfo> missingParentInfos, String dbOpenFileName, long preAllocatedSpace) {
       this.volumeId = volumeId;
       this.bucketId = bucketId;
-      this.dbFileKey = dbFileKey;
+      this.dbLeafFileKey = dbLeafFileKey;
       this.omFileInfo = omFileInfo;
       this.missingParentInfos = missingParentInfos;
       this.dbOpenFileName = dbOpenFileName;
