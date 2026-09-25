@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -1042,6 +1043,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     Map<String, ErrorInfo> keyToErrors = new HashMap<>();
     if (quiet) {
+      // PARTIAL_DELETE means the batch was processed and only some keys failed; those are reported per key
+      // in the returned map. Any other non-OK status means the whole request failed.
+      if (omResponse.getStatus() != PARTIAL_DELETE) {
+        handleError(omResponse);
+      }
       List<OzoneManagerProtocolProtos.DeleteKeyError> errors =
           omResponse.getDeleteKeysResponse().getErrorsList();
       for (OzoneManagerProtocolProtos.DeleteKeyError deleteKeyError : errors) {

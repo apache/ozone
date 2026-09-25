@@ -379,8 +379,9 @@ public interface OzoneManagerProtocol
    * through OzoneFileSystem.
    *
    * @param deleteKeys
-   * @param quiet - flag to not throw exception if delete fails
-   * @throws IOException
+   * @param quiet - if true, per-key failures are returned in the result map instead of being thrown
+   * @return key name to error for each key that could not be deleted, empty if all keys were deleted
+   * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true
    */
   default Map<String, ErrorInfo> deleteKeys(OmDeleteKeys deleteKeys, boolean quiet)
       throws IOException {
