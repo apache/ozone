@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.cli.datanode;
+package org.apache.hadoop.hdds.scm.cli;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,9 +32,6 @@ import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
-import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
-import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
-import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
