@@ -18,10 +18,9 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,9 +56,9 @@ public final class TestContainerBalancerAdvisor {
 
     assertEquals(1, results.size());
     ContainerBalancerEstimation estimation = results.get(0);
-    assertTrue(estimation.succeeded());
+    assertThat(estimation.succeeded()).isTrue();
     assertEquals(ContainerBalancerProfile.MEDIUM, estimation.getProfile());
-    assertTrue(estimation.getBytesToMove() > 0);
+    assertThat(estimation.getBytesToMove()).isPositive();
     assertEquals(26L * OzoneConsts.GB * 7, estimation.getPerIterationBytes());
   }
 
@@ -76,12 +75,12 @@ public final class TestContainerBalancerAdvisor {
     assertEquals(ContainerBalancerProfile.SLOW, results.get(0).getProfile());
     assertEquals(ContainerBalancerProfile.MEDIUM, results.get(1).getProfile());
     assertEquals(ContainerBalancerProfile.FAST, results.get(2).getProfile());
-    assertTrue(results.get(0).succeeded());
-    assertTrue(results.get(1).succeeded());
-    assertTrue(results.get(2).succeeded());
+    assertThat(results.get(0).succeeded()).isTrue();
+    assertThat(results.get(1).succeeded()).isTrue();
+    assertThat(results.get(2).succeeded()).isTrue();
 
     long bytesToMove = results.get(0).getBytesToMove();
-    assertTrue(bytesToMove > 0);
+    assertThat(bytesToMove).isPositive();
     for (ContainerBalancerEstimation result : results) {
       assertEquals(bytesToMove, result.getBytesToMove());
     }
@@ -108,7 +107,7 @@ public final class TestContainerBalancerAdvisor {
 
     assertEquals(1, results.size());
     ContainerBalancerEstimation estimation = results.get(0);
-    assertTrue(estimation.succeeded());
+    assertThat(estimation.succeeded()).isTrue();
     assertEquals(ContainerBalancerProfile.FAST, estimation.getProfile());
     // 40% of 70 -> maxInvolved=28 -> [14 sources, 14 targets];
     // 14*100GB exceeds the 500GB iteration cap, so the cap binds.
@@ -143,7 +142,7 @@ public final class TestContainerBalancerAdvisor {
         .get(0)
         .getBytesToMove();
 
-    assertTrue(tighterThresholdBytesToMove > defaultThresholdBytesToMove);
+    assertThat(tighterThresholdBytesToMove).isGreaterThan(defaultThresholdBytesToMove);
   }
 
   @Test
@@ -156,8 +155,8 @@ public final class TestContainerBalancerAdvisor {
             .setProfile(ContainerBalancerProfile.SLOW)
             .setMaxDatanodesPercentageToInvolvePerIteration(1));
     assertEquals(1, results.size());
-    assertFalse(results.get(0).succeeded());
-    assertTrue(results.get(0).getFailureMessage().contains("at least 2 are required"));
+    assertThat(results.get(0).succeeded()).isFalse();
+    assertThat(results.get(0).getFailureMessage()).contains("at least 2 are required");
   }
 
   @Test
@@ -185,8 +184,8 @@ public final class TestContainerBalancerAdvisor {
     assertEquals(500L * OzoneConsts.GB, baseline.getPerIterationBytes());
     assertEquals(14L * overriddenLeavingSource, overridden.getPerIterationBytes());
 
-    assertTrue(overridden.getEstimatedIterations() > baseline.getEstimatedIterations());
-    assertTrue(overridden.getEstimatedDurationMillis() > baseline.getEstimatedDurationMillis());
+    assertThat(overridden.getEstimatedIterations()).isGreaterThan(baseline.getEstimatedIterations());
+    assertThat(overridden.getEstimatedDurationMillis()).isGreaterThan(baseline.getEstimatedDurationMillis());
   }
 
   @Test
@@ -200,12 +199,12 @@ public final class TestContainerBalancerAdvisor {
             .setMaxSizeToMovePerIteration(70L * OzoneConsts.GB));
 
     assertEquals(3, results.size());
-    assertTrue(results.get(0).succeeded());
-    assertTrue(results.get(1).succeeded());
-    assertFalse(results.get(2).succeeded());
+    assertThat(results.get(0).succeeded()).isTrue();
+    assertThat(results.get(1).succeeded()).isTrue();
+    assertThat(results.get(2).succeeded()).isFalse();
     assertEquals(ContainerBalancerProfile.FAST, results.get(2).getProfile());
-    assertTrue(results.get(2).getFailureMessage().contains(
-        "max-size-entering-target must be less than or equal to max-size-to-move-per-iteration."));
+    assertThat(results.get(2).getFailureMessage()).contains(
+        "max-size-entering-target must be less than or equal to max-size-to-move-per-iteration.");
     assertEquals(100L * OzoneConsts.GB, results.get(2).getMaxSizeEnteringTarget());
     assertEquals(70L * OzoneConsts.GB, results.get(2).getMaxSizeToMovePerIteration());
   }
@@ -251,7 +250,7 @@ public final class TestContainerBalancerAdvisor {
             .setProfile(ContainerBalancerProfile.SLOW)
             .setMaxSizeEnteringTarget(OzoneConsts.GB));
     assertEquals(1, results.size());
-    assertFalse(results.get(0).succeeded());
+    assertThat(results.get(0).succeeded()).isFalse();
   }
 
   /**
