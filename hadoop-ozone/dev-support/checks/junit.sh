@@ -63,8 +63,15 @@ if [[ "${OZONE_REPO_CACHED}" == "true" ]]; then
     # (e.g. test-om in ozone-manager and ozone-integration-test). Use full-reactor mvn test.
     # hadoop-native-lib is bound on ozone-main (inherited=false).
     if [[ "$*" == *"-Phadoop-native-lib"* ]]; then
-      if ! mvn ${MAVEN_OPTIONS} -pl :ozone-main -Phadoop-native-lib generate-resources; then
+      # Bootstrap must not inherit --fail-never from the main test invocation.
+      NATIVE_LIB_MVN_OPTIONS="${MAVEN_OPTIONS//--fail-never/}"
+      NATIVE_LIB_MVN_OPTIONS="${NATIVE_LIB_MVN_OPTIONS} --fail-fast"
+      if ! mvn ${NATIVE_LIB_MVN_OPTIONS} -pl :ozone-main -Phadoop-native-lib generate-resources; then
         echo "Failed to populate target/native-lib (hadoop-native-lib profile)" >&2
+        exit 1
+      fi
+      if [[ ! -d target/native-lib ]] || ! ls target/native-lib/* >/dev/null 2>&1; then
+        echo "target/native-lib is missing after hadoop-native-lib generate-resources" >&2
         exit 1
       fi
     fi

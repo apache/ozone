@@ -23,5 +23,10 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=repro
 ERROR_PATTERN='ERROR.*mismatch'
 
-# install populates the local repo reference that artifact:compare rebuilds against
-source "${DIR}"/_build.sh install artifact:compare "$@"
+# CI repro downloads build-job jars into ~/.m2 (OZONE_REPO_CACHED); compare against that reference.
+# Local runs without a cached repo need install first to populate the reference.
+if [[ "${OZONE_REPO_CACHED:-false}" == "true" ]]; then
+  source "${DIR}"/_build.sh verify artifact:compare "$@"
+else
+  source "${DIR}"/_build.sh install artifact:compare "$@"
+fi
