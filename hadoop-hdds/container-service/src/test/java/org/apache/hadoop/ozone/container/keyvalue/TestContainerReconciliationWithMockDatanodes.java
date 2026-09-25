@@ -34,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.doThrow;
 import  static org.mockito.Mockito.spy;
 
@@ -59,6 +58,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -390,7 +390,7 @@ public class TestContainerReconciliationWithMockDatanodes {
         });
 
     // Mock getBlock
-    containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(any(), any(), any(), any(), anyMap()))
+    containerProtocolMock.when(() -> ContainerProtocolCalls.getBlock(any(), any(), any(), any(), any()))
         .thenAnswer(inv -> {
           XceiverClientSpi xceiverClientSpi = inv.getArgument(0);
           BlockID blockID = inv.getArgument(2);
@@ -557,9 +557,21 @@ public class TestContainerReconciliationWithMockDatanodes {
      * Triggers a synchronous scan of the container. This method will block until the scan completes.
      */
     public void scanContainer(long containerID) {
-      Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID),
-          TEST_SCAN);
-      assertTrue(scanFuture.isPresent());
+      // A previously triggered on-demand scan may still be registered as in progress, for example the
+      // fire-and-forget scan that reconciliation schedules in a finally block. While it is, the scanner
+      // returns an empty Optional instead of scheduling a new one. Wait for the prior scan to drain so
+      // this synchronous scan is actually scheduled.
+      AtomicReference<Future<?>> scanFuture = new AtomicReference<>();
+      try {
+        GenericTestUtils.waitFor(() -> {
+          Optional<Future<?>> future =
+              onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID), TEST_SCAN);
+          future.ifPresent(scanFuture::set);
+          return future.isPresent();
+        }, 100, 10_000);
+      } catch (InterruptedException | TimeoutException e) {
+        fail("On demand container scan was not scheduled", e);
+      }
 
       try {
         scanFuture.get().get();

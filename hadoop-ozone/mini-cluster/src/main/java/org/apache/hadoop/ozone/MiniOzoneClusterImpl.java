@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.server.http.BaseHttpServer.SERVER_DIR;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
@@ -74,9 +75,11 @@ import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectMetrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.net.DNSToSwitchMapping;
+import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -394,6 +397,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
+    } finally {
+      resetStaticMappingIfConfigured(conf);
+    }
+  }
+
+  private static void resetStaticMappingIfConfigured(
+      OzoneConfiguration conf) {
+    if (StaticMapping.class.getName().equals(
+        conf.get(CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY))) {
+      StaticMapping.resetMap();
     }
   }
 
@@ -536,7 +549,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
         // Recreate the Ratis pipeline to prevent imbalanced node placement across racks
         // caused by asynchronous DN registration.
-        if (racks != null && startDataNodes) {
+        if (racks != null && startDataNodes && numOfDatanodes >= HddsProtos.ReplicationFactor.THREE.getNumber()) {
           resetPipelinesForRackAwareness(cluster);
         }
 
@@ -622,11 +635,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
 
     private void configureHostAndRackTopology() throws IOException {
-      FixedHostMapping.clear();
       if (racks == null && hosts == null) {
         return;
       }
 
+      StaticMapping.resetMap();
       conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME, true);
 
       if (hosts == null) {
@@ -645,10 +658,10 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         }
 
         conf.setClass(CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            FixedHostMapping.class, DNSToSwitchMapping.class);
+            StaticMapping.class, DNSToSwitchMapping.class);
 
         for (int i = 0; i < racks.length; i++) {
-          FixedHostMapping.addNode(hosts[i], racks[i]);
+          StaticMapping.addNodeToRack(hosts[i], racks[i]);
         }
       }
     }
@@ -774,10 +787,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         OzoneConfiguration dnConf = dnFactory.apply(conf);
         if (hosts != null) {
           dnConf.set(HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY, hosts[i]);
+          initializeDatanodeIdentity(dnConf, hosts[i]);
         }
 
-        // Bypass InetAddress.getName() resolution for custom hostnames by starting DN via YAML.
-        confDatanodeViaYaml(dnConf);
         HddsDatanodeService datanode = new HddsDatanodeService(NO_ARGS);
         dnConf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, conf.getStrings(ScmConfigKeys.OZONE_SCM_NAMES));
         datanode.setConfiguration(dnConf);
@@ -787,13 +799,28 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       return hddsDatanodes;
     }
 
-    private void confDatanodeViaYaml(OzoneConfiguration dnConf) throws IOException {
+    /**
+     * Seeds the datanode.id file for a Datanode with a synthetic hostname: such a hostname
+     * cannot be resolved, so the Datanode cannot discover its own IP address, which is a
+     * required field of the registration request.  The layout version is stamped as well,
+     * since a datanode.id file without a VERSION file marks the Datanode as an installation
+     * predating the upgrade framework, which would make it start pre-finalized.
+     */
+    private void initializeDatanodeIdentity(OzoneConfiguration dnConf, String hostName)
+        throws IOException {
       DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()
           .setID(DatanodeID.randomID())
-          .setHostName(dnConf.get(HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY))
+          .setHostName(hostName)
           .setIpAddress("127.0.0.1")
           .build();
       datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
+
+      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(dnConf,
+          datanodeDetails.getUuidString(), maxLayoutVersion());
+      if (layoutStorage.getState() != StorageState.INITIALIZED) {
+        layoutStorage.initialize();
+      }
+
       String dnFilePath = HddsServerUtil.getDatanodeIdFilePath(dnConf);
       ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, new File(dnFilePath), dnConf);
     }

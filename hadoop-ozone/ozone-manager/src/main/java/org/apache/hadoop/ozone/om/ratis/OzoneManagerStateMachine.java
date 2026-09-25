@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
 
@@ -57,6 +56,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -623,14 +624,19 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
 
       long startTime = Time.monotonicNow();
-      final TransactionInfo transactionInfo = TransactionInfo.valueOf(snapshot);
+      // The double buffer may have committed transactions past the index computed above, since it
+      // advances lastAppliedTermIndex only after its batch commit returns. Persisting through it
+      // keeps the stored index from moving backwards over that data, and yields whichever value is
+      // actually stored so the in-memory copy Ratis reads cannot disagree with the DB.
+      final TransactionInfo transactionInfo =
+          ozoneManagerDoubleBuffer.persistIfNewer(TransactionInfo.valueOf(snapshot));
       ozoneManager.setTransactionInfo(transactionInfo);
-      ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, transactionInfo);
       ozoneManager.getMetadataManager().getStore().flushDB();
       LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
           "notified = {}, current snapshot index = {}, took {} ms",
-              getId(), applied, lastSkippedIndex, notified, snapshot, Time.monotonicNow() - startTime);
-      return snapshot.getIndex();
+              getId(), applied, lastSkippedIndex, notified, transactionInfo.getTermIndex(),
+              Time.monotonicNow() - startTime);
+      return transactionInfo.getTermIndex().getIndex();
     }
   }
 
@@ -691,7 +697,26 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @VisibleForTesting
   OMResponse runCommand(OMRequest request, TermIndex termIndex) {
+    boolean isS3AuthThreadLocalSet = false;
+    boolean isStsThreadLocalSet = false;
     try {
+      if (ozoneManager.isSecurityEnabled() && request.hasS3Authentication()) {
+        // STS token verification runs on the leader RPC path so we don't need to recheck here on the apply
+        // after the log is committed
+        STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+
+        final OzoneManagerProtocolProtos.S3Authentication s3Auth = request.getS3Authentication();
+        // ThreadLocal carries S3 action for OmMetadataReader.
+        OzoneManager.setS3Auth(s3Auth);
+        isS3AuthThreadLocalSet = true;
+
+        // ThreadLocal carries session policy for OmMetadataReader
+        final STSTokenIdentifier rehydratedTokenIdentifier = STSSecurityUtil.rehydrateStsTokenIdentifier(s3Auth);
+        if (rehydratedTokenIdentifier != null) {
+          OzoneManager.setStsTokenIdentifier(rehydratedTokenIdentifier);
+          isStsThreadLocalSet = true;
+        }
+      }
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
@@ -710,6 +735,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // For any Runtime exceptions, terminate OM.
       String errorMessage = "Request " + request + " failed with exception";
       ExitUtils.terminate(1, errorMessage, e, LOG);
+    } finally {
+      if (isS3AuthThreadLocalSet) {
+        OzoneManager.setS3Auth(null);
+      }
+      if (isStsThreadLocalSet) {
+        OzoneManager.setStsTokenIdentifier(null);
+      }
     }
     return null;
   }

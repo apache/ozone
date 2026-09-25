@@ -49,7 +49,7 @@ import org.apache.ozone.test.GenericTestUtils;
 /**
  * Tests for {@link KeyValueContainerMetadataInspector}.
  */
-public class TestKeyValueContainerMetadataInspector extends TestKeyValueContainerIntegrityChecks {
+public class TestKeyValueContainerMetadataInspector extends KeyValueContainerIntegrityTestBase {
   private static final long CONTAINER_ID = 102;
 
   static final DeletedBlocksTransactionGeneratorForTesting GENERATOR =
