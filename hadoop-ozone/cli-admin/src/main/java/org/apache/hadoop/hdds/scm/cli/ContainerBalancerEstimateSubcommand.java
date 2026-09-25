@@ -77,17 +77,21 @@ public class ContainerBalancerEstimateSubcommand extends ScmSubcommand {
     }
 
     boolean anySucceeded = false;
+    boolean multipleProfiles = estimations.size() > 1;
     for (ContainerBalancerEstimation result : estimations) {
       out().printf("Profile: %s%n", result.getProfile().name());
       printBasedOn(result);
       if (result.succeeded()) {
         anySucceeded = true;
         printEstimation(result);
-      } else {
+      } else if (multipleProfiles) {
         out().printf(" Estimation failed: %s%n%n", result.getFailureMessage());
       }
     }
     if (!anySucceeded) {
+      if (multipleProfiles) {
+        throw new IOException("Estimation failed for all profiles.");
+      }
       throw new IOException(estimations.get(0).getFailureMessage());
     }
   }
