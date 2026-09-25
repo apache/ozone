@@ -234,6 +234,11 @@ class TestPerVolumePushReplication {
       // Must run even if an assertion above fails: the volume dir is left read-only otherwise, which breaks
       // the next test and stops the cluster from cleaning up its base dir.
       DatanodeTestUtils.restoreBadVolume(vol0);
+      // restoreBadVolume only flips the directory permission. vol0 stays in the failed volume map and its
+      // pool is not recreated, so this datanode would keep serving one volume for the rest of the class and
+      // the decommission test would fail its two-pool assertion whenever it happens to pick this node.
+      // Restarting rescans the data dirs and brings both volumes and both pools back.
+      cluster.restartHddsDatanode(source, true);
     }
   }
 
