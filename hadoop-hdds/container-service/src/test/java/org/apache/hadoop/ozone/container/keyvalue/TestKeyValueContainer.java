@@ -23,7 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_METADATA_DIR;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
