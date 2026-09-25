@@ -41,7 +41,7 @@ import org.apache.ozone.test.GenericTestUtils;
  * Represents a type of container corruption that can be injected into a container for testing.
  * Currently this class only supports file per block layout.
  */
-public enum TestContainerCorruptions {
+public enum ContainerTestCorruptions {
   MISSING_CHUNKS_DIR((container, blockID) -> {
     File chunksDir = new File(container.getContainerData().getContainerPath(),
         "chunks");
@@ -116,7 +116,7 @@ public enum TestContainerCorruptions {
   private final BiConsumer<Container<?>, Long> corruption;
   private final ContainerScanError.FailureType expectedResult;
 
-  TestContainerCorruptions(BiConsumer<Container<?>, Long> corruption, ContainerScanError.FailureType expectedResult) {
+  ContainerTestCorruptions(BiConsumer<Container<?>, Long> corruption, ContainerScanError.FailureType expectedResult) {
     this.corruption = corruption;
     this.expectedResult = expectedResult;
 
@@ -160,10 +160,10 @@ public enum TestContainerCorruptions {
    * Get all container corruption types as parameters for junit 4
    * parameterized tests, except the ones specified.
    */
-  public static Set<TestContainerCorruptions> getAllParamsExcept(
-      TestContainerCorruptions... exclude) {
-    Set<TestContainerCorruptions> includeSet =
-        EnumSet.allOf(TestContainerCorruptions.class);
+  public static Set<ContainerTestCorruptions> getAllParamsExcept(
+      ContainerTestCorruptions... exclude) {
+    Set<ContainerTestCorruptions> includeSet =
+        EnumSet.allOf(ContainerTestCorruptions.class);
     Arrays.asList(exclude).forEach(includeSet::remove);
     return includeSet;
   }
