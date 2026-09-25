@@ -31,6 +31,7 @@ import {
 import { navItems, SIDEBAR_WIDTH } from './navigation';
 import { JMX_QUERY_KEY } from './api/useJmx';
 import OverviewPage from './pages/Overview/OverviewPage';
+import MetricsPage from './pages/Metrics/MetricsPage';
 import Placeholder from './pages/Placeholder';
 
 /** 404 page for unknown routes; the action returns to the Overview. */
@@ -89,12 +90,19 @@ function AppShell() {
       <Routes>
         <Route path="/" element={<OverviewPage />} />
         <Route path="/configuration" element={<Placeholder title="Configuration" />} />
-        <Route path="/rpc" element={<Placeholder title="Remote Procedure Call" />} />
-        <Route path="/ozone-manager" element={<Placeholder title="Ozone Manager" />} />
-        <Route path="/jmx-info" element={<Placeholder title="JMX" />} />
+        {/* Metrics group */}
+        <Route path="/metrics/rpc" element={<Placeholder title="Remote Procedure Call" />} />
+        <Route
+          path="/metrics/ratis-event-timeline"
+          element={<Placeholder title="Ratis Event Timeline" />}
+        />
+        <Route path="/metrics/ozone-manager" element={<MetricsPage />} />
+        <Route path="/metrics/deletion" element={<Placeholder title="Deletion" />} />
+        <Route path="/metrics/snapshots" element={<Placeholder title="Snapshots" />} />
+        {/* Common tools group */}
+        <Route path="/jmx" element={<Placeholder title="JMX" />} />
         <Route path="/stacks" element={<Placeholder title="Stacks" />} />
-        <Route path="/documentation" element={<Placeholder title="Documentation" />} />
-        <Route path="/log-levels" element={<Placeholder title="Log levels" />} />
+        <Route path="/log-levels" element={<Placeholder title="Log Levels" />} />
         <Route path="*" element={<NotFoundRoute />} />
       </Routes>
     </AppLayout>

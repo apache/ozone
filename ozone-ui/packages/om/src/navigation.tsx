@@ -21,10 +21,12 @@ import {
   ApiOutlined,
   BarChartOutlined,
   BlockOutlined,
-  BookOutlined,
+  CameraOutlined,
   ClusterOutlined,
   ControlOutlined,
   DashboardOutlined,
+  DeleteOutlined,
+  FileTextOutlined,
   HistoryOutlined,
 } from '@ant-design/icons';
 
@@ -42,7 +44,9 @@ const navItem = (key: string, label: string, path: string, icon: MenuItem['icon'
 
 /**
  * Ozone Manager navigation rail. Mirrors the "Sidebar Navigation" in the design:
- * primary items, then a "Diagnostics" group and a "Links" group.
+ * Overview and Configuration at the top, then a "Metrics" group of per-subsystem
+ * metrics views and a "Common tools" group. The OM Metrics page is the
+ * "Ozone Manager" item under the Metrics group.
  */
 export const navItems: MenuItem[] = [
   navItem('overview', 'Overview', '/', <DashboardOutlined style={iconStyle} />),
@@ -54,32 +58,34 @@ export const navItems: MenuItem[] = [
   ),
   {
     type: 'group',
-    key: 'group-diagnostics',
-    label: 'Diagnostics',
+    key: 'group-metrics',
+    label: 'Metrics',
     children: [
-      navItem('rpc', 'Remote Procedure Call', '/rpc', <ApiOutlined style={iconStyle} />),
+      navItem('rpc', 'Remote Procedure Call', '/metrics/rpc', <ApiOutlined style={iconStyle} />),
       navItem(
-        'ozone-manager',
+        'ratis-event-timeline',
+        'Ratis Event Timeline',
+        '/metrics/ratis-event-timeline',
+        <HistoryOutlined style={iconStyle} />
+      ),
+      navItem(
+        'om-metrics',
         'Ozone Manager',
-        '/ozone-manager',
+        '/metrics/ozone-manager',
         <ClusterOutlined style={iconStyle} />
       ),
-      navItem('jmx', 'JMX', '/jmx-info', <BarChartOutlined style={iconStyle} />),
-      navItem('stacks', 'Stacks', '/stacks', <BlockOutlined style={iconStyle} />),
+      navItem('deletion', 'Deletion', '/metrics/deletion', <DeleteOutlined style={iconStyle} />),
+      navItem('snapshots', 'Snapshots', '/metrics/snapshots', <CameraOutlined style={iconStyle} />),
     ],
   },
   {
     type: 'group',
-    key: 'group-links',
-    label: 'Links',
+    key: 'group-common-tools',
+    label: 'Common tools',
     children: [
-      navItem(
-        'documentation',
-        'Documentation',
-        '/documentation',
-        <BookOutlined style={iconStyle} />
-      ),
-      navItem('log-levels', 'Log levels', '/log-levels', <HistoryOutlined style={iconStyle} />),
+      navItem('jmx', 'JMX', '/jmx', <BarChartOutlined style={iconStyle} />),
+      navItem('stacks', 'Stacks', '/stacks', <BlockOutlined style={iconStyle} />),
+      navItem('log-levels', 'Log Levels', '/log-levels', <FileTextOutlined style={iconStyle} />),
     ],
   },
 ];
