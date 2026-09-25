@@ -73,10 +73,6 @@ public class InterSCMGrpcProtocolService {
         ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME,
         ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME_DEFAULT,
         TimeUnit.MILLISECONDS);
-    final boolean permitKeepAliveWithoutCalls = conf.getBoolean(
-        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_WITHOUT_CALLS,
-        ScmConfigKeys
-            .OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_WITHOUT_CALLS_DEFAULT);
 
     NettyServerBuilder nettyServerBuilder =
         ((NettyServerBuilder) ServerBuilder.forPort(port))
@@ -84,8 +80,7 @@ public class InterSCMGrpcProtocolService {
             .maxConnectionIdle(maxConnectionIdle, TimeUnit.MILLISECONDS)
             .keepAliveTime(keepAliveTime, TimeUnit.MILLISECONDS)
             .keepAliveTimeout(keepAliveTimeout, TimeUnit.MILLISECONDS)
-            .permitKeepAliveTime(permitKeepAliveTime, TimeUnit.MILLISECONDS)
-            .permitKeepAliveWithoutCalls(permitKeepAliveWithoutCalls);
+            .permitKeepAliveTime(permitKeepAliveTime, TimeUnit.MILLISECONDS);
 
     InterSCMGrpcService service = new InterSCMGrpcService(scm);
     ServerBuilder b = nettyServerBuilder.addService(service);

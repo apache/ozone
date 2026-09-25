@@ -4416,13 +4416,6 @@
       ozone.scm.ha.grpc.client.keepalive.time so client pings are accepted.</description>
   </property>
   <property>
-    <name>ozone.scm.ha.grpc.server.permit.keepalive.without.calls</name>
-    <value>true</value>
-    <tag>SCM, OZONE, HA, RATIS</tag>
-    <description>Whether the Inter-SCM gRPC server permits client keepalive
-      pings when there is no active RPC on the connection.</description>
-  </property>
-  <property>
     <name>ozone.scm.close.container.wait.duration</name>
     <value>150s</value>
     <tag>SCM, OZONE, RECON</tag>

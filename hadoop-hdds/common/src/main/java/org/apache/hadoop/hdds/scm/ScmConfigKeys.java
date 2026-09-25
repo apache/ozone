@@ -593,12 +593,6 @@ public final class ScmConfigKeys {
   public static final long
           OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME_DEFAULT = 5 * 60 * 1000L;
 
-  public static final String
-          OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_WITHOUT_CALLS =
-          "ozone.scm.ha.grpc.server.permit.keepalive.without.calls";
-  public static final boolean
-          OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_WITHOUT_CALLS_DEFAULT = true;
-
   public static final String OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT =
           "ozone.scm.ha.ratis.server.failure.timeout.duration";
   public static final long
