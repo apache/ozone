@@ -219,6 +219,8 @@
                   <url>https://github.com/facebook/rocksdb/archive/refs/tags/v${rocksdb.source.version}.tar.gz</url>
                   <outputFileName>rocksdb-v${rocksdb.source.version}.tar.gz</outputFileName>
                   <outputDirectory>${project.build.directory}/rocksdb</outputDirectory>
+                  <readTimeOut>120000</readTimeOut>
+                  <skipCache>false</skipCache>
                 </configuration>
               </execution>
             </executions>
