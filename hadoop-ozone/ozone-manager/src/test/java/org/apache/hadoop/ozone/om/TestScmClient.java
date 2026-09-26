@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -71,6 +72,36 @@ public class TestScmClient {
     OzoneConfiguration conf = new OzoneConfiguration();
     scmClient = new ScmClient(scmBlockLocationProtocol,
         containerLocationProtocol, conf);
+  }
+
+  @Test
+  void usesDedicatedBlockClientForKeyDeletion() {
+    ScmBlockLocationProtocol foregroundClient = mock(ScmBlockLocationProtocol.class);
+    ScmBlockLocationProtocol keyDeletionClient = mock(ScmBlockLocationProtocol.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ScmClient client = new ScmClient(foregroundClient,
+        containerLocationProtocol, conf, keyDeletionClient);
+
+    assertSame(foregroundClient, client.getBlockClient());
+    assertSame(keyDeletionClient, client.getBlockClientForKeyDeletion());
+  }
+
+  @Test
+  void preservesScmProtocolClientsOnClose() throws IOException {
+    ScmBlockLocationProtocol foregroundClient =
+        mock(ScmBlockLocationProtocol.class);
+    ScmBlockLocationProtocol keyDeletionClient =
+        mock(ScmBlockLocationProtocol.class);
+    StorageContainerLocationProtocol containerClient =
+        mock(StorageContainerLocationProtocol.class);
+    ScmClient client = new ScmClient(foregroundClient, containerClient,
+        new OzoneConfiguration(), keyDeletionClient);
+
+    client.close();
+
+    verify(foregroundClient, never()).close();
+    verify(keyDeletionClient, never()).close();
+    verify(containerClient, never()).close();
   }
 
   private static Stream<Arguments> getContainerLocationsTestCases() {

@@ -603,6 +603,63 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.scmclient.location.rpc.timeout</name>
+    <value>30s</value>
+    <description>
+      RPC response timeout for OM's SCM block and container location
+      clients.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.scmclient.location.ipc.connect.timeout</name>
+    <value>5s</value>
+    <description>
+      TCP connect timeout for OM's SCM block and container location
+      clients. The value accepts a duration suffix such as ms, s, or m and is
+      converted to milliseconds for Hadoop IPC. The converted value must be
+      between 0 and 2147483647 milliseconds.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.scmclient.location.ipc.connect.max.retries.on.timeouts</name>
+    <value>0</value>
+    <description>
+      Maximum TCP connect retries after a timeout for OM's SCM block and
+      container location clients. A value of 0 immediately fails over to
+      another SCM peer.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.scmclient.location.failover.max.retry</name>
+    <value>3</value>
+    <description>
+      Maximum failover retries for OM's SCM block and container location
+      clients. The effective retry count is the largest of this value, the
+      configured SCM node count, and the floored quotient of
+      ozone.om.scmclient.location.max.retry.timeout divided by
+      ozone.om.scmclient.location.failover.retry.interval. Failover failures
+      permit one initial attempt plus the effective retry count.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.scmclient.location.max.retry.timeout</name>
+    <value>6s</value>
+    <description>
+      Duration used with ozone.om.scmclient.location.failover.retry.interval
+      to derive the failover retry count for OM's SCM block and container
+      location clients. This is not a limit on the total duration of an RPC
+      call.
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.scmclient.location.failover.retry.interval</name>
+    <value>2s</value>
+    <description>
+      Delay between failover retries for OM's SCM block and container location
+      clients. The value must resolve to at least 1 millisecond.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.http-address</name>
     <value>0.0.0.0:9874</value>
     <tag>OM, MANAGEMENT</tag>
