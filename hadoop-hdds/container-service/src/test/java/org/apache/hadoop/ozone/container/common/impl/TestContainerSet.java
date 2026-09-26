@@ -52,6 +52,7 @@ import java.util.stream.LongStream;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -544,6 +545,34 @@ public class TestContainerSet {
     containerSet.removeContainer(100);
     assertEquals(98, containerSet.containerCount(vol1));
     assertEquals(49, containerSet.containerCount(vol2));
+  }
+
+  private static KeyValueContainer newContainerOnVolume(long id, HddsVolume volume, State state) {
+    KeyValueContainerData kvData = new KeyValueContainerData(id,
+        ContainerLayoutVersion.FILE_PER_BLOCK,
+        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+        UUID.randomUUID().toString());
+    kvData.setVolume(volume);
+    kvData.setState(state);
+    return new KeyValueContainer(kvData, new OzoneConfiguration());
+  }
+
+  @Test
+  public void testGetOpenContainerCountsByVolume() throws StorageContainerException {
+    ContainerSet containerSet = newContainerSet();
+    HddsVolume volume1 = mockHddsVolume("vol-1");
+    HddsVolume volume2 = mockHddsVolume("vol-2");
+
+    containerSet.addContainer(newContainerOnVolume(1L, volume1, State.OPEN));
+    containerSet.addContainer(newContainerOnVolume(2L, volume1, State.OPEN));
+    containerSet.addContainer(newContainerOnVolume(3L, volume2, State.OPEN));
+    containerSet.addContainer(newContainerOnVolume(4L, volume2, State.CLOSED));
+
+    Map<String, Long> counts = containerSet.getOpenContainerCountsByVolume();
+
+    assertEquals(2, counts.size());
+    assertEquals(2L, counts.get("vol-1"));
+    assertEquals(1L, counts.get("vol-2"));
   }
 
   /**
