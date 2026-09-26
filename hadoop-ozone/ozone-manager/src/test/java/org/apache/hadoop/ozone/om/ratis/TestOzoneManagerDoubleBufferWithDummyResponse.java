@@ -20,18 +20,23 @@ package org.apache.hadoop.ozone.om.ratis;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import com.google.common.collect.Iterators;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -96,22 +101,32 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(0, metrics.getTotalNumOfFlushedTransactions());
     assertEquals(0, metrics.getMaxNumberOfTransactionsFlushedInOneIteration());
 
+    OMDummyCreateBucketResponse annotatedResponse =
+        createDummyBucketResponse(UUID.randomUUID().toString());
+    annotatedResponse.addCleanupTables(Collections.singleton(VOLUME_TABLE));
+    assertAnnotatedCleanupTakesPrecedence(annotatedResponse);
+
+    OMTrackedDummyCreateBucketResponse trackedResponse =
+        createTrackedDummyBucketResponse(UUID.randomUUID().toString());
+    assertBucketCacheCleanup(trackedResponse);
+
     for (int i = 0; i < bucketCount; i++) {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
           TermIndex.valueOf(term, trxId.incrementAndGet()));
     }
-    waitFor(() -> metrics.getTotalNumOfFlushedTransactions() == bucketCount,
+    int totalBucketCount = bucketCount + 2;
+    waitFor(() -> metrics.getTotalNumOfFlushedTransactions() == totalBucketCount,
         100, 60000);
 
     assertThat(metrics.getTotalNumOfFlushOperations()).isGreaterThan(0);
-    assertEquals(bucketCount, doubleBuffer.getFlushedTransactionCountForTesting());
+    assertEquals(totalBucketCount, doubleBuffer.getFlushedTransactionCountForTesting());
     assertThat(metrics.getMaxNumberOfTransactionsFlushedInOneIteration()).isGreaterThan(0);
-    assertEquals(bucketCount, omMetadataManager.countRowsInTable(
+    assertEquals(totalBucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
     assertThat(doubleBuffer.getFlushIterationsForTesting()).isGreaterThan(0);
     assertThat(metrics.getFlushTime().lastStat().numSamples()).isGreaterThan(0);
     assertThat(metrics.getAvgFlushTransactionsInOneIteration()).isGreaterThan(0);
-    assertEquals(bucketCount, (long) metrics.getQueueSize().lastStat().total());
+    assertEquals(totalBucketCount, (long) metrics.getQueueSize().lastStat().total());
     assertThat(metrics.getQueueSize().lastStat().numSamples()).isGreaterThan(0);
 
     // Assert there is only instance of OM Double Metrics.
@@ -123,8 +138,34 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
         omMetadataManager.getTransactionInfoTable().get(TRANSACTION_INFO_KEY);
     // Check lastAppliedIndex is updated correctly or not.
     assertNotNull(transactionInfo);
-    assertEquals(bucketCount, transactionInfo.getTransactionIndex());
+    assertEquals(totalBucketCount, transactionInfo.getTransactionIndex());
     assertEquals(term, transactionInfo.getTerm());
+  }
+
+  private void assertBucketCacheCleanup(
+      AbstractDummyCreateBucketResponse response) throws Exception {
+    long transactionIndex = trxId.incrementAndGet();
+    OmBucketInfo bucketInfo = response.getOmBucketInfo();
+    String dbBucketKey = omMetadataManager.getBucketKey(
+        bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(dbBucketKey), CacheValue.get(transactionIndex));
+
+    doubleBuffer.add(response, TermIndex.valueOf(term, transactionIndex));
+    waitFor(() -> Iterators.size(omMetadataManager.getBucketTable().cacheIterator()) == 0, 100, 5000);
+  }
+
+  private void assertAnnotatedCleanupTakesPrecedence(
+      AbstractDummyCreateBucketResponse response) throws Exception {
+    long transactionIndex = trxId.get() + 1;
+    String volumeName = response.getOmBucketInfo().getVolumeName();
+    omMetadataManager.getVolumeTable().addCacheEntry(
+        new CacheKey<>(volumeName), CacheValue.get(transactionIndex));
+
+    assertBucketCacheCleanup(response);
+
+    assertEquals(1, Iterators.size(omMetadataManager.getVolumeTable().cacheIterator()));
+    omMetadataManager.getVolumeTable().cleanupCache(Collections.singletonList(transactionIndex));
   }
 
   /**
@@ -146,18 +187,36 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
             .build());
   }
 
+  private OMTrackedDummyCreateBucketResponse createTrackedDummyBucketResponse(
+      String volumeName) {
+    OmBucketInfo omBucketInfo =
+        OmBucketInfo.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(UUID.randomUUID().toString())
+            .setCreationTime(Time.now())
+            .build();
+    return new OMTrackedDummyCreateBucketResponse(omBucketInfo,
+        OMResponse.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCreateBucketResponse(CreateBucketResponse.newBuilder().build())
+            .build());
+  }
 
   /**
    * DummyCreatedBucket Response class used in testing.
    */
-  @CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
-  private static class OMDummyCreateBucketResponse extends OMClientResponse {
+  private abstract static class AbstractDummyCreateBucketResponse extends OMClientResponse {
     private final OmBucketInfo omBucketInfo;
 
-    OMDummyCreateBucketResponse(OmBucketInfo omBucketInfo,
+    AbstractDummyCreateBucketResponse(OmBucketInfo omBucketInfo,
         OMResponse omResponse) {
       super(omResponse);
       this.omBucketInfo = omBucketInfo;
+    }
+
+    OmBucketInfo getOmBucketInfo() {
+      return omBucketInfo;
     }
 
     @Override
@@ -168,6 +227,24 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
               omBucketInfo.getBucketName());
       omMetadataManager.getBucketTable().putWithBatch(batchOperation,
           dbBucketKey, omBucketInfo);
+    }
+  }
+
+  @CleanupTableInfo(cleanupTables = {BUCKET_TABLE})
+  private static class OMDummyCreateBucketResponse
+      extends AbstractDummyCreateBucketResponse {
+    OMDummyCreateBucketResponse(OmBucketInfo omBucketInfo,
+        OMResponse omResponse) {
+      super(omBucketInfo, omResponse);
+    }
+  }
+
+  private static class OMTrackedDummyCreateBucketResponse
+      extends AbstractDummyCreateBucketResponse {
+    OMTrackedDummyCreateBucketResponse(OmBucketInfo omBucketInfo,
+        OMResponse omResponse) {
+      super(omBucketInfo, omResponse);
+      addCleanupTables(Collections.singleton(BUCKET_TABLE));
     }
   }
 }

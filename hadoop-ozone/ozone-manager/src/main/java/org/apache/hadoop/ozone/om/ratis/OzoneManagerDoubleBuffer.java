@@ -528,26 +528,20 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   private void addCleanupEntry(Entry entry, Map<String, List<Long>> cleanupEpochs) {
-    Class<? extends OMClientResponse> responseClass =
-        entry.getResponse().getClass();
+    OMClientResponse response = entry.getResponse();
     CleanupTableInfo cleanupTableInfo =
-        responseClass.getAnnotation(CleanupTableInfo.class);
-    if (cleanupTableInfo != null) {
-      final List<String> cleanupTables;
-      if (cleanupTableInfo.cleanupAll()) {
-        cleanupTables = OMDBDefinition.get().getColumnFamilyNames();
-      } else {
-        cleanupTables = Arrays.asList(cleanupTableInfo.cleanupTables());
-      }
-      for (String table : cleanupTables) {
-        cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
-            .add(entry.getTermIndex().getIndex());
-      }
+        response.getClass().getAnnotation(CleanupTableInfo.class);
+    final Iterable<String> cleanupTables;
+    if (cleanupTableInfo == null) {
+      cleanupTables = response.removeCleanupTables();
+    } else if (cleanupTableInfo.cleanupAll()) {
+      cleanupTables = OMDBDefinition.get().getColumnFamilyNames();
     } else {
-      // This is to catch early errors, when a new response class missed to
-      // add CleanupTableInfo annotation.
-      throw new RuntimeException("CleanupTableInfo Annotation is missing " +
-          "for" + responseClass);
+      cleanupTables = Arrays.asList(cleanupTableInfo.cleanupTables());
+    }
+    for (String table : cleanupTables) {
+      cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
+          .add(entry.getTermIndex().getIndex());
     }
   }
 
