@@ -125,6 +125,11 @@ public final class OmKeyInfo extends WithParentObjectId
   // been modified.
   private final Long expectedDataGeneration;
 
+  // Visibility interval; see KeyInfo.seqNumMin in OmClientProtocol.proto. Null means the version
+  // predates HDDS-15125 and falls back to previous-snapshot lookups.
+  private final Long seqNumMin;
+  private final Long seqNumMax;
+
   private OmKeyInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -143,6 +148,8 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.seqNumMin = b.seqNumMin;
+    this.seqNumMax = b.seqNumMax;
   }
 
   /**
@@ -219,6 +226,14 @@ public final class OmKeyInfo extends WithParentObjectId
 
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
+  }
+
+  public Long getSeqNumMin() {
+    return seqNumMin;
+  }
+
+  public Long getSeqNumMax() {
+    return seqNumMax;
   }
 
   public String getOwnerName() {
@@ -526,6 +541,8 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private Long seqNumMin = null;
+    private Long seqNumMax = null;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -548,6 +565,8 @@ public final class OmKeyInfo extends WithParentObjectId
       this.fileChecksum = obj.fileChecksum;
       this.isFile = obj.isFile;
       this.expectedDataGeneration = obj.expectedDataGeneration;
+      this.seqNumMin = obj.seqNumMin;
+      this.seqNumMax = obj.seqNumMax;
       this.tags = MapBuilder.of(obj.tags);
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
@@ -719,6 +738,16 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    public Builder setSeqNumMin(Long minSeqNum) {
+      this.seqNumMin = minSeqNum;
+      return this;
+    }
+
+    public Builder setSeqNumMax(Long maxSeqNum) {
+      this.seqNumMax = maxSeqNum;
+      return this;
+    }
+
     @Override
     protected void validate() {
       super.validate();
@@ -870,6 +899,12 @@ public final class OmKeyInfo extends WithParentObjectId
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
+    if (seqNumMin != null) {
+      kb.setSeqNumMin(seqNumMin);
+    }
+    if (seqNumMax != null) {
+      kb.setSeqNumMax(seqNumMax);
+    }
     return kb.build();
   }
 
@@ -923,6 +958,12 @@ public final class OmKeyInfo extends WithParentObjectId
 
     if (keyInfo.hasOwnerName()) {
       builder.setOwnerName(keyInfo.getOwnerName());
+    }
+    if (keyInfo.hasSeqNumMin()) {
+      builder.setSeqNumMin(keyInfo.getSeqNumMin());
+    }
+    if (keyInfo.hasSeqNumMax()) {
+      builder.setSeqNumMax(keyInfo.getSeqNumMax());
     }
     return builder;
   }
