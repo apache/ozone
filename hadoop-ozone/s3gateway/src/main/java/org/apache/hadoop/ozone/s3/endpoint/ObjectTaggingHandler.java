@@ -46,6 +46,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
     }
 
     try {
+      rejectVersionId(keyName);
       S3Tagging tagging;
       try {
         tagging = UNMARSHALLER.get().readFrom(body);
@@ -80,6 +81,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
       return null;
     }
     try {
+      rejectVersionId(keyName);
       context.getBucket().deleteObjectTagging(keyName);
       getMetrics().updateDeleteObjectTaggingSuccessStats(context.getStartNanos());
       return Response.noContent().build();
@@ -111,6 +113,13 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
     } catch (Exception e) {
       getMetrics().updateGetObjectTaggingFailureStats(context.getStartNanos());
       throw e;
+    }
+  }
+
+  // Tagging a specific version is not implemented; ignoring versionId would modify the tags of the current object.
+  private void rejectVersionId(String keyName) {
+    if (queryParams().get(S3Consts.QueryParams.VERSION_ID) != null) {
+      throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, keyName);
     }
   }
 

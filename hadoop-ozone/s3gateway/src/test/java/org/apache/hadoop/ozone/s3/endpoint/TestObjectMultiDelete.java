@@ -21,6 +21,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
@@ -190,6 +191,29 @@ public class TestObjectMultiDelete {
     assertEquals("ALL", response.getErrors().get(0).getKey());
     assertEquals("InternalError", response.getErrors().get(0).getCode());
     assertEquals("[key1, key2, key3]", auditParams.get("failedDeletes"));
+  }
+
+  @Test
+  public void multiDeleteWithVersionIdIsNotImplemented() throws Exception {
+    final OzoneClient client = new OzoneClientStub();
+    final OzoneBucket bucket = initTestData(client);
+    final BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    final DeleteObject versioned = new DeleteObject("key2");
+    versioned.setVersionId("nonexistent");
+    final MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(new DeleteObject("key1"));
+    mdr.getObjects().add(versioned);
+
+    assertErrorResponse(NOT_IMPLEMENTED, () -> rest.multiDelete("b1", "", mdr));
+
+    // the whole request is rejected, including the keys without VersionId
+    final Set<String> keysAtTheEnd = Sets.newHashSet(bucket.listKeys("")).stream()
+        .map(OzoneKey::getName)
+        .collect(Collectors.toSet());
+    assertEquals(Sets.newHashSet("key1", "key2", "key3"), keysAtTheEnd);
   }
 
   private MultiDeleteRequest threeKeyRequest() {
