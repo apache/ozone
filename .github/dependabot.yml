@@ -50,9 +50,6 @@ updates:
           - "<10.17.1.0" # CVE-2022-46337 https://issues.apache.org/jira/browse/DERBY-7147
           - ">=10.17.1.0" # requires Java 21
       - dependency-name: "org.apache.hadoop:*" # using multiple versions
-      - dependency-name: "org.apache.iceberg:*"
-        versions:
-          - ">=1.11.0" # requires Java 17
       - dependency-name: "org.apache.parquet:*" # update in sync with iceberg
       - dependency-name: "org.apache.rat:apache-rat-plugin"
         versions:
