@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -118,6 +119,7 @@ public class OMKeyRequestTests {
   protected StorageContainerLocationProtocol scmContainerLocationProtocol;
   protected OMPerformanceMetrics perfMetrics;
   protected DeletingServiceMetrics delMetrics;
+  protected ProtocolMessageMetrics<OzoneManagerProtocolProtos.Type> omClientProtocolMetrics;
 
   protected static final long CONTAINER_ID = 1000L;
   protected static final long LOCAL_ID = 100L;
@@ -140,6 +142,9 @@ public class OMKeyRequestTests {
     omMetrics = OMMetrics.create(ozoneConfiguration);
     perfMetrics = OMPerformanceMetrics.register();
     delMetrics = DeletingServiceMetrics.create();
+    omClientProtocolMetrics = ProtocolMessageMetrics.create(
+        "OmClientProtocol", "Ozone Manager RPC endpoint",
+        OzoneManagerProtocolProtos.Type.class);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         folder.toAbsolutePath().toString());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
@@ -151,6 +156,7 @@ public class OMKeyRequestTests {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getPerfMetrics()).thenReturn(perfMetrics);
     when(ozoneManager.getDeletionMetrics()).thenReturn(delMetrics);
+    when(ozoneManager.getOmClientProtocolMetrics()).thenReturn(omClientProtocolMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
