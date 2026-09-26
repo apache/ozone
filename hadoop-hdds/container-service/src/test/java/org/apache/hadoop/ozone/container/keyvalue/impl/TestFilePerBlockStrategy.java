@@ -21,17 +21,29 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
@@ -45,6 +57,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
@@ -68,6 +81,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.MockedConstruction;
 
 /**
  * Test for FilePerBlockStrategy.
@@ -76,6 +90,35 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
   @TempDir
   private File tempDir;
+
+  @Test
+  public void testFileSizeFailure() throws IOException {
+    KeyValueHandler handler = createKeyValueHandler(newContainerSet());
+    ContainerProtos.ContainerCommandRequestProto request =
+        getWriteChunkRequest(MockPipeline.createSingleNodePipeline(), getBlockID(), 20);
+    FileChannel channel = mock(FileChannel.class);
+    IOException failure = new IOException("Failed to read file size");
+    when(channel.size()).thenThrow(failure);
+
+    try (MockedConstruction<RandomAccessFile> files =
+             mockConstruction(RandomAccessFile.class, (file, context) -> when(file.getChannel()).thenReturn(channel))) {
+      assertThatThrownBy(() -> handler.getChunkManager().writeChunk(
+          getKeyValueContainer(), getBlockID(), getChunkInfo(), getData(), WRITE_STAGE))
+          .isInstanceOf(UncheckedIOException.class)
+          .hasCause(failure);
+
+      ContainerProtos.ContainerCommandResponseProto response =
+          handler.handle(request, getKeyValueContainer(), WRITE_STAGE);
+      assertThat(response.getResult()).isEqualTo(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+      assertThat(files.constructed()).hasSize(1);
+      verify(channel, times(2)).size();
+      verifyNoMoreInteractions(channel);
+      checkWriteIOStats(0, 0);
+      assertThat(getKeyValueContainerData().getBytesUsed()).isZero();
+    } finally {
+      handler.stop();
+    }
+  }
 
   @Test
   public void testDeletePartialChunkWithOffsetUnsupportedRequest() {
