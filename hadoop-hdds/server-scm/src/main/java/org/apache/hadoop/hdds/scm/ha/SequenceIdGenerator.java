@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
@@ -347,8 +348,7 @@ public class SequenceIdGenerator {
     // operations can take effect exactly once in a SCM HA cluster.
     if (sequenceIdTable.get(SequenceIdType.localId) == null) {
       long millisSinceEpoch = TimeUnit.DAYS.toMillis(
-          LocalDate.of(LocalDate.now().getYear() + 1, 1, 1).toEpochDay());
-
+          LocalDate.of(LocalDate.now(ZoneOffset.UTC).getYear() + 1, 1, 1).toEpochDay());
       long localId = millisSinceEpoch << Short.SIZE;
       Preconditions.checkArgument(localId > UniqueId.next());
 
