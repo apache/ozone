@@ -47,7 +47,7 @@
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
-    <com.nimbusds.nimbus-jose-jwt.version>10.9.1</com.nimbusds.nimbus-jose-jwt.version>
+    <com.nimbusds.nimbus-jose-jwt.version>10.10</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
     <commons-codec.version>1.22.1</commons-codec.version>
     <commons-collections.version>4.6.0</commons-collections.version>
