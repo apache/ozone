@@ -278,6 +278,35 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testPublicAccessBlockIsNotImplemented() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    S3Exception getException = assertThrows(S3Exception.class,
+        () -> s3Client.getPublicAccessBlock(b -> b.bucket(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, getException.statusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(),
+        getException.awsErrorDetails().errorCode());
+
+    S3Exception putException = assertThrows(S3Exception.class,
+        () -> s3Client.putPublicAccessBlock(b -> b
+            .bucket(bucketName)
+            .publicAccessBlockConfiguration(c -> c.blockPublicAcls(true))));
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, putException.statusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(),
+        putException.awsErrorDetails().errorCode());
+
+    S3Exception deleteException = assertThrows(S3Exception.class,
+        () -> s3Client.deletePublicAccessBlock(b -> b.bucket(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, deleteException.statusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(),
+        deleteException.awsErrorDetails().errorCode());
+    assertDoesNotThrow(() -> s3Client.headBucket(b -> b.bucket(bucketName)));
+
+    s3Client.deleteBucket(b -> b.bucket(bucketName));
+  }
+
+  @Test
   public void testPutObject() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();

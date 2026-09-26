@@ -53,12 +53,14 @@ import com.amazonaws.services.s3.model.CopyPartRequest;
 import com.amazonaws.services.s3.model.CopyPartResult;
 import com.amazonaws.services.s3.model.CreateBucketRequest;
 import com.amazonaws.services.s3.model.DeleteBucketTaggingConfigurationRequest;
+import com.amazonaws.services.s3.model.DeletePublicAccessBlockRequest;
 import com.amazonaws.services.s3.model.GeneratePresignedUrlRequest;
 import com.amazonaws.services.s3.model.GetBucketLifecycleConfigurationRequest;
 import com.amazonaws.services.s3.model.GetBucketTaggingConfigurationRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectTaggingRequest;
 import com.amazonaws.services.s3.model.GetObjectTaggingResult;
+import com.amazonaws.services.s3.model.GetPublicAccessBlockRequest;
 import com.amazonaws.services.s3.model.Grantee;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadRequest;
 import com.amazonaws.services.s3.model.InitiateMultipartUploadResult;
@@ -79,6 +81,7 @@ import com.amazonaws.services.s3.model.PartETag;
 import com.amazonaws.services.s3.model.PartListing;
 import com.amazonaws.services.s3.model.PartSummary;
 import com.amazonaws.services.s3.model.Permission;
+import com.amazonaws.services.s3.model.PublicAccessBlockConfiguration;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.PutObjectResult;
 import com.amazonaws.services.s3.model.S3Object;
@@ -88,6 +91,7 @@ import com.amazonaws.services.s3.model.SetBucketLifecycleConfigurationRequest;
 import com.amazonaws.services.s3.model.SetBucketTaggingConfigurationRequest;
 import com.amazonaws.services.s3.model.SetObjectAclRequest;
 import com.amazonaws.services.s3.model.SetObjectTaggingRequest;
+import com.amazonaws.services.s3.model.SetPublicAccessBlockRequest;
 import com.amazonaws.services.s3.model.Tag;
 import com.amazonaws.services.s3.model.TagSet;
 import com.amazonaws.services.s3.model.UploadPartRequest;
@@ -483,6 +487,37 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
 
     assertFalse(s3Client.doesBucketExist(bucketName));
     assertFalse(s3Client.doesBucketExistV2(bucketName));
+  }
+
+  @Test
+  public void testPublicAccessBlockIsNotImplemented() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(bucketName);
+
+    AmazonServiceException getException = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getPublicAccessBlock(
+            new GetPublicAccessBlockRequest().withBucketName(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, getException.getStatusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), getException.getErrorCode());
+
+    AmazonServiceException putException = assertThrows(AmazonServiceException.class,
+        () -> s3Client.setPublicAccessBlock(
+            new SetPublicAccessBlockRequest()
+                .withBucketName(bucketName)
+                .withPublicAccessBlockConfiguration(
+                    new PublicAccessBlockConfiguration()
+                        .withBlockPublicAcls(true))));
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, putException.getStatusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), putException.getErrorCode());
+
+    AmazonServiceException deleteException = assertThrows(AmazonServiceException.class,
+        () -> s3Client.deletePublicAccessBlock(
+            new DeletePublicAccessBlockRequest().withBucketName(bucketName)));
+    assertEquals(HttpURLConnection.HTTP_NOT_IMPLEMENTED, deleteException.getStatusCode());
+    assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getCode(), deleteException.getErrorCode());
+    assertTrue(s3Client.doesBucketExistV2(bucketName));
+
+    s3Client.deleteBucket(bucketName);
   }
 
   @Test

@@ -32,18 +32,15 @@ import org.apache.http.HttpStatus;
  * Implements PUT (create bucket) and DELETE operations when no
  * subresource query parameters are present.
  *
- * This handler processes bucket-level requests that do not target
- * specific subresources (such as {@code ?acl}, {@code ?uploads},
- * {@code ?delete} or {@code ?tagging}), which are handled by dedicated handlers.
+ * This handler processes bucket-level requests that do not target a
+ * subresource handled by another handler.
  *
  * This handler extends EndpointBase to inherit all required functionality
  * (configuration, headers, request context, audit logging, metrics, etc.).
  */
 public class BucketCrudHandler extends BucketOperationHandler {
 
-  /**
-   * Handle only plain PUT bucket (create bucket), not subresources.
-   */
+  /** Handle only plain bucket creation and deletion, not subresources. */
   private boolean shouldHandle() {
     return queryParams().get(QueryParams.ACL) == null
         && queryParams().get(QueryParams.UPLOADS) == null
