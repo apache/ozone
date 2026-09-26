@@ -1042,12 +1042,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMResponse omResponse = submitRequest(omRequest);
 
     Map<String, ErrorInfo> keyToErrors = new HashMap<>();
-    if (quiet) {
+    if (quiet && omResponse.getStatus() == PARTIAL_DELETE) {
       // PARTIAL_DELETE means the batch was processed and only some keys failed; those are reported per key
       // in the returned map. Any other non-OK status means the whole request failed.
-      if (omResponse.getStatus() != PARTIAL_DELETE) {
-        handleError(omResponse);
-      }
       List<OzoneManagerProtocolProtos.DeleteKeyError> errors =
           omResponse.getDeleteKeysResponse().getErrorsList();
       for (OzoneManagerProtocolProtos.DeleteKeyError deleteKeyError : errors) {
