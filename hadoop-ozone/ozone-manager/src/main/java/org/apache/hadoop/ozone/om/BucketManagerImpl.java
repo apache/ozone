@@ -111,7 +111,7 @@ public class BucketManagerImpl implements BucketManager {
           "BucketManager. OzoneObj type:" + obj.getResourceType());
     }
     // bucket getAcl operation does not need resolveBucketLink in server side
-    // see: hadoop-hdds/docs/content/design/volume-management.md
+    // see: design/volume-management.md
     String volume = obj.getVolumeName();
     String bucket = obj.getBucketName();
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volume, bucket);
