@@ -28,7 +28,7 @@ cd "$DIR/../../.." || exit 1
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
 : ${OZONE_REPO_CACHED:="false"}
-: ${PHASE:="test"}
+: ${PHASE:="verify"}
 
 declare -i ITERATIONS
 if [[ ${ITERATIONS} -le 0 ]]; then
