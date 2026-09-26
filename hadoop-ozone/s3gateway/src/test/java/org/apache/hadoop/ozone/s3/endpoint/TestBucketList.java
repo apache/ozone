@@ -452,9 +452,9 @@ public class TestBucketList {
 
   @Test
   public void testListObjectsWithNonIntegerMaxKeys() throws Exception {
-    OzoneClient client = new OzoneClientStub();
+    client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("bucket");
-    BucketEndpoint bucketEndpoint = newBucketEndpointBuilder()
+    bucketEndpoint = newBucketEndpointBuilder()
         .setClient(client)
         .build();
 
@@ -465,9 +465,9 @@ public class TestBucketList {
 
   @Test
   public void testListObjectsWithNegativeMaxKeys() throws Exception {
-    OzoneClient client = new OzoneClientStub();
+    client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("bucket");
-    BucketEndpoint bucketEndpoint = newBucketEndpointBuilder()
+    bucketEndpoint = newBucketEndpointBuilder()
         .setClient(client)
         .build();
 
@@ -479,9 +479,9 @@ public class TestBucketList {
 
   @Test
   public void testListObjectsWithZeroMaxKeys() throws Exception {
-    OzoneClient client = new OzoneClientStub();
+    client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("bucket");
-    BucketEndpoint bucketEndpoint = newBucketEndpointBuilder()
+    bucketEndpoint = newBucketEndpointBuilder()
         .setClient(client)
         .build();
 
