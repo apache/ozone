@@ -25,7 +25,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.junit.jupiter.api.Test;
@@ -133,4 +135,70 @@ public class TestChecksum {
           exception.getMessage());
     }
   }
+
+  private static ContainerProtos.ChunkInfo chunk(byte[] data, int offset, int length, int interval) throws Exception {
+    return ContainerProtos.ChunkInfo.newBuilder().setChunkName("chunk-" + offset).setOffset(offset).setLen(length)
+        .setChecksumData(new Checksum(ContainerProtos.ChecksumType.CRC32, interval)
+            .computeChecksum(ByteBuffer.wrap(data, offset, length)).getProtoBufMessage()).build();
+  }
+
+  @Test
+  void testChunkRelativeRangesPreserveBuffer() throws Exception {
+    byte[] data = "ABCDEFGHIJKL".getBytes(UTF_8);
+    List<ContainerProtos.ChunkInfo> chunks = Arrays.asList(chunk(data, 0, 3, 4), chunk(data, 3, 9, 4));
+    for (int start : new int[] {0, 3, 7, 11}) {
+      ByteBuffer buffer = ByteBuffer.wrap(data, start, data.length - start);
+      buffer.mark();
+      Checksum.validateChecksums(buffer, start, start == 0 ? 0 : 1, chunks);
+      assertEquals(start, buffer.position());
+      assertEquals(data.length, buffer.limit());
+      buffer.reset();
+    }
+    Checksum.validateChecksums(ByteBuffer.allocate(0), 0, 0, Collections.emptyList());
+    data[8]++;
+    assertThrows(OzoneChecksumException.class,
+        () -> Checksum.validateChecksums(ByteBuffer.wrap(data), 0, 0, chunks));
+  }
+
+  @Test
+  void testMalformedChunkCoverageAndAlignment() throws Exception {
+    byte[] data = "ABCDEFGHIJKL".getBytes(UTF_8);
+    ContainerProtos.ChunkInfo first = chunk(data, 0, 3, 4);
+    ContainerProtos.ChunkInfo second = chunk(data, 3, 9, 4);
+    for (List<ContainerProtos.ChunkInfo> chunks : Arrays.asList(
+        Collections.<ContainerProtos.ChunkInfo>emptyList(), Collections.singletonList(first),
+        Arrays.asList(second, first),
+        Arrays.asList(first, second.toBuilder().setOffset(2).build()),
+        Arrays.asList(first, second.toBuilder().setOffset(4).build()))) {
+      assertThrows(OzoneChecksumException.class,
+          () -> Checksum.validateChecksums(ByteBuffer.wrap(data), 0, 0, chunks));
+    }
+    assertThrows(OzoneChecksumException.class, () -> Checksum.validateChecksums(
+        ByteBuffer.wrap(data), -1, 0, Arrays.asList(first, second)));
+    assertThrows(OzoneChecksumException.class, () -> Checksum.validateChecksums(
+        ByteBuffer.wrap(data), 0, -1, Arrays.asList(first, second)));
+    ContainerProtos.ChunkInfo last = first.toBuilder().setOffset(Long.MAX_VALUE - first.getLen()).build();
+    assertThrows(OzoneChecksumException.class, () -> Checksum.validateChecksums(
+        ByteBuffer.wrap(data), last.getOffset(), 0, Collections.singletonList(last)));
+    for (int[] range : new int[][] {{4, 4}, {3, 3}}) {
+      assertThrows(OzoneChecksumException.class, () -> Checksum.validateChecksums(
+          ByteBuffer.wrap(data, range[0], range[1]), range[0], 0, Collections.singletonList(second)));
+    }
+    ContainerProtos.ChunkInfo invalid = second.toBuilder().setChecksumData(
+        second.getChecksumData().toBuilder().setBytesPerChecksum(0)).build();
+    assertThrows(OzoneChecksumException.class, () -> Checksum.validateChecksums(
+        ByteBuffer.wrap(data, 3, 9), 3, 0, Collections.singletonList(invalid)));
+  }
+
+  @Test
+  void testNoneAndDifferentChunkParameters() throws Exception {
+    byte[] data = "ABCDEFGHIJKL".getBytes(UTF_8);
+    ContainerProtos.ChunkInfo first = chunk(data, 0, 3, 2).toBuilder()
+        .setChecksumData(Checksum.getNoChecksumDataProto()).build();
+    List<ContainerProtos.ChunkInfo> chunks = Arrays.asList(first, chunk(data, 3, 9, 3));
+    Checksum.validateChecksums(ByteBuffer.wrap(data, 1, 11), 1, 0, chunks);
+    Checksum.validateChecksums(ByteBuffer.wrap(data), 0, 0,
+        Arrays.asList(chunk(data, 0, 3, 2), chunk(data, 3, 9, 3)));
+  }
+
 }

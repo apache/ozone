@@ -36,7 +36,9 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -60,6 +62,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
@@ -862,10 +865,12 @@ public class TestStreamBlockInputStream {
     return ReadBlockResponseProto.newBuilder()
         .setOffset(0)
         .setData(ByteString.copyFrom(data))
-        .setChecksumData(ChecksumData.newBuilder()
-            .setType(ContainerProtos.ChecksumType.NONE)
-            .setBytesPerChecksum(data.length)
-            .build())
+        .addChunkInfoList(ContainerProtos.ChunkInfo.newBuilder()
+            .setChunkName("chunk").setOffset(0).setLen(data.length)
+            .setChecksumData(ChecksumData.newBuilder()
+                .setType(ContainerProtos.ChecksumType.NONE)
+                .setBytesPerChecksum(data.length)
+                .build()))
         .build();
   }
 
@@ -876,10 +881,12 @@ public class TestStreamBlockInputStream {
         .setReadBlock(ReadBlockResponseProto.newBuilder()
             .setOffset(offset)
             .setData(ByteString.copyFrom(data))
-            .setChecksumData(ChecksumData.newBuilder()
-                .setType(ContainerProtos.ChecksumType.NONE)
-                .setBytesPerChecksum(data.length)
-                .build())
+            .addChunkInfoList(ContainerProtos.ChunkInfo.newBuilder()
+                .setChunkName("chunk").setOffset(offset).setLen(data.length)
+                .setChecksumData(ChecksumData.newBuilder()
+                    .setType(ContainerProtos.ChecksumType.NONE)
+                    .setBytesPerChecksum(data.length)
+                    .build()))
             .build())
         .build();
   }
@@ -891,12 +898,80 @@ public class TestStreamBlockInputStream {
         .setReadBlock(ReadBlockResponseProto.newBuilder()
             .setOffset(offset)
             .setData(ByteString.copyFrom(data))
-            .setChecksumData(ChecksumData.newBuilder()
-                .setType(ContainerProtos.ChecksumType.CRC32)
-                .setBytesPerChecksum(data.length)
-                .addChecksums(ByteString.copyFrom(new byte[4]))
-                .build())
+            .addChunkInfoList(ContainerProtos.ChunkInfo.newBuilder()
+                .setChunkName("chunk").setOffset(offset).setLen(data.length)
+                .setChecksumData(ChecksumData.newBuilder()
+                    .setType(ContainerProtos.ChecksumType.CRC32)
+                    .setBytesPerChecksum(data.length)
+                    .addChecksums(ByteString.copyFrom(new byte[4]))
+                    .build()))
             .build())
         .build();
+  }
+
+  private static ContainerProtos.ChunkInfo checksummedChunk(byte[] data, int offset, int length) throws Exception {
+    return ContainerProtos.ChunkInfo.newBuilder().setChunkName("chunk-" + offset).setOffset(offset).setLen(length)
+        .setChecksumData(new Checksum(ContainerProtos.ChecksumType.CRC32, 4)
+            .computeChecksum(ByteBuffer.wrap(data, offset, length)).getProtoBufMessage()).build();
+  }
+
+  private static ContainerCommandResponseProto response(byte[] data, long offset,
+      List<ContainerProtos.ChunkInfo> chunks) {
+    return ContainerCommandResponseProto.newBuilder().setCmdType(Type.ReadBlock)
+        .setResult(ContainerProtos.Result.SUCCESS).setReadBlock(ReadBlockResponseProto.newBuilder()
+            .setOffset(offset).setData(ByteString.copyFrom(data)).addAllChunkInfoList(chunks)).build();
+  }
+
+  @Test
+  void testChunkChecksumsAndSeekPrefix() throws Exception {
+    byte[] data = new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    List<ContainerProtos.ChunkInfo> chunks = Arrays.asList(
+        checksummedChunk(data, 0, 3), checksummedChunk(data, 3, 9));
+    for (int seek : new int[] {0, 4, 8, 11}) {
+      int offset = seek == 0 ? 0 : 3 + (seek - 3) / 4 * 4;
+      ContainerCommandResponseProto response = response(Arrays.copyOfRange(data, offset, data.length), offset,
+          offset == 0 ? chunks : chunks.subList(1, 2));
+      assertStreamResponse(response, data, seek, true, false);
+    }
+  }
+
+  @Test
+  void testMissingMetadataAndVerificationDisabled() throws Exception {
+    byte[] data = new byte[] {0, 1, 2, 3};
+    ContainerCommandResponseProto missing = response(data, 0, Collections.emptyList());
+    assertStreamResponse(missing, data, 0, true, true);
+    assertStreamResponse(missing, data, 0, false, false);
+    assertStreamResponse(buildResponseProto(data, 0), data, 0, true, false);
+    byte[] corruptData = data.clone();
+    corruptData[0]++;
+    ContainerCommandResponseProto corrupt = response(corruptData, 0,
+        Collections.singletonList(checksummedChunk(data, 0, data.length)));
+    assertStreamResponse(corrupt, data, 0, true, true);
+    assertStreamResponse(corrupt, corruptData, 0, false, false);
+  }
+
+  private void assertStreamResponse(ContainerCommandResponseProto response, byte[] expected, int seek,
+      boolean verifyChecksum, boolean fails) throws Exception {
+    OzoneClientConfig config = newStreamReadConfig();
+    config.setChecksumVerify(verifyChecksum);
+    config.setMaxReadRetryCount(0);
+    ClientCallStreamObserver<ContainerCommandRequestProto> observer = mock(ClientCallStreamObserver.class);
+    XceiverClientGrpc client = mockCapturingStreamingReadClient(observer, reader -> reader.onNext(response));
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any(Pipeline.class))).thenReturn(client);
+    try (StreamBlockInputStream stream = new StreamBlockInputStream(new BlockID(1, 16258), expected.length,
+        mockStandalonePipeline(), null, factory, NO_REFRESH, config)) {
+      stream.seek(seek);
+      byte[] actual = new byte[expected.length - seek];
+      if (fails) {
+        IOException error = assertThrows(IOException.class, () -> stream.read(actual));
+        assertThat(hasCause(error, OzoneChecksumException.class)).isTrue();
+        assertArrayEquals(new byte[actual.length], actual);
+      } else {
+        assertEquals(actual.length, stream.read(actual));
+        assertArrayEquals(Arrays.copyOfRange(expected, seek, expected.length), actual);
+      }
+    }
+    verify(client, times(1)).completeStreamRead();
   }
 }

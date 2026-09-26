@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.common;
 
-import static org.apache.ratis.util.Preconditions.assertSame;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -441,37 +439,39 @@ public class Checksum {
   public static void validateChecksums(ByteBuffer data, long blockOffset, int startIndex,
       final List<ChunkInfo> chunks) throws OzoneChecksumException {
 
-    long firstChunkOffset = blockOffset - chunks.get(startIndex).getOffset();
-    int bytesPerChecksum = chunks.get(startIndex).getChecksumData().getBytesPerChecksum();
-    long readLength = data.remaining();
-    int dataOffset = data.position();
-
-    if (readLength <= 0) {
+    if (!data.hasRemaining()) {
       return;
     }
-
-    assertSame(0, firstChunkOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
-    ContainerProtos.ChunkInfo firstChunk = chunks.get(startIndex);
-
-    // verify first chunk, only the first chunk is not start at zero.
-    int firstChunkIndex = (int) (firstChunkOffset / bytesPerChecksum);
-    int dataLimit = (int) Math.min(firstChunk.getLen() - firstChunkOffset, readLength);
-    Checksum.verifySingleChunk(data, dataOffset, dataLimit, firstChunk, firstChunkIndex);
-    dataOffset += dataLimit;
-    readLength -= dataLimit;
-    startIndex++;
-
-    while (readLength > 0) {
-      ContainerProtos.ChunkInfo chunkInfo = chunks.get(startIndex);
-      dataLimit = (int) Math.min(chunkInfo.getLen(), readLength);
-
-      Checksum.verifySingleChunk(data, dataOffset, dataLimit, chunkInfo, 0);
-
-      dataOffset += dataLimit;
-      readLength -= dataLimit;
-      startIndex++;
+    int dataOffset = data.position();
+    int remaining = data.remaining();
+    long offset = blockOffset;
+    while (remaining > 0) {
+      if (startIndex < 0 || startIndex >= chunks.size()) {
+        throw new OzoneChecksumException("Missing chunk metadata at offset " + offset);
+      }
+      ChunkInfo chunk = chunks.get(startIndex++);
+      long chunkOffset = chunk.getOffset();
+      long length = chunk.getLen();
+      if (chunkOffset < 0 || length <= 0 || length > Long.MAX_VALUE - chunkOffset
+          || offset < chunkOffset || offset - chunkOffset >= length
+          || (offset != blockOffset && offset != chunkOffset)) {
+        throw new OzoneChecksumException("Invalid chunk coverage at offset " + offset);
+      }
+      long relativeOffset = offset - chunkOffset;
+      int size = (int) Math.min(remaining, length - relativeOffset);
+      if (chunk.getChecksumData().getType() != ChecksumType.NONE) {
+        int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
+        if (bytesPerChecksum <= 0 || relativeOffset % bytesPerChecksum != 0
+            || (relativeOffset + size != length && (relativeOffset + size) % bytesPerChecksum != 0)
+            || relativeOffset / bytesPerChecksum > Integer.MAX_VALUE) {
+          throw new OzoneChecksumException("Invalid checksum boundary at offset " + offset);
+        }
+        verifySingleChunk(data, dataOffset, size, chunk, (int) (relativeOffset / bytesPerChecksum));
+      }
+      dataOffset += size;
+      offset += size;
+      remaining -= size;
     }
-
   }
 
   private static void verifySingleChunk(ByteBuffer data, int dataOffset, int dataLimit,
