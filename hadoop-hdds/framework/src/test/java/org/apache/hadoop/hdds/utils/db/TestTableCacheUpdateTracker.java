@@ -33,7 +33,7 @@ public class TestTableCacheUpdateTracker {
       TableCacheUpdateTracker.recordCacheUpdate("table1");
       TableCacheUpdateTracker.recordCacheUpdate("table2");
 
-      assertThat(tracker.getUpdatedTables())
+      assertThat(tracker.removeUpdatedTables())
           .containsExactly("table1", "table2");
     }
   }
@@ -46,6 +46,6 @@ public class TestTableCacheUpdateTracker {
     tracker.close();
     TableCacheUpdateTracker.recordCacheUpdate("table2");
 
-    assertThat(tracker.getUpdatedTables()).containsExactly("table1");
+    assertThat(tracker.removeUpdatedTables()).containsExactly("table1");
   }
 }

@@ -207,7 +207,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         TransactionInfo.getTermIndex(transactionLogIndex));
     try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
       OMClientResponse response = validateAndUpdateCache(ozoneManager, context);
-      response.addCleanupTables(tracker.getUpdatedTables());
+      response.addCleanupTables(tracker.removeUpdatedTables());
       return response;
     }
   }

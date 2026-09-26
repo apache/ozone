@@ -262,7 +262,7 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
     String expectedCleanupTable =
         getBucketLayout().isFileSystemOptimized() ? OPEN_FILE_TABLE : OPEN_KEY_TABLE;
     assertEquals(Collections.singleton(expectedCleanupTable),
-        omClientResponse.getCleanupTables());
+        omClientResponse.removeCleanupTables());
 
     assertInOpenKeyTable(keysWithHigherUpdateID);
     assertNotInOpenKeyTable(keysWithSameUpdateID);

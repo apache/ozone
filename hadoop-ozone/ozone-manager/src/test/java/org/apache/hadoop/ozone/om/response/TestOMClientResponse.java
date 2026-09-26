@@ -46,6 +46,6 @@ public class TestOMClientResponse {
 
     assertEquals(new LinkedHashSet<>(Arrays.asList("deletedTable",
         "snapshotRenamedTable", "snapshotInfoTable")),
-        response.getCleanupTables());
+        response.removeCleanupTables());
   }
 }

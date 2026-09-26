@@ -533,7 +533,7 @@ public final class OzoneManagerDoubleBuffer {
         response.getClass().getAnnotation(CleanupTableInfo.class);
     final Iterable<String> cleanupTables;
     if (cleanupTableInfo == null) {
-      cleanupTables = response.getCleanupTables();
+      cleanupTables = response.removeCleanupTables();
     } else if (cleanupTableInfo.cleanupAll()) {
       cleanupTables = OMDBDefinition.get().getColumnFamilyNames();
     } else {

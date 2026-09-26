@@ -20,9 +20,10 @@ package org.apache.hadoop.ozone.om.response;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -37,7 +38,7 @@ public abstract class OMClientResponse {
 
   private final OMResponse omResponse;
   private OMLockDetails omLockDetails;
-  private Set<String> cleanupTables = Collections.emptySet();
+  private final AtomicReference<Set<String>> cleanupTables = new AtomicReference<>();
 
   public OMClientResponse(OMResponse omResponse) {
     Objects.requireNonNull(omResponse, "omResponse == null");
@@ -91,17 +92,22 @@ public abstract class OMClientResponse {
     this.omLockDetails = omLockDetails;
   }
 
-  public Set<String> getCleanupTables() {
-    return Collections.unmodifiableSet(cleanupTables);
+  public Set<String> removeCleanupTables() {
+    final Set<String> tables = cleanupTables.getAndSet(null);
+    return tables == null ? Collections.emptySet() : Collections.unmodifiableSet(tables);
   }
 
   public void addCleanupTables(Set<String> tables) {
     if (tables == null || tables.isEmpty()) {
       return;
     }
-    if (cleanupTables.isEmpty()) {
-      cleanupTables = new LinkedHashSet<>();
-    }
-    cleanupTables.addAll(tables);
+    cleanupTables.updateAndGet(t -> {
+      if (t == null || t.isEmpty()) {
+        return tables;
+      } else {
+        t.addAll(tables);
+        return t;
+      }
+    });
   }
 }

@@ -17,22 +17,28 @@
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
-import java.util.Collections;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * Tracks table caches updated by the current thread.
- * Only one tracker should be active per thread. This class is not thread-safe.
+ * Only one tracker is allowed to be active per thread.
+ * <p>
+ * Only one thread, which is the thread invoked the constructor, can access the non-static methods.
+ * The call sequences must be:
+ * {@link #TableCacheUpdateTracker()},
+ * {@link #record(String)} (any number of times including zero),
+ * {@link #removeUpdatedTables()} (exactly one time),
+ * {@link #close()} (exactly one time).
  */
 public final class TableCacheUpdateTracker implements UncheckedAutoCloseable {
   private static final ThreadLocal<TableCacheUpdateTracker> CURRENT = new ThreadLocal<>();
 
   private final Thread thread = Thread.currentThread();
   private Set<String> tables = null;
-  private boolean closed;
 
   public static TableCacheUpdateTracker track() {
     TableCacheUpdateTracker tracker = new TableCacheUpdateTracker();
@@ -50,32 +56,33 @@ public final class TableCacheUpdateTracker implements UncheckedAutoCloseable {
   private TableCacheUpdateTracker() {
   }
 
-  public Set<String> getUpdatedTables() {
-    if (tables == null || tables.isEmpty()) {
-      return Collections.emptySet();
-    }
-    return Collections.unmodifiableSet(new LinkedHashSet<>(tables));
+  private void assertCurrent() {
+    Preconditions.assertSame(this, CURRENT.get(), "tracker");
+    Preconditions.assertSame(thread, Thread.currentThread(), "thread");
+  }
+
+  public Set<String> removeUpdatedTables() {
+    assertCurrent();
+    final Set<String> t = tables;
+    tables = null;
+    return t; // can be null
   }
 
   @Override
   public void close() {
-    Preconditions.assertSame(thread, Thread.currentThread(), "thread");
-    if (closed) {
-      return;
-    }
-    if (CURRENT.get() == this) {
-      CURRENT.remove();
-    }
-    closed = true;
+    assertCurrent(); // not idempotent
+    Preconditions.assertNull(tables, "tables");
+    CURRENT.remove();
   }
 
   private void record(String tableName) {
-    Preconditions.assertSame(thread, Thread.currentThread(), "thread");
-    if (!closed && tableName != null && !tableName.isEmpty()) {
-      if (tables == null) {
-        tables = new LinkedHashSet<>();
-      }
-      tables.add(tableName);
+    assertCurrent();
+    Objects.requireNonNull(tableName, "tableName");
+    Preconditions.assertTrue(!tableName.isEmpty(), "tableName is empty");
+
+    if (tables == null) {
+      tables = new LinkedHashSet<>();
     }
+    tables.add(tableName);
   }
 }
