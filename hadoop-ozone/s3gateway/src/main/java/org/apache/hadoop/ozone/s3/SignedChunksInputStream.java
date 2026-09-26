@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 
 import java.io.IOException;
@@ -28,6 +29,8 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
@@ -46,6 +49,7 @@ import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
  * 0;chunk-signature=b6c6ea8a5354eaf15b3cb7646744f4275b71ea724fed81ceb9323e279d449df9\r\n
  * x-amz-checksum-crc32c:sOO8/Q==\r\n
  * x-amz-trailer-signature:63bddb248ad2590c92712055f51b8e78ab024eead08276b24f010b0efd74843f\r\n
+ * \r\n
  * </pre>
  * </p>
  * For the first chunk 10000 will be read and decoded from base-16 representation to 65536, which is the size of
@@ -62,7 +66,7 @@ import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
  * <p>
  * If a {@link ChunksValidator} is supplied, the signature of each chunk is verified (in real time, without
  * buffering the whole chunk) as the payload is read. Without a validator the stream only strips the chunk
- * signatures format and returns the payload.
+ * signatures format and returns the payload. Trailer contents are consumed without validation.
  * </p>
  *
  * Reference:
@@ -85,6 +89,9 @@ public class SignedChunksInputStream extends InputStream {
    */
   private static final Pattern SIGNATURE_LINE_PATTERN =
       Pattern.compile("([0-9A-Fa-f]+);chunk-signature=([0-9A-Fa-f]{64})");
+  private static final Pattern TRAILER_SIGNATURE_PATTERN =
+      Pattern.compile("x-amz-trailer-signature:([0-9A-Fa-f]{64})", Pattern.CASE_INSENSITIVE);
+  private static final int MAX_LINE_LENGTH = 8 * 1024;
 
   private final InputStream originalStream;
 
@@ -100,6 +107,9 @@ public class SignedChunksInputStream extends InputStream {
   /** Signature parsed from the current chunk header line. */
   private String chunkSignature;
 
+  /** Checksum header declared by x-amz-trailer, or NONE for a regular signed stream. */
+  private final TrailerHeader trailerHeader;
+
   /**
    * Size of the chunk payload. If zero, the signature line should be parsed to
    * retrieve the subsequent chunk payload size.
@@ -112,9 +122,55 @@ public class SignedChunksInputStream extends InputStream {
    */
   private boolean isFinalChunkEncountered = false;
 
+  /** Supported checksum trailers, or no trailer for a regular signed stream. */
+  public enum TrailerHeader {
+    NONE(""),
+    CRC32("x-amz-checksum-crc32"),
+    CRC32C("x-amz-checksum-crc32c"),
+    CRC64NVME("x-amz-checksum-crc64nvme"),
+    SHA1("x-amz-checksum-sha1"),
+    SHA256("x-amz-checksum-sha256");
+
+    private final String headerName;
+
+    TrailerHeader(String headerName) {
+      this.headerName = headerName;
+    }
+
+    /** Parse the required single-checksum declaration of a signed trailer upload. */
+    public static TrailerHeader fromHeader(String header, String keyPath) {
+      if (StringUtils.isBlank(header)) {
+        OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, keyPath);
+        ex.setErrorMessage("The " + X_AMZ_TRAILER + " header is required for signed trailing headers");
+        throw ex;
+      }
+      String name = header.trim().toLowerCase(Locale.ROOT);
+      for (TrailerHeader trailer : values()) {
+        if (trailer != NONE && trailer.headerName.equals(name)) {
+          return trailer;
+        }
+      }
+      OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyPath);
+      ex.setErrorMessage("Invalid x-amz-trailer header");
+      throw ex;
+    }
+  }
+
   public SignedChunksInputStream(InputStream inputStream, String keyPath) {
+    this(inputStream, keyPath, TrailerHeader.NONE);
+  }
+
+  /**
+   * Creates a signed chunk stream. Supports one checksum trailer; comma-separated trailer names are not supported.
+   *
+   * @param inputStream the encoded request body
+   * @param keyPath resource used in S3 errors
+   * @param trailerHeader the checksum trailer, or NONE when no trailer is expected
+   */
+  public SignedChunksInputStream(InputStream inputStream, String keyPath, TrailerHeader trailerHeader) {
     originalStream = inputStream;
     this.keyPath = keyPath;
+    this.trailerHeader = Objects.requireNonNull(trailerHeader, "trailerHeader == null");
   }
 
   /**
@@ -200,11 +256,14 @@ public class SignedChunksInputStream extends InputStream {
       return true;
     }
     if (remainingData == 0) {
-      // final zero-byte chunk: verify it (empty payload) and stop reading
-      if (validator != null) {
+      // The final zero-byte chunk has no payload terminator when trailing headers follow it.
+      if (trailerHeader == TrailerHeader.NONE) {
         readChunkTerminator();
       }
       validateChunk();
+      if (trailerHeader != TrailerHeader.NONE) {
+        validateTrailer();
+      }
       isFinalChunkEncountered = true;
     } else {
       stopAtUnexpectedEof();
@@ -268,21 +327,9 @@ public class SignedChunksInputStream extends InputStream {
   }
 
   private int readContentLengthFromHeader() throws IOException {
-    int prev = -1;
-    int curr = 0;
-    StringBuilder buf = new StringBuilder();
-
-    //read everything until the next \r\n
-    while (!eol(prev, curr) && curr != -1) {
-      int next = originalStream.read();
-      if (next != -1) {
-        buf.append((char) next);
-      }
-      prev = curr;
-      curr = next;
-    }
-    if (!eol(prev, curr)) {
-      checkNotTruncated();
+    String signatureLine = readLine(false);
+    if (signatureLine == null) {
+      return -1;
     }
     // Example of a single chunk data:
     //  10000;chunk-signature=b474d8862b1487a5145d686f57f013e54db672cee1c953b3010fb58501ef5aa2\r\n
@@ -290,7 +337,7 @@ public class SignedChunksInputStream extends InputStream {
     //
     // 10000 will be read and decoded from base-16 representation to 65536, which is the size of
     // the subsequent chunk payload.
-    String signatureLine = buf.toString().trim();
+    signatureLine = signatureLine.trim();
     if (signatureLine.isEmpty()) {
       return -1;
     }
@@ -302,6 +349,73 @@ public class SignedChunksInputStream extends InputStream {
     }
     chunkSignature = matcher.group(2);
     return Integer.parseInt(matcher.group(1), 16);
+  }
+
+  private void validateTrailer() throws IOException {
+    if (validator == null) {
+      // Consume trailers through their blank-line terminator, tolerating EOF as for unverified chunks.
+      String line;
+      do {
+        line = readLine(true);
+      } while (StringUtils.isNotEmpty(line));
+      return;
+    }
+    String trailerLine = readLine(true);
+    if (trailerLine == null || trailerLine.isEmpty()) {
+      throw invalidBody("Missing trailing checksum header");
+    }
+    int separator = trailerLine.indexOf(':');
+    if (separator <= 0) {
+      throw invalidBody("Invalid trailing header: " + trailerLine);
+    }
+    String name = trailerLine.substring(0, separator).trim().toLowerCase(Locale.ROOT);
+    String value = trailerLine.substring(separator + 1).trim();
+    if (!trailerHeader.headerName.equals(name)) {
+      throw invalidBody("Unexpected trailing header: " + name);
+    }
+
+    String signatureLine = readLine(true);
+    if (signatureLine == null) {
+      throw invalidBody("Missing trailing signature");
+    }
+    Matcher matcher = TRAILER_SIGNATURE_PATTERN.matcher(signatureLine.trim());
+    if (!matcher.matches()) {
+      throw invalidBody("Invalid trailing signature");
+    }
+    validator.validateTrailer(matcher.group(1), DigestUtils.sha256Hex(name + ":" + value + "\n"));
+    // AWS SDKs terminate the trailer section with a blank line after the signature.
+    if (!"".equals(readLine(true))) {
+      throw invalidBody("Invalid trailer terminator");
+    }
+    if (originalStream.read() != -1) {
+      throw invalidBody("Unexpected data after trailing signature");
+    }
+  }
+
+  private String readLine(boolean trailingHeader) throws IOException {
+    StringBuilder line = new StringBuilder();
+    int previous = -1;
+    while (true) {
+      int current = originalStream.read();
+      if (current == -1) {
+        if (trailingHeader && validator != null && line.length() > 0) {
+          throw invalidBody("Truncated trailing header");
+        }
+        if (!trailingHeader) {
+          checkNotTruncated();
+        }
+        return line.length() == 0 ? null : line.toString();
+      }
+      line.append((char) current);
+      if (line.length() > MAX_LINE_LENGTH) {
+        throw invalidBody("Chunk or trailing header line is too long");
+      }
+      if (eol(previous, current)) {
+        line.setLength(line.length() - 2);
+        return line.toString();
+      }
+      previous = current;
+    }
   }
 
   private void updateDigest(byte b) {
