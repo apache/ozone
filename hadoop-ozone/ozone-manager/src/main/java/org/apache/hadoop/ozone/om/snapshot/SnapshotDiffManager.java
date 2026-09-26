@@ -35,6 +35,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
@@ -100,7 +102,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
 import org.apache.commons.io.file.PathUtils;
@@ -135,6 +136,9 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition;
+import org.apache.hadoop.ozone.om.snapshot.diff.FullDiffSequentialReader;
+import org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter;
+import org.apache.hadoop.ozone.om.snapshot.diff.SnapDiffJobStore;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer;
 import org.apache.hadoop.ozone.om.snapshot.util.TableMergeIterator;
@@ -165,17 +169,19 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   private static final Logger LOG =
       LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final Map<DiffType, String> DIFF_TYPE_STRING_MAP =
-      new EnumMap<>(ImmutableMap.of(DELETE, "1", RENAME, "2", CREATE, "3", MODIFY, "4"));
+      new EnumMap<>(ImmutableMap.of(DELETE, "1", MODIFY, "2", RENAME, "3", CREATE, "4"));
 
   private final ManagedRocksDB db;
   private final OzoneManager ozoneManager;
   private final OMMetadataManager activeOmMetadataManager;
   private final CodecRegistry codecRegistry;
   private final ManagedColumnFamilyOptions familyOptions;
+  private final ColumnFamilyHandle snapDiffReportCfh;
   private final ColumnFamilyHandle snapDiffPurgedJobCfh;
   // TODO: [SNAPSHOT] Use different wait time based of job status.
   private final long defaultWaitTime;
   private final long maxAllowedKeyChangesForASnapDiff;
+  private final long maxInMemoryEntriesPerJob;
 
   /**
    * Global table to keep the diff report. Each key is prefixed by the jobID
@@ -227,6 +233,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     this.activeOmMetadataManager = ozoneManager.getMetadataManager();
     this.familyOptions = familyOptions;
     this.codecRegistry = codecRegistry;
+    this.snapDiffReportCfh = snapDiffReportCfh;
     this.snapDiffPurgedJobCfh = snapDiffPurgedJobCfh;
     this.defaultWaitTime = ozoneManager.getConfiguration().getTimeDuration(
         OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME,
@@ -247,6 +254,10 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
             OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB,
             OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
         );
+
+    this.maxInMemoryEntriesPerJob = ozoneManager.getConfiguration().getLong(
+        OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB,
+        OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT);
 
     int threadPoolSize = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE,
@@ -396,7 +407,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
    *     1. Rename "B" to "C"
    *     2. Create "B"
    */
-  static String getReportKeyForIndex(String jobId, DiffType diffType, long index) {
+  public static String getReportKeyForIndex(String jobId, DiffType diffType, long index) {
     return getReportKeyForIndex(jobId, DIFF_TYPE_STRING_MAP.get(diffType) + leftPad(String.valueOf(index), 20, '0'));
   }
 
@@ -1399,97 +1410,117 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
    * chain cannot be resolved in the live from-snapshot directory graph, so the
    * delete entry can be skipped from the final report.
    *
-   * @param objectIdToParentId from-snapshot directory parent graph keyed by stable
-   *     objectId; must not be the to-snapshot graph
-   * @param renamedDirectoryIds objectIds of directories renamed in the diff (from
-   *     snapshot objectIds, not destination paths)
+   * @param deletedDirectoryIds membership test for deleted directory object ids
+   * @param renamedDirectoryIds membership test for renamed directory object ids
+   *     (from snapshot objectIds, not destination paths)
+   * @param ancestorMemo LRU cache of ancestor object ids to deleted-ancestor results
    */
   @VisibleForTesting
-  boolean hasDeletedAncestor(long parentObjectId, Set<Long> deletedDirectoryIds,
-      Set<Long> renamedDirectoryIds, Map<Long, Long> objectIdToParentId,
-      long bucketObjectId, Map<Long, Boolean> ancestorMemo) {
-    Objects.requireNonNull(objectIdToParentId, "objectIdToParentId must not be null");
+  public boolean[] hasDeletedAncestors(List<Long> parentObjectIds,
+      DirectoryIdCheck deletedDirectoryIds, DirectoryIdCheck renamedDirectoryIds,
+      ParentIdBatchLookup parentLookup, long bucketObjectId,
+      Map<Long, Boolean> ancestorMemo) throws IOException {
+    Objects.requireNonNull(parentObjectIds, "parentObjectIds must not be null");
+    Objects.requireNonNull(deletedDirectoryIds, "deletedDirectoryIds must not be null");
+    Objects.requireNonNull(parentLookup, "parentLookup must not be null");
     Objects.requireNonNull(renamedDirectoryIds, "renamedDirectoryIds must not be null");
+    Objects.requireNonNull(ancestorMemo, "ancestorMemo must not be null");
 
-    if (parentObjectId == bucketObjectId) {
-      return false;
-    }
-    Boolean cached = ancestorMemo.get(parentObjectId);
-    if (cached != null) {
-      return cached;
+    int batchSize = parentObjectIds.size();
+    boolean[] hasDeletedAncestor = new boolean[batchSize];
+    long[] currentAncestors = new long[batchSize];
+    boolean[] resolved = new boolean[batchSize];
+    List<List<Long>> ancestorPaths = new ArrayList<>(batchSize);
+    for (int i = 0; i < batchSize; i++) {
+      ancestorPaths.add(new ArrayList<>());
+      currentAncestors[i] = parentObjectIds.get(i);
     }
 
-    List<Long> path = new ArrayList<>();
-    long current = parentObjectId;
-    boolean result;
     while (true) {
-      if (current == bucketObjectId) {
-        result = false;
+      Map<Long, List<Integer>> frontier = new HashMap<>();
+      boolean hasUnresolved = false;
+      for (int i = 0; i < batchSize; i++) {
+        if (resolved[i]) {
+          continue;
+        }
+        hasUnresolved = true;
+        long current = currentAncestors[i];
+        if (current == bucketObjectId) {
+          resolved[i] = true;
+          continue;
+        }
+        Boolean cached = ancestorMemo.get(current);
+        if (cached != null) {
+          resolved[i] = true;
+          hasDeletedAncestor[i] = cached;
+          continue;
+        }
+        if (renamedDirectoryIds.contains(current)) {
+          resolved[i] = true;
+          ancestorMemo.put(current, false);
+          continue;
+        }
+        if (deletedDirectoryIds.contains(current)) {
+          resolved[i] = true;
+          ancestorMemo.put(current, true);
+          hasDeletedAncestor[i] = true;
+          continue;
+        }
+        frontier.computeIfAbsent(current, ignored -> new ArrayList<>()).add(i);
+      }
+
+      if (!hasUnresolved || frontier.isEmpty()) {
         break;
       }
-      cached = ancestorMemo.get(current);
-      if (cached != null) {
-        result = cached;
-        break;
+
+      List<Long> lookupObjectIds = new ArrayList<>(frontier.keySet());
+      List<Long> nextParents = parentLookup.getParentIds(lookupObjectIds);
+      Objects.requireNonNull(nextParents, "nextParents must not be null");
+      if (nextParents.size() != lookupObjectIds.size()) {
+        throw new IOException("Batch parent lookup returned " + nextParents.size()
+            + " values for " + lookupObjectIds.size() + " objectIds");
       }
-      if (renamedDirectoryIds.contains(current)) {
-        result = false;
-        ancestorMemo.put(current, false);
-        break;
+      for (int i = 0; i < lookupObjectIds.size(); i++) {
+        long current = lookupObjectIds.get(i);
+        Long nextParent = nextParents.get(i);
+        List<Integer> positions = frontier.get(current);
+        if (nextParent == null) {
+          ancestorMemo.put(current, true);
+          for (int position : positions) {
+            resolved[position] = true;
+            hasDeletedAncestor[position] = true;
+          }
+          continue;
+        }
+        for (int position : positions) {
+          ancestorPaths.get(position).add(current);
+          currentAncestors[position] = nextParent;
+        }
       }
-      if (deletedDirectoryIds.contains(current)) {
-        result = true;
-        ancestorMemo.put(current, true);
-        break;
-      }
-      Long nextParent = objectIdToParentId.get(current);
-      if (nextParent == null) {
-        result = true;
-        ancestorMemo.put(current, true);
-        break;
-      }
-      path.add(current);
-      current = nextParent;
     }
-    for (Long node : path) {
-      ancestorMemo.put(node, result);
+
+    for (int i = 0; i < batchSize; i++) {
+      for (Long ancestor : ancestorPaths.get(i)) {
+        ancestorMemo.put(ancestor, hasDeletedAncestor[i]);
+      }
     }
-    return result;
+    return hasDeletedAncestor;
   }
 
   /**
-   * Filters mixed directory and file delete entries, retaining only those without
-   * a deleted directory ancestor. FSO buckets only.
-   *
-   * @param objectIdToParentId from-snapshot directory parent graph keyed by stable
-   *     objectId, built from a full fromSnapshot directoryTable scan
-   * @param renamedDirectoryIds objectIds of directories renamed in the diff (from
-   *     snapshot objectIds); pass an empty set when there are no renames
+   * Tests membership of a directory object id in a snap diff set.
    */
-  @VisibleForTesting
-  <T extends WithParentObjectId> List<T> filterTopLevelDeletedEntries(
-      Collection<T> deletedEntries,
-      Predicate<T> isDirectory,
-      Map<Long, Long> objectIdToParentId,
-      Set<Long> renamedDirectoryIds,
-      long bucketObjectId) {
-    Objects.requireNonNull(objectIdToParentId, "objectIdToParentId must not be null");
-    Objects.requireNonNull(renamedDirectoryIds, "renamedDirectoryIds must not be null");
-    Set<Long> deletedDirectoryIds = new HashSet<>();
-    for (T deletedEntry : deletedEntries) {
-      if (isDirectory.test(deletedEntry)) {
-        deletedDirectoryIds.add(deletedEntry.getObjectID());
-      }
-    }
-    Map<Long, Boolean> ancestorMemo = new HashMap<>();
-    List<T> filteredDeletes = new ArrayList<>();
-    for (T deletedEntry : deletedEntries) {
-      if (!hasDeletedAncestor(deletedEntry.getParentObjectID(), deletedDirectoryIds,
-          renamedDirectoryIds, objectIdToParentId, bucketObjectId, ancestorMemo)) {
-        filteredDeletes.add(deletedEntry);
-      }
-    }
-    return filteredDeletes;
+  @FunctionalInterface
+  public interface DirectoryIdCheck {
+    boolean contains(long objectId) throws IOException;
+  }
+
+  /**
+   * Batch-resolves parent object ids for ancestor walks.
+   */
+  @FunctionalInterface
+  public interface ParentIdBatchLookup {
+    List<Long> getParentIds(List<Long> objectIds) throws IOException;
   }
 
   @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:MethodLength"})
@@ -1625,6 +1656,45 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   }
 
   /**
+   * Optimized full-diff report generation (Stages 1–4). Reachable from tests only
+   * until the feature flag in HDDS-15397 wires it into production traffic.
+   */
+  @VisibleForTesting
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  Pair<Long, String> generateDiffReportOptimized(
+      final String jobId,
+      final Table<byte[], byte[]> fsKeyTable,
+      final Table<byte[], byte[]> tsKeyTable,
+      final Table<byte[], byte[]> fsDirTable,
+      final Table<byte[], byte[]> tsDirTable,
+      final byte[] keyPrefix,
+      final Long updateIdGate,
+      final long bucketObjectId,
+      final boolean isFSOBucket,
+      final String volumeName,
+      final String bucketName,
+      final String fromSnapshotName,
+      final String toSnapshotName) throws IOException {
+    LOG.info("Starting optimized diff report generation for jobId: {}.", jobId);
+    try (SnapDiffJobStore store = SnapDiffJobStore.open(db, codecRegistry, familyOptions, jobId,
+        isFSOBucket, SnapDiffJobStore.Mode.FULL, SnapDiffJobStore.DEFAULT_BATCH_SIZE,
+        maxInMemoryEntriesPerJob, snapDiffReportCfh)) {
+      FullDiffSequentialReader reader = updateIdGate != null
+          ? new FullDiffSequentialReader(store, updateIdGate)
+          : new FullDiffSequentialReader(store);
+      reader.scanFileTables(fsKeyTable, tsKeyTable, keyPrefix);
+      if (isFSOBucket) {
+        reader.scanDirectoryTables(fsDirTable, tsDirTable, keyPrefix);
+      }
+      if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
+          fromSnapshotName, toSnapshotName)) {
+        return Pair.of(-1L, null);
+      }
+      return MergeJoinSnapDiffWriter.writeReport(this, store, bucketObjectId, isFSOBucket);
+    }
+  }
+
+  /**
    * Checks if the key has been modified b/w snapshots.
    * @param fromKey Key info in source snapshot.
    * @param toKey Key info in target snapshot.
@@ -1672,9 +1742,11 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
             familyOptions));
   }
 
-  private String addToReport(String jobId, long index, DiffReportEntry diffReportEntry) throws IOException {
+  private String addToReport(String jobId, long index, DiffReportEntry diffReportEntry)
+      throws IOException {
     String jobReportKey = getReportKeyForIndex(jobId, diffReportEntry.getType(), index);
-    snapDiffReportTable.put(codecRegistry.asRawData(jobReportKey), codecRegistry.asRawData(diffReportEntry));
+    snapDiffReportTable.put(codecRegistry.asRawData(jobReportKey),
+        codecRegistry.asRawData(diffReportEntry));
     return jobReportKey;
   }
 
