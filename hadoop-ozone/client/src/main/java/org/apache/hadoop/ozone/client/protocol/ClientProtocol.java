@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
@@ -1389,15 +1390,42 @@ public interface ClientProtocol {
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
   /**
+   * Sets the read consistency hint for the current request thread.
+   * @param readConsistency read consistency selected by the client.
+   */
+  void setThreadLocalReadConsistency(ReadConsistency readConsistency);
+
+  /**
+   * Sets the read consistency hint and optional local lease context for the
+   * current request thread.
+   * @param readConsistency read consistency selected by the client.
+   * @param localLeaseLogLimit optional local lease log limit.
+   * @param localLeaseTimeMs optional local lease duration in milliseconds.
+   */
+  void setThreadLocalReadConsistency(ReadConsistency readConsistency,
+      Long localLeaseLogLimit, Long localLeaseTimeMs);
+
+  /**
    * Gets the S3 Authentication information that is attached to the thread.
    * @return S3 Authentication information.
    */
   S3Auth getThreadLocalS3Auth();
 
   /**
+   * Gets the read consistency hint that is attached to the thread.
+   * @return request-local read consistency.
+   */
+  ReadConsistency getThreadLocalReadConsistency();
+
+  /**
    * Clears the S3 Authentication information attached to the thread.
    */
   void clearThreadLocalS3Auth();
+
+  /**
+   * Clears the read consistency hint attached to the thread.
+   */
+  void clearThreadLocalReadConsistency();
 
   default ThreadLocal<S3Auth> getS3CredentialsProvider() {
     return null;

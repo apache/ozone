@@ -598,7 +598,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
       HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
           OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
       assertNotNull(followerReadFailoverProxyProvider);
-      assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
+      assertTrue(followerReadFailoverProxyProvider.isOmServiceSupportsFollowerRead());
 
       String currentOMNodeId = followerReadFailoverProxyProvider.getCurrentProxy().getNodeId();
       OzoneManager ozoneManager = getCluster().getOzoneManager(currentOMNodeId);

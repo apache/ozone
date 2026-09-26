@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.protocolPB;
 
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 
@@ -33,9 +34,18 @@ public interface OzoneManagerClientProtocol extends OzoneManagerProtocol {
    */
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
+  void setThreadLocalReadConsistency(ReadConsistency readConsistency);
+
+  void setThreadLocalReadConsistency(ReadConsistency readConsistency,
+      Long localLeaseLogLimit, Long localLeaseTimeMs);
+
   S3Auth getThreadLocalS3Auth();
 
+  ReadConsistency getThreadLocalReadConsistency();
+
   void clearThreadLocalS3Auth();
+
+  void clearThreadLocalReadConsistency();
 
   ThreadLocal<S3Auth> getS3CredentialsProvider();
 }
