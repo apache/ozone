@@ -1416,6 +1416,7 @@ message GetKeyInfoResponse {
   optional KeyInfo keyInfo = 1;
   optional VolumeInfo volumeInfo = 2;
   optional string UserPrincipal = 3;
+  optional BucketLayoutProto bucketLayout = 4;
 }
 
 message RenameKeysRequest {
