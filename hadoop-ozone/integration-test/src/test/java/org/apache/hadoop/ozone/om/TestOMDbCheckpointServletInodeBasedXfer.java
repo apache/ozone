@@ -317,7 +317,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     try (Stream<Path> list = Files.list(newDbDir.toPath())) {
       totalSize = list.mapToLong(path -> path.toFile().length()).sum();
     }
-    boolean obtainedFilesUnderMaxLimit = totalSize < maxFileSizeLimit;
+    boolean obtainedFilesUnderMaxLimit = totalSize <= maxFileSizeLimit;
     if (!includeSnapshots) {
       // If includeSnapshotData flag is set to false , it always sends all data
       // in one batch and doesn't respect the max size config. This is how Recon
@@ -946,6 +946,62 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       servlet.collectFilesFromDir(sstFilesToExclude, filesUnderDir.stream(),
           maxTotalSstSize, true, archiverSpy, false);
     });
+  }
+
+  /**
+   * A request must always transfer at least one file, even when a single file is larger than the
+   * max total SST size. Otherwise the leader keeps replying with an empty tarball and the follower
+   * asks for the same files forever without making any progress.
+   */
+  @Test
+  public void testCollectFilesFromDirTransfersFileLargerThanMaxSize() throws Exception {
+    OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
+    Path dbDir = Files.createTempDirectory(folder, "oversized-sst-");
+    Path sstFile1 = dbDir.resolve("file1.sst");
+    Path sstFile2 = dbDir.resolve("file2.sst");
+    Files.write(sstFile1, new byte[1024]);
+    Files.write(sstFile2, new byte[1024]);
+    // Both files are larger than the whole budget of a single request.
+    long maxTotalSstSize = 512;
+    Set<String> sstFilesToExclude = new HashSet<>();
+
+    for (int part = 1; part <= 2; part++) {
+      // Every request starts with a fresh archiver and the full budget, the same way the servlet does.
+      OMDBArchiver archiver = newArchiver("tmp-oversized-part" + part);
+      assertFalse(servlet.collectFilesFromDir(sstFilesToExclude, Stream.of(sstFile1, sstFile2),
+          new AtomicLong(maxTotalSstSize), true, archiver, false), "A part carrying an oversized file ends there");
+      assertEquals(1, archiver.getFilesToWriteIntoTarball().size(),
+          "Part " + part + " should transfer exactly one file");
+      assertEquals(part, sstFilesToExclude.size(), "Every part should make progress");
+    }
+    // Once every file has been sent, the scan completes without recording anything.
+    OMDBArchiver finalArchiver = newArchiver("tmp-oversized-final");
+    assertTrue(servlet.collectFilesFromDir(sstFilesToExclude, Stream.of(sstFile1, sstFile2),
+        new AtomicLong(maxTotalSstSize), true, finalArchiver, false));
+    assertTrue(finalArchiver.getFilesToWriteIntoTarball().isEmpty());
+
+    // The relaxation is per request: one budget spans all the directories of a request, and once the
+    // tarball holds a file the limit is enforced again.
+    OMDBArchiver archiver = newArchiver("tmp-oversized-multi-dir");
+    Set<String> excludeNothing = new HashSet<>();
+    AtomicLong budget = new AtomicLong(maxTotalSstSize);
+    assertFalse(servlet.collectFilesFromDir(excludeNothing, Stream.of(sstFile1), budget, true, archiver, false));
+    assertFalse(servlet.collectFilesFromDir(excludeNothing, Stream.of(sstFile2), budget, true, archiver, false));
+    assertEquals(1, archiver.getFilesToWriteIntoTarball().size());
+
+    // A file which exactly fills the budget is not over it.
+    OMDBArchiver exactFitArchiver = newArchiver("tmp-oversized-exact-fit");
+    assertTrue(servlet.collectFilesFromDir(new HashSet<>(), Stream.of(sstFile1), new AtomicLong(1024), true,
+        exactFitArchiver, false));
+    assertEquals(1, exactFitArchiver.getFilesToWriteIntoTarball().size());
+  }
+
+  private OMDBArchiver newArchiver(String tmpDirName) throws IOException {
+    OMDBArchiver archiver = new OMDBArchiver();
+    Path tmpDir = folder.resolve(tmpDirName);
+    Files.createDirectories(tmpDir);
+    archiver.setTmpDir(tmpDir);
+    return archiver;
   }
 
   private void writeDummyKeyToDeleteTableOfSnapshotDB(OzoneSnapshot snapshotToModify, String bucketName,
