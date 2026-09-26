@@ -68,4 +68,4 @@ Run rk with key validation through short-circuit channel
     ${keysCount} =     BuiltIn.Set Variable   10
     ${result} =        Execute          ozone freon rk --num-of-volumes 1 --num-of-buckets 1 --num-of-keys ${keysCount} --key-size 1MB --replication-type=RATIS --factor=ONE --validate-writes --validation-channel=short-circuit
                        Should contain   ${result}   Status: Success
-                       Should contain   ${result}   XceiverClientShortCircuit is created for pipeline
+                       Should contain   ${result}   Created: XceiverClientShortCircuit
