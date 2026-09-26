@@ -27,10 +27,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -38,6 +36,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.lock.OMLockDetailsUtil;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
@@ -139,16 +138,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   public OMResponse processRequest(OMRequest request) throws ServiceException {
     OMResponse response = internalProcessRequest(request);
     if (response.hasOmLockDetails()) {
-      OzoneManagerProtocolProtos.OMLockDetailsProto omLockDetailsProto =
-          response.getOmLockDetails();
       Server.Call call = Server.getCurCall().get();
       if (call != null) {
-        call.getProcessingDetails().add(Timing.LOCKWAIT,
-            omLockDetailsProto.getWaitLockNanos(), TimeUnit.NANOSECONDS);
-        call.getProcessingDetails().add(Timing.LOCKSHARED,
-            omLockDetailsProto.getReadLockNanos(), TimeUnit.NANOSECONDS);
-        call.getProcessingDetails().add(Timing.LOCKEXCLUSIVE,
-            omLockDetailsProto.getWriteLockNanos(), TimeUnit.NANOSECONDS);
+        OMLockDetailsUtil.addToProcessingDetails(
+            call.getProcessingDetails(), response.getOmLockDetails());
       }
     }
     return response;
@@ -337,7 +330,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     }
   }
 
-  private OMResponse submitReadRequestToOmLinearizableAllowFollower(OMRequest request) throws ServiceException {
+  private OMResponse  submitReadRequestToOmLinearizableAllowFollower(OMRequest request) throws ServiceException {
     RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
     switch (raftServerStatus) {
     case LEADER_AND_NOT_READY:

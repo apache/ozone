@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.STSSecurityUtil;
+import org.apache.hadoop.ozone.security.S3AuthenticationContext;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -128,8 +128,7 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
 
     if (requestBuilder.hasS3Authentication()) {
-      requestBuilder.setS3Authentication(
-          STSSecurityUtil.resolveS3Authentication(requestBuilder.getS3Authentication(), ozoneManager));
+      S3AuthenticationContext.captureInto(requestBuilder, ozoneManager);
     }
 
     omRequest = requestBuilder.build();
@@ -178,6 +177,22 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
+    return getUserInfo(omRequest, true);
+  }
+
+  /**
+   * Get authenticated user information for a read request submitted to Ratis.
+   * Client-supplied user information is not trusted on this path.
+   * @param omRequest OM request
+   * @return User Info.
+   */
+  public static OzoneManagerProtocolProtos.UserInfo getAuthenticatedUserInfo(
+      OMRequest omRequest) throws IOException {
+    return getUserInfo(omRequest, false);
+  }
+
+  private static OzoneManagerProtocolProtos.UserInfo getUserInfo(
+      OMRequest omRequest, boolean allowClientUserInfo) throws IOException {
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
     InetAddress remoteAddress = ProtobufRpcEngine.Server.getRemoteIp();
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
@@ -219,7 +234,8 @@ public abstract class OMClientRequest implements RequestAuditor {
     // client-supplied user name when no identity was established above:
     // it is unauthenticated data and must never override the identity
     // derived from S3 authentication or from the RPC user.
-    if (user == null && !userInfo.hasUserName() && omRequest.hasUserInfo()) {
+    if (allowClientUserInfo && user == null && !userInfo.hasUserName() &&
+        omRequest.hasUserInfo()) {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 

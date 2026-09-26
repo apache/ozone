@@ -24,6 +24,7 @@ import java.io.IOException;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.ratis.OMRatisRequestContext;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -73,7 +74,14 @@ public class OMExecutionFlow {
         return OzoneManagerRatisUtils.createErrorResponse(request, ex);
       }
     } else {
-      requestToSubmit = request;
+      try {
+        // We capture the ThreadLocal context in OzoneManager so that it will be available
+        // in a separate read thread in OzoneManagerStateMachine#query.
+        // Write requests already implemented this logic in the preExecute.
+        requestToSubmit = OMRatisRequestContext.captureIntoRequest(request, ozoneManager);
+      } catch (IOException ex) {
+        return OzoneManagerRatisUtils.createErrorResponse(request, ex);
+      }
     }
 
     // 2. submit request to ratis
