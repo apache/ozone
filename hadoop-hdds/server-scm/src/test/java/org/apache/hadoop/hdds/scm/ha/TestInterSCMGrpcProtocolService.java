@@ -110,6 +110,30 @@ class TestInterSCMGrpcProtocolService {
     service.stop();
   }
 
+  @Test
+  void testDownloadSucceedsWithCustomGrpcKeepAlive() throws Exception {
+    int port = PortAllocator.getFreePort();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY, port);
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_MAX_CONNECTION_IDLE, "20m");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIME, "1m");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIMEOUT, "10s");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME, "1m");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIME, "1m");
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIMEOUT, "10s");
+
+    InterSCMGrpcProtocolService service =
+        new InterSCMGrpcProtocolService(conf, scmWith(mock(SCMCertificateClient.class)));
+    service.start();
+    try (InterSCMGrpcClient client =
+        new InterSCMGrpcClient("localhost", port, conf, null)) {
+      Path downloaded = client.download(temp.resolve(CP_FILE_NAME)).get();
+      verifyDownloadedCheckPoint(downloaded);
+    } finally {
+      service.stop();
+    }
+  }
+
   private void verifyServiceUsedItsCertAndValidatedClientCert()
       throws CertificateException {
     ArgumentCaptor<X509Certificate[]> capturedCerts =

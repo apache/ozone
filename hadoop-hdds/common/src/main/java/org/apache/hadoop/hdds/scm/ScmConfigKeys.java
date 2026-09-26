@@ -563,6 +563,36 @@ public final class ScmConfigKeys {
   public static final long
           OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL_DEFAULT = 30 * 60 * 1000L;
 
+  public static final String OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIME =
+          "ozone.scm.ha.grpc.client.keepalive.time";
+  public static final long
+          OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIME_DEFAULT = 5 * 60 * 1000L;
+
+  public static final String OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIMEOUT =
+          "ozone.scm.ha.grpc.client.keepalive.timeout";
+  public static final long
+          OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIMEOUT_DEFAULT = 30 * 1000L;
+
+  public static final String OZONE_SCM_HA_GRPC_SERVER_MAX_CONNECTION_IDLE =
+          "ozone.scm.ha.grpc.server.max.connection.idle";
+  public static final long
+          OZONE_SCM_HA_GRPC_SERVER_MAX_CONNECTION_IDLE_DEFAULT = 15 * 60 * 1000L;
+
+  public static final String OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIME =
+          "ozone.scm.ha.grpc.server.keepalive.time";
+  public static final long
+          OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIME_DEFAULT = 5 * 60 * 1000L;
+
+  public static final String OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIMEOUT =
+          "ozone.scm.ha.grpc.server.keepalive.timeout";
+  public static final long
+          OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIMEOUT_DEFAULT = 30 * 1000L;
+
+  public static final String OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME =
+          "ozone.scm.ha.grpc.server.permit.keepalive.time";
+  public static final long
+          OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME_DEFAULT = 5 * 60 * 1000L;
+
   public static final String OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT =
           "ozone.scm.ha.ratis.server.failure.timeout.duration";
   public static final long
