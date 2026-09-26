@@ -22,16 +22,19 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializ
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -46,9 +49,11 @@ import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -77,6 +82,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
   private ReconTaskController reconTaskController;
   private ReconTaskStatusDao reconTaskStatusDao;
   private MockClock testClock;
+  private DBStore reconDbStore;
 
   public TestReconTaskControllerImpl() {
     super();
@@ -92,8 +98,9 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
           String taskName = i.getArgument(0);
           return new ReconTaskStatusUpdater(reconTaskStatusDao, taskName);
         });
+    reconDbStore = mock(DBStore.class);
     ReconDBProvider reconDbProvider = mock(ReconDBProvider.class);
-    when(reconDbProvider.getDbStore()).thenReturn(mock(DBStore.class));
+    when(reconDbProvider.getDbStore()).thenReturn(reconDbStore);
     when(reconDbProvider.getStagedReconDBProvider()).thenReturn(reconDbProvider);
     ReconContainerMetadataManager reconContainerMgr = mock(ReconContainerMetadataManager.class);
     ReconNamespaceSummaryManager nsSummaryManager = mock(ReconNamespaceSummaryManager.class);
@@ -930,6 +937,164 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
 
     ReconTaskControllerImpl controller = (ReconTaskControllerImpl) reconTaskController;
     assertThrows(IOException.class, () -> controller.createOMCheckpoint(omMetadataManager));
+  }
+
+  @Test
+  public void testDerivedDbSyncedBeforeCursorAdvanceOnSuccess() throws Exception {
+    AtomicBoolean flushedBeforeCursorCommit = new AtomicBoolean(false);
+    doAnswer(invocation -> {
+      ReconTaskStatus status1 = reconTaskStatusDao.findById("SyncBarrierTask1");
+      ReconTaskStatus status2 = reconTaskStatusDao.findById("SyncBarrierTask2");
+      // At the exact moment flushLog(true) is invoked, neither cursor must have been committed to 100L yet.
+      if ((status1 == null || status1.getLastUpdatedSeqNumber() < 100L)
+          && (status2 == null || status2.getLastUpdatedSeqNumber() < 100L)) {
+        flushedBeforeCursorCommit.set(true);
+      }
+      return null;
+    }).when(reconDbStore).flushLog(true);
+
+    ReconOmTask task1 = getMockTask("SyncBarrierTask1");
+    when(task1.process(any(OMUpdateEventBatch.class), anyMap()))
+        .thenReturn(new ReconOmTask.TaskResult.Builder()
+            .setTaskName("SyncBarrierTask1").setTaskSuccess(true).build());
+    reconTaskController.registerTask(task1);
+
+    ReconOmTask task2 = getMockTask("SyncBarrierTask2");
+    when(task2.process(any(OMUpdateEventBatch.class), anyMap()))
+        .thenReturn(new ReconOmTask.TaskResult.Builder()
+            .setTaskName("SyncBarrierTask2").setTaskSuccess(true).build());
+    reconTaskController.registerTask(task2);
+
+    OMUpdateEventBatch batch = mock(OMUpdateEventBatch.class);
+    when(batch.getLastSequenceNumber()).thenReturn(100L);
+    when(batch.isEmpty()).thenReturn(false);
+    when(batch.getEvents()).thenReturn(new ArrayList<>());
+    when(batch.getEventType()).thenReturn(ReconEvent.EventType.OM_UPDATE_BATCH);
+    when(batch.getEventCount()).thenReturn(1);
+
+    reconTaskController.consumeOMEvents(batch, mock(OMMetadataManager.class));
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ReconTaskStatus status1 = reconTaskStatusDao.findById("SyncBarrierTask1");
+        ReconTaskStatus status2 = reconTaskStatusDao.findById("SyncBarrierTask2");
+        return status1 != null && status1.getLastTaskRunStatus() == 0
+            && status1.getLastUpdatedSeqNumber() == 100L
+            && status2 != null && status2.getLastTaskRunStatus() == 0
+            && status2.getLastUpdatedSeqNumber() == 100L;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 100, 5000);
+
+    // The derived-data RocksDB WAL must be synced (sync == true) exactly once per batch before the
+    // durable cursors advance, coalescing multiple task writes.
+    verify(reconDbStore, times(1)).flushLog(true);
+    // A non-syncing flush would leave the write in page cache and reintroduce the durability gap.
+    verify(reconDbStore, never()).flushLog(false);
+    // Crucially assert that flushLog(true) was invoked strictly before cursors were committed to 100L.
+    assertTrue(flushedBeforeCursorCommit.get(),
+        "flushLog(true) must be invoked before task cursors are committed to 100L in Derby");
+  }
+
+  @Test
+  public void testDerivedDbSyncFailureSignalsReinitialization() throws Exception {
+    doThrow(new RocksDatabaseException("Simulated sync failure")).when(reconDbStore).flushLog(true);
+
+    ReconOmTask task = getMockTask("SyncFailureTask");
+    when(task.process(any(OMUpdateEventBatch.class), anyMap()))
+        .thenReturn(new ReconOmTask.TaskResult.Builder()
+            .setTaskName("SyncFailureTask").setTaskSuccess(true).build());
+    reconTaskController.registerTask(task);
+
+    OMUpdateEventBatch batch = mock(OMUpdateEventBatch.class);
+    when(batch.getLastSequenceNumber()).thenReturn(100L);
+    when(batch.isEmpty()).thenReturn(false);
+    when(batch.getEvents()).thenReturn(new ArrayList<>());
+    when(batch.getEventType()).thenReturn(ReconEvent.EventType.OM_UPDATE_BATCH);
+    when(batch.getEventCount()).thenReturn(1);
+
+    reconTaskController.consumeOMEvents(batch, mock(OMMetadataManager.class));
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ReconTaskStatus status = reconTaskStatusDao.findById("SyncFailureTask");
+        return status != null && status.getLastTaskRunStatus() == -1
+            && status.getLastUpdatedSeqNumber() == 0L
+            && reconTaskController.hasTasksFailed();
+      } catch (Exception e) {
+        return false;
+      }
+    }, 100, 5000);
+
+    // Sync was attempted once for the batch.
+    verify(reconDbStore, times(1)).flushLog(true);
+    // Task process must NOT be retried to prevent double-applying non-idempotent events.
+    verify(task, times(1)).process(any(OMUpdateEventBatch.class), anyMap());
+
+    ReconTaskStatus status = reconTaskStatusDao.findById("SyncFailureTask");
+    assertNotNull(status);
+    assertEquals(-1, status.getLastTaskRunStatus());
+    assertEquals(0L, status.getLastUpdatedSeqNumber());
+    assertTrue(reconTaskController.hasTasksFailed());
+  }
+
+  @Test
+  public void testDerivedDbSyncFailureWhenDbStoreNullSignalsReinitialization() throws Exception {
+    reconTaskController.stop();
+
+    ReconTaskStatusUpdaterManager updaterManagerMock = mock(ReconTaskStatusUpdaterManager.class);
+    when(updaterManagerMock.getTaskStatusUpdater(anyString()))
+        .thenAnswer(i -> {
+          String taskName = i.getArgument(0);
+          return new ReconTaskStatusUpdater(reconTaskStatusDao, taskName);
+        });
+    ReconDBProvider nullStoreDbProvider = mock(ReconDBProvider.class);
+    when(nullStoreDbProvider.getDbStore()).thenReturn(null);
+
+    ReconTaskControllerImpl controller = new ReconTaskControllerImpl(new OzoneConfiguration(), new HashSet<>(),
+        updaterManagerMock, nullStoreDbProvider, mock(ReconContainerMetadataManager.class),
+        mock(ReconNamespaceSummaryManager.class), mock(ReconGlobalStatsManager.class),
+        mock(ReconFileMetadataManager.class), MockClock.newInstance());
+    controller.start();
+    try {
+      ReconOmTask task = getMockTask("NullDbStoreTask");
+      when(task.process(any(OMUpdateEventBatch.class), anyMap()))
+          .thenReturn(new ReconOmTask.TaskResult.Builder()
+              .setTaskName("NullDbStoreTask").setTaskSuccess(true).build());
+      controller.registerTask(task);
+
+      OMUpdateEventBatch batch = mock(OMUpdateEventBatch.class);
+      when(batch.getLastSequenceNumber()).thenReturn(100L);
+      when(batch.isEmpty()).thenReturn(false);
+      when(batch.getEvents()).thenReturn(new ArrayList<>());
+      when(batch.getEventType()).thenReturn(ReconEvent.EventType.OM_UPDATE_BATCH);
+      when(batch.getEventCount()).thenReturn(1);
+
+      controller.consumeOMEvents(batch, mock(OMMetadataManager.class));
+
+      GenericTestUtils.waitFor(() -> {
+        try {
+          ReconTaskStatus status = reconTaskStatusDao.findById("NullDbStoreTask");
+          return status != null && status.getLastTaskRunStatus() == -1
+              && status.getLastUpdatedSeqNumber() == 0L
+              && controller.hasTasksFailed();
+        } catch (Exception e) {
+          return false;
+        }
+      }, 100, 5000);
+
+      // Task process must not be retried.
+      verify(task, times(1)).process(any(OMUpdateEventBatch.class), anyMap());
+
+      ReconTaskStatus status = reconTaskStatusDao.findById("NullDbStoreTask");
+      assertNotNull(status);
+      assertEquals(-1, status.getLastTaskRunStatus());
+      assertEquals(0L, status.getLastUpdatedSeqNumber());
+      assertTrue(controller.hasTasksFailed());
+    } finally {
+      controller.stop();
+    }
   }
 
   private ReconOmTask getMockTask(String taskName) {

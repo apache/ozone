@@ -50,6 +50,8 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskControllerMetrics;
@@ -434,6 +436,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
   private void processTasks(
       Collection<NamedCallableTask<ReconOmTask.TaskResult>> tasks,
       OMUpdateEventBatch events, List<ReconOmTask.TaskResult> failedTasks) {
+    List<ReconOmTask.TaskResult> successfulTasks = Collections.synchronizedList(new ArrayList<>());
+    List<ReconOmTask.TaskResult> executionFailedTasks = Collections.synchronizedList(new ArrayList<>());
     List<CompletableFuture<Void>> futures = tasks.stream()
         .map(task -> CompletableFuture.supplyAsync(() -> {
           // Track task delta processing duration
@@ -456,27 +460,23 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           }
         }, executorService).thenAccept(result -> {
           String taskName = result.getTaskName();
-          ReconTaskStatusUpdater taskStatusUpdater =
-              taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
           if (!result.isTaskSuccess()) {
             LOG.error("Task {} failed", taskName);
 
             // Track task delta processing failure
             taskMetrics.incrTaskDeltaProcessingFailures(taskName);
 
-            failedTasks.add(new ReconOmTask.TaskResult.Builder()
+            executionFailedTasks.add(new ReconOmTask.TaskResult.Builder()
                 .setTaskName(taskName)
                 .setSubTaskSeekPositions(result.getSubTaskSeekPositions())
                 .build());
+            ReconTaskStatusUpdater taskStatusUpdater =
+                taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
             taskStatusUpdater.setLastTaskRunStatus(-1);
+            taskStatusUpdater.recordRunCompletion();
           } else {
-            // Track task delta processing success
-            taskMetrics.incrTaskDeltaProcessingSuccess(taskName);
-
-            taskStatusUpdater.setLastTaskRunStatus(0);
-            taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
+            successfulTasks.add(result);
           }
-          taskStatusUpdater.recordRunCompletion();
         }).exceptionally(ex -> {
           LOG.error("Task failed with exception: ", ex);
           if (ex.getCause() instanceof TaskExecutionException) {
@@ -501,6 +501,61 @@ public class ReconTaskControllerImpl implements ReconTaskController {
       LOG.error("Completing all tasks failed with exception ", ce);
     } catch (CancellationException ce) {
       LOG.error("Some tasks were cancelled with exception", ce);
+    }
+
+    failedTasks.addAll(executionFailedTasks);
+
+    if (!successfulTasks.isEmpty()) {
+      // Sync derived-data RocksDB WAL before committing task-status cursors to avoid durability gaps.
+      boolean synced = syncReconDbLog();
+      for (ReconOmTask.TaskResult result : successfulTasks) {
+        String taskName = result.getTaskName();
+        ReconTaskStatusUpdater taskStatusUpdater =
+            taskStatusUpdaterManager.getTaskStatusUpdater(taskName);
+
+        if (synced) {
+          taskMetrics.incrTaskDeltaProcessingSuccess(taskName);
+          taskStatusUpdater.setLastTaskRunStatus(0);
+          taskStatusUpdater.setLastUpdatedSeqNumber(events.getLastSequenceNumber());
+        } else {
+          taskMetrics.incrTaskDeltaProcessingFailures(taskName);
+          taskStatusUpdater.setLastTaskRunStatus(-1);
+        }
+        taskStatusUpdater.recordRunCompletion();
+      }
+
+      if (!synced) {
+        // Signal task reinitialization directly instead of retrying process(),
+        // because task writes were already applied and retrying would re-apply non-idempotent events.
+        tasksFailed.compareAndSet(false, true);
+      }
+    }
+  }
+
+  /**
+   * Flushes and syncs the Recon derived-data RocksDB write-ahead log to stable storage so the
+   * derived writes for the processed batch are durable before the task-status cursor advances.
+   *
+   * The cursor rows committed to Derby are fsync-durable while RocksDB writes are not synced by default.
+   * Without this barrier, a power loss can leave the durable cursors ahead of the (lost) derived data.
+   * On restart, reconciliation sees matching sequence numbers and never reprocesses the events,
+   * permanently dropping the applied updates.
+   *
+   * @return {@code true} if sync succeeded; {@code false} if dbStore is null or sync failed,
+   *         in which case callers must not advance cursors and must signal reinitialization.
+   */
+  private boolean syncReconDbLog() {
+    DBStore dbStore = reconDBProvider.getDbStore();
+    if (dbStore == null) {
+      LOG.error("Recon DB store is null; cannot sync WAL before advancing task status cursor.");
+      return false;
+    }
+    try {
+      dbStore.flushLog(true);
+      return true;
+    } catch (RocksDatabaseException e) {
+      LOG.error("Failed to sync Recon DB WAL before advancing task status cursor.", e);
+      return false;
     }
   }
   
