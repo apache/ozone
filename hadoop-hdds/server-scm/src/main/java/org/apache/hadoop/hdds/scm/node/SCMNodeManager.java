@@ -1171,7 +1171,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       }
       nodes.put(opState.name(), states);
     }
-    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+    for (DatanodeInfo dni : getAllNodes()) {
       NodeStatus status = dni.getNodeStatus();
       nodes.get(status.getOperationalState().name())
           .compute(status.getHealth().name(), (k, v) -> v + 1);
@@ -1206,7 +1206,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     boolean fsPresent = false;
     boolean fsMissing = false;
 
-    for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
+    for (DatanodeInfo node : getAllNodes()) {
       String keyPrefix = "";
       NodeStatus status = node.getNodeStatus();
       if (status.isMaintenance()) {
@@ -1264,7 +1264,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
   @Override
   public Map<String, Map<String, String>> getNodeStatusInfo() {
     Map<String, Map<String, String>> nodes = new HashMap<>();
-    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+    for (DatanodeInfo dni : getAllNodes()) {
       String hostName = dni.getHostName();
       DatanodeDetails.Port httpPort = dni.getPort(HTTP);
       DatanodeDetails.Port httpsPort = dni.getPort(HTTPS);
@@ -1358,24 +1358,12 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     String usedPercentage = "N/A";
     String nonUsedPercentage = "N/A";
     if (storageReports != null && !storageReports.isEmpty()) {
-      long capacity = 0;
-      long scmUsed = 0;
-      long remaining = 0;
-      for (StorageReportProto storageReport : storageReports) {
-        capacity += storageReport.getCapacity();
-        scmUsed += storageReport.getScmUsed();
-        remaining += storageReport.getRemaining();
-      }
-      long scmNonUsed = capacity - scmUsed - remaining;
-
-      DecimalFormat decimalFormat = TWO_DECIMAL_FORMAT.get();
-
-      double usedPerc = ((double) scmUsed / capacity) * 100;
-      usedPerc = usedPerc > 100.0 ? 100.0 : usedPerc;
-      double nonUsedPerc = ((double) scmNonUsed / capacity) * 100;
-      nonUsedPerc = nonUsedPerc > 100.0 ? 100.0 : nonUsedPerc;
-      usedPercentage = decimalFormat.format(usedPerc);
-      nonUsedPercentage = decimalFormat.format(nonUsedPerc);
+      StorageReportTotals totals = sumStorageReports(storageReports);
+      long scmNonUsed = totals.capacity - totals.scmUsed - totals.remaining;
+      usedPercentage = formatStoragePercentage(
+          ((double) totals.scmUsed / totals.capacity) * 100);
+      nonUsedPercentage = formatStoragePercentage(
+          ((double) scmNonUsed / totals.capacity) * 100);
     }
 
     storagePercentage[0] = usedPercentage;
@@ -1383,41 +1371,83 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     return storagePercentage;
   }
 
+  private static StorageReportTotals sumStorageReports(List<StorageReportProto> storageReports) {
+    long capacity = 0;
+    long scmUsed = 0;
+    long remaining = 0;
+    if (storageReports != null) {
+      for (StorageReportProto storageReport : storageReports) {
+        capacity += storageReport.getCapacity();
+        scmUsed += storageReport.getScmUsed();
+        remaining += storageReport.getRemaining();
+      }
+    }
+    return new StorageReportTotals(capacity, scmUsed, remaining);
+  }
+
+  private static String formatStoragePercentage(double percentage) {
+    double capped = percentage > 100.0 ? 100.0 : percentage;
+    return TWO_DECIMAL_FORMAT.get().format(capped);
+  }
+
   @Override
   public Map<String, String> getNodeStatistics() {
     Map<String, String> nodeStatistics = new HashMap<>();
-    // Statistics node usaged
-    nodeUsageStatistics(nodeStatistics);
+    List<DatanodeInfo> allNodes = getAllNodes();
+    NodeStorageAggregation storageAggregation = aggregateNodeStorage(allNodes);
+    // Statistics node usage
+    nodeUsageStatistics(nodeStatistics, storageAggregation);
     // Statistics node states
-    nodeStateStatistics(nodeStatistics);
+    nodeStateStatistics(nodeStatistics, allNodes);
     // Statistics node space
-    nodeSpaceStatistics(nodeStatistics);
+    nodeSpaceStatistics(nodeStatistics, storageAggregation);
     // Statistics node non-writable
-    nodeNonWritableStatistics(nodeStatistics);
+    nodeNonWritableStatistics(nodeStatistics, allNodes);
     // todo: Statistics of other instances
     return nodeStatistics;
   }
 
-  private void nodeUsageStatistics(Map<String, String> nodeStatics) {
-    if (nodeStateManager.getAllNodes().isEmpty()) {
-      return;
+  private NodeStorageAggregation aggregateNodeStorage(List<DatanodeInfo> allNodes) {
+    if (allNodes.isEmpty()) {
+      return null;
     }
-    float[] usages = new float[nodeStateManager.getAllNodes().size()];
-    float totalOzoneUsed = 0;
-    int i = 0;
-    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
-      String[] storagePercentage = calculateStoragePercentage(
-              dni.getStorageReports());
-      if (storagePercentage[0].equals("N/A")) {
-        usages[i++] = 0;
+    long capacityByte = 0;
+    long scmUsedByte = 0;
+    long remainingByte = 0;
+    long totalPending = 0;
+    float[] usages = new float[allNodes.size()];
+    int usageIndex = 0;
+    for (DatanodeInfo dni : allNodes) {
+      totalPending += dni.getPendingContainerAllocations().getCount();
+      List<StorageReportProto> storageReports = dni.getStorageReports();
+      if (storageReports != null && !storageReports.isEmpty()) {
+        StorageReportTotals nodeTotals = sumStorageReports(storageReports);
+        capacityByte += nodeTotals.capacity;
+        scmUsedByte += nodeTotals.scmUsed;
+        remainingByte += nodeTotals.remaining;
+        if (nodeTotals.capacity <= 0) {
+          usages[usageIndex++] = 0;
+        } else {
+          usages[usageIndex++] = Float.parseFloat(formatStoragePercentage(
+              ((double) nodeTotals.scmUsed / nodeTotals.capacity) * 100));
+        }
       } else {
-        float storagePerc = Float.parseFloat(storagePercentage[0]);
-        usages[i++] = storagePerc;
-        totalOzoneUsed = totalOzoneUsed + storagePerc;
+        usages[usageIndex++] = 0;
       }
     }
+    return new NodeStorageAggregation(capacityByte, scmUsedByte, remainingByte, totalPending, usages);
+  }
 
-    totalOzoneUsed /= nodeStateManager.getAllNodes().size();
+  private void nodeUsageStatistics(Map<String, String> nodeStatics, NodeStorageAggregation storageAggregation) {
+    if (storageAggregation == null) {
+      return;
+    }
+    float[] usages = storageAggregation.usages.clone();
+    float totalOzoneUsed = 0;
+    for (float usage : usages) {
+      totalOzoneUsed += usage;
+    }
+    totalOzoneUsed /= usages.length;
     Arrays.sort(usages);
     float median = usages[usages.length / 2];
     nodeStatics.put(UsageStatics.MEDIAN.getLabel(), String.valueOf(median));
@@ -1427,19 +1457,39 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     nodeStatics.put(UsageStatics.MIN.getLabel(), String.valueOf(min));
 
     float dev = 0;
-    for (i = 0; i < usages.length; i++) {
-      dev += (usages[i] - totalOzoneUsed) * (usages[i] - totalOzoneUsed);
+    for (float usage : usages) {
+      dev += (usage - totalOzoneUsed) * (usage - totalOzoneUsed);
     }
     dev = (float) Math.sqrt(dev / usages.length);
     nodeStatics.put(UsageStatics.STDEV.getLabel(), TWO_DECIMAL_FORMAT.get().format(dev));
   }
 
-  private void nodeStateStatistics(Map<String, String> nodeStatics) {
-    int healthyNodeCount = nodeStateManager.getHealthyNodeCount();
-    int deadNodeCount = nodeStateManager.getDeadNodeCount();
-    int decommissioningNodeCount = nodeStateManager.getDecommissioningNodeCount();
-    int enteringMaintenanceNodeCount = nodeStateManager.getEnteringMaintenanceNodeCount();
-    int volumeFailuresNodeCount = nodeStateManager.getVolumeFailuresNodeCount();
+  private void nodeStateStatistics(Map<String, String> nodeStatics, List<DatanodeInfo> allNodes) {
+    int healthyNodeCount = 0;
+    int deadNodeCount = 0;
+    int decommissioningNodeCount = 0;
+    int enteringMaintenanceNodeCount = 0;
+    int volumeFailuresNodeCount = 0;
+
+    for (DatanodeInfo dni : allNodes) {
+      NodeStatus status = dni.getNodeStatus();
+      if (status.getHealth() == HEALTHY) {
+        healthyNodeCount++;
+      }
+      if (status.isDead()) {
+        deadNodeCount++;
+      }
+      if (status.isDecommissioning()) {
+        decommissioningNodeCount++;
+      }
+      if (status.isEnteringMaintenance()) {
+        enteringMaintenanceNodeCount++;
+      }
+      if (dni.getFailedVolumeCount() > 0) {
+        volumeFailuresNodeCount++;
+      }
+    }
+
     nodeStatics.put(StateStatistics.HEALTHY.getLabel(), String.valueOf(healthyNodeCount));
     nodeStatics.put(StateStatistics.DEAD.getLabel(), String.valueOf(deadNodeCount));
     nodeStatics.put(StateStatistics.DECOMMISSIONING.getLabel(), String.valueOf(decommissioningNodeCount));
@@ -1447,34 +1497,20 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     nodeStatics.put(StateStatistics.VOLUME_FAILURES.getLabel(), String.valueOf(volumeFailuresNodeCount));
   }
 
-  private void nodeSpaceStatistics(Map<String, String> nodeStatics) {
-    if (nodeStateManager.getAllNodes().isEmpty()) {
+  private void nodeSpaceStatistics(Map<String, String> nodeStatics, NodeStorageAggregation storageAggregation) {
+    if (storageAggregation == null) {
       return;
     }
-    long capacityByte = 0;
-    long scmUsedByte = 0;
-    long remainingByte = 0;
-    long totalPending = 0;
-    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
-      totalPending += dni.getPendingContainerAllocations().getCount();
-      List<StorageReportProto> storageReports = dni.getStorageReports();
-      if (storageReports != null && !storageReports.isEmpty()) {
-        for (StorageReportProto storageReport : storageReports) {
-          capacityByte += storageReport.getCapacity();
-          scmUsedByte += storageReport.getScmUsed();
-          remainingByte += storageReport.getRemaining();
-        }
-      }
-    }
-    metrics.setTotalPendingContainerSlots(totalPending);
+    metrics.setTotalPendingContainerSlots(storageAggregation.totalPending);
 
-    long nonScmUsedByte = capacityByte - scmUsedByte - remainingByte;
+    long nonScmUsedByte = storageAggregation.capacityByte - storageAggregation.scmUsedByte
+        - storageAggregation.remainingByte;
     if (nonScmUsedByte < 0) {
       nonScmUsedByte = 0;
     }
-    String capacity = convertUnit(capacityByte);
-    String scmUsed = convertUnit(scmUsedByte);
-    String remaining = convertUnit(remainingByte);
+    String capacity = convertUnit(storageAggregation.capacityByte);
+    String scmUsed = convertUnit(storageAggregation.scmUsedByte);
+    String remaining = convertUnit(storageAggregation.remainingByte);
     String nonScmUsed = convertUnit(nonScmUsedByte);
     nodeStatics.put(SpaceStatistics.CAPACITY.getLabel(), capacity);
     nodeStatics.put(SpaceStatistics.SCM_USED.getLabel(), scmUsed);
@@ -1482,8 +1518,8 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     nodeStatics.put(SpaceStatistics.NON_SCM_USED.getLabel(), nonScmUsed);
   }
 
-  private void nodeNonWritableStatistics(Map<String, String> nodeStatics) {
-    int nonWritableNodesCount = (int) getAllNodes().parallelStream()
+  private void nodeNonWritableStatistics(Map<String, String> nodeStatics, List<DatanodeInfo> allNodes) {
+    int nonWritableNodesCount = (int) allNodes.parallelStream()
         .filter(nonWritableNodeFilter)
         .count();
 
@@ -1548,6 +1584,13 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
           dnInfo.getID(), blockSize);
       return false;
     }
+  }
+
+  private record StorageReportTotals(long capacity, long scmUsed, long remaining) {
+  }
+
+  private record NodeStorageAggregation(long capacityByte, long scmUsedByte, long remainingByte, 
+      long totalPending, float[] usages) {
   }
 
   /**
