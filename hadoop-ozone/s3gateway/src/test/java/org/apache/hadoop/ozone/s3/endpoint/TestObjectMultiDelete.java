@@ -163,6 +163,30 @@ public class TestObjectMultiDelete {
   }
 
   @Test
+  public void conditionalDeleteMatchingEtag() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    OzoneBucket bucket = initConditionalDeleteTestData(client);
+
+    BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client)
+        .build();
+
+    MultiDeleteRequest mdr = new MultiDeleteRequest();
+    MultiDeleteRequest.DeleteObject obj1 = new MultiDeleteRequest.DeleteObject("key1");
+    obj1.setETag("\"match-1\"");
+    mdr.getObjects().add(obj1);
+    MultiDeleteRequest.DeleteObject obj2 = new MultiDeleteRequest.DeleteObject("key2");
+    obj2.setETag("match-2");
+    mdr.getObjects().add(obj2);
+
+    MultiDeleteResponse response = rest.multiDelete("b1", "", mdr);
+
+    assertEquals(2, response.getDeletedObjects().size());
+    assertEquals(0, response.getErrors().size());
+    assertEquals(singleton("key3"), listKeyNames(bucket));
+  }
+
+  @Test
   public void conditionalDeleteMatchingIfMatch() throws Exception {
     OzoneClient client = new OzoneClientStub();
     OzoneBucket bucket = initConditionalDeleteTestData(client);

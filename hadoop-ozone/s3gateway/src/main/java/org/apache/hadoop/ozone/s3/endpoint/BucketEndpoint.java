@@ -30,7 +30,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +52,6 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -369,7 +367,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     if (request.getObjects() != null) {
       Map<String, ErrorInfo> undeletedKeyResultMap;
       boolean hasConditionalDeletes = request.getObjects().stream()
-          .anyMatch(d -> StringUtils.isNotBlank(d.getIfMatch()));
+          .anyMatch(MultiDeleteRequest.DeleteObject::hasDeletePrecondition);
       for (DeleteObject keyToDelete : request.getObjects()) {
         deleteKeys.add(keyToDelete.getKey());
       }
@@ -377,8 +375,10 @@ public class BucketEndpoint extends BucketOperationHandler {
       try {
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
         if (hasConditionalDeletes) {
+          String volumeName = getVolume().getName();
           for (DeleteObject keyToDelete : request.getObjects()) {
-            deleteSingleObject(bucket, keyToDelete, result, request.isQuiet(), failedDeletes);
+            deleteSingleObject(volumeName, bucketName, keyToDelete, result, request.isQuiet(),
+                failedDeletes);
           }
         } else {
           undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
@@ -425,41 +425,33 @@ public class BucketEndpoint extends BucketOperationHandler {
     return result;
   }
 
-  private void deleteSingleObject(OzoneBucket bucket, DeleteObject deleteObject,
-      MultiDeleteResponse result, boolean quiet, List<String> failedDeletes)
-      throws IOException {
+  private void deleteSingleObject(String volumeName, String bucketName,
+      DeleteObject deleteObject, MultiDeleteResponse result, boolean quiet,
+      List<String> failedDeletes) throws IOException {
     String key = deleteObject.getKey();
-    if (StringUtils.isNotBlank(deleteObject.getIfMatch())) {
-      try {
-        OzoneKeyDetails keyDetails = bucket.getKey(key);
-        String currentETag = keyDetails.getMetadata().get(ETAG);
-        if (!S3ConditionalRequest.eTagMatches(deleteObject.getIfMatch(), currentETag)) {
-          addPreconditionFailedError(result, key);
-          failedDeletes.add(key);
-          return;
-        }
-      } catch (OMException ex) {
-        if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-          addPreconditionFailedError(result, key);
-          failedDeletes.add(key);
-          return;
-        }
-        throw ex;
-      }
-    }
-
-    Map<String, ErrorInfo> undeletedKeyResultMap =
-        bucket.deleteKeys(Collections.singletonList(key), true);
-    ErrorInfo error = undeletedKeyResultMap.get(key);
-    boolean deleted = error == null ||
-        ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
-    if (deleted) {
+    S3ConditionalDelete.Result deleteResult = S3ConditionalDelete.deleteKey(
+        getClientProtocol(), volumeName, bucketName, key,
+        deleteObject.getDeletePreconditionEtag());
+    switch (deleteResult.getOutcome()) {
+    case DELETED:
+    case NOT_FOUND_UNCONDITIONAL:
+    case DIRECTORY_NOT_EMPTY:
       if (!quiet) {
         result.addDeleted(new DeletedObject(key));
       }
-    } else {
+      break;
+    case PRECONDITION_FAILED:
+      addPreconditionFailedError(result, key);
       failedDeletes.add(key);
-      result.addError(new Error(key, error.getCode(), error.getMessage()));
+      break;
+    case FAILED:
+      OMException ex = deleteResult.getOmException();
+      failedDeletes.add(key);
+      result.addError(new Error(key, ex.getResult().name(), ex.getMessage()));
+      break;
+    default:
+      throw new IllegalStateException("Unexpected delete outcome: "
+          + deleteResult.getOutcome());
     }
   }
 

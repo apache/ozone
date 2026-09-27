@@ -23,6 +23,8 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
@@ -69,6 +71,11 @@ public class MultiDeleteRequest {
     @XmlElement(name = "VersionId")
     private String versionId;
 
+    /** AWS DeleteObjects conditional delete (see DeleteObjects API). */
+    @XmlElement(name = OzoneConsts.ETAG)
+    private String eTag;
+
+    /** Non-AWS element retained for compatibility with earlier Ozone drafts. */
     @XmlElement(name = S3Consts.IF_MATCH_HEADER)
     private String ifMatch;
 
@@ -106,6 +113,28 @@ public class MultiDeleteRequest {
 
     public void setIfMatch(String ifMatch) {
       this.ifMatch = ifMatch;
+    }
+
+    public String getETag() {
+      return eTag;
+    }
+
+    public void setETag(String eTagValue) {
+      this.eTag = eTagValue;
+    }
+
+    /**
+     * ETag precondition for conditional delete ({@code ETag} in AWS DeleteObjects XML).
+     */
+    public String getDeletePreconditionEtag() {
+      if (StringUtils.isNotBlank(eTag)) {
+        return eTag;
+      }
+      return ifMatch;
+    }
+
+    public boolean hasDeletePrecondition() {
+      return StringUtils.isNotBlank(getDeletePreconditionEtag());
     }
   }
 }
