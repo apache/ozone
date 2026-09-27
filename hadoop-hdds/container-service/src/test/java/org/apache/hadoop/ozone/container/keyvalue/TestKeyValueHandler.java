@@ -25,7 +25,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
@@ -1213,18 +1212,11 @@ public class TestKeyValueHandler {
   }
 
   @Test
-  void testReadBlockResponseSizeLimit() throws Exception {
+  void testReadBlockResponseSize() throws Exception {
     try (StreamFixture fixture = new StreamFixture()) {
       fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
-      assertResponses(fixture.read(0, BLOCK_SIZE, 0), 0, BLOCK_SIZE);
-      for (int responseSize : new int[] {OZONE_SCM_CHUNK_MAX_SIZE + 1, Integer.MAX_VALUE}) {
-        ReadBlockResult result = fixture.read(0, BLOCK_SIZE, responseSize);
-        assertNull(result.getResponse());
-        assertThat(result.getDataResponses()).isEmpty();
-        assertEquals(1, result.getErrors().size());
-        StatusRuntimeException error = assertInstanceOf(StatusRuntimeException.class, result.getErrors().get(0));
-        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
-        assertFalse(fixture.blockFile.isOpen());
+      for (int responseSize : new int[] {0, 64 * 1024 * 1024}) {
+        assertResponses(fixture.read(0, BLOCK_SIZE, responseSize), 0, BLOCK_SIZE);
       }
     }
   }

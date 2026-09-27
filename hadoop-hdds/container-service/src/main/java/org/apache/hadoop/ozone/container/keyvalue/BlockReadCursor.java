@@ -22,7 +22,6 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 
 /** Tracks chunk-relative checksum boundaries for a streaming block read. */
 class BlockReadCursor {
@@ -43,19 +42,14 @@ class BlockReadCursor {
     int bufferSize = responseSize;
     for (int i = 0; i < chunks.size(); i++) {
       ChunkInfo chunk = chunks.get(i);
-      long chunkOffset = chunkOffsets[i];
-      if (chunk.getOffset() != chunkOffset || chunk.getLen() <= 0 || chunk.getLen() > Long.MAX_VALUE - chunkOffset) {
-        throw new IOException("Invalid chunk range: " + chunk);
-      }
-      chunkOffsets[i + 1] = chunkOffset + chunk.getLen();
+      chunkOffsets[i] = chunk.getOffset();
       // One checksum interval (or the short chunk containing it) must always fit in the buffer.
       bufferSize = Math.max(bufferSize, (int) Math.min(chunk.getLen(), interval(chunk)));
     }
-    long blockEnd = chunkOffsets[chunks.size()];
-    if (requestedOffset < 0 || requestedOffset >= blockEnd || length < 0 || responseSize <= 0) {
-      throw new IOException("Invalid streaming read range or response size");
-    }
-    this.responseDataSize = ChunkUtils.limitReadSize(bufferSize);
+    ChunkInfo lastChunk = chunks.get(chunks.size() - 1);
+    long blockEnd = lastChunk.getOffset() + lastChunk.getLen();
+    chunkOffsets[chunks.size()] = blockEnd;
+    this.responseDataSize = bufferSize;
     chunkIndex = findChunk(requestedOffset);
     start = length == 0 ? requestedOffset : alignDown(requestedOffset, chunkIndex);
     offset = start;

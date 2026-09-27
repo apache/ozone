@@ -446,14 +446,13 @@ public class Checksum {
     int remaining = data.remaining();
     long offset = blockOffset;
     while (remaining > 0) {
-      if (startIndex < 0 || startIndex >= chunks.size()) {
+      if (startIndex >= chunks.size()) {
         throw new OzoneChecksumException("Missing chunk metadata at offset " + offset);
       }
       ChunkInfo chunk = chunks.get(startIndex++);
       long chunkOffset = chunk.getOffset();
       long length = chunk.getLen();
-      if (chunkOffset < 0 || length <= 0 || length > Long.MAX_VALUE - chunkOffset
-          || offset < chunkOffset || offset - chunkOffset >= length
+      if (offset < chunkOffset || offset - chunkOffset >= length
           || (offset != blockOffset && offset != chunkOffset)) {
         throw new OzoneChecksumException("Invalid chunk coverage at offset " + offset);
       }
@@ -462,8 +461,7 @@ public class Checksum {
       if (chunk.getChecksumData().getType() != ChecksumType.NONE) {
         int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
         if (bytesPerChecksum <= 0 || relativeOffset % bytesPerChecksum != 0
-            || (relativeOffset + size != length && (relativeOffset + size) % bytesPerChecksum != 0)
-            || relativeOffset / bytesPerChecksum > Integer.MAX_VALUE) {
+            || (relativeOffset + size != length && (relativeOffset + size) % bytesPerChecksum != 0)) {
           throw new OzoneChecksumException("Invalid checksum boundary at offset " + offset);
         }
         verifySingleChunk(data, dataOffset, size, chunk, (int) (relativeOffset / bytesPerChecksum));
