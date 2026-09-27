@@ -71,6 +71,7 @@ import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for StreamBlockInputStream custom configuration behavior.
@@ -972,6 +973,9 @@ public class TestStreamBlockInputStream {
         assertArrayEquals(Arrays.copyOfRange(expected, seek, expected.length), actual);
       }
     }
+    ArgumentCaptor<ContainerCommandRequestProto> request = ArgumentCaptor.forClass(ContainerCommandRequestProto.class);
+    verify(client).streamRead(request.capture(), any());
+    assertEquals(verifyChecksum, request.getValue().getReadBlock().getIncludeChecksums());
     verify(client, times(1)).completeStreamRead();
   }
 }

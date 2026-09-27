@@ -1221,6 +1221,54 @@ public class TestKeyValueHandler {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testReadBlockWithoutResponseChecksums(boolean validateChecksums) throws Exception {
+    DatanodeConfiguration datanodeConfig = conf.getObject(DatanodeConfiguration.class);
+    datanodeConfig.setChunkDataValidationCheck(validateChecksums);
+    conf.setFromObject(datanodeConfig);
+    try (StreamFixture fixture = new StreamFixture()) {
+      long offset = 0;
+      for (int length : new int[] {3, 9}) {
+        ChunkInfo chunk = new ChunkInfo("chunk-" + offset, offset, length);
+        chunk.setChecksumData(new Checksum(ContainerProtos.ChecksumType.CRC32, 4)
+            .computeChecksum(ByteBuffer.wrap(writtenBytes(offset, length))));
+        fixture.appendChunk(chunk);
+        offset += length;
+      }
+      ContainerProtos.ReadBlockRequestProto.Builder request = ContainerProtos.ReadBlockRequestProto.newBuilder()
+          .setOffset(4).setLength(8).setResponseDataSize(4);
+      ReadBlockResult withChecksums = fixture.read(request);
+      assertResponses(withChecksums, 3, 9);
+      assertResponses(fixture.read(request.setIncludeChecksums(true)), 3, 9);
+      ReadBlockResult withoutChecksums = fixture.read(request.setIncludeChecksums(false));
+      assertNull(withoutChecksums.getResponse());
+      assertThat(withoutChecksums.getErrors()).isEmpty();
+      assertEquals(withChecksums.getDataResponses().size(), withoutChecksums.getDataResponses().size());
+      for (int i = 0; i < withChecksums.getDataResponses().size(); i++) {
+        ContainerProtos.ReadBlockResponseProto expected = withChecksums.getDataResponses().get(i).getReadBlock();
+        assertEquals(expected.toBuilder().clearChunkInfoList().build(),
+            withoutChecksums.getDataResponses().get(i).getReadBlock());
+      }
+
+      File file = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(
+          fixture.container.getContainerData(), fixture.blockID, "unused");
+      try (java.io.RandomAccessFile corrupt = new java.io.RandomAccessFile(file, "rw")) {
+        corrupt.seek(3);
+        corrupt.write(255);
+      }
+      ReadBlockResult corrupt = fixture.read(request);
+      if (validateChecksums) {
+        assertEquals(ContainerProtos.Result.IO_EXCEPTION, corrupt.getResponse().getResult());
+        assertThat(corrupt.getDataResponses()).isEmpty();
+      } else {
+        assertNull(corrupt.getResponse());
+        assertThat(corrupt.getErrors()).isEmpty();
+        assertEquals((byte) 255, corrupt.getDataResponses().get(0).getReadBlock().getData().byteAt(0));
+      }
+    }
+  }
+
   /** Each byte of the block is the low byte of its position. */
   private static byte[] writtenBytes(long offset, int length) {
     final byte[] bytes = new byte[length];
@@ -1286,9 +1334,13 @@ public class TestKeyValueHandler {
 
     /** Write one more chunk and re-put the block with it. */
     void appendChunk(String name, long offset, int length) throws Exception {
-      ChunkInfo chunkInfo = new ChunkInfo(name, offset, length);
+      appendChunk(new ChunkInfo(name, offset, length));
+    }
+
+    void appendChunk(ChunkInfo chunkInfo) throws Exception {
       blockData.addChunk(chunkInfo.getProtoBufMessage());
-      ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(writtenBytes(offset, length)));
+      ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(
+          writtenBytes(chunkInfo.getOffset(), (int) chunkInfo.getLen())));
       kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, data,
           DispatcherContext.getHandleWriteChunk());
       kvHandler.getBlockManager().putBlock(container, blockData);
@@ -1300,16 +1352,16 @@ public class TestKeyValueHandler {
     }
 
     ReadBlockResult read(long offset, long length, int responseDataSize) {
+      return read(ContainerProtos.ReadBlockRequestProto.newBuilder()
+          .setOffset(offset).setLength(length).setResponseDataSize(responseDataSize));
+    }
+
+    ReadBlockResult read(ContainerProtos.ReadBlockRequestProto.Builder readBlock) {
       ContainerCommandRequestProto request = ContainerCommandRequestProto.newBuilder()
           .setCmdType(ContainerProtos.Type.ReadBlock)
           .setContainerID(container.getContainerData().getContainerID())
           .setDatanodeUuid(DATANODE_UUID)
-          .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
-              .setBlockID(blockID.getDatanodeBlockIDProtobuf())
-              .setOffset(offset)
-              .setLength(length)
-              .setResponseDataSize(responseDataSize)
-              .build())
+          .setReadBlock(readBlock.setBlockID(blockID.getDatanodeBlockIDProtobuf()))
           .build();
       ReadBlockResult result = new ReadBlockResult(blockID);
       result.setResponse(kvHandler.readBlock(request, container, blockFile, result));

@@ -371,7 +371,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
     xceiverClient.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
-        blockID, requestedLength, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
+        blockID, requestedLength, length, responseDataSize, verifyChecksum, tokenRef.get(), pipelineRef.get()), r);
   }
 
   private void handleExceptions(IOException cause) throws IOException {

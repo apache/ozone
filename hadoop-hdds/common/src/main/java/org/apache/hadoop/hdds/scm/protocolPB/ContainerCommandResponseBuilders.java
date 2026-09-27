@@ -345,11 +345,12 @@ public final class ContainerCommandResponseBuilders {
   public static ContainerCommandResponseProto getReadBlockResponse(
       ContainerCommandRequestProto request, List<ChunkInfo> chunks, ByteBuffer data, long offset) {
 
-    ContainerProtos.ReadBlockResponseProto response = ContainerProtos.ReadBlockResponseProto.newBuilder()
-        .addAllChunkInfoList(chunks)
+    ContainerProtos.ReadBlockResponseProto.Builder response = ContainerProtos.ReadBlockResponseProto.newBuilder()
         .setData(ByteString.copyFrom(data))
-        .setOffset(offset)
-        .build();
+        .setOffset(offset);
+    if (request.getReadBlock().getIncludeChecksums()) {
+      response.addAllChunkInfoList(chunks);
+    }
 
     return getSuccessResponseBuilder(request)
         .setReadBlock(response)
