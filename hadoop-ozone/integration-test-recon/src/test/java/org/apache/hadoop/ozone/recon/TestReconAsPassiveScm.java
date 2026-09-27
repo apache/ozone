@@ -24,10 +24,8 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.Optional;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -91,15 +89,22 @@ public class TestReconAsPassiveScm {
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
 
-    LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() >= 4));
-
-    // Verify if Recon has all the pipelines from SCM.
-    scmPipelineManager.getPipelines().forEach(p -> {
+    // SCM and Recon update their pipeline state asynchronously. Validate the
+    // complete SCM snapshot inside the retry loop so a pipeline created after
+    // Recon reaches the expected count does not cause a one-shot failure.
+    LambdaTestUtils.await(60000, 5000, () -> {
+      if (scmPipelineManager.getPipelines().size() < 4) {
+        return false;
+      }
       try {
-        assertNotNull(reconPipelineManager.getPipeline(p.getId()));
+        for (Pipeline pipeline : scmPipelineManager.getPipelines()) {
+          if (reconPipelineManager.getPipeline(pipeline.getId()) == null) {
+            return false;
+          }
+        }
+        return true;
       } catch (PipelineNotFoundException e) {
-        fail();
+        return false;
       }
     });
 
