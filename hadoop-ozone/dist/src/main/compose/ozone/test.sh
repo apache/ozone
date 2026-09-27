@@ -24,6 +24,7 @@ export COMPOSE_DIR
 
 export SECURITY_ENABLED=false
 export OZONE_REPLICATION_FACTOR=3
+export COMPOSE_FILE=docker-compose.yaml:monitoring.yaml
 
 # shellcheck source=/dev/null
 source "$COMPOSE_DIR/../testlib.sh"
@@ -40,6 +41,7 @@ execute_robot_test scm gdpr
 execute_robot_test scm security/ozone-secure-token.robot
 
 execute_robot_test scm recon
+execute_robot_test scm prometheus
 
 execute_robot_test scm om-ratis
 
@@ -54,6 +56,8 @@ execute_robot_test scm -v SCHEME:o3fs -v BUCKET_TYPE:bucket -N ozonefs-o3fs-buck
 execute_robot_test scm -v SCHEME:ofs -N ozonefs-obs ozonefs/ozonefs-obs.robot
 
 execute_robot_test s3g grpc/grpc-om-s3-metrics.robot
+
+execute_robot_test s3g s3/health.robot
 
 execute_robot_test scm --exclude om_filesystem --exclude pre-finalized-snapshot-tests snapshot
 

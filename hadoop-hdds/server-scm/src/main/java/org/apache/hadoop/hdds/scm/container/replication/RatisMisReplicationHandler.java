@@ -26,7 +26,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
@@ -63,18 +62,11 @@ public class RatisMisReplicationHandler extends MisReplicationHandler {
       List<DatanodeDetails> sources, List<DatanodeDetails> targetDns)
       throws CommandTargetOverloadedException, NotLeaderException {
     ReplicationManager replicationManager = getReplicationManager();
-    long containerID = containerInfo.getContainerID();
 
     int commandsSent = 0;
     for (DatanodeDetails target : targetDns) {
-      if (replicationManager.getConfig().isPush()) {
-        replicationManager.sendThrottledReplicationCommand(containerInfo,
-            sources, target, 0);
-      } else {
-        ReplicateContainerCommand cmd = ReplicateContainerCommand
-            .fromSources(containerID, sources);
-        replicationManager.sendDatanodeCommand(cmd, containerInfo, target);
-      }
+      replicationManager.sendThrottledReplicationCommand(containerInfo,
+          sources, target, 0);
       commandsSent++;
     }
 

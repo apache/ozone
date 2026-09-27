@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.scm.node;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -219,7 +219,7 @@ public class TestDiskBalancer {
     }
 
     // Query status from remaining IN_SERVICE DNs and verify they still show RUNNING
-    List<DatanodeDetails> inServiceDatanodes = nm.getNodes(IN_SERVICE, HddsProtos.NodeState.HEALTHY);
+    final List<DatanodeInfo> inServiceDatanodes = nm.getNodes(IN_SERVICE, HddsProtos.NodeState.HEALTHY);
     statusProtoList.clear();
     for (DatanodeDetails dn : inServiceDatanodes) {
       try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {

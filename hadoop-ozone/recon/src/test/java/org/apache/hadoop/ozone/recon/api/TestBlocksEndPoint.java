@@ -268,7 +268,7 @@ public class TestBlocksEndPoint {
     reconPipelineManager.addPipeline(localPipeline);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
-            .setContainerID(localContainerID.getId())
+            .setContainerID(localContainerID.getIdForTesting())
             .setNumberOfKeys(10)
             .setPipelineID(localPipeline.getId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))

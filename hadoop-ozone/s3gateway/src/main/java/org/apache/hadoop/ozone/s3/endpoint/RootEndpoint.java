@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +83,8 @@ public class RootEndpoint extends EndpointBase {
    */
   private Response listDirectoryBuckets()
       throws OS3Exception, IOException {
-    long startNanos = Time.monotonicNowNanos();
+    S3RequestContext context = new S3RequestContext(this, S3GAction.LIST_DIRECTORY_BUCKETS);
+    long startNanos = context.getStartNanos();
     boolean auditSuccess = true;
     try {
       final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
@@ -139,49 +139,85 @@ public class RootEndpoint extends EndpointBase {
       return Response.ok(response).build();
     } catch (Exception ex) {
       auditSuccess = false;
-      auditReadFailure(S3GAction.LIST_DIRECTORY_BUCKETS, ex);
+      auditReadFailure(context.getAction(), ex);
       throw ex;
     } finally {
       if (auditSuccess) {
-        auditReadSuccess(S3GAction.LIST_DIRECTORY_BUCKETS);
+        auditReadSuccess(context.getAction());
       }
     }
   }
 
   private Response listAllBuckets()
       throws OS3Exception, IOException {
-    long startNanos = Time.monotonicNowNanos();
+    S3RequestContext context = new S3RequestContext(this, S3GAction.LIST_S3_BUCKETS);
+    long startNanos = context.getStartNanos();
     boolean auditSuccess = true;
     try {
+      final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
+      final String maxBucketsParam = queryParams().get(QueryParams.MAX_BUCKETS);
+      final boolean paginated = maxBucketsParam != null || continueToken != null;
+      final int maxBuckets = getMaxBuckets(paginated,
+          queryParams().getInt(QueryParams.MAX_BUCKETS, S3Consts.MAX_BUCKETS_LIMIT));
+
       ListBucketResponse response = new ListBucketResponse();
+      String previousBucket = null;
+      if (continueToken != null) {
+        previousBucket = ContinueToken.decodeFromString(continueToken).getLastKey();
+      }
+
       Iterator<? extends OzoneBucket> bucketIterator;
       try {
-        bucketIterator =
-            listS3Buckets(null, volume -> response.setOwner(S3Owner.of(volume.getOwner())));
+        if (previousBucket == null) {
+          bucketIterator = listS3Buckets(null,
+              volume -> response.setOwner(S3Owner.of(volume.getOwner())));
+        } else {
+          bucketIterator = listS3Buckets(null, previousBucket,
+              volume -> response.setOwner(S3Owner.of(volume.getOwner())));
+        }
       } catch (Exception e) {
         getMetrics().updateListS3BucketsFailureStats(startNanos);
         throw e;
       }
 
-      while (bucketIterator.hasNext()) {
+      int count = 0;
+      String lastBucketName = null;
+      while (bucketIterator.hasNext() && count < maxBuckets) {
         OzoneBucket next = bucketIterator.next();
         BucketMetadata bucketMetadata = new BucketMetadata();
         bucketMetadata.setName(next.getName());
         bucketMetadata.setCreationDate(next.getCreationTime());
         response.addBucket(bucketMetadata);
+        lastBucketName = next.getName();
+        count++;
+      }
+
+      if (paginated && lastBucketName != null && bucketIterator.hasNext()) {
+        response.setContinuationToken(
+            new ContinueToken(lastBucketName, null).encodeToString());
       }
 
       getMetrics().updateListS3BucketsSuccessStats(startNanos);
       return Response.ok(response).build();
     } catch (Exception ex) {
       auditSuccess = false;
-      auditReadFailure(S3GAction.LIST_S3_BUCKETS, ex);
+      auditReadFailure(context.getAction(), ex);
       throw ex;
     } finally {
       if (auditSuccess) {
-        auditReadSuccess(S3GAction.LIST_S3_BUCKETS);
+        auditReadSuccess(context.getAction());
       }
     }
+  }
+
+  private int getMaxBuckets(boolean paginated, int requestedMaxBuckets) throws OS3Exception {
+    if (!paginated) {
+      return Integer.MAX_VALUE;
+    }
+    if (requestedMaxBuckets < 1) {
+      throw newError(INVALID_ARGUMENT, "max-buckets must be >= 1");
+    }
+    return Math.min(requestedMaxBuckets, S3Consts.MAX_BUCKETS_LIMIT);
   }
 
   private int validateMaxDirectoryBuckets(int maxDirectoryBuckets) throws OS3Exception {

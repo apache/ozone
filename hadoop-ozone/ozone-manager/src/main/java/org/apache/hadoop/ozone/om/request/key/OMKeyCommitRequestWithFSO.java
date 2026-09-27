@@ -52,6 +52,7 @@ import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -129,7 +130,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       bucketLockAcquired = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       String errMsg = "Cannot create file : " + keyName
               + " as parent directory doesn't exist";
@@ -245,10 +246,12 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       validateAtomicRewrite(keyToDelete, omKeyInfo, auditMap);
       // Optimistic locking validation has passed. Now set the rewrite fields to null so they are
       // not persisted in the key table.
-      omKeyInfo.setExpectedDataGeneration(null);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setExpectedDataGeneration(null)
+          .build();
 
       long correctedSpace = omKeyInfo.getReplicatedSize();
-      // if keyToDelete isn't null, usedNamespace shouldn't check and increase.
+      // Same-client hsync re-commit does not consume namespace.
       if (keyToDelete != null && isSameHsyncKey) {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
@@ -297,12 +300,13 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         omBucketInfo.decrUsedNamespace(totalNamespace, true);
         omBucketInfo.decrUsedNamespace(filteredUsedBlockCnt.getRight(), false);
         omBucketInfo.decrUsedBytes(totalSize, true);
+        omBucketInfo.incrUsedNamespace(1L);
       } else {
         checkBucketQuotaInNamespace(omBucketInfo, 1L);
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
+        omBucketInfo.incrUsedNamespace(1L);
       }
-      omBucketInfo.incrUsedNamespace(1L);
 
       // let the uncommitted blocks pretend as key's old version blocks
       // which will be deleted as RepeatedOmKeyInfo
@@ -346,6 +350,13 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               omKeyInfo, fileName, trxnLogIndex);
 
       omBucketInfo.incrUsedBytes(correctedSpace);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
+      omResponse.setCommitKeyResponse(CommitKeyResponse.newBuilder()
+          .setModificationTime(commitKeyArgs.getModificationTime())
+          .build());
 
       omClientResponse = new OMKeyCommitResponseWithFSO(omResponse.build(),
           omKeyInfo, dbFileKey, dbOpenFileKey, omBucketInfo.copyObject(),

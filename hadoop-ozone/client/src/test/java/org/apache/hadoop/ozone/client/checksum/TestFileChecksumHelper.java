@@ -145,7 +145,7 @@ public class TestFileChecksumHelper {
       int length, OzoneClientConfig.ChecksumCombineMode combineMode, RpcClient mockRpcClient, OmKeyInfo keyInfo)
       throws IOException {
     return type == ReplicationType.RATIS ? new ReplicatedFileChecksumHelper(
-        mockVolume, mockBucket, "dummy", length, combineMode, mockRpcClient)
+        mockVolume, mockBucket, "dummy", length, combineMode, mockRpcClient, keyInfo)
         : new ECFileChecksumHelper(
         mockVolume, mockBucket, "dummy", length, combineMode, mockRpcClient, keyInfo);
   }
@@ -346,8 +346,10 @@ public class TestFileChecksumHelper {
       OzoneClientConfig.ChecksumCombineMode combineMode =
           OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
 
+      OmKeyInfo keyInfo = rpcClient.getKeyInfo(
+          volume.getName(), bucket.getName(), keyName, false);
       ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-          volume, bucket, keyName, 10, combineMode, rpcClient);
+          volume, bucket, keyName, 10, combineMode, rpcClient, keyInfo);
 
       helper.compute();
       FileChecksum fileChecksum = helper.getFileChecksum();

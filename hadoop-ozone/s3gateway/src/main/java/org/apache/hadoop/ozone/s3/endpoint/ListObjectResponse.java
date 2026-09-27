@@ -69,7 +69,7 @@ public class ListObjectResponse {
   @XmlElement(name = "NextMarker")
   private String nextMarker;
 
-  @XmlElement(name = "continueToken")
+  @XmlElement(name = "ContinuationToken")
   private String continueToken;
 
   @XmlElement(name = "Contents")

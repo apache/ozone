@@ -50,10 +50,10 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectMetrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -150,8 +150,8 @@ public class TestOzoneContainerUpgradeShell {
   }
 
   private static void writeKey(String keyName) throws IOException {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, VOLUME_NAME, BUCKET_NAME);
-    TestDataUtil.createKey(bucket, keyName, "test".getBytes(StandardCharsets.UTF_8));
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, VOLUME_NAME, BUCKET_NAME);
+    DataTestUtil.createKey(bucket, keyName, "test".getBytes(StandardCharsets.UTF_8));
   }
 
   private static ContainerInfo closeContainerForKey(String keyName)

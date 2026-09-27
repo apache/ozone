@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.DataTestUtil.createKey;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.TestDataUtil.createKey;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.jupiter.api.Assertions.assertThrows;

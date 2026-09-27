@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.proxy;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.net.InetAddresses;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -29,8 +30,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
@@ -249,22 +252,96 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
                                                            Exception e) {
     ServerNotLeaderException snle =
         (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
-    if (snle != null && snle.getSuggestedLeader() != null) {
-      Optional<SCMProxyInfo> matchedProxyInfo =
-          scmProxyInfoMap.values().stream().filter(
-              proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
-                  .equals(snle.getSuggestedLeader())).findFirst();
-      if (matchedProxyInfo.isPresent()) {
-        newLeader = matchedProxyInfo.get().getNodeId();
+    String suggestedLeader = snle != null ? snle.getSuggestedLeader() : null;
+    if (suggestedLeader != null) {
+      Optional<String> matchedNodeId = findSuggestedLeaderNodeId(suggestedLeader);
+      if (matchedNodeId.isPresent()) {
+        newLeader = matchedNodeId.get();
         getLogger().debug("Performing failover to suggested leader {}, nodeId {}",
-            snle.getSuggestedLeader(), newLeader);
+            suggestedLeader, newLeader);
       } else {
         getLogger().debug("Suggested leader {} does not match with any of the " +
-                "proxyInfo address {}", snle.getSuggestedLeader(),
+                "proxyInfo address {}", suggestedLeader,
             Arrays.toString(scmProxyInfoMap.values().toArray()));
       }
     }
     assignLeaderToNode(newLeader);
+  }
+
+  /**
+   * Find the SCM nodeId whose address matches the suggested-leader authority. Callers hold
+   * the provider monitor, so this must never resolve a name.
+   */
+  private Optional<String> findSuggestedLeaderNodeId(String suggestedLeader) {
+    final Optional<String> host;
+    final OptionalInt port;
+    try {
+      host = HddsUtils.getHostName(suggestedLeader);
+      port = HddsUtils.getHostPort(suggestedLeader);
+    } catch (IllegalArgumentException ex) {
+      getLogger().warn("Ignoring unparseable suggested leader {}", suggestedLeader, ex);
+      return Optional.empty();
+    }
+    if (!host.isPresent() || !port.isPresent()) {
+      return Optional.empty();
+    }
+    return scmProxyInfoMap.values().stream()
+        .filter(proxyInfo -> matchesAuthority(proxyInfo.getAddress(), host.get(), port.getAsInt()))
+        .findFirst()
+        .map(SCMProxyInfo::getNodeId);
+  }
+
+  private static boolean matchesAuthority(InetSocketAddress address, String host, int port) {
+    if (address.getPort() != port) {
+      return false;
+    }
+    // Both getHostString() and getAddress() read what was resolved when the proxy info was
+    // built, so neither triggers a lookup here.
+    String addressHost = address.getHostString();
+    if (sameHost(addressHost, host)) {
+      return true;
+    }
+    InetAddress resolved = address.getAddress();
+    return resolved != null && sameIpLiteral(resolved.getHostAddress(), host);
+  }
+
+  /**
+   * Whether two authority hosts denote the same SCM. Names are matched case-insensitively as DNS
+   * requires, while IP literals go through {@link #sameIpLiteral} so that an IPv6 zone keeps its
+   * case: eth0 and ETH0 are different interfaces.
+   */
+  private static boolean sameHost(String addressHost, String host) {
+    if (isIpLiteral(addressHost) || isIpLiteral(host)) {
+      return sameIpLiteral(addressHost, host);
+    }
+    return addressHost.equalsIgnoreCase(host);
+  }
+
+  /**
+   * Whether two IP literals denote the same address, allowing for different spellings of one
+   * IPv6 address. Scope is compared as text, unlike {@link InetAddress#equals} which drops it,
+   * so fe80::1%1 and fe80::1%2 differ, and so do %2 and %eth0 for the same interface.
+   */
+  private static boolean sameIpLiteral(String host, String otherHost) {
+    String ip = stripScope(host);
+    String otherIp = stripScope(otherHost);
+    return scopeOf(host).equals(scopeOf(otherHost))
+        && InetAddresses.isInetAddress(ip) && InetAddresses.isInetAddress(otherIp)
+        && InetAddresses.forString(ip).equals(InetAddresses.forString(otherIp));
+  }
+
+  private static boolean isIpLiteral(String host) {
+    return InetAddresses.isInetAddress(stripScope(host));
+  }
+
+  private static String stripScope(String host) {
+    int mark = host.indexOf('%');
+    return mark < 0 ? host : host.substring(0, mark);
+  }
+
+  private static String scopeOf(String host) {
+    int mark = host.indexOf('%');
+    return mark < 0 ? "" : host.substring(mark + 1);
   }
 
   @Override

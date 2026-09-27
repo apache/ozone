@@ -21,38 +21,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
-import org.apache.ratis.server.RaftServerConfigKeys;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
  * This class tests Ozone sh shell command with FollowerRead.
- * Inspired by TestS3Shell
  */
-public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
+public class TestOzoneShellHAWithFollowerRead {
+
+  private static MiniOzoneHAClusterImpl cluster;
 
   @BeforeAll
-  @Override
-  public void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+  static void init() throws Exception {
+    cluster = TestOzoneShellHA.startCluster(true);
+  }
 
-    OzoneManagerRatisServerConfig omHAConfig =
-        conf.getObject(OzoneManagerRatisServerConfig.class);
-    omHAConfig.setReadOption(RaftServerConfigKeys.Read.Option.LINEARIZABLE.name());
-
-    conf.setFromObject(omHAConfig);
-    conf.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
-    conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
-    conf.setBoolean("ozone.om.ha.raft.server.read.leader.lease.enabled", true);
-    conf.setBoolean("ozone.om.allow.leader.skip.linearizable.read", true);
-    conf.setBoolean("ozone.client.follower.read.enabled", true);
-    conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    startKMS();
-    startCluster(conf);
+  @AfterAll
+  static void shutdown() {
+    IOUtils.closeQuietly(cluster);
   }
 
   @Test
@@ -136,5 +128,13 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
         omFollower2.setConfiguration(oldConf);
       }
     }
+  }
+
+  private static MiniOzoneHAClusterImpl getCluster() {
+    return cluster;
+  }
+
+  private static void execute(GenericCli shell, String[] args) {
+    TestOzoneShellHA.execute(cluster.getConf(), shell, args);
   }
 }

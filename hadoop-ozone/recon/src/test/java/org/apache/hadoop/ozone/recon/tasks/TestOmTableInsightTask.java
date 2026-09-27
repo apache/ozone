@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_PARTS_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
@@ -58,12 +59,16 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
@@ -172,7 +177,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     }
     MockitoAnnotations.openMocks(this);
     // Truncate table before running each test
-    dslContext.truncate(GLOBAL_STATS);
+    dslContext.truncate(GLOBAL_STATS).execute();
   }
 
   /**
@@ -488,8 +493,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // Creating events for each table except the deleted table
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)) {
-        continue; // Skipping deleted and multipartInfo tables as they have separate tests
+      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)
+          || tableName.equals(MULTIPART_PARTS_TABLE)) {
+        continue; // Skipping deleted, multipartInfo and multipartParts tables as they have separate tests
       }
 
       // Adding 5 PUT events per table
@@ -516,7 +522,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
 
     // Verifying the count in each table
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)) {
+      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)
+          || tableName.equals(MULTIPART_PARTS_TABLE)) {
         continue;
       }
       assertEquals(4L, getCountForTable(
@@ -526,7 +533,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     List<OMDBUpdateEvent> additionalEvents = new ArrayList<>();
     // Simulating new PUT and DELETE events
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)) {
+      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)
+          || tableName.equals(MULTIPART_PARTS_TABLE)) {
         continue;
       }
       // Adding 1 new PUT event
@@ -544,7 +552,8 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     omTableInsightTask.process(additionalBatch, Collections.emptyMap());
     // Verifying the final count in each table
     for (String tableName : omTableInsightTask.getTaskTables()) {
-      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)) {
+      if (tableName.equals(DELETED_TABLE) || tableName.equals(MULTIPART_INFO_TABLE)
+          || tableName.equals(MULTIPART_PARTS_TABLE)) {
         continue;
       }
       // 5 items expected after processing the additional events.
@@ -746,6 +755,89 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(2700L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
   }
 
+  /**
+   * Validates the event-driven (O(1) per part event) accounting of split-schema MPU sizes:
+   * multipartInfoTable PUT caches the parent's replication config, multipartPartsTable PUT/UPDATE/DELETE
+   * events adjust the multipartInfoTable size totals incrementally, and a part re-upload (UPDATE, same
+   * part number) nets the old size out and the new size in rather than cancelling to zero.
+   */
+  @Test
+  public void testProcessForSplitSchemaMPU() throws Exception {
+    String uploadID = UUID.randomUUID().toString();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    OmMultipartKeyInfo splitMpu = new OmMultipartKeyInfo.Builder()
+        .setObjectID(1L)
+        .setUploadID(uploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    String multipartKey = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
+
+    // MPU initiation: caches the parent's replication config for the part events below.
+    ArrayList<OMDBUpdateEvent> initEvents = new ArrayList<>();
+    initEvents.add(getOMUpdateEvent(multipartKey, splitMpu, MULTIPART_INFO_TABLE, PUT, null));
+    omTableInsightTask.process(new OMUpdateEventBatch(initEvents, 0L), Collections.emptyMap());
+
+    assertEquals(1L, getCountForTable(MULTIPART_INFO_TABLE));
+    assertEquals(0L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(0L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+
+    // 3 parts uploaded (multipartPartsTable PUT), 100 bytes each.
+    OmMultipartPartInfo part1 = buildSplitSchemaPartInfo(volumeName, bucketName, keyName, uploadID, 1, 100L);
+    OmMultipartPartInfo part2 = buildSplitSchemaPartInfo(volumeName, bucketName, keyName, uploadID, 2, 100L);
+    OmMultipartPartInfo part3 = buildSplitSchemaPartInfo(volumeName, bucketName, keyName, uploadID, 3, 100L);
+    ArrayList<OMDBUpdateEvent> partPutEvents = new ArrayList<>();
+    partPutEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 1), part1, MULTIPART_PARTS_TABLE, PUT, null));
+    partPutEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 2), part2, MULTIPART_PARTS_TABLE, PUT, null));
+    partPutEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 3), part3, MULTIPART_PARTS_TABLE, PUT, null));
+    omTableInsightTask.process(new OMUpdateEventBatch(partPutEvents, 0L), Collections.emptyMap());
+
+    // 3 parts * 100 bytes = 300 bytes unreplicated; RATIS THREE -> 900 bytes replicated.
+    assertEquals(1L, getCountForTable(MULTIPART_INFO_TABLE));
+    assertEquals(300L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(900L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+
+    // Part 1 re-uploaded (multipartPartsTable UPDATE) with the same part number, 100 -> 200 bytes.
+    OmMultipartPartInfo newPart1 = buildSplitSchemaPartInfo(volumeName, bucketName, keyName, uploadID, 1, 200L);
+    ArrayList<OMDBUpdateEvent> partUpdateEvents = new ArrayList<>();
+    partUpdateEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 1), newPart1, MULTIPART_PARTS_TABLE,
+        UPDATE, part1));
+    omTableInsightTask.process(new OMUpdateEventBatch(partUpdateEvents, 0L), Collections.emptyMap());
+
+    // 200 + 100 + 100 = 400 bytes unreplicated; RATIS THREE -> 1200 bytes replicated.
+    assertEquals(400L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(1200L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+
+    // Part 3 removed (multipartPartsTable DELETE).
+    ArrayList<OMDBUpdateEvent> partDeleteEvents = new ArrayList<>();
+    partDeleteEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 3), part3, MULTIPART_PARTS_TABLE,
+        DELETE, null));
+    omTableInsightTask.process(new OMUpdateEventBatch(partDeleteEvents, 0L), Collections.emptyMap());
+
+    // 200 + 100 = 300 bytes unreplicated; RATIS THREE -> 900 bytes replicated.
+    assertEquals(300L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(900L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+
+    // MPU aborted: remaining parts removed, followed by the multipartInfoTable DELETE, matching OM's
+    // write-ordering guarantee that multipartInfoTable writes/deletes precede multipartPartsTable ones.
+    ArrayList<OMDBUpdateEvent> finalEvents = new ArrayList<>();
+    finalEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 1), newPart1, MULTIPART_PARTS_TABLE,
+        DELETE, null));
+    finalEvents.add(getOMUpdateEvent(OmMultipartPartKey.of(uploadID, 2), part2, MULTIPART_PARTS_TABLE,
+        DELETE, null));
+    finalEvents.add(getOMUpdateEvent(multipartKey, splitMpu, MULTIPART_INFO_TABLE, DELETE, null));
+    omTableInsightTask.process(new OMUpdateEventBatch(finalEvents, 0L), Collections.emptyMap());
+
+    assertEquals(0L, getCountForTable(MULTIPART_INFO_TABLE));
+    assertEquals(0L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    assertEquals(0L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+  }
+
   @Test
   public void testReprocessForMultipartInfoTable() throws Exception {
     String uploadID = UUID.randomUUID().toString();
@@ -783,6 +875,141 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     assertEquals(900L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
   }
 
+  /**
+   * Validates schema-aware reprocess for a split (schemaVersion 1) MPU: the
+   * multipartInfoTable value carries NO embedded parts, so Recon must read the
+   * part sizes from the separate multipartPartsTable, using the parent MPU's
+   * replication config to compute the replicated size.
+   */
+  @Test
+  public void testReprocessForMultipartInfoTableSplitSchema() throws Exception {
+    String uploadID = UUID.randomUUID().toString();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    // Split-schema MPU: no embedded parts in the multipartInfoTable value.
+    OmMultipartKeyInfo splitMpu = new OmMultipartKeyInfo.Builder()
+        .setObjectID(1L)
+        .setUploadID(uploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    String multipartKey = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
+    reconOMMetadataManager.getMultipartInfoTable().put(multipartKey, splitMpu);
+
+    // 3 parts of 100 bytes each, stored as rows in the split parts table.
+    putSplitSchemaPart(uploadID, volumeName, bucketName, keyName, 1, 100L);
+    putSplitSchemaPart(uploadID, volumeName, bucketName, keyName, 2, 100L);
+    putSplitSchemaPart(uploadID, volumeName, bucketName, keyName, 3, 100L);
+
+    ReconOmTask.TaskResult result = omTableInsightTask.reprocess(reconOMMetadataManager);
+    assertTrue(result.isTaskSuccess());
+
+    // Count is the number of MPU uploads (1), not the number of parts.
+    assertEquals(1L, getCountForTable(MULTIPART_INFO_TABLE));
+    // 3 split-table parts * 100 bytes = 300 bytes unreplicated.
+    assertEquals(300L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    // RATIS THREE: 300 bytes * 3 = 900 bytes replicated.
+    assertEquals(900L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+  }
+
+  /**
+   * Validates schema-aware reprocess when both legacy (schemaVersion 0, embedded
+   * parts) and split (schemaVersion 1, parts in multipartPartsTable) MPUs coexist
+   * in the same DB. Recon must sum both under the multipartInfoTable stats.
+   */
+  @Test
+  public void testReprocessForMultipartInfoTableMixedSchema() throws Exception {
+    // Legacy MPU: 2 embedded parts of 100 bytes.
+    String legacyUploadID = UUID.randomUUID().toString();
+    String legacyVol = UUID.randomUUID().toString();
+    String legacyBucket = UUID.randomUUID().toString();
+    String legacyKey = UUID.randomUUID().toString();
+    OmMultipartKeyInfo legacyMpu = new OmMultipartKeyInfo.Builder()
+        .setObjectID(1L)
+        .setUploadID(legacyUploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        // schemaVersion defaults to LEGACY_SCHEMA_VERSION (0).
+        .build();
+    legacyMpu.addPartKeyInfo(createPartKeyInfo(legacyVol, legacyBucket, legacyKey, legacyUploadID, 1, 100L));
+    legacyMpu.addPartKeyInfo(createPartKeyInfo(legacyVol, legacyBucket, legacyKey, legacyUploadID, 2, 100L));
+    reconOMMetadataManager.getMultipartInfoTable().put(
+        reconOMMetadataManager.getMultipartKey(legacyVol, legacyBucket, legacyKey, legacyUploadID), legacyMpu);
+
+    // Split MPU: 3 parts of 100 bytes in the split parts table.
+    String splitUploadID = UUID.randomUUID().toString();
+    String splitVol = UUID.randomUUID().toString();
+    String splitBucket = UUID.randomUUID().toString();
+    String splitKey = UUID.randomUUID().toString();
+    OmMultipartKeyInfo splitMpu = new OmMultipartKeyInfo.Builder()
+        .setObjectID(2L)
+        .setUploadID(splitUploadID)
+        .setCreationTime(Time.now())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .build();
+    reconOMMetadataManager.getMultipartInfoTable().put(
+        reconOMMetadataManager.getMultipartKey(splitVol, splitBucket, splitKey, splitUploadID), splitMpu);
+    putSplitSchemaPart(splitUploadID, splitVol, splitBucket, splitKey, 1, 100L);
+    putSplitSchemaPart(splitUploadID, splitVol, splitBucket, splitKey, 2, 100L);
+    putSplitSchemaPart(splitUploadID, splitVol, splitBucket, splitKey, 3, 100L);
+
+    ReconOmTask.TaskResult result = omTableInsightTask.reprocess(reconOMMetadataManager);
+    assertTrue(result.isTaskSuccess());
+
+    // 2 MPU uploads total (1 legacy + 1 split).
+    assertEquals(2L, getCountForTable(MULTIPART_INFO_TABLE));
+    // Legacy 2*100 (embedded) + split 3*100 (parts table) = 500 bytes unreplicated.
+    assertEquals(500L, getUnReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+    // RATIS THREE: 500 bytes * 3 = 1500 bytes replicated.
+    assertEquals(1500L, getReplicatedSizeForTable(MULTIPART_INFO_TABLE));
+  }
+
+  /**
+   * Writes a single split-schema part (an {@link OmMultipartPartInfo}) to the
+   * multipartPartsTable, keyed by {@code uploadId/partNumber}. An ETag is set
+   * because it is mandatory for split-schema parts.
+   */
+  private void putSplitSchemaPart(String uploadID, String volumeName, String bucketName,
+      String keyName, int partNumber, long dataSize) throws IOException {
+    OmMultipartPartInfo partInfo =
+        buildSplitSchemaPartInfo(volumeName, bucketName, keyName, uploadID, partNumber, dataSize);
+    reconOMMetadataManager.getMultipartPartsTable().put(
+        OmMultipartPartKey.of(uploadID, partNumber), partInfo);
+  }
+
+  /**
+   * Builds a single split-schema part (an {@link OmMultipartPartInfo}), without writing it to the
+   * multipartPartsTable. An ETag is set because it is mandatory for split-schema parts.
+   */
+  private OmMultipartPartInfo buildSplitSchemaPartInfo(String volumeName, String bucketName,
+      String keyName, String uploadID, int partNumber, long dataSize) {
+    OmKeyInfo partOmKeyInfo = new OmKeyInfo.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .setDataSize(dataSize)
+        .setCreationTime(Time.now())
+        .setModificationTime(Time.now())
+        .setObjectID(UUID.randomUUID().hashCode())
+        .setUpdateID(1L)
+        .setOmKeyLocationInfos(Collections.singletonList(
+            new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true)))
+        // ETag is mandatory for split-schema parts.
+        .addMetadata(OzoneConsts.ETAG, "etag-" + partNumber)
+        .build();
+    String partName = reconOMMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
+    return OmMultipartPartInfo.from(partName, partNumber, partOmKeyInfo);
+  }
+
   public PartKeyInfo createPartKeyInfo(String volumeName, String bucketName,
                                        String keyName, String uploadID, int partNumber, long dataSize) {
     return PartKeyInfo.newBuilder()
@@ -804,7 +1031,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   }
 
   private OMDBUpdateEvent getOMUpdateEvent(
-      String name, Object value,
+      Object name, Object value,
       String table,
       OMDBUpdateEvent.OMDBUpdateAction action,
       Object oldValue) {

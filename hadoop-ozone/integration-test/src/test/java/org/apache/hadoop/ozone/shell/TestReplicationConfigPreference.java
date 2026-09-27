@@ -41,13 +41,13 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -100,7 +100,7 @@ public abstract class TestReplicationConfigPreference implements NonHATests.Test
       conf.unset(key);
     }
 
-    TestDataUtil.createVolume(client, VOLUME_NAME);
+    DataTestUtil.createVolume(client, VOLUME_NAME);
     volume = client.getObjectStore().getVolume(VOLUME_NAME);
   }
 
@@ -109,7 +109,7 @@ public abstract class TestReplicationConfigPreference implements NonHATests.Test
     IOUtils.closeQuietly(client);
 
     OzoneConfiguration conf = cluster.getOzoneManager().getConfiguration();
-    originalSettings.forEach((k, v) -> TestHelper.setConfig(conf, k, v));
+    originalSettings.forEach((k, v) -> OzoneTestHelper.setConfig(conf, k, v));
   }
 
   private static void execute(OzoneShell shell, List<String> args) {
@@ -240,8 +240,8 @@ public abstract class TestReplicationConfigPreference implements NonHATests.Test
 
   private void updateReplicationInOM(@Nullable String type, @Nullable String params) {
     OzoneConfiguration conf = cluster.getOzoneManager().getConfiguration();
-    TestHelper.setConfig(conf, OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY, type);
-    TestHelper.setConfig(conf, OZONE_SERVER_DEFAULT_REPLICATION_KEY, params);
+    OzoneTestHelper.setConfig(conf, OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY, type);
+    OzoneTestHelper.setConfig(conf, OZONE_SERVER_DEFAULT_REPLICATION_KEY, params);
     cluster.getOzoneManager().setReplicationFromConfig();
   }
 

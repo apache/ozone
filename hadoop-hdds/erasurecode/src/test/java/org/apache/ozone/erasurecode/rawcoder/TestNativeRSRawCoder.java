@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Test native raw Reed-solomon encoding and decoding.
  */
-public class TestNativeRSRawCoder extends TestRSRawCoderBase {
+public class TestNativeRSRawCoder extends RSRawCoderTests {
 
   public TestNativeRSRawCoder() {
     super(NativeRSRawErasureCoderFactory.class,

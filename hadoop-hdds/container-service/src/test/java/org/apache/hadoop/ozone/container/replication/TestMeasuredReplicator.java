@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
-import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.forTest;
+import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +34,9 @@ import org.junit.jupiter.api.Test;
  * Test replicator metric measurement.
  */
 public class TestMeasuredReplicator {
+
+  private static final DatanodeDetails TARGET =
+      MockDatanodeDetails.randomDatanodeDetails();
 
   private MeasuredReplicator measuredReplicator;
   private ContainerReplicator replicator;
@@ -64,9 +69,9 @@ public class TestMeasuredReplicator {
   @Test
   public void measureFailureSuccessAndBytes() {
     //WHEN
-    measuredReplicator.replicate(new ReplicationTask(forTest(1), replicator));
-    measuredReplicator.replicate(new ReplicationTask(forTest(2), replicator));
-    measuredReplicator.replicate(new ReplicationTask(forTest(3), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(1, TARGET), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(2, TARGET), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(3, TARGET), replicator));
 
     //THEN
     //even containers should be failed
@@ -84,9 +89,9 @@ public class TestMeasuredReplicator {
   public void testReplicationTime() throws Exception {
     //WHEN
     //will wait at least the 300ms
-    measuredReplicator.replicate(new ReplicationTask(forTest(101), replicator));
-    measuredReplicator.replicate(new ReplicationTask(forTest(201), replicator));
-    measuredReplicator.replicate(new ReplicationTask(forTest(300), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(101, TARGET), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(201, TARGET), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(300, TARGET), replicator));
 
     //THEN
     //even containers should be failed
@@ -104,7 +109,7 @@ public class TestMeasuredReplicator {
   public void testFailureTimeSuccessExcluded() {
     //WHEN
     //will wait at least the 15ms
-    measuredReplicator.replicate(new ReplicationTask(forTest(15), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(15, TARGET), replicator));
 
 
     //THEN
@@ -116,7 +121,7 @@ public class TestMeasuredReplicator {
   public void testSuccessTimeFailureExcluded() {
     //WHEN
     //will wait at least the 10ms
-    measuredReplicator.replicate(new ReplicationTask(forTest(10), replicator));
+    measuredReplicator.replicate(new ReplicationTask(toTarget(10, TARGET), replicator));
 
 
     //THEN
@@ -127,7 +132,7 @@ public class TestMeasuredReplicator {
   @Test
   public void testReplicationQueueTimeMetrics() {
     final Instant queued = Instant.now().minus(1, ChronoUnit.SECONDS);
-    ReplicationTask task = new ReplicationTask(forTest(100), replicator) {
+    ReplicationTask task = new ReplicationTask(toTarget(100, TARGET), replicator) {
       @Override
       public Instant getQueued() {
         return queued;

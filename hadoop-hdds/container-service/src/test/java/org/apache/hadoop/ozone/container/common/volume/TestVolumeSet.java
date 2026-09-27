@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -34,6 +35,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -192,6 +196,29 @@ public class TestVolumeSet {
         .getStorageDir());
     assertNumVolumes(volSet, 1, 1);
     volSet.shutdown();
+  }
+
+  @Test
+  public void testStorageReportSnapshotDoesNotBlockOnWriteLock() throws Exception {
+    // Regression test: DatanodeStorageMetrics.getMetrics() samples the volume
+    // set while the DefaultMetricsSystem monitor is held. It must not block on
+    // the volume-set lock, otherwise it deadlocks with a volume-failure handler
+    // that holds the write lock while unregistering volume metrics.
+    volumeSet.writeLock();
+    try {
+      CompletableFuture<Integer> snapshot = CompletableFuture.supplyAsync(
+          () -> volumeSet.getStorageReportSnapshot().length);
+      // The snapshot must return without waiting for the write lock.
+      assertEquals(2, snapshot.get(10, TimeUnit.SECONDS));
+
+      // Sanity check that the lock is genuinely held: the locking variant does
+      // block behind the write lock (it must time out here).
+      CompletableFuture<Integer> locked = CompletableFuture.supplyAsync(
+          () -> volumeSet.getStorageReport().length);
+      assertThrows(TimeoutException.class, () -> locked.get(2, TimeUnit.SECONDS));
+    } finally {
+      volumeSet.writeUnlock();
+    }
   }
 
   @Test

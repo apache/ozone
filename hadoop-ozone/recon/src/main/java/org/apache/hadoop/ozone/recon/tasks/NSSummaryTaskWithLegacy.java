@@ -273,8 +273,7 @@ public class NSSummaryTaskWithLegacy extends NSSummaryTaskDbEventHandler {
       Table<String, OmKeyInfo> keyTable =
           omMetadataManager.getKeyTable(LEGACY_BUCKET_LAYOUT);
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-          keyTableIter = keyTable.iterator()) {
+      try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> keyTableIter = keyTable.iterator()) {
 
         while (keyTableIter.hasNext()) {
           Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();

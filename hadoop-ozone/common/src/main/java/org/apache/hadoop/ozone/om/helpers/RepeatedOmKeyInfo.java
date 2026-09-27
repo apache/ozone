@@ -37,8 +37,13 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Repeate
  * admin wants to confirm if a given key is deleted from deletedTable metadata.
  */
 public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
-  private static final Codec<RepeatedOmKeyInfo> CODEC_TRUE = newCodec(true);
-  private static final Codec<RepeatedOmKeyInfo> CODEC_FALSE = newCodec(false);
+  
+  private static final Codec<RepeatedOmKeyInfo> CODEC_TRUE = newCodec(true, true);
+  private static final Codec<RepeatedOmKeyInfo> CODEC_FALSE = newCodec(false, true);
+
+  // Codecs for deletedTable - exclude fields only used in openKeyTable
+  private static final Codec<RepeatedOmKeyInfo> CODEC_DELETED_TABLE_TRUE = newCodec(true, false);
+  private static final Codec<RepeatedOmKeyInfo> CODEC_DELETED_TABLE_FALSE = newCodec(false, false);
 
   private final List<OmKeyInfo> omKeyInfoList;
   /**
@@ -51,16 +56,34 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
    */
   private final long bucketId;
 
-  private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline) {
+  private static Codec<RepeatedOmKeyInfo> newCodec(boolean ignorePipeline, boolean isOpenKey) {
     return new DelegatedCodec<>(
         Proto2Codec.get(RepeatedKeyInfo.getDefaultInstance()),
         RepeatedOmKeyInfo::getFromProto,
-        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION),
+        k -> k.getProto(ignorePipeline, ClientVersion.CURRENT_VERSION, isOpenKey),
         RepeatedOmKeyInfo.class);
   }
 
-  public static Codec<RepeatedOmKeyInfo> getCodec(boolean ignorePipeline) {
+  /**
+   * Gets the codec for openKeyTable. This codec includes fields only used in
+   * openKeyTable during serialization.
+   *
+   * @param ignorePipeline whether to ignore pipeline info
+   * @return the codec for openKeyTable
+   */
+  public static Codec<RepeatedOmKeyInfo> getOpenKeyTableCodec(boolean ignorePipeline) {
     return ignorePipeline ? CODEC_TRUE : CODEC_FALSE;
+  }
+
+  /**
+   * Gets the codec for deletedTable. This codec excludes fields only used in
+   * openKeyTable during serialization, as deleted keys are committed keys.
+   *
+   * @param ignorePipeline whether to ignore pipeline info
+   * @return the codec for deletedTable
+   */
+  public static Codec<RepeatedOmKeyInfo> getDeletedTableCodec(boolean ignorePipeline) {
+    return ignorePipeline ? CODEC_DELETED_TABLE_TRUE : CODEC_DELETED_TABLE_FALSE;
   }
 
   public RepeatedOmKeyInfo(long bucketId) {
@@ -129,9 +152,18 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
    * @param compact true for persistence, false for network transmit
    */
   public RepeatedKeyInfo getProto(boolean compact, int clientVersion) {
+    return getProto(compact, clientVersion, true);
+  }
+
+  /**
+   * @param compact true for persistence, false for network transmit
+   * @param clientVersion the client version
+   * @param isOpenKey true for openKeyTable, false for keyTable/deletedTable
+   */
+  public RepeatedKeyInfo getProto(boolean compact, int clientVersion, boolean isOpenKey) {
     List<KeyInfo> list = new ArrayList<>();
     for (OmKeyInfo k : cloneOmKeyInfoList()) {
-      list.add(k.getProtobuf(compact, clientVersion));
+      list.add(k.getProtobuf(compact, clientVersion, isOpenKey));
     }
 
     RepeatedKeyInfo.Builder builder = RepeatedKeyInfo.newBuilder()

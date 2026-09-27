@@ -91,4 +91,21 @@ class TestOzoneClientConfig {
     assertEquals(2 << 20, clientConfig.getStreamReadResponseDataSize());
     assertEquals(Duration.ofSeconds(5), clientConfig.getStreamReadTimeout());
   }
+
+  @Test
+  void testDatastreamPutBlockOnCloseEnabledDefault() {
+    OzoneClientConfig subject = new OzoneConfiguration()
+        .getObject(OzoneClientConfig.class);
+    assertFalse(subject.isDatastreamPutBlockOnCloseEnabled());
+  }
+
+  @Test
+  void testDatastreamPutBlockOnCloseConfigParsing() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.client.datastream.putblock.on.close.enabled", true);
+
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+
+    assertTrue(subject.isDatastreamPutBlockOnCloseEnabled());
+  }
 }

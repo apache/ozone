@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.nio.charset.StandardCharsets;
@@ -27,7 +28,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -67,12 +68,12 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
 
   @Test
   public void testAllocateCommit() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
-    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
+    String keyName = uniqueObjectName("key");
 
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+        DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName);
     // Versioning isn't supported currently, but just preserving old behaviour
     bucket.setVersioning(true);
 
@@ -97,7 +98,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
     OmKeyLocationInfoGroup highestVersion =
         checkVersions(keyInfo.getKeyLocationVersions());
     assertEquals(0, highestVersion.getVersion());
-    assertEquals(1, highestVersion.getLocationList().size());
+    assertEquals(1, highestVersion.createLocationList().size());
 
     // 2nd update, version 1
     openKey = writeClient.openKey(keyArgs);
@@ -111,7 +112,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
     keyInfo = ozoneManager.lookupKey(keyArgs);
     highestVersion = checkVersions(keyInfo.getKeyLocationVersions());
     assertEquals(1, highestVersion.getVersion());
-    assertEquals(1, highestVersion.getLocationList().size());
+    assertEquals(1, highestVersion.createLocationList().size());
 
     // 3rd update, version 2
     openKey = writeClient.openKey(keyArgs);
@@ -131,7 +132,7 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
     keyInfo = ozoneManager.lookupKey(keyArgs);
     highestVersion = checkVersions(keyInfo.getKeyLocationVersions());
     assertEquals(2, highestVersion.getVersion());
-    assertEquals(2, highestVersion.getLocationList().size());
+    assertEquals(2, highestVersion.createLocationList().size());
   }
 
   private OmKeyLocationInfoGroup checkVersions(
@@ -149,12 +150,12 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
   @Test
   public void testReadLatestVersion() throws Exception {
 
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
-    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
+    String keyName = uniqueObjectName("key");
 
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+        DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName);
 
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
@@ -165,30 +166,30 @@ public abstract class TestOmBlockVersioning implements NonHATests.TestCase {
 
     String dataString = RandomStringUtils.secure().nextAlphabetic(100);
 
-    TestDataUtil.createKey(bucket, keyName, dataString.getBytes(StandardCharsets.UTF_8));
-    assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
+    DataTestUtil.createKey(bucket, keyName, dataString.getBytes(StandardCharsets.UTF_8));
+    assertEquals(dataString, DataTestUtil.getKey(bucket, keyName));
     OmKeyInfo keyInfo = ozoneManager.lookupKey(omKeyArgs);
     assertEquals(0, keyInfo.getLatestVersionLocations().getVersion());
     assertEquals(1,
-        keyInfo.getLatestVersionLocations().getLocationList().size());
+        keyInfo.getLatestVersionLocations().createLocationList().size());
 
     // When bucket versioning is disabled, overwriting a key doesn't increment
     // its version count. Rather it always resets the version to 0
-    TestDataUtil.createKey(bucket, keyName, dataString.getBytes(StandardCharsets.UTF_8));
+    DataTestUtil.createKey(bucket, keyName, dataString.getBytes(StandardCharsets.UTF_8));
 
     keyInfo = ozoneManager.lookupKey(omKeyArgs);
-    assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
+    assertEquals(dataString, DataTestUtil.getKey(bucket, keyName));
     assertEquals(0, keyInfo.getLatestVersionLocations().getVersion());
     assertEquals(1,
-        keyInfo.getLatestVersionLocations().getLocationList().size());
+        keyInfo.getLatestVersionLocations().createLocationList().size());
 
     dataString = RandomStringUtils.secure().nextAlphabetic(200);
-    TestDataUtil.createKey(bucket, keyName, dataString.getBytes(StandardCharsets.UTF_8));
+    DataTestUtil.createKey(bucket, keyName, dataString.getBytes(StandardCharsets.UTF_8));
 
     keyInfo = ozoneManager.lookupKey(omKeyArgs);
-    assertEquals(dataString, TestDataUtil.getKey(bucket, keyName));
+    assertEquals(dataString, DataTestUtil.getKey(bucket, keyName));
     assertEquals(0, keyInfo.getLatestVersionLocations().getVersion());
     assertEquals(1,
-        keyInfo.getLatestVersionLocations().getLocationList().size());
+        keyInfo.getLatestVersionLocations().createLocationList().size());
   }
 }

@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMHAMetrics;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -126,7 +126,7 @@ public abstract class TestStorageContainerManagerHAWithAllRunning implements HAT
 
       byte[] bytes = value.getBytes(UTF_8);
       RatisReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
-      TestDataUtil.createKey(bucket, keyName, replication, bytes);
+      DataTestUtil.createKey(bucket, keyName, replication, bytes);
 
       OzoneKey key = bucket.getKey(keyName);
       assertEquals(keyName, key.getName());

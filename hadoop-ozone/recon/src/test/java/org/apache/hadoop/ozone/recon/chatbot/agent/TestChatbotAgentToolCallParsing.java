@@ -17,88 +17,70 @@
 
 package org.apache.hadoop.ozone.recon.chatbot.agent;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
-import java.util.HashMap;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotException;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconApiAllowlist;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryExecutor;
+import org.apache.hadoop.ozone.recon.chatbot.recon.ReconQueryResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Tests for {@link ChatbotAgent} tool-call routing and JSON parsing through {@code processQuery()}.
+ * Tests for {@link ChatbotAgent} native tool-call parsing and {@code processQuery} routing.
  *
- * <p>This class verifies how the agent parses the LLM's JSON responses, routes them to
- * the correct execution path (single endpoint, multi-endpoint, documentation query, or fallback),
- * and handles malformed or unexpected LLM outputs.</p>
- *
- * <p><b>Lifecycle Phase:</b> Post-1st LLM Call to 2nd LLM Call. This tests the orchestration after the first LLM call
- * returns, including routing to the executor, and triggering the second LLM call (summarization or fallback).</p>
- *
- * <p><b>Key scenarios tested:</b></p>
- * <ul>
- *   <li><b>Routing:</b> Ensures SINGLE_ENDPOINT, MULTI_ENDPOINT, and DOCUMENTATION_QUERY are routed correctly.</li>
- *   <li><b>Robustness:</b> Verifies fallbacks are triggered for truncated JSON, missing fields,
- *       or plain prose responses.</li>
- *   <li><b>Exception handling:</b> Ensures LLM exceptions and ToolExecutor IOExceptions are
- *       properly wrapped in ChatbotException.</li>
- * </ul>
+ * <p>Covers how the agent dispatches a tool-selection LLM response: single tool, multi tool
+ * (including the {@code maxToolCalls} cap), direct text answers, and fallback paths. Allowlist
+ * blocking and listKeys safe-scope are covered by sibling test classes.</p>
  */
 @ExtendWith(MockitoExtension.class)
 public class TestChatbotAgentToolCallParsing {
+
+  private static final String SUMMARY = "The cluster has 5 healthy datanodes.";
+  private static final String FALLBACK = "I can only answer questions about Apache Ozone Recon.";
+  private static final String DIRECT_ANSWER =
+      "Apache Ozone is a scalable distributed storage system.";
 
   @Mock
   private LLMClient mockLlmClient;
 
   @Mock
-  private ToolExecutor mockToolExecutor;
+  private ReconQueryExecutor mockReconQueryExecutor;
+
+  @Mock
+  private ReconApiAllowlist mockReconApiAllowlist;
+
+  @Mock
+  private LlmToolSpecFactory mockLlmToolSpecFactory;
 
   private ChatbotAgent agent;
-
-  // ── Canned LLM response strings ───────────────────────────────────────────
-
-  private static final String SINGLE_CLUSTER_STATE =
-      "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"/api/v1/clusterState\"," +
-          "\"method\":\"GET\",\"parameters\":{},\"reasoning\":\"need cluster data\"}";
-
-  private static final String SINGLE_DATANODES =
-      "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"/api/v1/datanodes\"," +
-          "\"method\":\"GET\",\"parameters\":{},\"reasoning\":\"need datanodes\"}";
-
-  private static final String MULTI_TWO_ENDPOINTS =
-      "{\"type\":\"MULTI_ENDPOINT\",\"reasoning\":\"need both\"," +
-          "\"tool_calls\":[" +
-          "{\"endpoint\":\"/api/v1/clusterState\",\"method\":\"GET\",\"parameters\":{}," +
-          "\"reasoning\":\"cluster\"}," +
-          "{\"endpoint\":\"/api/v1/datanodes\",\"method\":\"GET\",\"parameters\":{}," +
-          "\"reasoning\":\"nodes\"}]}";
-
-  private static final String DOC_QUERY =
-      "{\"type\":\"DOCUMENTATION_QUERY\"," +
-          "\"answer\":\"Apache Ozone is a scalable distributed storage system.\"," +
-          "\"reasoning\":\"general knowledge\"}";
-
-  private static final String SUMMARY_RESPONSE = "The cluster has 5 healthy datanodes.";
-  private static final String FALLBACK_RESPONSE =
-      "I can only answer questions about Apache Ozone Recon.";
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -107,387 +89,188 @@ public class TestChatbotAgentToolCallParsing {
     conf.setBoolean(ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE, true);
     conf.setInt(ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS, 5);
 
-    // Lenient default: only applies when a test actually calls the executor.
-    // Tests that never reach the executor (fallback/doc paths) won't fail
-    // because of this unused stub.
-    lenient().when(mockToolExecutor.executeToolCallWithPolicy(
-            anyString(), anyString(), any(), anyInt(), anyInt()))
+    lenient().when(mockReconQueryExecutor.execute(anyString(), anyMap()))
         .thenReturn(defaultOutcome());
+    lenient().when(mockReconApiAllowlist.isRegistered(anyString())).thenReturn(true);
 
-    agent = new ChatbotAgent(mockLlmClient, mockToolExecutor, conf);
+    agent = new ChatbotAgent(mockLlmClient, mockReconQueryExecutor, mockReconApiAllowlist,
+        mockLlmToolSpecFactory, conf);
   }
 
-  // ── Happy path: SINGLE_ENDPOINT ───────────────────────────────────────────
-
   @Test
-  public void testSingleEndpointCallsExecutorOnce() throws Exception {
-    // First LLM call (tool selection) returns a SINGLE_ENDPOINT JSON.
-    // Second LLM call (summarization) returns a natural-language answer.
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(SINGLE_CLUSTER_STATE))
-        .thenReturn(resp(SUMMARY_RESPONSE));
+  public void testSingleToolCallExecutesAndSummarizes() throws Exception {
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(toolCall("api_v1_datanodes", "{}"));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(text(SUMMARY));
 
-    String result = agent.processQuery("What is the cluster state?", null, null);
+    String result = agent.processQuery("How many datanodes?", null, null);
 
-    assertNotNull(result);
-    // Executor must be called once with the exact endpoint from the LLM response
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    // Summarization requires a second LLM call
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
+    assertEquals(SUMMARY, result);
+    verify(mockReconQueryExecutor, times(1)).execute(anyString(), anyMap());
   }
 
-  // ── Happy path: MULTI_ENDPOINT ────────────────────────────────────────────
-
   @Test
-  public void testMultiEndpointCallsExecutorForEachToolCall() throws Exception {
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(MULTI_TWO_ENDPOINTS))
-        .thenReturn(resp(SUMMARY_RESPONSE));
+  public void testSingleToolCallArgumentsParsedIntoParams() throws Exception {
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(toolCall("api_v1_datanodes", "{\"limit\":\"50\"}"));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(text(SUMMARY));
 
-    String result = agent.processQuery(
-        "Show me datanodes and cluster state", null, null);
+    agent.processQuery("How many datanodes?", null, null);
 
-    assertNotNull(result);
-    // Executor must be called once per tool_call in the MULTI_ENDPOINT array
-    verify(mockToolExecutor, times(2)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, String>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(mockReconQueryExecutor, times(1)).execute(anyString(), paramsCaptor.capture());
+    assertEquals("50", paramsCaptor.getValue().get("limit"));
   }
 
-  // ── Happy path: DOCUMENTATION_QUERY ──────────────────────────────────────
+  @Test
+  public void testMultiToolCallExecutesEach() throws Exception {
+    List<LLMClient.ToolCallRequest> reqs = new ArrayList<>();
+    reqs.add(new LLMClient.ToolCallRequest("api_v1_clusterState", "{}"));
+    reqs.add(new LLMClient.ToolCallRequest("api_v1_datanodes", "{}"));
+
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(toolCalls(reqs));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(text(SUMMARY));
+
+    String result = agent.processQuery("Show datanodes and cluster state", null, null);
+
+    assertEquals(SUMMARY, result);
+    verify(mockReconQueryExecutor, times(2)).execute(anyString(), anyMap());
+  }
 
   @Test
-  public void testDocumentationQueryReturnsAnswerDirectlyNoApiCall() throws Exception {
-    // DOCUMENTATION_QUERY: LLM answers directly from its knowledge.
-    // No Recon API call and no summarization LLM call should happen.
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(DOC_QUERY));
+  public void testMultiToolCallCappedAtMaxToolCalls() throws Exception {
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(repeatedToolCalls("api_v1_clusterState", 20));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(text(SUMMARY));
+
+    agent.processQuery("Tell me everything about the cluster", null, null);
+
+    verify(mockReconQueryExecutor, atMost(5)).execute(anyString(), anyMap());
+  }
+
+  @Test
+  public void testDirectAnswerReturnedVerbatimNoExecutor() throws Exception {
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(text(DIRECT_ANSWER));
 
     String result = agent.processQuery("What is Apache Ozone?", null, null);
 
-    assertNotNull(result);
-    assertTrue(result.contains("Apache Ozone"),
-        "Response should contain the answer from the DOCUMENTATION_QUERY");
-    // No Recon API call should ever happen for documentation queries
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    // Only one LLM call — no summarization step
-    verify(mockLlmClient, times(1)).chatCompletion(anyList(), any(), any());
-  }
-
-  // ── ROB-04: Unknown type triggers fallback ────────────────────────────────
-
-  @Test
-  public void testUnknownTypeTriggersFallback() throws Exception {
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp("{\"type\":\"HACK_SYSTEM\",\"payload\":\"x\"}"))
-        .thenReturn(resp(FALLBACK_RESPONSE));
-
-    String result = agent.processQuery("Do something", null, null);
-
-    assertNotNull(result);
-    // Executor must never be called when the type is unrecognized
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    // Fallback requires a second LLM call
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
-  }
-
-  @Test
-  public void testMissingTypeFieldTriggersFallback() throws Exception {
-    // JSON without a "type" field defaults to "" in the switch — hits default case
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp("{\"endpoint\":\"/api/v1/clusterState\",\"method\":\"GET\"}"))
-        .thenReturn(resp(FALLBACK_RESPONSE));
-
-    String result = agent.processQuery("What is the state?", null, null);
-
-    assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
-  }
-
-  // ── ROB-03: Truncated JSON triggers fallback ──────────────────────────────
-
-  @Test
-  public void testTruncatedJsonTriggersFallback() throws Exception {
-    // Missing closing brace — extractFirstJsonObject returns null
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp("{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"/api/v1/clusterState\""))
-        .thenReturn(resp(FALLBACK_RESPONSE));
-
-    String result = agent.processQuery("What is the state?", null, null);
-
-    assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
-  }
-
-  @Test
-  public void testPlainProseResponseTriggersFallback() throws Exception {
-    // LLM returns prose with no JSON object at all
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp("I don't know how to answer this question."))
-        .thenReturn(resp(FALLBACK_RESPONSE));
-
-    String result = agent.processQuery("Some query", null, null);
-
-    assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
+    assertTrue(result.contains("Apache Ozone"));
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
+    verify(mockLlmClient, never()).chatCompletion(anyList(), any(), any(), any(), isNull());
   }
 
   @Test
   public void testNoSuitableEndpointSentinelTriggersFallback() throws Exception {
-    // The LLM uses the sentinel string when it cannot answer — no JSON, no API call
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp("NO_SUITABLE_ENDPOINT"))
-        .thenReturn(resp(FALLBACK_RESPONSE));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(text("NO_SUITABLE_ENDPOINT"));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(text(FALLBACK));
 
     String result = agent.processQuery("What is the meaning of life?", null, null);
 
-    assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    // First call returns NO_SUITABLE_ENDPOINT; second call is the fallback
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
-  }
-
-  // ── ROB-05: Null / missing parameters handled safely ─────────────────────
-
-  @Test
-  public void testNullParametersFieldMappedToEmptyMap() throws Exception {
-    // When LLM returns "parameters": null, parseSingleToolCall should use an empty map
-    String json = "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"/api/v1/datanodes\"," +
-        "\"method\":\"GET\",\"parameters\":null,\"reasoning\":\"test\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(SUMMARY_RESPONSE));
-
-    // Must not throw NullPointerException
-    String result = agent.processQuery("How many datanodes?", null, null);
-
-    assertNotNull(result);
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    assertEquals(FALLBACK, result);
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
+    verify(mockLlmClient, times(1)).chatCompletion(anyList(), any(), any(), any(), isNull());
   }
 
   @Test
-  public void testWrongParametersTypeMappedToEmptyMap() throws Exception {
-    // When LLM returns "parameters" as a plain string instead of an object,
-    // parseSingleToolCall should fall back to an empty parameters map
-    String json = "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"/api/v1/datanodes\"," +
-        "\"method\":\"GET\",\"parameters\":\"should be an object\",\"reasoning\":\"test\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(SUMMARY_RESPONSE));
-
-    String result = agent.processQuery("How many datanodes?", null, null);
-
-    assertNotNull(result);
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-  }
-
-  // ── Missing required endpoint field ──────────────────────────────────────
-
-  @Test
-  public void testMissingEndpointFieldTriggersFallback() throws Exception {
-    // SINGLE_ENDPOINT response with no "endpoint" field → empty string → fallback
-    String json = "{\"type\":\"SINGLE_ENDPOINT\",\"method\":\"GET\"," +
-        "\"parameters\":{},\"reasoning\":\"no endpoint\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(FALLBACK_RESPONSE));
+  public void testEmptyTextResponseTriggersFallback() throws Exception {
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(text(""));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(text(FALLBACK));
 
     String result = agent.processQuery("What is the state?", null, null);
 
-    assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
-  }
-
-  // ── EXE-01: Tool-call count is capped at maxToolCalls ────────────────────
-
-  @Test
-  public void testMultiEndpointExceedingMaxToolCallsIsCappedAtFive() throws Exception {
-    // Build a MULTI_ENDPOINT response with 20 tool_calls; maxToolCalls config is 5
-    StringBuilder sb = new StringBuilder();
-    sb.append("{\"type\":\"MULTI_ENDPOINT\",\"reasoning\":\"need many\",\"tool_calls\":[");
-    for (int i = 0; i < 20; i++) {
-      if (i > 0) {
-        sb.append(',');
-      }
-      sb.append("{\"endpoint\":\"/api/v1/clusterState\",\"method\":\"GET\"," +
-          "\"parameters\":{},\"reasoning\":\"call ").append(i).append("\"}");
-    }
-    sb.append("]}");
-
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(sb.toString()))
-        .thenReturn(resp(SUMMARY_RESPONSE));
-
-    agent.processQuery("Tell me everything about the cluster", null, null);
-
-    // Must cap at maxToolCalls=5, not execute all 20
-    verify(mockToolExecutor, atMost(5)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+    assertEquals(FALLBACK, result);
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
+    verify(mockLlmClient, times(1)).chatCompletion(anyList(), any(), any(), any(), isNull());
   }
 
   @Test
-  public void testMultiEndpointWithEmptyToolCallsArrayTriggersFallback() throws Exception {
-    String json = "{\"type\":\"MULTI_ENDPOINT\",\"reasoning\":\"test\"," +
-        "\"tool_calls\":[]}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(json))
-        .thenReturn(resp(FALLBACK_RESPONSE));
+  public void testMalformedToolArgumentsDegradeToEmptyParams() throws Exception {
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(toolCall("api_v1_datanodes", "{not json"));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(text(SUMMARY));
 
-    String result = agent.processQuery("Show all data", null, null);
+    agent.processQuery("How many datanodes?", null, null);
 
-    assertNotNull(result);
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
-  }
-
-  // ── VAL-01: Empty / null query rejected before LLM call ──────────────────
-
-  @Test
-  public void testEmptyQueryThrowsChatbotExceptionBeforeLlmCall() throws LLMClient.LLMException {
-    assertThrows(ChatbotException.class,
-        () -> agent.processQuery("", null, null));
-
-    // No LLM call should be made at all
-    verify(mockLlmClient, never()).chatCompletion(anyList(), any(), any());
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, String>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(mockReconQueryExecutor, times(1)).execute(anyString(), paramsCaptor.capture());
+    assertTrue(paramsCaptor.getValue().isEmpty());
   }
 
   @Test
-  public void testNullQueryThrowsChatbotExceptionBeforeLlmCall() throws LLMClient.LLMException {
-    assertThrows(ChatbotException.class,
-        () -> agent.processQuery(null, null, null));
+  public void testEmptyToolNameTriggersFallback() throws Exception {
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
+        .thenReturn(toolCall("", "{}"));
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), isNull()))
+        .thenReturn(text(FALLBACK));
 
-    verify(mockLlmClient, never()).chatCompletion(anyList(), any(), any());
+    String result = agent.processQuery("What is happening?", null, null);
+
+    assertEquals(FALLBACK, result);
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
+    verify(mockLlmClient, times(1)).chatCompletion(anyList(), any(), any(), any(), isNull());
   }
 
-  // ── ROB-01 (via processQuery): Prose-wrapped JSON parsed successfully ─────
-
   @Test
-  public void testProseWrappedJsonIsExtractedAndParsedCorrectly() throws Exception {
-    // LLM returns prose before and after the JSON blob
-    String wrappedJson = "Sure! Here is the call: " + SINGLE_DATANODES +
-        " Hope that helps!";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(wrappedJson))
-        .thenReturn(resp(SUMMARY_RESPONSE));
-
-    String result = agent.processQuery("How many datanodes?", null, null);
-
-    assertNotNull(result);
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
+  public void testEmptyQueryThrowsBeforeLlmCall() {
+    assertThrows(ChatbotException.class, () -> agent.processQuery("", null, null));
+    verifyNoInteractions(mockLlmClient);
   }
 
-  // ── LLM exception propagation ─────────────────────────────────────────────
+  @Test
+  public void testNullQueryThrowsBeforeLlmCall() {
+    assertThrows(ChatbotException.class, () -> agent.processQuery(null, null, null));
+    verifyNoInteractions(mockLlmClient);
+  }
 
   @Test
-  public void testLlmExceptionIsPropagatedAsChatbotException() throws Exception {
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
+  public void testLlmExceptionDuringSelectionWrappedAsChatbotException() throws Exception {
+    when(mockLlmClient.chatCompletion(anyList(), any(), any(), any(), anyList()))
         .thenThrow(new LLMClient.LLMException("LLM API unavailable"));
 
     ChatbotException ex = assertThrows(ChatbotException.class,
         () -> agent.processQuery("What is the state?", null, null));
 
-    // The original LLMException should be the cause — not swallowed
-    assertNotNull(ex.getCause(),
-        "ChatbotException should wrap the original LLMException as its cause");
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-  }
-
-  // ── EXC-01: ToolExecutor IOException is wrapped as ChatbotException ──────
-
-  @Test
-  public void testToolExecutorIoExceptionIsWrappedAsChatbotException() throws Exception {
-    // First LLM call succeeds (tool selection), then ToolExecutor throws IOException
-    // (e.g. Recon API is down). The agent must wrap it as ChatbotException,
-    // not let the raw IOException leak to ChatbotEndpoint.
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(SINGLE_CLUSTER_STATE));
-    when(mockToolExecutor.executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt()))
-        .thenThrow(new IOException("Recon API unreachable"));
-
-    ChatbotException ex = assertThrows(ChatbotException.class,
-        () -> agent.processQuery("What is the cluster state?", null, null));
-
-    assertNotNull(ex.getCause(), "IOException must be preserved as the cause");
-    assertTrue(ex.getCause() instanceof IOException,
-        "Cause should be the original IOException, not swallowed");
-    // ToolExecutor was called — the failure happened inside it
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-  }
-
-  // ── EXC-02: Summarization LLM call fails after tool execution succeeds ───
-
-  @Test
-  public void testSummarizationLlmFailureIsWrappedAsChatbotException() throws Exception {
-    // First LLM call (tool selection) succeeds.
-    // ToolExecutor succeeds.
-    // Second LLM call (summarization) throws LLMException.
-    // The whole pipeline must fail with ChatbotException, not silently return null.
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(SINGLE_CLUSTER_STATE))           // tool selection: OK
-        .thenThrow(new LLMClient.LLMException("Rate limit hit on summarization call"));
-
-    ChatbotException ex = assertThrows(ChatbotException.class,
-        () -> agent.processQuery("What is the cluster state?", null, null));
-
-    assertNotNull(ex.getCause(), "LLMException from summarization must be the cause");
-    assertTrue(ex.getCause() instanceof LLMClient.LLMException,
-        "Cause should be the original LLMException from the summarization call");
-    // Both LLM call and executor call were made before the failure
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
-    verify(mockToolExecutor, times(1)).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-  }
-
-  // ── EXC-03: SINGLE_ENDPOINT with empty endpoint triggers fallback ─────────
-
-  @Test
-  public void testSingleEndpointWithEmptyEndpointTriggersFallback() throws Exception {
-    // LLM returns a valid SINGLE_ENDPOINT JSON but with an empty "endpoint" value.
-    // The agent must treat this as unanswerable and fall back — never call ToolExecutor
-    // with an empty string.
-    String emptyEndpoint = "{\"type\":\"SINGLE_ENDPOINT\",\"endpoint\":\"\"," +
-        "\"method\":\"GET\",\"parameters\":{},\"reasoning\":\"none\"}";
-    when(mockLlmClient.chatCompletion(anyList(), any(), any()))
-        .thenReturn(resp(emptyEndpoint))
-        .thenReturn(resp(FALLBACK_RESPONSE));
-
-    String result = agent.processQuery("What is happening?", null, null);
-
-    assertNotNull(result);
-    // ToolExecutor must never be invoked with an empty endpoint
-    verify(mockToolExecutor, never()).executeToolCallWithPolicy(
-        anyString(), anyString(), any(), anyInt(), anyInt());
-    // Fallback requires a second LLM call
-    verify(mockLlmClient, times(2)).chatCompletion(anyList(), any(), any());
+    assertNotNull(ex.getCause());
+    verify(mockReconQueryExecutor, never()).execute(anyString(), anyMap());
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  private LLMClient.LLMResponse resp(String content) {
+  private LLMClient.LLMResponse text(String content) {
     return new LLMClient.LLMResponse(content, "test-model", 10, 20, null);
   }
 
-  private ToolExecutor.ToolExecutionOutcome defaultOutcome() {
-    return new ToolExecutor.ToolExecutionOutcome(
-        new HashMap<>(), 0, 1, false, null, new HashMap<>());
+  private LLMClient.LLMResponse toolCall(String name, String argsJson) {
+    return new LLMClient.LLMResponse("", "test-model", 10, 20,
+        Collections.singletonList(new LLMClient.ToolCallRequest(name, argsJson)));
+  }
+
+  private LLMClient.LLMResponse toolCalls(List<LLMClient.ToolCallRequest> reqs) {
+    return new LLMClient.LLMResponse("", "test-model", 10, 20, reqs);
+  }
+
+  private LLMClient.LLMResponse repeatedToolCalls(String toolName, int count) {
+    List<LLMClient.ToolCallRequest> reqs = new ArrayList<>();
+    for (int i = 0; i < count; i++) {
+      reqs.add(new LLMClient.ToolCallRequest(toolName, "{}"));
+    }
+    return toolCalls(reqs);
+  }
+
+  private ReconQueryResult defaultOutcome() {
+    return new ReconQueryResult(JsonNodeFactory.instance.objectNode(), 0, false, 1000);
   }
 }

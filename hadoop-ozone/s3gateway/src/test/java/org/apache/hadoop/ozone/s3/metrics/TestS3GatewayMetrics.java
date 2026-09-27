@@ -19,19 +19,23 @@ package org.apache.hadoop.ozone.s3.metrics;
 
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.abortMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.delete;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.deleteBucketTagging;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.deleteTagging;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.getBucketTagging;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.getTagging;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.listParts;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putBucketTagging;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putTagging;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -56,6 +60,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
+import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
@@ -408,8 +413,9 @@ public class TestS3GatewayMetrics {
   public void testCompleteMultiPartUploadSuccess() throws Exception {
     long oriMetric = metrics.getCompleteMultiPartUploadSuccess();
     String uploadID = initiateMultipartUpload(bucketName, keyName);
+    Part part = uploadPart(keyEndpoint, bucketName, keyName, 1, uploadID, CONTENT);
 
-    completeMultipartUpload(keyEndpoint, bucketName, keyName, uploadID, emptyList());
+    completeMultipartUpload(keyEndpoint, bucketName, keyName, uploadID, singletonList(part));
 
     long curMetric = metrics.getCompleteMultiPartUploadSuccess();
     assertEquals(1L, curMetric - oriMetric);
@@ -419,8 +425,11 @@ public class TestS3GatewayMetrics {
   public void testCompleteMultiPartUploadFailure() {
     long oriMetric = metrics.getCompleteMultiPartUploadFailure();
 
+    Part part = new Part();
+    part.setPartNumber(1);
+    part.setETag("etag");
     assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD,
-        () -> completeMultipartUpload(keyEndpoint, bucketName, "key2", "random", emptyList()));
+        () -> completeMultipartUpload(keyEndpoint, bucketName, "key2", "random", singletonList(part)));
 
     long curMetric = metrics.getCompleteMultiPartUploadFailure();
     assertEquals(1L, curMetric - oriMetric);
@@ -566,6 +575,68 @@ public class TestS3GatewayMetrics {
     assertEquals(1L, curMetric - oriMetric);
   }
 
+  @Test
+  public void testPutBucketTaggingSuccess() throws Exception {
+    long oriMetric = metrics.getPutBucketTaggingSuccess();
+    assertSucceeds(() -> putBucketTagging(bucketEndpoint, bucketName, getPutBucketTaggingBody()));
+
+    long curMetric = metrics.getPutBucketTaggingSuccess();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testPutBucketTaggingFailure() {
+    long oriMetric = metrics.getPutBucketTaggingFailure();
+
+    assertErrorResponse(S3ErrorTable.NO_SUCH_BUCKET,
+        () -> putBucketTagging(bucketEndpoint, "nonexistent", getPutBucketTaggingBody()));
+
+    long curMetric = metrics.getPutBucketTaggingFailure();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testGetBucketTaggingSuccess() throws Exception {
+    long oriMetric = metrics.getGetBucketTaggingSuccess();
+    assertSucceeds(() -> putBucketTagging(bucketEndpoint, bucketName, getPutBucketTaggingBody()));
+    assertSucceeds(() -> getBucketTagging(bucketEndpoint, bucketName));
+
+    long curMetric = metrics.getGetBucketTaggingSuccess();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testGetBucketTaggingFailure() {
+    long oriMetric = metrics.getGetBucketTaggingFailure();
+
+    assertErrorResponse(S3ErrorTable.NO_SUCH_TAG_SET,
+        () -> getBucketTagging(bucketEndpoint, bucketName));
+
+    long curMetric = metrics.getGetBucketTaggingFailure();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testDeleteBucketTaggingSuccess() throws Exception {
+    long oriMetric = metrics.getDeleteBucketTaggingSuccess();
+    assertSucceeds(() -> putBucketTagging(bucketEndpoint, bucketName, getPutBucketTaggingBody()));
+    deleteBucketTagging(bucketEndpoint, bucketName);
+
+    long curMetric = metrics.getDeleteBucketTaggingSuccess();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
+  @Test
+  public void testDeleteBucketTaggingFailure() {
+    long oriMetric = metrics.getDeleteBucketTaggingFailure();
+
+    assertErrorResponse(S3ErrorTable.NO_SUCH_BUCKET,
+        () -> deleteBucketTagging(bucketEndpoint, "nonexistent"));
+
+    long curMetric = metrics.getDeleteBucketTaggingFailure();
+    assertEquals(1L, curMetric - oriMetric);
+  }
+
   private String initiateMultipartUpload(String bktName, String key) throws IOException, OS3Exception {
     return EndpointTestUtils.initiateMultipartUpload(keyEndpoint, bktName, key);
   }
@@ -580,6 +651,10 @@ public class TestS3GatewayMetrics {
             "      </Tag>" +
             "   </TagSet>" +
             "</Tagging>";
+  }
+
+  private static String getPutBucketTaggingBody() {
+    return getPutTaggingBody();
   }
 
   @Test

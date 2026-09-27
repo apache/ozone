@@ -24,8 +24,8 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -58,17 +58,17 @@ public abstract class TestBucketLayoutWithOlderClient implements NonHATests.Test
     // create a volume and a bucket without bucket layout argument
     BucketLayout defaultLayout = cluster().getConf().getEnum(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, null);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, null);
     String volumeName = bucket.getVolumeName();
     // OM defaulted bucket layout
     assertEquals(defaultLayout, bucket.getBucketLayout());
 
     // Sets bucket layout explicitly.
-    OzoneBucket fsobucket = TestDataUtil
+    OzoneBucket fsobucket = DataTestUtil
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
     assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED,
         fsobucket.getBucketLayout());
-    OzoneBucket obsBucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    OzoneBucket obsBucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
     assertEquals(BucketLayout.OBJECT_STORE, obsBucket.getBucketLayout());
 
     // Create bucket request by an older client.

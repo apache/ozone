@@ -22,12 +22,10 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
-import static org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy.hasEnoughSpace;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.math.RoundingMode;
 import java.net.InetAddress;
@@ -63,6 +61,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -74,6 +73,8 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOpsSubscriber;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -117,7 +118,7 @@ import org.slf4j.LoggerFactory;
  * get functions in this file as a snap-shot of information that is inconsistent
  * as soon as you read it.
  */
-public class SCMNodeManager implements NodeManager {
+public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSubscriber {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeManager.class);
@@ -156,6 +157,20 @@ public class SCMNodeManager implements NodeManager {
   private static final String TOTALCAPACITY = "CAPACITY";
   private static final String DNUUID = "UUID";
   private static final String VERSION = "VERSION";
+
+  // DecimalFormat is not thread-safe; keep one per thread and reuse across node-stats/JMX loops.
+  private static final ThreadLocal<DecimalFormat> ONE_DECIMAL_FORMAT =
+      ThreadLocal.withInitial(() -> {
+        DecimalFormat format = new DecimalFormat("#0.0");
+        format.setRoundingMode(RoundingMode.HALF_UP);
+        return format;
+      });
+  private static final ThreadLocal<DecimalFormat> TWO_DECIMAL_FORMAT =
+      ThreadLocal.withInitial(() -> {
+        DecimalFormat format = new DecimalFormat("#0.00");
+        format.setRoundingMode(RoundingMode.HALF_UP);
+        return format;
+      });
 
   /**
    * Constructs SCM machine Manager.
@@ -213,7 +228,7 @@ public class SCMNodeManager implements NodeManager {
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
     this.scmContext = scmContext;
     this.sendCommandNotifyMap = new HashMap<>();
-    this.nonWritableNodeFilter = new NonWritableNodeFilter(conf);
+    this.nonWritableNodeFilter = new NonWritableNodeFilter(conf, pendingContainerTracker);
   }
 
   @Override
@@ -268,11 +283,9 @@ public class SCMNodeManager implements NodeManager {
    * @return List of Datanodes that are known to SCM in the requested states.
    */
   @Override
-  public List<DatanodeDetails> getNodes(
+  public List<DatanodeInfo> getNodes(
       NodeOperationalState opState, NodeState health) {
-    return nodeStateManager.getNodes(opState, health)
-        .stream()
-        .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
+    return nodeStateManager.getNodes(opState, health);
   }
 
   @Override
@@ -474,6 +487,11 @@ public class SCMNodeManager implements NodeManager {
           LOG.info("Update the version for registered datanode {}, " +
               "oldVersion = {}, newVersion = {}.",
               datanodeDetails, oldNode.getVersion(), datanodeDetails.getVersion());
+          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
+        } else if (oldNode.portsChanged(datanodeDetails)) {
+          // Refresh the stored node when its port set changes
+          LOG.info("Updating ports for registered datanode {}: {} -> {}",
+              datanodeDetails, oldNode.getPorts(), datanodeDetails.getPorts());
           nodeStateManager.updateNode(datanodeDetails, layoutInfo);
         }
       } catch (NodeNotFoundException e) {
@@ -1013,8 +1031,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
       boolean mostUsed) {
-    List<DatanodeDetails> healthyNodes =
-        getNodes(IN_SERVICE, NodeState.HEALTHY);
+    final List<DatanodeInfo> healthyNodes = getNodes(IN_SERVICE, NodeState.HEALTHY);
 
     List<DatanodeUsageInfo> datanodeUsageInfoList =
         new ArrayList<>(healthyNodes.size());
@@ -1061,33 +1078,45 @@ public class SCMNodeManager implements NodeManager {
     return usageInfo;
   }
 
-  /**
-   * Get the usage info of a specified datanode.
-   *
-   * @param dn the usage of which we want to get
-   * @return DatanodeUsageInfo of the specified datanode
-   */
-  @Override
-  @Nullable
-  public DatanodeInfo getDatanodeInfo(DatanodeDetails dn) {
-    try {
-      return nodeStateManager.getNode(dn);
-    } catch (NodeNotFoundException e) {
-      LOG.warn("Cannot retrieve DatanodeInfo, datanode {} not found.",
-          dn.getID());
-      return null;
-    }
-  }
-
   @Override
   public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
     return pendingContainerTracker.checkSpaceAndRecordAllocation(datanodeInfo, containerID);
   }
 
   @Override
+  public void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    pendingContainerTracker.recordAllocation(datanodeInfo, containerID);
+  }
+  
+  @Override
+  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
+    return pendingContainerTracker.hasAvailableSpace(datanodeInfo);
+  }
+
+  @Override
   public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
     pendingContainerTracker.removePendingAllocation(
         datanodeInfo.getPendingContainerAllocations(), containerID);
+  }
+
+  @Override
+  public void opAdded(ContainerReplicaOp op, ContainerID containerID) {
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+      DatanodeInfo dnInfo = getNode(op.getTarget().getID());
+      if (dnInfo != null) {
+        recordAllocationForDatanode(dnInfo, containerID);
+      }
+    }
+  }
+
+  @Override
+  public void opCompleted(ContainerReplicaOp op, ContainerID containerID, boolean timedOut) {
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD && !timedOut) {
+      DatanodeInfo dnInfo = getNode(op.getTarget().getID());
+      if (dnInfo != null) {
+        removePendingAllocationForDatanode(dnInfo, containerID);
+      }
+    }
   }
 
   /**
@@ -1314,9 +1343,7 @@ public class SCMNodeManager implements NodeManager {
       unit.replace(0, 2, "TB");
     }
 
-    DecimalFormat decimalFormat = new DecimalFormat("#0.0");
-    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-    String newValue = decimalFormat.format(value);
+    String newValue = ONE_DECIMAL_FORMAT.get().format(value);
     return newValue + unit.toString();
   }
 
@@ -1341,8 +1368,7 @@ public class SCMNodeManager implements NodeManager {
       }
       long scmNonUsed = capacity - scmUsed - remaining;
 
-      DecimalFormat decimalFormat = new DecimalFormat("#0.00");
-      decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
+      DecimalFormat decimalFormat = TWO_DECIMAL_FORMAT.get();
 
       double usedPerc = ((double) scmUsed / capacity) * 100;
       usedPerc = usedPerc > 100.0 ? 100.0 : usedPerc;
@@ -1405,9 +1431,7 @@ public class SCMNodeManager implements NodeManager {
       dev += (usages[i] - totalOzoneUsed) * (usages[i] - totalOzoneUsed);
     }
     dev = (float) Math.sqrt(dev / usages.length);
-    DecimalFormat decimalFormat = new DecimalFormat("#0.00");
-    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-    nodeStatics.put(UsageStatics.STDEV.getLabel(), decimalFormat.format(dev));
+    nodeStatics.put(UsageStatics.STDEV.getLabel(), TWO_DECIMAL_FORMAT.get().format(dev));
   }
 
   private void nodeStateStatistics(Map<String, String> nodeStatics) {
@@ -1430,7 +1454,9 @@ public class SCMNodeManager implements NodeManager {
     long capacityByte = 0;
     long scmUsedByte = 0;
     long remainingByte = 0;
+    long totalPending = 0;
     for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+      totalPending += dni.getPendingContainerAllocations().getCount();
       List<StorageReportProto> storageReports = dni.getStorageReports();
       if (storageReports != null && !storageReports.isEmpty()) {
         for (StorageReportProto storageReport : storageReports) {
@@ -1440,6 +1466,7 @@ public class SCMNodeManager implements NodeManager {
         }
       }
     }
+    metrics.setTotalPendingContainerSlots(totalPending);
 
     long nonScmUsedByte = capacityByte - scmUsedByte - remainingByte;
     if (nonScmUsedByte < 0) {
@@ -1467,9 +1494,9 @@ public class SCMNodeManager implements NodeManager {
 
     private final long blockSize;
     private final long minRatisVolumeSizeBytes;
-    private final long containerSize;
+    private final PendingContainerTracker tracker;
 
-    NonWritableNodeFilter(ConfigurationSource conf) {
+    NonWritableNodeFilter(ConfigurationSource conf, PendingContainerTracker tracker) {
       blockSize = (long) conf.getStorageSize(
           OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
           OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
@@ -1478,17 +1505,32 @@ public class SCMNodeManager implements NodeManager {
           ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
           ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
           StorageUnit.BYTES);
-      containerSize = (long) conf.getStorageSize(
-          ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-          ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-          StorageUnit.BYTES);
+      this.tracker = tracker;
     }
 
     @Override
     public boolean test(DatanodeInfo dn) {
       return !dn.getNodeStatus().isNodeWritable()
-          || (!hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize)
-          && !hasEnoughCommittedVolumeSpace(dn));
+          || (!hasEnoughSpaceForNode(dn) && !hasEnoughCommittedVolumeSpace(dn));
+    }
+
+    /**
+     * Returns true if the datanode has both an available data slot (via
+     * {@link PendingContainerTracker}) and sufficient Ratis metadata volume space.
+     */
+    private boolean hasEnoughSpaceForNode(DatanodeInfo dn) {
+      if (!tracker.hasAvailableSpace(dn)) {
+        return false;
+      }
+      if (minRatisVolumeSizeBytes <= 0) {
+        return true;
+      }
+      for (MetadataStorageReportProto report : dn.getMetadataStorageReports()) {
+        if (report.getRemaining() > minRatisVolumeSizeBytes) {
+          return true;
+        }
+      }
+      return false;
     }
 
     /**

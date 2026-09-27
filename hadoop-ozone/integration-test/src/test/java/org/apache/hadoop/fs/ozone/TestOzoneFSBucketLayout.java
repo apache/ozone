@@ -34,8 +34,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -97,7 +97,7 @@ public abstract class TestOzoneFSBucketLayout implements NonHATests.TestCase {
     objectStore = client.getObjectStore();
     rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, cluster().getConf().get(OZONE_OM_ADDRESS_KEY));
-    volumeName = TestDataUtil.createVolumeAndBucket(client).getVolumeName();
+    volumeName = DataTestUtil.createVolumeAndBucket(client).getVolumeName();
   }
 
   @AfterAll

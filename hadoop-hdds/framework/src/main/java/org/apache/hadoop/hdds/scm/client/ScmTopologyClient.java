@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
-import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT;
@@ -60,8 +59,7 @@ public class ScmTopologyClient {
   }
 
   public NetworkTopology getClusterMap() {
-    return requireNonNull(cache.get(),
-        "ScmBlockLocationClient must have been initialized already.");
+    return cache.get();
   }
 
   public void start(ConfigurationSource conf) throws IOException {

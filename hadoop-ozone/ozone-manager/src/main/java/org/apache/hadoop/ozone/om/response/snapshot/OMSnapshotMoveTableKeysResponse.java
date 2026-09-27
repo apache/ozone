@@ -21,9 +21,10 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABL
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.createMergedRepeatedOmKeyInfoFromDeletedTableEntry;
 
-import com.google.common.collect.Lists;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -87,8 +88,8 @@ public class OMSnapshotMoveTableKeysResponse extends OMClientResponse {
         .getOzoneManager().getOmSnapshotManager();
     IOzoneManagerLock lock = omMetadataManager.getLock();
     String[] fromSnapshotId = new String[] {fromSnapshot.getSnapshotId().toString()};
-    String[] nextSnapshotId = nextSnapshot == null ? null : new String[] {nextSnapshot.getSnapshotId().toString()};
-    List<String[]> snapshotIds = Lists.newArrayList(fromSnapshotId, nextSnapshotId);
+    final List<String[]> snapshotIds = nextSnapshot == null ? Collections.singletonList(fromSnapshotId)
+        : Arrays.asList(fromSnapshotId, new String[]{nextSnapshot.getSnapshotId().toString()});
     OMLockDetails lockDetails = lock.acquireReadLocks(SNAPSHOT_DB_CONTENT_LOCK, snapshotIds);
     if (!lockDetails.isLockAcquired()) {
       throw new OMException("Unable to acquire read lock on " + SNAPSHOT_DB_CONTENT_LOCK + " for snapshot: " +

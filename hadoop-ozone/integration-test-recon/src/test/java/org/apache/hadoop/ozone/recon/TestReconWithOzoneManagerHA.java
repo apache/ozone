@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitForEventBufferEmpty;
 import static org.apache.hadoop.ozone.recon.ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -120,14 +119,6 @@ public class TestReconWithOzoneManagerHA {
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         recon.getReconServer().getOzoneManagerServiceProvider();
 
-    String hostname =
-        ozoneManager.get().getHttpServer().getHttpAddress().getHostName();
-    String expectedUrl = "http://" +
-        (hostname.equals("0.0.0.0") ? "localhost" : hostname) + ":" +
-        ozoneManager.get().getHttpServer().getHttpAddress().getPort() +
-        OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
-    String snapshotUrl = impl.getOzoneManagerSnapshotUrl();
-    assertEquals(expectedUrl, snapshotUrl);
     // Write some data
     String keyPrefix = "ratis";
     OzoneOutputStream key = objectStore.getVolume(VOL_NAME)

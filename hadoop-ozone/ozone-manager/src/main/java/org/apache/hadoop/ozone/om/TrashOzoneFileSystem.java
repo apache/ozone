@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_MAX_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
@@ -140,8 +143,7 @@ public class TrashOzoneFileSystem extends FileSystem {
     Preconditions.checkArgument(srcPath.getTrashRoot().
         toString().equals(dstPath.getTrashRoot().toString()));
     RenameIterator iterator = new RenameIterator(src, dst);
-    iterator.iterate();
-    return true;
+    return iterator.iterate();
   }
 
   private boolean renameFSO(OFSPath srcPath, OFSPath dstPath) {
@@ -170,8 +172,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       return deleteFSO(srcPath);
     }
     DeleteIterator iterator = new DeleteIterator(path, true);
-    iterator.iterate();
-    return true;
+    return iterator.iterate();
   }
 
   private boolean deleteFSO(OFSPath srcPath) {
@@ -194,13 +195,32 @@ public class TrashOzoneFileSystem extends FileSystem {
   public FileStatus[] listStatus(Path path) throws  IOException {
     ozoneManager.getMetrics().incNumTrashListStatus();
     List<FileStatus> fileStatuses = new ArrayList<>();
+    int pageSize = ozoneConfiguration.getInt(
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    pageSize = (int) OzoneConfigUtil.limitValue(pageSize,
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        OZONE_FS_MAX_LISTING_PAGE_SIZE);
     OmKeyArgs keyArgs = constructOmKeyArgs(path);
-    List<OzoneFileStatus> list = ozoneManager.
-        listStatus(keyArgs, false, null, Integer.MAX_VALUE);
-    for (OzoneFileStatus status : list) {
-      FileStatus fileStatus = convertToFileStatus(status);
-      fileStatuses.add(fileStatus);
-    }
+    String startKey = null;
+    String lastKeyPath = null;
+    int entriesAdded;
+    do {
+      List<OzoneFileStatus> list = ozoneManager.
+          listStatus(keyArgs, false, startKey, pageSize);
+      entriesAdded = 0;
+      for (OzoneFileStatus status : list) {
+        // The server includes the start key itself in the response.
+        if (status.getPath().equals(lastKeyPath)) {
+          continue;
+        }
+        fileStatuses.add(convertToFileStatus(status));
+        lastKeyPath = status.getPath();
+        startKey = status.getKeyInfo().getKeyName();
+        entriesAdded++;
+      }
+    } while (entriesAdded > 0);
     return fileStatuses.toArray(new FileStatus[0]);
   }
 
@@ -494,11 +514,15 @@ public class TrashOzoneFileSystem extends FileSystem {
 
         OzoneManagerProtocolProtos.OMRequest omRequest =
             getRenameKeyRequest(src, dst);
+        if (omRequest == null) {
+          return false;
+        }
         try {
           ozoneManager.getMetrics().incNumTrashFilesRenames();
           submitRequest(omRequest);
         } catch (Throwable e) {
           LOG.error("Couldn't send rename request.", e);
+          return false;
         }
 
       }
@@ -557,11 +581,15 @@ public class TrashOzoneFileSystem extends FileSystem {
             ozoneConfiguration);
         OzoneManagerProtocolProtos.OMRequest omRequest =
             getDeleteKeysRequest(path);
+        if (omRequest == null) {
+          return false;
+        }
         try {
           ozoneManager.getMetrics().incNumTrashFilesDeletes();
           submitRequest(omRequest);
         } catch (Throwable e) {
-          LOG.error("Couldn't send rename request.", e);
+          LOG.error("Couldn't send delete request.", e);
+          return false;
         }
       }
       return true;
@@ -584,6 +612,7 @@ public class TrashOzoneFileSystem extends FileSystem {
       OzoneManagerProtocolProtos.DeleteKeysRequest deleteKeysRequest =
           OzoneManagerProtocolProtos.DeleteKeysRequest.newBuilder()
               .setDeleteKeys(deleteKeyArgs)
+              .setSourceType(OzoneManagerProtocolProtos.RequestSource.TRASH)
               .build();
       OzoneManagerProtocolProtos.OMRequest omRequest =
           null;

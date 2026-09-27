@@ -55,14 +55,15 @@ public class OMBucketRemoveAclRequest extends OMBucketAclRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    long modificationTime = Time.now();
-    OzoneManagerProtocolProtos.RemoveAclRequest.Builder removeAclRequestBuilder
-        = getOmRequest().getRemoveAclRequest().toBuilder()
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+
+    final long modificationTime = Time.now();
+    final OzoneManagerProtocolProtos.RemoveAclRequest.Builder removeAclRequestBuilder =
+        omRequest.getRemoveAclRequest().toBuilder()
             .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
+    return omRequest.toBuilder()
         .setRemoveAclRequest(removeAclRequestBuilder)
-        .setUserInfo(getUserInfo())
         .build();
   }
 

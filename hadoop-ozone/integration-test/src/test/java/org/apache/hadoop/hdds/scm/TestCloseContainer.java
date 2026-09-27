@@ -50,10 +50,10 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils;
@@ -106,7 +106,7 @@ public class TestCloseContainer {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
-    bucket = TestDataUtil.createVolumeAndBucket(client, volName, bucketName);
+    bucket = DataTestUtil.createVolumeAndBucket(client, volName, bucketName);
   }
 
   @AfterEach
@@ -122,7 +122,7 @@ public class TestCloseContainer {
       throws Exception {
     // Create some keys to write data into the open containers
     for (int i = 0; i < 10; i++) {
-      TestDataUtil.createKey(bucket, "key" + i, "this is the content".getBytes(UTF_8));
+      DataTestUtil.createKey(bucket, "key" + i, "this is the content".getBytes(UTF_8));
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
@@ -180,7 +180,7 @@ public class TestCloseContainer {
       throws Exception {
     // Create some keys to write data into the open containers
     for (int i = 0; i < 10; i++) {
-      TestDataUtil.createKey(bucket, "key" + i, "this is the content".getBytes(UTF_8));
+      DataTestUtil.createKey(bucket, "key" + i, "this is the content".getBytes(UTF_8));
     }
     StorageContainerManager scm = cluster.getStorageContainerManager();
     // Pick any container on the cluster and close it via client
@@ -213,7 +213,7 @@ public class TestCloseContainer {
   public void testContainerChecksumForClosedContainer() throws Exception {
     // Create some keys to write data into the open containers
     ReplicationConfig repConfig = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
-    TestDataUtil.createKey(bucket, "key1", repConfig, "this is the content".getBytes(UTF_8));
+    DataTestUtil.createKey(bucket, "key1", repConfig, "this is the content".getBytes(UTF_8));
     StorageContainerManager scm = cluster.getStorageContainerManager();
 
     ContainerInfo containerInfo1 = scm.getContainerManager().getContainers().get(0);
@@ -243,7 +243,7 @@ public class TestCloseContainer {
     }
 
     // Create 2nd container and check the checksum doesn't match with 1st container
-    TestDataUtil.createKey(bucket, "key2", repConfig, "this is the different content".getBytes(UTF_8));
+    DataTestUtil.createKey(bucket, "key2", repConfig, "this is the different content".getBytes(UTF_8));
     ContainerInfo containerInfo2 = scm.getContainerManager().getContainers().get(1);
     for (HddsDatanodeService hddsDatanode : hddsDatanodes) {
       assertFalse(containerChecksumFileExists(hddsDatanode, containerInfo2.getContainerID()));

@@ -47,6 +47,8 @@ import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
@@ -495,11 +497,43 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
 
   Table<String, CompactionLogEntry> getCompactionLogTable();
 
+  Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable();
+
+  /**
+   * Gets the LifecycleScanStateTable.
+   *
+   * @return Table
+   */
+  Table<String, OmLifecycleScanState> getLifecycleScanStateTable();
+
+  /**
+   * @return list all LifecycleConfigurations.
+   */
+  List<OmLifecycleConfiguration> listLifecycleConfigurations() throws IOException;
+
+  /**
+   * Fetches the lifecycle configuration by bucketName.
+   *
+   * @param bucketName bucketName of the lifecycle configuration
+   * @return OmLifecycleConfiguration
+   * @throws IOException
+   */
+  OmLifecycleConfiguration getLifecycleConfiguration(String volumeName,
+      String bucketName) throws IOException;
+
   /**
    * Gets the OM Meta table.
    * @return meta table reference.
    */
   Table<String, String> getMetaTable();
+
+  /**
+   * Gets the S3RevokedStsTokenTable.
+   *
+   * @return Table.
+   */
+  Table<String, Long> getS3RevokedStsTokenTable();
+
 
   /**
    * Returns number of rows in a table.  This should not be used for very
@@ -558,11 +592,13 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    */
   Set<String> listTableNames();
 
+  Iterator<Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>>>
+      getVolumeIterator();
+
   Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>>
       getBucketIterator();
 
-  TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-      getKeyIterator() throws IOException;
+  TableIterator<String, Table.KeyValue<String, OmKeyInfo>> getKeyIterator() throws IOException;
 
   /**
    * Given parent object id and path component name, return the corresponding

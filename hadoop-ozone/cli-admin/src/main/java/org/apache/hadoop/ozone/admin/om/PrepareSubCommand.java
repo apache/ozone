@@ -60,68 +60,36 @@ public class PrepareSubCommand implements Callable<Void> {
       names = {"--transaction-apply-wait-timeout"},
       description = "Max time in SECONDS to wait for all transactions before" +
           "the prepare request to be applied to the OM DB.",
+      defaultValue = "120",
       hidden = true
   )
-  private Long txnApplyWaitTimeSeconds;
-
-  /** For backward compatibility. */
-  @CommandLine.Option(
-      names = {"-tawt"},
-      hidden = true
-  )
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  private Long deprecatedTxnApplyWaitTimeSeconds;
+  private long txnApplyWaitTimeSeconds;
 
   @CommandLine.Option(
       names = {"--transaction-apply-check-interval"},
       description = "Time in SECONDS to wait between successive checks for " +
           "all transactions to be applied to the OM DB.",
+      defaultValue = "5",
       hidden = true
   )
-  private Long txnApplyCheckIntervalSeconds;
-
-  /** For backward compatibility. */
-  @CommandLine.Option(
-      names = {"-tact"},
-      hidden = true
-  )
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  private Long deprecatedTxnApplyCheckIntervalSeconds;
+  private long txnApplyCheckIntervalSeconds;
 
   @CommandLine.Option(
       names = {"--prepare-check-interval"},
       description = "Time in SECONDS to wait between successive checks for OM" +
           " preparation.",
+      defaultValue = "10",
       hidden = true
   )
-  private Long prepareCheckInterval;
-
-  /** For backward compatibility. */
-  @CommandLine.Option(
-      names = {"-pct"},
-      hidden = true
-  )
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  private Long deprecatedPrepareCheckInterval;
+  private long prepareCheckInterval;
 
   @CommandLine.Option(
       names = {"--prepare-timeout"},
       description = "Max time in SECONDS to wait for all OMs to be prepared",
+      defaultValue = "300",
       hidden = true
   )
-  private Long prepareTimeOut;
-
-  /** For backward compatibility. */
-  @CommandLine.Option(
-      names = {"-pt"},
-      hidden = true
-  )
-  @Deprecated
-  @SuppressWarnings("DeprecatedIsStillUsed")
-  private Long deprecatedPrepareTimeOut;
+  private long prepareTimeOut;
 
   @Override
   public Void call() throws Exception {
@@ -132,8 +100,8 @@ public class PrepareSubCommand implements Callable<Void> {
   }
 
   private void execute(OzoneManagerProtocol client) throws Exception {
-    long prepareTxnId = client.prepareOzoneManager(getTxnApplyWaitTimeSeconds(),
-        getTxnApplyCheckIntervalSeconds());
+    long prepareTxnId = client.prepareOzoneManager(txnApplyWaitTimeSeconds,
+        txnApplyCheckIntervalSeconds);
     System.out.println("Ozone Manager Prepare Request successfully returned " +
         "with Transaction Id : [" + prepareTxnId + "].");
 
@@ -141,8 +109,8 @@ public class PrepareSubCommand implements Callable<Void> {
     Set<String> omHosts = getOmHostsFromConfig(
         parent.getParent().getOzoneConf(), omServiceOption.getServiceID());
     omHosts.forEach(h -> omPreparedStatusMap.put(h, false));
-    Duration pTimeout = Duration.of(getPrepareTimeOut(), ChronoUnit.SECONDS);
-    Duration pInterval = Duration.of(getPrepareCheckInterval(), ChronoUnit.SECONDS);
+    Duration pTimeout = Duration.of(prepareTimeOut, ChronoUnit.SECONDS);
+    Duration pInterval = Duration.of(prepareCheckInterval, ChronoUnit.SECONDS);
 
     System.out.println();
     System.out.println("Checking individual OM instances for prepare request " +
@@ -175,7 +143,7 @@ public class PrepareSubCommand implements Callable<Void> {
         }
       }
       if (currentNumPreparedOms < expectedNumPreparedOms) {
-        System.out.println("Waiting for " + getPrepareCheckInterval() +
+        System.out.println("Waiting for " + prepareCheckInterval +
             " seconds before retrying...");
         Thread.sleep(pInterval.toMillis());
       }
@@ -199,32 +167,6 @@ public class PrepareSubCommand implements Callable<Void> {
       System.out.println("No new write requests will be allowed until " +
           "preparation is cancelled or upgrade/downgrade is done.");
     }
-  }
-
-  private long getTxnApplyWaitTimeSeconds() {
-    return resolveOption(txnApplyWaitTimeSeconds, deprecatedTxnApplyWaitTimeSeconds, 120L);
-  }
-
-  private long getTxnApplyCheckIntervalSeconds() {
-    return resolveOption(txnApplyCheckIntervalSeconds, deprecatedTxnApplyCheckIntervalSeconds, 5L);
-  }
-
-  private long getPrepareCheckInterval() {
-    return resolveOption(prepareCheckInterval, deprecatedPrepareCheckInterval, 10L);
-  }
-
-  private long getPrepareTimeOut() {
-    return resolveOption(prepareTimeOut, deprecatedPrepareTimeOut, 300L);
-  }
-
-  private static long resolveOption(Long value, Long deprecatedValue, long defaultValue) {
-    if (value != null) {
-      return value;
-    }
-    if (deprecatedValue != null) {
-      return deprecatedValue;
-    }
-    return defaultValue;
   }
 
 }

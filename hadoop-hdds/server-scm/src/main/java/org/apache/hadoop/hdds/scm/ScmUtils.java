@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT;
@@ -45,6 +46,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.BlockingQueue;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -54,6 +56,7 @@ import org.apache.hadoop.hdds.scm.server.ContainerReportQueue;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
@@ -83,14 +86,13 @@ public final class ScmUtils {
       logWarn(OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
           OZONE_SCM_BLOCK_CLIENT_PORT_KEY);
     }
-    return NetUtils.createSocketAddr(
-        host.orElse(
-            OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(conf.getInt(
-                ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
-                    localScmServiceId, nodeId),
-                conf.getInt(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
-                    OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT))));
+    return NetUtils.createSocketAddr(getHostPortString(
+        host.orElse(OZONE_SCM_BLOCK_CLIENT_BIND_HOST_DEFAULT),
+        port.orElse(conf.getInt(
+            ConfUtils.addKeySuffixes(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+                localScmServiceId, nodeId),
+            conf.getInt(OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
+                OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT)))));
   }
 
   public static String getScmBlockProtocolServerAddressKey(
@@ -116,12 +118,12 @@ public final class ScmUtils {
       logWarn(OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_CLIENT_PORT_KEY);
     }
 
-    return NetUtils.createSocketAddr(host + ":" +
+    return NetUtils.createSocketAddr(getHostPortString(host,
         port.orElse(
             conf.getInt(ConfUtils.addKeySuffixes(OZONE_SCM_CLIENT_PORT_KEY,
                 localScmServiceId, nodeId),
             conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
-                OZONE_SCM_CLIENT_PORT_DEFAULT))));
+                OZONE_SCM_CLIENT_PORT_DEFAULT)))));
   }
 
   public static String getClientProtocolServerAddressKey(
@@ -143,12 +145,13 @@ public final class ScmUtils {
       logWarn(OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY);
     }
 
-    return NetUtils.createSocketAddr(
-        host.orElse(OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(conf.getInt(ConfUtils.addKeySuffixes(
-                OZONE_SCM_DATANODE_PORT_KEY, localScmServiceId, nodeId),
-                conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
-                    OZONE_SCM_DATANODE_PORT_DEFAULT))));
+    return NetUtils.createSocketAddr(getHostPortString(
+        host.orElse(OZONE_SCM_DATANODE_BIND_HOST_DEFAULT),
+        port.orElse(conf.getInt(
+            ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
+                localScmServiceId, nodeId),
+            conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+                OZONE_SCM_DATANODE_PORT_DEFAULT)))));
   }
 
   public static String getScmDataNodeBindAddressKey(
@@ -216,6 +219,27 @@ public final class ScmUtils {
             "Please try the operation later again.",
             SCMException.ResultCodes.CA_ROTATION_IN_POST_PROGRESS);
       }
+    }
+  }
+
+  /**
+   * Returns default replication config, or null when configured values are
+   * invalid. Callers can decide whether to fallback or skip their operation.
+   */
+  public static ReplicationConfig getDefaultReplicationConfig(
+      ConfigurationSource conf, Logger logger, String componentName) {
+    try {
+      return ReplicationConfig.getDefault(conf);
+    } catch (IllegalArgumentException e) {
+      logger.warn("Ignoring invalid default replication config in {}: "
+              + "type={}, replication={}.",
+          componentName,
+          conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
+              OzoneConfigKeys.OZONE_REPLICATION_TYPE_DEFAULT),
+          conf.get(OzoneConfigKeys.OZONE_REPLICATION,
+              OzoneConfigKeys.OZONE_REPLICATION_DEFAULT),
+          e);
+      return null;
     }
   }
 }

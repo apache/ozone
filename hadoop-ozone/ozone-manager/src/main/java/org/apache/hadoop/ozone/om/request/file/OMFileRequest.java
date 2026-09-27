@@ -944,7 +944,7 @@ public final class OMFileRequest {
     // Check fileTable entries for any sub paths.
     String seekFileInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>>
             iterator = fileTable.iterator(seekFileInDB)) {
 
       while (iterator.hasNext()) {

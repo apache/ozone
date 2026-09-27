@@ -45,6 +45,7 @@ import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.ReconSchemaGenerationModule;
 import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
+import org.apache.ozone.test.tag.Slow;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -716,6 +717,7 @@ public class TestUnhealthyContainersDerbyPerformance {
    */
   @Test
   @Order(9)
+  @Slow("HDDS-15582")
   public void testBatchDeletePerformanceOneMillionRecords() {
     int deleteCount = CONTAINER_ID_RANGE;               // 200 000 container IDs
     int expectedDeleted = deleteCount * STATE_COUNT;    // 1 000 000 rows
@@ -767,6 +769,7 @@ public class TestUnhealthyContainersDerbyPerformance {
    */
   @Test
   @Order(10)
+  @Slow("HDDS-15582")
   public void testCountByStateAfterFullDelete() {
     int expectedPerState = 0;
     LOG.info("--- Test 10: COUNT by state after full delete (expected {} each) ---",

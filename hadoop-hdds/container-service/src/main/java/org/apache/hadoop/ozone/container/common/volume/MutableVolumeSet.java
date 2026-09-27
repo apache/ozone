@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -404,6 +405,16 @@ public class MutableVolumeSet implements VolumeSet {
     return hasEnoughVolumes;
   }
 
+  /**
+   * Returns a consistent snapshot of the storage reports under the volume-set
+   * read lock.
+   *
+   * <p>Do not call this from metrics collection (or any caller that may hold the
+   * {@code DefaultMetricsSystem} monitor): a volume-failure handler holds the
+   * volume-set write lock while unregistering volume metrics under that same
+   * monitor, so taking the read lock here can deadlock the metrics system. Use
+   * {@link #getStorageReportSnapshot()} from those paths instead.
+   */
   public StorageLocationReport[] getStorageReport() {
     this.readLock();
     try {
@@ -419,6 +430,32 @@ public class MutableVolumeSet implements VolumeSet {
     } finally {
       this.readUnlock();
     }
+  }
+
+  /**
+   * Lock-free variant of {@link #getStorageReport()}. Both {@code volumeMap}
+   * and {@code failedVolumeMap} are {@link ConcurrentHashMap}s, so this returns
+   * a weakly-consistent snapshot (mirroring {@link #getVolumesList()}) without
+   * acquiring the volume-set lock.
+   *
+   * <p>Use this from callers that must not block on the volume-set lock. In
+   * particular, metrics sampling runs while the {@code DefaultMetricsSystem}
+   * monitor is held, and a volume-failure handler holds the volume-set write
+   * lock while unregistering volume metrics (which needs that same monitor);
+   * acquiring the volume-set lock from the sampling thread can therefore
+   * deadlock the whole metrics system.
+   */
+  public StorageLocationReport[] getStorageReportSnapshot() {
+    // volumeMap and failedVolumeMap are ConcurrentHashMaps; their value streams
+    // are weakly consistent, so no lock is needed here (same guarantee as
+    // getVolumesList()).
+    return Stream.concat(volumeMap.values().stream(), failedVolumeMap.values().stream())
+        .map(StorageVolume::getReport)
+        .toArray(StorageLocationReport[]::new);
+  }
+
+  public String getDatanodeUuid() {
+    return datanodeUuid;
   }
 
   public StorageVolume.VolumeType getVolumeType() {

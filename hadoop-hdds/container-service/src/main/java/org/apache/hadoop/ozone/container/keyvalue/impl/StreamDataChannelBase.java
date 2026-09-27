@@ -94,12 +94,28 @@ abstract class StreamDataChannelBase
     return getChannel().isOpen();
   }
 
+  abstract boolean isPutBlockCommittedOnClose();
+
   protected void assertSpaceAvailability(int requested) throws StorageContainerException {
     ContainerUtils.assertSpaceAvailability(containerData.getContainerID(), containerData.getVolume(), requested);
   }
 
   public void setLinked() {
     linked.set(true);
+  }
+
+  public boolean link() {
+    if (isPutBlockCommittedOnClose()) {
+      // The PutBlock should be commited when the steam is closed
+      return linked.get();
+    } else {
+      setLinked();
+      return true;
+    }
+  }
+
+  public boolean isLinked() {
+    return linked.get();
   }
 
   /**

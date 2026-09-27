@@ -77,11 +77,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // field and hence maintain the original output.
   @JsonIgnore
   private final ContainerID containerID;
-  // Delete Transaction Id is updated when new transaction for a container
-  // is stored in SCM delete Table.
-  // TODO: Replication Manager should consider deleteTransactionId so that
-  // replica with higher deleteTransactionId is preferred over replica with
-  // lower deleteTransactionId.
+  // Deprecated SCM-side delete transaction ID retained for old persisted data, SCM no longer updates this field.
+  @Deprecated
   private long deleteTransactionId;
   // The sequenceId of a close container cannot change, and all the
   // container replica should have the same sequenceId.
@@ -218,16 +215,19 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     numberOfKeys = value;
   }
 
+  /**
+   * Legacy SCM-side delete transaction ID. SCM no longer updates this field.
+   *
+   * @deprecated SCM no longer updates this field. Use DN-side container data
+   *             for delete transaction tracking.
+   */
+  @Deprecated
   public long getDeleteTransactionId() {
     return deleteTransactionId;
   }
 
   public long getSequenceId() {
     return sequenceId;
-  }
-
-  public void updateDeleteTransactionId(long transactionId) {
-    deleteTransactionId = max(transactionId, deleteTransactionId);
   }
 
   public void updateSequenceId(long sequenceID) {
@@ -464,6 +464,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       return this;
     }
 
+    @Deprecated
     public Builder setDeleteTransactionId(long deleteTransactionID) {
       this.deleteTransactionId = deleteTransactionID;
       return this;

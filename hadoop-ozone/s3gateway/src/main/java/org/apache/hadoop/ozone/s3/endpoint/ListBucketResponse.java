@@ -41,7 +41,10 @@ public class ListBucketResponse {
 
   @XmlElement(name = "Owner")
   private S3Owner owner;
-  
+
+  @XmlElement(name = "ContinuationToken")
+  private String continuationToken;
+
   public List<BucketMetadata> getBuckets() {
     return buckets;
   }
@@ -65,5 +68,13 @@ public class ListBucketResponse {
 
   public void setOwner(S3Owner owner) {
     this.owner = owner;
+  }
+
+  public String getContinuationToken() {
+    return continuationToken;
+  }
+
+  public void setContinuationToken(String continuationToken) {
+    this.continuationToken = continuationToken;
   }
 }

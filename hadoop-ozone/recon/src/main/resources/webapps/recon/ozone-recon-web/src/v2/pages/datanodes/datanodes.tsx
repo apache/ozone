@@ -141,8 +141,8 @@ const Datanodes: React.FC<{}> = () => {
 
   const loadData = () => {
     // Trigger both API hooks to refetch data
-    decommissionAPI.refetch();
-    datanodesAPI.refetch();
+    decommissionAPI.refetch().catch(() => {});
+    datanodesAPI.refetch().catch(() => {});
   };
 
   // Process data when both APIs have loaded

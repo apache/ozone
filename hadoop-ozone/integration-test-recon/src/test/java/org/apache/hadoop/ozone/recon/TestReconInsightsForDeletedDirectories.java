@@ -50,9 +50,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -159,7 +159,7 @@ public class TestReconInsightsForDeletedDirectories {
   @MethodSource("replicationConfigs")
   public void testGetDeletedDirectoryInfo(ReplicationConfig replicationConfig)
       throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
         new DefaultReplicationConfig(replicationConfig));
     String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
         bucket.getVolumeName());
@@ -283,7 +283,7 @@ public class TestReconInsightsForDeletedDirectories {
   @MethodSource("replicationConfigs")
   public void testGetDeletedDirectoryInfoForNestedDirectories(ReplicationConfig replicationConfig)
       throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
         new DefaultReplicationConfig(replicationConfig));
     String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
         bucket.getVolumeName());
@@ -395,7 +395,7 @@ public class TestReconInsightsForDeletedDirectories {
   @MethodSource("replicationConfigs")
   public void testGetDeletedDirectoryInfoWithMultipleSubdirectories(ReplicationConfig replicationConfig)
       throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
         new DefaultReplicationConfig(replicationConfig));
     String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
         bucket.getVolumeName());

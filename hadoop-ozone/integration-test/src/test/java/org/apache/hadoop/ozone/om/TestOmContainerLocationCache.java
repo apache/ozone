@@ -214,7 +214,11 @@ public class TestOmContainerLocationCache {
         .thenCallRealMethod();
     when(manager.acquireClient(argThat(matchEmptyPipeline()),
         anyBoolean())).thenCallRealMethod();
+    when(manager.acquireClient(argThat(matchEmptyPipeline()), anyBoolean(), anyBoolean()))
+        .thenCallRealMethod();
     when(manager.acquireClientForReadData(argThat(matchEmptyPipeline())))
+        .thenCallRealMethod();
+    when(manager.acquireClientForReadData(argThat(matchEmptyPipeline()), anyBoolean()))
         .thenCallRealMethod();
 
     when(manager.acquireClient(argThat(matchPipeline(DN1))))

@@ -52,7 +52,7 @@ public class TestOmKeyLocationInfoGroup {
     List<OmKeyLocationInfo> locationInfoList = createLocationList();
     OmKeyLocationInfoGroup newInstance =
         testInstance.generateNextVersion(locationInfoList);
-    assertEquals(1, newInstance.getLocationList().size());
+    assertEquals(1, newInstance.createLocationList().size());
     // createTestInstance is of version 2, nextVersion should be 3
     assertEquals(3, newInstance.getVersion());
 

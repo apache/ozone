@@ -171,6 +171,7 @@ public class TestFailoverWithSCMHA {
     ScmClient scmClient = new ContainerOperationClient(conf);
     // assert that container balancer is not running right now
     assertFalse(scmClient.getContainerBalancerStatus());
+    conf.setInt("hdds.container.balancer.datanodes.involved.max.percentage.per.iteration", 100);
     ContainerBalancerConfiguration balancerConf =
         conf.getObject(ContainerBalancerConfiguration.class);
     ContainerBalancer containerBalancer = leader.getContainerBalancer();

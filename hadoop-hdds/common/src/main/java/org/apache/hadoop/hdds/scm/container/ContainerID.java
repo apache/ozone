@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.ratis.util.MemoizedSupplier;
+import org.apache.ratis.util.WeakValueCache;
 
 /**
  * Container ID is an integer that is a value between 1..MAX_CONTAINER ID.
@@ -42,7 +43,9 @@ public final class ContainerID implements Comparable<ContainerID> {
       LongCodec.get(), ContainerID::valueOf, c -> c.id,
       ContainerID.class, DelegatedCodec.CopyType.SHALLOW);
 
-  public static final ContainerID MIN = ContainerID.valueOf(0);
+  public static final ContainerID MIN = new ContainerID(0);
+  private static final WeakValueCache<Long, ContainerID> CACHE
+      = new WeakValueCache<>("containerId", ContainerID::new);
 
   private final long id;
   private final Supplier<HddsProtos.ContainerID> proto;
@@ -71,7 +74,11 @@ public final class ContainerID implements Comparable<ContainerID> {
    * @return ContainerID.
    */
   public static ContainerID valueOf(final long containerID) {
-    return new ContainerID(containerID);
+    return CACHE.getOrCreate(containerID);
+  }
+
+  static WeakValueCache<Long, ContainerID> getCacheForTesting() {
+    return CACHE;
   }
 
   /**
@@ -84,6 +91,10 @@ public final class ContainerID implements Comparable<ContainerID> {
    * Don't expose the int value.
    */
   public long getId() {
+    return id;
+  }
+
+  public long getIdForTesting() {
     return id;
   }
 

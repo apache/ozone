@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.scm.node;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.getDNHostAndPort;
-import static org.apache.hadoop.hdds.scm.node.TestNodeUtil.waitForDnToReachOpState;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.getDNHostAndPort;
+import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpState;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -137,20 +137,13 @@ public class TestDiskBalancerDuringDecommissionAndMaintenance {
   }
 
   /**
-   * Helper method to get all IN_SERVICE datanodes.
-   */
-  private List<DatanodeDetails> getInServiceDatanodes(NodeManager nm) {
-    return nm.getNodes(IN_SERVICE, HddsProtos.NodeState.HEALTHY);
-  }
-
-  /**
    * Helper method to query DiskBalancer info from all IN_SERVICE datanodes.
    * Similar to --in-service-datanodes option in CLI.
    */
   private <T> List<T> queryAllInServiceDatanodes(
       DiskBalancerQuery<T> query) throws IOException {
     NodeManager nm = cluster.getStorageContainerManager().getScmNodeManager();
-    List<DatanodeDetails> inServiceDatanodes = getInServiceDatanodes(nm);
+    final List<DatanodeInfo> inServiceDatanodes = nm.getNodes(IN_SERVICE, HddsProtos.NodeState.HEALTHY);
     List<T> results = new ArrayList<>();
     
     for (DatanodeDetails dn : inServiceDatanodes) {

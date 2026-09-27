@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -107,7 +106,7 @@ abstract class AbstractContainerReportHandler {
   protected void processContainerReplica(final DatanodeDetails datanodeDetails,
       final ContainerInfo containerInfo,
       final ContainerReplicaProto replicaProto, final EventPublisher publisher, Object detailsForLogging)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     getLogger().debug("Processing replica {}", detailsForLogging);
     // Synchronized block should be replaced by container lock,
     // once we have introduced lock inside ContainerInfo.
@@ -242,7 +241,7 @@ abstract class AbstractContainerReportHandler {
                                     final ContainerInfo container,
                                     final ContainerReplicaProto replica,
                                     final EventPublisher publisher,
-      Object detailsForLogging) throws IOException, InvalidStateTransitionException {
+      Object detailsForLogging) throws IOException {
 
     final ContainerID containerId = container.containerID();
     boolean replicaIsEmpty = replica.hasIsEmpty() && replica.getIsEmpty();
@@ -253,7 +252,7 @@ abstract class AbstractContainerReportHandler {
       // If the state of a container is OPEN and a replica is in different state, finalize the container.
       if (replica.getState() != State.OPEN) {
         getLogger().info("FINALIZE (i.e. CLOSING) {}", detailsForLogging);
-        containerManager.updateContainerState(containerId, LifeCycleEvent.FINALIZE);
+        updateContainerState(containerId, LifeCycleEvent.FINALIZE);
       }
       return false;
     case CLOSING:
@@ -264,7 +263,7 @@ abstract class AbstractContainerReportHandler {
       // If the replica is in QUASI_CLOSED state, move the container to QUASI_CLOSED state.
       if (replica.getState() == State.QUASI_CLOSED) {
         getLogger().info("QUASI_CLOSE {}", detailsForLogging);
-        containerManager.updateContainerState(containerId, LifeCycleEvent.QUASI_CLOSE);
+        updateContainerState(containerId, LifeCycleEvent.QUASI_CLOSE);
         return false;
       }
 
@@ -288,7 +287,7 @@ abstract class AbstractContainerReportHandler {
           return true;
         }
         getLogger().info("CLOSE {}", detailsForLogging);
-        containerManager.updateContainerState(containerId, LifeCycleEvent.CLOSE);
+        updateContainerState(containerId, LifeCycleEvent.CLOSE);
       }
       return false;
     case QUASI_CLOSED:
@@ -301,7 +300,7 @@ abstract class AbstractContainerReportHandler {
           return true;
         }
         getLogger().info("FORCE_CLOSE for {}", detailsForLogging);
-        containerManager.updateContainerState(containerId, LifeCycleEvent.FORCE_CLOSE);
+        updateContainerState(containerId, LifeCycleEvent.FORCE_CLOSE);
       }
       return false;
     case CLOSED:
@@ -359,6 +358,24 @@ abstract class AbstractContainerReportHandler {
       getLogger().error("Replica not processed due to container state {}: {}",
           container.getState(), detailsForLogging);
       return false;
+    }
+  }
+
+  /**
+   * Apply a container lifecycle state transition, but only on the leader SCM.
+   * On a follower the underlying {@code containerManager.updateContainerState}
+   * is a Ratis write and would throw {@code NotLeaderException}, which would
+   * abort {@code processContainerReplica} and skip recording the replica
+   * location. Skipping the state change on a follower is safe: the leader
+   * drives the transition and it replicates back via the Ratis log.
+   */
+  private void updateContainerState(ContainerID containerID, LifeCycleEvent event)
+      throws IOException {
+    if (scmContext.isLeader()) {
+      containerManager.updateContainerState(containerID, event);
+    } else {
+      getLogger().debug("Skipping updateContainerState on non-leader SCM, container {} event {}",
+          containerID, event);
     }
   }
 

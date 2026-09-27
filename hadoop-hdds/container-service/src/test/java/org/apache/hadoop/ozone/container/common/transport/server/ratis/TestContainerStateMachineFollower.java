@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 /**
  * Test class to ContainerStateMachine class for follower.
  */
-public class TestContainerStateMachineFollower extends TestContainerStateMachine {
+public class TestContainerStateMachineFollower extends ContainerStateMachineTests {
   public TestContainerStateMachineFollower() {
     super(false);
   }

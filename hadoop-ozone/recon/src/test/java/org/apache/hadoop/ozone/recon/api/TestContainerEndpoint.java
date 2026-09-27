@@ -75,7 +75,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -799,7 +798,7 @@ public class TestContainerEndpoint {
         responseObject.getContainers().stream().findFirst().orElse(null);
     assertNotNull(container);
 
-    assertEquals(containerID.getId(), container.getContainerID());
+    assertEquals(containerID.getIdForTesting(), container.getContainerID());
     assertEquals(keyCount, container.getKeys());
     assertEquals(pipelineID.getId(), container.getPipelineID());
     assertEquals(3, container.getReplicas().size());
@@ -1186,7 +1185,7 @@ public class TestContainerEndpoint {
     reconPipelineManager.addPipeline(localPipeline);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
-            .setContainerID(localContainerID.getId())
+            .setContainerID(localContainerID.getIdForTesting())
             .setNumberOfKeys(10)
             .setPipelineID(localPipeline.getId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
@@ -1331,7 +1330,7 @@ public class TestContainerEndpoint {
   }
 
   private void updateContainerStateToDeleted(long containerId)
-      throws IOException, InvalidStateTransitionException, TimeoutException {
+      throws IOException {
     reconContainerManager.updateContainerState(ContainerID.valueOf(containerId),
         HddsProtos.LifeCycleEvent.FINALIZE);
     reconContainerManager.updateContainerState(ContainerID.valueOf(containerId),

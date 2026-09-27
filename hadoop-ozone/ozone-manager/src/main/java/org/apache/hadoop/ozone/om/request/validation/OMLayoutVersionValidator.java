@@ -101,7 +101,7 @@ public @interface OMLayoutVersionValidator {
   /**
    * The version before which the validator needs to run. The validator will run only for requests
    * having a version which precedes the specified version.
-   * @returns the exclusive upper bound of the request's version under which the validator is applicable.
+   * @return the exclusive upper bound of the request's version under which the validator is applicable.
    */
   OMLayoutFeature applyBefore();
 

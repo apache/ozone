@@ -48,7 +48,9 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
@@ -77,7 +79,7 @@ public class TestReconIncrementalContainerReportHandler
     when(reportMock.getDatanodeDetails()).thenReturn(datanodeDetails);
 
     ContainerWithPipeline containerWithPipeline = getTestContainer(
-        containerID.getId(), OPEN);
+        containerID.getIdForTesting(), OPEN);
     List<ContainerWithPipeline> containerWithPipelineList = new ArrayList<>();
     containerWithPipelineList.add(containerWithPipeline);
     ReconContainerManager containerManager = getContainerManager();
@@ -136,11 +138,12 @@ public class TestReconIncrementalContainerReportHandler
       ReconContainerManager containerManager = getContainerManager();
       containerManager.addNewContainer(containerWithPipeline);
 
-      DatanodeDetails datanodeDetails =
-          containerWithPipeline.getPipeline().getFirstNode();
+      DatanodeInfo datanodeInfo = new DatanodeInfo(
+          containerWithPipeline.getPipeline().getFirstNode(),
+          NodeStatus.inServiceHealthy(), null, 1000);
       NodeManager nodeManagerMock = mock(NodeManager.class);
       when(nodeManagerMock.getNode(any(DatanodeID.class)))
-          .thenReturn(datanodeDetails);
+          .thenReturn(datanodeInfo);
       IncrementalContainerReportFromDatanode reportMock =
           mock(IncrementalContainerReportFromDatanode.class);
       when(reportMock.getDatanodeDetails())
@@ -148,7 +151,7 @@ public class TestReconIncrementalContainerReportHandler
 
       IncrementalContainerReportProto containerReport =
           getIncrementalContainerReportProto(containerID, state,
-              datanodeDetails.getUuidString());
+              datanodeInfo.getUuidString());
       when(reportMock.getReport()).thenReturn(containerReport);
       ReconIncrementalContainerReportHandler reconIcr =
           new ReconIncrementalContainerReportHandler(nodeManagerMock,
@@ -164,7 +167,7 @@ public class TestReconIncrementalContainerReportHandler
           String.format("Expecting %s in container state for replica state %s",
               expectedState, state));
       verify(containerManager.getScmClient(), never())
-          .getContainerWithPipeline(containerID.getId());
+          .getContainerWithPipeline(containerID.getIdForTesting());
     }
   }
 
@@ -197,7 +200,7 @@ public class TestReconIncrementalContainerReportHandler
           String.format("Expecting %s in container state for replica state %s",
               expectedState, state));
       verify(containerManager.getScmClient(), never())
-          .getContainerWithPipeline(containerID.getId());
+          .getContainerWithPipeline(containerID.getIdForTesting());
     }
   }
 
@@ -239,8 +242,10 @@ public class TestReconIncrementalContainerReportHandler
   private static NodeManager getNodeManagerMock(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
     NodeManager nodeManagerMock = mock(NodeManager.class);
+    DatanodeInfo datanodeInfo = new DatanodeInfo(
+        datanodeDetails, NodeStatus.inServiceHealthy(), null, 1000);
     when(nodeManagerMock.getNode(any(DatanodeID.class)))
-        .thenReturn(datanodeDetails);
+        .thenReturn(datanodeInfo);
     return nodeManagerMock;
   }
 
@@ -264,7 +269,7 @@ public class TestReconIncrementalContainerReportHandler
         IncrementalContainerReportProto.newBuilder();
     final ContainerReplicaProto replicaProto =
         ContainerReplicaProto.newBuilder()
-            .setContainerID(containerId.getId())
+            .setContainerID(containerId.getIdForTesting())
             .setState(state)
             .setOriginNodeId(originNodeId)
             .build();

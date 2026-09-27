@@ -22,7 +22,7 @@ import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 /**
  * Test OmSnapshot for Legacy bucket type.
  */
-public class TestOmSnapshotWithoutBucketLinkingLegacy extends TestOmSnapshot {
+public class TestOmSnapshotWithoutBucketLinkingLegacy extends OmSnapshotTests {
 
   public TestOmSnapshotWithoutBucketLinkingLegacy() throws Exception {
     super(LEGACY, false, false, false, false);

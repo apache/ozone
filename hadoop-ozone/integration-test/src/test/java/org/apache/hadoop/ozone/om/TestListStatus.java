@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -65,7 +65,7 @@ public abstract class TestListStatus implements NonHATests.TestCase {
     client = OzoneClientFactory.getRpcClient(conf);
 
     // create a volume and a LEGACY bucket
-    fsoOzoneBucket = TestDataUtil
+    fsoOzoneBucket = DataTestUtil
         .createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
 
     buildNameSpaceTree(fsoOzoneBucket);

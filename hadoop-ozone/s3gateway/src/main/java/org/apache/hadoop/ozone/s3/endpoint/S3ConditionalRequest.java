@@ -189,6 +189,17 @@ final class S3ConditionalRequest {
     return new WriteConditions(trimmedIfNoneMatch, trimmedIfMatch);
   }
 
+  static DeleteCondition parseDeleteCondition(HttpHeaders headers, String keyPath)
+      throws OS3Exception {
+    String ifMatch = headers.getHeaderString(S3Consts.IF_MATCH_HEADER);
+    if (ifMatch != null && StringUtils.isBlank(ifMatch)) {
+      OS3Exception ex = newError(INVALID_REQUEST, keyPath);
+      ex.setErrorMessage("If-Match header cannot be empty.");
+      throw ex;
+    }
+    return new DeleteCondition(ifMatch);
+  }
+
   private static Response buildNotModifiedResponse(OzoneKey key) {
     ResponseBuilder responseBuilder = Response.status(Status.NOT_MODIFIED);
     ObjectEndpoint.addEntityTagHeader(responseBuilder, key);
@@ -278,6 +289,22 @@ final class S3ConditionalRequest {
 
     boolean hasIfNoneMatch() {
       return ifNoneMatch != null;
+    }
+
+    boolean hasIfMatch() {
+      return ifMatch != null;
+    }
+
+    String getExpectedETag() {
+      return parseETag(ifMatch);
+    }
+  }
+
+  static final class DeleteCondition {
+    private final String ifMatch;
+
+    private DeleteCondition(String ifMatch) {
+      this.ifMatch = ifMatch;
     }
 
     boolean hasIfMatch() {

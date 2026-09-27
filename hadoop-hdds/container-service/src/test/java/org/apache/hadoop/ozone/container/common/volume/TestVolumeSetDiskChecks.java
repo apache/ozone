@@ -32,7 +32,6 @@ import com.google.common.collect.Iterables;
 import com.google.protobuf.Message;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,6 +46,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -316,7 +316,7 @@ public class TestVolumeSetDiskChecks {
         new OzoneConfiguration(), DatanodeStateMachine
         .DatanodeStates.getInitState(),
         datanodeStateMachineMock, "");
-    InetSocketAddress scm1 = new InetSocketAddress("scm1", 9001);
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
     stateContext.addEndpoint(scm1);
     when(datanodeStateMachineMock.getContainer()).thenReturn(ozoneContainer);
 

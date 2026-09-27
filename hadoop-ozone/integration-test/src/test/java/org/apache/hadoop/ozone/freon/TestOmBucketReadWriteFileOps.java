@@ -27,8 +27,8 @@ import java.util.List;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.freon.OmBucketTestUtils.ParameterBuilder;
 import org.apache.ozone.test.NonHATests;
@@ -106,7 +106,7 @@ public abstract class TestOmBucketReadWriteFileOps implements NonHATests.TestCas
   @MethodSource("parameters")
   void testOmBucketReadWriteFileOps(ParameterBuilder parameterBuilder) throws Exception {
     try (OzoneClient client = cluster().newClient()) {
-      TestDataUtil.createVolumeAndBucket(client,
+      DataTestUtil.createVolumeAndBucket(client,
           parameterBuilder.getVolumeName(),
           parameterBuilder.getBucketName(),
           parameterBuilder.getBucketArgs().build()

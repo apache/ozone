@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Stream;
+import javax.ws.rs.core.MediaType;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -154,6 +155,14 @@ public class TestS3Utils {
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, S3Utils.generateCanonicalUserId("ozone"));
   }
 
+  @Test
+  public void testWrapOS3ExceptionContentType() {
+    OS3Exception exception = S3ErrorTable.newError(
+        S3ErrorTable.ACCESS_DENIED, "bucket");
+    assertEquals(MediaType.APPLICATION_XML_TYPE,
+        S3Utils.wrapOS3Exception(exception).getResponse().getMediaType());
+  }
+
   static Stream<Arguments> wrongContentMD5Provider() throws Exception {
     String serverMD5 = Hex.encodeHexString(
         MessageDigest.getInstance("MD5").digest("bar".getBytes(StandardCharsets.UTF_8)));
@@ -187,6 +196,26 @@ public class TestS3Utils {
     String md5Hex = Hex.encodeHexString(md5Bytes);
 
     assertDoesNotThrow(() -> S3Utils.validateContentMD5(md5Base64, md5Hex, "test-resource"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("contentEncodingProvider")
+  public void testNormalizeContentEncoding(String input, String expected) {
+    assertEquals(expected, S3Utils.normalizeContentEncoding(input));
+  }
+
+  private static Stream<Arguments> contentEncodingProvider() {
+    return Stream.of(
+        Arguments.of(null, null),
+        Arguments.of("", null),
+        Arguments.of("gzip", "gzip"),
+        Arguments.of("deflate, gzip", "deflate, gzip"),
+        Arguments.of("gzip, aws-chunked", "gzip"),
+        Arguments.of("aws-chunked, gzip", "gzip"),
+        Arguments.of("aws-chunked", null),
+        Arguments.of("aws-chunked, aws-chunked", null),
+        Arguments.of("gzip, AWS-CHUNKED", "gzip"),
+        Arguments.of("Aws-Chunked", null));
   }
 
 }

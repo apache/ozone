@@ -21,12 +21,14 @@ import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusM
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -73,6 +75,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
@@ -165,22 +168,6 @@ public class TestDeletedBlockLog {
         });
     when(containerManager.getContainers())
         .thenReturn(new ArrayList<>(containers.values()));
-    doAnswer(invocationOnMock -> {
-      Map<ContainerID, Long> map =
-          (Map<ContainerID, Long>) invocationOnMock.getArguments()[0];
-      for (Map.Entry<ContainerID, Long> e : map.entrySet()) {
-        ContainerInfo info = containers.get(e.getKey());
-        try {
-          assertThat(e.getValue()).isGreaterThan(info.getDeleteTransactionId());
-        } catch (AssertionError err) {
-          throw new Exception("New TxnId " + e.getValue() + " < " + info
-              .getDeleteTransactionId());
-        }
-        info.updateDeleteTransactionId(e.getValue());
-        scmHADBTransactionBuffer.addToBuffer(containerTable, e.getKey(), info);
-      }
-      return null;
-    }).when(containerManager).updateDeleteTransactionId(any());
   }
 
   private void updateContainerMetadata(long cid,
@@ -312,7 +299,8 @@ public class TestDeletedBlockLog {
   }
 
   @Test
-  public void testContainerManagerTransactionId() throws Exception {
+  public void testAddTransactionsDoesNotUpdateContainerTransactionId()
+      throws Exception {
     // Initially all containers should have deleteTransactionId as 0
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
       assertEquals(0, containerInfo.getDeleteTransactionId());
@@ -329,11 +317,12 @@ public class TestDeletedBlockLog {
 
     scmHADBTransactionBuffer.flush();
     // After flush there should be 30 transactions in deleteTable
-    // All containers should have positive deleteTransactionId
+    // SCM does not update ContainerInfo deleteTransactionId when adding delete
+    // transactions.
     mockContainerHealthResult(true);
     assertEquals(30 * THREE, getAllTransactions().size());
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
-      assertThat(containerInfo.getDeleteTransactionId()).isGreaterThan(0);
+      assertEquals(0, containerInfo.getDeleteTransactionId());
     }
   }
 
@@ -899,7 +888,7 @@ public class TestDeletedBlockLog {
       Map<Long, TxBlockInfo> txSizeMap = statusManager.getTxSizeMap();
       for (Map.Entry<Long, List<DeletedBlock>> entry : data.entrySet()) {
         List<DeletedBlock> deletedBlockList = entry.getValue();
-        TxBlockInfo txBlockInfo = new TxBlockInfo(deletedBlockList.size(),
+        TxBlockInfo txBlockInfo = new TxBlockInfo(entry.getKey(), 0, deletedBlockList.size(),
             deletedBlockList.stream().map(DeletedBlock::getSize).reduce(0L, Long::sum),
             deletedBlockList.stream().map(DeletedBlock::getReplicatedSize).reduce(0L, Long::sum));
         txSizeMap.put(entry.getKey(), txBlockInfo);
@@ -959,6 +948,170 @@ public class TestDeletedBlockLog {
     when(containerManager.getContainerReplicas(
         ContainerID.valueOf(containerID)))
         .thenReturn(replicaSet);
+  }
+
+  private SCMException ratisTimeout() {
+    return new SCMException("Simulated Ratis submit timeout", SCMException.ResultCodes.TIMEOUT);
+  }
+
+  private SCMException hardDbFailure() {
+    return new SCMException("Simulated hard DB failure", SCMException.ResultCodes.IO_EXCEPTION);
+  }
+
+  private DeletedBlocksTransaction buildTx(long txId, long containerId, long blockSize, long blockCount) {
+    return DeletedBlocksTransaction.newBuilder()
+        .setTxID(txId)
+        .setContainerID(containerId)
+        .setCount(0)
+        .addLocalID(1L)
+        .setTotalBlockSize(blockSize * blockCount)
+        .setTotalBlockReplicatedSize(blockSize * blockCount * 3L)
+        .build();
+  }
+
+  /**
+   * Ratis timeout on addTransactionsToDB: the abandoned future may still commit,
+   * so the in-memory increment must NOT be rolled back (HDDS-16142).
+   */
+  @Test
+  public void testSummaryDoesNotDoubleDecrementOnRatisSubmitTimeout() throws IOException {
+    long txId = 1L;
+    long containerId = 100L;
+    long blockSize = 64L * 1024 * 1024;
+    long blockCount = 5L;
+    ArrayList<DeletedBlocksTransaction> txList = new ArrayList<>();
+    txList.add(buildTx(txId, containerId, blockSize, blockCount));
+
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    doThrow(ratisTimeout()).when(mockStateManager).addTransactionsToDB(any(ArrayList.class), any());
+
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        new SCMDeletedBlockTransactionStatusManager(
+            mockStateManager,
+            scm.getScmMetadataStore().getStatefulServiceConfigTable(),
+            containerManager, metrics, Long.MAX_VALUE);
+
+    assertThrows(IOException.class, () -> statusManager.addTransactions(txList));
+    // Increment must NOT be rolled back: the late commit can still apply.
+    assertEquals(1, statusManager.getSummary().getTotalTransactionCount(),
+        "Ratis timeout on add: summary must stay incremented (no rollback)");
+
+    // Simulate the late Ratis commit landing and the tx being found by getTransactions.
+    statusManager.getTxSizeMap().put(txId,
+        new TxBlockInfo(txId, containerId, blockCount, blockSize * blockCount, blockSize * blockCount * 3L));
+    ArrayList<Long> txIds = new ArrayList<>();
+    txIds.add(txId);
+    statusManager.removeTransactions(txIds);
+
+    assertEquals(0, statusManager.getSummary().getTotalTransactionCount(),
+        "One add (no rollback) + one remove must yield 0, not -1");
+  }
+
+  /**
+   * Hard DB failure on addTransactionsToDB: the write definitively did not land,
+   * so the in-memory increment must be rolled back.
+   */
+  @Test
+  public void testSummaryRollsBackOnHardAddFailure() throws IOException {
+    long txId = 3L;
+    long containerId = 300L;
+    long blockSize = 16L * 1024 * 1024;
+    long blockCount = 2L;
+    ArrayList<DeletedBlocksTransaction> txList = new ArrayList<>();
+    txList.add(buildTx(txId, containerId, blockSize, blockCount));
+
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    doThrow(hardDbFailure()).when(mockStateManager).addTransactionsToDB(any(ArrayList.class), any());
+
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        new SCMDeletedBlockTransactionStatusManager(
+            mockStateManager,
+            scm.getScmMetadataStore().getStatefulServiceConfigTable(),
+            containerManager, metrics, Long.MAX_VALUE);
+
+    assertThrows(IOException.class, () -> statusManager.addTransactions(txList));
+    // Hard failure: write did not land, rollback must restore summary to 0.
+    assertEquals(0, statusManager.getSummary().getTotalTransactionCount(),
+        "Hard add failure: summary must be rolled back to 0");
+  }
+
+  /**
+   * Ratis timeout on removeTransactionsFromDB: the abandoned future may still commit
+   * and remove the tx durably, so the in-memory decrement must NOT be rolled back (HDDS-16142).
+   */
+  @Test
+  public void testSummaryDoesNotOvercountOnRatisRemoveTimeout() throws IOException {
+    long txId = 2L;
+    long containerId = 200L;
+    long blockSize = 32L * 1024 * 1024;
+    long blockCount = 3L;
+
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        new SCMDeletedBlockTransactionStatusManager(
+            mockStateManager,
+            scm.getScmMetadataStore().getStatefulServiceConfigTable(),
+            containerManager, metrics, Long.MAX_VALUE);
+
+    statusManager.addTransactions(new ArrayList<>(
+        Collections.singletonList(buildTx(txId, containerId, blockSize, blockCount))));
+    assertEquals(1, statusManager.getSummary().getTotalTransactionCount());
+
+    statusManager.getTxSizeMap().put(txId,
+        new TxBlockInfo(txId, containerId, blockCount, blockSize * blockCount, blockSize * blockCount * 3L));
+
+    doThrow(ratisTimeout()).when(mockStateManager).removeTransactionsFromDB(any(ArrayList.class), any());
+
+    ArrayList<Long> txIds = new ArrayList<>();
+    txIds.add(txId);
+    assertThrows(IOException.class, () -> statusManager.removeTransactions(txIds));
+
+    // Decrement must NOT be rolled back: the late commit may have removed the tx.
+    assertEquals(0, statusManager.getSummary().getTotalTransactionCount(),
+        "Ratis timeout on remove: summary must stay decremented (no rollback)");
+    // txSizeMap must also not be restored (same reasoning).
+    assertFalse(statusManager.getTxSizeMap().containsKey(txId),
+        "Ratis timeout on remove: txSizeMap entry must not be restored");
+  }
+
+  /**
+   * Hard DB failure on removeTransactionsFromDB: the write definitively did not land,
+   * so the in-memory decrement must be rolled back and txSizeMap restored.
+   */
+  @Test
+  public void testSummaryRollsBackOnHardRemoveFailure() throws IOException {
+    long txId = 4L;
+    long containerId = 400L;
+    long blockSize = 8L * 1024 * 1024;
+    long blockCount = 4L;
+
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+
+    SCMDeletedBlockTransactionStatusManager statusManager =
+        new SCMDeletedBlockTransactionStatusManager(
+            mockStateManager,
+            scm.getScmMetadataStore().getStatefulServiceConfigTable(),
+            containerManager, metrics, Long.MAX_VALUE);
+
+    statusManager.addTransactions(new ArrayList<>(
+        Collections.singletonList(buildTx(txId, containerId, blockSize, blockCount))));
+    assertEquals(1, statusManager.getSummary().getTotalTransactionCount());
+
+    statusManager.getTxSizeMap().put(txId,
+        new TxBlockInfo(txId, containerId, blockCount, blockSize * blockCount, blockSize * blockCount * 3L));
+
+    doThrow(hardDbFailure()).when(mockStateManager).removeTransactionsFromDB(any(ArrayList.class), any());
+
+    ArrayList<Long> txIds = new ArrayList<>();
+    txIds.add(txId);
+    assertThrows(IOException.class, () -> statusManager.removeTransactions(txIds));
+
+    // Hard failure: write did not land, rollback must restore summary to 1.
+    assertEquals(1, statusManager.getSummary().getTotalTransactionCount(),
+        "Hard remove failure: summary must be rolled back to 1");
+    assertTrue(statusManager.getTxSizeMap().containsKey(txId),
+        "Hard remove failure: txSizeMap entry must be restored for retry");
   }
 
   private void mockInadequateReplicaUnhealthyContainerInfo(long containerID,

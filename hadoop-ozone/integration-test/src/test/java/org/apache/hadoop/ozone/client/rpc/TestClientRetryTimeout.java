@@ -26,7 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,9 +39,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.storage.RatisBlockOutputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -54,8 +51,9 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -118,6 +116,7 @@ public class TestClientRetryTimeout {
   private ObjectStore objectStore;
   private String volumeName;
   private String bucketName;
+  private OzoneOutputStream key;
 
   @BeforeAll
   public void init() throws Exception {
@@ -190,6 +189,12 @@ public class TestClientRetryTimeout {
     objectStore.getVolume(volumeName).createBucket(bucketName);
   }
 
+  @AfterEach
+  public void closeKey() {
+    IOUtils.closeQuietly(key);
+    key = null;
+  }
+
   @AfterAll
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -209,7 +214,7 @@ public class TestClientRetryTimeout {
   @Order(1)
   public void testWriteToDeadPipelineFailsFast() throws Exception {
     String keyName = getKeyName();
-    OzoneOutputStream key = createKey(keyName);
+    key = createKey(keyName);
 
     // Write initial data to establish the pipeline connection
     byte[] data = generateData(FLUSH_SIZE);
@@ -219,13 +224,8 @@ public class TestClientRetryTimeout {
     // Get the pipeline for this key
     KeyOutputStream keyOutputStream =
         assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
-    OutputStream stream = keyOutputStream.getStreamEntries().get(0)
-        .getOutputStream();
-    RatisBlockOutputStream blockOutputStream =
-        assertInstanceOf(RatisBlockOutputStream.class, stream);
-    XceiverClientRatis ratisClient =
-        (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Pipeline pipeline = ratisClient.getPipeline();
+    Pipeline pipeline =
+        keyOutputStream.getLocationInfoList().get(0).getPipeline();
     List<DatanodeDetails> nodes = pipeline.getNodes();
 
     LOG.info("Shutting down ALL datanodes in pipeline: {}", pipeline.getId());
@@ -281,7 +281,7 @@ public class TestClientRetryTimeout {
   @Order(2)
   public void testWatchForCommitWithDeadFollowersFailsFast() throws Exception {
     String keyName = getKeyName();
-    OzoneOutputStream key = createKey(keyName);
+    key = createKey(keyName);
 
     // Write initial data to establish the pipeline
     byte[] data = generateData(FLUSH_SIZE);
@@ -291,13 +291,8 @@ public class TestClientRetryTimeout {
     // Get the pipeline and identify leader vs followers
     KeyOutputStream keyOutputStream =
         assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
-    OutputStream stream = keyOutputStream.getStreamEntries().get(0)
-        .getOutputStream();
-    RatisBlockOutputStream blockOutputStream =
-        assertInstanceOf(RatisBlockOutputStream.class, stream);
-    XceiverClientRatis ratisClient =
-        (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Pipeline pipeline = ratisClient.getPipeline();
+    Pipeline pipeline =
+        keyOutputStream.getLocationInfoList().get(0).getPipeline();
 
     // Find and shut down exactly ONE follower (keep leader + 1 follower
     // alive so majority exists for write, but ALL_COMMITTED will fail)
@@ -362,7 +357,7 @@ public class TestClientRetryTimeout {
   @Order(3)
   public void testWriteWithLeaderFailureFailsFast() throws Exception {
     String keyName = getKeyName();
-    OzoneOutputStream key = createKey(keyName);
+    key = createKey(keyName);
 
     // Write initial data
     byte[] data = generateData(FLUSH_SIZE);
@@ -372,13 +367,8 @@ public class TestClientRetryTimeout {
     // Get the pipeline and find the leader
     KeyOutputStream keyOutputStream =
         assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
-    OutputStream stream = keyOutputStream.getStreamEntries().get(0)
-        .getOutputStream();
-    RatisBlockOutputStream blockOutputStream =
-        assertInstanceOf(RatisBlockOutputStream.class, stream);
-    XceiverClientRatis ratisClient =
-        (XceiverClientRatis) blockOutputStream.getXceiverClient();
-    Pipeline pipeline = ratisClient.getPipeline();
+    Pipeline pipeline =
+        keyOutputStream.getLocationInfoList().get(0).getPipeline();
 
     // Find and kill the leader
     HddsDatanodeService leader = null;
@@ -437,7 +427,7 @@ public class TestClientRetryTimeout {
   public void testEndToEndWriteWithAllDatanodesDownFailsFast()
       throws Exception {
     String keyName = getKeyName();
-    OzoneOutputStream key = createKey(keyName);
+    key = createKey(keyName);
 
     // Write initial data to establish a pipeline
     byte[] data = generateData(FLUSH_SIZE);
@@ -483,7 +473,7 @@ public class TestClientRetryTimeout {
   }
 
   private OzoneOutputStream createKey(String keyName) throws Exception {
-    return TestHelper.createKey(keyName, ReplicationType.RATIS, 0,
+    return OzoneTestHelper.createKey(keyName, ReplicationType.RATIS, 0,
         objectStore, volumeName, bucketName);
   }
 

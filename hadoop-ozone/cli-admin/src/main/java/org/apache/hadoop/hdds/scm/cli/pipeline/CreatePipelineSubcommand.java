@@ -36,18 +36,16 @@ import picocli.CommandLine;
 public class CreatePipelineSubcommand extends ScmSubcommand {
 
   @CommandLine.Option(
-      names = {"-t", "--replication-type", "--replicationType"},
-      description = "Replication type is RATIS. Full name" +
-          " --replicationType will be removed in later versions.",
+      names = {"-t", "--replication-type"},
+      description = "Replication type is RATIS.",
       defaultValue = "RATIS",
       hidden = true
   )
   private HddsProtos.ReplicationType type;
 
   @CommandLine.Option(
-      names = {"-f", "--replication-factor", "--replicationFactor"},
-      description = "Replication factor for RATIS (ONE, THREE). Full name" +
-          " --replicationFactor will be removed in later versions.",
+      names = {"-f", "--replication-factor"},
+      description = "Replication factor for RATIS (ONE, THREE).",
       defaultValue = "ONE"
   )
   private HddsProtos.ReplicationFactor factor;

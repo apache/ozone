@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -729,6 +730,43 @@ public class TestHddsDispatcher {
         .build();
   }
 
+  private static ContainerCommandRequestProto withCreatableFalse(
+      ContainerCommandRequestProto writeChunk) {
+    return ContainerCommandRequestProto.newBuilder(writeChunk)
+        .setWriteChunk(writeChunk.getWriteChunk().toBuilder()
+            .setContainerAutoCreate(false)
+            .build())
+        .build();
+  }
+
+  private static ContainerCommandRequestProto getEmptyPutBlockRequest(
+      String datanodeId, Long containerId, Long localId) {
+    BlockID blockID = new BlockID(containerId, localId);
+    ContainerProtos.BlockData blockData = ContainerProtos.BlockData.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobuf())
+        .build();
+    ContainerProtos.PutBlockRequestProto putBlockRequest =
+        ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(blockData)
+            .setEof(true)
+            .build();
+    return ContainerCommandRequestProto.newBuilder()
+        .setContainerID(containerId)
+        .setCmdType(ContainerProtos.Type.PutBlock)
+        .setDatanodeUuid(datanodeId)
+        .setPutBlock(putBlockRequest)
+        .build();
+  }
+
+  private static ContainerCommandRequestProto withCreatableFalsePutBlock(
+      ContainerCommandRequestProto putBlock) {
+    return ContainerCommandRequestProto.newBuilder(putBlock)
+        .setPutBlock(putBlock.getPutBlock().toBuilder()
+            .setContainerAutoCreate(false)
+            .build())
+        .build();
+  }
+
   static ChecksumData checksum(ByteString data) {
     try {
       return new Checksum(ContainerProtos.ChecksumType.CRC32, 256)
@@ -1005,6 +1043,43 @@ public class TestHddsDispatcher {
       volumeSet.shutdown();
       ContainerMetrics.remove();
     }
+  }
+
+  @Test
+  public void testEcReconstructionWriteChunkDeniedWhenContainerCreatableFalse()
+      throws IOException {
+    String testDirPath = testDir.getPath();
+    UUID scmId = UUID.randomUUID();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    HddsDispatcher dispatcher = createDispatcher(dd, scmId, conf);
+    long containerId = 99L;
+
+    ContainerCommandResponseProto response = dispatcher.dispatch(
+        withCreatableFalse(getWriteChunkRequest(dd.getUuidString(), containerId, 1L)), null);
+    assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
+    assertNull(dispatcher.getContainer(containerId));
+  }
+
+  @Test
+  public void testEcReconstructionPutBlockDeniedWhenContainerCreatableFalse()
+      throws IOException {
+    String testDirPath = testDir.getPath();
+    UUID scmId = UUID.randomUUID();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+    conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+    DatanodeDetails dd = randomDatanodeDetails();
+    HddsDispatcher dispatcher = createDispatcher(dd, scmId, conf);
+    long containerId = 100L;
+
+    ContainerCommandResponseProto response = dispatcher.dispatch(
+        withCreatableFalsePutBlock(getEmptyPutBlockRequest(dd.getUuidString(), containerId, 1L)),
+        null);
+    assertEquals(ContainerProtos.Result.CONTAINER_NOT_FOUND, response.getResult());
+    assertNull(dispatcher.getContainer(containerId));
   }
 
   static DispatcherContext newContext(Op op) {

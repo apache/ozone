@@ -38,13 +38,6 @@ import org.apache.hadoop.security.token.Token;
  */
 public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
-  public ReplicatedFileChecksumHelper(
-      OzoneVolume volume, OzoneBucket bucket, String keyName, long length,
-      OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
-      ClientProtocol rpcClient) throws IOException {
-    super(volume, bucket, keyName, length, checksumCombineMode, rpcClient);
-  }
-
   public ReplicatedFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
       String keyName, long length,
       OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
@@ -82,7 +75,7 @@ public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
       }
       xceiverClientSpi = getXceiverClientFactory().acquireClientForReadData(pipeline);
       ContainerProtos.GetBlockResponseProto response = ContainerProtocolCalls
-          .getBlock(xceiverClientSpi, blockID, token, pipeline.getReplicaIndexes());
+          .getBlock(xceiverClientSpi, blockID, token, pipeline);
 
       chunks = response.getBlockData().getChunksList();
     } finally {

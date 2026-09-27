@@ -1106,7 +1106,7 @@ public class TestReconSCMContainerSyncIntegration
           any(ContainerID.class), eq(1), eq(DELETED)))
           .thenAnswer(inv -> {
             ContainerID id = inv.getArgument(0);
-            return Collections.singletonList(containerInfo(id.getId(), DELETED));
+            return Collections.singletonList(containerInfo(id.getIdForTesting(), DELETED));
           });
 
       assertTrue(syncHelper.syncWithSCMContainerInfo());

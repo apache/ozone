@@ -90,7 +90,21 @@ public class ContainerLogParser extends AbstractSubcommand implements Callable<V
 
     cdd.insertLatestContainerLogData();
     cdd.createIndexes();
-    out().println("Successfully parsed the log files and updated the respective tables");
+
+    int failures = parser.getParseFailureCount();
+    int successes = parser.getParseSuccessCount();
+    if (successes == 0 && failures == 0) {
+      err().println("No container log files were found to parse (expected dn-container[...].log.<datanodeId>).");
+      out().println("Database tables were created but are empty.");
+    } else if (failures == 0) {
+      out().println("Successfully parsed the log files and updated the respective tables");
+    } else if (successes == 0) {
+      err().println(failures + " log file(s) could not be parsed. No log data was loaded into the database.");
+      out().println("Database tables were created but are empty.");
+    } else {
+      err().println(failures + " log file(s) could not be parsed and were excluded.");
+      out().println("Database tables were updated from successfully parsed files.");
+    }
 
     return null;
   }

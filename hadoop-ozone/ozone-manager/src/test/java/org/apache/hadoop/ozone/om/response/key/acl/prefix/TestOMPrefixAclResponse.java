@@ -35,7 +35,7 @@ import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
-import org.apache.hadoop.ozone.om.response.key.TestOMKeyResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeyResponseTests;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -45,7 +45,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests TestOMPrefixAclResponse.
  */
-public class TestOMPrefixAclResponse extends TestOMKeyResponse {
+public class TestOMPrefixAclResponse extends OMKeyResponseTests {
 
   @Test
   public void testAddToDBBatch() throws Exception {

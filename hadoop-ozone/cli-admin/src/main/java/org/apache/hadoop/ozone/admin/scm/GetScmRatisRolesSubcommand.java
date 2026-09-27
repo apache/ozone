@@ -17,14 +17,13 @@
 
 package org.apache.hadoop.ozone.admin.scm;
 
-import static java.lang.System.err;
-
+import com.google.common.net.HostAndPort;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -73,11 +72,18 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
       formattingCLIUtils.addHeaders(SCM_ROLES_HEADER);
 
       for (String role : peerRoles) {
-        String[] roleItems = role.split(":");
-        if (roleItems.length < 2) {
-          err.println("Invalid response received for ScmRatisRoles.");
+        try {
+          String[] roleItems = HddsUtils.parseRatisRoleString(role);
+          formattingCLIUtils.addLine(roleItems);
+        } catch (IllegalArgumentException e) {
+          try {
+            HostAndPort hp = HostAndPort.fromString(role);
+            String port = hp.hasPort() ? String.valueOf(hp.getPort()) : "";
+            formattingCLIUtils.addLine(new String[]{hp.getHost(), port, "", "", ""});
+          } catch (IllegalArgumentException ex) {
+            formattingCLIUtils.addLine(new String[]{role, "", "", "", ""});
+          }
         }
-        formattingCLIUtils.addLine(roleItems);
       }
       System.out.println(formattingCLIUtils.render());
     } else {
@@ -92,20 +98,25 @@ public class GetScmRatisRolesSubcommand extends ScmSubcommand {
     Map<String, Map<String, String>> allRoles = new HashMap<>();
     for (String role : peerRoles) {
       Map<String, String> roleDetails = new HashMap<>();
-      String[] roles = role.split(":");
-      if (roles.length < 2) {
-        err.println("Invalid response received for ScmRatisRoles.");
-        return Collections.emptyMap();
+      try {
+        String[] fields = HddsUtils.parseRatisRoleString(role);
+        roleDetails.put("address", HddsUtils.getHostPortString(
+            fields[0], Integer.parseInt(fields[1])));
+        roleDetails.put("raftPeerRole", fields[2]);
+        roleDetails.put("ID", fields[3]);
+        roleDetails.put("InetAddress", fields[4]);
+        allRoles.put(fields[0], roleDetails);
+      } catch (IllegalArgumentException e) {
+        try {
+          HostAndPort hp = HostAndPort.fromString(role);
+          String addr = hp.hasPort() ? HddsUtils.getHostPortString(hp.getHost(), hp.getPort()) : hp.getHost();
+          roleDetails.put("address", addr);
+          allRoles.put(hp.getHost(), roleDetails);
+        } catch (IllegalArgumentException ex) {
+          roleDetails.put("address", role);
+          allRoles.put(role, roleDetails);
+        }
       }
-      // In case, there is no ratis, there is no ratis role.
-      // This will just print the hostname with ratis port as the address
-      roleDetails.put("address", roles[0].concat(":").concat(roles[1]));
-      if (roles.length == 5) {
-        roleDetails.put("raftPeerRole", roles[2]);
-        roleDetails.put("ID", roles[3]);
-        roleDetails.put("InetAddress", roles[4]);
-      }
-      allRoles.put(roles[0], roleDetails);
     }
     return allRoles;
   }

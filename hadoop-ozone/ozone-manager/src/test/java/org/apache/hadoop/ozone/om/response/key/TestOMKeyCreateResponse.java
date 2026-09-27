@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests MKeyCreateResponse.
  */
-public class TestOMKeyCreateResponse extends TestOMKeyResponse {
+public class TestOMKeyCreateResponse extends OMKeyResponseTests {
 
   protected long getVolumeId() throws IOException {
     return omMetadataManager.getVolumeId(volumeName);

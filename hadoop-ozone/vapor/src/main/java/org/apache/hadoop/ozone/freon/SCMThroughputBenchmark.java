@@ -156,7 +156,7 @@ public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcom
       defaultValue = "4")
   private int numHeartbeats = 4;
 
-  @CommandLine.Option(names = {"--scmHost", "--scm-host"},
+  @CommandLine.Option(names = {"--scm-host"},
       required = true,
       description = "The leader scm host x.x.x.x.")
   private String scm;

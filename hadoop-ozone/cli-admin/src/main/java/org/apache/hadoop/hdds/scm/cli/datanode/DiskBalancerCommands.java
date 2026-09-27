@@ -39,8 +39,15 @@ import picocli.CommandLine.Command;
  *                                  in IN_SERVICE operational state, excluding non-HEALTHY,
  *                                  DECOMMISSIONING, DECOMMISSIONED, and nodes in maintenance states.
  *
+ * Datanode identifiers:
+ *      Positional arguments accept hostname, host:port, or IP address.
+ *      Use --node-id to target a datanode by UUID (requires SCM).
+ *      --in-service-datanodes queries SCM for all HEALTHY IN_SERVICE datanodes.
+ *
  * To start:
- *      ozone admin datanode diskbalancer start {@literal <host[:port]>} [{@literal <host[:port]>} ...]
+ *      ozone admin datanode diskbalancer start {@literal <datanode-address>}
+ *      [{@literal <datanode-address>} ...]
+ *      [ --node-id {@literal <uuid>} ...]
  *      [ -t/--threshold-percentage {@literal <threshold>}]
  *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
  *      [ -p/--parallel-thread {@literal <parallelThread>}]
@@ -54,6 +61,9 @@ import picocli.CommandLine.Command;
  *
  *      ozone admin datanode diskbalancer start 192.168.1.10:19864
  *        Start balancer with explicit port specification
+ *
+ *      ozone admin datanode diskbalancer start --node-id a3b63511-bdf8-4fa1-8ab6-d19c0e806f84
+ *        Start balancer using a datanode UUID (resolved via SCM)
  *
  *      ozone admin datanode diskbalancer start DN-1 DN-2 DN-3
  *        Start balancer on multiple datanodes (using default port)
@@ -80,7 +90,9 @@ import picocli.CommandLine.Command;
  *        Start balancer on all IN_SERVICE and HEALTHY datanodes and output results in JSON format
  *
  * To stop:
- *      ozone admin datanode diskbalancer stop {@literal <host[:port]>} [{@literal <host[:port]>} ...]
+ *      ozone admin datanode diskbalancer stop {@literal <datanode-address>}
+ *      [{@literal <datanode-address>} ...]
+ *      [ --node-id {@literal <uuid>} ...]
  *      [ --json ]
  *      [ --in-service-datanodes ]
  *
@@ -98,7 +110,9 @@ import picocli.CommandLine.Command;
  *        Stop diskbalancer on DN-1 and output result in JSON format
  *
  * To update:
- *      ozone admin datanode diskbalancer update {@literal <host[:port]>} [{@literal <host[:port]>} ...]
+ *      ozone admin datanode diskbalancer update {@literal <datanode-address>}
+ *      [{@literal <datanode-address>} ...]
+ *      [ --node-id {@literal <uuid>} ...]
  *      [ -t/--threshold-percentage {@literal <threshold>}]
  *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
  *      [ -p/--parallel-thread {@literal <parallelThread>}]
@@ -117,7 +131,9 @@ import picocli.CommandLine.Command;
  *        Update diskbalancer threshold to 10% on DN-1 and output result in JSON format
  *
  * To get report:
- *      ozone admin datanode diskbalancer report {@literal <host[:port]>} [{@literal <host[:port]>} ...]
+ *      ozone admin datanode diskbalancer report {@literal <datanode-address>}
+ *      [{@literal <datanode-address>} ...]
+ *      [ --node-id {@literal <uuid>} ...]
  *      [ --json ]
  *      [ --in-service-datanodes ]
  *
@@ -135,13 +151,18 @@ import picocli.CommandLine.Command;
  *        Retrieve volume density report from DN-1 in JSON format
  *
  * To get status:
- *      ozone admin datanode diskbalancer status {@literal <host[:port]>} [{@literal <host[:port]>} ...]
+ *      ozone admin datanode diskbalancer status {@literal <datanode-address>}
+ *      [{@literal <datanode-address>} ...]
+ *      [ --node-id {@literal <uuid>} ...]
  *      [ --json ]
  *      [ --in-service-datanodes ]
  *
  *      Examples:
  *      ozone admin datanode diskbalancer status DN-1
  *        Return the diskbalancer status on DN-1
+ *
+ *      ozone admin datanode diskbalancer status --node-id a3b63511-bdf8-4fa1-8ab6-d19c0e806f84
+ *        Return the diskbalancer status using a datanode UUID
  *
  *      ozone admin datanode diskbalancer status DN-1 DN-2 DN-3
  *        Return the diskbalancer status on multiple datanodes

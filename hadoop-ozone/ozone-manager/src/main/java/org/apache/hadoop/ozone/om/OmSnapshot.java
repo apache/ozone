@@ -133,12 +133,13 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException {
-
-    List<OzoneFileStatus> ozoneFileStatuses =
-        listStatus(args, recursive, startKey, numEntries, allowPartialPrefixes);
+    List<OzoneFileStatusLight> ozoneFileStatuses = omMetadataReader
+        .listStatusLight(normalizeOmKeyArgs(args),
+            recursive, normalizeKeyName(startKey), numEntries,
+            allowPartialPrefixes);
 
     return ozoneFileStatuses.stream()
-        .map(OzoneFileStatusLight::fromOzoneFileStatus)
+        .map(this::denormalizeOzoneFileStatusLight)
         .collect(Collectors.toList());
   }
 
@@ -283,6 +284,29 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     }
     return new OzoneFileStatus(
         omKeyInfo, fileStatus.getBlockSize(), fileStatus.isDirectory());
+  }
+
+  private OzoneFileStatusLight denormalizeOzoneFileStatusLight(
+      OzoneFileStatusLight fileStatus) {
+    if (fileStatus == null || fileStatus.getKeyInfo() == null) {
+      return fileStatus;
+    }
+    BasicOmKeyInfo keyInfo = fileStatus.getKeyInfo();
+    BasicOmKeyInfo denormalized = new BasicOmKeyInfo.Builder()
+        .setVolumeName(keyInfo.getVolumeName())
+        .setBucketName(keyInfo.getBucketName())
+        .setKeyName(denormalizeKeyName(keyInfo.getKeyName()))
+        .setDataSize(keyInfo.getDataSize())
+        .setCreationTime(keyInfo.getCreationTime())
+        .setModificationTime(keyInfo.getModificationTime())
+        .setReplicationConfig(keyInfo.getReplicationConfig())
+        .setIsFile(keyInfo.isFile())
+        .setETag(keyInfo.getETag())
+        .setOwnerName(keyInfo.getOwnerName())
+        .setIsEncrypted(keyInfo.isEncrypted())
+        .build();
+    return new OzoneFileStatusLight(
+        denormalized, fileStatus.getBlockSize(), fileStatus.isDirectory());
   }
 
   private KeyInfoWithVolumeContext denormalizeKeyInfoWithVolumeContext(

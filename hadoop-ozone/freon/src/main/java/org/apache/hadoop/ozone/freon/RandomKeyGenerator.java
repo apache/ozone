@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -116,36 +117,31 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private volatile boolean completed = false;
   private volatile Throwable exception;
 
-  @Option(names = {"--num-of-threads", "--numOfThreads"},
-      description = "number of threads to be launched for the run. Full name " +
-          "--numOfThreads will be removed in later versions.",
+  @Option(names = {"--num-of-threads"},
+      description = "number of threads to be launched for the run.",
       defaultValue = "10")
   private int numOfThreads = 10;
 
-  @Option(names = {"--num-of-volumes", "--numOfVolumes"},
-      description = "specifies number of Volumes to be created in offline " +
-          "mode. Full name --numOfVolumes will be removed in later versions.",
+  @Option(names = {"--num-of-volumes"},
+      description = "specifies number of Volumes to be created in offline mode.",
       defaultValue = "10")
   private int numOfVolumes = 10;
 
-  @Option(names = {"--num-of-buckets", "--numOfBuckets"},
-      description = "specifies number of Buckets to be created per Volume. " +
-          "Full name --numOfBuckets will be removed in later versions.",
+  @Option(names = {"--num-of-buckets"},
+      description = "specifies number of Buckets to be created per Volume.",
       defaultValue = "1000")
   private int numOfBuckets = 1000;
 
   @Option(
-      names = {"--num-of-keys", "--numOfKeys"},
-      description = "specifies number of Keys to be created per Bucket. Full" +
-          " name --numOfKeys will be removed in later versions.",
+      names = {"--num-of-keys"},
+      description = "specifies number of Keys to be created per Bucket.",
       defaultValue = "500000"
   )
   private int numOfKeys = 500000;
 
   @Option(
-      names = {"--key-size", "--keySize"},
-      description = "Specifies the size of Key in bytes to be created. Full" +
-          " name --keySize will be removed in later versions. " +
+      names = {"--key-size"},
+      description = "Specifies the size of Key in bytes to be created." +
           StorageSizeConverter.STORAGE_SIZE_DESCRIPTION,
       defaultValue = "10KB",
       converter = StorageSizeConverter.class
@@ -153,22 +149,24 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private StorageSize keySize;
 
   @Option(
-      names = {"--validate-writes", "--validateWrites"},
-      description = "Specifies whether to validate keys after writing. Full" +
-          " name --validateWrites will be removed in later versions."
+      names = {"--validate-writes"},
+      description = "Specifies whether to validate keys after writing"
   )
   private boolean validateWrites = false;
 
-  @Option(names = {"--num-of-validate-threads", "--numOfValidateThreads"},
-      description = "number of threads to be launched for validating keys." +
-          "Full name --numOfValidateThreads will be removed in later versions.",
+  @Option(names = {"--num-of-validate-threads"},
+      description = "number of threads to be launched for validating keys.",
       defaultValue = "1")
   private int numOfValidateThreads = 1;
 
+  @Option(names = {"--validation-channel"},
+      description = "grpc or short-circuit.",
+      defaultValue = "grpc")
+  private String validationChannel = "grpc";
+
   @Option(
-      names = {"--buffer-size", "--bufferSize"},
-      description = "Specifies the buffer size while writing. Full name " +
-          "--bufferSize will be removed in later versions.",
+      names = {"--buffer-size"},
+      description = "Specifies the buffer size while writing.",
       defaultValue = "4096"
   )
   private int bufferSize = 4096;
@@ -218,6 +216,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   private AtomicLong bucketCreationTime;
   private AtomicLong keyCreationTime;
   private AtomicLong keyWriteTime;
+  private AtomicLong keyReadTime;
 
   private AtomicLong totalBytesWritten;
 
@@ -290,6 +289,29 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     }
   }
 
+  private void validateCounts() {
+    if (numOfVolumes <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid command, --num-of-volumes must be a positive integer");
+    }
+    if (numOfBuckets <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid command, --num-of-buckets must be a positive integer");
+    }
+    if (numOfKeys <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid command, --num-of-keys must be a positive integer");
+    }
+    if (numOfThreads <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid command, --num-of-threads must be a positive integer");
+    }
+    if (validateWrites && numOfValidateThreads <= 0) {
+      throw new IllegalArgumentException(
+          "Invalid command, --num-of-validate-threads must be a positive integer");
+    }
+  }
+
   @Override
   public Void call() throws Exception {
     if (ozoneConfiguration == null) {
@@ -302,6 +324,22 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
           + HddsConfigKeys.HDDS_CONTAINER_PERSISTDATA + " is set to false.");
       validateWrites = false;
     }
+    validateCounts();
+    OzoneClientConfig clientConfig = ozoneConfiguration.getObject(OzoneClientConfig.class);
+    if (validationChannel.equalsIgnoreCase("grpc")) {
+      clientConfig.setShortCircuit(false);
+      ozoneConfiguration.setFromObject(clientConfig);
+    } else if (validationChannel.equalsIgnoreCase("short-circuit")) {
+      boolean shortCircuit = clientConfig.isShortCircuitEnabled();
+      if (!shortCircuit) {
+        LOG.error("Short-circuit read is not enabled");
+        return null;
+      }
+    } else {
+      LOG.error("'--validate-channel={}' is not supported", validationChannel);
+      return null;
+    }
+
     init(ozoneConfiguration);
 
     replicationConfig = replication.fromParamsOrConfig(ozoneConfiguration);
@@ -346,6 +384,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
       totalWritesValidated = new AtomicLong();
       writeValidationSuccessCount = new AtomicLong();
       writeValidationFailureCount = new AtomicLong();
+      keyReadTime = new AtomicLong();
 
       validationQueue = new LinkedBlockingQueue<>();
       validateExecutor = Executors.newFixedThreadPool(numOfValidateThreads);
@@ -376,11 +415,13 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     } else {
       progressbar.shutdown();
     }
+    LOG.info("Data generation is completed");
 
     if (validateExecutor != null) {
       while (!validationQueue.isEmpty()) {
         Thread.sleep(CHECK_INTERVAL_MILLIS);
       }
+      LOG.info("Data validation is completed");
       validateExecutor.shutdown();
       validateExecutor.awaitTermination(Integer.MAX_VALUE,
           TimeUnit.MILLISECONDS);
@@ -506,6 +547,13 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
           writeValidationSuccessCount);
       out.println("Unsuccessful validation: " +
           writeValidationFailureCount);
+
+      long averageKeyReadTime =
+          TimeUnit.NANOSECONDS.toMillis(keyReadTime.get()) / numOfValidateThreads;
+      String prettyAverageKeyReadTime = DurationFormatUtils
+          .formatDuration(averageKeyReadTime, DURATION_FORMAT);
+      out.println(
+          "Average Time spent in key read and validation: " + prettyAverageKeyReadTime);
     }
     out.println("Total Execution time: " + execTime);
     out.println("***************************************************");
@@ -1226,6 +1274,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
         try {
           KeyValidate kv = validationQueue.poll(5, TimeUnit.SECONDS);
           if (kv != null) {
+            long validationStartTime = System.nanoTime();
             try (OzoneInputStream is = kv.bucket.readKey(kv.keyName)) {
               dig.getMessageDigest().reset();
               byte[] curDigest = dig.digest(is);
@@ -1239,6 +1288,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
                 LOG.warn("Expected checksum: {}, Actual checksum: {}",
                     kv.digest, curDigest);
               }
+              keyReadTime.addAndGet(System.nanoTime() - validationStartTime);
             }
           }
         } catch (IOException ex) {

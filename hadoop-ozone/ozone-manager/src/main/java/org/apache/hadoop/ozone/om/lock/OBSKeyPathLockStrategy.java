@@ -43,6 +43,7 @@ public class OBSKeyPathLockStrategy implements OzoneLockStrategy {
     Preconditions.checkArgument(omLockDetails.isLockAcquired(),
         "BUCKET_LOCK should be acquired!");
 
+    // TODO optimize three key case in similar way as HDDS-16059
     omLockDetails.merge(omMetadataManager.getLock()
         .acquireWriteLock(KEY_PATH_LOCK, volumeName, bucketName, keyName));
 

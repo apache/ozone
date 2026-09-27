@@ -41,9 +41,9 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -77,7 +77,8 @@ public class TestRootedDDSWithFSO {
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 1);
+    conf.setStrings(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, "5s");
+    conf.setInt(OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION, 1);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
@@ -91,7 +92,7 @@ public class TestRootedDDSWithFSO {
 
     // create a volume and a bucket to be used by OzoneFileSystem
     OzoneBucket bucket =
-        TestDataUtil.createVolumeAndBucket(client, getFSOBucketLayout());
+        DataTestUtil.createVolumeAndBucket(client, getFSOBucketLayout());
     String volumeName = bucket.getVolumeName();
     volumePath = new Path(OZONE_URI_DELIMITER, volumeName);
     String bucketName = bucket.getName();
@@ -185,8 +186,12 @@ public class TestRootedDDSWithFSO {
     long prevDeletes = omMetrics.getNumKeyDeletes();
     assertTrue(fs.delete(bucketPath, true));
     assertTrue(fs.delete(volumePath, false));
+    GenericTestUtils.waitFor(() -> {
+      long keyCount = omMetrics.getNumKeys();
+      return keyCount == 0;
+    }, 1000, 30000);
     long deletes = omMetrics.getNumKeyDeletes();
-    assertEquals(prevDeletes + 1, deletes);
+    assertEquals(prevDeletes + totalDirCount + totalFilesCount, deletes);
 
     // After Delete
     checkPath(volumePath);

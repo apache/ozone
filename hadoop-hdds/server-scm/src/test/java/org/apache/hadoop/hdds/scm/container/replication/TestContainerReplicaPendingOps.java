@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,7 +56,7 @@ import org.junit.jupiter.api.Test;
 public class TestContainerReplicaPendingOps {
 
   private ContainerReplicaPendingOps pendingOps;
-  private TestClock clock;
+  private MockClock clock;
   private DatanodeDetails dn1;
   private DatanodeDetails dn2;
   private DatanodeDetails dn3;
@@ -70,7 +70,7 @@ public class TestContainerReplicaPendingOps {
 
   @BeforeEach
   public void setup() {
-    clock = new TestClock(Instant.now(), ZoneOffset.UTC);
+    clock = new MockClock(Instant.now(), ZoneOffset.UTC);
     deadline = clock.millis() + 10000; // Current time plus 10 seconds
 
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -581,5 +581,64 @@ public class TestContainerReplicaPendingOps {
     pendingOps.removeExpiredEntries();
     assertNull(scheduled.get(dn2.getID()));
     assertEquals(THREE_GB_CONTAINER_SIZE, scheduled.get(dn1.getID()).getSize());
+  }
+
+  /**
+   * scheduleAddReplica must notify subscribers via opAdded() so that
+   * a subscribed NodeManager can record the PendingContainerTracker slot.
+   */
+  @Test
+  public void testScheduleAddReplicaNotifiesSubscriberOpAdded() {
+    ContainerReplicaPendingOpsSubscriber subscriber = mock(ContainerReplicaPendingOpsSubscriber.class);
+    ContainerID containerID = ContainerID.valueOf(1);
+
+    pendingOps.registerSubscriber(subscriber);
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
+
+    verify(subscriber, times(1)).opAdded(
+        org.mockito.ArgumentMatchers.argThat(op ->
+            op.getOpType() == ADD && op.getTarget().equals(dn1)),
+        org.mockito.ArgumentMatchers.eq(containerID));
+  }
+
+  /**
+   * scheduleDeleteReplica must NOT invoke opAdded() on subscribers — only ADD ops
+   * reserve container slots in the PendingContainerTracker.
+   */
+  @Test
+  public void testScheduleDeleteReplicaDoesNotNotifyOpAdded() {
+    ContainerReplicaPendingOpsSubscriber subscriber = mock(ContainerReplicaPendingOpsSubscriber.class);
+    ContainerID containerID = ContainerID.valueOf(1);
+
+    pendingOps.registerSubscriber(subscriber);
+    pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deleteCmd, deadline);
+
+    verifyNoMoreInteractions(subscriber);
+  }
+
+  /**
+   * completeAddReplica must notify subscribers via opCompleted(timedOut=false) so that
+   * a subscribed NodeManager can release the PendingContainerTracker slot.
+   */
+  @Test
+  public void testCompleteAddReplicaNotifiesSubscriberOpCompleted() {
+    ContainerReplicaPendingOpsSubscriber subscriber = mock(ContainerReplicaPendingOpsSubscriber.class);
+    ContainerID containerID = ContainerID.valueOf(1);
+
+    pendingOps.registerSubscriber(subscriber);
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
+    pendingOps.completeAddReplica(containerID, dn1, 0);
+
+    verify(subscriber, times(1)).opAdded(
+        org.mockito.ArgumentMatchers.argThat(op ->
+            op.getOpType() == ADD && op.getTarget().equals(dn1)),
+        org.mockito.ArgumentMatchers.eq(containerID));
+    verify(subscriber, times(1)).opCompleted(
+        org.mockito.ArgumentMatchers.argThat(op ->
+            op.getOpType() == ADD && op.getTarget().equals(dn1)),
+        org.mockito.ArgumentMatchers.eq(containerID),
+        org.mockito.ArgumentMatchers.eq(false));
   }
 }

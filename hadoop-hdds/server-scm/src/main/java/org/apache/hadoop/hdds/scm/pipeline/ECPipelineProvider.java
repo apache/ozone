@@ -103,7 +103,10 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
       ecIndex++;
     }
 
-    return createPipelineInternal(replicationConfig, nodes, dnIndexes);
+    return newPipelineBuilder(replicationConfig, nodes)
+        .setId(PipelineID.randomId())
+        .setReplicaIndexes(dnIndexes)
+        .build();
   }
 
   @Override
@@ -130,17 +133,11 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
 
     dns.sort(Comparator.comparing(nodeStatusMap::get, CREATE_FOR_READ_COMPARATOR));
 
-    return createPipelineInternal(replicationConfig, dns, map);
-  }
-
-  private Pipeline createPipelineInternal(ECReplicationConfig repConfig,
-      List<DatanodeDetails> dns, Map<DatanodeDetails, Integer> indexes) {
-    return Pipeline.newBuilder()
-        .setId(PipelineID.randomId())
-        .setState(Pipeline.PipelineState.ALLOCATED)
-        .setReplicationConfig(repConfig)
-        .setNodes(dns)
-        .setReplicaIndexes(indexes)
+    // Use insecureRandomId for throwaway read pipeline IDs to avoid
+    // contention on the shared SecureRandom instance.
+    return newPipelineBuilder(replicationConfig, dns)
+        .setId(PipelineID.insecureRandomId())
+        .setReplicaIndexes(map)
         .build();
   }
 

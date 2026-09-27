@@ -268,6 +268,42 @@ public final class OMMetadataManagerTestUtils {
                     .build());
   }
 
+  /**
+   * Write a multi-block key on OM instance with an explicit replication config.
+   * Combines the location-group and replication-config overloads so tests can
+   * exercise a real (&gt; 1) replication factor.
+   * @throw IOException while writing.
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  public static void writeKeyToOm(OMMetadataManager omMetadataManager,
+                                  String keyName,
+                                  String bucketName,
+                                  String volName,
+                                  String fileName,
+                                  long objectId,
+                                  long parentObjectId,
+                                  long bucketObjectId,
+                                  long volumeObjectId,
+                                  List<OmKeyLocationInfoGroup> locationVersions,
+                                  BucketLayout bucketLayout,
+                                  long dataSize,
+                                  ReplicationConfig replicationConfig)
+          throws IOException {
+    String omKey = getKey(omMetadataManager, keyName, bucketName, volName,
+        fileName, parentObjectId, bucketObjectId, volumeObjectId, bucketLayout);
+    omMetadataManager.getKeyTable(bucketLayout).put(omKey,
+            new OmKeyInfo.Builder()
+                    .setBucketName(bucketName)
+                    .setVolumeName(volName)
+                    .setKeyName(keyName)
+                    .setDataSize(dataSize)
+                    .setOmKeyLocationInfos(locationVersions)
+                    .setReplicationConfig(replicationConfig)
+                    .setObjectID(objectId)
+                    .setParentObjectID(parentObjectId)
+                    .build());
+  }
+
   @SuppressWarnings("checkstyle:ParameterNumber")
   private static String getKey(OMMetadataManager omMetadataManager, String key, String bucket, String volume,
                                String fileName, long parentObjectId, long bucketObjectId, long volumeObjectId,

@@ -210,6 +210,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       return ozoneManager.getOmExecutionFlow().submit(request, true);
     } finally {
       OzoneManager.setS3Auth(null);
+      OzoneManager.setStsTokenIdentifier(null);
     }
   }
 

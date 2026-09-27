@@ -38,6 +38,7 @@
                  volume.FilesystemAvailable = transform(volume.FilesystemAvailable);
                  volume.FilesystemUsed = transform(volume.FilesystemUsed);
                  volume.MinFreeSpace = transform(volume.MinFreeSpace);
+                 volume.HardMinFreeSpace = transform(volume.HardMinFreeSpace);
                  volume.NonOzoneUsed = transform(volume.NonOzoneUsed);
                 })
                 });

@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Test NativeXOR encoding and decoding.
  */
-public class TestNativeXORRawCoder extends TestXORRawCoderBase {
+public class TestNativeXORRawCoder extends XORRawCoderTests {
 
   public TestNativeXORRawCoder() {
     super(NativeXORRawErasureCoderFactory.class,

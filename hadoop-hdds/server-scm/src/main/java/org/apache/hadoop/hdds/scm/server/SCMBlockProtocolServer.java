@@ -268,10 +268,8 @@ public class SCMBlockProtocolServer implements
     for (BlockGroup bg : keyBlocksInfoList) {
       totalBlocks += bg.getDeletedBlocks().size();
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
+    LOG.info("SCM is informed by OM to delete {} keys. Total blocks to deleted {}.",
           keyBlocksInfoList.size(), totalBlocks);
-    }
     List<DeleteBlockGroupResult> results = new ArrayList<>();
     Map<String, String> auditMap = Maps.newHashMap();
     ScmBlockLocationProtocolProtos.DeleteScmBlockResult.Result resultCode;
@@ -283,9 +281,8 @@ public class SCMBlockProtocolServer implements
       perfMetrics.updateDeleteKeySuccessStats(keyBlocksInfoList.size(), startNanos);
       resultCode = ScmBlockLocationProtocolProtos.
           DeleteScmBlockResult.Result.success;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Total number of blocks ACK by SCM in this cycle: " + totalBlocks);
-      }
+      LOG.info("Total number of blocks ACK by SCM in this cycle: " + totalBlocks);
+
     } catch (IOException ioe) {
       e = ioe;
       perfMetrics.updateDeleteKeyFailedBlocks(totalBlocks);

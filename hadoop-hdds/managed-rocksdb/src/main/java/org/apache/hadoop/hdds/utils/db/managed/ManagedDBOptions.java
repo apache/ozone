@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.DBOptions;
-import org.rocksdb.Logger;
+import org.rocksdb.LoggerInterface;
 
 /**
  * Managed DBOptions.
@@ -32,21 +32,32 @@ import org.rocksdb.Logger;
 public class ManagedDBOptions extends DBOptions {
 
   private final UncheckedAutoCloseable leakTracker = track(this);
-  private final AtomicReference<Logger> loggerRef = new AtomicReference<>();
+  private final AtomicReference<LoggerInterface> loggerRef = new AtomicReference<>();
 
+  // DBOptions#setLogger takes LoggerInterface since RocksDB 9.x. Override that
+  // exact signature (not the pre-9.x Logger overload) so every call path,
+  // including one made through a DBOptions-typed reference, is leak-tracked.
   @Override
-  public DBOptions setLogger(Logger logger) {
-    IOUtils.close(LOG, loggerRef.getAndSet(logger));
+  public DBOptions setLogger(LoggerInterface logger) {
+    closeLogger(loggerRef.getAndSet(logger));
     return super.setLogger(logger);
   }
 
   @Override
   public void close() {
     try {
-      IOUtils.close(LOG, loggerRef.getAndSet(null));
+      closeLogger(loggerRef.getAndSet(null));
       super.close();
     } finally {
       leakTracker.close();
+    }
+  }
+
+  // RocksDB loggers (org.rocksdb.Logger) own native resources and are
+  // AutoCloseable; a bare LoggerInterface may not be, so only close when it is.
+  private static void closeLogger(LoggerInterface logger) {
+    if (logger instanceof AutoCloseable) {
+      IOUtils.close(LOG, (AutoCloseable) logger);
     }
   }
 }

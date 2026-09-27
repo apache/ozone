@@ -21,7 +21,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.protocol.RaftPeer;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -121,5 +125,16 @@ public class TestRatisHelper {
     assertEquals("30s", raftProperties.get("raft.server.rpc.request.timeout"));
     assertNull(raftProperties.get("raft.client.rpc.request.timeout"));
 
+  }
+
+  @Test
+  public void testRaftPeerAddressBracketsIpv6() {
+    // hdds.datanode.use.datanode.hostname defaults to false, so the datanode
+    // IP is used for the raft peer address. An IPv6 literal must be bracketed
+    // for the Ratis/gRPC peer target to be parsed correctly.
+    DatanodeDetails dn = MockDatanodeDetails.createDatanodeDetails(
+        DatanodeID.randomID(), "dn-ipv6", "2001:db8::1", "/default-rack");
+    RaftPeer peer = RatisHelper.toRaftPeer(dn);
+    assertEquals("[2001:db8::1]:0", peer.getAddress());
   }
 }

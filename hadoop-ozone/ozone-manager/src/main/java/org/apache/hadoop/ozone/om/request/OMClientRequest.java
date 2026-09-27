@@ -45,14 +45,17 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -111,12 +114,25 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
-    LayoutVersion layoutVersion = LayoutVersion.newBuilder()
-        .setVersion(ozoneManager.getVersionManager().getMetadataLayoutVersion())
-        .build();
-    omRequest = getOmRequest().toBuilder()
-        .setUserInfo(getUserIfNotExists(ozoneManager))
-        .setLayoutVersion(layoutVersion).build();
+    final OMRequest.Builder requestBuilder = getOmRequest().toBuilder()
+        .setUserInfo(getUserIfNotExists(ozoneManager));
+
+    // VersionManager is always expected in production OzoneManager instances.
+    // Some unit tests use a minimal mocked OzoneManager, so perform null check here.
+    final OMLayoutVersionManager versionManager = ozoneManager.getVersionManager();
+    if (versionManager != null) {
+      final LayoutVersion layoutVersion = LayoutVersion.newBuilder()
+          .setVersion(versionManager.getMetadataLayoutVersion())
+          .build();
+      requestBuilder.setLayoutVersion(layoutVersion);
+    }
+
+    if (requestBuilder.hasS3Authentication()) {
+      requestBuilder.setS3Authentication(
+          STSSecurityUtil.resolveS3Authentication(requestBuilder.getS3Authentication(), ozoneManager));
+    }
+
+    omRequest = requestBuilder.build();
     return omRequest;
   }
 
@@ -167,18 +183,43 @@ public abstract class OMClientRequest implements RequestAuditor {
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
         OzoneManagerProtocolProtos.UserInfo.newBuilder();
 
-    // If S3 Authentication is set, determine user based on access ID.
+    // If S3 Authentication is set, determine user based on STS token first,
+    // falling back to accessId if session token not present.
     if (omRequest.hasS3Authentication()) {
-      String principal = OzoneAclUtils.accessIdToUserPrincipal(
-          omRequest.getS3Authentication().getAccessId());
-      userInfo.setUserName(principal);
+      final String accessKeyId = omRequest.getS3Authentication().getAccessId();
+      if (accessKeyId.startsWith(S3STSUtils.STS_TOKEN_PREFIX) &&
+          !omRequest.getS3Authentication().hasSessionToken()) {
+        throw new IOException("Error with STS token", new AuthenticationException(
+            "Missing session token for accessKeyId: " + accessKeyId));
+      }
+      if (omRequest.getS3Authentication().hasSessionToken()) {
+        try {
+          final String originalAccessKeyId = OzoneManager.getS3AuthEffectiveAccessId();
+          if (originalAccessKeyId != null && !originalAccessKeyId.isEmpty()) {
+            final String principal = OzoneAclUtils.accessIdToUserPrincipal(originalAccessKeyId);
+            userInfo.setUserName(principal);
+          } else {
+            throw new AuthenticationException(
+                "Invalid STS Token - originalAccessKeyId was null or empty: " + originalAccessKeyId);
+          }
+        } catch (Exception e) {
+          throw new IOException("Error with STS Token", e);
+        }
+      } else {
+        String principal = OzoneAclUtils.accessIdToUserPrincipal(
+            omRequest.getS3Authentication().getAccessId());
+        userInfo.setUserName(principal);
+      }
     } else if (user != null) {
       // Added not null checks, as in UT's these values might be null.
       userInfo.setUserName(user.getUserName());
     }
 
-    // for gRPC s3g omRequests that contain user name
-    if (user == null && omRequest.hasUserInfo()) {
+    // for gRPC s3g omRequests that contain user name. Only adopt the
+    // client-supplied user name when no identity was established above:
+    // it is unauthenticated data and must never override the identity
+    // derived from S3 authentication or from the RPC user.
+    if (user == null && !userInfo.hasUserName() && omRequest.hasUserInfo()) {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 
@@ -188,7 +229,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY.get();
     if (remoteAddress != null) {
       userInfo.setHostName(remoteAddress.getHostName());
-      userInfo.setRemoteAddress(remoteAddress.getHostAddress()).build();
+      userInfo.setRemoteAddress(remoteAddress.getHostAddress());
     } else if (grpcContextClientHostname != null
         && grpcContextClientIpAddress != null) {
       userInfo.setHostName(grpcContextClientHostname);
@@ -308,7 +349,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         OmMetadataReader omMetadataReader =
             (OmMetadataReader) rcMetadataReader.get();
 
-        omMetadataReader.checkAcls(obj, contextBuilder.build(), true);
+        omMetadataReader.checkAcls(obj, contextBuilder, true);
       }
     }
   }

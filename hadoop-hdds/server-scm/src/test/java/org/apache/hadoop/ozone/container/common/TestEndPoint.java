@@ -579,6 +579,7 @@ public class TestEndPoint {
             ReplicateContainerCommandProto.newBuilder()
                 .setCmdId(2)
                 .setContainerID(2)
+                .setTarget(randomDatanodeDetails().getProtoBufMessage())
                 .build())
         .setCommandType(Type.replicateContainerCommand)
         .build();

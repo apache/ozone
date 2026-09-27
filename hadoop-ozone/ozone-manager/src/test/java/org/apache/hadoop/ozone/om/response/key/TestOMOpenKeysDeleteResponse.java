@@ -41,7 +41,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Tests the OM Response when open keys are deleted.
  */
-public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
+public class TestOMOpenKeysDeleteResponse extends OMKeyResponseTests {
   private static final long KEY_LENGTH = 100;
   private BucketLayout bucketLayout;
 

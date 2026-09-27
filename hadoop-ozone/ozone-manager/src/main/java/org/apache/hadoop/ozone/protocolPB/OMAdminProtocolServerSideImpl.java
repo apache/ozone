@@ -60,6 +60,18 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
   public OMConfigurationResponse getOMConfiguration(RpcController controller,
       OMConfigurationRequest request) throws ServiceException {
 
+    try {
+      if (ozoneManager.isAdminAuthorizationEnabled() &&
+          !ozoneManager.isAdmin(getRemoteUser())) {
+        throw new OMException("Only administrators are authorized to get OM configuration.", PERMISSION_DENIED);
+      }
+    } catch (IOException ex) {
+      return OMConfigurationResponse.newBuilder()
+          .setSuccess(false)
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
+          .build();
+    }
+
     List<OMNodeDetails> oldOMNodesList = ozoneManager.getAllOMNodesInMemory();
     List<OMNodeDetails> newOMNodesList = ozoneManager.getAllOMNodesInNewConf();
 

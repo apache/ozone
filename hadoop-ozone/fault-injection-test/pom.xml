@@ -26,7 +26,6 @@
   <description>Apache Ozone Fault Injection Tests</description>
 
   <modules>
-    <module>mini-chaos-tests</module>
     <module>network-tests</module>
   </modules>
 </project>

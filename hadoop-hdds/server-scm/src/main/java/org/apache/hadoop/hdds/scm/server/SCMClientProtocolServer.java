@@ -46,11 +46,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -66,6 +64,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -90,6 +89,7 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -691,9 +691,9 @@ public class SCMClientProtocolServer implements
     }
     try {
       List<HddsProtos.Node> result = new ArrayList<>();
-      for (DatanodeDetails node : queryNode(opState, state)) {
+      for (DatanodeDetails node : scm.getScmNodeManager().getNodes(opState, state)) {
         NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        DatanodeInfo datanodeInfo = scm.getScmNodeManager().getDatanodeInfo(node);
+        DatanodeInfo datanodeInfo = node instanceof DatanodeInfo ? (DatanodeInfo) node : null;
         HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
             .setNodeID(node.toProto(clientVersion))
             .addNodeStates(ns.getHealth())
@@ -717,34 +717,22 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public HddsProtos.Node queryNode(UUID uuid)
-      throws IOException {
+  public HddsProtos.Node queryNode(UUID uuid) {
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("uuid", String.valueOf(uuid));
     HddsProtos.Node result = null;
-    try {
-      DatanodeDetails node = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
-      if (node != null) {
-        NodeStatus ns = scm.getScmNodeManager().getNodeStatus(node);
-        DatanodeInfo datanodeInfo = scm.getScmNodeManager().getDatanodeInfo(node);
-        HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
-            .setNodeID(node.getProtoBufMessage())
-            .addNodeStates(ns.getHealth())
-            .addNodeOperationalStates(ns.getOperationalState());
+    DatanodeInfo datanodeInfo = scm.getScmNodeManager().getNode(DatanodeID.of(uuid));
+    if (datanodeInfo != null) {
+      NodeStatus ns = datanodeInfo.getNodeStatus();
+      HddsProtos.Node.Builder nodeBuilder = HddsProtos.Node.newBuilder()
+          .setNodeID(datanodeInfo.getProtoBufMessage())
+          .addNodeStates(ns.getHealth())
+          .addNodeOperationalStates(ns.getOperationalState());
 
-        if (datanodeInfo != null) {
-          nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
-          nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
-          addFailedVolumes(nodeBuilder, datanodeInfo);
-        }
-        result = nodeBuilder.build();
-      }
-    } catch (NodeNotFoundException e) {
-      IOException ex = new IOException(
-          "An unexpected error occurred querying the NodeStatus", e);
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.QUERY_NODE, auditMap, ex));
-      throw ex;
+      nodeBuilder.setTotalVolumeCount(datanodeInfo.getStorageReports().size());
+      nodeBuilder.setHealthyVolumeCount(datanodeInfo.getHealthyVolumeCount());
+      addFailedVolumes(nodeBuilder, datanodeInfo);
+      result = nodeBuilder.build();
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
         SCMAction.QUERY_NODE, auditMap));
@@ -1015,7 +1003,7 @@ public class SCMClientProtocolServer implements
             .orElseThrow(() -> new IOException("Cannot" +
                 " find a new leader to transfer leadership."));
       } else {
-        targetPeerId = RaftPeerId.valueOf(newLeaderId);
+        targetPeerId = resolveTargetPeerId(newLeaderId, group);
       }
       final GrpcTlsConfig tlsConfig =
           createSCMRatisTLSConfig(new SecurityConfig(scm.getConfiguration()),
@@ -1030,6 +1018,27 @@ public class SCMClientProtocolServer implements
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
             SCMAction.TRANSFER_LEADERSHIP, auditMap));
+  }
+
+  /** Resolves the transfer target, which may be given as an SCM UUID or as a configured SCM node id. */
+  private RaftPeerId resolveTargetPeerId(String newLeaderId, RaftGroup group) {
+    final RaftPeerId peerId = RaftPeerId.valueOf(newLeaderId);
+    if (group.getPeer(peerId) != null) {
+      return peerId;
+    }
+    // Raft peer ids are SCM UUIDs, so a node id only matches through its configured Ratis address.
+    for (SCMNodeDetails node : scm.getSCMHANodeDetails().getAllNodeDetails()) {
+      if (!newLeaderId.equals(node.getNodeId())) {
+        continue;
+      }
+      for (RaftPeer peer : group.getPeers()) {
+        if (node.getRatisHostPortStr().equals(peer.getAddress())) {
+          return peer.getId();
+        }
+      }
+    }
+    // Leave an unmatched id to RatisHelper, which reports the group it did not match.
+    return peerId;
   }
 
   @Deprecated
@@ -1077,16 +1086,13 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
-      throws IOException {
+  public List<SafeModeRuleStatusProto> getSafeModeRuleStatuses() {
     try {
-      Map<String, Pair<Boolean, String>> result = scm.getRuleStatus();
-      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-          SCMAction.GET_SAFE_MODE_RULE_STATUSES, null));
+      final List<SafeModeRuleStatusProto> result = scm.getRuleStatus();
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.GET_SAFE_MODE_RULE_STATUSES, null));
       return result;
     } catch (Exception ex) {
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.GET_SAFE_MODE_RULE_STATUSES, null, ex));
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.GET_SAFE_MODE_RULE_STATUSES, null, ex));
       throw ex;
     }
   }
@@ -1248,9 +1254,9 @@ public class SCMClientProtocolServer implements
         int mdti = maxDatanodesPercentageToInvolvePerIteration.get();
         auditMap.put("maxDatanodesPercentageToInvolvePerIteration",
             String.valueOf(mdti));
-        if (mdti < 0 || mdti > 100) {
+        if (mdti <= 0 || mdti > 100) {
           throw new IOException("Max Datanodes Percentage To Involve Per Iteration" +
-                  "should be specified in the range [0, 100]");
+                  "should be specified in the range (0, 100]");
         }
         cbc.setMaxDatanodesPercentageToInvolvePerIteration(mdti);
       }
@@ -1392,14 +1398,13 @@ public class SCMClientProtocolServer implements
           .newBuilder()
           .setIsRunning(false)
           .build();
-    } else {
-
-      return ContainerBalancerStatusInfoResponseProto
-          .newBuilder()
-          .setIsRunning(true)
-          .setContainerBalancerStatusInfo(balancerStatusInfo.toProto())
-          .build();
     }
+
+    return ContainerBalancerStatusInfoResponseProto
+        .newBuilder()
+        .setIsRunning(balancerStatusInfo.getConfiguration().getShouldRun())
+        .setContainerBalancerStatusInfo(balancerStatusInfo.toProto())
+        .build();
   }
 
   /**
@@ -1582,7 +1587,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("state", String.valueOf(state));
     try {
       List<ContainerID> results = scm.getContainerManager().getContainerIDs(
-          startContainerID, count, state);
+          startContainerID, count, state, null);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.LIST_CONTAINER_IDS, auditMap));
       return results;
@@ -1591,26 +1596,6 @@ public class SCMClientProtocolServer implements
           SCMAction.LIST_CONTAINER_IDS, auditMap, ex));
       throw ex;
     }
-  }
-
-  /**
-   * Queries a list of Node that match a set of statuses.
-   *
-   * <p>For example, if the nodeStatuses is HEALTHY and RAFT_MEMBER, then
-   * this call will return all
-   * healthy nodes which members in Raft pipeline.
-   *
-   * <p>Right now we don't support operations, so we assume it is an AND
-   * operation between the
-   * operators.
-   *
-   * @param opState - NodeOperational State
-   * @param state - NodeState.
-   * @return List of Datanodes.
-   */
-  public List<DatanodeDetails> queryNode(
-      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state) {
-    return new ArrayList<>(queryNodeState(opState, state));
   }
 
   @VisibleForTesting
@@ -1623,24 +1608,6 @@ public class SCMClientProtocolServer implements
    */
   public boolean getSafeModeStatus() {
     return scm.getScmContext().isInSafeMode();
-  }
-
-  /**
-   * Query the System for Nodes.
-   *
-   * @params opState - The node operational state
-   * @param nodeState - NodeState that we are interested in matching.
-   * @return Set of Datanodes that match the NodeState.
-   */
-  private Set<DatanodeDetails> queryNodeState(
-      HddsProtos.NodeOperationalState opState, HddsProtos.NodeState nodeState) {
-    Set<DatanodeDetails> returnSet = new TreeSet<>();
-    List<DatanodeDetails> tmp = scm.getScmNodeManager()
-        .getNodes(opState, nodeState);
-    if ((tmp != null) && (!tmp.isEmpty())) {
-      returnSet.addAll(tmp);
-    }
-    return returnSet;
   }
 
   @Override

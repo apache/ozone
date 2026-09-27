@@ -108,7 +108,6 @@ public class TestContainerStateMachineFlushDelay {
             .build();
     cluster.waitForClusterToBeReady();
     cluster.getOzoneManager().startSecretManager();
-    // The easiest way to create an open container is creating a key.
     client = OzoneClientFactory.getRpcClient(conf);
     objectStore = client.getObjectStore();
     volumeName = "testcontainerstatemachinefailures";

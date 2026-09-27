@@ -42,8 +42,6 @@ public abstract class AbstractReplicationTask {
 
   private ReplicationCommandPriority priority = NORMAL;
 
-  private boolean shouldOnlyRunOnInServiceDatanodes = true;
-
   protected AbstractReplicationTask(long containerID,
       long deadlineMsSinceEpoch, long term) {
     this(containerID, deadlineMsSinceEpoch, term,
@@ -113,24 +111,6 @@ public abstract class AbstractReplicationTask {
    */
   public ReplicationCommandPriority getPriority() {
     return priority;
-  }
-
-  /**
-   * Returns true if the task should only run on in service datanodes. False
-   * otherwise.
-   */
-  public boolean shouldOnlyRunOnInServiceDatanodes() {
-    return shouldOnlyRunOnInServiceDatanodes;
-  }
-
-  /**
-   * Set whether the task should only run on in service datanodes. Passing false
-   * allows the task to run on out of service datanodes as well.
-   * @param runOnInServiceOnly
-   */
-  protected void setShouldOnlyRunOnInServiceDatanodes(
-      boolean runOnInServiceOnly) {
-    this.shouldOnlyRunOnInServiceDatanodes = runOnInServiceOnly;
   }
 
   /**

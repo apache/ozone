@@ -43,7 +43,8 @@ public class DatanodeParameters extends ItemsFromStdin {
           "  # From file having list of dns to balance",
           "  ozone admin datanode diskbalancer report - < datanode-lists.txt",
           "Port is optional and defaults to 19864 (CLIENT_RPC port).",
-          "Address examples: 'DN-1', 'DN-1:19864', '192.168.1.10'."
+          "Address examples: 'DN-1', 'DN-1:19864', '192.168.1.10'.",
+          "Use --node-id to target a datanode by UUID (requires SCM)."
       },
       arity = "0..*",
       paramLabel = "<datanode address>")

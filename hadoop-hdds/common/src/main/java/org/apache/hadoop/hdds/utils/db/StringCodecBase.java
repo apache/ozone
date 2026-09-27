@@ -42,6 +42,9 @@ abstract class StringCodecBase implements Codec<String> {
   private final Charset charset;
   private final boolean fixedLength;
   private final int maxBytesPerChar;
+  // CharsetEncoder/CharsetDecoder are stateful and not thread-safe: reuse one per thread.
+  private final ThreadLocal<CharsetEncoder> threadLocalEncoder = ThreadLocal.withInitial(this::newEncoder);
+  private final ThreadLocal<CharsetDecoder> threadLocalDecoder = ThreadLocal.withInitial(this::newDecoder);
 
   StringCodecBase(Charset charset) {
     this.charset = charset;
@@ -78,7 +81,7 @@ abstract class StringCodecBase implements Codec<String> {
    * <p>
    * For a fixed-length {@link Codec},
    * each character is encoded to the same number of bytes and
-   * {@link #getSerializedSizeUpperBound(String)} equals to the serialized size.
+   * {@code getSerializedSizeUpperBound(String)} equals to the serialized size.
    */
   public boolean isFixedLength() {
     return fixedLength;
@@ -97,7 +100,7 @@ abstract class StringCodecBase implements Codec<String> {
   private <E extends Exception> PutToByteBuffer<E> encode(
       String string, Integer serializedSize, Function<String, E> newE) {
     return buffer -> {
-      final CoderResult result = newEncoder().encode(
+      final CoderResult result = threadLocalEncoder.get().reset().encode(
           CharBuffer.wrap(string), buffer, true);
       if (result.isError()) {
         throw newE.apply("Failed to encode with " + charset + ": " + result
@@ -114,7 +117,7 @@ abstract class StringCodecBase implements Codec<String> {
 
   String decodeNoFallback(ByteBuffer buffer) throws CodecException {
     try {
-      return newDecoder().decode(buffer.asReadOnlyBuffer()).toString();
+      return threadLocalDecoder.get().decode(buffer.asReadOnlyBuffer()).toString();
     } catch (Exception e) {
       throw new CodecException("Failed to decode " + buffer, e);
     }
@@ -123,7 +126,7 @@ abstract class StringCodecBase implements Codec<String> {
   String decodeWithFallback(ByteBuffer buffer) {
     Runnable error = null;
     try {
-      return newDecoder().decode(buffer.asReadOnlyBuffer()).toString();
+      return threadLocalDecoder.get().decode(buffer.asReadOnlyBuffer()).toString();
     } catch (Exception e) {
       error = () -> LOG.warn("Failed to decode buffer with {}, buffer = (hex) {}",
           charset, StringUtils.bytes2Hex(buffer, 20), e);

@@ -79,7 +79,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -250,7 +250,7 @@ public class TestBlockDeletion {
     // Delete transactionIds for the containers should be 0.
     // NOTE: this test assumes that all the container is KetValueContainer. If
     // other container types is going to be added, this test should be checked.
-    matchContainerTransactionIds();
+    verifyDeleteTransactionIds();
 
     assertEquals(0L,
         metrics.getNumBlockDeletionTransactionCreated());
@@ -272,7 +272,7 @@ public class TestBlockDeletion {
         .getDatanodeStateMachine().getContainer().getContainerSet();
     GenericTestUtils.waitFor(() -> {
       return !(omKeyLocationInfoGroupList.stream().anyMatch((group) ->
-        group.getLocationList().stream().anyMatch((info) ->
+        group.createLocationList().stream().anyMatch((info) ->
           containerSet.getContainer(info.getContainerID()).getContainerData()
               .getState() != ContainerProtos.ContainerDataProto.State.CLOSED
         )
@@ -293,8 +293,9 @@ public class TestBlockDeletion {
 
     // Few containers with deleted blocks
     assertThat(containerIdsWithDeletedBlocks).isNotEmpty();
-    // Containers in the DN and SCM should have same delete transactionIds
-    matchContainerTransactionIds();
+    // DN-side delete transactionIds should advance after deletion. SCM-side
+    // ContainerInfo deleteTransactionId is not updated by DeletedBlockLog.
+    verifyDeleteTransactionIds();
 
     // Verify transactions committed
     GenericTestUtils.waitFor(() -> {
@@ -308,11 +309,10 @@ public class TestBlockDeletion {
       }
     }, 500, 10000);
 
-    // After DN restart, containers in the DN and SCM should have same delete
-    // transactionIds. The assertion verifies that the state of containerInfos
-    // in DN and SCM is consistent after DN restart.
+    // After DN restart, delete transactionIds should remain persisted on DN.
+    // SCM-side ContainerInfo deleteTransactionId should remain unchanged.
     cluster.restartHddsDatanode(0, true);
-    matchContainerTransactionIds();
+    verifyDeleteTransactionIds();
 
     assertEquals(metrics.getNumBlockDeletionTransactionCreated(),
         metrics.getNumBlockDeletionTransactionCompleted());
@@ -492,11 +492,11 @@ public class TestBlockDeletion {
 
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     // Wait for container to close
-    TestHelper.waitForContainerClose(cluster,
+    OzoneTestHelper.waitForContainerClose(cluster,
         containerIdList.toArray(new Long[0]));
     // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      List<OmKeyLocationInfo> locationInfo = group.createLocationList();
       locationInfo.forEach(
           (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
               .getContainer().getContainerSet()
@@ -508,14 +508,14 @@ public class TestBlockDeletion {
         containerInfos.get(0).getContainerID());
     // Before restart container state is non-empty
     assertFalse(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
     // Restart DataNode
     cluster.restartHddsDatanode(0, true);
 
     // After restart also container state remains non-empty.
     assertFalse(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
 
     // Delete key
@@ -535,14 +535,14 @@ public class TestBlockDeletion {
 
     // Container state should be empty now as key got deleted
     assertTrue(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
 
     // Restart DataNode
     cluster.restartHddsDatanode(0, true);
     // Container state should be empty even after restart
     assertTrue(getContainerFromDN(
-        cluster.getHddsDatanodes().get(0), containerId.getId())
+        cluster.getHddsDatanodes().get(0), containerId.getIdForTesting())
         .getContainerData().isEmpty());
 
     GenericTestUtils.waitFor(() -> {
@@ -622,11 +622,11 @@ public class TestBlockDeletion {
 
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
     // Wait for container to close
-    TestHelper.waitForContainerClose(cluster,
+    OzoneTestHelper.waitForContainerClose(cluster,
         containerIdList.toArray(new Long[0]));
     // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      List<OmKeyLocationInfo> locationInfo = group.createLocationList();
       locationInfo.forEach(
           (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
               .getContainer().getContainerSet()
@@ -676,9 +676,9 @@ public class TestBlockDeletion {
     containerStateManager.updateContainerReplica(replicaOne);
 
     // Check replica updated with wrong keyCount
-    scm.getContainerManager().getContainerReplicas(
+    assertTrue(scm.getContainerManager().getContainerReplicas(
             ContainerID.valueOf(containerInfos.get(0).getContainerID()))
-        .stream().anyMatch(replica -> replica.getKeyCount() == 10);
+        .stream().anyMatch(replica -> replica.getKeyCount() == 10));
 
     // Process delete container in SCM, ensure containers gets deleted,
     // even though keyCount is invalid in one of the replica
@@ -716,7 +716,7 @@ public class TestBlockDeletion {
     }
   }
 
-  private void matchContainerTransactionIds() throws IOException {
+  private void verifyDeleteTransactionIds() throws IOException {
     for (HddsDatanodeService datanode : cluster.getHddsDatanodes()) {
       ContainerSet dnContainerSet =
           datanode.getDatanodeStateMachine().getContainer().getContainerSet();
@@ -724,19 +724,17 @@ public class TestBlockDeletion {
       dnContainerSet.listContainer(0, 10000, containerDataList);
       for (ContainerData containerData : containerDataList) {
         long containerId = containerData.getContainerID();
-        if (containerIdsWithDeletedBlocks.contains(containerId)) {
-          assertThat(scm.getContainerInfo(containerId).getDeleteTransactionId())
-              .isGreaterThan(0);
-          maxTransactionId = max(maxTransactionId,
-              scm.getContainerInfo(containerId).getDeleteTransactionId());
-        } else {
-          assertEquals(
-              scm.getContainerInfo(containerId).getDeleteTransactionId(), 0);
-        }
-        assertEquals(
+        long dnDeleteTransactionId =
             ((KeyValueContainerData) dnContainerSet.getContainer(containerId)
-                .getContainerData()).getDeleteTransactionId(),
+                .getContainerData()).getDeleteTransactionId();
+        assertEquals(0,
             scm.getContainerInfo(containerId).getDeleteTransactionId());
+        if (containerIdsWithDeletedBlocks.contains(containerId)) {
+          assertThat(dnDeleteTransactionId).isGreaterThan(0);
+          maxTransactionId = max(maxTransactionId, dnDeleteTransactionId);
+        } else {
+          assertEquals(0, dnDeleteTransactionId);
+        }
       }
     }
   }

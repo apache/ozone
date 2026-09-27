@@ -59,10 +59,10 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
@@ -159,7 +159,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
     client = cluster.newClient();
 
     // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, layout);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, layout);
 
     GenericTestUtils.setLogLevel(XceiverClientGrpc.class, Level.DEBUG);
 
@@ -260,7 +260,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
   @Test
   public void testOBSRecoveryShouldFail() throws Exception {
-    OzoneBucket obsBucket = TestDataUtil.createVolumeAndBucket(client,
+    OzoneBucket obsBucket = DataTestUtil.createVolumeAndBucket(client,
         "vol2", "obs", BucketLayout.OBJECT_STORE);
     String obsDir = OZONE_ROOT + obsBucket.getVolumeName() + OZONE_URI_DELIMITER + obsBucket.getName();
     Path obsFile = new Path(obsDir, uniqueObjectName());

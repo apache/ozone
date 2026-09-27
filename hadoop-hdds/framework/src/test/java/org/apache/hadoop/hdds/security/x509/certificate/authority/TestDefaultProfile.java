@@ -156,6 +156,48 @@ public class TestDefaultProfile {
   }
 
   /**
+   * Tests that internal-suffix and single-label DNS names, which are not
+   * accepted by a public-suffix based validator, are accepted by
+   * the RFC 1123 based DnsNames validation.
+   */
+  @Test
+  public void testExtensionsWithInternalDnsNames() throws Exception {
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("scm1.lxd")
+        .addDnsName("datanode1")
+        .setCA(false)
+        .setClusterID("ClusterID")
+        .setScmID("SCMID")
+        .setSubject("Ozone Cluster")
+        .setConfiguration(securityConfig)
+        .setKey(keyPair)
+        .build()
+        .generateCSR();
+    assertTrue(approver.verfiyExtensions(csr));
+  }
+
+  /**
+   * Tests that a wildcard, an IP literal, or an empty dNSName are still
+   * rejected by the DnsNames validation.
+   */
+  @Test
+  public void testInvalidExtensionsWithDnsName() throws IOException,
+      OperatorCreationException {
+    Extensions dnsExtension = getSANExtension(GeneralName.dNSName,
+        "*.example.com", false);
+    PKCS10CertificationRequest csr = getInvalidCSR(keyPair, dnsExtension);
+    assertFalse(approver.verfiyExtensions(csr));
+
+    dnsExtension = getSANExtension(GeneralName.dNSName, "10.0.0.5", false);
+    csr = getInvalidCSR(keyPair, dnsExtension);
+    assertFalse(approver.verfiyExtensions(csr));
+
+    dnsExtension = getSANExtension(GeneralName.dNSName, "", false);
+    csr = getInvalidCSR(keyPair, dnsExtension);
+    assertFalse(approver.verfiyExtensions(csr));
+  }
+
+  /**
    * Tests that  invalid extensions cause a failure in validation. We will fail
    * if CA extension is enabled.
    *

@@ -41,7 +41,7 @@ public class TransferOmLeaderSubCommand implements Callable<Void> {
 
   static class TransferOption {
     @CommandLine.Option(
-        names = {"-n", "--newLeaderId", "--new-leader-id"},
+        names = {"-n", "--new-leader-id"},
         description = "The new leader id of OM to transfer leadership. E.g OM1."
     )
     private String omNodeId;

@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests OMAllocateBlockResponse.
  */
-public class TestOMAllocateBlockResponse extends TestOMKeyResponse {
+public class TestOMAllocateBlockResponse extends OMKeyResponseTests {
 
   @Test
   public void testAddToDBBatch() throws Exception {

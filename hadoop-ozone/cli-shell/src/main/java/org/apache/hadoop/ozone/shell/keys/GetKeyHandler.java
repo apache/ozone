@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.io.IOUtils;
@@ -82,6 +83,9 @@ public class GetKeyHandler extends KeyHandler {
     try (InputStream input = bucket.readKey(keyName);
         OutputStream output = Files.newOutputStream(dataFile.toPath())) {
       IOUtils.copyBytes(input, output, chunkSize);
+    } catch (IOException | RuntimeException e) {
+      cleanupIfEmpty(dataFile);
+      throw e;
     }
 
     if (isVerbose() && !"/dev/null".equals(dataFile.getAbsolutePath())) {
@@ -89,6 +93,17 @@ public class GetKeyHandler extends KeyHandler {
         String hash = DigestUtils.sha256Hex(stream);
         out().printf("Downloaded file sha256 checksum : %s%n", hash);
       }
+    }
+  }
+
+  private void cleanupIfEmpty(File dataFile) {
+    try {
+      Path dataFilePath = dataFile.toPath();
+      if (Files.isRegularFile(dataFilePath) && Files.size(dataFilePath) == 0) {
+        Files.deleteIfExists(dataFilePath);
+      }
+    } catch (IOException e) {
+      err().println("Failed to delete empty output file " + dataFile + ": " + e.getMessage());
     }
   }
 }

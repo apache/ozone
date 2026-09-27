@@ -21,10 +21,12 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Node;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -109,13 +111,14 @@ public class PipelineSyncTask extends ReconScmTask {
    */
   private void syncOperationalStateOnDeadNodes()
       throws IOException, NodeNotFoundException {
-    List<DatanodeDetails> deadNodesOnRecon = nodeManager.getNodes(null, DEAD);
+    final Set<DatanodeID> deadNodesOnRecon = nodeManager.getNodes(null, DEAD).stream()
+        .map(info -> info.getID())
+        .collect(Collectors.toSet());
 
     if (!deadNodesOnRecon.isEmpty()) {
       List<Node> scmNodes = scmClient.getNodes();
       List<Node> filteredScmNodes = scmNodes.stream()
-              .filter(n -> deadNodesOnRecon.contains(
-                  DatanodeDetails.getFromProtoBuf(n.getNodeID())))
+              .filter(n -> deadNodesOnRecon.contains(DatanodeDetails.getFromProtoBuf(n.getNodeID()).getID()))
               .collect(Collectors.toList());
 
       for (Node deadNode : filteredScmNodes) {

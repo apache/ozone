@@ -18,12 +18,14 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.UuidCodec;
+import org.apache.hadoop.ozone.util.UUIDUtil;
 import org.apache.ratis.util.MemoizedSupplier;
 
 /**
@@ -50,6 +52,19 @@ public final class PipelineID {
 
   public static PipelineID randomId() {
     return new PipelineID(UUID.randomUUID());
+  }
+
+  /**
+   * Generates a random PipelineID using {@link java.util.Random} instead of
+   * {@link java.security.SecureRandom}. This avoids contention on the shared
+   * {@code SecureRandom} instance and is suitable for non-sensitive,
+   * throwaway IDs such as read pipelines, where predictability of the next
+   * ID has no security impact.
+   */
+  public static PipelineID insecureRandomId() {
+    byte[] bytes = UUIDUtil.insecureRandomUUIDBytes();
+    ByteBuffer buf = ByteBuffer.wrap(bytes);
+    return new PipelineID(new UUID(buf.getLong(), buf.getLong()));
   }
 
   public static PipelineID valueOf(UUID id) {

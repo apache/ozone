@@ -42,7 +42,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -51,14 +51,14 @@ import org.junit.jupiter.api.Test;
  */
 public class TestDeleteContainerCommandHandler {
 
-  private TestClock clock;
+  private MockClock clock;
   private OzoneContainer ozoneContainer;
   private ContainerController controller;
   private StateContext context;
 
   @BeforeEach
   public void setup() {
-    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    clock = new MockClock(Instant.now(), ZoneId.systemDefault());
     ozoneContainer = mock(OzoneContainer.class);
     controller = mock(ContainerController.class);
     when(ozoneContainer.getController()).thenReturn(controller);
@@ -114,7 +114,7 @@ public class TestDeleteContainerCommandHandler {
     when(context.getTermOfLeaderSCM())
         .thenReturn(OptionalLong.of(command.getTerm()));
 
-    TestClock testClock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    MockClock testClock = new MockClock(Instant.now(), ZoneId.systemDefault());
     CountDownLatch latch = new CountDownLatch(1);
     ThreadFactory threadFactory = new ThreadFactoryBuilder().build();
     ThreadPoolWithLockExecutor executor = new ThreadPoolWithLockExecutor(
@@ -181,12 +181,12 @@ public class TestDeleteContainerCommandHandler {
   }
 
   private static DeleteContainerCommandHandler createSubject() {
-    TestClock clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    MockClock clock = new MockClock(Instant.now(), ZoneId.systemDefault());
     return createSubject(clock, 1000);
   }
 
   private static DeleteContainerCommandHandler createSubject(
-      TestClock clock, int queueSize) {
+      MockClock clock, int queueSize) {
     ThreadFactory threadFactory = new ThreadFactoryBuilder().build();
     ThreadPoolExecutor executor = (ThreadPoolExecutor) Executors.
         newFixedThreadPool(1, threadFactory);
@@ -194,7 +194,7 @@ public class TestDeleteContainerCommandHandler {
   }
 
   private static DeleteContainerCommandHandler createSubjectWithPoolSize(
-      TestClock clock, int queueSize) {
+      MockClock clock, int queueSize) {
     return new DeleteContainerCommandHandler(1, clock, queueSize, "");
   }
 

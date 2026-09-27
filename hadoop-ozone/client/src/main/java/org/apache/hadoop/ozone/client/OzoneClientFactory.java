@@ -100,7 +100,10 @@ public final class OzoneClientFactory {
     Objects.requireNonNull(omRpcPort, "omRpcPort == null");
     Objects.requireNonNull(config, "config == null");
     OmUtils.resolveOmHost(omHost, omRpcPort);
-    config.set(OZONE_OM_ADDRESS_KEY, omHost + ":" + omRpcPort);
+    // getHostPortString brackets IPv6 literals; a plain host + ":" + port would
+    // produce an ambiguous address such as ::1:9862 for an IPv6 OM host.
+    config.set(OZONE_OM_ADDRESS_KEY,
+        HddsUtils.getHostPortString(omHost, omRpcPort));
     return getRpcClient(getClientProtocol(config), config);
   }
 

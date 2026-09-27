@@ -391,7 +391,17 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     writeLock();
     final State prevState = containerData.getState();
     try {
-      updateContainerState(UNHEALTHY);
+      if (!getContainerFile().getParentFile().exists()) {
+        // Metadata directory is absent (e.g. MISSING_METADATA_DIR detected by scanner).
+        // Attempting to write the .container file would fail
+        // The in-memory UNHEALTHY state is sufficient: SCM will receive it via ICR
+        // and schedule deletion without requiring a persisted .container file.
+        containerData.setState(UNHEALTHY);
+        LOG.debug("Skipping .container file update for container {} with missing metadata directory",
+            containerData.getContainerID());
+      } else {
+        updateContainerState(UNHEALTHY);
+      }
       clearPendingPutBlockCache();
     } finally {
       writeUnlock();

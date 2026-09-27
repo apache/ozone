@@ -67,6 +67,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -425,13 +426,14 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
 
   private void init() throws IOException {
     conf = freonCommand.getOzoneConf();
-    Collection<InetSocketAddress> addresses = getSCMAddressForDatanodes(conf);
+    final Collection<HostAndPort> addresses = getSCMAddressForDatanodes(conf);
     scmClients = new HashMap<>(addresses.size());
-    for (InetSocketAddress address : addresses) {
+    for (HostAndPort a : addresses) {
+      InetSocketAddress address = a.getAddress();
       scmClients.put(address, createScmClient(address));
     }
 
-    reconAddress = getReconAddressForDatanodes(conf);
+    reconAddress = getReconAddressForDatanodes(conf).getAddress();
     reconClient = createReconClient(reconAddress);
 
     heartbeatScheduler = Executors.newScheduledThreadPool(threadCount);

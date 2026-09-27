@@ -66,11 +66,6 @@ python -m pytest -s .
 
 更多细节查看 blockade 目录下的 README。
 
-## MiniChaosOzoneCluster
-
-这是一种在你的机器上获得[混沌](https://en.wikipedia.org/wiki/Chaos_engineering)的方法。它可以直接从源码启动一个 MiniOzoneCluster
-（会启动真实的守护进程），并随机杀死它。
-
 ## Freon
 
 Freon 是 Ozone 发行包中包含的命令行应用，它是一个负载生成器，用于压力测试。

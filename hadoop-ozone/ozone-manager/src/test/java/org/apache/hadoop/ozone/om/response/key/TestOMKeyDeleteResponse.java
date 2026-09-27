@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests OMKeyDeleteResponse.
  */
-public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
+public class TestOMKeyDeleteResponse extends OMKeyResponseTests {
 
   @Test
   public void testAddToDBBatch() throws Exception {
@@ -119,7 +119,7 @@ public class TestOMKeyDeleteResponse extends TestOMKeyResponse {
     
     String deletedKey = omMetadataManager.getOzoneKey(volumeName, bucketName,
         keyName);
-    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+    List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
         = omMetadataManager.getDeletedTable().getRangeKVs(
         null, 100, deletedKey);
 

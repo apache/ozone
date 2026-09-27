@@ -178,6 +178,23 @@ public class TestOMFailoverProxyProvider {
   }
 
   @Test
+  public void testConfiguredIpv6Address() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::10]:9862");
+
+    try (HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> ipv6Provider =
+             new HadoopRpcOMFailoverProxyProvider<>(conf,
+                 UserGroupInformation.getCurrentUser(), null,
+                 OzoneManagerProtocolPB.class)) {
+      List<OMProxyInfo<OzoneManagerProtocolPB>> proxies =
+          ipv6Provider.getOMProxies();
+      assertEquals(1, proxies.size());
+      assertEquals("[2001:db8::10]:9862",
+          proxies.get(0).getAddressString());
+    }
+  }
+
+  @Test
   public void testOMProxyMap() {
     final String serviceID = "service0";
     final List<OMProxyInfo<Integer>> list = new ArrayList<>();

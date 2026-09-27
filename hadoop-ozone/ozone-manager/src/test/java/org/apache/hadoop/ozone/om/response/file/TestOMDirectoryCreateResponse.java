@@ -38,7 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
-import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
+import org.apache.hadoop.ozone.om.response.OMResponseTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.junit.jupiter.api.AfterEach;
@@ -85,7 +85,7 @@ public class TestOMDirectoryCreateResponse {
 
     ThreadLocalRandom random = ThreadLocalRandom.current();
     long usedNamespace = Math.abs(random.nextLong(Long.MAX_VALUE));
-    OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
+    OmBucketInfo omBucketInfo = OMResponseTestUtils.createBucket(
         volumeName, bucketName);
     omBucketInfo = omBucketInfo.toBuilder()
         .setUsedNamespace(usedNamespace).build();

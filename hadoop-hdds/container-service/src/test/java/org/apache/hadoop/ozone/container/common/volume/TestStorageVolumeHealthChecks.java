@@ -34,7 +34,7 @@ import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
@@ -52,7 +52,7 @@ public class TestStorageVolumeHealthChecks {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
-  private static final TestClock TEST_CLOCK = TestClock.newInstance();
+  private static final MockClock TEST_CLOCK = MockClock.newInstance();
 
   @TempDir
   private static Path volumePath;

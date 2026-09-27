@@ -281,9 +281,10 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count) {
+  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerHealthState healthState,
+      ContainerID start, int count) {
     try (AutoCloseableLock ignored = readLock()) {
-      return containers.getContainerIDs(state, start, count);
+      return containers.getContainerIDs(state, healthState, start, count);
     }
   }
 
@@ -385,11 +386,41 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  @Deprecated
+  @Override
+  public void updateContainerState(final HddsProtos.ContainerID containerID,
+      final LifeCycleEvent event)
+      throws IOException, InvalidStateTransitionException {
+    // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
+    final ContainerID id = ContainerID.getFromProtobuf(containerID);
+
+    try (AutoCloseableLock ignored = writeLock(id)) {
+      if (containers.contains(id)) {
+        final ContainerInfo oldInfo = containers.getContainerInfo(id);
+        final LifeCycleState oldState = oldInfo.getState();
+        final LifeCycleState newState = stateMachine.getNextState(
+            oldInfo.getState(), event);
+        if (newState.getNumber() > oldState.getNumber()) {
+          ExecutionUtil.create(() -> {
+            containers.updateState(id, oldState, newState);
+            transactionBuffer.addToBuffer(containerStore, id,
+                containers.getContainerInfo(id));
+          }).onException(() -> {
+            transactionBuffer.addToBuffer(containerStore, id, oldInfo);
+            containers.updateState(id, newState, oldState);
+          }).execute();
+          containerStateChangeActions.getOrDefault(event, info -> { })
+              .accept(oldInfo);
+        }
+      }
+    }
+  }
+
   @Override
   public void updateContainerStateWithSequenceId(final HddsProtos.ContainerID containerID,
                                                   final LifeCycleEvent event,
                                                   final Long sequenceId)
-      throws IOException, InvalidStateTransitionException {
+      throws IOException {
     // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
@@ -404,10 +435,11 @@ public final class ContainerStateManagerImpl
           LOG.warn("Container sequenceId is {} greater than the leader container sequenceId {}",
               containerInfo.getSequenceId(), sequenceId);
         }
-        
+
         final LifeCycleState oldState = containerInfo.getState();
         final LifeCycleState newState = stateMachine.getNextState(
             oldState, event);
+
         if (newState.getNumber() > oldState.getNumber()) {
           ExecutionUtil.create(() -> {
             containers.updateState(id, oldState, newState);
@@ -423,6 +455,9 @@ public final class ContainerStateManagerImpl
               .accept(containerInfo);
         }
       }
+    } catch (InvalidStateTransitionException e) {
+      LOG.warn("Failed to updateContainerStateWithSequenceId for container {} at sequenceId {}, ignoring it.",
+          id, sequenceId, e);
     }
   }
 
@@ -481,28 +516,6 @@ public final class ContainerStateManagerImpl
       // replica.
       containerReplicaPendingOps.completeDeleteReplica(id,
           replica.getDatanodeDetails(), replica.getReplicaIndex());
-    }
-  }
-
-  @Override
-  public void updateDeleteTransactionId(
-      final Map<ContainerID, Long> deleteTransactionMap) throws IOException {
-
-    // TODO: Refactor this. Error handling is not done.
-    for (Map.Entry<ContainerID, Long> transaction :
-        deleteTransactionMap.entrySet()) {
-      ContainerID containerID = transaction.getKey();
-      try (AutoCloseableLock ignored = writeLock(containerID)) {
-        final ContainerInfo info = containers.getContainerInfo(
-            transaction.getKey());
-        if (info == null) {
-          LOG.warn("Cannot find container {}, transaction id is {}",
-              transaction.getKey(), transaction.getValue());
-          continue;
-        }
-        info.updateDeleteTransactionId(transaction.getValue());
-        transactionBuffer.addToBuffer(containerStore, info.containerID(), info);
-      }
     }
   }
 

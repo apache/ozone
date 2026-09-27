@@ -120,7 +120,7 @@ public class TestOmMultipartKeyInfo {
   @Test
   public void addPartKeyInfoRejectsSchemaVersionOne() {
     OmMultipartKeyInfo subject = createSubject()
-        .setSchemaVersion((byte) 1)
+        .setSchemaVersion(1)
         .build();
 
     assertThrows(IllegalStateException.class,
@@ -128,7 +128,7 @@ public class TestOmMultipartKeyInfo {
   }
 
   @Test
-  public void getProtoRejectsLegacyPartListForSchemaVersionOne() {
+  public void getProtoRejectsPartListForSchemaVersionOne() {
     PartKeyInfo part = createPart(createKeyInfo()).build();
     TreeMap<Integer, PartKeyInfo> legacyMap = new TreeMap<>();
     legacyMap.put(part.getPartNumber(), part);
@@ -136,13 +136,29 @@ public class TestOmMultipartKeyInfo {
     OmMultipartKeyInfo subject = new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())
         .setCreationTime(Time.now())
-        .setSchemaVersion((byte) 1)
+        .setSchemaVersion(1)
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(
             HddsProtos.ReplicationFactor.ONE))
         .setPartKeyInfoList(legacyMap)
         .build();
 
     assertThrows(IllegalStateException.class, subject::getProto);
+  }
+
+  @Test
+  public void builderFromProtoRejectsUnsupportedSchemaVersion() {
+    OmMultipartKeyInfo subject = createSubject()
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE))
+        .build();
+
+    OzoneManagerProtocolProtos.MultipartKeyInfo invalidProto = subject.getProto()
+        .toBuilder()
+        .setSchemaVersion(256)
+        .build();
+
+    assertThrows(IllegalArgumentException.class,
+        () -> OmMultipartKeyInfo.getFromProto(invalidProto));
   }
 
   private static OmMultipartKeyInfo.Builder createSubject() {

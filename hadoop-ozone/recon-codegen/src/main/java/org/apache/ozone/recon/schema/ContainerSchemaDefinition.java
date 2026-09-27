@@ -17,6 +17,8 @@
 
 package org.apache.ozone.recon.schema;
 
+import static java.util.Collections.unmodifiableList;
+import static java.util.stream.Collectors.toList;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
@@ -25,6 +27,8 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.List;
 import javax.sql.DataSource;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
@@ -78,7 +82,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
             .primaryKey(CONTAINER_ID, CONTAINER_STATE))
         .constraint(DSL.constraint(UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
             .check(field(name(CONTAINER_STATE))
-                .in(UnHealthyContainerStates.values())))
+                .in(UnHealthyContainerStates.NAMES)))
         .execute();
     // Composite index (container_state, container_id) serves two query patterns:
     //
@@ -121,6 +125,10 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     MIS_REPLICATED,
     ALL_REPLICAS_BAD,
     NEGATIVE_SIZE, // Added new state to track containers with negative sizes
-    REPLICA_MISMATCH
+    REPLICA_MISMATCH;
+
+    public static final List<String> NAMES = unmodifiableList(Arrays.stream(values())
+        .map(Enum::toString)
+        .collect(toList()));
   }
 }

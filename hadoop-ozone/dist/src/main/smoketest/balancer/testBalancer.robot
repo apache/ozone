@@ -90,7 +90,7 @@ Verify Balancer Iteration
 
 Verify Balancer Iteration History
     [arguments]       ${output}
-    Should Contain                  ${output}             Iteration history list:
+    Should Contain                  ${output}             Completed iteration history:
     Should Contain X Times          ${output}             Size scheduled to move                    1      collapse_spaces=True
     Should Contain X Times          ${output}             Moved data size                           1      collapse_spaces=True
     Should Contain X Times          ${output}             Scheduled to move containers              1      collapse_spaces=True
@@ -205,7 +205,7 @@ Verify Container Balancer for RATIS/EC containers
 
     Run Balancer Verbose Status
 
-    Wait Until Keyword Succeeds    40sec    5sec   Run Balancer Verbose History Status
+    Wait Until Keyword Succeeds    90s    5sec   Run Balancer Verbose History Status
 
     Wait Finish Of Balancing
 

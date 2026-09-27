@@ -38,7 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.bucket.TestBucketRequest;
+import org.apache.hadoop.ozone.om.request.bucket.BucketRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
@@ -54,7 +54,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests for {@link S3DeleteBucketTaggingRequest}.
  */
-public class TestS3DeleteBucketTaggingRequest extends TestBucketRequest {
+public class TestS3DeleteBucketTaggingRequest extends BucketRequestTests {
 
   private String volumeName;
   private String bucketName;

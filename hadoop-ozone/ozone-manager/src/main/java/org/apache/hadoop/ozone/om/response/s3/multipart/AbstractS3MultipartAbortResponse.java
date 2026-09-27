@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartAbortInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -74,30 +75,52 @@ public abstract class AbstractS3MultipartAbortResponse extends OmKeyResponse {
 
       OmMultipartKeyInfo omMultipartKeyInfo = abortInfo
           .getOmMultipartKeyInfo();
-      // Move all the parts to delete table
-      for (PartKeyInfo partKeyInfo: omMultipartKeyInfo.getPartKeyInfoMap()) {
-        OmKeyInfo currentKeyPartInfo =
-            OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+      if (omMultipartKeyInfo.getSchemaVersion()
+          == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
+        // Move all the parts to delete table
+        for (PartKeyInfo partKeyInfo: omMultipartKeyInfo.getPartKeyInfoMap()) {
+          OmKeyInfo currentKeyPartInfo =
+              OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
 
-        // TODO: Similar to open key deletion response, we can check if the
-        //  MPU part actually contains blocks, and only move the to
-        //  deletedTable if it does.
+          // TODO: Similar to open key deletion response, we can check if the
+          //  MPU part actually contains blocks, and only move the to
+          //  deletedTable if it does.
 
-        RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(omBucketInfo.getObjectID(),
-            currentKeyPartInfo, omMultipartKeyInfo.getUpdateID());
+          addPartToDeletedTable(omMetadataManager, batchOperation,
+              omBucketInfo, abortInfo, currentKeyPartInfo,
+              omMultipartKeyInfo.getUpdateID());
+        }
+      } else {
+        for (OmKeyInfo currentKeyPartInfo :
+            abortInfo.getPartsKeyInfoToDelete()) {
+          addPartToDeletedTable(omMetadataManager, batchOperation,
+              omBucketInfo, abortInfo, currentKeyPartInfo,
+              omMultipartKeyInfo.getUpdateID());
+        }
 
-        // multi-part key format is volumeName/bucketName/keyName/uploadId
-        String deleteKey = omMetadataManager.getOzoneDeletePathKey(
-            currentKeyPartInfo.getObjectID(), abortInfo.getMultipartKey());
-
-        omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-            deleteKey, repeatedOmKeyInfo);
+        for (OmMultipartPartKey partKey :
+            abortInfo.getPartsTableKeysToDelete()) {
+          omMetadataManager.getMultipartPartsTable().deleteWithBatch(
+              batchOperation, partKey);
+        }
       }
     }
     // update bucket usedBytes.
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
+  }
+
+  private void addPartToDeletedTable(OMMetadataManager omMetadataManager,
+      BatchOperation batchOperation, OmBucketInfo omBucketInfo,
+      OmMultipartAbortInfo abortInfo, OmKeyInfo currentKeyPartInfo,
+      long updateID) throws IOException {
+    RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+        omBucketInfo.getObjectID(), currentKeyPartInfo, updateID);
+    String deleteKey = omMetadataManager.getOzoneDeletePathKey(
+        currentKeyPartInfo.getObjectID(), abortInfo.getMultipartKey());
+    omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
+        deleteKey, repeatedOmKeyInfo);
   }
 
   /**

@@ -43,6 +43,10 @@ abstract class RDBStoreAbstractIterator<RAW>
   private final RAW prefix;
   private final IteratorType type;
   private final AtomicBoolean isIteratorClosed = new AtomicBoolean(false);
+  // Defer positioning until the first iterator operation. Explicit positioning
+  // avoids a redundant seek, while ordinary iteration still starts at the table
+  // or prefix start through initializeIfNeeded().
+  private boolean initialized;
 
   /**
    * Constructor for RDBStoreAbstractIterator.
@@ -107,17 +111,27 @@ abstract class RDBStoreAbstractIterator<RAW>
     }
   }
 
+  private void initializeIfNeeded() {
+    if (!initialized) {
+      // Preserve the original start position for callers that iterate without
+      // explicitly positioning the iterator.
+      seekToFirst();
+    }
+  }
+
   @Override
   public final boolean hasNext() {
     if (isDbClosed()) {
       return false;
     }
+    initializeIfNeeded();
     return rocksDBIterator.get().isValid() &&
         (prefix == null || startsWithPrefix(key()));
   }
 
   @Override
   public final Table.KeyValue<RAW, RAW> next() {
+    initializeIfNeeded();
     setCurrentEntry();
     if (currentEntry != null) {
       rocksDBIterator.get().next();
@@ -133,6 +147,7 @@ abstract class RDBStoreAbstractIterator<RAW>
     } else {
       seek0(prefix);
     }
+    initialized = true;
     setCurrentEntry();
   }
 
@@ -143,12 +158,14 @@ abstract class RDBStoreAbstractIterator<RAW>
     } else {
       throw new UnsupportedOperationException("seekToLast: prefix != null");
     }
+    initialized = true;
     setCurrentEntry();
   }
 
   @Override
   public final Table.KeyValue<RAW, RAW> seek(RAW key) {
     seek0(key);
+    initialized = true;
     setCurrentEntry();
     return currentEntry;
   }
@@ -158,6 +175,7 @@ abstract class RDBStoreAbstractIterator<RAW>
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
+    initializeIfNeeded();
     if (currentEntry != null) {
       delete(currentEntry.getKey());
     } else {

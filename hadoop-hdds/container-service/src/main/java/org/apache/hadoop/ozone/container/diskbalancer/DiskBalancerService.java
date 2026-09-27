@@ -851,16 +851,21 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     if (stateChanged) {
+      DiskBalancerRunningStatus newOperationalState = this.operationalState;
       LOG.info("DiskBalancer operational state changed from {} to {} due to Datanode state update . Persisting.",
-          originalServiceState, this.operationalState);
+          originalServiceState, newOperationalState);
       try {
         writeDiskBalancerInfoTo(getDiskBalancerInfo(), diskBalancerInfoFile);
       } catch (IOException e) {
-        LOG.error("Failed to persist DiskBalancerInfo after state change in nodeStateUpdated. " +
-            "Reverting operational state to {} to maintain consistency.", originalServiceState, e);
-        // Revert state on persistence error to keep in-memory state consistent with last known persisted state.
-        this.operationalState = originalServiceState;
-        LOG.warn("DiskBalancer operational state reverted to {} due to persistence failure.", this.operationalState);
+        if (newOperationalState == DiskBalancerRunningStatus.PAUSED) {
+          LOG.error("Failed to persist DiskBalancerInfo after pausing DiskBalancer due to " +
+              "Datanode state update. Retaining in-memory PAUSED state for safety.", e);
+        } else {
+          LOG.error("Failed to persist DiskBalancerInfo after state change in nodeStateUpdated. " +
+              "Reverting operational state to {} to maintain consistency.", originalServiceState, e);
+          // Revert state on persistence error to keep in-memory state consistent with last known persisted state.
+          this.operationalState = originalServiceState;
+        }
       }
     }
   }
