@@ -160,6 +160,21 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     return readFully(targetBuf, true);
   }
 
+  @Override
+  protected synchronized int readPositioned(long offset, ByteBuffer buffer) throws IOException {
+    checkOpen();
+    if (offset >= blockLength) {
+      return EOF;
+    }
+    final long oldPosition = position;
+    try {
+      seek(offset);
+      return readFully(buffer, false);
+    } finally {
+      seek(oldPosition);
+    }
+  }
+
   synchronized int readFully(ByteBuffer targetBuf, boolean preRead) throws IOException {
     checkOpen();
     int read = 0;

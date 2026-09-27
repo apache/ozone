@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.ozone.DataTestUtil;
@@ -111,6 +112,27 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
   @AfterAll
   void shutdown() {
     closeQuietly(client, ecFs);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testConcurrentPositionedRead(boolean streaming) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
+    conf.setBoolean("ozone.client.stream.readblock.enable", streaming);
+    try (FileSystem fs = FileSystem.newInstance(URI.create(uri), conf);
+         FSDataInputStream stream = fs.open(filePath)) {
+      stream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(data, (offset, buffer) -> {
+        if ((offset & 1) == 0) {
+          stream.readFully(offset, buffer);
+        } else {
+          byte[] bytes = new byte[buffer.remaining()];
+          stream.readFully(offset, bytes);
+          buffer.put(bytes);
+        }
+      });
+      assertEquals(123, stream.getPos());
+    }
   }
 
   @ParameterizedTest

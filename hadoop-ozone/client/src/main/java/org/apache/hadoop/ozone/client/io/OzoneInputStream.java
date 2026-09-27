@@ -20,15 +20,18 @@ package org.apache.hadoop.ozone.client.io;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
+import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 
 /**
  * OzoneInputStream is used to read data from Ozone.
  * It uses {@link KeyInputStream} for reading the data.
  */
-public class OzoneInputStream extends InputStream implements CanUnbuffer,
+public class OzoneInputStream extends ExtendedInputStream implements CanUnbuffer,
     ByteBufferReadable, Seekable {
 
   private final InputStream inputStream;
@@ -64,6 +67,19 @@ public class OzoneInputStream extends InputStream implements CanUnbuffer,
       throw new UnsupportedOperationException("Read with ByteBuffer is not " +
           " supported by " + inputStream.getClass().getName());
     }
+  }
+
+  @Override
+  protected int readWithStrategy(ByteReaderStrategy strategy) throws IOException {
+    return strategy.readFromBlock(inputStream, strategy.getTargetLength());
+  }
+
+  @Override
+  protected int readPositioned(long position, ByteBuffer buffer) throws IOException {
+    if (inputStream instanceof ByteBufferPositionedReadable) {
+      return ((ByteBufferPositionedReadable) inputStream).read(position, buffer);
+    }
+    return super.readPositioned(position, buffer);
   }
 
   @Override

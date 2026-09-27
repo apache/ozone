@@ -44,6 +44,7 @@ import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.Decryptor;
+import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.fs.StreamCapabilities;
@@ -51,6 +52,7 @@ import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
@@ -292,6 +294,54 @@ public class TestOzoneFSInputStream {
     }
   }
 
+  @Test
+  void positionedReadDelegatesThroughWrappersAndCountsBytesOnce() throws Exception {
+    byte[] source = RandomUtils.secure().randomBytes(32);
+    for (boolean nativeRead : new boolean[] {false, true}) {
+      FileSystem.Statistics statistics = new FileSystem.Statistics("test");
+      InputStream input = nativeRead ? new OzoneInputStream(new NativePositionedInputStream(source))
+          : new SeekableOnlyInputStream(source);
+      try (OzoneFSInputStream stream = new OzoneFSInputStream(input, statistics)) {
+        byte[] result = new byte[12];
+        stream.readFully(3, result, 2, 7);
+        assertArrayEquals(Arrays.copyOfRange(source, 3, 10), Arrays.copyOfRange(result, 2, 9));
+        assertEquals(7, statistics.getBytesRead());
+        ByteBuffer destination = ByteBuffer.wrap(result, 2, 7).slice();
+        assertEquals(3, stream.read(29, destination));
+        assertArrayEquals(Arrays.copyOfRange(source, 29, 32), Arrays.copyOfRange(result, 2, 5));
+        assertEquals(10, statistics.getBytesRead());
+        assertEquals(-1, stream.read(32, ByteBuffer.allocateDirect(1)));
+        assertThrows(EOFException.class, () -> stream.readFully(31, ByteBuffer.allocateDirect(2)));
+        assertEquals(11, statistics.getBytesRead());
+      }
+    }
+  }
+
+  private static final class NativePositionedInputStream extends ByteArrayInputStream
+      implements ByteBufferPositionedReadable {
+    private NativePositionedInputStream(byte[] data) {
+      super(data);
+    }
+
+    @Override
+    public int read(long position, ByteBuffer destination) {
+      if (position >= count) {
+        return -1;
+      }
+      int n = Math.min(destination.remaining(), count - (int) position);
+      destination.put(buf, (int) position, n);
+      return n;
+    }
+
+    @Override
+    public void readFully(long position, ByteBuffer destination) throws IOException {
+      int length = destination.remaining();
+      if (read(position, destination) < length) {
+        throw new EOFException();
+      }
+    }
+  }
+
   /**
    * Mimics KeyInputStream synchronized per-operation seek/read where multi-steps
    * positioned reads must still be serialized at the FS layer.
@@ -332,9 +382,7 @@ public class TestOzoneFSInputStream {
   }
 
   /**
-   * Mimics an erasure-coded key stream: {@link ExtendedInputStream#readFully}
-   * returns {@code false}, so {@link OzoneFSInputStream} falls back to
-   * seek-read-restore on the shared cursor.
+   * Mimics an erasure-coded key stream using ExtendedInputStream's synchronized positioned-read fallback.
    */
   private static final class EcInterleavingInputStream extends ExtendedInputStream {
 
