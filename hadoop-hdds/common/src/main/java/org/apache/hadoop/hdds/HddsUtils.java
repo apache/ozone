@@ -561,6 +561,8 @@ public final class HddsUtils {
       }
       break;
     case WriteChunk:
+    case StreamInit:
+    case StreamInitWithPutBlock:
       if (msg.hasWriteChunk()) {
         blockID = msg.getWriteChunk().getBlockID();
       }

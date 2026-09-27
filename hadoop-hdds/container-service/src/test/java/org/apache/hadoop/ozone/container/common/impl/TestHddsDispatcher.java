@@ -557,6 +557,16 @@ public class TestHddsDispatcher {
     StorageContainerException exception = assertThrows(StorageContainerException.class,
         () -> dispatcher.validateContainerCommand(requestWithInvalidStorageType));
     assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, exception.getResult());
+
+    for (ContainerProtos.Type type : Arrays.asList(ContainerProtos.Type.StreamInit,
+        ContainerProtos.Type.StreamInitWithPutBlock)) {
+      ContainerCommandRequestProto streamRequest = requestWithInvalidStorageType.toBuilder()
+          .setCmdType(type).build();
+      assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, dispatcher.dispatch(streamRequest, null).getResult());
+      StorageContainerException streamException = assertThrows(StorageContainerException.class,
+          () -> dispatcher.validateContainerCommand(streamRequest));
+      assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, streamException.getResult());
+    }
   }
 
   @Test
@@ -587,6 +597,14 @@ public class TestHddsDispatcher {
     assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, response.getResult());
     assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
         dispatcher.getContainer(1L).getContainerData().getState());
+
+    for (ContainerProtos.Type type : Arrays.asList(ContainerProtos.Type.StreamInit,
+        ContainerProtos.Type.StreamInitWithPutBlock)) {
+      ContainerCommandRequestProto streamRequest = requestWithInvalidStorageType.toBuilder().setCmdType(type).build();
+      assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, dispatcher.dispatch(streamRequest, null).getResult());
+      assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
+          dispatcher.getContainer(1L).getContainerData().getState());
+    }
   }
 
   @Test
@@ -619,6 +637,55 @@ public class TestHddsDispatcher {
     assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, writeChunkResponse.getResult());
     assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
         dispatcher.getContainer(1L).getContainerData().getState());
+  }
+
+  @Test
+  public void testWriteChunkWithInvalidEmbeddedBlockHasNoSideEffects() throws IOException {
+    File diskVolume = Files.createTempDirectory(tempDir, "disk").toFile();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, diskVolume.getAbsolutePath());
+    DatanodeDetails dd = randomDatanodeDetails();
+    HddsDispatcher dispatcher = createDispatcher(dd, UUID.randomUUID(), conf);
+
+    ContainerCommandRequestProto createRequest = getWriteChunkRequest(dd.getUuidString(), 1L, 1L, null);
+    assertEquals(ContainerProtos.Result.SUCCESS, dispatcher.dispatch(createRequest, null).getResult());
+
+    ContainerCommandRequestProto writeRequest = getWriteChunkRequest(dd.getUuidString(), 1L, 2L,
+        HddsProtos.StorageTypeProto.DISK);
+    ContainerProtos.DatanodeBlockID outerID = writeRequest.getWriteChunk().getBlockID();
+    ContainerProtos.PutBlockRequestProto putBlock =
+        ContainerTestHelper.getPutBlockRequest(writeRequest).getPutBlock();
+    ContainerProtos.DatanodeBlockID[] embeddedIDs = {
+        outerID.toBuilder().setStorageTypeID(HddsProtos.StorageTypeProto.SSD.getNumber()).build(),
+        outerID.toBuilder().setStorageTypeID(999).build(),
+        outerID.toBuilder().setLocalID(3L).build(),
+        outerID
+    };
+    ContainerProtos.DatanodeBlockID[] outerIDs = {
+        outerID, outerID, outerID,
+        outerID.toBuilder().setStorageTypeID(HddsProtos.StorageTypeProto.SSD.getNumber()).build()
+    };
+
+    for (int i = 0; i < embeddedIDs.length; i++) {
+      ContainerProtos.BlockData embeddedBlock =
+          putBlock.getBlockData().toBuilder().setBlockID(embeddedIDs[i]).build();
+      ContainerCommandRequestProto request = writeRequest.toBuilder()
+          .setWriteChunk(writeRequest.getWriteChunk().toBuilder()
+              .setBlockID(outerIDs[i])
+              .setBlock(putBlock.toBuilder().setBlockData(embeddedBlock).setEof(true)))
+          .build();
+
+      assertEquals(ContainerProtos.Result.INVALID_ARGUMENT,
+          dispatcher.dispatch(request, null).getResult());
+      assertEquals(ContainerProtos.Result.UNABLE_TO_FIND_CHUNK,
+          dispatcher.dispatch(getReadChunkRequest(writeRequest), null).getResult());
+      ContainerCommandResponseProto listBlocks = dispatcher.dispatch(
+          ContainerTestHelper.getListBlockRequest(writeRequest), null);
+      assertEquals(ContainerProtos.Result.SUCCESS, listBlocks.getResult());
+      assertEquals(0, listBlocks.getListBlock().getBlockDataCount());
+      assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
+          dispatcher.getContainer(1L).getContainerData().getState());
+    }
   }
 
   private void assertContainerDoNotExist(HddsDispatcher hddsDispatcher,

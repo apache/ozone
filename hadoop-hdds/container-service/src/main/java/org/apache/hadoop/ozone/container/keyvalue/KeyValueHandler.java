@@ -1117,6 +1117,7 @@ public class KeyValueHandler extends Handler {
       WriteChunkRequestProto writeChunk = request.getWriteChunk();
       BlockID blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
       BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockID);
+      BlockData blockData = validateWriteChunkBlockData(writeChunk, kvContainer, blockID);
       ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
 
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
@@ -1140,8 +1141,6 @@ public class KeyValueHandler extends Handler {
       if (isCommit && writeChunk.hasBlock()) {
         long startTime = Time.monotonicNowNanos();
         metrics.incContainerOpsMetrics(Type.PutBlock);
-        BlockData blockData = BlockData.getFromProtoBuf(
-            writeChunk.getBlock().getBlockData());
         // optimization for hsync when WriteChunk is in commit phase:
         //
         // block metadata is piggybacked in the same message.
@@ -1176,6 +1175,24 @@ public class KeyValueHandler extends Handler {
 
     updateRecoveringContainerTimeout(kvContainer);
     return getWriteChunkResponseSuccess(request, blockDataProto);
+  }
+
+  private static BlockData validateWriteChunkBlockData(WriteChunkRequestProto writeChunk,
+      KeyValueContainer kvContainer, BlockID blockID) throws IOException {
+    if (!writeChunk.hasBlock()) {
+      return null;
+    }
+    final BlockData blockData;
+    try {
+      blockData = BlockData.getFromProtoBuf(writeChunk.getBlock().getBlockData());
+    } catch (IllegalArgumentException ex) {
+      throw new StorageContainerException(ex.getMessage(), ex, INVALID_ARGUMENT);
+    }
+    BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockData.getBlockID());
+    if (!blockID.getContainerBlockID().equals(blockData.getBlockID().getContainerBlockID())) {
+      throw new StorageContainerException("WriteChunk and PutBlock have different block IDs", INVALID_ARGUMENT);
+    }
+    return blockData;
   }
 
   private void updateRecoveringContainerTimeout(KeyValueContainer kvContainer) {
