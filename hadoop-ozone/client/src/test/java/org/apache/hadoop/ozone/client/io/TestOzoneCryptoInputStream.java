@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -44,8 +45,10 @@ import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.Encryptor;
+import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.PositionedReadable;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
 import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -104,8 +107,7 @@ public class TestOzoneCryptoInputStream {
 
   @Test
   void testPositionedReadCrossesBufferBoundary() throws Exception {
-    // The crypto buffer is 8 KB by default; read crossing that boundary exercises
-    // the position/length adjustment logic in OzoneCryptoInputStream.read(byte[], int, int).
+    // The positioned decryptor must handle an unaligned range across crypto buffers.
     byte[] plaintext = RandomUtils.secure().randomBytes(32 * 1024);
     try (OzoneCryptoInputStream s = buildStream(plaintext)) {
       // Start 100 bytes before the 8 KB boundary
@@ -319,11 +321,7 @@ public class TestOzoneCryptoInputStream {
   @Test
   @Timeout(value = 30)
   void testConcurrentSkipAndPositionedRead() throws Exception {
-    // Verifies that skip() is serialized on the same monitor as positioned reads.
-    // Half the threads continuously seek-then-skip (cursor-moving sequential ops).
-    // The other half do positioned readFully and assert correctness. If skip() could
-    // slip between the positioned read's internal seek and read, the read would
-    // consume data from the wrong offset and assertArrayEquals would fail.
+    // Sequential cursor changes must not affect positioned decryption.
     byte[] plaintext = RandomUtils.secure().randomBytes(SOURCE_SIZE);
     try (OzoneCryptoInputStream s = buildStream(plaintext)) {
       ExecutorService pool = Executors.newFixedThreadPool(THREAD_COUNT);
@@ -392,8 +390,7 @@ public class TestOzoneCryptoInputStream {
   @Test
   @Timeout(value = 30)
   void testConcurrentPositionedReadsMixedApi() throws Exception {
-    // Intermix ByteBuffer and byte-array callers on the same stream to verify
-    // both APIs share the same monitor and do not interleave.
+    // Intermix ByteBuffer and byte-array callers on the same stream.
     byte[] plaintext = RandomUtils.secure().randomBytes(SOURCE_SIZE);
     try (OzoneCryptoInputStream s = buildStream(plaintext)) {
       PositionedReadTestHelper.runConcurrentPositionedReads(plaintext, (offset, buf) -> {
@@ -408,19 +405,60 @@ public class TestOzoneCryptoInputStream {
     }
   }
 
+  @Test
+  @Timeout(30)
+  void positionedReadsOverlapAcrossEncryptedParts() throws Exception {
+    byte[] plaintext = RandomUtils.secure().randomBytes(SOURCE_SIZE);
+    int split = SOURCE_SIZE / 2 + 7;
+    CyclicBarrier reads = new CyclicBarrier(2);
+    try (MultipartInputStream stream = new MultipartInputStream(KEY_NAME, Arrays.asList(
+        buildStream(Arrays.copyOf(plaintext, split), reads),
+        buildStream(Arrays.copyOfRange(plaintext, split, plaintext.length), reads)))) {
+      stream.seek(777);
+      ExecutorService pool = Executors.newFixedThreadPool(2);
+      try {
+        List<Future<?>> futures = new ArrayList<>();
+        for (int offset : new int[] {split - 101, split - 203}) {
+          futures.add(pool.submit((Callable<Void>) () -> {
+            ByteBuffer destination = ByteBuffer.allocateDirect(20000);
+            destination.position(3);
+            stream.readFully(offset, destination);
+            destination.flip();
+            destination.position(3);
+            assertArrayEquals(Arrays.copyOfRange(plaintext, offset, offset + 19997), toArray(destination));
+            return null;
+          }));
+        }
+        for (Future<?> future : futures) {
+          future.get(20, TimeUnit.SECONDS);
+        }
+        assertEquals(777, stream.getPos());
+        byte[] sequential = new byte[97];
+        assertEquals(sequential.length, stream.read(sequential));
+        assertArrayEquals(Arrays.copyOfRange(plaintext, 777, 874), sequential);
+      } finally {
+        pool.shutdownNow();
+      }
+    }
+  }
+
   /**
    * Encrypts {@code plaintext} with the shared key/IV, wraps it in a
    * {@link SeekableByteArrayInputStream}, and returns a ready-to-use
    * {@link OzoneCryptoInputStream}.
    */
   private static OzoneCryptoInputStream buildStream(byte[] plaintext) throws Exception {
+    return buildStream(plaintext, null);
+  }
+
+  private static OzoneCryptoInputStream buildStream(byte[] plaintext, CyclicBarrier reads) throws Exception {
     Encryptor enc = codec.createEncryptor();
     enc.init(key, iv);
     ByteBuffer plain = ByteBuffer.wrap(plaintext);
     ByteBuffer cipher = ByteBuffer.allocate(plaintext.length);
     enc.encrypt(plain, cipher);
 
-    SeekableByteArrayInputStream raw = new SeekableByteArrayInputStream(cipher.array());
+    SeekableByteArrayInputStream raw = new SeekableByteArrayInputStream(cipher.array(), reads);
     LengthInputStream lin = new LengthInputStream(raw, plaintext.length);
     return new OzoneCryptoInputStream(lin, codec, key, iv, KEY_NAME, PART_INDEX);
   }
@@ -436,13 +474,15 @@ public class TestOzoneCryptoInputStream {
    * Used to feed ciphertext into {@link OzoneCryptoInputStream} in tests.
    */
   private static final class SeekableByteArrayInputStream extends InputStream
-      implements Seekable, PositionedReadable {
+      implements Seekable, PositionedReadable, ByteBufferPositionedReadable {
 
     private final byte[] data;
+    private final CyclicBarrier reads;
     private volatile int pos;
 
-    SeekableByteArrayInputStream(byte[] data) {
+    SeekableByteArrayInputStream(byte[] data, CyclicBarrier reads) {
       this.data = data;
+      this.reads = reads;
     }
 
     @Override
@@ -477,6 +517,31 @@ public class TestOzoneCryptoInputStream {
     @Override
     public boolean seekToNewSource(long targetPos) {
       return false;
+    }
+
+    @Override
+    public int read(long position, ByteBuffer destination) throws IOException {
+      if (reads != null) {
+        try {
+          reads.await(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+          throw new IOException("Positioned reads did not overlap", e);
+        }
+      }
+      if (position >= data.length) {
+        return -1;
+      }
+      int n = Math.min(destination.remaining(), data.length - (int) position);
+      destination.put(data, (int) position, n);
+      return n;
+    }
+
+    @Override
+    public void readFully(long position, ByteBuffer destination) throws IOException {
+      int n = destination.remaining();
+      if (read(position, destination) < n) {
+        throw new EOFException();
+      }
     }
 
     @Override
