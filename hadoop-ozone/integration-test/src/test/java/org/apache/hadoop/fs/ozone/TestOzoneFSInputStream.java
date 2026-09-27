@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -55,6 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -112,6 +114,20 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
   @AfterAll
   void shutdown() {
     closeQuietly(client, ecFs);
+  }
+
+  @Test
+  void testConcurrentECPositionedRead() throws Exception {
+    Path path = new Path("/concurrent-ec-reads");
+    byte[] expected = Arrays.copyOf(data, 7 * 1024 * 1024 + 103);
+    try (FSDataOutputStream output = ecFs.create(path)) {
+      output.write(expected);
+    }
+    try (FSDataInputStream stream = ecFs.open(path)) {
+      stream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(expected, stream::readFully);
+      assertEquals(123, stream.getPos());
+    }
   }
 
   @ParameterizedTest
