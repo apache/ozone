@@ -1127,8 +1127,14 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     }
   }
 
+  /**
+   * Writes the source object content to the destination key. When {@code reusedETag} is null the
+   * MD5 digest {@code src} computes during the copy becomes the destination ETag; otherwise
+   * {@code reusedETag} is stored as-is and {@code src} has digesting switched off, so the content
+   * is not re-hashed.
+   */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  CopyResult copy(OzoneVolume volume, DigestInputStream src, long srcKeyLen,
+  CopyResult copy(OzoneVolume volume, DigestInputStream src, String reusedETag, long srcKeyLen,
       String destKey, String destBucket,
       ReplicationConfig replication,
       Map<String, String> metadata,
@@ -1145,7 +1151,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       perf.appendStreamMode();
       final CopyResult copyResult = ObjectEndpointStreaming
           .copyKeyWithStream(volume.getBucket(destBucket), destKey, srcKeyLen,
-              getChunkSize(), replication, metadata, src, perf, startNanos, tags,
+              getChunkSize(), replication, metadata, src, reusedETag, perf, startNanos, tags,
               writeConditions);
       eTag = copyResult.getETag();
       copyLength = copyResult.getSize();
@@ -1160,7 +1166,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         copyLength = dest.copyFrom(src, getIOBufferSize(expectedLength));
-        eTag = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
+        eTag = reusedETag != null ? reusedETag
+            : DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
         dest.getMetadata().put(OzoneConsts.ETAG, eTag);
       }
       modificationTime = destStream.getModificationTime();
@@ -1269,12 +1276,24 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         throw ex;
       }
 
+      // A whole-object copy writes byte-identical content, so a plain (non-multipart) MD5 ETag
+      // stored on the source is also the correct content MD5 for the destination and the data does
+      // not need to be re-hashed during the copy. An aggregate "-N" ETag of an MPU-created source
+      // is not a content MD5, so a fresh digest is still computed for it.
+      final String sourceETag = sourceKeyDetails.getMetadata().get(OzoneConsts.ETAG);
+      final String reusedETag = StringUtils.isNotEmpty(sourceETag) && !sourceETag.contains("-")
+          ? stripQuotes(sourceETag) : null;
+
       try (OzoneInputStream src = runWithS3ActionString(
               "GetObject", () -> getClientProtocol().getKey(volume.getName(), sourceBucket, sourceKey));
            DigestInputStream sourceDigestInputStream = new DigestInputStream(src, md5Digest)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
+        if (reusedETag != null) {
+          // Nothing reads the digest in this case, so do not hash the copied bytes at all.
+          sourceDigestInputStream.on(false);
+        }
         final CopyResult copyResult = runWithS3ActionString("PutObject", () ->
-            copy(volume, sourceDigestInputStream, sourceKeyLen, destkey, destBucket,
+            copy(volume, sourceDigestInputStream, reusedETag, sourceKeyLen, destkey, destBucket,
               replicationConfig, customMetadata, perf, startNanos, tags, writeConditions));
 
         getMetrics().updateCopyObjectSuccessStats(startNanos);

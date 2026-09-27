@@ -64,6 +64,11 @@ import picocli.CommandLine.Command;
  * </pre>
  *
  * <p>DESCRIPTION
+ * <p>The estimate subcommand fetches datanode usage from SCM and estimates from
+ * local configurations, profile presets and cluster analysis made. It does not start the balancer. Start does not yet
+ * support {@code --profile}, compare estimate profiles to the config you plan
+ * to pass on start, or wait until profile support is added to start.
+ * estimate subcommand produces upper-bound estimates.
  * <p>The threshold parameter is a fraction in the range of (1%, 100%) with a
  * default value of 10%. The threshold sets a target for whether the cluster
  * is balanced. A cluster is balanced if for each datanode, the utilization
@@ -88,7 +93,8 @@ import picocli.CommandLine.Command;
         ContainerBalancerStartSubcommand.class,
         ContainerBalancerStopSubcommand.class,
         ContainerBalancerStatusSubcommand.class,
-        ContainerBalancerAssessmentSubcommand.class
+        ContainerBalancerAssessmentSubcommand.class,
+        ContainerBalancerEstimateSubcommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
 public class ContainerBalancerCommands implements AdminSubcommand {

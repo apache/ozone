@@ -26,6 +26,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -120,7 +121,7 @@ public final class ServerUtils {
     InetSocketAddress updatedAddr = new InetSocketAddress(addr.getHostString(),
         listenAddr.getPort());
     conf.set(addressKey,
-        addr.getHostString() + ":" + listenAddr.getPort());
+        HddsUtils.getHostPortString(addr.getHostString(), listenAddr.getPort()));
     return updatedAddr;
   }
 

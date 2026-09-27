@@ -30,36 +30,29 @@ public enum VersionExtractor {
   /**
    * Extracts current metadata layout version.
    */
-  LAYOUT_VERSION_EXTRACTOR {
-    @Override
-    public Versioned extractVersion(OMRequest req, ValidationContext ctx) {
-      LayoutVersionManager layoutVersionManager = ctx.versionManager();
-      return ctx.versionManager().getFeature(layoutVersionManager.getMetadataLayoutVersion());
-    }
-
-    @Override
-    public Class<? extends Annotation> getValidatorClass() {
-      return OMLayoutVersionValidator.class;
-    }
-  },
+  LAYOUT_VERSION_EXTRACTOR,
 
   /**
    * Extracts client version from the OMRequests.
    */
-  CLIENT_VERSION_EXTRACTOR {
-    @Override
-    public Versioned extractVersion(OMRequest req, ValidationContext ctx) {
-      return req.getVersion() > ClientVersion.CURRENT_VERSION ?
-          ClientVersion.FUTURE_VERSION : ClientVersion.fromProtoValue(req.getVersion());
+  CLIENT_VERSION_EXTRACTOR;
+
+  public Versioned extractVersion(OMRequest req, ValidationContext ctx) {
+    return switch (this) {
+    case LAYOUT_VERSION_EXTRACTOR -> {
+      LayoutVersionManager versionManager = ctx.versionManager();
+      yield versionManager.getFeature(versionManager.getMetadataLayoutVersion());
     }
+    case CLIENT_VERSION_EXTRACTOR -> req.getVersion() > ClientVersion.CURRENT_VERSION
+        ? ClientVersion.FUTURE_VERSION
+        : ClientVersion.fromProtoValue(req.getVersion());
+    };
+  }
 
-    @Override
-    public Class<? extends Annotation> getValidatorClass() {
-      return OMClientVersionValidator.class;
-    }
-  };
-
-  public abstract Versioned extractVersion(OMRequest req, ValidationContext ctx);
-
-  public abstract Class<? extends Annotation> getValidatorClass();
+  public Class<? extends Annotation> getValidatorClass() {
+    return switch (this) {
+    case LAYOUT_VERSION_EXTRACTOR -> OMLayoutVersionValidator.class;
+    case CLIENT_VERSION_EXTRACTOR -> OMClientVersionValidator.class;
+    };
+  }
 }

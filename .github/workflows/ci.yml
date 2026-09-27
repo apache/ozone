@@ -213,7 +213,26 @@ jobs:
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
+        exclude:
+          - check: errorprone
       fail-fast: false
+
+  errorprone:
+    needs:
+      - build-info
+      - build
+      - basic
+    if: contains(needs.build-info.outputs.basic-checks, 'errorprone')
+    uses: $/.github/workflows/check.yml
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: true
+      ratis-args: ${{ inputs.ratis_args }}
+      script: errorprone
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 30
 
   dependency:
     needs:
@@ -384,7 +403,7 @@ jobs:
           mkdir -p hadoop-ozone/dist/target
           tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Setup java ${{ env.TEST_JAVA_VERSION }}
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
