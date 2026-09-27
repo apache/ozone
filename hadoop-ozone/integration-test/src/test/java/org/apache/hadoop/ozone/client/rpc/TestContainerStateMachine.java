@@ -23,12 +23,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_I
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -172,6 +170,8 @@ public class TestContainerStateMachine {
     SimpleStateMachineStorage storage =
         (SimpleStateMachineStorage) stateMachine.getStateMachineStorage();
     long lastAppliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();
+    int retainedSnapshots = conf.getObject(RatisServerConfiguration.class)
+        .getNumSnapshotsRetained();
 
     // Write 10 keys. Num snapshots should be equal to config value.
     for (int i = 1; i <= 10; i++) {
@@ -187,18 +187,7 @@ public class TestContainerStateMachine {
       }
     }
 
-    waitForSnapshotAfter(storage, lastAppliedIndex);
-
-    RatisServerConfiguration ratisServerConfiguration =
-        conf.getObject(RatisServerConfiguration.class);
-
-    Path parentPath = getSnapshotPath(storage).getParent();
-    assertThat(parentPath).isNotNull();
-    File[] files = parentPath.toFile().listFiles();
-    assertThat(files).isNotNull();
-    int numSnapshots = files.length;
-    assertThat(Math.abs(ratisServerConfiguration.getNumSnapshotsRetained() - numSnapshots))
-        .isLessThanOrEqualTo(1);
+    waitForSnapshotRetention(storage, lastAppliedIndex, retainedSnapshots);
 
     // Write 10 more keys. Num Snapshots should remain the same.
     lastAppliedIndex = stateMachine.getLastAppliedTermIndex().getIndex();
@@ -214,28 +203,23 @@ public class TestContainerStateMachine {
         key.write(("ratis" + i).getBytes(UTF_8));
       }
     }
-    waitForSnapshotAfter(storage, lastAppliedIndex);
-
-    files = parentPath.toFile().listFiles();
-    assertThat(files).isNotNull();
-    numSnapshots = files.length;
-    assertThat(Math.abs(ratisServerConfiguration.getNumSnapshotsRetained() - numSnapshots))
-        .isLessThanOrEqualTo(1);
+    waitForSnapshotRetention(storage, lastAppliedIndex, retainedSnapshots);
   }
 
-  private static void waitForSnapshotAfter(SimpleStateMachineStorage storage,
-      long index) throws Exception {
-    CheckedSupplier<Boolean, IOException> snapshotAdvanced = () -> {
+  private static void waitForSnapshotRetention(
+      SimpleStateMachineStorage storage, long index, int retainedSnapshots)
+      throws Exception {
+    CheckedSupplier<Boolean, IOException> retentionSatisfied = () -> {
       SingleFileSnapshotInfo snapshot =
           StatemachineImplTestUtil.findLatestSnapshot(storage);
-      return snapshot != null && snapshot.getTermIndex().getIndex() > index;
+      if (snapshot == null || snapshot.getTermIndex().getIndex() <= index) {
+        return false;
+      }
+      File[] files = snapshot.getFile().getPath().getParent().toFile()
+          .listFiles();
+      return files != null
+          && Math.abs(retainedSnapshots - files.length) <= 1;
     };
-    GenericTestUtils.waitFor(snapshotAdvanced, 100, 30_000);
-  }
-
-  static Path getSnapshotPath(SimpleStateMachineStorage storage)
-      throws IOException {
-    return StatemachineImplTestUtil.findLatestSnapshot(storage)
-        .getFile().getPath();
+    GenericTestUtils.waitFor(retentionSatisfied, 100, 30_000);
   }
 }
