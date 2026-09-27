@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import static org.apache.hadoop.util.StringUtils.byteDesc;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,7 +35,6 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import static org.apache.hadoop.util.StringUtils.byteDesc;
 
 /**
  * Orchestrates cluster analysis, estimation and recommendation for container balancer.
