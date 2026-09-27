@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.ratis.util.Preconditions;
 
@@ -41,7 +40,6 @@ public class MultipartInputStream extends ExtendedInputStream {
   // List of PartInputStream, one for each part of the key
   private final List<? extends PartInputStream> partStreams;
   private final boolean isStreamBlockInputStream;
-  private final boolean positionedReadSupported;
 
   // partOffsets[i] stores the index of the first data byte in
   // partStream w.r.t the whole key data.
@@ -72,19 +70,15 @@ public class MultipartInputStream extends ExtendedInputStream {
 
     // Calculate and update the partOffsets
     this.partOffsets = new long[inputStreams.size()];
-    boolean positionedSupported = !inputStreams.isEmpty();
     int i = 0;
     long streamLength = 0L;
     for (PartInputStream partInputStream : inputStreams) {
       this.partOffsets[i++] = streamLength;
       if (isStreamBlockInputStream) {
         Preconditions.assertInstanceOf(partInputStream, StreamBlockInputStream.class);
-      } else if (positionedSupported && !(partInputStream instanceof ByteBufferPositionedReadable)) {
-        positionedSupported = false;
       }
       streamLength += partInputStream.getLength();
     }
-    this.positionedReadSupported = positionedSupported;
     this.length = streamLength;
   }
 
@@ -198,9 +192,6 @@ public class MultipartInputStream extends ExtendedInputStream {
   @Override
   protected int readPositioned(long position, ByteBuffer buffer) throws IOException {
     checkOpen();
-    if (!positionedReadSupported) {
-      return super.readPositioned(position, buffer);
-    }
     long pos = position;
     int bytesRead = 0;
     while (buffer.hasRemaining() && pos < length) {
@@ -211,7 +202,7 @@ public class MultipartInputStream extends ExtendedInputStream {
       final int n;
       try {
         buffer.limit(buffer.position() + (int) Math.min(buffer.remaining(), part.getLength() - partPosition));
-        n = ((ByteBufferPositionedReadable) part).read(partPosition, buffer);
+        n = part.read(partPosition, buffer);
       } finally {
         buffer.limit(oldLimit);
       }

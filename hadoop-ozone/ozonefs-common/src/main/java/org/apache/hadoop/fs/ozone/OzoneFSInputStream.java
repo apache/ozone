@@ -28,6 +28,7 @@ import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -38,8 +39,7 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
  * Sequential reads are NOT thread safe.
  * <p>
  * Positioned reads are thread safe.
- * When the underlying stream implements {@link ByteBufferPositionedReadable}, they delegate to it.
- * Otherwise, they fall back to the default synchronized seek-read-restore implementation.
+ * They delegate to the underlying {@link ByteBufferPositionedReadable} stream.
  * <p>
  * Applications must use either sequential reads or position reads at any given time,
  * but not concurrent sequential/position reads
@@ -51,7 +51,6 @@ public class OzoneFSInputStream extends FSInputStream
 
   private final InputStream inputStream;
   private final Statistics statistics;
-  private final Object positionedReadLock = new Object();
 
   public OzoneFSInputStream(InputStream inputStream, Statistics statistics) {
     this.inputStream = inputStream;
@@ -190,28 +189,25 @@ public class OzoneFSInputStream extends FSInputStream
     return readImpl(position, ByteBuffer.wrap(array, offset, length));
   }
 
+  protected boolean supportsPositionedRead() {
+    return inputStream instanceof ByteBufferPositionedReadable
+        && (!(inputStream instanceof StreamCapabilities)
+            || ((StreamCapabilities) inputStream).hasCapability(StreamCapabilities.PREADBYTEBUFFER));
+  }
+
   private int readImpl(long position, ByteBuffer buffer) throws IOException {
     if (buffer.isReadOnly()) {
       throw new ReadOnlyBufferException();
     }
-    if (inputStream instanceof ByteBufferPositionedReadable) {
-      final int n = ((ByteBufferPositionedReadable) inputStream).read(position, buffer);
-      if (statistics != null && n > 0) {
-        statistics.incrementBytesRead(n);
-      }
-      return n;
+    if (!(inputStream instanceof ByteBufferPositionedReadable)) {
+      throw new UnsupportedOperationException("Positioned reads are not supported by "
+          + inputStream.getClass().getName());
     }
-    synchronized (positionedReadLock) {
-      final long oldPosition = getPos();
-      try {
-        seek(position);
-        return read(buffer);
-      } catch (EOFException e) {
-        return -1;
-      } finally {
-        seek(oldPosition);
-      }
+    final int n = ((ByteBufferPositionedReadable) inputStream).read(position, buffer);
+    if (statistics != null && n > 0) {
+      statistics.incrementBytesRead(n);
     }
+    return n;
   }
 
   /**

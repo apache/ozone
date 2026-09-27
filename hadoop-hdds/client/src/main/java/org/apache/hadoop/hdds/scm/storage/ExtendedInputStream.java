@@ -51,19 +51,9 @@ public abstract class ExtendedInputStream extends FSInputStream
   }
 
   /**
-   * Fallback for streams without independent range reads. Uses the same monitor as sequential operations.
+   * Read without changing the sequential cursor. Implementations must allow concurrent calls.
    */
-  protected synchronized int readPositioned(long position, ByteBuffer buffer) throws IOException {
-    final long oldPosition = getPos();
-    try {
-      seek(position);
-      return read(buffer);
-    } catch (EOFException e) {
-      return EOF;
-    } finally {
-      seek(oldPosition);
-    }
-  }
+  protected abstract int readPositioned(long position, ByteBuffer buffer) throws IOException;
 
   @Override
   public void readFully(long position, ByteBuffer buffer) throws IOException {

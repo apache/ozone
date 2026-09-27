@@ -660,6 +660,18 @@ public class TestECBlockInputStream {
     }
 
     @Override
+    protected int readPositioned(long offset, ByteBuffer buffer) {
+      if (offset >= length) {
+        return EOF;
+      }
+      int n = (int) Math.min(buffer.remaining(), length - offset);
+      for (int i = 0; i < n; i++) {
+        buffer.put(dataVal);
+      }
+      return n;
+    }
+
+    @Override
     public BlockID getBlockID() {
       return blockID;
     }

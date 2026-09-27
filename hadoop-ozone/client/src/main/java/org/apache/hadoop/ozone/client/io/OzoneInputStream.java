@@ -24,6 +24,7 @@ import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
 
@@ -79,7 +80,16 @@ public class OzoneInputStream extends ExtendedInputStream implements CanUnbuffer
     if (inputStream instanceof ByteBufferPositionedReadable) {
       return ((ByteBufferPositionedReadable) inputStream).read(position, buffer);
     }
-    return super.readPositioned(position, buffer);
+    throw new UnsupportedOperationException("Positioned reads are not supported by "
+        + inputStream.getClass().getName());
+  }
+
+  @Override
+  public boolean hasCapability(String capability) {
+    if (StreamCapabilities.PREADBYTEBUFFER.equalsIgnoreCase(capability)) {
+      return inputStream instanceof ByteBufferPositionedReadable;
+    }
+    return super.hasCapability(capability);
   }
 
   @Override
