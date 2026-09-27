@@ -78,16 +78,28 @@ import picocli.CommandLine.Command;
  *        estimate for the SLOW profile only
  *      ozone admin containerbalancer estimate --profile fast -t 5
  *        estimate FAST profile with a 5% threshold
+ * To recommend:
+ *      ozone admin containerbalancer recommend
+ *      [ --profile {@literal <slow|medium|fast>} ]
+ *      [ -t/--threshold {@literal <threshold>} ]
+ *      [ --include-datanodes {@literal <host1,host2,...>} ]
+ *      [ --exclude-datanodes {@literal <host1,host2,...>} ]
+ *      Examples:
+ *      ozone admin containerbalancer recommend
+ *        recommend balancer configuration for SLOW, MEDIUM, and FAST profiles
+ *      ozone admin containerbalancer recommend --profile slow
+ *        recommend for the SLOW profile only
+ *      ozone admin containerbalancer recommend -t 5
+ *        recommend with a 5% threshold
  * To stop:
  *      ozone admin containerbalancer stop
  * </pre>
  *
  * <p>DESCRIPTION
- * <p>The estimate subcommand fetches datanode usage from SCM and estimates from
- * local configurations, profile presets and cluster analysis made. It does not start the balancer. Start does not yet
- * support {@code --profile}, compare estimate profiles to the config you plan
- * to pass on start, or wait until profile support is added to start.
- * estimate subcommand produces upper-bound estimates.
+ * <p>Estimate and recommend fetch datanode usage from SCM and use local configuration and cluster
+ * analysis. They do not start the balancer. Start does not yet support {@code --profile}; compare
+ * estimate/recommend profiles to the config you plan to pass on start. Estimate produces upper-bound
+ * duration estimates.
  * <p>The threshold parameter is a fraction in the range of (1%, 100%) with a
  * default value of 10%. The threshold sets a target for whether the cluster
  * is balanced. A cluster is balanced if for each datanode, the utilization
@@ -112,7 +124,8 @@ import picocli.CommandLine.Command;
         ContainerBalancerStartSubcommand.class,
         ContainerBalancerStopSubcommand.class,
         ContainerBalancerStatusSubcommand.class,
-        ContainerBalancerEstimateSubcommand.class
+        ContainerBalancerEstimateSubcommand.class,
+        ContainerBalancerRecommendSubcommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
 public class ContainerBalancerCommands implements AdminSubcommand {

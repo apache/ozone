@@ -21,7 +21,10 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -29,6 +32,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import static org.apache.hadoop.util.StringUtils.byteDesc;
 
 /**
  * Orchestrates cluster analysis, estimation and recommendation for container balancer.
@@ -36,6 +41,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 public final class ContainerBalancerAdvisor {
 
   private static final long MIN_DELETE_PHASE_MILLIS = Duration.ofMinutes(9).toMillis();
+  private static final double PLANNING_ITERATION_BUFFER = 1.3d;
   private static final String DATANODE_OFFSET_KEY =
       "hdds.scm.replication.event.timeout.datanode.offset";
 
@@ -72,7 +78,7 @@ public final class ContainerBalancerAdvisor {
 
     ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(nodes, thresholdRatio, 
         includeNodes, excludeNodes);
-    validateSnapshotForEstimation(snapshot);
+    validateSnapshotForEstimation(snapshot, conf);
 
     List<ContainerBalancerProfile> profiles = selectProfiles(request);
     List<ContainerBalancerEstimation> estimations = new ArrayList<>(profiles.size());
@@ -80,6 +86,178 @@ public final class ContainerBalancerAdvisor {
       estimations.add(estimateForProfile(conf, request, profile, snapshot, balancerConfig, thresholdPercent));
     }
     return Collections.unmodifiableList(estimations);
+  }
+
+  /** @see #estimate(OzoneConfiguration, AdvisorRequest) */
+  public static List<ContainerBalancerEstimation> estimateDryRun(OzoneConfiguration conf, AdvisorRequest request) {
+    return estimate(conf, request);
+  }
+
+  /**
+   * Recommends balancer configuration for one or more balancer profiles.
+   *
+   * <p>If {@link AdvisorRequest#profile} is set, returns a result for that profile only.
+   * Otherwise returns SLOW, MEDIUM, and FAST. Per-profile validation failures are returned with
+   * {@link ContainerBalancerRecommendation#succeeded()} false instead of aborting other profiles.
+   */
+  public static List<ContainerBalancerRecommendation> recommend(
+      OzoneConfiguration conf, AdvisorRequest request) {
+    Objects.requireNonNull(conf, "conf");
+    Objects.requireNonNull(request, "request");
+    List<DatanodeUsageInfoProto> nodes = Objects.requireNonNull(request.nodes, "nodes");
+
+    ContainerBalancerConfiguration balancerConfig = conf.getObject(ContainerBalancerConfiguration.class);
+
+    double thresholdPercent = request.thresholdPercent != null
+        ? request.thresholdPercent
+        : balancerConfig.getThreshold();
+    validateThresholdPercent(thresholdPercent);
+    double thresholdRatio = thresholdPercent / 100.0;
+    Set<String> includeNodes = request.includeNodes != null
+        ? request.includeNodes
+        : balancerConfig.getIncludeNodes();
+    Set<String> excludeNodes = request.excludeNodes != null
+        ? request.excludeNodes
+        : balancerConfig.getExcludeNodes();
+
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        nodes, thresholdRatio, includeNodes, excludeNodes);
+    validateSnapshotForEstimation(snapshot, conf);
+
+    List<ContainerBalancerProfile> profiles = selectProfilesForRecommend(request);
+    List<ContainerBalancerRecommendation> recommendations = new ArrayList<>(profiles.size());
+    for (ContainerBalancerProfile profile : profiles) {
+      recommendations.add(recommendForProfile(
+          conf, request, profile, balancerConfig, thresholdPercent, includeNodes, excludeNodes));
+    }
+    return Collections.unmodifiableList(recommendations);
+  }
+
+  private static ContainerBalancerRecommendation recommendForProfile(
+      OzoneConfiguration conf,
+      AdvisorRequest request,
+      ContainerBalancerProfile profile,
+      ContainerBalancerConfiguration balancerConfig,
+      double thresholdPercent,
+      Set<String> includeNodes,
+      Set<String> excludeNodes) {
+
+    ContainerBalancerRecommendation.Builder builder = ContainerBalancerRecommendation.newBuilder()
+        .setProfile(profile)
+        .setThresholdPercent(thresholdPercent);
+
+    try {
+      long moveReplicationTimeoutMillis = balancerConfig.getMoveReplicationTimeout().toMillis();
+      long moveTimeoutMillis = balancerConfig.getMoveTimeout().toMillis();
+      long balancingIntervalMillis = balancerConfig.getBalancingInterval().toMillis();
+      validateMoveTimeouts(conf, moveReplicationTimeoutMillis, moveTimeoutMillis);
+      validateBalancingIntervalMillis(balancingIntervalMillis);
+
+      AdvisorRequest estimateRequest = new AdvisorRequest()
+          .setNodes(request.nodes)
+          .setThresholdPercent(thresholdPercent)
+          .setIncludeNodes(includeNodes)
+          .setExcludeNodes(excludeNodes)
+          .setProfile(profile);
+
+      ContainerBalancerEstimation estimation = estimate(conf, estimateRequest).get(0);
+      if (!estimation.succeeded()) {
+        throw new IllegalArgumentException(estimation.getFailureMessage());
+      }
+
+      long configCeiling = balancerConfig.getMaxSizeToMovePerIteration();
+      long recommendedMaxMove = computeRecommendedMaxSizeToMove(configCeiling, estimation);
+
+      validateResolvedMoveLimits(
+          conf,
+          estimation.getMaxSizeEnteringTarget(),
+          estimation.getMaxSizeLeavingSource(),
+          recommendedMaxMove);
+
+      int recommendedIterations = (int) Math.ceil(
+          estimation.getEstimatedIterations() * PLANNING_ITERATION_BUFFER);
+
+      Map<String, String> rationale = buildRationale(
+          request.thresholdPercent != null,
+          profile,
+          balancerConfig,
+          estimation,
+          moveTimeoutMillis,
+          moveReplicationTimeoutMillis,
+          balancingIntervalMillis);
+
+      return builder
+          .setMaxDatanodesPercentage(estimation.getMaxDatanodesPercentage())
+          .setMaxSizeToMovePerIteration(recommendedMaxMove)
+          .setMaxSizeEnteringTarget(estimation.getMaxSizeEnteringTarget())
+          .setMaxSizeLeavingSource(estimation.getMaxSizeLeavingSource())
+          .setMoveTimeoutMillis(moveTimeoutMillis)
+          .setMoveReplicationTimeoutMillis(moveReplicationTimeoutMillis)
+          .setBalancingIntervalMillis(balancingIntervalMillis)
+          .setRecommendedIterations(recommendedIterations)
+          .setRationale(rationale)
+          .setEstimation(estimation)
+          .build();
+    } catch (IllegalArgumentException e) {
+      return builder.setFailureMessage(e.getMessage()).build();
+    }
+  }
+
+  /**
+   * Recommended max-size-to-move for one profile:
+   * min(config ceiling, max(per-iteration estimate, profile entering, profile leaving)).
+   */
+  static long computeRecommendedMaxSizeToMove(
+      long configCeiling, ContainerBalancerEstimation estimation) {
+    long floor = maxPositive(
+        estimation.getPerIterationBytes(),
+        estimation.getMaxSizeEnteringTarget(),
+        estimation.getMaxSizeLeavingSource());
+    return minPositive(configCeiling, floor);
+  }
+
+  private static Map<String, String> buildRationale(
+      boolean userProvidedThreshold,
+      ContainerBalancerProfile profile,
+      ContainerBalancerConfiguration balancerConfig,
+      ContainerBalancerEstimation estimation,
+      long moveTimeoutMillis,
+      long moveReplicationTimeoutMillis,
+      long balancingIntervalMillis) {
+    Map<String, String> rationale = new HashMap<>();
+    rationale.put("threshold", userProvidedThreshold
+        ? "user override"
+        : "default from configuration");
+    int profileDatanodesPercentage = profile.getDatanodesMaxPercentage();
+    int usedDatanodesPercentage = estimation.getMaxDatanodesPercentage();
+    if (usedDatanodesPercentage == profileDatanodesPercentage) {
+      rationale.put("maxDatanodesPercentage", String.format(Locale.ENGLISH,
+          "profile default (%d%%)", usedDatanodesPercentage));
+    } else {
+      rationale.put("maxDatanodesPercentage", String.format(Locale.ENGLISH,
+          "profile %d%%, raised to %d%% (≥2 nodes)", profileDatanodesPercentage, usedDatanodesPercentage));
+    }
+    rationale.put("maxSizeToMovePerIteration", String.format(Locale.ENGLISH,
+        "min(%s ceiling, max(per-iteration %s, entering %s, leaving %s))",
+        byteDesc(balancerConfig.getMaxSizeToMovePerIteration()),
+        byteDesc(estimation.getPerIterationBytes()),
+        byteDesc(estimation.getMaxSizeEnteringTarget()),
+        byteDesc(estimation.getMaxSizeLeavingSource())));
+    rationale.put("maxSizeEnteringTarget", String.format(Locale.ENGLISH,
+        "profile default (%d GB)", estimation.getMaxSizeEnteringTarget() / OzoneConsts.GB));
+    rationale.put("maxSizeLeavingSource", String.format(Locale.ENGLISH,
+        "profile default (%d GB)", estimation.getMaxSizeLeavingSource() / OzoneConsts.GB));
+    rationale.put("moveTimeout", String.format(Locale.ENGLISH,
+        "configuration default (%d min)", moveTimeoutMillis / 60000));
+    rationale.put("moveReplicationTimeout", String.format(Locale.ENGLISH,
+        "configuration default (%d min)", moveReplicationTimeoutMillis / 60000));
+    rationale.put("balancingInterval", String.format(Locale.ENGLISH,
+        "configuration default (%d min)", balancingIntervalMillis / 60000));
+    long planningIterations = (long) Math.ceil(
+        estimation.getEstimatedIterations() * PLANNING_ITERATION_BUFFER);
+    rationale.put("iterations", String.format(Locale.ENGLISH,
+        "includes +30%% buffer (planning estimate: %d)", planningIterations));
+    return rationale;
   }
 
   private static ContainerBalancerEstimation estimateForProfile(OzoneConfiguration conf, AdvisorRequest request,
@@ -167,6 +345,7 @@ public final class ContainerBalancerAdvisor {
           .build();
     } catch (IllegalArgumentException e) {
       return builder
+          .setThresholdPercent(thresholdPercent)
           .setMaxDatanodesPercentage(maxDatanodesPercentage)
           .setFailureMessage(e.getMessage())
           .build();
@@ -245,7 +424,22 @@ public final class ContainerBalancerAdvisor {
     return result;
   }
 
-  private static void validateSnapshotForEstimation(ContainerBalancerClusterSnapshot snapshot) {
+  private static long maxPositive(long... values) {
+    long result = 0;
+    for (long value : values) {
+      if (value > result) {
+        result = value;
+      }
+    }
+    return result;
+  }
+
+  private static void validateSnapshotForEstimation(ContainerBalancerClusterSnapshot snapshot,
+      OzoneConfiguration conf) {
+    long containerSizeBytes = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
+        StorageUnit.BYTES);
     if (snapshot.getSourceCount() < 1) {
       throw new IllegalArgumentException("No over-utilized datanodes (sources) found.");
     }
@@ -254,6 +448,11 @@ public final class ContainerBalancerAdvisor {
     }
     if (snapshot.getBytesToMove() <= 0) {
       throw new IllegalArgumentException("No bytes to move.");
+    }
+    if (snapshot.getBytesToMove() < containerSizeBytes) {
+      throw new IllegalArgumentException(
+              "Bytes to move (" + snapshot.getBytesToMove()
+                      + ") is less than container size (" + containerSizeBytes + ").");
     }
     if (snapshot.getTotalEligibleDatanodes() < 2) {
       throw new IllegalArgumentException(String.format(
@@ -349,6 +548,16 @@ public final class ContainerBalancerAdvisor {
       return Collections.singletonList(request.profile);
     }
     return Collections.singletonList(ContainerBalancerProfile.MEDIUM);
+  }
+
+  private static List<ContainerBalancerProfile> selectProfilesForRecommend(AdvisorRequest request) {
+    if (request.profile != null) {
+      return Collections.singletonList(request.profile);
+    }
+    return Arrays.asList(
+        ContainerBalancerProfile.SLOW,
+        ContainerBalancerProfile.MEDIUM,
+        ContainerBalancerProfile.FAST);
   }
 
   /**

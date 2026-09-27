@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerEstimateSubcommand;
+import org.apache.hadoop.hdds.scm.cli.ContainerBalancerRecommendSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStartSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStatusSubcommand;
 import org.apache.hadoop.hdds.scm.cli.ContainerBalancerStopSubcommand;
@@ -171,6 +172,7 @@ class TestContainerBalancerSubCommand {
   private ContainerBalancerStartSubcommand startCmd;
   private ContainerBalancerStatusSubcommand statusCmd;
   private ContainerBalancerEstimateSubcommand estimateCmd;
+  private ContainerBalancerRecommendSubcommand recommendCmd;
   private GenericTestUtils.PrintStreamCapturer out;
   private GenericTestUtils.PrintStreamCapturer err;
   private AtomicBoolean verbose;
@@ -382,6 +384,7 @@ class TestContainerBalancerSubCommand {
     };
     parseSubcommand(startCmd);
     estimateCmd = new ContainerBalancerEstimateSubcommand();
+    recommendCmd = new ContainerBalancerRecommendSubcommand();
     out = GenericTestUtils.captureOut();
     err = GenericTestUtils.captureErr();
   }
@@ -1030,6 +1033,68 @@ class TestContainerBalancerSubCommand {
             + "max-size-to-move-per-iteration.")
         .doesNotContain("Bytes to move:")
         .doesNotContain("Per iteration (estimate):");
+  }
+
+  @Test
+  void testContainerBalancerRecommendSubcommandDefaultShowsAllProfiles() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(recommendCmd);
+    recommendCmd.execute(scmClient);
+
+    String output = out.get();
+    assertThat(output)
+        .contains("RECOMMENDED CONFIGURATION (profile: SLOW)")
+        .contains("RECOMMENDED CONFIGURATION (profile: MEDIUM)")
+        .contains("RECOMMENDED CONFIGURATION (profile: FAST)")
+        .contains("--threshold")
+        .contains("--iterations")
+        .contains(" Estimation:")
+        .contains("Bytes to move:")
+        .contains("planning estimate:")
+        .contains("assumes full move timeout + interval each cycle")
+        .doesNotContain("Recommendation failed:");
+  }
+
+  @Test
+  void testContainerBalancerRecommendSubcommandWithThresholdOverride() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(recommendCmd, "-t", "5");
+    recommendCmd.execute(scmClient);
+
+    assertThat(out.get()).contains("RECOMMENDED CONFIGURATION (profile: SLOW)");
+  }
+
+  @Test
+  void testContainerBalancerRecommendSubcommandWithProfileShowsOneProfile() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(recommendCmd, "--profile", "medium");
+    recommendCmd.execute(scmClient);
+
+    String output = out.get();
+    assertThat(output)
+        .contains("RECOMMENDED CONFIGURATION (profile: MEDIUM)")
+        .doesNotContain("RECOMMENDED CONFIGURATION (profile: SLOW)")
+        .doesNotContain("RECOMMENDED CONFIGURATION (profile: FAST)");
+  }
+
+  @Test
+  void testContainerBalancerRecommendSubcommandInvalidThresholdFails() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
+        .thenReturn(buildImbalancedCluster());
+
+    parseSubcommand(recommendCmd, "-t", "-1");
+    IOException ex = assertThrows(IOException.class, () -> recommendCmd.execute(scmClient));
+    assertThat(ex.getMessage()).contains("Threshold should be specified in the range [0.0, 100.0).");
   }
 
   /**

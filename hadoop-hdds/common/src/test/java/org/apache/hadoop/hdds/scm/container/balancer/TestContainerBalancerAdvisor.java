@@ -20,7 +20,10 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import static org.apache.hadoop.ozone.ClientVersion.DEFAULT_VERSION;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +36,19 @@ import org.junit.jupiter.api.Test;
 
 /** Tests for {@link ContainerBalancerAdvisor} estimation. */
 public final class TestContainerBalancerAdvisor {
+
+  @Test
+  void testComputePerIterationBytesLimitedByEnteringTarget() {
+    int[] involved = {7, 7};
+    long expected = 26L * OzoneConsts.GB * 7;
+
+    assertEquals(expected, ContainerBalancerAdvisor.computePerIterationBytes(
+        expected * 10,
+        500L * OzoneConsts.GB,
+        26 * OzoneConsts.GB,
+        26 * OzoneConsts.GB,
+        involved));
+  }
 
   @Test
   void testComputePerIterationBytesNeverExceedsBytesToMove() {
@@ -236,6 +252,119 @@ public final class TestContainerBalancerAdvisor {
 
     assertThrows(IllegalArgumentException.class, () ->
         ContainerBalancerAdvisor.estimate(
+            conf,
+            new ContainerBalancerAdvisor.AdvisorRequest().setNodes(balanced)));
+  }
+
+  @Test
+  void testRecommendReturnsThreeProfiles() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    List<ContainerBalancerRecommendation> results = ContainerBalancerAdvisor.recommend(
+        conf,
+        new ContainerBalancerAdvisor.AdvisorRequest().setNodes(buildCluster(70, 14, 14)));
+
+    assertEquals(3, results.size());
+    assertEquals(ContainerBalancerProfile.SLOW, results.get(0).getProfile());
+    assertEquals(ContainerBalancerProfile.MEDIUM, results.get(1).getProfile());
+    assertEquals(ContainerBalancerProfile.FAST, results.get(2).getProfile());
+    for (ContainerBalancerRecommendation result : results) {
+      assertTrue(result.succeeded());
+      assertNotNull(result.getEstimation());
+      assertTrue(result.getEstimation().succeeded());
+      assertTrue(result.getRecommendedIterations() >= result.getEstimation().getEstimatedIterations());
+      assertFalse(result.getRationale().isEmpty());
+    }
+  }
+
+  @Test
+  void testComputeRecommendedMaxSizeToMoveFloorsAtProfileLimits() {
+    ContainerBalancerEstimation estimation = ContainerBalancerEstimation.newBuilder()
+        .setProfile(ContainerBalancerProfile.SLOW)
+        .setPerIterationBytes(8L * OzoneConsts.GB)
+        .setMaxSizeEnteringTarget(10L * OzoneConsts.GB)
+        .setMaxSizeLeavingSource(10L * OzoneConsts.GB)
+        .build();
+
+    assertEquals(10L * OzoneConsts.GB,
+        ContainerBalancerAdvisor.computeRecommendedMaxSizeToMove(500L * OzoneConsts.GB, estimation));
+  }
+
+  @Test
+  void testComputeRecommendedMaxSizeToMoveUsesPerIterationWhenLarger() {
+    ContainerBalancerEstimation estimation = ContainerBalancerEstimation.newBuilder()
+        .setProfile(ContainerBalancerProfile.MEDIUM)
+        .setPerIterationBytes(182L * OzoneConsts.GB)
+        .setMaxSizeEnteringTarget(26L * OzoneConsts.GB)
+        .setMaxSizeLeavingSource(26L * OzoneConsts.GB)
+        .build();
+
+    assertEquals(182L * OzoneConsts.GB,
+        ContainerBalancerAdvisor.computeRecommendedMaxSizeToMove(500L * OzoneConsts.GB, estimation));
+  }
+
+  @Test
+  void testRecommendReturnsSingleProfileWhenProfileSet() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    List<ContainerBalancerRecommendation> results = ContainerBalancerAdvisor.recommend(
+        conf,
+        new ContainerBalancerAdvisor.AdvisorRequest()
+            .setNodes(buildCluster(70, 14, 14))
+            .setProfile(ContainerBalancerProfile.MEDIUM));
+
+    assertEquals(1, results.size());
+    assertEquals(ContainerBalancerProfile.MEDIUM, results.get(0).getProfile());
+    assertTrue(results.get(0).succeeded());
+  }
+
+  @Test
+  void testRecommendUsesProfileDefaults() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    ContainerBalancerRecommendation slow = ContainerBalancerAdvisor.recommend(
+            conf,
+            new ContainerBalancerAdvisor.AdvisorRequest().setNodes(buildCluster(70, 14, 14)))
+        .get(0);
+
+    assertEquals(10, slow.getMaxDatanodesPercentage());
+    assertEquals(10L * OzoneConsts.GB, slow.getMaxSizeEnteringTarget());
+    assertEquals(10L * OzoneConsts.GB, slow.getMaxSizeLeavingSource());
+    assertEquals(30L * OzoneConsts.GB, slow.getMaxSizeToMovePerIteration());
+    assertTrue(slow.getMaxSizeToMovePerIteration() >= slow.getMaxSizeEnteringTarget());
+    assertTrue(slow.getMaxSizeToMovePerIteration() >= slow.getMaxSizeLeavingSource());
+  }
+
+  @Test
+  void testRecommendRespectsThresholdOverride() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    List<DatanodeUsageInfoProto> nodes = buildCluster(70, 14, 14);
+
+    long defaultBytesToMove = ContainerBalancerAdvisor.recommend(
+            conf,
+            new ContainerBalancerAdvisor.AdvisorRequest().setNodes(nodes))
+        .get(0)
+        .getEstimation()
+        .getBytesToMove();
+
+    long tighterBytesToMove = ContainerBalancerAdvisor.recommend(
+            conf,
+            new ContainerBalancerAdvisor.AdvisorRequest()
+                .setNodes(nodes)
+                .setThresholdPercent(5.0))
+        .get(0)
+        .getEstimation()
+        .getBytesToMove();
+
+    assertTrue(tighterBytesToMove > defaultBytesToMove);
+  }
+
+  @Test
+  void testRecommendFailsWhenClusterBalanced() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    List<DatanodeUsageInfoProto> balanced = new ArrayList<>();
+    balanced.add(proto("dn-1", OzoneConsts.TB, (long) (0.70 * OzoneConsts.TB)));
+    balanced.add(proto("dn-2", OzoneConsts.TB, (long) (0.70 * OzoneConsts.TB)));
+
+    assertThrows(IllegalArgumentException.class, () ->
+        ContainerBalancerAdvisor.recommend(
             conf,
             new ContainerBalancerAdvisor.AdvisorRequest().setNodes(balanced)));
   }
