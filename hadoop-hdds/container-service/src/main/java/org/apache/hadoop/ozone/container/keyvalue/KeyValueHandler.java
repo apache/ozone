@@ -295,6 +295,7 @@ public class KeyValueHandler extends Handler {
     if (msg.hasWriteChunk()) {
       BlockID blockID =
           BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+      BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockID);
 
       return chunkManager.getStreamDataChannel(kvContainer,
           blockID, putBlock, metrics);

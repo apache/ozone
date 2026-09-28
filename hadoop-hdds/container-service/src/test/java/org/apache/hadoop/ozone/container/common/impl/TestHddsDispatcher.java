@@ -637,6 +637,17 @@ public class TestHddsDispatcher {
     assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, writeChunkResponse.getResult());
     assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
         dispatcher.getContainer(1L).getContainerData().getState());
+
+    for (ContainerProtos.Type type : Arrays.asList(ContainerProtos.Type.StreamInit,
+        ContainerProtos.Type.StreamInitWithPutBlock)) {
+      ContainerCommandRequestProto streamRequest = getWriteChunkRequest(
+          dd.getUuidString(), 1L, 5L, HddsProtos.StorageTypeProto.SSD).toBuilder().setCmdType(type).build();
+      StorageContainerException exception = assertThrows(StorageContainerException.class,
+          () -> dispatcher.getStreamDataChannel(streamRequest, null));
+      assertEquals(ContainerProtos.Result.INVALID_ARGUMENT, exception.getResult());
+      assertEquals(ContainerProtos.ContainerDataProto.State.OPEN,
+          dispatcher.getContainer(1L).getContainerData().getState());
+    }
   }
 
   @Test
