@@ -66,7 +66,8 @@ public class BucketDeletedDataCalculator {
       throws IOException {
     BucketDeletedBytesStats totals = new BucketDeletedBytesStats();
     processStore(volume, bucket, null,
-        requireKeyManager(ozoneManager.getKeyManager(), "active store"), totals);
+        requireKeyManager(ozoneManager.getKeyManager(), "active store"),
+        totals, false);
 
     Iterator<UUID> iterator = snapshotChainManager.iterator(true);
     while (iterator.hasNext()) {
@@ -75,19 +76,21 @@ public class BucketDeletedDataCalculator {
           ozoneManager, snapshotChainManager, snapshotId);
       if (snapshotInfo == null
           || snapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE
-          || !snapshotInfo.isDeepCleanedDeletedDir()
           || !snapshotInfo.getVolumeName().equals(volume)
           || !snapshotInfo.getBucketName().equals(bucket)
           || !OmSnapshotManager.areSnapshotChangesFlushedToDB(
               ozoneManager.getMetadataManager(), snapshotInfo)) {
         continue;
       }
+      // Not deep-cleaned snapshots are still expanded and counted, but treated
+      // as trapped because reclaimability is not final yet.
+      boolean forceSnapshotTrapped = !snapshotInfo.isDeepCleanedDeletedDir();
       try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
                omSnapshotManager.getActiveSnapshot(volume, bucket, snapshotInfo.getName())) {
         processStore(volume, bucket, snapshotInfo,
             requireKeyManager(snapshot.get().getKeyManager(),
                 "snapshot " + snapshotInfo.getTableKey()),
-            totals);
+            totals, forceSnapshotTrapped);
       }
     }
     return totals;
@@ -107,7 +110,13 @@ public class BucketDeletedDataCalculator {
       String bucket,
       SnapshotInfo currentSnapshotInfo,
       KeyManager keyManager,
-      BucketDeletedBytesStats totals) throws IOException {
+      BucketDeletedBytesStats totals,
+      boolean forceSnapshotTrapped) throws IOException {
+    if (forceSnapshotTrapped) {
+      processDeletedKeysAsTrapped(volume, bucket, keyManager, totals);
+      processDeletedDirsAsTrapped(volume, bucket, keyManager, totals);
+      return;
+    }
     try (ReclaimableKeyFilter reclaimableKeyFilter = new ReclaimableKeyFilter(
              ozoneManager,
              omSnapshotManager,
@@ -126,6 +135,26 @@ public class BucketDeletedDataCalculator {
       processDeletedKeys(volume, bucket, keyManager, reclaimableKeyFilter, totals);
       processDeletedDirs(volume, bucket, keyManager, reclaimableKeyFilter,
           reclaimableDirFilter, totals);
+    }
+  }
+
+  private void processDeletedKeysAsTrapped(
+      String volume,
+      String bucket,
+      KeyManager keyManager,
+      BucketDeletedBytesStats totals) throws IOException {
+    OMMetadataManager metadataManager = keyManager.getMetadataManager();
+    Table<String, RepeatedOmKeyInfo> deletedTable = metadataManager.getDeletedTable();
+    String deletedTablePrefix = metadataManager.getTableBucketPrefix(
+        deletedTable.getName(), volume, bucket);
+    try (TableIterator<String, ? extends KeyValue<String, RepeatedOmKeyInfo>> itr =
+             deletedTable.iterator(deletedTablePrefix)) {
+      while (itr.hasNext()) {
+        KeyValue<String, ? extends RepeatedOmKeyInfo> entry = itr.next();
+        for (OmKeyInfo omKeyInfo : entry.getValue().getOmKeyInfoList()) {
+          totals.addSnapshotTrappedKey(omKeyInfo.getReplicatedSize());
+        }
+      }
     }
   }
 
@@ -164,15 +193,33 @@ public class BucketDeletedDataCalculator {
     OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
     long volumeId = metadataManager.getVolumeId(volume);
     long bucketId = metadataManager.getBucketId(volume, bucket);
-    KeyManager traversalKeyManager = ozoneManager.getKeyManager();
 
     try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> deletedDirItr =
              keyManager.getDeletedDirEntries(volume, bucket)) {
       while (deletedDirItr.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> rootEntry = deletedDirItr.next();
         traverseDeletedDirSubtree(
-            traversalKeyManager, reclaimableKeyFilter, reclaimableDirFilter,
+            keyManager, reclaimableKeyFilter, reclaimableDirFilter,
             volumeId, bucketId, rootEntry, totals);
+      }
+    }
+  }
+
+  private void processDeletedDirsAsTrapped(
+      String volume,
+      String bucket,
+      KeyManager keyManager,
+      BucketDeletedBytesStats totals) throws IOException {
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    long volumeId = metadataManager.getVolumeId(volume);
+    long bucketId = metadataManager.getBucketId(volume, bucket);
+
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> deletedDirItr =
+             keyManager.getDeletedDirEntries(volume, bucket)) {
+      while (deletedDirItr.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> rootEntry = deletedDirItr.next();
+        traverseDeletedDirSubtreeAsTrapped(
+            keyManager, volumeId, bucketId, rootEntry, totals);
       }
     }
   }
@@ -207,6 +254,8 @@ public class BucketDeletedDataCalculator {
         if (!visitedFileIds.add(subFile.getObjectID())) {
           continue;
         }
+        // Keep parity with DirectoryDeletingService where purgeable parent
+        // directory implies purgeable descendant files.
         boolean fileReclaimable = currentDirReclaimable
             || reclaimableKeyFilter.apply(Table.newKeyValue("", subFile));
         if (fileReclaimable) {
@@ -214,6 +263,40 @@ public class BucketDeletedDataCalculator {
         } else {
           totals.addSnapshotTrappedKey(subFile.getReplicatedSize());
         }
+      }
+
+      for (OmKeyInfo subDir : keyManager.getPendingDeletionSubDirs(
+          volumeId, bucketId, currentDir, keyValue -> true, Integer.MAX_VALUE).getKeysToDelete()) {
+        if (visitedDirIds.add(subDir.getObjectID())) {
+          queue.add(subDir);
+        }
+      }
+    }
+  }
+
+  private void traverseDeletedDirSubtreeAsTrapped(
+      KeyManager keyManager,
+      long volumeId,
+      long bucketId,
+      Table.KeyValue<String, OmKeyInfo> rootEntry,
+      BucketDeletedBytesStats totals) throws IOException {
+    Queue<OmKeyInfo> queue = new ArrayDeque<>();
+    Set<Long> visitedDirIds = new HashSet<>();
+    Set<Long> visitedFileIds = new HashSet<>();
+
+    queue.add(rootEntry.getValue());
+    visitedDirIds.add(rootEntry.getValue().getObjectID());
+
+    while (!queue.isEmpty()) {
+      OmKeyInfo currentDir = queue.poll();
+      totals.addSnapshotTrappedDir();
+
+      for (OmKeyInfo subFile : keyManager.getPendingDeletionSubFiles(
+          volumeId, bucketId, currentDir, keyValue -> true, Integer.MAX_VALUE).getKeysToDelete()) {
+        if (!visitedFileIds.add(subFile.getObjectID())) {
+          continue;
+        }
+        totals.addSnapshotTrappedKey(subFile.getReplicatedSize());
       }
 
       for (OmKeyInfo subDir : keyManager.getPendingDeletionSubDirs(

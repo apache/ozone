@@ -1946,10 +1946,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     String[] tokens = bucketPath.split("/", 2);
     if (tokens.length != 2 || tokens[0].isEmpty() || tokens[1].isEmpty()) {
-      throw new IllegalArgumentException(
-          "bucketPath must be in volume/bucket format: " + bucketPath);
+      throw new OMException("bucketPath must be in volume/bucket format: " + bucketPath, INVALID_PATH);
     }
-    return calculateDeletedBytesForBucket(tokens[0], tokens[1]);
+    ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(tokens[0], tokens[1]));
+    return calculateDeletedBytesForBucket(resolvedBucket.realVolume(), resolvedBucket.realBucket());
   }
 
   @Override

@@ -18,7 +18,16 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 /**
- * Bucket-level deleted bytes split.
+ * Bucket-level deleted-data split for a bucket at query time.
+ * <p>
+ * {@code snapshotTrappedBytes + purgeableBytes} represents the replicated size
+ * currently visible to the on-demand calculator for deleted keys and files
+ * discovered in deleted directory traversal for that bucket.
+ * <p>
+ * These values are not the same as OM global metrics such as
+ * {@code totalPendingDeletionBytes} / {@code totalPendingDeletionKeyCount}
+ * because those are cluster-wide service counters with different timing and
+ * accounting scope.
  */
 public final class BucketDeletedBytes {
   private final long snapshotTrappedBytes;

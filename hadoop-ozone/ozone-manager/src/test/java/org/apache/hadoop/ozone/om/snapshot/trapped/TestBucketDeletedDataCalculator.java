@@ -137,7 +137,7 @@ public class TestBucketDeletedDataCalculator extends SnapshotRequestAndResponseT
   }
 
   @Test
-  public void testSnapshotDeletedKeysSkippedUntilDeletedDirDeepClean() throws Exception {
+  public void testSnapshotDeletedKeysCountedAsTrappedUntilDeletedDirDeepClean() throws Exception {
     String volume = getVolumeName();
     String bucket = getBucketName();
     mockActiveKeyManager(volume, bucket);
@@ -156,9 +156,9 @@ public class TestBucketDeletedDataCalculator extends SnapshotRequestAndResponseT
     BucketDeletedDataCalculator.BucketDeletedBytesStats stats =
         new BucketDeletedDataCalculator(getOzoneManager()).calculate(volume, bucket);
 
-    assertEquals(0L, stats.getSnapshotTrappedBytes());
+    assertEquals(keyInfo.getReplicatedSize(), stats.getSnapshotTrappedBytes());
     assertEquals(0L, stats.getPurgeableBytes());
-    assertEquals(0L, stats.getSnapshotTrappedKeys());
+    assertEquals(1L, stats.getSnapshotTrappedKeys());
     assertEquals(0L, stats.getPurgeableKeys());
     assertEquals(0L, stats.getSnapshotTrappedDirs());
     assertEquals(0L, stats.getPurgeableDirs());
