@@ -65,48 +65,6 @@ class TestOMLockDetailsUtil {
     assertSame(response, OMLockDetailsUtil.addToResponse(response, newCall().getProcessingDetails()));
   }
 
-  @Test
-  void testAddOmLockDetailsToResponse() {
-    OMLockDetails details = new OMLockDetails();
-    details.setLockAcquired(true);
-    details.setWaitLockNanos(11);
-    details.setReadLockNanos(22);
-    details.setWriteLockNanos(33);
-    OMResponse response = newResponseBuilder()
-        .setOmLockDetails(OMLockDetailsProto.newBuilder().setWaitLockNanos(1))
-        .build();
-
-    OMResponse result = OMLockDetailsUtil.addToResponse(response, details);
-
-    assertEquals(details.toProtobufBuilder().build(), result.getOmLockDetails());
-  }
-
-  @Test
-  void testNullOmLockDetailsDoesNotChangeResponse() {
-    OMResponse response = OMResponse.getDefaultInstance();
-
-    assertSame(response, OMLockDetailsUtil.addToResponse(response, (OMLockDetails) null));
-  }
-
-  @Test
-  void testAddToProcessingDetails() {
-    Server.Call call = newCall();
-    call.getProcessingDetails().add(LOCKWAIT, 1, TimeUnit.NANOSECONDS);
-    call.getProcessingDetails().add(LOCKSHARED, 2, TimeUnit.NANOSECONDS);
-    call.getProcessingDetails().add(LOCKEXCLUSIVE, 3, TimeUnit.NANOSECONDS);
-    OMLockDetailsProto details = OMLockDetailsProto.newBuilder()
-        .setWaitLockNanos(11)
-        .setReadLockNanos(22)
-        .setWriteLockNanos(33)
-        .build();
-
-    OMLockDetailsUtil.addToProcessingDetails(call.getProcessingDetails(), details);
-
-    assertEquals(12, call.getProcessingDetails().get(LOCKWAIT, TimeUnit.NANOSECONDS));
-    assertEquals(24, call.getProcessingDetails().get(LOCKSHARED, TimeUnit.NANOSECONDS));
-    assertEquals(36, call.getProcessingDetails().get(LOCKEXCLUSIVE, TimeUnit.NANOSECONDS));
-  }
-
   private static Server.Call newCall() {
     return new Server.Call(RpcConstants.INVALID_CALL_ID, RpcConstants.INVALID_RETRY_COUNT,
         null, null, RPC.RpcKind.RPC_PROTOCOL_BUFFER, RpcConstants.DUMMY_CLIENT_ID);

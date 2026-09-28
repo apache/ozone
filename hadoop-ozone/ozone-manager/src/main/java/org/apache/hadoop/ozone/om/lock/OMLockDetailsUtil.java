@@ -45,14 +45,4 @@ public final class OMLockDetailsUtil {
     return response.toBuilder().setOmLockDetails(lockDetails).build();
   }
 
-  public static OMResponse addToResponse(OMResponse response, OMLockDetails lockDetails) {
-    return lockDetails == null ? response
-        : response.toBuilder().setOmLockDetails(lockDetails.toProtobufBuilder()).build();
-  }
-
-  public static void addToProcessingDetails(ProcessingDetails processingDetails, OMLockDetailsProto lockDetails) {
-    processingDetails.add(Timing.LOCKWAIT, lockDetails.getWaitLockNanos(), TimeUnit.NANOSECONDS);
-    processingDetails.add(Timing.LOCKSHARED, lockDetails.getReadLockNanos(), TimeUnit.NANOSECONDS);
-    processingDetails.add(Timing.LOCKEXCLUSIVE, lockDetails.getWriteLockNanos(), TimeUnit.NANOSECONDS);
-  }
 }
