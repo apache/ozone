@@ -32,7 +32,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -57,13 +56,11 @@ import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
@@ -107,12 +104,6 @@ public class TestCommitWatcher {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
 
-    RatisClientConfig ratisClientConfig =
-        conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(10));
-    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(10));
-    conf.setFromObject(ratisClientConfig);
-
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ChecksumType.NONE);
     conf.setFromObject(clientConfig);
@@ -147,45 +138,14 @@ public class TestCommitWatcher {
     }
   }
 
-  /**
-   * Allocates a RATIS THREE container and waits until SCM's record of its pipeline names the datanode that
-   * currently leads the Raft group.
-   * <p>
-   * SCM learns a pipeline's leader from datanode pipeline reports, which ride the heartbeat (10s here), and
-   * never unsets it, so {@link Pipeline#getLeaderNode()} can name a datanode that has since stopped leading.
-   * The Ratis client aims its first request at that node. Ratis puts a dummy watch request at the head of the
-   * ordered sliding window, so a first request that lands on a follower burns the watch retry budget - only
-   * 10s in this test - and fails every request queued behind it with AlreadyClosedException (HDDS-16398).
-   */
-  private ContainerWithPipeline allocateContainerWithElectedLeader() throws Exception {
-    ContainerWithPipeline allocated = storageContainerLocationClient.allocateContainer(
-        HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
-    long containerId = allocated.getContainerInfo().getContainerID();
-    AtomicReference<ContainerWithPipeline> withElectedLeader = new AtomicReference<>();
-    GenericTestUtils.waitFor(() -> {
-      try {
-        ContainerWithPipeline current = storageContainerLocationClient.getContainerWithPipeline(containerId);
-        Pipeline pipeline = current.getPipeline();
-        if (pipeline.getLeaderId() == null
-            || !RatisTestHelper.isRatisLeader(cluster.getHddsDatanode(pipeline.getLeaderNode()), pipeline)) {
-          return false;
-        }
-        withElectedLeader.set(current);
-        return true;
-      } catch (Exception e) {
-        // SCM or the datanode is not ready to answer yet; keep polling.
-        return false;
-      }
-    }, 500, 60000);
-    return withElectedLeader.get();
-  }
-
   @Test
   public void testReleaseBuffers() throws Exception {
     int capacity = 2;
     BufferPool bufferPool = new BufferPool(CHUNK_SIZE, capacity);
     try (XceiverClientManager mgr = new XceiverClientManager(conf)) {
-      ContainerWithPipeline container = allocateContainerWithElectedLeader();
+      ContainerWithPipeline container = storageContainerLocationClient
+          .allocateContainer(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
       Pipeline pipeline = container.getPipeline();
       long containerId = container.getContainerInfo().getContainerID();
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
@@ -251,7 +211,9 @@ public class TestCommitWatcher {
     int capacity = 2;
     BufferPool bufferPool = new BufferPool(CHUNK_SIZE, capacity);
     try (XceiverClientManager mgr = new XceiverClientManager(conf)) {
-      ContainerWithPipeline container = allocateContainerWithElectedLeader();
+      ContainerWithPipeline container = storageContainerLocationClient
+          .allocateContainer(HddsProtos.ReplicationType.RATIS,
+              HddsProtos.ReplicationFactor.THREE, OzoneConsts.OZONE);
       Pipeline pipeline = container.getPipeline();
       long containerId = container.getContainerInfo().getContainerID();
       try (XceiverClientSpi xceiverClient = mgr.acquireClient(pipeline)) {
@@ -310,9 +272,8 @@ public class TestCommitWatcher {
         IOException ioe =
             assertThrows(IOException.class, () -> watcher.watchForCommit(replies.get(1).getLogIndex() + 100));
         Throwable t = HddsClientUtils.checkForException(ioe);
-        // with retry count set to noRetry and a lower watch request
-        // timeout, watch request will eventually
-        // fail with TimeoutIOException from ratis client or the client
+        // Two of the three datanodes are down, so the watch can never be satisfied. It fails once the
+        // client watch timeout expires, with TimeoutIOException from the ratis client, or the client
         // can itself get AlreadyClosedException from the Ratis Server
         // and the write may fail with RaftRetryFailureException
         assertTrue(
