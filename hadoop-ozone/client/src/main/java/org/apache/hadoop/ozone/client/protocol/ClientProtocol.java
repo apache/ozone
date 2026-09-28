@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -75,6 +76,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.KerberosInfo;
@@ -678,8 +680,9 @@ public interface ClientProtocol {
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
    * @param keyNameList List of the Key
-   * @param quiet flag to not throw exception if delete fails
-   * @throws IOException
+   * @param quiet if true, per-key failures are returned in the result map instead of being thrown
+   * @return key name to error for each key that could not be deleted, empty if all keys were deleted
+   * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true
    */
   Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName,
                                     List<String> keyNameList, boolean quiet)
@@ -1062,6 +1065,14 @@ public interface ClientProtocol {
    * @throws IOException
    */
   OzoneFsServerDefaults getServerDefaults() throws IOException;
+
+  /**
+   * Returns the negotiated Ozone Manager version for the connected cluster.
+   * In an HA cluster this is the minimum version across all OMs, so callers
+   * can safely gate client behavior on new server-side features.
+   * @return the effective Ozone Manager version.
+   */
+  OzoneManagerVersion getOmVersion();
 
   /**
    * Get KMS client provider.
@@ -1488,6 +1499,14 @@ public interface ClientProtocol {
   ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException;
+
+  /**
+   * Bucket-wise snapshot count distribution from snapshotInfo table.
+   * @param bucketFilter optional filter, accepts either bucket or volume/bucket
+   * @return snapshot counts aggregated by bucket
+   * @throws IOException
+   */
+  SnapshotCountResponse snapshotCount(String bucketFilter) throws IOException;
 
   /**
    * Get the differences between two snapshots.

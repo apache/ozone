@@ -41,7 +41,6 @@ public abstract class BackgroundService {
 
   // Executor to launch child tasks
   private ScheduledThreadPoolExecutor exec;
-  private ThreadGroup threadGroup;
   private final String serviceName;
   private long interval;
   private volatile long serviceTimeoutInNanos;
@@ -66,7 +65,7 @@ public abstract class BackgroundService {
             .toLong(TimeUnit.NANOSECONDS);
     this.threadPoolSize = threadPoolSize;
     this.threadNamePrefix = threadNamePrefix;
-    initExecutorAndThreadGroup();
+    initExecutor();
     service = new PeriodicalTask();
     this.future = CompletableFuture.completedFuture(null);
   }
@@ -99,7 +98,7 @@ public abstract class BackgroundService {
 
   @VisibleForTesting
   public int getThreadCount() {
-    return threadGroup.activeCount();
+    return exec.getPoolSize();
   }
 
   @VisibleForTesting
@@ -114,7 +113,7 @@ public abstract class BackgroundService {
   // start service
   public synchronized void start() {
     if (exec == null || exec.isShutdown() || exec.isTerminated()) {
-      initExecutorAndThreadGroup();
+      initExecutor();
     }
     LOG.info("Starting service {} with interval {} {}", serviceName,
         interval, unit.name().toLowerCase());
@@ -211,15 +210,10 @@ public abstract class BackgroundService {
       Thread.currentThread().interrupt();
       current.shutdownNow();
     }
-    if (threadGroup.activeCount() == 0 && !threadGroup.isDestroyed()) {
-      threadGroup.destroy();
-    }
   }
 
-  private void initExecutorAndThreadGroup() {
-    threadGroup = new ThreadGroup(serviceName);
+  private void initExecutor() {
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setThreadFactory(r -> new Thread(threadGroup, r))
         .setDaemon(true)
         .setNameFormat(threadNamePrefix + serviceName + "#%d")
         .build();

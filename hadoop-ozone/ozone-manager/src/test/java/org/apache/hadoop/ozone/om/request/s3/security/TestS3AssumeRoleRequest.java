@@ -168,7 +168,7 @@ public class TestS3AssumeRoleRequest {
 
     assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(exception.getMessage()).isEqualTo(
-        "Invalid Value: DurationSeconds must be between 900 and 43200 seconds");
+        "Invalid Value: DurationSeconds must be a number between 900 and 43200 seconds");
     assertMarkForAuditCalled(request);
   }
 
@@ -188,7 +188,7 @@ public class TestS3AssumeRoleRequest {
 
     assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
     assertThat(exception.getMessage()).isEqualTo(
-        "Invalid Value: DurationSeconds must be between 900 and 43200 seconds");
+        "Invalid Value: DurationSeconds must be a number between 900 and 43200 seconds");
     assertMarkForAuditCalled(request);
   }
 
