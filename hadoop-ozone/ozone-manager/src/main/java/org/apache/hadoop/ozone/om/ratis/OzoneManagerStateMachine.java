@@ -502,11 +502,11 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final CompletableFuture<OMResponse> runFuture;
       try {
         runFuture = CompletableFuture.supplyAsync(() -> {
-              try {
-                return runCommand(request, termIndex);
-              } finally {
-                exitApplyTransaction();
-              }
+          try {
+            return runCommand(request, termIndex);
+          } finally {
+            exitApplyTransaction();
+          }
             }, executorService);
       } catch (RuntimeException ex) {
         ozoneManagerDoubleBuffer.releaseUnFlushedTransactions(1);
