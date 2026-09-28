@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -81,6 +82,7 @@ class TestS3DerivedKey {
   void setup() throws Exception {
     when(om.getConfiguration()).thenReturn(new OzoneConfiguration());
     when(om.isSecurityEnabled()).thenReturn(true);
+    doNothing().when(om).checkLeaderStatus();
     when(om.getS3SecretManager()).thenReturn(secrets);
     when(om.getSecretKeyClient()).thenReturn(secretKeyClient);
     when(om.getDelegationTokenMgr()).thenReturn(mock(OzoneDelegationTokenSecretManager.class));
