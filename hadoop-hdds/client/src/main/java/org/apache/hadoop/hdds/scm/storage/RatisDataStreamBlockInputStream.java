@@ -61,19 +61,26 @@ import org.slf4j.LoggerFactory;
  * sequential reader requests at most {@code ozone.client.ratis.stream.read.window-size} bytes ahead of its position,
  * as two pipelined requests of half the window each: the datanode keeps sending the second while the reader consumes
  * the first. This bounds both the bytes wasted when the reader stops or seeks and the replies buffered per stream.
- * The read-ahead starts at {@link #INITIAL_READ_AHEAD} and doubles with each request the reader consumes, so a short
- * run of small reads (such as Parquet reading its page indexes) wastes little at its next seek, while a long scan
- * (such as HBase reading 64 KB blocks) soon reads ahead the full half window.
+ * Read-ahead starts only once the reader has read, since its last seek, whole requests adding up to
+ * {@link #INITIAL_READ_AHEAD} bytes. So a few small reads before a seek (such as Parquet reading an index and then a
+ * page header) and a single large read the reader then seeks away from request only what they read. Read-ahead then
+ * starts at {@link #INITIAL_READ_AHEAD} and doubles with each request the reader consumes, so a long scan (such as
+ * HBase reading 64 KB blocks) soon reads ahead the full half window.
  * A reader that asks for at least half the window in one read (Parquet reads a run of column chunks in 8 MB buffers)
  * already reads in large pieces, so it gets exactly what it asks for until its next seek.
  */
 public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
   private static final Logger LOG =
       LoggerFactory.getLogger(RatisDataStreamBlockInputStream.class);
-  /** The first read-ahead request of a sequential run, before it doubles up to {@link #readAheadRequestSize}. */
+  /**
+   * The bytes a reader reads in a row before read-ahead starts, and the first read-ahead request, which then doubles up
+   * to {@link #readAheadRequestSize}.
+   */
   static final long INITIAL_READ_AHEAD = 128 << 10;
 
   private final long readAheadRequestSize;
+  /** {@link #INITIAL_READ_AHEAD}, at most {@link #readAheadRequestSize}. */
+  private final long initialReadAhead;
 
   private XceiverClientRatis xceiverClient;
   /** The request being consumed. */
@@ -82,11 +89,11 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
   private ReadRequest next;
   /** The buffered data, released as soon as it is consumed or dropped. */
   private DataReply dataReply;
-  /** Set once a request has been consumed to its end without a seek, so the reader is reading sequentially. */
-  private boolean sequential;
+  /** Bytes of the requests read to their end since the last seek; read-ahead starts at {@link #initialReadAhead}. */
+  private long sequentialBytes;
   /** Set when a read since the last seek asked for at least {@link #readAheadRequestSize}: no read-ahead then. */
   private boolean largeReads;
-  /** The size of the next read-ahead request; 0 until the reader reads sequentially. */
+  /** The size of the next read-ahead request; 0 until read-ahead starts. */
   private long readAheadSize;
 
   public RatisDataStreamBlockInputStream(BlockID blockID, long length,
@@ -95,6 +102,7 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
       OzoneClientConfig config) throws IOException {
     super(blockID, length, pipeline, token, xceiverClientFactory, null, config);
     this.readAheadRequestSize = Math.max(1L, config.getRatisStreamReadWindowSize() / 2);
+    this.initialReadAhead = Math.min(INITIAL_READ_AHEAD, readAheadRequestSize);
   }
 
   /** Keeps the RATIS pipeline, which the data stream is opened on, instead of converting it for standalone reads. */
@@ -109,9 +117,9 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
     int leaderRedirects = 0;
     largeReads |= length >= readAheadRequestSize;
     while (getPos() < getLength()) {
-      final boolean readAhead = preRead && sequential && !largeReads;
+      final boolean readAhead = preRead && !largeReads && sequentialBytes >= initialReadAhead;
       if (readAhead && readAheadSize == 0) {
-        readAheadSize = Math.min(INITIAL_READ_AHEAD, readAheadRequestSize);
+        readAheadSize = initialReadAhead;
       }
       if (current == null) {
         current = openRequest(getPos(),
@@ -166,9 +174,16 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
     }
   }
 
-  /** A seek closes the requests in flight, so the first read after it requests exactly what the reader asks for. */
+  /**
+   * A seek within the buffered reply keeps reading from it: a reply starts and ends at checksum boundaries around the
+   * requested range, so a reader stepping back a little often finds its data there. Any other seek closes the requests
+   * in flight, so the first read after it requests exactly what the reader asks for.
+   */
   @Override
   synchronized ReadBuffer seekReader(ReadBuffer buffered, long pos) {
+    if (dataReply != null && dataReply == buffered && dataReply.seek(pos)) {
+      return buffered;
+    }
     closeReads("seek");
     return null;
   }
@@ -177,7 +192,7 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
   synchronized void closeReads(String reason) {
     releaseDataReply();
     closeRequests();
-    sequential = false;
+    sequentialBytes = 0;
     largeReads = false;
     readAheadSize = 0;
   }
@@ -185,9 +200,9 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
   /** Closes the consumed request and moves on to the read-ahead request, if any. */
   private void finishCurrent() {
     current.close(getBlockID());
+    sequentialBytes += current.length;
     current = next;
     next = null;
-    sequential = true;
     if (readAheadSize > 0) {
       readAheadSize = Math.min(2 * readAheadSize, readAheadRequestSize);
     }
@@ -203,7 +218,7 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
     final ContainerCommandRequestMessage message =
         ContainerCommandRequestMessage.toMessage(request,
             TracingUtil.exportCurrentSpan());
-    return new ReadRequest(offset + length, xceiverClient.getDataStreamApi()
+    return new ReadRequest(offset, length, xceiverClient.getDataStreamApi()
         .streamReadOnly(message.getContent().asReadOnlyByteBuffer()));
   }
 
@@ -373,12 +388,14 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
 
   /** A ReadBlock request for the block range ending at {@link #end}, served over its own read-only stream. */
   private static final class ReadRequest {
+    private final long length;
     private final long end;
     private final DataStreamInput input;
     private boolean dataSeen;
 
-    ReadRequest(long end, DataStreamInput input) {
-      this.end = end;
+    ReadRequest(long offset, long length, DataStreamInput input) {
+      this.length = length;
+      this.end = offset + length;
       this.input = input;
     }
 
@@ -402,6 +419,17 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
 
     void release() {
       reply.release();
+    }
+
+    /** Moves to {@code pos}, when the reply has data there. */
+    boolean seek(long pos) {
+      final long offset = getProto().getOffset();
+      final ByteBuffer data = getByteBuffer();
+      if (pos < offset || pos >= offset + data.limit()) {
+        return false;
+      }
+      data.position(Math.toIntExact(pos - offset));
+      return true;
     }
   }
 }

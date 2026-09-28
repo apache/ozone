@@ -100,8 +100,9 @@ class TestRatisDataStreamBlockInputStream {
   }
 
   /**
-   * A sequential reader keeps one read-ahead request of half the window in flight after the one it consumes, so it
-   * never has more than the window requested ahead, and the requests cover the block without overlap.
+   * Once a reader has read the first read-ahead size in a row, it keeps one read-ahead request of half the window in
+   * flight after the one it consumes, so it never has more than the window requested ahead, and the requests cover the
+   * block without overlap.
    */
   @Test
   void sequentialReadPipelinesBoundedRequests() throws Exception {
@@ -120,7 +121,7 @@ class TestRatisDataStreamBlockInputStream {
     }
 
     assertArrayEquals(block, out.array());
-    assertEquals(Arrays.asList("0+4", "4+8", "12+8", "20+8", "28+8", "36+8", "44+8", "52+8", "60+4"),
+    assertEquals(Arrays.asList("0+4", "4+4", "8+8", "16+8", "24+8", "32+8", "40+8", "48+8", "56+8"),
         streams.ranges());
     assertEquals(2, streams.maxOpen);
     assertEquals(0, streams.open);
@@ -135,9 +136,10 @@ class TestRatisDataStreamBlockInputStream {
 
     try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 16)) {
       final ByteBuffer chunk = ByteBuffer.allocate(4);
-      in.read(chunk);
-      chunk.clear();
-      in.read(chunk);
+      for (int i = 0; i < 3; i++) {
+        chunk.clear();
+        in.read(chunk);
+      }
       assertEquals(2, streams.open);
 
       in.seek(40);
@@ -147,7 +149,7 @@ class TestRatisDataStreamBlockInputStream {
       assertArrayEquals(Arrays.copyOfRange(block, 40, 44), chunk.array());
     }
 
-    assertEquals(Arrays.asList("0+4", "4+8", "12+8", "40+4"), streams.ranges());
+    assertEquals(Arrays.asList("0+4", "4+4", "8+8", "16+8", "40+4"), streams.ranges());
   }
 
   /**
@@ -179,12 +181,13 @@ class TestRatisDataStreamBlockInputStream {
       assertArrayEquals(Arrays.copyOfRange(block, 40, 44), small.array());
     }
 
-    assertEquals(Arrays.asList("0+8", "8+8", "16+4", "32+4", "36+8", "44+8"), streams.ranges());
+    assertEquals(Arrays.asList("0+8", "8+8", "16+4", "32+4", "36+4", "40+8", "48+8"), streams.ranges());
   }
 
   /**
-   * Read-ahead starts at 128 KB and doubles with each request the reader consumes, up to half the window, so a short
-   * run of small reads before a seek requests little beyond what it reads, while a long scan soon reads ahead fully.
+   * Read-ahead starts only once the reader has read 128 KB in a row, so a short run of small reads before a seek
+   * requests only what it reads. It then starts at 128 KB and doubles with each request the reader consumes, up to half
+   * the window, so a long scan soon reads ahead fully.
    */
   @Test
   void readAheadStartsSmallAndDoubles() throws Exception {
@@ -211,10 +214,61 @@ class TestRatisDataStreamBlockInputStream {
     }
 
     assertEquals(Arrays.asList(
-        // three 4 KB reads, then a seek: the read-ahead is two 128 KB requests
-        "0+4096", "4096+131072", "135168+131072",
-        // 64 KB reads to the end of the block: the read-ahead doubles up to 512 KB
-        "0+65536", "65536+131072", "196608+131072", "327680+262144", "589824+524288"), streams.ranges());
+        // three 4 KB reads, then a seek: no read-ahead
+        "0+4096", "4096+4096", "8192+4096",
+        // 64 KB reads to the end of the block: read-ahead starts after 128 KB and doubles up to 512 KB
+        "0+65536", "65536+65536", "131072+131072", "262144+131072", "393216+262144", "655360+458752"),
+        streams.ranges());
+  }
+
+  /**
+   * Only requests read to their end count toward starting read-ahead, so a single read spanning several replies does
+   * not start it halfway through; a read that continues right after it does.
+   */
+  @Test
+  void readAheadStartsAfterWholeRequests() throws Exception {
+    final int kb = 1 << 10;
+    final byte[] block = block(1088 * kb);
+    final Streams streams = new Streams(block, 1, 64 * kb);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 1024 * kb)) {
+      final ByteBuffer large = ByteBuffer.allocate(256 * kb);
+      assertEquals(large.capacity(), in.read(large));
+      assertEquals(Collections.singletonList("0+262144"), streams.ranges());
+
+      final ByteBuffer next = ByteBuffer.allocate(4 * kb);
+      in.read(next);
+      assertArrayEquals(Arrays.copyOfRange(block, 256 * kb, 260 * kb), next.array());
+    }
+
+    assertEquals(Arrays.asList("0+262144", "262144+131072", "393216+131072"), streams.ranges());
+  }
+
+  /**
+   * A reply covers whole checksum intervals around the requested range, so a reader stepping back or forward within it
+   * keeps reading from it without a new request; a seek outside it requests again.
+   */
+  @Test
+  void seekWithinTheBufferedReplyReusesIt() throws Exception {
+    final byte[] block = block(64);
+    final Streams streams = new Streams(block, 16, Integer.MAX_VALUE);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 16)) {
+      in.seek(20);
+      assertEquals(block[20], in.read());
+      in.seek(17);
+      assertEquals(block[17], in.read());
+      in.seek(30);
+      assertEquals(block[30], in.read());
+      assertEquals(Collections.singletonList("20+1"), streams.ranges());
+
+      in.seek(40);
+      assertEquals(block[40], in.read());
+    }
+
+    assertEquals(Arrays.asList("20+1", "40+1"), streams.ranges());
   }
 
   /** A single-byte read returns the byte as 0 to 255: 0xFF must not look like the end of the stream. */
@@ -336,16 +390,28 @@ class TestRatisDataStreamBlockInputStream {
     return block;
   }
 
-  /** Read-only streams that each serve the requested range of a block, then a successful terminal reply. */
+  /**
+   * Read-only streams that each serve the requested range of a block, then a successful terminal reply. Like a
+   * datanode, they can widen the range to multiples of {@code align} bytes and split it into replies of
+   * {@code replySize} bytes.
+   */
   private final class Streams {
     private final byte[] block;
+    private final int align;
+    private final int replySize;
     private final List<ContainerCommandRequestProto> requests = new ArrayList<>();
     private final List<DataStreamInput> inputs = new ArrayList<>();
     private int open;
     private int maxOpen;
 
     Streams(byte[] block) {
+      this(block, 1, Integer.MAX_VALUE);
+    }
+
+    Streams(byte[] block, int align, int replySize) {
       this.block = block;
+      this.align = align;
+      this.replySize = replySize;
     }
 
     XceiverClientRatis client(Pipeline pipeline) throws Exception {
@@ -360,10 +426,17 @@ class TestRatisDataStreamBlockInputStream {
     private DataStreamInput newInput(ByteBuffer header) throws Exception {
       final ContainerCommandRequestProto request = toRequest(header);
       requests.add(request);
-      final int offset = Math.toIntExact(request.getReadBlock().getOffset());
-      final int end = offset + Math.toIntExact(request.getReadBlock().getLength());
-      final Deque<DataStreamReply> replies = new ArrayDeque<>(Arrays.asList(
-          dataReply(offset, Arrays.copyOfRange(block, offset, end)), successReply()));
+      final int requested = Math.toIntExact(request.getReadBlock().getOffset());
+      final int offset = requested - requested % align;
+      final int end = Math.min(block.length,
+          (requested + Math.toIntExact(request.getReadBlock().getLength()) + align - 1) / align * align);
+      final Deque<DataStreamReply> replies = new ArrayDeque<>();
+      for (int o = offset; o < end;) {
+        final int length = Math.min(end - o, replySize);
+        replies.add(dataReply(o, Arrays.copyOfRange(block, o, o + length)));
+        o += length;
+      }
+      replies.add(successReply());
       final DataStreamInput input = mock(DataStreamInput.class);
       when(input.readAsync()).thenAnswer(invocation -> CompletableFuture.completedFuture(retained(replies.remove())));
       doAnswer(invocation -> {
