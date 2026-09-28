@@ -2435,6 +2435,9 @@ message S3Authentication {
     // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
     // in finer-grained STS permissions.
     optional string s3Action = 10;
+    // Resolved so GetCallerIdentity can return the assumed-role identity from the session token.
+    optional string resolvedStsAssumedRoleId = 11;
+    optional string resolvedStsAssumedRoleUserArn = 12;
 }
 
 message RecoverLeaseRequest {
@@ -2479,6 +2482,10 @@ message BucketQuotaCount {
     required bool supportOldQuota = 5 [default=false];
     optional int64 diffSnapshotUsedBytes = 6;
     optional int64 diffSnapshotUsedNamespace = 7;
+    // objectID of the bucket the delta was computed against, so the apply can
+    // reject a stale delta if the bucket was deleted and recreated under the
+    // same name during the repair window. Optional for backward compatibility.
+    optional uint64 bucketObjectID = 8;
 }
 
 message QuotaRepairResponse {
