@@ -188,7 +188,7 @@ public final class ContainerProtocolCalls  {
    */
   public static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
       List<Validator> validators, BlockID blockID, Token<? extends TokenIdentifier> token,
-      Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
+      Pipeline pipeline) throws IOException {
     ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
         .newBuilder()
         .setCmdType(Type.GetBlock)
@@ -198,7 +198,7 @@ public final class ContainerProtocolCalls  {
     }
 
     return tryEachDatanode(xceiverClient.getPipeline(),
-        d -> getBlock(xceiverClient, validators, builder, blockID, d, replicaIndexes),
+        d -> getBlock(xceiverClient, validators, builder, blockID, d, pipeline),
         d -> toErrorMessage(blockID, d));
   }
 
@@ -209,8 +209,8 @@ public final class ContainerProtocolCalls  {
 
   public static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
       BlockID datanodeBlockID,
-      Token<? extends TokenIdentifier> token, Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
-    return getBlock(xceiverClient, getValidatorList(), datanodeBlockID, token, replicaIndexes);
+      Token<? extends TokenIdentifier> token, Pipeline pipeline) throws IOException {
+    return getBlock(xceiverClient, getValidatorList(), datanodeBlockID, token, pipeline);
   }
 
   /**
@@ -221,7 +221,6 @@ public final class ContainerProtocolCalls  {
    * @param blockID blockID to identify container
    * @param token a token for this block (may be null)
    * @param datanode datanode to query
-   * @param replicaIndexes replica indexes for EC pipelines
    * @return container protocol get block response
    * @throws IOException if there is an I/O error while performing the call
    */
@@ -230,7 +229,7 @@ public final class ContainerProtocolCalls  {
       BlockID blockID,
       Token<? extends TokenIdentifier> token,
       DatanodeDetails datanode,
-      Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
+      Pipeline pipeline) throws IOException {
     ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
         .newBuilder()
         .setCmdType(Type.GetBlock)
@@ -238,23 +237,19 @@ public final class ContainerProtocolCalls  {
     if (token != null) {
       builder.setEncodedToken(token.encodeToUrlString());
     }
-    return getBlock(xceiverClient, getValidatorList(), builder, blockID, datanode,
-        replicaIndexes);
+    return getBlock(xceiverClient, getValidatorList(), builder, blockID, datanode, pipeline);
   }
 
   private static GetBlockResponseProto getBlock(XceiverClientSpi xceiverClient,
       List<Validator> validators,
       ContainerCommandRequestProto.Builder builder, BlockID blockID,
-      DatanodeDetails datanode, Map<DatanodeDetails, Integer> replicaIndexes) throws IOException {
+      DatanodeDetails datanode, Pipeline pipeline) throws IOException {
     String traceId = TracingUtil.exportCurrentSpan();
     if (traceId != null) {
       builder.setTraceID(traceId);
     }
-    final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder();
-    int replicaIndex = replicaIndexes.getOrDefault(datanode, 0);
-    if (replicaIndex > 0) {
-      datanodeBlockID.setReplicaIndex(replicaIndex);
-    }
+    final int replicaIndex = pipeline.getReplicaIndex(datanode);
+    final DatanodeBlockID.Builder datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder(replicaIndex);
     final GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto.newBuilder()
         .setBlockID(datanodeBlockID.build());
     final ContainerCommandRequestProto request = builder
@@ -510,16 +505,10 @@ public final class ContainerProtocolCalls  {
       boolean containerAutoCreate)
       throws IOException, ExecutionException, InterruptedException {
 
-    WriteChunkRequestProto.Builder writeChunkRequest =
-        WriteChunkRequestProto.newBuilder()
-            .setBlockID(DatanodeBlockID.newBuilder()
-                .setContainerID(blockID.getContainerID())
-                .setLocalID(blockID.getLocalID())
-                .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId())
-                .setReplicaIndex(replicationIndex)
-                .build())
-            .setChunkData(chunk)
-            .setData(data);
+    final WriteChunkRequestProto.Builder writeChunkRequest = WriteChunkRequestProto.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicationIndex))
+        .setChunkData(chunk)
+        .setData(data);
     if (blockData != null) {
       PutBlockRequestProto.Builder createBlockRequest =
           PutBlockRequestProto.newBuilder()
@@ -931,41 +920,6 @@ public final class ContainerProtocolCalls  {
     return Collections.unmodifiableList(validators);
   }
 
-  public static HashMap<DatanodeDetails, GetBlockResponseProto>
-      getBlockFromAllNodes(
-      XceiverClientSpi xceiverClient,
-      DatanodeBlockID datanodeBlockID,
-      Token<OzoneBlockTokenIdentifier> token)
-      throws IOException, InterruptedException {
-    GetBlockRequestProto.Builder readBlockRequest = GetBlockRequestProto
-            .newBuilder()
-            .setBlockID(datanodeBlockID);
-    HashMap<DatanodeDetails, GetBlockResponseProto> datanodeToResponseMap
-            = new HashMap<>();
-    String id = xceiverClient.getPipeline().getFirstNode().getUuidString();
-    ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto
-        .newBuilder()
-        .setCmdType(Type.GetBlock)
-        .setContainerID(datanodeBlockID.getContainerID())
-        .setDatanodeUuid(id)
-        .setGetBlock(readBlockRequest);
-    if (token != null) {
-      builder.setEncodedToken(token.encodeToUrlString());
-    }
-    String traceId = TracingUtil.exportCurrentSpan();
-    if (traceId != null) {
-      builder.setTraceID(traceId);
-    }
-    ContainerCommandRequestProto request = builder.build();
-    Map<DatanodeDetails, ContainerCommandResponseProto> responses =
-            xceiverClient.sendCommandOnAllNodes(request);
-    for (Map.Entry<DatanodeDetails, ContainerCommandResponseProto> entry:
-           responses.entrySet()) {
-      datanodeToResponseMap.put(entry.getKey(), entry.getValue().getGetBlock());
-    }
-    return datanodeToResponseMap;
-  }
-
   public static HashMap<DatanodeDetails, ReadContainerResponseProto>
       readContainerFromAllNodes(XceiverClientSpi client, long containerID,
       String encodedToken) throws IOException, InterruptedException {
@@ -1000,12 +954,12 @@ public final class ContainerProtocolCalls  {
       Token<? extends TokenIdentifier> token, Pipeline pipeline)
       throws IOException {
     final DatanodeDetails datanode = pipeline.getClosestNode();
-    final DatanodeBlockID datanodeBlockID = getDatanodeBlockID(blockID, datanode, pipeline.getReplicaIndexes());
+    final int replicaIndex = pipeline.getReplicaIndex(datanode);
     final ReadBlockRequestProto.Builder readBlockRequest = ReadBlockRequestProto.newBuilder()
         .setOffset(offset)
         .setLength(length)
         .setResponseDataSize(responseDataSize)
-        .setBlockID(datanodeBlockID);
+        .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicaIndex));
     final ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadBlock)
             .setContainerID(blockID.getContainerID());
@@ -1016,15 +970,5 @@ public final class ContainerProtocolCalls  {
     return builder.setDatanodeUuid(datanode.getUuidString())
         .setReadBlock(readBlockRequest)
         .build();
-  }
-
-  static DatanodeBlockID getDatanodeBlockID(BlockID blockID, DatanodeDetails datanode,
-      Map<DatanodeDetails, Integer> replicaIndexes) {
-    final DatanodeBlockID.Builder b = blockID.getDatanodeBlockIDProtobufBuilder();
-    final int replicaIndex = replicaIndexes.getOrDefault(datanode, 0);
-    if (replicaIndex > 0) {
-      b.setReplicaIndex(replicaIndex);
-    }
-    return b.build();
   }
 }

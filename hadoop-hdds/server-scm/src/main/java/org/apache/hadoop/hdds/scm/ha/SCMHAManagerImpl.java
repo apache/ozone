@@ -321,8 +321,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
       // this exception. In this way reinitialize can throw exception to
       // ratis to handle properly.
       LOG.error("Failed to install Snapshot as SCM failed to replace"
-          + " DB with downloaded checkpoint. Checkpoint transaction {}", e,
-          checkpointTxnInfo.getTransactionIndex());
+          + " DB with downloaded checkpoint. Checkpoint transaction {}",
+          checkpointTxnInfo.getTransactionIndex(), e);
       throw e;
     }
 
@@ -341,8 +341,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
           dbBackup =
               HAUtils.replaceDBWithCheckpoint(lastAppliedIndex, oldDBLocation,
                   dbBackup.toPath(), OzoneConsts.SCM_DB_BACKUP_PREFIX);
-          LOG.error("Replacing SCM state with Term : {} and Index:",
-              termIndex.getTerm(), termIndex.getTerm());
+          LOG.error("Replacing SCM state with Term: {} and Index: {}",
+              termIndex.getTerm(), termIndex.getIndex());
           // This is being done to check before stop with old db
           // try to reload and then finally terminate and also test has
           // assumption for re-verify after corrupt DB loading without

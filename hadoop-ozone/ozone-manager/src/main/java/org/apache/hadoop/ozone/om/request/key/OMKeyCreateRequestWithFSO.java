@@ -175,7 +175,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               .collect(Collectors.toList());
       omFileInfo.appendNewBlocks(newLocationList, false);
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
       long preAllocatedSpace =
           newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
@@ -200,6 +200,9 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
               volumeId, bucketId, trxnLogIndex,
               missingParentInfos, null);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.

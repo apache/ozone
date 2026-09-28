@@ -69,10 +69,30 @@ public final class EndpointTestUtils {
       String key,
       String attributesHeader
   ) throws IOException, OS3Exception {
+    return getObjectAttributes(subject, bucket, key, attributesHeader, null, null);
+  }
+
+  /** Get object attributes (?attributes) with optional ObjectParts pagination headers. */
+  public static Response getObjectAttributes(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      String attributesHeader,
+      Integer maxParts,
+      Integer partNumberMarker
+  ) throws IOException, OS3Exception {
     subject.queryParamsForTest().set(S3Consts.QueryParams.ATTRIBUTES, "");
     when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
     when(subject.getHeaders().getHeaderString(S3Consts.OBJECT_ATTRIBUTES_HEADER))
         .thenReturn(attributesHeader);
+    if (maxParts != null) {
+      when(subject.getHeaders().getHeaderString(S3Consts.MAX_PARTS_HEADER))
+          .thenReturn(String.valueOf(maxParts));
+    }
+    if (partNumberMarker != null) {
+      when(subject.getHeaders().getHeaderString(S3Consts.PART_NUMBER_MARKER_HEADER))
+          .thenReturn(String.valueOf(partNumberMarker));
+    }
     return subject.get(bucket, key);
   }
 

@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IOzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -193,7 +194,8 @@ public class TestOmAcls {
 
   @Test
   public void testGetFileStatusPermissionDenied() throws Exception {
-    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
     DataTestUtil.createKey(bucket, "testKey", "testcontent".getBytes(StandardCharsets.UTF_8));
 
     authorizer.keyAclAllow = false;

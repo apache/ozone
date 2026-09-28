@@ -33,11 +33,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.builder.EqualsBuilder;
-import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -242,10 +238,27 @@ public final class Pipeline {
   }
 
   /**
-   * Get the replicaIndex Map.
+   * @param fromIndex the replica index starting from (inclusive)
+   * @param toIndex the replica index starting to (exclusive)
+   * @return true if this pipeline contains all replica indexes within the given range.
    */
+  public boolean containsAllReplicaIndexes(int fromIndex, int toIndex) {
+    final boolean[] contains = new boolean[toIndex - fromIndex];
+    for (int r : replicaIndexes.values()) {
+      if (r >= fromIndex && r < toIndex) {
+        contains[r - fromIndex] = true;
+      }
+    }
+    for (boolean contain : contains) {
+      if (!contain) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   public Map<DatanodeDetails, Integer> getReplicaIndexes() {
-    return this.getNodes().stream().collect(Collectors.toMap(Function.identity(), this::getReplicaIndex));
+    return Collections.unmodifiableMap(replicaIndexes);
   }
 
   /**
@@ -519,20 +532,14 @@ public final class Pipeline {
 
     Pipeline that = (Pipeline) o;
 
-    return new EqualsBuilder()
-        .append(id, that.id)
-        .append(replicationConfig, that.replicationConfig)
-        .append(nodeStatus.keySet(), that.nodeStatus.keySet())
-        .isEquals();
+    return id.equals(that.id)
+        && replicationConfig.equals(that.replicationConfig)
+        && nodeStatus.keySet().equals(that.nodeStatus.keySet());
   }
 
   @Override
   public int hashCode() {
-    return new HashCodeBuilder()
-        .append(id)
-        .append(replicationConfig.getReplicationType())
-        .append(nodeStatus)
-        .toHashCode();
+    return id.hashCode();
   }
 
   @Override

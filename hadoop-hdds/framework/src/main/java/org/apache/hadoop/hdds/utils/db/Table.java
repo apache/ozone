@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +91,26 @@ public interface Table<KEY, VALUE> {
    */
   default VALUE getSkipCache(KEY key) throws RocksDatabaseException, CodecException {
     throw new NotImplementedException("getSkipCache is not implemented");
+  }
+
+  /**
+   * Skip checking cache and get the values mapped to the given keys. The
+   * returned list has the same size and order as {@code keys}; a missing key
+   * is represented by a null value.
+   *
+   * @param keys metadata keys
+   * @return values in the same order as {@code keys}
+   */
+  default List<VALUE> multiGetSkipCache(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<VALUE> values = new ArrayList<>(keys.size());
+    for (KEY key : keys) {
+      values.add(getSkipCache(key));
+    }
+    return values;
   }
 
   /**

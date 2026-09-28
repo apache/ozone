@@ -40,14 +40,14 @@ run-name: Test Ozone ${{ inputs.ref }} with Ratis ${{ inputs.ratis-repo }} @ ${{
 permissions: { }
 jobs:
   ratis:
-    uses: ./.github/workflows/build-ratis.yml
+    uses: $/.github/workflows/build-ratis.yml
     with:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
       ref: ${{ github.event.inputs.ratis-ref }}
   ozone:
     needs:
       - ratis
-    uses: ./.github/workflows/ci.yml
+    uses: $/.github/workflows/ci.yml
     permissions:
       contents: read
     secrets:
