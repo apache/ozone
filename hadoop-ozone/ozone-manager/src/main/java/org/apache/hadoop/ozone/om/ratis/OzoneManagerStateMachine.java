@@ -695,7 +695,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @VisibleForTesting
   OMResponse runCommand(OMRequest request, TermIndex termIndex) {
-    try (OMRatisRequestContext ignored = OMRatisRequestContext.openForWrite(request, ozoneManager)) {
+    try (OMThreadContext.Scope ignored =
+             OMThreadContext.forWrite(request, ozoneManager).applyToCurrentThread()) {
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
@@ -754,7 +755,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @return response from OM
    */
   private Message queryCommand(OMRequest request) throws IOException {
-    try (OMRatisRequestContext context = OMRatisRequestContext.openForRead(request, ozoneManager)) {
+    try (OMThreadContext.Scope context =
+             OMThreadContext.forRead(request, ozoneManager).applyToCurrentThread()) {
       OMResponse response = handler.handleReadRequest(request);
       return OMRatisHelper.convertResponseToMessage(context.addLockDetails(response));
     }

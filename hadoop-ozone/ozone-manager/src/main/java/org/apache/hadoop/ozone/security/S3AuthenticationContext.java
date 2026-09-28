@@ -43,14 +43,6 @@ public final class S3AuthenticationContext {
         OzoneManager.getS3Auth(), OzoneManager.getStsTokenIdentifier());
   }
 
-  public static void captureInto(OMRequest.Builder requestBuilder, OzoneManager ozoneManager)
-      throws IOException {
-    if (requestBuilder.hasS3Authentication()) {
-      requestBuilder.setS3Authentication(
-          STSSecurityUtil.resolveS3Authentication(requestBuilder.getS3Authentication(), ozoneManager));
-    }
-  }
-
   public static S3AuthenticationContext fromRequest(
       OMRequest request, boolean securityEnabled) throws IOException {
     if (!securityEnabled || !request.hasS3Authentication()) {

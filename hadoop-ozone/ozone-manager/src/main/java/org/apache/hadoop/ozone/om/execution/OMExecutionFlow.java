@@ -24,11 +24,11 @@ import java.io.IOException;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
-import org.apache.hadoop.ozone.om.ratis.OMRatisRequestContext;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
 
 /**
  * entry for execution flow for write request.
@@ -75,10 +75,7 @@ public class OMExecutionFlow {
       }
     } else {
       try {
-        // We capture the ThreadLocal context in OzoneManager so that it will be available
-        // in a separate read thread in OzoneManagerStateMachine#query.
-        // Write requests already implemented this logic in the preExecute.
-        requestToSubmit = OMRatisRequestContext.captureIntoRequest(request, ozoneManager);
+        requestToSubmit = captureReadContext(request);
       } catch (IOException ex) {
         return OzoneManagerRatisUtils.createErrorResponse(request, ex);
       }
@@ -90,5 +87,18 @@ public class OMExecutionFlow {
       omClientRequest.handleRequestFailure(ozoneManager);
     }
     return response;
+  }
+
+  /**
+   * Captures authenticated request context on the RPC thread before submitting a read request to Ratis.
+   */
+  private OMRequest captureReadContext(OMRequest request) throws IOException {
+    OMRequest.Builder requestBuilder = request.toBuilder()
+        .setUserInfo(OMClientRequest.getAuthenticatedUserInfo(request));
+    if (requestBuilder.hasS3Authentication()) {
+      requestBuilder.setS3Authentication(
+          STSSecurityUtil.resolveS3Authentication(requestBuilder.getS3Authentication(), ozoneManager));
+    }
+    return requestBuilder.build();
   }
 }

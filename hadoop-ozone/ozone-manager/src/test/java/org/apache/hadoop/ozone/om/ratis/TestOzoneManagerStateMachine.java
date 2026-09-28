@@ -161,7 +161,7 @@ public class TestOzoneManagerStateMachine {
         .collect(Collectors.toList());
 
     assertEquals(Arrays.asList("S3_AUTH", "STS_TOKEN"), threadLocalFields,
-        "Update OMRatisRequestContext when adding request-scoped ThreadLocal fields to OzoneManager");
+        "Update OMThreadContext when adding request-scoped ThreadLocal fields to OzoneManager");
   }
 
   // --- startTransaction tests ---
@@ -483,7 +483,7 @@ public class TestOzoneManagerStateMachine {
   }
 
   @Test
-  public void testRunCommandClearsStaleRequestContext() throws Exception {
+  public void testRunCommandRestoresPreviousRequestContext() throws Exception {
     OMRequest request = sampleWriteRequest();
     TermIndex ti = TermIndex.valueOf(1, 5);
     OMResponse expectedResponse = OMResponse.newBuilder()
@@ -501,16 +501,19 @@ public class TestOzoneManagerStateMachine {
       return clientResponse;
     });
 
-    Server.getCurCall().set(createCall("stale-user", "stale.example.com", new byte[] {10, 0, 0, 1}));
-    OzoneManager.setS3Auth(S3Authentication.newBuilder().setAccessId("stale-access-id").build());
-    OzoneManager.setStsTokenIdentifier(mock(STSTokenIdentifier.class));
+    Server.Call previousCall = createCall("previous-user", "previous.example.com", new byte[] {10, 0, 0, 1});
+    S3Authentication previousS3Auth = S3Authentication.newBuilder().setAccessId("previous-access-id").build();
+    STSTokenIdentifier previousStsToken = mock(STSTokenIdentifier.class);
+    Server.getCurCall().set(previousCall);
+    OzoneManager.setS3Auth(previousS3Auth);
+    OzoneManager.setStsTokenIdentifier(previousStsToken);
 
     OMResponse result = sm.runCommand(request, ti);
 
     assertTrue(result.getSuccess());
-    assertNull(Server.getCurCall().get());
-    assertNull(OzoneManager.getS3Auth());
-    assertNull(OzoneManager.getStsTokenIdentifier());
+    assertSame(previousCall, Server.getCurCall().get());
+    assertSame(previousS3Auth, OzoneManager.getS3Auth());
+    assertSame(previousStsToken, OzoneManager.getStsTokenIdentifier());
   }
 
   @Test

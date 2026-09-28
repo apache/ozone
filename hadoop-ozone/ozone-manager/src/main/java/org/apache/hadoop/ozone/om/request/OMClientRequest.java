@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.security.S3AuthenticationContext;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
@@ -128,7 +128,8 @@ public abstract class OMClientRequest implements RequestAuditor {
     }
 
     if (requestBuilder.hasS3Authentication()) {
-      S3AuthenticationContext.captureInto(requestBuilder, ozoneManager);
+      requestBuilder.setS3Authentication(
+          STSSecurityUtil.resolveS3Authentication(requestBuilder.getS3Authentication(), ozoneManager));
     }
 
     omRequest = requestBuilder.build();
