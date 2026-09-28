@@ -84,7 +84,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -962,8 +961,7 @@ public class TestRocksDBCheckpointDiffer {
     readRocksDBInstance(ACTIVE_DB_DIR_NAME, activeRocksDB, null,
         rocksDBCheckpointDiffer);
 
-    GenericTestUtils.waitFor((BooleanSupplier) () ->
-        rocksDBCheckpointDiffer.getInflightCompactions().isEmpty(), 1000, 10000);
+    GenericTestUtils.waitFor(() -> rocksDBCheckpointDiffer.getInflightCompactions().isEmpty(), 1000, 10000);
 
     if (LOG.isDebugEnabled()) {
       printAllSnapshots();
@@ -998,21 +996,15 @@ public class TestRocksDBCheckpointDiffer {
       throws IOException {
     final DifferSnapshotInfo src = snapshots.get(snapshots.size() - 1);
     Set<String> allTables = allTablesForDiff();
-    int validatedSnapshotPairs = 0;
     boolean sawNonEmptyDiff = false;
 
     for (DifferSnapshotInfo snap : snapshots) {
-      Optional<List<SstFileInfo>> fullDagDiffOpt = differ.getSSTDiffList(
-          new DifferSnapshotVersion(src, 0, allTables),
-          new DifferSnapshotVersion(snap, 0, allTables),
-          null, allTables, true);
-      if (!fullDagDiffOpt.isPresent()) {
-        LOG.info("Skipping DAG diff to '{}' because compaction DAG could not reach all "
-            + "destination SST files", snap.getDbPath(0));
-        continue;
-      }
-      validatedSnapshotPairs++;
-      List<SstFileInfo> fullDagDiff = fullDagDiffOpt.get();
+      List<SstFileInfo> fullDagDiff = requireSstDiffList(
+          differ.getSSTDiffList(
+              new DifferSnapshotVersion(src, 0, allTables),
+              new DifferSnapshotVersion(snap, 0, allTables),
+              null, allTables, true),
+          src, snap);
       sawNonEmptyDiff = sawNonEmptyDiff || !fullDagDiff.isEmpty();
 
       // Independent structural oracle: a snapshot diffed against itself must have no
@@ -1024,8 +1016,7 @@ public class TestRocksDBCheckpointDiffer {
             .isEmpty();
       }
 
-      List<String> tablesToTrack = new ArrayList<>(COLUMN_FAMILIES_TO_TRACK_IN_DAG);
-      tablesToTrack.add("compactionLogTable");
+      List<String> tablesToTrack = new ArrayList<>(allTables);
 
       Set<String> tableToLookUp = new HashSet<>();
       for (int i = 0; i < Math.pow(2, tablesToTrack.size()); i++) {
@@ -1055,9 +1046,6 @@ public class TestRocksDBCheckpointDiffer {
         assertThat(actualFiles).containsExactlyInAnyOrderElementsOf(expectedFiles);
       }
     }
-    assertThat(validatedSnapshotPairs)
-        .as("expected compaction DAG diffs for at least one snapshot pair")
-        .isPositive();
     assertThat(sawNonEmptyDiff)
         .as("expected at least one non-empty SST diff across snapshots")
         .isTrue();
@@ -1110,7 +1098,7 @@ public class TestRocksDBCheckpointDiffer {
           .map(path -> getBaseName(path.getFileName().toString()))
           .collect(Collectors.toSet());
       assertThat(backupBaseNames).hasSizeGreaterThanOrEqualTo(7);
-      assertThat(backupBaseNames).allMatch(name -> name.matches("\\d+"));
+      assertThat(backupPaths).allMatch(path -> path.getFileName().toString().matches("\\d+\\.sst"));
       for (Path path : backupPaths) {
         assertTrue(Files.size(path) > 0, "SST link should not be empty: " + path);
       }
