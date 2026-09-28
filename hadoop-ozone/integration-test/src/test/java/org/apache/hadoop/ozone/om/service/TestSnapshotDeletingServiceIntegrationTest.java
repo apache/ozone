@@ -177,7 +177,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
 
   @Test
   @Order(2)
-  @Flaky("HDDS-11130")
   public void testSnapshotSplitAndMove() throws Exception {
 
     if (runIndividualTest) {
@@ -200,6 +199,9 @@ public class TestSnapshotDeletingServiceIntegrationTest {
             .getDeletedTable().getRangeKVs(null, 100,
                 "/vol1/bucket1/bucket1key1");
     assertEquals(1, omKeyInfos.size());
+
+    client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap1");
+    client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3");
   }
 
   @Test
@@ -250,8 +252,6 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     assertEquals(2, om.getOmSnapshotManager().getSnapshotCacheSize());
 
     // cleaning up the data
-    client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap1");
-    client.getProxy().deleteSnapshot(VOLUME_NAME, BUCKET_NAME_ONE, "bucket1snap3");
     client.getProxy().deleteBucket(VOLUME_NAME, BUCKET_NAME_TWO);
   }
 

@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.OFSPath;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -345,6 +346,12 @@ public class BasicRootedOzoneClientAdapterImpl
         }
         // Try get bucket again
         bucket = proxy.getBucketDetails(volumeStr, bucketStr);
+
+        BucketLayout resolvedBucketLayout =
+            OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
+                new HashSet<>());
+
+        OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
       } else {
         throw ex;
       }
@@ -690,19 +697,40 @@ public class BasicRootedOzoneClientAdapterImpl
    * Return FileStatusAdapter based on OFSPath being a
    * valid bucket path or valid snapshot path.
    * Throws exception in case of failure.
+   *
+   * <p>Non-snapshot paths call OM GetFileStatus directly (HDDS-15925) without a
+   * prior InfoBucket RPC. OBJECT_STORE buckets are rejected by OM GetFileStatus.
+   * Mutating OFS operations still validate layout via {@link #getBucket(OFSPath, boolean)}.
+   *
+   * <p>The direct call is only safe once the OM performs the server-side
+   * OBJECT_STORE rejection. During a rolling upgrade a new client can talk to an
+   * older OM that lacks that check, so when the negotiated OM version predates
+   * {@link OzoneManagerVersion#GET_FILE_STATUS_REJECTS_OBS} we fall back to the
+   * pre-HDDS-15925 path that fetches the bucket and validates its layout
+   * client-side.
    */
   private FileStatusAdapter getFileStatusForKeyOrSnapshot(
       OFSPath ofsPath, URI uri, Path qualifiedPath, String userName,
       boolean headOp) throws IOException {
     String key = ofsPath.getKeyName();
     try {
-      OzoneBucket bucket = getBucket(ofsPath, false);
       if (ofsPath.isSnapshotPath()) {
+        OzoneBucket bucket = getBucket(ofsPath, false);
         OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
         return getFileStatusAdapterWithSnapshotIndicator(
             volume, bucket, uri);
       } else {
-        OzoneFileStatus status = bucket.getFileStatus(key, headOp);
+        OzoneFileStatus status;
+        if (proxy.getOmVersion()
+            .compareTo(OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS) >= 0) {
+          status = proxy.getOzoneFileStatus(ofsPath.getVolumeName(),
+              ofsPath.getBucketName(), key, headOp);
+        } else {
+          // Older OM has no server-side OBJECT_STORE check; validate the bucket
+          // layout on the client, matching pre-HDDS-15925 behavior.
+          OzoneBucket bucket = getBucket(ofsPath, false);
+          status = bucket.getFileStatus(key, headOp);
+        }
         return toFileStatusAdapter(status, userName, uri, qualifiedPath,
             ofsPath.getNonKeyPath());
       }
@@ -711,6 +739,12 @@ public class BasicRootedOzoneClientAdapterImpl
         throw new FileNotFoundException(key + ": No such file or directory!");
       } else if (e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
         throw new FileNotFoundException(key + ": Bucket doesn't exist!");
+      } else if (e.getResult()
+          == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+        // OM rejects getFileStatus on an OBJECT_STORE bucket (no file system
+        // semantics). Surface it as IllegalArgumentException, matching the
+        // pre-HDDS-15925 client-side layout check.
+        throw new IllegalArgumentException(e.getMessage());
       }
       throw e;
     }
@@ -748,6 +782,12 @@ public class BasicRootedOzoneClientAdapterImpl
         Iterator<? extends OzoneBucket> bucketIter = volume.listBuckets("");
         while (bucketIter.hasNext()) {
           OzoneBucket bucket = bucketIter.next();
+          // OBJECT_STORE buckets have no file system semantics, so no trash
+          // root. Skip them; probing would fail getFileStatus with
+          // IllegalArgumentException and abort the whole scan.
+          if (BucketLayout.OBJECT_STORE.equals(bucket.getBucketLayout())) {
+            continue;
+          }
           Path bucketPath = new Path(volumePath, bucket.getName());
           Path trashRoot = new Path(bucketPath, FileSystem.TRASH_PREFIX);
           if (allUsers) {

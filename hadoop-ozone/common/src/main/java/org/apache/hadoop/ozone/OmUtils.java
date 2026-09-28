@@ -151,8 +151,8 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         OZONE_OM_ADDRESS_KEY);
 
-    return host.orElse(OZONE_OM_BIND_HOST_DEFAULT) + ":" +
-        getOmRpcPort(conf);
+    return getHostPortString(host.orElse(OZONE_OM_BIND_HOST_DEFAULT),
+        getOmRpcPort(conf));
   }
 
   /**
@@ -167,8 +167,9 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf, confKey);
 
     if (host.isPresent()) {
-      return host.get() + ":" + getPortNumberFromConfigKeys(conf, confKey)
-              .orElse(OZONE_OM_PORT_DEFAULT);
+      return getHostPortString(host.get(),
+          getPortNumberFromConfigKeys(conf, confKey)
+              .orElse(OZONE_OM_PORT_DEFAULT));
     } else {
       // The specified confKey is not set
       return null;
@@ -238,10 +239,12 @@ public final class OmUtils {
     case FinalizeUpgradeProgress:
     case PrepareStatus:
     case GetS3VolumeContext:
+    case GetCallerIdentity:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
+    case SnapshotCount:
     case RefetchSecretKey:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
@@ -285,6 +288,7 @@ public final class OmUtils {
     case CompleteMultiPartUpload:
     case AbortMultiPartUpload:
     case GetS3Secret:
+    case AssumeRole:
     case GetDelegationToken:
     case RenewDelegationToken:
     case CancelDelegationToken:
@@ -305,6 +309,7 @@ public final class OmUtils {
     case DeleteOpenKeys:
     case SetS3Secret:
     case RevokeS3Secret:
+    case RevokeSTSToken:
     case PurgeDirectories:
     case PurgePaths:
     case CreateTenant:
@@ -327,6 +332,7 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case DeleteRevokedSTSTokens:
     case PutBucketTagging:
     case DeleteBucketTagging:
     case SetLifecycleConfiguration:
@@ -380,10 +386,12 @@ public final class OmUtils {
     case FinalizeUpgradeProgress:
     case PrepareStatus:
     case GetS3VolumeContext:
+    case GetCallerIdentity:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
+    case SnapshotCount:
     case RefetchSecretKey:
     case GetKeyInfo:
     case GetSnapshotInfo:
@@ -453,6 +461,9 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case AssumeRole:
+    case RevokeSTSToken:
+    case DeleteRevokedSTSTokens:
     case PutBucketTagging:
     case DeleteBucketTagging:
     case ServiceList: // OM leader should have the most up-to-date OM service list info
@@ -494,7 +505,7 @@ public final class OmUtils {
           "This could possibly indicate a faulty JRE");
     }
   }
-
+  
   /**
    * Get a collection of all active omNodeIds (excluding decommissioned nodes)
    * for the given omServiceId.
@@ -616,7 +627,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" + addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT));
   }
 
   /**
@@ -642,8 +654,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" +
-        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT));
   }
 
   public static File createOMDir(String dirPath) {

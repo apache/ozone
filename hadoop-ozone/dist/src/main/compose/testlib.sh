@@ -115,6 +115,18 @@ find_tests(){
 }
 
 ## @description wait until safemode exit (or 240 seconds)
+## @description wait until S3 Gateway reports ready via /health/ready (port 19878)
+## Required when HAProxy health-checks gate S3 traffic: without a wait, tests
+## start while all backends are still in DOWN state and HAProxy returns 503.
+## Only waits when the multi-instance HAProxy setup (s3g1/s3g2/s3g3) is present.
+wait_for_s3g_ready() {
+  if ! docker-compose config --services 2>/dev/null | grep -q "^s3g1$"; then
+    return 0
+  fi
+  echo "Waiting for S3 Gateway (s3g1) to report ready..."
+  wait_for_execute_command s3g1 120 "curl -sf http://localhost:19878/health/ready"
+}
+
 wait_for_safemode_exit(){
   local cmd="ozone admin safemode wait -t 240"
   if [[ "${SECURITY_ENABLED}" == 'true' ]]; then
@@ -207,6 +219,7 @@ start_docker_env(){
 
   wait_for_safemode_exit
   wait_for_om_leader
+  wait_for_s3g_ready
 }
 
 has_scalable_datanode() {
