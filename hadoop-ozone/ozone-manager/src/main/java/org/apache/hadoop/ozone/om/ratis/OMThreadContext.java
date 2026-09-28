@@ -28,8 +28,10 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.lock.OMLockDetailsUtil;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
-import org.apache.hadoop.ozone.security.S3AuthenticationContext;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,11 +47,14 @@ public final class OMThreadContext {
   private static final Logger LOG = LoggerFactory.getLogger(OMThreadContext.class);
 
   private final UserInfo userInfo;
-  private final S3AuthenticationContext s3AuthenticationContext;
+  private final S3Authentication s3Authentication;
+  private final STSTokenIdentifier stsTokenIdentifier;
 
-  private OMThreadContext(UserInfo userInfo, S3AuthenticationContext s3AuthenticationContext) {
+  private OMThreadContext(UserInfo userInfo, S3Authentication s3Authentication,
+      STSTokenIdentifier stsTokenIdentifier) {
     this.userInfo = userInfo;
-    this.s3AuthenticationContext = Objects.requireNonNull(s3AuthenticationContext, "s3AuthenticationContext");
+    this.s3Authentication = s3Authentication;
+    this.stsTokenIdentifier = stsTokenIdentifier;
   }
 
   /**
@@ -59,8 +64,7 @@ public final class OMThreadContext {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(ozoneManager, "ozoneManager");
     UserInfo requestUserInfo = request.hasUserInfo() ? request.getUserInfo() : null;
-    return new OMThreadContext(requestUserInfo,
-        S3AuthenticationContext.fromRequest(request, ozoneManager.isSecurityEnabled()));
+    return fromRequest(requestUserInfo, request, ozoneManager);
   }
 
   /**
@@ -70,24 +74,30 @@ public final class OMThreadContext {
   public static OMThreadContext forWrite(OMRequest request, OzoneManager ozoneManager) throws IOException {
     Objects.requireNonNull(request, "request");
     Objects.requireNonNull(ozoneManager, "ozoneManager");
-    return new OMThreadContext(null,
-        S3AuthenticationContext.fromRequest(request, ozoneManager.isSecurityEnabled()));
+    return fromRequest(null, request, ozoneManager);
+  }
+
+  private static OMThreadContext fromRequest(UserInfo userInfo, OMRequest request,
+      OzoneManager ozoneManager) throws IOException {
+    if (!ozoneManager.isSecurityEnabled() || !request.hasS3Authentication()) {
+      return new OMThreadContext(userInfo, null, null);
+    }
+
+    STSSecurityUtil.ensureResolvedStsFieldsInvariants(request);
+    S3Authentication s3Authentication = request.getS3Authentication();
+    return new OMThreadContext(userInfo, s3Authentication,
+        STSSecurityUtil.rehydrateStsTokenIdentifier(s3Authentication));
   }
 
   /**
    * Replaces request-scoped state on the current thread until the returned scope is closed.
    */
   public Scope applyToCurrentThread() {
-    Server.Call previousCall = Server.getCurCall().get();
-    S3AuthenticationContext previousS3Context = S3AuthenticationContext.capture();
     Server.Call currentCall = createCall(userInfo);
-
-    clear();
-    if (currentCall != null) {
-      Server.getCurCall().set(currentCall);
-    }
-    s3AuthenticationContext.applyToCurrentThread();
-    return new Scope(previousCall, previousS3Context, currentCall);
+    Scope scope = new Scope(Server.getCurCall().get(), OzoneManager.getS3Auth(),
+        OzoneManager.getStsTokenIdentifier(), currentCall);
+    install(currentCall, s3Authentication, stsTokenIdentifier);
+    return scope;
   }
 
   private static Server.Call createCall(UserInfo userInfo) {
@@ -132,9 +142,15 @@ public final class OMThreadContext {
     }
   }
 
-  private static void clear() {
-    Server.getCurCall().remove();
-    S3AuthenticationContext.clear();
+  private static void install(Server.Call call, S3Authentication s3Authentication,
+      STSTokenIdentifier stsTokenIdentifier) {
+    if (call == null) {
+      Server.getCurCall().remove();
+    } else {
+      Server.getCurCall().set(call);
+    }
+    OzoneManager.setS3Auth(s3Authentication);
+    OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
   }
 
   /**
@@ -143,14 +159,17 @@ public final class OMThreadContext {
   public static final class Scope implements AutoCloseable {
     private final Thread ownerThread;
     private final Server.Call previousCall;
-    private final S3AuthenticationContext previousS3Context;
+    private final S3Authentication previousS3Authentication;
+    private final STSTokenIdentifier previousStsTokenIdentifier;
     private final Server.Call currentCall;
     private boolean closed;
 
-    private Scope(Server.Call previousCall, S3AuthenticationContext previousS3Context, Server.Call currentCall) {
+    private Scope(Server.Call previousCall, S3Authentication previousS3Authentication,
+        STSTokenIdentifier previousStsTokenIdentifier, Server.Call currentCall) {
       this.ownerThread = Thread.currentThread();
       this.previousCall = previousCall;
-      this.previousS3Context = previousS3Context;
+      this.previousS3Authentication = previousS3Authentication;
+      this.previousStsTokenIdentifier = previousStsTokenIdentifier;
       this.currentCall = currentCall;
     }
 
@@ -172,12 +191,7 @@ public final class OMThreadContext {
         return;
       }
 
-      if (previousCall == null) {
-        Server.getCurCall().remove();
-      } else {
-        Server.getCurCall().set(previousCall);
-      }
-      previousS3Context.applyToCurrentThread();
+      install(previousCall, previousS3Authentication, previousStsTokenIdentifier);
       closed = true;
     }
   }
