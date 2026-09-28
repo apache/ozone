@@ -285,12 +285,6 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT
       = TimeDuration.valueOf(3000, TimeUnit.MILLISECONDS);
-  public static final String
-      OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY
-      = "ozone.om.ratis.server.retry.cache.timeout";
-  public static final TimeDuration
-      OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT
-      = TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
   public static final String OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY
       = "ozone.om.ratis.minimum.timeout";
   public static final TimeDuration OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
@@ -786,6 +780,16 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL =
       "ozone.om.snapshot.local.data.manager.service.interval";
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
+
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_INTERVAL
+      = "ozone.om.sts.token.cleanup.service.interval";
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_INTERVAL_DEFAULT
+      = "3h";
+
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT
+      = "ozone.om.sts.token.cleanup.service.timeout";
+  public static final String OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT_DEFAULT
+      = "15m";
 
   public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
       "ozone.om.ratis.events.max.limit";

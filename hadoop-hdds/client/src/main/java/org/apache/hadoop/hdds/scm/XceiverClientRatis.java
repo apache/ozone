@@ -399,12 +399,10 @@ public final class XceiverClientRatis extends XceiverClientSpi {
             ContainerCommandResponseProto response =
                 ContainerCommandResponseProto
                     .parseFrom(reply.getMessage().getContent());
-            UUID serverId = RatisHelper.toDatanodeId(reply.getReplierId());
             if (response.getResult() == ContainerProtos.Result.SUCCESS) {
               updateCommitInfosMap(reply.getCommitInfos(), watchType);
             }
             asyncReply.setLogIndex(reply.getLogIndex());
-            addDatanodetoReply(serverId, asyncReply);
             return response;
           } catch (InvalidProtocolBufferException e) {
             throw new CompletionException(e);

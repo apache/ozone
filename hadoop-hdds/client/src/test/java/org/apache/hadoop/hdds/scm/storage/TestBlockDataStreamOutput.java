@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletionException;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -159,7 +158,7 @@ class TestBlockDataStreamOutput {
     }
   }
 
-  //@Test - skipped as it fails now.
+  @Test
   void hsyncPropagatesIOException() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     // Fail the first putBlock
@@ -171,10 +170,10 @@ class TestBlockDataStreamOutput {
 
     // hsync should propagate the IOException from the failed putBlock
     assertThrows(IOException.class, stream::hsync, "hsync() must propagate IOException from failed putBlock");
-    stream.close();
+    assertThrows(IOException.class, stream::close);
   }
 
-  //@Test - skipped as it fails now
+  @Test
   void hsyncPropagatesWatchFailure() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     // Fail the first watchForCommit
@@ -187,7 +186,7 @@ class TestBlockDataStreamOutput {
 
     // hsync should propagate the watch failure
     assertThrows(IOException.class, stream::hsync, "hsync() must propagate IOException from failed watchForCommit");
-    stream.close();
+    assertThrows(IOException.class, stream::close);
   }
 
   @Test
@@ -201,26 +200,12 @@ class TestBlockDataStreamOutput {
     stream.write(ByteBuffer.wrap(data), 0, data.length); // ok, stays in buffer
 
     byte[] data2 = randomBytes(CHUNK_SIZE + 50);
-    // This write will fill the buffer and trigger a chunk write that may fail.
-    // Close will surface the exception, which will be caused by the injected exception,
-    // however based on thread scheduling, the actual exception we get back from the stream
-    // is either a CompletionException caused by the injected exception or the
-    // injected exception itself so check for both.
     stream.write(ByteBuffer.wrap(data2), 0, data2.length);
-    Throwable e = assertThrows(IOException.class, () -> stream.close());
-    if (e instanceof CompletionException) {
-      assertThat(e.getMessage()).contains("Failed to write chunk ");
-      boolean foundExpectedCause = false;
-      while (e.getCause() != null) {
-        e = e.getCause();
-        if (e instanceof IOException && e.getMessage().contains("chunk write failed due to injected failure")) {
-          foundExpectedCause = true;
-        }
-      }
-      assertTrue(foundExpectedCause);
-    } else {
-      assertThat(e.getMessage().contains("chunk write failed due to injected failure"));
-    }
+    // The exception wrapping depends on thread scheduling, so verify the root cause.
+    IOException e = assertThrows(IOException.class, stream::close);
+    assertThat(e)
+        .hasRootCauseInstanceOf(IOException.class)
+        .hasRootCauseMessage("chunk write failed due to injected failure");
   }
 
   @Test

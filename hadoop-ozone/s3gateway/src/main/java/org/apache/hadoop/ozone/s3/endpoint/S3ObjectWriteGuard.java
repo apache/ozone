@@ -20,10 +20,13 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.ratis.util.function.CheckedRunnable;
 
 /**
@@ -84,6 +87,15 @@ class S3ObjectWriteGuard implements AutoCloseable {
     preCommits.add(preCommit);
   }
 
+  void onKeyOpened(Consumer<ByteBuffer> action) {
+    try {
+      action.accept(getDerivedKey());
+    } catch (RuntimeException ex) {
+      recordTransferFailure(ex);
+      throw ex;
+    }
+  }
+
   long copyFrom(InputStream body, int bufferSize) throws IOException {
     byte[] buffer = new byte[bufferSize];
     while (writtenLength < expectedLength) {
@@ -107,7 +119,20 @@ class S3ObjectWriteGuard implements AutoCloseable {
       }
       writtenLength += readLength;
     }
+    try {
+      verifySignedChunksComplete(body);
+    } catch (IOException | RuntimeException ex) {
+      recordTransferFailure(ex);
+      throw ex;
+    }
     return writtenLength;
+  }
+
+  private static void verifySignedChunksComplete(InputStream body) throws IOException {
+    SignedChunksInputStream signed = SignedChunksInputStream.unwrap(body);
+    if (signed != null) {
+      signed.verifyComplete();
+    }
   }
 
   protected void write(byte[] buffer, int offset, int length)
@@ -117,6 +142,11 @@ class S3ObjectWriteGuard implements AutoCloseable {
 
   public Map<String, String> getMetadata() {
     return ((OzoneOutputStream) outputStream).getMetadata();
+  }
+
+  /** @return the signing key OM derived for chunk verification, or null. */
+  public ByteBuffer getDerivedKey() {
+    return ((OzoneOutputStream) outputStream).getDerivedKey();
   }
 
   @Override
