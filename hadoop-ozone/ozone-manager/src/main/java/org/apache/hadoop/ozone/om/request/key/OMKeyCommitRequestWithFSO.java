@@ -160,8 +160,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
    * <p>
    * Keeping the parent walk (OmFSOFile.build -> getParentID) out of the bucket write lock is the point
    * of HDDS-16289: it stops the lone apply thread from gating readers of a hot bucket during path
-   * resolution. If OM ever applies transactions in parallel per bucket/key, these reads must be
-   * re-validated under the lock in {@link #applyKeyCommit}.
+   * resolution. This rests on the serial-apply invariant: if OM ever applies transactions in parallel
+   * per bucket/key, the re-check in {@link #applyKeyCommit} is not enough and every read here needs
+   * re-validating under the lock, including the committed key another client may overwrite and the
+   * walked ancestors.
    */
   private void prepareCommit(OzoneManager ozoneManager, CommitKeyRequest commitKeyRequest,
       PreparedCommit prepared, List<OmKeyLocationInfo> locationInfoList,
@@ -322,8 +324,10 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     final boolean isRecovery = commitKeyRequest.hasRecovery() && commitKeyRequest.getRecovery();
 
     // Cheap O(1) re-check of the commit target resolved in Phase 1. Under serial apply this always
-    // holds; it is a tripwire that fails safe (as the KEY_NOT_FOUND checks in Phase 1) rather than
-    // committing a stale open key if that invariant is ever broken by a concurrent writer.
+    // holds, so it is unreachable; it is kept because it is a point lookup and it fails the way the
+    // Phase 1 KEY_NOT_FOUND checks do rather than committing a stale open key. It does not make Phase 1
+    // safe under concurrent apply: it re-reads this client's open key, not the committed key another
+    // client may have overwritten meanwhile, nor the ancestor chain the parent id came from.
     OmKeyInfo recheckOpenKey = OMFileRequest.getOmKeyInfoFromFileTable(true,
         omMetadataManager, prepared.dbOpenFileKey, keyName);
     if (recheckOpenKey == null
