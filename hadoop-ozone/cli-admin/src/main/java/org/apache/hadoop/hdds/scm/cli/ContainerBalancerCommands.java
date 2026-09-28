@@ -80,6 +80,11 @@ import picocli.CommandLine.Command;
  *        estimate FAST profile with a 5% threshold
  * To stop:
  *      ozone admin containerbalancer stop
+ * To assess:
+ *      ozone admin containerbalancer assessment
+ *      [ -t/--threshold {@literal <threshold>}]
+ *      [ --include-datanodes {@literal <hostnames>}]
+ *      [ --exclude-datanodes {@literal <hostnames>}]
  * </pre>
  *
  * <p>DESCRIPTION
@@ -112,6 +117,7 @@ import picocli.CommandLine.Command;
         ContainerBalancerStartSubcommand.class,
         ContainerBalancerStopSubcommand.class,
         ContainerBalancerStatusSubcommand.class,
+        ContainerBalancerAssessmentSubcommand.class,
         ContainerBalancerEstimateSubcommand.class
     })
 @MetaInfServices(AdminSubcommand.class)
