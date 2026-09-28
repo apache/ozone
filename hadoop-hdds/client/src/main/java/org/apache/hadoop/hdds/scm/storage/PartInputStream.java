@@ -36,10 +36,14 @@ public interface PartInputStream
   void close() throws IOException;
 
   /**
-   * positioned read within this part starting at {@code partOffset}.
+   * Positioned read within this part starting at {@code partOffset}.
    *
    * @return bytes copied into {@code buffer}, {@code -1} if {@code buffer} has no remaining space
    *         or at EOF
+   * @throws UnsupportedOperationException if this part stream does not support positioned read
    */
-  int readPositioned(long partOffset, ByteBuffer buffer) throws IOException;
+  default int readPositioned(long partOffset, ByteBuffer buffer) throws IOException {
+    throw new UnsupportedOperationException(
+        "Positioned read is not supported by " + getClass().getName());
+  }
 }

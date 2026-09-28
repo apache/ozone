@@ -779,10 +779,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       releaseResources();
     }
 
-    /**
-     * Declared on this class (not only inherited): integration test TestStreamReadDatanodeFailover looks it
-     * up with {@code streamingReader.getClass().getDeclaredMethod("getResponse")}.
-     */
     public StreamingReadResponse getResponse() {
       return response.get();
     }

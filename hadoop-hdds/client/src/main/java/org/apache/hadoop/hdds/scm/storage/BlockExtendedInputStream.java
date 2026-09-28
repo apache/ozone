@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -134,37 +133,6 @@ public abstract class BlockExtendedInputStream extends ExtendedInputStream
    */
   protected boolean isConnectivityIssue(IOException ex) {
     return Status.fromThrowable(ex).getCode() == Status.UNAVAILABLE.getCode();
-  }
-
-  /**
-   * Default positioned read: seek-read-restore on this part's cursor. Block streams with a
-   * stateless implementation override this.
-   */
-  @Override
-  public int readPositioned(long partOffset, ByteBuffer dst) throws IOException {
-    if (!dst.hasRemaining()) {
-      return EOF;
-    }
-    if (partOffset < 0 || partOffset >= getLength()) {
-      return EOF;
-    }
-    synchronized (this) {
-      final long oldPos = getPos();
-      try {
-        seek(partOffset);
-        int totalRead = 0;
-        while (dst.hasRemaining() && getPos() < getLength()) {
-          final int n = read(dst);
-          if (n <= 0) {
-            break;
-          }
-          totalRead += n;
-        }
-        return totalRead == 0 ? EOF : totalRead;
-      } finally {
-        seek(oldPos);
-      }
-    }
   }
 
 }
