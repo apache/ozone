@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -233,7 +234,7 @@ public class TestReconContainerManager
     for (State replicaState : new State[] {
         State.UNHEALTHY, State.INVALID, State.DELETED}) {
       ContainerWithPipeline containerWithPipeline =
-          getTestContainer(120L + replicaState.ordinal(), LifeCycleState.OPEN);
+          getTestContainer(120L + replicaState.getNumber(), LifeCycleState.OPEN);
       ContainerID containerID =
           containerWithPipeline.getContainerInfo().containerID();
       getContainerManager().addNewContainer(containerWithPipeline);
@@ -292,7 +293,7 @@ public class TestReconContainerManager
 
   @Test
   public void testUpdateAndRemoveContainerReplica()
-      throws IOException, TimeoutException {
+      throws IOException, InterruptedException, TimeoutException {
     // Sanity checking updateContainerReplica and ContainerReplicaHistory
 
     // Init Container 1
@@ -340,6 +341,8 @@ public class TestReconContainerManager
     containerReplica1 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
         .setDatanodeDetails(datanodeDetails1).setSequenceId(1051L).build();
+    // firstSeen and lastSeen are stamped from a single clock read, so wait for the millisecond to tick.
+    GenericTestUtils.waitFor(() -> System.currentTimeMillis() > repHist1.getFirstSeenTime(), 1, 1000);
     containerManager.updateContainerReplica(containerID1, containerReplica1);
     // Should still have 1 entry in the replica history map
     assertEquals(1, repHistMap.size());

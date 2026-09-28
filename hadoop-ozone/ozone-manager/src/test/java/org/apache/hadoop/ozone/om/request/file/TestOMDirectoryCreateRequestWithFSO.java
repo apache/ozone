@@ -220,6 +220,34 @@ public class TestOMDirectoryCreateRequestWithFSO {
   }
 
   @Test
+  public void testFailedRequestDoesNotLeakNamespaceQuota() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    // A single-level directory has no missing parents, so the first ACL lookup, and with it the
+    // first chance to fail, happens after the namespace charge is applied.
+    String keyName = "dir1";
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    long usedNamespaceBefore = omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+
+    // Neither preExecute nor setUGI runs, so the request carries no user info and the ACL lookup
+    // for the leaf directory fails with UNAUTHORIZED.
+    OMDirectoryCreateRequestWithFSO omDirCreateRequestFSO =
+        new OMDirectoryCreateRequestWithFSO(
+            createDirectoryRequest(volumeName, bucketName, keyName),
+            BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    OMClientResponse omClientResponse =
+        omDirCreateRequestFSO.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertSame(OzoneManagerProtocolProtos.Status.UNAUTHORIZED,
+        omClientResponse.getOMResponse().getStatus());
+    assertEquals(usedNamespaceBefore, omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
     String volumeName = "vol1";
     String bucketName = "bucket1";

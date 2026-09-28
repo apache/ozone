@@ -2344,14 +2344,9 @@ public class KeyValueHandler extends Handler {
 
     final BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
     if (readBlock.getOffset() >= blockData.getSize()) {
-      // An out of range offset is a client fault, so report it on the stream instead of throwing: throwing would be
-      // turned into a CONTAINER_INTERNAL_ERROR response by readBlock, and a non-null response makes the dispatcher
-      // scan the container as if the data were corrupt.
-      streamObserver.onError(Status.OUT_OF_RANGE
-          .withDescription("Requested offset " + readBlock.getOffset() + " is beyond the end of block " + blockID
-              + " with size " + blockData.getSize())
-          .asRuntimeException());
-      return 0;
+      return rejectReadBlock(blockFile, streamObserver, Status.OUT_OF_RANGE.withDescription(
+          "Requested offset " + readBlock.getOffset() + " is beyond the end of block " + blockID + " with size "
+              + blockData.getSize()));
     }
     final List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
     final ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
@@ -2423,6 +2418,18 @@ public class KeyValueHandler extends Handler {
       chunkIndex = readBlockComputation.findChunk(adjustedOffset);
     }
     return totalDataLength;
+  }
+
+  /**
+   * Report a client fault on the stream instead of throwing, which would become a CONTAINER_INTERNAL_ERROR response
+   * and make the dispatcher scan the container. This ends the call from the datanode side, so also close the stream's
+   * block file: GrpcXceiverService closes it only when the client ends the stream or a request throws.
+   */
+  private static long rejectReadBlock(RandomAccessFileChannel blockFile,
+      StreamObserver<ContainerCommandResponseProto> streamObserver, Status status) {
+    blockFile.close();
+    streamObserver.onError(status.asRuntimeException());
+    return 0;
   }
 
   static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChecksum,

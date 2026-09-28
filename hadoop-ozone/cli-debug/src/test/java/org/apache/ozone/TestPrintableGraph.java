@@ -19,8 +19,8 @@ package org.apache.ozone.graph;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.when;
 
+import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.MutableGraph;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,24 +29,19 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.ozone.rocksdiff.CompactionNode;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * This class is used for testing the PrintableGraph class.
  * It contains methods to test the generation and printing of graphs with different types.
  */
-@ExtendWith(MockitoExtension.class)
 public class TestPrintableGraph {
   @TempDir
   private Path dir;
 
-  @Mock
-  private MutableGraph<CompactionNode> mutableGraph;
+  private final MutableGraph<CompactionNode> mutableGraph = GraphBuilder.directed().build();
 
   @ParameterizedTest
   @EnumSource(PrintableGraph.GraphType.class)
@@ -68,7 +63,7 @@ public class TestPrintableGraph {
         new CompactionNode("fileName3", 300, null, "endKey3", "columnFamily3"),
         new CompactionNode("fileName4", 400, "startKey4", null, "columnFamily4")
     ).collect(Collectors.toSet());
-    when(mutableGraph.nodes()).thenReturn(nodes);
+    nodes.forEach(mutableGraph::addNode);
 
     PrintableGraph graph = new PrintableGraph(mutableGraph, graphType);
     graph.generateImage(dir.resolve(graphType.name()).toString());
