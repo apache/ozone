@@ -974,7 +974,8 @@ public class NodeStateManager implements Runnable, Closeable {
   private void updateClusterMap(DatanodeInfo node, NodeStatus oldStatus, NodeStatus newStatus) {
     try {
       if (newStatus.isDead()) {
-        if (clusterMap.contains(node)) {
+        // Look up by path, as a re-registered node's DatanodeInfo may have no parent.
+        if (clusterMap.getNode(node.getNetworkFullPath()) != null) {
           clusterMap.remove(node);
         }
       } else if (oldStatus.isDead()) {

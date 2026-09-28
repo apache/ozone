@@ -294,6 +294,28 @@ public class TestNodeStateManager {
   }
 
   @Test
+  public void testReregisteredNodeIsRemovedFromTopologyWhenDead()
+      throws NodeAlreadyExistsException, NodeNotFoundException {
+    DatanodeDetails dn = generateDatanode();
+    dn.setNetworkName(dn.getUuidString());
+    clusterMap.add(dn);
+    nsm.addNode(dn, defaultLayoutVersionProto());
+    String path = dn.getNetworkFullPath();
+
+    // Re-registering with a new version or new ports replaces the DatanodeInfo with a copy that has no parent.
+    DatanodeDetails reregistered = new DatanodeDetails(dn);
+    reregistered.setParent(null);
+    nsm.updateNode(reregistered, defaultLayoutVersionProto());
+
+    nsm.getNode(dn).updateLastHeartbeatTime(Time.monotonicNow() - HddsServerUtil.getDeadNodeInterval(conf) - 1000);
+    nsm.checkNodesHealth();
+    nsm.checkNodesHealth();
+
+    assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
+    assertNull(clusterMap.getNode(path));
+  }
+
+  @Test
   public void testTopologyUpdateFailureDoesNotFailHealthCheck()
       throws NodeAlreadyExistsException, NodeNotFoundException {
     NetworkTopology failingClusterMap = mock(NetworkTopology.class);
