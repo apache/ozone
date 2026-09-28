@@ -27,6 +27,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -299,12 +300,13 @@ class TestRatisDataStreamBlockInputStream {
         .build();
   }
 
-  private RatisDataStreamBlockInputStream newStream(Pipeline pipeline, XceiverClientFactory factory) {
+  private RatisDataStreamBlockInputStream newStream(Pipeline pipeline, XceiverClientFactory factory)
+      throws IOException {
     return newStream(pipeline, factory, DATA.length, new OzoneClientConfig().getRatisStreamReadWindowSize());
   }
 
   private RatisDataStreamBlockInputStream newStream(Pipeline pipeline, XceiverClientFactory factory,
-      long blockLength, long window) {
+      long blockLength, long window) throws IOException {
     final OzoneClientConfig config = new OzoneClientConfig();
     config.setChecksumVerify(false);
     config.setRatisStreamReadWindowSize(window);

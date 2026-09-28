@@ -31,6 +31,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -146,6 +147,19 @@ public class TestStreamBlockInputStream {
     verify(xceiverClient, times(1)).completeStreamRead();
     verify(requestObserver, times(1)).onCompleted();
     verify(requestObserver, never()).cancel(any(), any());
+  }
+
+  /** A read into no space returns 0, not EOF, and reads nothing from the datanode. */
+  @Test
+  public void testZeroLengthReadReturnsZero() throws Exception {
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(new BlockID(1L, 3L), 1024L,
+        mockStandalonePipeline(), null, xceiverClientFactory, NO_REFRESH, newStreamReadConfig())) {
+      assertEquals(0, sbis.read(ByteBuffer.allocate(0)));
+      assertEquals(0, sbis.read(new byte[1], 0, 0));
+      assertEquals(0, sbis.getPos());
+      verifyNoInteractions(xceiverClientFactory);
+    }
   }
 
   @Test

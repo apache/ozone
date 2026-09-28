@@ -67,9 +67,7 @@ public class MultipartInputStream extends ExtendedInputStream {
 
     this.key = keyName;
     this.partStreams = Collections.unmodifiableList(inputStreams);
-    this.isStreamBlockInputStream = !inputStreams.isEmpty()
-        && (inputStreams.get(0) instanceof StreamBlockInputStream
-        || inputStreams.get(0) instanceof RatisDataStreamBlockInputStream);
+    this.isStreamBlockInputStream = !inputStreams.isEmpty() && inputStreams.get(0) instanceof StreamBlockInputStream;
 
     // Calculate and update the partOffsets
     this.partOffsets = new long[inputStreams.size()];
@@ -79,9 +77,7 @@ public class MultipartInputStream extends ExtendedInputStream {
     for (PartInputStream partInputStream : inputStreams) {
       this.partOffsets[i++] = streamLength;
       if (isStreamBlockInputStream) {
-        Preconditions.assertTrue(partInputStream instanceof StreamBlockInputStream
-            || partInputStream instanceof RatisDataStreamBlockInputStream,
-            () -> "Unexpected stream block input stream " + partInputStream);
+        Preconditions.assertInstanceOf(partInputStream, StreamBlockInputStream.class);
       } else if (statelessSupported && !(partInputStream instanceof BlockInputStream)) {
         statelessSupported = false;
       }
@@ -223,12 +219,7 @@ public class MultipartInputStream extends ExtendedInputStream {
       read(new ByteBufferReader(buffer) {
         @Override
         int readImpl(InputStream inputStream) throws IOException {
-          if (inputStream instanceof StreamBlockInputStream) {
-            return ((StreamBlockInputStream) inputStream)
-                .readFully(getBuffer(), false);
-          }
-          return Preconditions.assertInstanceOf(inputStream,
-              RatisDataStreamBlockInputStream.class)
+          return Preconditions.assertInstanceOf(inputStream, StreamBlockInputStream.class)
               .readFully(getBuffer(), false);
         }
       });

@@ -20,15 +20,12 @@ package org.apache.hadoop.hdds.scm.storage;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -43,7 +40,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.client.api.DataStreamInput;
 import org.apache.ratis.client.impl.ClientProtoUtils;
@@ -58,7 +54,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Reads RATIS blocks exclusively through the Ratis data stream read-only API.
+ * Reads RATIS blocks exclusively through the Ratis data stream read-only API. The reading, seeking and buffering are
+ * those of {@link StreamBlockInputStream}; this class replaces its gRPC stream with Ratis read-only streams.
  * <p>
  * A datanode sends the whole range of a ReadBlock request, and closing a read-only stream does not stop it. So a
  * sequential reader requests at most {@code ozone.client.ratis.stream.read.window-size} bytes ahead of its position,
@@ -70,190 +67,68 @@ import org.slf4j.LoggerFactory;
  * A reader that asks for at least half the window in one read (Parquet reads a run of column chunks in 8 MB buffers)
  * already reads in large pieces, so it gets exactly what it asks for until its next seek.
  */
-public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
+public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
   private static final Logger LOG =
       LoggerFactory.getLogger(RatisDataStreamBlockInputStream.class);
-  private static final ByteBuffer EMPTY_BUFFER = ByteBuffer.allocate(0);
   /** The first read-ahead request of a sequential run, before it doubles up to {@link #readAheadRequestSize}. */
   static final long INITIAL_READ_AHEAD = 128 << 10;
 
-  private final BlockID blockID;
-  private final long blockLength;
-  private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
-  private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef =
-      new AtomicReference<>();
-  private final XceiverClientFactory xceiverClientFactory;
-  private final boolean verifyChecksum;
   private final long readAheadRequestSize;
-  private final int responseDataSize;
-  private final Duration readTimeout;
 
   private XceiverClientRatis xceiverClient;
   /** The request being consumed. */
   private ReadRequest current;
   /** The read-ahead request for the bytes right after {@link #current}. */
   private ReadRequest next;
-  private ByteBuffer buffer = EMPTY_BUFFER;
-  private ReferenceCountedObject<DataStreamReply> retainedDataReply;
-  private long position;
+  /** The buffered data, released as soon as it is consumed or dropped. */
+  private DataReply dataReply;
   /** Set once a request has been consumed to its end without a seek, so the reader is reading sequentially. */
   private boolean sequential;
   /** Set when a read since the last seek asked for at least {@link #readAheadRequestSize}: no read-ahead then. */
   private boolean largeReads;
   /** The size of the next read-ahead request; 0 until the reader reads sequentially. */
   private long readAheadSize;
-  private boolean closed;
 
   public RatisDataStreamBlockInputStream(BlockID blockID, long length,
       Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
-      OzoneClientConfig config) {
-    this.blockID = Objects.requireNonNull(blockID, "blockID == null");
-    this.blockLength = length;
-    pipelineRef.set(Objects.requireNonNull(pipeline, "pipeline == null"));
-    tokenRef.set(token);
-    this.xceiverClientFactory = Objects.requireNonNull(xceiverClientFactory,
-        "xceiverClientFactory == null");
-    Objects.requireNonNull(config, "config == null");
-    this.verifyChecksum = config.isChecksumVerify();
+      OzoneClientConfig config) throws IOException {
+    super(blockID, length, pipeline, token, xceiverClientFactory, null, config);
     this.readAheadRequestSize = Math.max(1L, config.getRatisStreamReadWindowSize() / 2);
-    this.responseDataSize = config.getStreamReadResponseDataSize();
-    this.readTimeout = config.getStreamReadTimeout();
+  }
+
+  /** Keeps the RATIS pipeline, which the data stream is opened on, instead of converting it for standalone reads. */
+  @Override
+  protected Pipeline setPipeline(Pipeline pipeline) {
+    return Objects.requireNonNull(pipeline, "pipeline == null");
   }
 
   @Override
-  public BlockID getBlockID() {
-    return blockID;
-  }
-
-  @Override
-  public long getLength() {
-    return blockLength;
-  }
-
-  @Override
-  public long getPos() {
-    return position;
-  }
-
-  @Override
-  public synchronized int read(byte[] b, int off, int len) throws IOException {
-    Objects.requireNonNull(b, "b == null");
-    if (off < 0 || len < 0 || len > b.length - off) {
-      throw new IndexOutOfBoundsException();
-    }
-    return read(ByteBuffer.wrap(b, off, len));
-  }
-
-  @Override
-  public synchronized int read(ByteBuffer targetBuf) throws IOException {
-    return readFully(targetBuf, true);
-  }
-
-  public synchronized int readFully(ByteBuffer targetBuf, boolean preRead)
-      throws IOException {
-    checkOpen();
-    if (!targetBuf.hasRemaining()) {
-      return 0;
-    }
-    int read = 0;
-    while (targetBuf.hasRemaining() && position < blockLength) {
-      if (!buffer.hasRemaining()) {
-        releaseRetainedDataReply();
-        buffer = readBlock(targetBuf.remaining(), preRead);
-      }
-      if (!buffer.hasRemaining()) {
-        break;
-      }
-
-      final int toCopy = Math.min(buffer.remaining(), targetBuf.remaining());
-      final ByteBuffer tmp = buffer.duplicate();
-      tmp.limit(tmp.position() + toCopy);
-      targetBuf.put(tmp);
-      buffer.position(tmp.position());
-      position += toCopy;
-      read += toCopy;
-      if (!buffer.hasRemaining()) {
-        releaseRetainedDataReply();
-        if (current != null && position >= current.end) {
-          // All data of the request is consumed: close it now instead of waiting for its terminal reply, which would
-          // keep the stream and the netty buffer holding that reply until the next read or seek.
-          finishCurrent();
-        }
-      }
-    }
-    return read > 0 ? read : EOF;
-  }
-
-  @Override
-  protected int readWithStrategy(ByteReaderStrategy strategy) {
-    throw new NotImplementedException("readWithStrategy is not implemented.");
-  }
-
-  @Override
-  public synchronized void seek(long pos) throws IOException {
-    checkOpen();
-    if (pos < 0) {
-      throw new IOException("Cannot seek to negative offset");
-    }
-    if (pos > blockLength) {
-      throw new EOFException("Failed to seek to position " + pos
-          + " > block length = " + blockLength);
-    }
-    if (pos != position) {
-      closeRequests();
-      position = pos;
-      discardBufferedData();
-      sequential = false;
-      largeReads = false;
-      readAheadSize = 0;
-    }
-  }
-
-  @Override
-  public synchronized boolean seekToNewSource(long targetPos)
-      throws IOException {
-    return false;
-  }
-
-  @Override
-  public synchronized void unbuffer() {
-    discardBufferedData();
-    releaseClient(false);
-  }
-
-  @Override
-  public synchronized void close() {
-    closed = true;
-    discardBufferedData();
-    closeRequests();
-    releaseClient(false);
-  }
-
-  private ByteBuffer readBlock(int length, boolean preRead) throws IOException {
+  synchronized ReadBuffer readNext(int length, boolean preRead) throws IOException {
+    releaseDataReply();
     int leaderRedirects = 0;
     largeReads |= length >= readAheadRequestSize;
-    while (position < blockLength) {
+    while (getPos() < getLength()) {
       final boolean readAhead = preRead && sequential && !largeReads;
       if (readAhead && readAheadSize == 0) {
         readAheadSize = Math.min(INITIAL_READ_AHEAD, readAheadRequestSize);
       }
       if (current == null) {
-        current = openRequest(position,
-            requestLength(blockLength, position, length, readAhead, readAheadSize));
+        current = openRequest(getPos(),
+            requestLength(getLength(), getPos(), length, readAhead, readAheadSize));
       }
-      if (readAhead && next == null && current.end < blockLength) {
+      if (readAhead && next == null && current.end < getLength()) {
         next = openRequest(current.end,
-            requestLength(blockLength, current.end, 0, true, readAheadSize));
+            requestLength(getLength(), current.end, 0, true, readAheadSize));
       }
 
       final ReferenceCountedObject<DataStreamReply> ref = readReply(current);
       final DataStreamReply reply = ref.get();
       if (reply.getType() == Type.STREAM_DATA) {
         current.dataSeen = true;
-        final ByteBuffer data = readDataReply(ref);
-        if (data.hasRemaining()) {
-          return data;
+        dataReply = readDataReply(ref);
+        if (dataReply != null) {
+          return dataReply;
         }
       } else if (reply.getType() == Type.STREAM_HEADER) {
         final RaftPeer leader = handleTerminalReply(ref, current.dataSeen);
@@ -261,26 +136,55 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
           redirectToLeader(leader, ++leaderRedirects);
           continue;
         }
-        if (!current.dataSeen && position < blockLength) {
+        if (!current.dataSeen && getPos() < getLength()) {
           throw new EOFException("ReadBlock stream returned no data for "
-              + blockID + " at position " + position);
+              + getBlockID() + " at position " + getPos());
         }
         finishCurrent();
       } else {
         try {
           throw new IOException("Unexpected data stream reply type "
-              + reply.getType() + " for " + blockID);
+              + reply.getType() + " for " + getBlockID());
         } finally {
           ref.release();
         }
       }
     }
-    return ByteBuffer.allocate(0);
+    return null;
+  }
+
+  @Override
+  synchronized void advancePosition(long delta, boolean preRead) {
+    super.advancePosition(delta, preRead);
+    if (dataReply != null && !dataReply.getByteBuffer().hasRemaining()) {
+      releaseDataReply();
+      if (current != null && getPos() >= current.end) {
+        // All data of the request is consumed: close it now instead of waiting for its terminal reply, which would
+        // keep the stream and the netty buffer holding that reply until the next read or seek.
+        finishCurrent();
+      }
+    }
+  }
+
+  /** A seek closes the requests in flight, so the first read after it requests exactly what the reader asks for. */
+  @Override
+  synchronized ReadBuffer seekReader(ReadBuffer buffered, long pos) {
+    closeReads("seek");
+    return null;
+  }
+
+  @Override
+  synchronized void closeReads(String reason) {
+    releaseDataReply();
+    closeRequests();
+    sequential = false;
+    largeReads = false;
+    readAheadSize = 0;
   }
 
   /** Closes the consumed request and moves on to the read-ahead request, if any. */
   private void finishCurrent() {
-    current.close(blockID);
+    current.close(getBlockID());
     current = next;
     next = null;
     sequential = true;
@@ -294,8 +198,8 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     // Name the datanode the client streams to (the closest node of the client's pipeline): a datanode serves a
     // closed-container read only when the request names it, see ClosedContainerReadResolver.
     final ContainerCommandRequestProto request =
-        ContainerProtocolCalls.buildReadBlockCommandProto(blockID, offset,
-            length, responseDataSize, tokenRef.get(), xceiverClient.getPipeline());
+        ContainerProtocolCalls.buildReadBlockCommandProto(getBlockID(), offset,
+            length, getResponseDataSize(), getToken(), xceiverClient.getPipeline());
     final ContainerCommandRequestMessage message =
         ContainerCommandRequestMessage.toMessage(request,
             TracingUtil.exportCurrentSpan());
@@ -305,7 +209,7 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
 
   private ReferenceCountedObject<DataStreamReply> readReply(ReadRequest request) throws IOException {
     try {
-      return request.input.readAsync().get(readTimeout.toMillis(),
+      return request.input.readAsync().get(getReadTimeout().toMillis(),
           TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -326,7 +230,8 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private ByteBuffer readDataReply(ReferenceCountedObject<DataStreamReply> ref)
+  /** @return the data of the reply from the reader's position, or null when the reply has no data there */
+  private DataReply readDataReply(ReferenceCountedObject<DataStreamReply> ref)
       throws IOException {
     final DataStreamReply reply = ref.get();
     boolean releaseReply = true;
@@ -342,22 +247,20 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
       final ReadBlockResponseProto readBlock = response.getReadBlock();
       final ByteBuffer dataBuffer = readBlockData.getData() != null ?
           readBlockData.getData() : readBlock.getData().asReadOnlyByteBuffer();
-      if (verifyChecksum) {
-        Checksum.validateChecksums(dataBuffer, readBlock.getOffset(), 0, readBlock.getChunkInfoListList());
-      }
+      validateChecksums(readBlock, dataBuffer);
 
       final long blockOffset = readBlock.getOffset();
-      if (position < blockOffset) {
+      if (getPos() < blockOffset) {
         throw new IOException("ReadBlock response is ahead of requested "
-            + "position " + position + ", response offset " + blockOffset);
+            + "position " + getPos() + ", response offset " + blockOffset);
       }
       dataBuffer.position(Math.toIntExact(
-          Math.min(position - blockOffset, dataBuffer.limit())));
-      if (dataBuffer.hasRemaining()) {
-        retainedDataReply = ref;
-        releaseReply = false;
+          Math.min(getPos() - blockOffset, dataBuffer.limit())));
+      if (!dataBuffer.hasRemaining()) {
+        return null;
       }
-      return dataBuffer;
+      releaseReply = false;
+      return new DataReply(readBlock, dataBuffer, ref);
     } catch (InvalidProtocolBufferException e) {
       releaseClient(true);
       throw new IOException("Failed to parse ReadBlock response", e);
@@ -393,71 +296,68 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
 
   /** Moves the suggested leader to the front of the pipeline, so the next stream is opened on it. */
   private void redirectToLeader(RaftPeer leader, int attempt) throws IOException {
-    final Pipeline pipeline = pipelineRef.get();
+    final Pipeline pipeline = getPipeline();
     final DatanodeDetails target = pipeline.getNodes().stream()
         .filter(dn -> RatisHelper.toRaftPeerId(dn).equals(leader.getId()))
         .findFirst()
         .orElse(null);
     if (target == null || attempt > pipeline.getNodes().size()) {
-      throw new IOException("Failed Ratis read-only data stream request for " + blockID
+      throw new IOException("Failed Ratis read-only data stream request for " + getBlockID()
           + ": not leader, suggested leader " + leader + ", attempt " + attempt + ", " + pipeline);
     }
     final List<DatanodeDetails> nodes = new ArrayList<>(pipeline.getNodes());
     nodes.remove(target);
     nodes.add(0, target);
     releaseClient(false);
-    pipelineRef.set(pipeline.copyWithNodesInOrder(nodes));
-    LOG.debug("Redirecting Ratis read-only data stream for {} to leader {}", blockID, target);
+    updatePipeline(pipeline.copyWithNodesInOrder(nodes));
+    LOG.debug("Redirecting Ratis read-only data stream for {} to leader {}", getBlockID(), target);
   }
 
-  private synchronized void acquireClient() throws IOException {
+  @Override
+  protected synchronized void acquireClient() throws IOException {
     checkOpen();
     if (xceiverClient == null) {
       // Topology aware: one cached client per target datanode (the pipeline's closest node), so a stream can be
       // redirected to the Raft leader.
       final XceiverClientSpi client =
-          xceiverClientFactory.acquireClient(pipelineRef.get(), true);
+          getXceiverClientFactory().acquireClient(getPipeline(), true);
       if (!(client instanceof XceiverClientRatis)) {
-        xceiverClientFactory.releaseClient(client, false, true);
+        getXceiverClientFactory().releaseClient(client, false, true);
         throw new IOException("Unexpected client class: "
-            + client.getClass().getName() + ", " + pipelineRef.get());
+            + client.getClass().getName() + ", " + getPipeline());
       }
       xceiverClient = (XceiverClientRatis) client;
     }
   }
 
+  @Override
+  protected synchronized void releaseClient() {
+    releaseClient(false);
+  }
+
   private synchronized void releaseClient(boolean invalidateClient) {
-    discardBufferedData();
-    sequential = false;
-    largeReads = false;
-    readAheadSize = 0;
+    closeReader("releaseClient");
     if (xceiverClient != null) {
-      closeRequests();
-      xceiverClientFactory.releaseClient(xceiverClient, invalidateClient, true);
+      getXceiverClientFactory().releaseClient(xceiverClient, invalidateClient, true);
       xceiverClient = null;
     }
   }
 
   private synchronized void closeRequests() {
     if (current != null) {
-      current.close(blockID);
+      current.close(getBlockID());
       current = null;
     }
     if (next != null) {
-      next.close(blockID);
+      next.close(getBlockID());
       next = null;
     }
   }
 
-  private void discardBufferedData() {
-    buffer = EMPTY_BUFFER;
-    releaseRetainedDataReply();
-  }
-
-  private void releaseRetainedDataReply() {
-    if (retainedDataReply != null) {
-      retainedDataReply.release();
-      retainedDataReply = null;
+  private void releaseDataReply() {
+    if (dataReply != null) {
+      dataReply.release();
+      dataReply = null;
     }
   }
 
@@ -469,12 +369,6 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
       long readAheadSize) {
     final long wanted = readAhead ? Math.max(length, readAheadSize) : Math.max(1L, length);
     return Math.min(blockLength - offset, wanted);
-  }
-
-  private void checkOpen() throws IOException {
-    if (closed) {
-      throw new IOException("Stream is closed for block " + blockID);
-    }
   }
 
   /** A ReadBlock request for the block range ending at {@link #end}, served over its own read-only stream. */
@@ -494,6 +388,20 @@ public class RatisDataStreamBlockInputStream extends BlockExtendedInputStream {
       } catch (IOException e) {
         LOG.debug("Failed to close Ratis read-only stream for {}", blockID, e);
       }
+    }
+  }
+
+  /** The data of a reply, which keeps the netty buffer the reply was received in until it is released. */
+  private static final class DataReply extends ReadBuffer {
+    private final ReferenceCountedObject<DataStreamReply> reply;
+
+    DataReply(ReadBlockResponseProto readBlock, ByteBuffer data, ReferenceCountedObject<DataStreamReply> reply) {
+      super(readBlock, data);
+      this.reply = reply;
+    }
+
+    void release() {
+      reply.release();
     }
   }
 }

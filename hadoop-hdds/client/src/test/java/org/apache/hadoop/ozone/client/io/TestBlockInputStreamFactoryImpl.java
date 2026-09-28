@@ -78,7 +78,8 @@ public class TestBlockInputStreamFactoryImpl {
             blockInfo.getToken(), null, null,
             clientConfig);
     if (streamReadBlockEnabled) {
-      assertInstanceOf(StreamBlockInputStream.class, stream);
+      // Exact class: a RatisDataStreamBlockInputStream is a StreamBlockInputStream too.
+      assertEquals(StreamBlockInputStream.class, stream.getClass());
     } else {
       assertInstanceOf(BlockInputStream.class, stream);
     }
@@ -154,7 +155,8 @@ public class TestBlockInputStreamFactoryImpl {
         clientConfig);
 
     if (streamReadBlockEnabled) {
-      assertInstanceOf(StreamBlockInputStream.class, stream);
+      // Exact class: a RatisDataStreamBlockInputStream is a StreamBlockInputStream too.
+      assertEquals(StreamBlockInputStream.class, stream.getClass());
     } else {
       assertInstanceOf(BlockInputStream.class, stream);
     }
