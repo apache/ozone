@@ -26,11 +26,13 @@ import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataCheck
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.times;
@@ -44,6 +46,7 @@ import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
@@ -90,6 +93,30 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
   @TempDir
   private File tempDir;
+
+  @Test
+  public void testWriteChunkReadsFileSizeOnce() throws IOException {
+    File chunkFile = FILE_PER_BLOCK.getChunkFile(getKeyValueContainerData(), getBlockID(), null);
+    byte[] expectedData = new byte[getData().remaining()];
+    getData().duplicate().get(expectedData);
+    KeyValueHandler handler = createKeyValueHandler(newContainerSet());
+    try (RandomAccessFile actualFile = new RandomAccessFile(chunkFile, "rw")) {
+      FileChannel channel = mock(FileChannel.class, delegatesTo(actualFile.getChannel()));
+      try (MockedConstruction<RandomAccessFile> files = mockConstruction(RandomAccessFile.class,
+          (file, context) -> when(file.getChannel()).thenReturn(channel))) {
+        handler.getChunkManager().writeChunk(
+            getKeyValueContainer(), getBlockID(), getChunkInfo(), getData(), WRITE_STAGE);
+
+        verify(channel).size();
+        assertThat(files.constructed()).hasSize(1);
+        assertThat(Files.readAllBytes(chunkFile.toPath())).isEqualTo(expectedData);
+        checkWriteIOStats(expectedData.length, 1);
+        assertThat(getKeyValueContainerData().getBytesUsed()).isEqualTo(expectedData.length);
+      }
+    } finally {
+      handler.stop();
+    }
+  }
 
   @Test
   public void testFileSizeFailure() throws IOException {
