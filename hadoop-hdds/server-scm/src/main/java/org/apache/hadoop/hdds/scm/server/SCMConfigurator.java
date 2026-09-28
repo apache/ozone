@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import java.time.Clock;
+import java.util.Random;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
@@ -25,11 +28,13 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 
@@ -77,6 +82,10 @@ public final class SCMConfigurator {
   private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
       finalizationExecutor;
   private LeaseManager<Object> leaseManager;
+  private EventQueue eventQueue;
+  private Clock systemClock;
+  private Supplier<PipelineID> pipelineIdGenerator;
+  private Random random;
 
   /**
    * Allows user to specify a version of Node manager to use with this SCM.
@@ -203,6 +212,42 @@ public final class SCMConfigurator {
   }
 
   /**
+   * Allows user to specify the event queue that delivers SCM events to their
+   * handlers.
+   * @param eventQueue - Event queue.
+   */
+  public void setEventQueue(EventQueue eventQueue) {
+    this.eventQueue = eventQueue;
+  }
+
+  /**
+   * Allows user to specify the clock SCM uses for wall clock times, such as
+   * replication deadlines and when containers and pipelines change state.
+   * @param systemClock - Clock.
+   */
+  public void setSystemClock(Clock systemClock) {
+    this.systemClock = systemClock;
+  }
+
+  /**
+   * Allows user to specify how SCM generates the IDs of new pipelines.
+   * @param pipelineIdGenerator - Pipeline ID generator.
+   */
+  public void setPipelineIdGenerator(Supplier<PipelineID> pipelineIdGenerator) {
+    this.pipelineIdGenerator = pipelineIdGenerator;
+  }
+
+  /**
+   * Allows user to specify the random source ReplicationManager uses for its
+   * random choices, such as the order in which it replicates vulnerable
+   * UNHEALTHY replicas.
+   * @param random - Random source.
+   */
+  public void setRandom(Random random) {
+    this.random = random;
+  }
+
+  /**
    * Gets SCM Node Manager.
    * @return Node Manager.
    */
@@ -313,5 +358,37 @@ public final class SCMConfigurator {
    */
   public LeaseManager<Object> getLeaseManager() {
     return leaseManager;
+  }
+
+  /**
+   * Get the event queue.
+   * @return EventQueue
+   */
+  public EventQueue getEventQueue() {
+    return eventQueue;
+  }
+
+  /**
+   * Get the system clock.
+   * @return Clock
+   */
+  public Clock getSystemClock() {
+    return systemClock;
+  }
+
+  /**
+   * Get the pipeline ID generator.
+   * @return Supplier of pipeline IDs
+   */
+  public Supplier<PipelineID> getPipelineIdGenerator() {
+    return pipelineIdGenerator;
+  }
+
+  /**
+   * Get the random source.
+   * @return Random
+   */
+  public Random getRandom() {
+    return random;
   }
 }

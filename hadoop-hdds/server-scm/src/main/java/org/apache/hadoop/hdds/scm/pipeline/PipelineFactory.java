@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -45,14 +46,14 @@ public class PipelineFactory {
 
   PipelineFactory(NodeManager nodeManager, PipelineStateManager stateManager,
                   ConfigurationSource conf, EventPublisher eventPublisher,
-                  SCMContext scmContext) {
+                  SCMContext scmContext, Supplier<PipelineID> pipelineIdGenerator) {
     providers = new HashMap<>();
     providers.put(ReplicationType.STAND_ALONE,
-        new SimplePipelineProvider(nodeManager, stateManager));
+        new SimplePipelineProvider(nodeManager, stateManager, pipelineIdGenerator));
     providers.put(ReplicationType.RATIS,
         new RatisPipelineProvider(nodeManager,
             stateManager, conf,
-            eventPublisher, scmContext));
+            eventPublisher, scmContext, pipelineIdGenerator));
     PlacementPolicy ecPlacementPolicy;
     try {
       ecPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(conf,
@@ -64,7 +65,7 @@ public class PipelineFactory {
     }
     providers.put(ReplicationType.EC,
         new ECPipelineProvider(nodeManager, stateManager, conf,
-            ecPlacementPolicy));
+            ecPlacementPolicy, pipelineIdGenerator));
   }
 
   protected PipelineFactory() {

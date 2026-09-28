@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
@@ -54,6 +56,7 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
   private final NodeManager nodeManager;
   private Table<PipelineID, Pipeline> pipelineStore;
   private final DBTransactionBuffer transactionBuffer;
+  private final Clock clock;
 
   // Protect potential contentions between RaftServer and PipelineManager.
   // See https://issues.apache.org/jira/browse/HDDS-4560
@@ -61,8 +64,9 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
 
   private PipelineStateManagerImpl(
       Table<PipelineID, Pipeline> pipelineStore, NodeManager nodeManager,
-      DBTransactionBuffer buffer) {
-    this.pipelineStateMap = new PipelineStateMap();
+      DBTransactionBuffer buffer, Clock clock) {
+    this.clock = clock;
+    this.pipelineStateMap = new PipelineStateMap(clock);
     this.nodeManager = nodeManager;
     this.pipelineStore = pipelineStore;
     this.transactionBuffer = buffer;
@@ -77,7 +81,10 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
     }
     try (TableIterator<PipelineID, Pipeline> iterator = pipelineStore.valueIterator()) {
       while (iterator.hasNext()) {
-        final Pipeline pipeline = iterator.next();
+        // Loading starts a pipeline's allocation and destroy timeouts over: the codec sets its creation time and the
+        // constructor its state enter time to Instant.now(). Keep that, but by SCM's clock.
+        final Instant now = clock.instant();
+        final Pipeline pipeline = iterator.next().toBuilder().setCreateTimestamp(now).setStateEnterTime(now).build();
         pipelineStateMap.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
       }
@@ -311,7 +318,7 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
       throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException {
     lock.writeLock().lock();
     try {
-      this.pipelineStateMap = new PipelineStateMap();
+      this.pipelineStateMap = new PipelineStateMap(clock);
       this.pipelineStore = store;
       initialize();
     } catch (Exception ex) {
@@ -335,6 +342,7 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
     private NodeManager nodeManager;
     private SCMRatisServer scmRatisServer;
     private DBTransactionBuffer transactionBuffer;
+    private Clock clock = Clock.systemUTC();
 
     public Builder setSCMDBTransactionBuffer(DBTransactionBuffer buffer) {
       this.transactionBuffer = buffer;
@@ -357,11 +365,16 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
       return this;
     }
 
+    public Builder setClock(final Clock stateClock) {
+      this.clock = stateClock;
+      return this;
+    }
+
     public PipelineStateManager build() throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException {
       Objects.requireNonNull(pipelineStore, "pipelineStore == null");
 
       final PipelineStateManagerImpl pipelineStateManager = new PipelineStateManagerImpl(
-          pipelineStore, nodeManager, transactionBuffer);
+          pipelineStore, nodeManager, transactionBuffer, clock);
       pipelineStateManager.initialize();
 
       return scmRatisServer.getProxyHandler(new PipelineStateManagerInvoker(pipelineStateManager, scmRatisServer));

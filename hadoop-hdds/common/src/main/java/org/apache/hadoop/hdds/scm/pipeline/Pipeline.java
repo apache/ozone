@@ -109,7 +109,7 @@ public final class Pipeline {
     nodesInOrder = b.nodesInOrder != null ? ImmutableList.copyOf(b.nodesInOrder) : ImmutableList.of();
     replicaIndexes = b.replicaIndexes;
     creationTimestamp = b.creationTimestamp != null ? b.creationTimestamp : Instant.now();
-    stateEnterTime = Instant.now();
+    stateEnterTime = b.stateEnterTime != null ? b.stateEnterTime : Instant.now();
   }
 
   public static Codec<Pipeline> getCodec() {
@@ -167,7 +167,7 @@ public final class Pipeline {
   }
 
   /**
-   * Set the creation timestamp. Only for protobuf now.
+   * Set the creation timestamp.
    */
   public void setCreationTimestamp(Instant creationTimestamp) {
     this.creationTimestamp = creationTimestamp;
@@ -578,6 +578,7 @@ public final class Pipeline {
     private List<DatanodeDetails> nodesInOrder = null;
     private DatanodeID leaderId = null;
     private Instant creationTimestamp = null;
+    private Instant stateEnterTime = null;
     private DatanodeID suggestedLeaderId = null;
     private Map<DatanodeDetails, Integer> replicaIndexes = ImmutableMap.of();
 
@@ -671,6 +672,12 @@ public final class Pipeline {
 
     public Builder setCreateTimestamp(long createTimestamp) {
       this.creationTimestamp = Instant.ofEpochMilli(createTimestamp);
+      return this;
+    }
+
+    /** Time the pipeline entered its state; defaults to now. */
+    public Builder setStateEnterTime(Instant instant) {
+      this.stateEnterTime = instant;
       return this;
     }
 

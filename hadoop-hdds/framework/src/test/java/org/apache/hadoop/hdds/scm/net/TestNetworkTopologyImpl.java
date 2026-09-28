@@ -1014,6 +1014,23 @@ class TestNetworkTopologyImpl {
     assertEquals(n1, dc.getLeaf(0, excludedScope, null, 0));
   }
 
+  @Test
+  void testRandomChoicesRepeatWithSameSeed() {
+    assertEquals(randomChoices(new Random(42)), randomChoices(new Random(42)));
+  }
+
+  private static List<String> randomChoices(Random random) {
+    NetworkTopologyImpl topology = new NetworkTopologyImpl(new OzoneConfiguration(), random);
+    for (int i = 1; i <= 8; i++) {
+      topology.add(createDatanode(i + "." + i + "." + i + "." + i, "/r" + (i % 3)));
+    }
+    List<String> choices = new ArrayList<>();
+    for (int i = 0; i < 20; i++) {
+      choices.add(topology.chooseRandom(ROOT).getNetworkFullPath());
+    }
+    return choices;
+  }
+
   private static Node createDatanode(String name, String path) {
     return new NodeImpl(name, path, NetConstants.NODE_COST_DEFAULT);
   }

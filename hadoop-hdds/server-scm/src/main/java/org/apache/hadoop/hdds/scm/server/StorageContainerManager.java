@@ -48,12 +48,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 import javax.management.ObjectName;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -136,6 +138,7 @@ import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.node.StartDatanodeAdminHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineReportHandler;
@@ -419,7 +422,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // A valid pointer to the store is required by all the other services below.
     initalizeMetadataStore(conf, configurator);
 
-    eventQueue = new EventQueue(threadNamePrefix);
+    if (configurator.getEventQueue() != null) {
+      eventQueue = configurator.getEventQueue();
+    } else {
+      eventQueue = new EventQueue(threadNamePrefix);
+    }
     serviceManager = new SCMServiceManager();
     reconfigurationHandler =
         new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
@@ -688,7 +695,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       SCMConfigurator configurator) throws IOException {
     // Use SystemClock when data is persisted
     // and used again after system restarts.
-    systemClock = Clock.system(ZoneOffset.UTC);
+    if (configurator.getSystemClock() != null) {
+      systemClock = configurator.getSystemClock();
+    } else {
+      systemClock = Clock.system(ZoneOffset.UTC);
+    }
 
     if (configurator.getNetworkTopology() != null) {
       clusterMap = configurator.getNetworkTopology();
@@ -778,6 +789,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     if (configurator.getPipelineManager() != null) {
       pipelineManager = configurator.getPipelineManager();
     } else {
+      Supplier<PipelineID> pipelineIdGenerator = configurator.getPipelineIdGenerator() != null
+          ? configurator.getPipelineIdGenerator() : PipelineID::randomId;
       pipelineManager =
           PipelineManagerImpl.newPipelineManager(
               conf,
@@ -787,7 +800,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               eventQueue,
               scmContext,
               serviceManager,
-              systemClock
+              systemClock,
+              pipelineIdGenerator
               );
     }
 
@@ -828,7 +842,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     } else {
       containerManager = new ContainerManagerImpl(conf, scmHAManager,
           sequenceIdGen, pipelineManager, scmMetadataStore.getContainerTable(),
-          containerReplicaPendingOps);
+          containerReplicaPendingOps, systemClock);
     }
 
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
@@ -859,7 +873,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           scmContext,
           scmNodeManager,
           systemClock,
-          containerReplicaPendingOps);
+          containerReplicaPendingOps,
+          configurator.getRandom() != null ? configurator.getRandom() : new Random());
       reconfigurationHandler.register(rmConf);
     }
     serviceManager.register(replicationManager);

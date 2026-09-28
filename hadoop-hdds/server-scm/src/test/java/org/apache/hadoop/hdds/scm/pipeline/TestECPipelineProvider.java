@@ -74,7 +74,7 @@ public class TestECPipelineProvider {
   public void setup() throws IOException, NodeNotFoundException {
     OzoneConfiguration conf = new OzoneConfiguration();
     provider = new ECPipelineProvider(
-        nodeManager, stateManager, conf, placementPolicy);
+        nodeManager, stateManager, conf, placementPolicy, PipelineID::randomId);
     this.containerSizeBytes = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,

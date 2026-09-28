@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -192,17 +193,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       new MonitoringReplicationQueue();
 
   /**
-   * Constructs ReplicationManager instance with the given configuration.
-   *
-   * @param conf The SCM configuration used by RM.
-   * @param containerManager The containerManager instance
-   * @param ratisContainerPlacement The Ratis container placement policy
-   * @param ecContainerPlacement The EC container placement policy
-   * @param eventPublisher The eventPublisher instance
-   * @param scmContext The SCMContext instance
-   * @param nodeManager The nodeManager instance
-   * @param clock Clock object used to get the current time
-   * @param replicaPendingOps The pendingOps instance
+   * Constructs ReplicationManager instance with the given configuration and a new Random.
    */
   @SuppressWarnings("parameternumber")
   public ReplicationManager(final ReplicationManagerConfiguration rmConf,
@@ -215,6 +206,38 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
              final NodeManager nodeManager,
              final Clock clock,
              final ContainerReplicaPendingOps replicaPendingOps)
+             throws IOException {
+    this(rmConf, conf, containerManager, ratisContainerPlacement, ecContainerPlacement, eventPublisher, scmContext,
+        nodeManager, clock, replicaPendingOps, new Random());
+  }
+
+  /**
+   * Constructs ReplicationManager instance with the given configuration.
+   *
+   * @param conf The SCM configuration used by RM.
+   * @param containerManager The containerManager instance
+   * @param ratisContainerPlacement The Ratis container placement policy
+   * @param ecContainerPlacement The EC container placement policy
+   * @param eventPublisher The eventPublisher instance
+   * @param scmContext The SCMContext instance
+   * @param nodeManager The nodeManager instance
+   * @param clock Clock object used to get the current time
+   * @param replicaPendingOps The pendingOps instance
+   * @param random Random source for choices RM makes at random, such as the order in which vulnerable UNHEALTHY
+   *               replicas are replicated
+   */
+  @SuppressWarnings("parameternumber")
+  public ReplicationManager(final ReplicationManagerConfiguration rmConf,
+             final ConfigurationSource conf,
+             final ContainerManager containerManager,
+             final PlacementPolicy ratisContainerPlacement,
+             final PlacementPolicy ecContainerPlacement,
+             final EventPublisher eventPublisher,
+             final SCMContext scmContext,
+             final NodeManager nodeManager,
+             final Clock clock,
+             final ContainerReplicaPendingOps replicaPendingOps,
+             final Random random)
              throws IOException {
     this.containerManager = containerManager;
     this.scmContext = scmContext;
@@ -246,7 +269,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     ecMisReplicationHandler = new ECMisReplicationHandler(ecContainerPlacement,
         conf, this);
     ratisUnderReplicationHandler = new RatisUnderReplicationHandler(
-        ratisContainerPlacement, conf, this);
+        ratisContainerPlacement, conf, this, random);
     ratisOverReplicationHandler =
         new RatisOverReplicationHandler(ratisContainerPlacement, this);
     ratisMisReplicationHandler = new RatisMisReplicationHandler(
