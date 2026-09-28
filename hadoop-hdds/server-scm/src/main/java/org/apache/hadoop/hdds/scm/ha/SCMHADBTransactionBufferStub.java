@@ -129,17 +129,32 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
     rwLock.readLock().unlock();
   }
 
+  private void flushUnderWriteLock() throws RocksDatabaseException {
+    if (dbStore != null) {
+      dbStore.commitBatchOperation(getCurrentBatchOperation());
+    }
+    if (currentBatchOperation != null) {
+      currentBatchOperation.close();
+      currentBatchOperation = null;
+    }
+  }
+
   @Override
   public void flush() throws RocksDatabaseException {
     rwLock.writeLock().lock();
     try {
-      if (dbStore != null) {
-        dbStore.commitBatchOperation(getCurrentBatchOperation());
-      }
-      if (currentBatchOperation != null) {
-        currentBatchOperation.close();
-        currentBatchOperation = null;
-      }
+      flushUnderWriteLock();
+    } finally {
+      rwLock.writeLock().unlock();
+    }
+  }
+
+  @Override
+  public void flushAndRun(Runnable action) throws RocksDatabaseException {
+    rwLock.writeLock().lock();
+    try {
+      flushUnderWriteLock();
+      action.run();
     } finally {
       rwLock.writeLock().unlock();
     }

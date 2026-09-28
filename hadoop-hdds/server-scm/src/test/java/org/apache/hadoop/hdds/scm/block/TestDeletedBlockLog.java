@@ -987,7 +987,7 @@ public class TestDeletedBlockLog {
 
     SCMDeletedBlockTransactionStatusManager statusManager =
         new SCMDeletedBlockTransactionStatusManager(
-            mockStateManager,
+            mockStateManager, scmHADBTransactionBuffer,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
             containerManager, metrics, Long.MAX_VALUE);
 
@@ -1025,7 +1025,7 @@ public class TestDeletedBlockLog {
 
     SCMDeletedBlockTransactionStatusManager statusManager =
         new SCMDeletedBlockTransactionStatusManager(
-            mockStateManager,
+            mockStateManager, scmHADBTransactionBuffer,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
             containerManager, metrics, Long.MAX_VALUE);
 
@@ -1050,7 +1050,7 @@ public class TestDeletedBlockLog {
 
     SCMDeletedBlockTransactionStatusManager statusManager =
         new SCMDeletedBlockTransactionStatusManager(
-            mockStateManager,
+            mockStateManager, scmHADBTransactionBuffer,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
             containerManager, metrics, Long.MAX_VALUE);
 
@@ -1090,7 +1090,7 @@ public class TestDeletedBlockLog {
 
     SCMDeletedBlockTransactionStatusManager statusManager =
         new SCMDeletedBlockTransactionStatusManager(
-            mockStateManager,
+            mockStateManager, scmHADBTransactionBuffer,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
             containerManager, metrics, Long.MAX_VALUE);
 

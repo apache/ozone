@@ -151,6 +151,17 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
+  public void flushAndRun(Runnable action) throws RocksDatabaseException, CodecException {
+    rwLock.writeLock().lock();
+    try {
+      flushUnderWriteLock();
+      action.run();
+    } finally {
+      rwLock.writeLock().unlock();
+    }
+  }
+
+  @Override
   public void flushIfNeeded(long snapshotWaitTime)
       throws RocksDatabaseException, CodecException {
     rwLock.writeLock().lock();
