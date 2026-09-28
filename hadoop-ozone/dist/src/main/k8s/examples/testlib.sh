@@ -39,10 +39,20 @@ grep_log() {
    kubectl logs "$1"  | grep "$PATTERN"
 }
 
+scm_exited_safe_mode() {
+   local scm
+   for scm in scm-0 scm-1 scm-2; do
+      if kubectl logs "${scm}" 2>/dev/null | grep -q "SCM exiting safe mode."; then
+         return 0
+      fi
+   done
+   return 1
+}
+
 wait_for_startup(){
    print_phase "Waiting until the k8s cluster is running"
    if retry all_pods_are_running \
-       && retry grep_log scm-0 "SCM exiting safe mode." \
+       && retry scm_exited_safe_mode \
        && retry grep_log om-0 "HTTP server of ozoneManager listening"; then
      print_phase "Cluster is up and running"
    else
@@ -68,13 +78,15 @@ assert_pipeline_exists() {
 }
 
 all_pods_are_running() {
-   local -i running=$(kubectl get pod --field-selector status.phase=Running | grep -v 'STATUS' | wc -l)
-   local -i all=$(kubectl get pod | grep -v 'STATUS' | wc -l)
+   local -i running
+   local -i all
+   running=$(kubectl get pod -l app=ozone --field-selector status.phase=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+   all=$(kubectl get pod -l app=ozone --no-headers 2>/dev/null | wc -l | tr -d ' ')
    if [ "$running" -lt "3" ]; then
-      echo "$running pods are running. Waiting for more."
+      echo "$running ozone pods are running. Waiting for more."
       return 1
    elif [ "$running" -ne "$all" ]; then
-      echo "$running / $all pods are running"
+      echo "$running / $all ozone pods are running"
       return 2
    else
       STARTED=true
@@ -116,6 +128,9 @@ reset_k8s_env() {
    dump_pv_pvc_state "after pvc delete"
    kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found pv --all
    dump_pv_pvc_state "after pv delete"
+   if ! kubectl wait --for=delete pod --all --timeout="$DEL_TIMEOUT" 2>/dev/null; then
+      echo "Warning: timed out waiting for pods to terminate after reset"
+   fi
 }
 
 start_k8s_env() {

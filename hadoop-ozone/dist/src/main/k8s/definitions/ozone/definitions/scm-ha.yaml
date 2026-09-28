@@ -60,6 +60,19 @@ description: Enable HA for SCM component
     - spec
     - initContainers
   value:
+    - name: wait-for-scm-peers
+      image: "@docker.image@"
+      command:
+        - bash
+        - -c
+        - |
+          set -e
+          for peer in scm-0.scm scm-1.scm scm-2.scm; do
+            echo "Waiting for DNS: ${peer}"
+            until getent hosts "${peer}" >/dev/null 2>&1; do
+              sleep 2
+            done
+          done
     - name: bootstrap
       image: "@docker.image@"
       args:
@@ -78,3 +91,12 @@ description: Enable HA for SCM component
     - spec
     - replicas
   value: 3
+- type: replace
+  trigger:
+    metadata:
+      name: scm
+    kind: StatefulSet
+  path:
+    - spec
+    - podManagementPolicy
+  value: Parallel

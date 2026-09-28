@@ -27,6 +27,7 @@ spec:
       component: scm
   serviceName: scm
   replicas: 3
+  podManagementPolicy: Parallel
   template:
     metadata:
       labels:
@@ -40,6 +41,19 @@ spec:
       securityContext:
         fsGroup: 1000
       initContainers:
+      - name: wait-for-scm-peers
+        image: '@docker.image@'
+        command:
+        - bash
+        - -c
+        - |
+          set -e
+          for peer in scm-0.scm scm-1.scm scm-2.scm; do
+            echo "Waiting for DNS: ${peer}"
+            until getent hosts "${peer}" >/dev/null 2>&1; do
+              sleep 2
+            done
+          done
       - name: init
         image: '@docker.image@'
         args:
