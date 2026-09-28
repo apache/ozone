@@ -998,13 +998,12 @@ public class TestRocksDBCheckpointDiffer {
     Set<String> allTables = allTablesForDiff();
     boolean sawNonEmptyDiff = false;
 
+    // Each test snapshot only stores SST metadata for checkpoint version 0 (see createCheckpoint).
     for (DifferSnapshotInfo snap : snapshots) {
-      List<SstFileInfo> fullDagDiff = requireSstDiffList(
-          differ.getSSTDiffList(
-              new DifferSnapshotVersion(src, 0, allTables),
-              new DifferSnapshotVersion(snap, 0, allTables),
-              null, allTables, true),
-          src, snap);
+      List<SstFileInfo> fullDagDiff = differ.getSSTDiffList(
+          new DifferSnapshotVersion(src, 0, allTables),
+          new DifferSnapshotVersion(snap, 0, allTables),
+          null, allTables, true).orElseThrow();
       sawNonEmptyDiff = sawNonEmptyDiff || !fullDagDiff.isEmpty();
 
       // Independent structural oracle: a snapshot diffed against itself must have no
@@ -1029,9 +1028,8 @@ public class TestRocksDBCheckpointDiffer {
         }
         DifferSnapshotVersion srcSnapVersion = new DifferSnapshotVersion(src, 0, tableToLookUp);
         DifferSnapshotVersion destSnapVersion = new DifferSnapshotVersion(snap, 0, tableToLookUp);
-        List<SstFileInfo> sstDiffList = requireSstDiffList(
-            differ.getSSTDiffList(srcSnapVersion, destSnapVersion, null, tableToLookUp, true),
-            src, snap);
+        List<SstFileInfo> sstDiffList = differ.getSSTDiffList(
+            srcSnapVersion, destSnapVersion, null, tableToLookUp, true).orElseThrow();
         LOG.info("SST diff list from '{}' to '{}': {} tables: {}",
             src.getDbPath(0), snap.getDbPath(0), sstDiffList, tableToLookUp);
 
@@ -1057,33 +1055,16 @@ public class TestRocksDBCheckpointDiffer {
     return tables;
   }
 
-  private List<SstFileInfo> getTrackedSstFilesFromSnapshot(DifferSnapshotInfo snap) {
-    return snap.getSstFiles(0, allTablesForDiff());
-  }
-
-  private static List<SstFileInfo> requireSstDiffList(
-      Optional<List<SstFileInfo>> diffList,
-      DifferSnapshotInfo src,
-      DifferSnapshotInfo dest) {
-    if (diffList.isPresent()) {
-      return diffList.get();
-    }
-    throw new AssertionError(String.format(
-        "getSSTDiffList returned empty Optional (DAG could not reach all destination SSTs) "
-            + "from '%s' to '%s'", src.getDbPath(0), dest.getDbPath(0)));
-  }
-
   private void assertCompactionSstBackups(RocksDBCheckpointDiffer differ) throws IOException {
     Set<String> tablesToLookup = allTablesForDiff();
     DifferSnapshotInfo firstSnapshot = snapshots.get(0);
     DifferSnapshotInfo lastSnapshot = snapshots.get(snapshots.size() - 1);
-    List<SstFileInfo> diffSinceFirst = requireSstDiffList(
-        differ.getSSTDiffList(
-            new DifferSnapshotVersion(lastSnapshot, 0, tablesToLookup),
-            new DifferSnapshotVersion(firstSnapshot, 0, tablesToLookup),
-            null, tablesToLookup, true),
-        lastSnapshot, firstSnapshot);
-    Set<String> lastSnapshotFileNames = getTrackedSstFilesFromSnapshot(lastSnapshot).stream()
+    List<SstFileInfo> diffSinceFirst = differ.getSSTDiffList(
+        new DifferSnapshotVersion(lastSnapshot, 0, tablesToLookup),
+        new DifferSnapshotVersion(firstSnapshot, 0, tablesToLookup),
+        null, tablesToLookup, true).orElseThrow();
+    // Version 0 is the only RocksDB checkpoint layer we record for each snapshot in this test.
+    Set<String> lastSnapshotFileNames = lastSnapshot.getSstFiles(0, tablesToLookup).stream()
         .map(SstFileInfo::getFileName)
         .collect(Collectors.toSet());
     Set<String> diffNotInLastSnapshot = diffSinceFirst.stream()
@@ -1135,6 +1116,7 @@ public class TestRocksDBCheckpointDiffer {
     List<ColumnFamilyHandle> colHandle = new ArrayList<>();
     try (ManagedRocksDB rdb = ManagedRocksDB.openReadOnly(cpPath, getColumnFamilyDescriptors(), colHandle)) {
       TreeMap<Integer, List<SstFileInfo>> versionSstFilesMap = new TreeMap<>();
+      // OM snapshots can track multiple linked DB checkpoints; this test builds just one (version 0).
       versionSstFilesMap.put(0, rdb.getLiveMetadataForSSTFiles().values().stream().map(SstFileInfo::new)
           .collect(Collectors.toList()));
       final DifferSnapshotInfo currentSnapshot = new DifferSnapshotInfo((version) -> Paths.get(cpPath),
