@@ -37,6 +37,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -61,6 +62,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Class used to test ContainerSet operations.
@@ -72,6 +74,9 @@ public class TestContainerSet {
   private ContainerLayoutVersion layoutVersion;
 
   private static final String TEST_SCAN = "Test Scan";
+
+  @TempDir
+  private File metadataDir;
 
   private void setLayoutVersion(ContainerLayoutVersion layoutVersion) {
     this.layoutVersion = layoutVersion;
@@ -487,6 +492,7 @@ public class TestContainerSet {
           layoutVersion,
           (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
           UUID.randomUUID().toString());
+      kvData.setMetadataPath(metadataDir.getAbsolutePath());
       if (i % 2 == 0) {
         kvData.setState(ContainerProtos.ContainerDataProto.State.CLOSED);
       } else {

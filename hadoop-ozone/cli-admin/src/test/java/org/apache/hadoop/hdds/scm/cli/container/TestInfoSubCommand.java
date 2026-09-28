@@ -43,6 +43,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -75,6 +76,9 @@ public class TestInfoSubCommand {
   private final InputStream originalIn = System.in;
 
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
+
+  private static final String CONTAINER_PATH =
+      "/data/disk1/hdds/CID-1/current/containerDir0/1";
 
   @BeforeEach
   public void setup() throws IOException {
@@ -329,6 +333,100 @@ public class TestInfoSubCommand {
         Pattern.DOTALL);
     Matcher matcher = pattern.matcher(json);
     assertTrue(matcher.matches());
+  }
+
+  @Test
+  public void testContainerPathPrintedByDefaultButNotStorageTypes()
+      throws Exception {
+    when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicasWithStorageInfo());
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1");
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("ContainerPath: " + CONTAINER_PATH);
+    // Storage types stay hidden unless --with-storagetype is passed.
+    assertThat(output).doesNotContain("ContainerStorageType");
+    assertThat(output).doesNotContain("VolumeStorageType");
+  }
+
+  @Test
+  public void testStorageTypesPrintedWithFlag() throws Exception {
+    when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicasWithStorageInfo());
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1", "--with-storagetype");
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    // Both ContainerStorageType and VolumeStorageType
+    // must appear, and the volume line must not echo the container's value.
+    assertThat(output).contains("ContainerStorageType: SSD");
+    assertThat(output).contains("VolumeStorageType: ARCHIVE");
+  }
+
+  @Test
+  public void testStorageFieldsOmittedWhenNotReported() throws Exception {
+    when(scmClient.getContainerReplicas(anyLong())).thenReturn(getReplicas(true));
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1");
+    cmd.execute(scmClient);
+
+    // Replicas from a datanode that reports no path must not render an empty
+    // "ContainerPath: ;" entry.
+    assertThat(outContent.toString(DEFAULT_ENCODING))
+        .doesNotContain("ContainerPath");
+  }
+
+  @Test
+  public void testJsonIncludesStorageFields() throws Exception {
+    when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicasWithStorageInfo());
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1", "--json");
+    cmd.execute(scmClient);
+
+    // JSON carries the fields regardless of --with-storagetype, for scripting.
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("\"storageType\" : \"SSD\"");
+    assertThat(output).contains("\"volumeStorageType\" : \"ARCHIVE\"");
+    assertThat(output).contains("\"containerPath\" : \"" + CONTAINER_PATH + "\"");
+  }
+
+  @Test
+  public void testJsonOmitsStorageFieldsWhenNotReported() throws Exception {
+    when(scmClient.getContainerReplicas(anyLong())).thenReturn(getReplicas(true));
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1", "--json");
+    cmd.execute(scmClient);
+
+    // Null fields are dropped by the NON_NULL serialization inclusion, so an
+    // unset path must not surface as "containerPath" : "".
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).doesNotContain("storageType");
+    assertThat(output).doesNotContain("containerPath");
+  }
+
+  private List<ContainerReplicaInfo> getReplicasWithStorageInfo() {
+    List<ContainerReplicaInfo> replicas = new ArrayList<>();
+    int index = 1;
+    for (DatanodeDetails dn : datanodes) {
+      replicas.add(new ContainerReplicaInfo.Builder()
+          .setContainerID(1)
+          .setBytesUsed(1234)
+          .setState("CLOSED")
+          .setPlaceOfBirth(dn.getID())
+          .setDatanodeDetails(dn)
+          .setKeyCount(1)
+          .setSequenceId(1)
+          .setReplicaIndex(index++)
+          .setStorageType(StorageType.SSD)
+          .setVolumeStorageType(StorageType.ARCHIVE)
+          .setContainerPath(CONTAINER_PATH)
+          .build());
+    }
+    return replicas;
   }
 
   private List<ContainerReplicaInfo> getReplicas(boolean includeIndex) {

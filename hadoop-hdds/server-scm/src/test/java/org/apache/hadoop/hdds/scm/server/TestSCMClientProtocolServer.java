@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -36,22 +37,28 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -192,6 +199,74 @@ public class TestSCMClientProtocolServer {
     } finally {
       scmServer.stop();
     }
+  }
+
+  @Test
+  public void testGetContainerReplicasCopiesStorageFields() throws Exception {
+    final long containerId = 1L;
+    final String containerPath =
+        "/data/disk1/hdds/CID-1/current/containerDir0/1";
+    // Stamped SSD at creation, but currently sitting on an ARCHIVE volume.
+    ContainerReplica replica = newReplica(containerId)
+        .setStorageType(StorageType.SSD)
+        .setVolumeStorageType(StorageType.ARCHIVE)
+        .setContainerPath(containerPath)
+        .build();
+
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(
+        new OzoneConfiguration(), mockStorageContainerManager(containerId, replica),
+        mock(ReconfigurationHandler.class));
+    try {
+      List<HddsProtos.SCMContainerReplicaProto> replicas =
+          scmServer.getContainerReplicas(containerId, ClientVersion.CURRENT_VERSION);
+
+      assertThat(replicas).hasSize(1);
+      HddsProtos.SCMContainerReplicaProto proto = replicas.get(0);
+      assertThat(proto.getStorageType()).isEqualTo(HddsProtos.StorageTypeProto.SSD);
+      assertThat(proto.getVolumeStorageType()).isEqualTo(HddsProtos.StorageTypeProto.ARCHIVE);
+      assertThat(proto.getContainerPath()).isEqualTo(containerPath);
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testGetContainerReplicasOmitsUnsetStorageFields() throws Exception {
+    final long containerId = 1L;
+    // A replica reported by a datanode that does not send the storage fields.
+    ContainerReplica replica = newReplica(containerId).build();
+
+    SCMClientProtocolServer scmServer = new SCMClientProtocolServer(
+        new OzoneConfiguration(), mockStorageContainerManager(containerId, replica),
+        mock(ReconfigurationHandler.class));
+    try {
+      List<HddsProtos.SCMContainerReplicaProto> replicas =
+          scmServer.getContainerReplicas(containerId, ClientVersion.CURRENT_VERSION);
+
+      assertThat(replicas).hasSize(1);
+      HddsProtos.SCMContainerReplicaProto proto = replicas.get(0);
+      assertThat(proto.hasStorageType()).isFalse();
+      assertThat(proto.hasVolumeStorageType()).isFalse();
+      assertThat(proto.hasContainerPath()).isFalse();
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  private static ContainerReplica.ContainerReplicaBuilder newReplica(long containerId) {
+    return ContainerReplica.newBuilder()
+        .setContainerID(ContainerID.valueOf(containerId))
+        .setContainerState(ContainerReplicaProto.State.CLOSED)
+        .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+        .setSequenceId(1L);
+  }
+
+  private StorageContainerManager mockStorageContainerManager(
+      long containerId, ContainerReplica... replicas) throws IOException {
+    StorageContainerManager scmMock = mockStorageContainerManager();
+    when(scmMock.getContainerManager().getContainerReplicas(ContainerID.valueOf(containerId)))
+        .thenReturn(new HashSet<>(Arrays.asList(replicas)));
+    return scmMock;
   }
 
   private StorageContainerManager mockStorageContainerManager() {

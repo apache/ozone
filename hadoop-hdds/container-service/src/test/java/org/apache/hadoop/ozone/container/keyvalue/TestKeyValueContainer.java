@@ -72,6 +72,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
@@ -231,6 +233,54 @@ public class TestKeyValueContainer {
     assertEquals(StorageType.SSD, keyValueContainerData.getStorageType());
     verify(volumeChoosingPolicy).chooseVolume(anyList(), anyLong(),
         eq(StorageType.SSD));
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerReportHasPathAndVolumeStorageType(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+
+    HddsVolume ssdVolume = new HddsVolume.Builder(
+        new File(folder, "ssd-volume").getAbsolutePath())
+        .conf(CONF)
+        .datanodeUuid(datanodeId.toString())
+        .storageType(StorageType.SSD)
+        .build();
+    StorageVolumeUtil.checkVolume(ssdVolume, scmId, scmId, CONF, null, null);
+    hddsVolumes.add(ssdVolume);
+
+    when(volumeChoosingPolicy.chooseVolume(anyList(), anyLong(),
+        eq(StorageType.SSD))).thenReturn(ssdVolume);
+
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId,
+        StorageType.SSD);
+
+    ContainerReplicaProto report = keyValueContainer.getContainerReport();
+
+    // The container was created on an SSD volume, so both types agree.
+    assertThat(report.getStorageType()).isEqualTo(StorageTypeProto.SSD);
+    assertThat(report.getVolumeStorageType()).isEqualTo(StorageTypeProto.SSD);
+    assertThat(report.getContainerPath())
+        .isEqualTo(keyValueContainerData.getContainerPath());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerReportVolumeStorageTypeReflectsRelabelledVolume(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    createContainer();
+
+    // Simulate an operator relabelling the volume: the container keeps the type
+    // it was stamped with at creation, while the volume now reports a new one.
+    HddsVolume relabelled = mock(HddsVolume.class);
+    when(relabelled.getStorageType()).thenReturn(StorageType.ARCHIVE);
+    keyValueContainerData.setVolume(relabelled);
+
+    ContainerReplicaProto report = keyValueContainer.getContainerReport();
+
+    assertThat(report.getStorageType()).isEqualTo(StorageTypeProto.DISK);
+    assertThat(report.getVolumeStorageType())
+        .isEqualTo(StorageTypeProto.ARCHIVE);
   }
 
   /**

@@ -236,6 +236,8 @@ message ContainerReplicaProto {
   optional bool isEmpty = 15 [default = false];
   optional int64 dataChecksum = 16;
   optional StorageTypeProto storageType = 17;
+  optional string containerPath = 18;
+  optional StorageTypeProto volumeStorageType = 19;
 }
 
 message CommandStatusReportsProto {

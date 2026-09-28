@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.cr
 import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.createUniqueDataChecksumForReplica;
 import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.getContainerReportsProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -794,6 +795,80 @@ public class TestIncrementalContainerReportHandler {
       assertEquals(storageTypeToDn.get(containerReplica.getStorageType()),
           containerReplica.getDatanodeDetails());
     }
+  }
+
+  @Test
+  public void testReplicaContainerPathAndVolumeStorageType() throws IOException {
+    final IncrementalContainerReportHandler reportHandler =
+        new IncrementalContainerReportHandler(
+            nodeManager, containerManager, scmContext);
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
+    final DatanodeDetails datanode = randomDatanodeDetails();
+    nodeManager.register(datanode, null, null);
+    containerStateManager.addContainer(container.getProtobuf());
+
+    final String containerPath = "/data/ssd1/hdds/CID-1/current/containerDir0/"
+        + container.containerID().getIdForTesting();
+    // The container was stamped SSD at creation but now sits on an ARCHIVE
+    // volume, which is what a relabelled or migrated replica looks like.
+    final ContainerReplicaProto replicaProto = newReplicaProto(container, datanode)
+        .setStorageType(StorageTypeUtils.getStorageTypeProto(StorageType.SSD))
+        .setVolumeStorageType(
+            StorageTypeUtils.getStorageTypeProto(StorageType.ARCHIVE))
+        .setContainerPath(containerPath)
+        .build();
+    reportHandler.onMessage(new IncrementalContainerReportFromDatanode(
+        datanode, getIncrementalContainerReportProto(replicaProto)), publisher);
+
+    final ContainerReplica replica = getOnlyReplica(container);
+    assertThat(replica.getStorageType()).isEqualTo(StorageType.SSD);
+    assertThat(replica.getVolumeStorageType()).isEqualTo(StorageType.ARCHIVE);
+    assertThat(replica.getContainerPath()).isEqualTo(containerPath);
+  }
+
+  @Test
+  public void testReplicaStorageFieldsNullWhenNotReported() throws IOException {
+    final IncrementalContainerReportHandler reportHandler =
+        new IncrementalContainerReportHandler(
+            nodeManager, containerManager, scmContext);
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSING);
+    final DatanodeDetails datanode = randomDatanodeDetails();
+    nodeManager.register(datanode, null, null);
+    containerStateManager.addContainer(container.getProtobuf());
+
+    // A datanode running an older version reports none of the storage fields.
+    reportHandler.onMessage(new IncrementalContainerReportFromDatanode(datanode,
+        getIncrementalContainerReportProto(
+            newReplicaProto(container, datanode).build())), publisher);
+
+    final ContainerReplica replica = getOnlyReplica(container);
+    assertThat(replica.getStorageType()).isNull();
+    assertThat(replica.getVolumeStorageType()).isNull();
+    assertThat(replica.getContainerPath()).isNull();
+  }
+
+  private ContainerReplica getOnlyReplica(ContainerInfo container) {
+    final Set<ContainerReplica> replicas =
+        containerStateManager.getContainerReplicas(container.containerID());
+    assertThat(replicas).hasSize(1);
+    return replicas.iterator().next();
+  }
+
+  private static ContainerReplicaProto.Builder newReplicaProto(
+      ContainerInfo container, DatanodeDetails datanode) {
+    return ContainerReplicaProto.newBuilder()
+        .setContainerID(container.containerID().getIdForTesting())
+        .setState(ContainerReplicaProto.State.CLOSED)
+        .setOriginNodeId(datanode.getUuidString())
+        .setSize(5368709120L)
+        .setUsed(2000000000L)
+        .setKeyCount(100000000L)
+        .setReadCount(0)
+        .setWriteCount(0)
+        .setReadBytes(0)
+        .setWriteBytes(0)
+        .setBlockCommitSequenceId(10000L)
+        .setDeleteTransactionId(0);
   }
 
   private void addIncrContainerReport(ContainerInfo container, DatanodeDetails datanode,

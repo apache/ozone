@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.UUID;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -57,6 +59,38 @@ public class TestContainerReplicaInfo {
     assertEquals(proto.getState(), info.getState());
     // If replicaIndex is not in the proto, then -1 should be returned
     assertEquals(-1, info.getReplicaIndex());
+    // Storage fields are absent in the proto, so they must be null rather than
+    // the protobuf defaults ("" for the path), otherwise they would show up in
+    // JSON output for datanodes that do not report them.
+    assertThat(info.getStorageType()).isNull();
+    assertThat(info.getVolumeStorageType()).isNull();
+    assertThat(info.getContainerPath()).isNull();
+  }
+
+  @Test
+  public void testObjectCreatedFromProtoWithStorageFields() {
+    HddsProtos.SCMContainerReplicaProto proto =
+        HddsProtos.SCMContainerReplicaProto.newBuilder()
+            .setKeyCount(10)
+            .setBytesUsed(12345)
+            .setContainerID(567)
+            .setPlaceOfBirth(UUID.randomUUID().toString())
+            .setSequenceID(5)
+            .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails()
+                .getProtoBufMessage())
+            .setState("CLOSED")
+            .setStorageType(HddsProtos.StorageTypeProto.SSD)
+            .setVolumeStorageType(HddsProtos.StorageTypeProto.SSD)
+            .setContainerPath("/data/ssd1/hdds/CID-1/current/containerDir0/567")
+            .build();
+
+    ContainerReplicaInfo info = ContainerReplicaInfo.fromProto(proto);
+
+    // The container was stamped SSD and sits on the SSD volume.
+    assertThat(info.getStorageType()).isEqualTo(StorageType.SSD);
+    assertThat(info.getVolumeStorageType()).isEqualTo(StorageType.SSD);
+    assertThat(info.getContainerPath())
+        .isEqualTo("/data/ssd1/hdds/CID-1/current/containerDir0/567");
   }
 
   @Test

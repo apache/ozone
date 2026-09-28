@@ -59,6 +59,11 @@ public class InfoSubcommand extends ScmSubcommand {
       description = "Format output as JSON")
   private boolean json;
 
+  @CommandLine.Option(names = { "--with-storagetype" },
+      defaultValue = "false",
+      description = "Output Container and Volume StorageType info")
+  private boolean withStorageType;
+
   @CommandLine.Mixin
   private ContainerIDParameters containerList;
 
@@ -177,7 +182,7 @@ public class InfoSubcommand extends ScmSubcommand {
       if (replicas != null) {
         String replicaStr = replicas.stream()
             .sorted(Comparator.comparing(ContainerReplicaInfo::getReplicaIndex))
-            .map(InfoSubcommand::buildReplicaDetails)
+            .map(replica -> buildReplicaDetails(replica, withStorageType))
             .collect(Collectors.joining("," + System.lineSeparator()));
         System.out.printf("Replicas: [%s]%n", replicaStr);
       }
@@ -188,7 +193,7 @@ public class InfoSubcommand extends ScmSubcommand {
     return details.getUuidString() + "/" + details.getHostName();
   }
 
-  private static String buildReplicaDetails(ContainerReplicaInfo replica) {
+  private static String buildReplicaDetails(ContainerReplicaInfo replica, boolean withStorageType) {
     StringBuilder sb = new StringBuilder()
         .append("State: ").append(replica.getState()).append(';');
     if (replica.getReplicaIndex() != -1) {
@@ -197,6 +202,13 @@ public class InfoSubcommand extends ScmSubcommand {
     sb.append(" SequenceId: ").append(replica.getSequenceId()).append(';')
         .append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(';')
         .append(" Location: ").append(buildDatanodeDetails(replica.getDatanodeDetails()));
+    if (replica.getContainerPath() != null) {
+      sb.append("; ContainerPath: ").append(replica.getContainerPath());
+    }
+    if (withStorageType) {
+      sb.append("; ContainerStorageType: ").append(replica.getStorageType())
+          .append("; VolumeStorageType: ").append(replica.getVolumeStorageType());
+    }
     return sb.toString();
   }
 
