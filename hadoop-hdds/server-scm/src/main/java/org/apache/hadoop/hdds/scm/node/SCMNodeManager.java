@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.math.RoundingMode;
 import java.net.InetAddress;
 import java.text.DecimalFormat;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -88,6 +89,7 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -194,9 +196,26 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       SCMContext scmContext,
       HDDSLayoutVersionManager layoutVersionManager,
       Function<String, String> nodeResolver) {
+    this(conf, scmStorageConfig, eventPublisher, networkTopology, scmContext, layoutVersionManager, nodeResolver,
+        new SlidingWindow.MonotonicClock());
+  }
+
+  /**
+   * Constructs SCMNodeManager whose node health tracking reads time from the given clock.
+   */
+  @SuppressWarnings("checkstyle:parameterNumber")
+  public SCMNodeManager(
+      OzoneConfiguration conf,
+      SCMStorageConfig scmStorageConfig,
+      EventPublisher eventPublisher,
+      NetworkTopology networkTopology,
+      SCMContext scmContext,
+      HDDSLayoutVersionManager layoutVersionManager,
+      Function<String, String> nodeResolver,
+      Clock clock) {
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
-        layoutVersionManager, scmContext);
+        layoutVersionManager, scmContext, clock);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;

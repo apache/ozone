@@ -186,6 +186,45 @@ public class TestPipelineManagerImpl {
   }
 
   @Test
+  public void testNewPipelineTakesIdFromGeneratorAndTimeFromClock() throws Exception {
+    PipelineID id = PipelineID.randomId();
+    SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
+    PipelineManagerImpl pipelineManager = PipelineManagerImpl.newPipelineManager(conf,
+        SCMHAManagerStub.getInstance(true, buffer), nodeManager, SCMDBDefinition.PIPELINES.getTable(dbStore),
+        new EventQueue(), scmContext, serviceManager, testClock, () -> id);
+    try {
+      testClock.fastForward(60_000);
+
+      Pipeline pipeline = pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+
+      assertEquals(id, pipeline.getId());
+      assertEquals(testClock.millis(), pipelineManager.getPipeline(id).getCreationTimestamp().toEpochMilli());
+    } finally {
+      buffer.close();
+      pipelineManager.close();
+    }
+  }
+
+  @Test
+  public void testLoadedPipelineTakesTimesFromClock() throws Exception {
+    SCMHADBTransactionBuffer buffer = new SCMHADBTransactionBufferStub(dbStore);
+    PipelineManagerImpl pipelineManager = createPipelineManager(true, buffer);
+    Pipeline pipeline = pipelineManager.createPipeline(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    buffer.close();
+    pipelineManager.close();
+
+    testClock.fastForward(60_000);
+    PipelineManagerImpl reloaded = createPipelineManager(true);
+    try {
+      Pipeline loaded = reloaded.getPipeline(pipeline.getId());
+      assertEquals(testClock.instant(), loaded.getCreationTimestamp());
+      assertEquals(testClock.instant(), loaded.getStateEnterTime());
+    } finally {
+      reloaded.close();
+    }
+  }
+
+  @Test
   public void testCreatePipeline() throws Exception {
     SCMHADBTransactionBuffer buffer1 =
         new SCMHADBTransactionBufferStub(dbStore);

@@ -34,6 +34,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LOCK_
 
 import com.google.common.util.concurrent.Striped;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
@@ -124,6 +125,9 @@ public final class ContainerStateManagerImpl
    */
   private final ContainerReplicaPendingOps containerReplicaPendingOps;
 
+  /** Records when containers enter a new state. */
+  private final Clock clock;
+
   /**
    * We use the containers in round-robin fashion for operations like block
    * allocation. This map is used for remembering the last used container.
@@ -150,12 +154,14 @@ public final class ContainerStateManagerImpl
       final PipelineManager pipelineManager,
       final Table<ContainerID, ContainerInfo> containerStore,
       final DBTransactionBuffer buffer,
-      final ContainerReplicaPendingOps pendingOps) throws IOException {
+      final ContainerReplicaPendingOps pendingOps,
+      final Clock clock) throws IOException {
+    this.clock = clock;
     this.pipelineManager = pipelineManager;
     this.containerStore = containerStore;
     this.stateMachine = newStateMachine();
     this.containerSize = getConfiguredContainerSize(conf);
-    this.containers = new ContainerStateMap();
+    this.containers = new ContainerStateMap(clock);
     this.lastUsedMap = new ConcurrentHashMap<>();
     this.containerStateChangeActions = getContainerStateChangeActions();
     this.transactionBuffer = buffer;
@@ -596,7 +602,7 @@ public final class ContainerStateManagerImpl
       Table<ContainerID, ContainerInfo> store) throws IOException {
     try (AutoCloseableLock ignored = writeLock()) {
       this.containerStore = store;
-      this.containers = new ContainerStateMap();
+      this.containers = new ContainerStateMap(clock);
       this.lastUsedMap = new ConcurrentHashMap<>();
       initialize();
     }
@@ -650,6 +656,7 @@ public final class ContainerStateManagerImpl
     private Table<ContainerID, ContainerInfo> table;
     private DBTransactionBuffer transactionBuffer;
     private ContainerReplicaPendingOps containerReplicaPendingOps;
+    private Clock clock = Clock.systemUTC();
 
     public Builder setSCMDBTransactionBuffer(DBTransactionBuffer buffer) {
       this.transactionBuffer = buffer;
@@ -683,6 +690,11 @@ public final class ContainerStateManagerImpl
       return this;
     }
 
+    public Builder setClock(final Clock stateClock) {
+      clock = stateClock;
+      return this;
+    }
+
     public ContainerStateManager build() throws IOException {
       Objects.requireNonNull(conf, "conf == null");
       Objects.requireNonNull(pipelineMgr, "pipelineMgr == null");
@@ -690,7 +702,7 @@ public final class ContainerStateManagerImpl
 
       final ContainerStateManager csm = new ContainerStateManagerImpl(
           conf, pipelineMgr, table, transactionBuffer,
-          containerReplicaPendingOps);
+          containerReplicaPendingOps, clock);
 
       return scmRatisServer.getProxyHandler(new ContainerStateManagerInvoker(csm, scmRatisServer));
     }

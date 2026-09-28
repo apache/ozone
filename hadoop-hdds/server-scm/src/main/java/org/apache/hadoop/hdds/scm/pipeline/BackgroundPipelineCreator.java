@@ -208,7 +208,8 @@ public class BackgroundPipelineCreator implements SCMService {
     return true;
   }
 
-  private void createPipelines() throws RuntimeException {
+  @VisibleForTesting
+  void createPipelines() throws RuntimeException {
     boolean autoCreateFactorOne = conf.getBoolean(ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
