@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdfs.util.EnumCounters;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ClosePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
@@ -413,9 +414,10 @@ public class StateContext {
   public ContainerReportsProto getFullContainerReportDiscardPendingICR()
       throws IOException {
 
+    ContainerSet containerSet =
+        parentDatanodeStateMachine.getContainer().getContainerSet();
     // Block ICRs from being generated
-    synchronized (parentDatanodeStateMachine
-        .getContainer()) {
+    synchronized (containerSet) {
       synchronized (incrementalReportsQueue) {
         for (Map.Entry<HostAndPort, List<Message>>
             entry : incrementalReportsQueue.entrySet()) {
@@ -427,10 +429,46 @@ public class StateContext {
           }
         }
       }
-      return parentDatanodeStateMachine
-          .getContainer()
-          .getContainerSet()
-          .getContainerReport();
+      return containerSet.getContainerReport();
+    }
+  }
+
+  /**
+   * Gets a point in time snapshot of all containers for the given endpoint
+   * and drops any pending ICRs for that endpoint.
+   *
+   * @param endpoint endpoint that will receive the full container report
+   * @return full container report, or null if no report was ready
+   */
+  public ContainerReportsProto getFullContainerReportDiscardPendingICR(
+      HostAndPort endpoint) throws IOException {
+    Map<String, AtomicBoolean> reports =
+        isFullReportReadyToBeSent.get(endpoint);
+    if (reports == null) {
+      return null;
+    }
+    AtomicBoolean ready = reports.get(CONTAINER_REPORTS_PROTO_NAME);
+    if (ready == null || !ready.compareAndSet(true, false)) {
+      return null;
+    }
+
+    ContainerSet containerSet =
+        parentDatanodeStateMachine.getContainer().getContainerSet();
+    try {
+      synchronized (containerSet) {
+        synchronized (incrementalReportsQueue) {
+          List<Message> incrementalReports =
+              incrementalReportsQueue.get(endpoint);
+          if (incrementalReports != null) {
+            incrementalReports.removeIf(report ->
+                report instanceof IncrementalContainerReportProto);
+          }
+        }
+        return containerSet.getContainerReport();
+      }
+    } catch (IOException | RuntimeException ex) {
+      ready.set(true);
+      throw ex;
     }
   }
 

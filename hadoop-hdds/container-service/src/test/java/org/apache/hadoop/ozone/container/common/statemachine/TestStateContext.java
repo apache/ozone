@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.OptionalLong;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -247,6 +249,71 @@ public class TestStateContext {
 
     assertTrue(context.isFullContainerReportReady(scm1));
     assertFalse(context.isFullContainerReportReady(scm2));
+  }
+
+  @Test
+  public void testEndpointFullContainerReportDiscardsOnlyItsPendingICRs()
+      throws IOException {
+    StateContext context = createSubject();
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    HostAndPort scm2 = new HostAndPort("scm2", 9002);
+    context.addEndpoint(scm1);
+    context.addEndpoint(scm2);
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+    context.addIncrementalReport(
+        IncrementalContainerReportProto.getDefaultInstance());
+
+    context.getFullContainerReportDiscardPendingICR(scm1);
+
+    assertTrue(context.getAllAvailableReports(scm1).isEmpty());
+    assertEquals(2, context.getAllAvailableReports(scm2).size());
+  }
+
+  @Test
+  public void testEndpointFullContainerReportIsLinearizedWithICRGeneration()
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachine =
+        mock(DatanodeStateMachine.class);
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    ContainerSet containerSet = mock(ContainerSet.class);
+    CountDownLatch reportStarted = new CountDownLatch(1);
+    CountDownLatch releaseReport = new CountDownLatch(1);
+    when(datanodeStateMachine.getContainer()).thenReturn(ozoneContainer);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    when(containerSet.getContainerReport()).thenAnswer(invocation -> {
+      reportStarted.countDown();
+      assertTrue(releaseReport.await(5, TimeUnit.SECONDS));
+      return ContainerReportsProto.getDefaultInstance();
+    });
+    StateContext context = new StateContext(conf, DatanodeStates.getInitState(),
+        datanodeStateMachine, "");
+    HostAndPort scm = new HostAndPort("scm", 9001);
+    context.addEndpoint(scm);
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<ContainerReportsProto> fullReport = executor.submit(
+          () -> context.getFullContainerReportDiscardPendingICR(scm));
+      assertTrue(reportStarted.await(5, TimeUnit.SECONDS));
+      Future<?> incrementalReport = executor.submit(() -> {
+        synchronized (containerSet) {
+          context.addIncrementalReport(
+              IncrementalContainerReportProto.getDefaultInstance());
+        }
+      });
+
+      assertThrows(TimeoutException.class,
+          () -> incrementalReport.get(100, TimeUnit.MILLISECONDS));
+      releaseReport.countDown();
+
+      assertNotNull(fullReport.get(5, TimeUnit.SECONDS));
+      incrementalReport.get(5, TimeUnit.SECONDS);
+      assertEquals(1, context.getAllAvailableReports(scm).size());
+    } finally {
+      releaseReport.countDown();
+      executor.shutdownNow();
+    }
   }
 
   void batchRefreshfullReports(StateContext ctx, String reportName, int count) {
