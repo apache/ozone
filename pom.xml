@@ -43,11 +43,11 @@
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.86</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.2</build-helper-maven-plugin.version>
-    <byte-buddy.version>1.18.13</byte-buddy.version>
+    <byte-buddy.version>1.18.14</byte-buddy.version>
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
-    <com.nimbusds.nimbus-jose-jwt.version>10.9.1</com.nimbusds.nimbus-jose-jwt.version>
+    <com.nimbusds.nimbus-jose-jwt.version>10.10</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
     <commons-codec.version>1.22.1</commons-codec.version>
     <commons-collections.version>4.6.0</commons-collections.version>
@@ -115,8 +115,8 @@
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
     <jline.version>3.30.17</jline.version>
-    <jnr-constants.version>0.11.0</jnr-constants.version>
-    <jnr-posix.version>3.2.2</jnr-posix.version>
+    <jnr-constants.version>0.11.2</jnr-constants.version>
+    <jnr-posix.version>3.2.4</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.19.37</jooq.version>
     <jsch.version>0.1.55</jsch.version>
@@ -225,7 +225,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.6</zookeeper.version>
-    <zstd-jni.version>1.5.7-16</zstd-jni.version>
+    <zstd-jni.version>1.5.7-17</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
