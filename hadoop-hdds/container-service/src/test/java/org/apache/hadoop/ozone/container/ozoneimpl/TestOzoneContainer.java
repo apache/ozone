@@ -168,7 +168,9 @@ public class TestOzoneContainer {
       DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
       when(datanode.getContainer()).thenReturn(container);
       StateContext reportContext = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
-      assertThat(executor.submit(reportContext::getFullContainerReportDiscardPendingICR)
+      assertThat(executor.submit(() -> {
+        return reportContext.getFullContainerReportDiscardPendingICR();
+      })
           .get(5, TimeUnit.SECONDS).getReportsCount()).isZero();
       Future<?> second = executor.submit(() -> {
         secondCaller.countDown();
