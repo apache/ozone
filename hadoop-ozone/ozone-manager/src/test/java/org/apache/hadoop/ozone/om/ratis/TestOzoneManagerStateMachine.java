@@ -390,6 +390,7 @@ public class TestOzoneManagerStateMachine {
       CompletableFuture<Message> future = testSm.applyTransaction(trx);
       ExecutionException ex = assertThrows(ExecutionException.class, future::get);
       assertInstanceOf(RejectedExecutionException.class, ex.getCause());
+      verify(doubleBuffer).releaseUnFlushedTransactions(1);
 
       ExecutorService pauseExecutor = Executors.newSingleThreadExecutor();
       try {

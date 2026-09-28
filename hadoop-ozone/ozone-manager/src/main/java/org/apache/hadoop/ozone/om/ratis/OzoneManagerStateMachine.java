@@ -507,6 +507,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
               }
             }, executorService);
       } catch (RuntimeException ex) {
+        ozoneManagerDoubleBuffer.releaseUnFlushedTransactions(1);
         exitApplyTransaction();
         throw ex;
       }
@@ -574,11 +575,18 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
 
     pauseApplyTransaction();
-    try {
-      ozoneManagerDoubleBuffer.awaitFlush();
-    } catch (InterruptedException ex) {
+    boolean interrupted = false;
+    while (true) {
+      try {
+        ozoneManagerDoubleBuffer.awaitFlush();
+        break;
+      } catch (InterruptedException ex) {
+        interrupted = true;
+        LOG.warn("Interrupted while waiting for OM double buffer to flush during pause.", ex);
+      }
+    }
+    if (interrupted) {
       Thread.currentThread().interrupt();
-      LOG.warn("Interrupted while waiting for OM double buffer to flush during pause.", ex);
     }
     ozoneManagerDoubleBuffer.stop();
   }
