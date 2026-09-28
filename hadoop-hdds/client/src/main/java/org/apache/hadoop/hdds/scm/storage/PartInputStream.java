@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 
@@ -33,4 +34,12 @@ public interface PartInputStream
   }
 
   void close() throws IOException;
+
+  /**
+   * positioned read within this part starting at {@code partOffset}.
+   *
+   * @return bytes copied into {@code buffer}, {@code -1} if {@code buffer} has no remaining space
+   *         or at EOF
+   */
+  int readPositioned(long partOffset, ByteBuffer buffer) throws IOException;
 }

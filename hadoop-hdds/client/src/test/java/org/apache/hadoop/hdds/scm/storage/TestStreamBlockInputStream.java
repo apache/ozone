@@ -402,7 +402,7 @@ public class TestStreamBlockInputStream {
       }
       byte[] slice = Arrays.copyOfRange(data, start, end);
       reader.onNext(buildResponseProto(slice, offset));
-      if (reader.getClass().getSimpleName().equals("OneShotReader") || end >= data.length) {
+      if (offset > 0 || end >= data.length) {
         reader.onCompleted();
       }
       return null;
