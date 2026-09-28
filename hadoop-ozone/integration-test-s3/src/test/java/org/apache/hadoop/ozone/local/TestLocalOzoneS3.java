@@ -108,8 +108,11 @@ class TestLocalOzoneS3 {
     String bucketName = "local-" + UUID.randomUUID().toString().replace("-", "");
     String keyName = "key-" + UUID.randomUUID().toString().replace("-", "");
     String payload = "local-ozone-s3";
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // Match the test module's 128 MB containers; production blocks default to 256 MB.
+    ClientConfigForTesting.newBuilder(StorageUnit.MB).applyTo(conf);
 
-    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, conf)) {
       cluster.start();
 
       try (S3Client client = S3Client.builder()
