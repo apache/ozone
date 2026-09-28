@@ -33,9 +33,6 @@ updates:
       - dependency-name: "com.google.errorprone:error_prone_core"
         versions:
           - ">=2.43.0" # requires Java 21
-      - dependency-name: "com.googlecode.maven-download-plugin:download-maven-plugin"
-        versions:
-          - ">=1.10.0" # requires Java 11
       - dependency-name: "dev.langchain4j:*"
         versions:
           - ">=0.36.0" # requires Java 17
