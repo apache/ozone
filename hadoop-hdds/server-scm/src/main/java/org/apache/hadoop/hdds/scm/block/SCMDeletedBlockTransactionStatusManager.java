@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
@@ -78,6 +79,7 @@ public class SCMDeletedBlockTransactionStatusManager {
   // The access to DeletedBlocksTXTable is protected by
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
+  private final SCMHADBTransactionBuffer transactionBuffer;
   private final ContainerManager containerManager;
   private final ScmBlockDeletingServiceMetrics metrics;
   private final long scmCommandTimeoutMs;
@@ -112,11 +114,13 @@ public class SCMDeletedBlockTransactionStatusManager {
 
   public SCMDeletedBlockTransactionStatusManager(
       DeletedBlockLogStateManager deletedBlockLogStateManager,
+      SCMHADBTransactionBuffer transactionBuffer,
       Table<String, ByteString> statefulServiceConfigTable,
       ContainerManager containerManager,
       ScmBlockDeletingServiceMetrics metrics, long scmCommandTimeoutMs) throws IOException {
     // maps transaction to dns which have committed it.
     this.deletedBlockLogStateManager = deletedBlockLogStateManager;
+    this.transactionBuffer = transactionBuffer;
     this.statefulConfigTable = statefulServiceConfigTable;
     this.metrics = metrics;
     this.containerManager = containerManager;
@@ -465,30 +469,35 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
-      DeletedBlocksTransactionSummary summary;
-      synchronized (summaryLock) {
-        for (DeletedBlocksTransaction tx: txList) {
-          if (tx.hasTotalBlockSize()) {
-            incrDeletedBlocksSummary(tx);
-          }
-        }
-        onSummaryUpdatedForTest();
-        summary = getSummary();
-      }
+      transactionBuffer.lock();
       try {
-        deletedBlockLogStateManager.addTransactionsToDB(txList, summary);
-      } catch (IOException e) {
-        if (isRatisTimeout(e)) {
+        DeletedBlocksTransactionSummary summary;
+        synchronized (summaryLock) {
+          for (DeletedBlocksTransaction tx: txList) {
+            if (tx.hasTotalBlockSize()) {
+              incrDeletedBlocksSummary(tx);
+            }
+          }
+          onSummaryUpdatedForTest();
+          summary = getSummary();
+        }
+        try {
+          deletedBlockLogStateManager.addTransactionsToDB(txList, summary);
+        } catch (IOException e) {
+          if (isRatisTimeout(e)) {
+            throw e;
+          }
+          // Revert the in-memory changes if the DB update fails
+          for (DeletedBlocksTransaction tx: txList) {
+            if (tx.hasTotalBlockSize()) {
+              rollbackDeletedBlocksSummary(tx);
+              LOG.warn("{} is decreased from summary due to DB update failure", transactionToString(tx));
+            }
+          }
           throw e;
         }
-        // Revert the in-memory changes if the DB update fails
-        for (DeletedBlocksTransaction tx: txList) {
-          if (tx.hasTotalBlockSize()) {
-            rollbackDeletedBlocksSummary(tx);
-            LOG.warn("{} is decreased from summary due to DB update failure", transactionToString(tx));
-          }
-        }
-        throw e;
+      } finally {
+        transactionBuffer.unlock();
       }
       return;
     }
@@ -533,32 +542,37 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
-      List<TxBlockInfo> removedTxBlockInfos = new ArrayList<>();
-      DeletedBlocksTransactionSummary summary;
-      synchronized (summaryLock) {
-        for (Long txID: txIDs) {
-          TxBlockInfo txBlockInfo = txSizeMap.remove(txID);
-          if (txBlockInfo != null) {
-            descDeletedBlocksSummary(txBlockInfo);
-            removedTxBlockInfos.add(txBlockInfo);
-          }
-        }
-        onSummaryUpdatedForTest();
-        summary = getSummary();
-      }
+      transactionBuffer.lock();
       try {
-        deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, summary);
-      } catch (IOException e) {
-        if (isRatisTimeout(e)) {
+        List<TxBlockInfo> removedTxBlockInfos = new ArrayList<>();
+        DeletedBlocksTransactionSummary summary;
+        synchronized (summaryLock) {
+          for (Long txID: txIDs) {
+            TxBlockInfo txBlockInfo = txSizeMap.remove(txID);
+            if (txBlockInfo != null) {
+              descDeletedBlocksSummary(txBlockInfo);
+              removedTxBlockInfos.add(txBlockInfo);
+            }
+          }
+          onSummaryUpdatedForTest();
+          summary = getSummary();
+        }
+        try {
+          deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, summary);
+        } catch (IOException e) {
+          if (isRatisTimeout(e)) {
+            throw e;
+          }
+          // Revert the in-memory changes if the DB update fails
+          for (TxBlockInfo txBlockInfo : removedTxBlockInfos) {
+            txSizeMap.put(txBlockInfo.getTxId(), txBlockInfo);
+            rollbackDeletedBlocksSummary(txBlockInfo);
+            LOG.warn("{} is added back to txSizeMap and increased to summary due to DB update failure", txBlockInfo);
+          }
           throw e;
         }
-        // Revert the in-memory changes if the DB update fails
-        for (TxBlockInfo txBlockInfo : removedTxBlockInfos) {
-          txSizeMap.put(txBlockInfo.getTxId(), txBlockInfo);
-          rollbackDeletedBlocksSummary(txBlockInfo);
-          LOG.warn("{} is added back to txSizeMap and increased to summary due to DB update failure", txBlockInfo);
-        }
-        throw e;
+      } finally {
+        transactionBuffer.unlock();
       }
       return;
     }
