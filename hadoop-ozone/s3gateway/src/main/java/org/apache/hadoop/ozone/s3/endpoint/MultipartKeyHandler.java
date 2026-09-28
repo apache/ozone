@@ -29,7 +29,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.S3GAction;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -61,8 +60,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
 
     try {
       int partMarker = parsePartNumberMarker(partNumberMarker);
-      Response response = listParts(context.getBucket(), keyPath, uploadId,
-          partMarker, maxParts, perf);
+      Response response = listParts(context, keyPath, uploadId, partMarker, maxParts, perf);
       long opLatencyNs = getMetrics().updateListPartsSuccessStats(context.getStartNanos());
       perf.appendOpLatencyNanos(opLatencyNs);
       return response;
@@ -114,7 +112,7 @@ class MultipartKeyHandler extends ObjectOperationHandler {
   /**
    * Returns response for the listParts request.
    * See: https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadListParts.html
-   * @param ozoneBucket
+   * @param context
    * @param key
    * @param uploadId
    * @param partNumberMarker
@@ -123,17 +121,18 @@ class MultipartKeyHandler extends ObjectOperationHandler {
    * @throws IOException
    * @throws OS3Exception
    */
-  private Response listParts(OzoneBucket ozoneBucket, String key, String uploadId,
+  private Response listParts(ObjectEndpoint.ObjectRequestContext context, String key, String uploadId,
       int partNumberMarker, int maxParts,
       PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
 
     ListPartsResponse resp = new ListPartsResponse();
-    String bucketName = ozoneBucket.getName();
+    String bucketName = context.getBucketName();
 
     try {
       OzoneMultipartUploadPartListParts parts =
-          ozoneBucket.listParts(key, uploadId, partNumberMarker, maxParts);
+          getClientProtocol().listParts(context.getVolume().getName(), bucketName, key, uploadId,
+              partNumberMarker, maxParts);
 
       resp.setBucket(bucketName);
       resp.setKey(key);
