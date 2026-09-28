@@ -326,7 +326,7 @@ public class TestOzoneManagerStateMachine {
   }
 
   @Test
-  public void testPauseBlocksApplyUntilUnpause() throws Exception {
+  public void testPauseRejectsApplyUntilUnpause() throws Exception {
     OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
         om, doubleBuffer, handler, executor, null) {
       @Override
@@ -354,21 +354,15 @@ public class TestOzoneManagerStateMachine {
       }).when(handler).handleWriteRequest(eq(request), any(), eq(doubleBuffer));
 
       testSm.pause();
-      CompletableFuture<CompletableFuture<Message>> applyFuture = CompletableFuture.supplyAsync(() -> {
-        try {
-          return testSm.applyTransaction(trx);
-        } catch (Exception ex) {
-          throw new RuntimeException(ex);
-        }
-      });
-
+      CompletableFuture<Message> pausedFuture = testSm.applyTransaction(trx);
+      ExecutionException ex = assertThrows(ExecutionException.class, pausedFuture::get);
+      assertInstanceOf(IOException.class, ex.getCause());
       assertFalse(handlerInvoked.await(200, TimeUnit.MILLISECONDS),
-          "apply should stay blocked while state machine is paused");
-      assertFalse(applyFuture.isDone(), "applyTransaction should block while paused");
+          "apply should be rejected while state machine is paused");
 
       testSm.unpause(5, 1);
 
-      CompletableFuture<Message> future = applyFuture.get(2, TimeUnit.SECONDS);
+      CompletableFuture<Message> future = testSm.applyTransaction(trx);
       assertTrue(handlerInvoked.await(2, TimeUnit.SECONDS),
           "apply should continue after state machine unpause");
       assertNotNull(future.get(2, TimeUnit.SECONDS));

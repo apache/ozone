@@ -488,7 +488,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // lastAppliedIndex in OzoneManager StateMachine, even if other
       // executor has completed the transactions with id more.
 
-      enterApplyTransaction();
+      if (!tryEnterApplyTransaction()) {
+        return completeExceptionally(new IOException("Cannot apply transaction while state machine is paused."));
+      }
       try {
         //if there are too many pending requests, wait for doubleBuffer flushing
         ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
@@ -562,16 +564,18 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public synchronized void pause() {
-    LOG.info("OzoneManagerStateMachine is pausing");
-    statePausedCount.incrementAndGet();
-    final LifeCycle.State state = getLifeCycleState();
-    if (state == LifeCycle.State.PAUSED) {
-      return;
-    }
-    if (state != LifeCycle.State.NEW) {
-      getLifeCycle().transition(LifeCycle.State.PAUSING);
-      getLifeCycle().transition(LifeCycle.State.PAUSED);
+  public void pause() {
+    synchronized (this) {
+      LOG.info("OzoneManagerStateMachine is pausing");
+      statePausedCount.incrementAndGet();
+      final LifeCycle.State state = getLifeCycleState();
+      if (state == LifeCycle.State.PAUSED) {
+        return;
+      }
+      if (state != LifeCycle.State.NEW) {
+        getLifeCycle().transition(LifeCycle.State.PAUSING);
+        getLifeCycle().transition(LifeCycle.State.PAUSED);
+      }
     }
 
     pauseApplyTransaction();
@@ -873,12 +877,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
   }
 
-  private void enterApplyTransaction() throws InterruptedException {
+  private boolean tryEnterApplyTransaction() {
     synchronized (applyTransactionMonitor) {
-      while (applyTransactionPaused) {
-        applyTransactionMonitor.wait();
+      if (applyTransactionPaused) {
+        return false;
       }
       inFlightApplyTransactions++;
+      return true;
     }
   }
 
