@@ -4375,7 +4375,9 @@
     <description>Interval after which an Inter-SCM gRPC client (a follower SCM
       or Recon downloading a DB checkpoint) sends an HTTP/2 keepalive ping to
       the leader SCM when the connection is otherwise quiet, to keep long
-      checkpoint downloads alive across proxies and load balancers.</description>
+      checkpoint downloads alive across proxies and load balancers.
+      Must be >= ozone.scm.ha.grpc.server.permit.keepalive.time to prevent
+      server disconnections.</description>
   </property>
   <property>
     <name>ozone.scm.ha.grpc.client.keepalive.timeout</name>
