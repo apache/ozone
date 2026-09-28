@@ -217,6 +217,21 @@ class TestRatisDataStreamBlockInputStream {
         "0+65536", "65536+131072", "196608+131072", "327680+262144", "589824+524288"), streams.ranges());
   }
 
+  /** A single-byte read returns the byte as 0 to 255: 0xFF must not look like the end of the stream. */
+  @Test
+  void readReturnsUnsignedByte() throws Exception {
+    final byte[] block = block(256);
+    final Streams streams = new Streams(block);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 16)) {
+      in.seek(254);
+      assertEquals(254, in.read());
+      assertEquals(255, in.read());
+      assertEquals(-1, in.read());
+    }
+  }
+
   /**
    * A request is closed as soon as its data is consumed, without waiting for its terminal reply: the reply would
    * otherwise keep the stream, and the netty buffer it was decoded from, until the next read or seek.

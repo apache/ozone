@@ -142,7 +142,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!dataAvailableToRead(1, preRead)) {
       return EOF;
     }
-    final int value = readBuffer.getByteBuffer().get();
+    final int value = Byte.toUnsignedInt(readBuffer.getByteBuffer().get());
     advancePosition(1, preRead);
     return value;
   }
