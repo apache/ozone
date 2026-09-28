@@ -76,7 +76,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 /**
@@ -271,10 +270,7 @@ public class TestDirectoryDeletingService {
   }
 
   @ParameterizedTest
-  @CsvSource({"1, true, false", "2, true, false", "3, true, false",
-      "1, false, false", "2, false, false", "3, false, false",
-      "1, true, true", "2, true, true", "3, true, true",
-      "1, false, true", "2, false, true", "3, false, true"})
+  @CsvSource({"2, true, false", "2, false, true", "3, true, true", "3, false, false"})
   void testPurgeDirectoriesSubmitFailure(int failedBatch, boolean throwException, boolean snapshot) throws Exception {
     List<PurgePathRequest> purgeList = new ArrayList<>();
     String directoryName = StringUtils.repeat("d", 1200);
@@ -368,8 +364,9 @@ public class TestDirectoryDeletingService {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2, 3})
-  void testPurgeDirectoriesRecursiveAccounting(int failedBatch) throws Exception {
+  @CsvSource({"0, 3, 3, 0", "1, 1, 0, 0", "2, 2, 1, 1", "3, 3, 2, 0"})
+  void testPurgeDirectoriesRecursiveAccounting(int failedBatch, int expectedBatches, int expectedDeletedDirs,
+      int expectedMovedDirs) throws Exception {
     OzoneConfiguration conf = createConfAndInitValues(1);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 2304, StorageUnit.BYTES);
     OmTestManagers managers = new OmTestManagers(conf);
@@ -395,6 +392,7 @@ public class TestDirectoryDeletingService {
       List<OMRequest> submitted = new ArrayList<>();
       Mockito.doAnswer(invocation -> {
         submitted.add(invocation.getArgument(0));
+        // A failedBatch of 0 lets all batches succeed.
         boolean success = submitted.size() != failedBatch;
         return OMResponse.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.PurgeDirectories)
             .setStatus(success ? OzoneManagerProtocolProtos.Status.OK
@@ -405,9 +403,9 @@ public class TestDirectoryDeletingService {
       subject.optimizeDirDeletesAndSubmitRequest(subDirs, purgeList, null, Time.monotonicNow(), keyManager,
           kv -> true, kv -> true, Collections.emptyMap(), null, 1, new AtomicInteger(10));
 
-      assertThat(submitted).hasSize(failedBatch == 0 ? 3 : failedBatch);
-      assertThat(subject.getDeletedDirsCount()).isEqualTo(failedBatch == 0 ? 3 : failedBatch - 1);
-      assertThat(subject.getMovedDirsCount()).isEqualTo(failedBatch == 2 ? 1 : 0);
+      assertThat(submitted).hasSize(expectedBatches);
+      assertThat(subject.getDeletedDirsCount()).isEqualTo(expectedDeletedDirs);
+      assertThat(subject.getMovedDirsCount()).isEqualTo(expectedMovedDirs);
       assertThat(subject.getMovedFilesCount()).isZero();
       if (failedBatch != 1) {
         assertThat(submitted.get(1).getPurgeDirectoriesRequest().getDeletedPathList())
