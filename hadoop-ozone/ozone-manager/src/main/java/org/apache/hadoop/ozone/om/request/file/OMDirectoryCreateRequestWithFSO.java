@@ -151,8 +151,10 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
    * <p>
    * Keeping this walk out of the bucket write lock is the point of HDDS-16289: it stops the lone apply
    * thread from gating readers of a hot bucket (getBucketInfo/getFileStatus/lookupKey) during the
-   * per-segment path resolution. If OM ever applies transactions in parallel per bucket/key, these
-   * reads must be re-validated under the lock in {@link #applyDirectoryCreate}.
+   * per-segment path resolution. This rests on the serial-apply invariant: if OM ever applies
+   * transactions in parallel per bucket/key, the re-check in {@link #applyDirectoryCreate} is not
+   * enough and every read here needs re-validating under the lock, the walked ancestors and the
+   * missing-parent set as well as the leaf.
    *
    * @return the prepared directory, or {@code null} when the directory already exists, in which case
    *         the caller reports DIRECTORY_ALREADY_EXISTS without taking the lock
@@ -227,8 +229,9 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
     String keyName = keyArgs.getKeyName();
 
     // Cheap O(1) re-check at the leaf of what the Phase 1 walk resolved. Under serial apply this
-    // always holds; it is a tripwire that fails rather than creating a duplicate if that invariant is
-    // ever broken by a concurrent writer.
+    // always holds, so it is unreachable; it is kept because it is a point lookup and it fails rather
+    // than creating a duplicate. It does not make Phase 1 safe under concurrent apply: it re-reads the
+    // leaf, not the ancestor chain lastKnownParentId came from.
     final String dbLeafKey = omMetadataManager.getOzonePathKey(prepared.volumeId,
         prepared.bucketId, prepared.omPathInfo.getLastKnownParentId(),
         prepared.omPathInfo.getLeafNodeName());

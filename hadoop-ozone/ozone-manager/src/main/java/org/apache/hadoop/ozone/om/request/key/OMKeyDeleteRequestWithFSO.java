@@ -143,8 +143,12 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
    * apply thread from gating readers of a hot bucket (getBucketInfo/getFileStatus/lookupKey). Delete
    * has two costly reads here, not one: getOMKeyInfoIfExists walks the path segment by segment, and
    * hasChildren scans the whole dirTable and fileTable cache before seeking RocksDB, so on a
-   * non-recursive directory delete it dominates the hold. If OM ever applies transactions in parallel
-   * per bucket/key, these reads must be re-validated under the lock in {@link #applyKeyDelete}.
+   * non-recursive directory delete it dominates the hold. This rests on the serial-apply invariant, and
+   * delete needs it more than the other FSO writers: hasChildren is a range predicate over the subtree,
+   * so no re-check on a single key can restore it. If OM ever applies transactions in parallel per
+   * bucket/key, the re-check in {@link #applyKeyDelete} is not enough - delete then has to hold a lock
+   * covering the directory's subtree (PREFIX_LOCK), or re-run hasChildren under the lock and give back
+   * most of what this change won.
    * <p>
    * Also fills in the data-size and replication audit parameters for a file delete, which are read
    * off the resolved key.
@@ -233,9 +237,11 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     String bucketName = keyArgs.getBucketName();
     String keyName = keyArgs.getKeyName();
 
-    // Cheap O(1) re-check of the key resolved in Phase 1. Under serial apply this always holds; it
-    // is a tripwire that fails safe, the same way the Phase 1 existence check does, if that
-    // invariant is ever broken by a concurrent writer.
+    // Cheap O(1) re-check of the key resolved in Phase 1. Under serial apply this always holds, so it
+    // is unreachable; it is kept because it is a point lookup and it fails the way the Phase 1
+    // existence check does. It does not make Phase 1 safe under concurrent apply and cannot: a
+    // concurrent create can add a child after Phase 1's hasChildren scan and this delete would orphan
+    // it. See the note on prepareKeyDelete.
     final boolean keyStillExists = prepared.isDirectory
         ? omMetadataManager.getDirectoryTable().get(prepared.ozonePathKey) != null
         : omMetadataManager.getKeyTable(getBucketLayout()).get(prepared.ozonePathKey) != null;

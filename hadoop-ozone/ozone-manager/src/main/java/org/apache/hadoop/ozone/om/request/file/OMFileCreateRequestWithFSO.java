@@ -148,8 +148,10 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
    * <p>
    * Keeping this walk out of the bucket write lock is the point of HDDS-16289: it stops the lone apply
    * thread from gating readers of a hot bucket (getBucketInfo/getFileStatus/lookupKey) during the
-   * per-segment path resolution. If OM ever applies transactions in parallel per bucket/key, these
-   * reads must be re-validated under the lock in {@link #applyFileCreate}.
+   * per-segment path resolution. This rests on the serial-apply invariant: if OM ever applies
+   * transactions in parallel per bucket/key, the re-check in {@link #applyFileCreate} is not enough and
+   * every read here needs re-validating under the lock, the walked ancestors and the missing-parent set
+   * as well as the leaf.
    */
   private PreparedFileCreate prepareFileCreate(OzoneManager ozoneManager,
       CreateFileRequest createFileRequest, long trxnLogIndex) throws IOException {
@@ -256,8 +258,9 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
     String keyName = keyArgs.getKeyName();
 
     // Cheap O(1) re-check of the overwrite guard resolved in Phase 1. Under serial apply this always
-    // holds; it is a tripwire that fails safe (as checkDirectoryResult would) rather than silently
-    // overwriting if that invariant is ever broken by a concurrent writer.
+    // holds, so it is unreachable; it is kept because it is a point lookup and it fails the way
+    // checkDirectoryResult would rather than silently overwriting. It does not make Phase 1 safe under
+    // concurrent apply: it re-reads the leaf, not the ancestor chain lastKnownParentId came from.
     if (!createFileRequest.getIsOverwrite() && OMFileRequest.getOmKeyInfoFromFileTable(false,
         omMetadataManager, prepared.dbLeafFileKey, keyName) != null) {
       throw new OMException("File " + keyName + " already exists",

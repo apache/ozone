@@ -142,8 +142,12 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
    * <p>
    * Keeping these walks out of the bucket write lock is the point of HDDS-16289: it stops the lone
    * apply thread from gating readers of a hot bucket (getBucketInfo/getFileStatus/lookupKey) while the
-   * path is resolved segment by segment. If OM ever applies transactions in parallel per bucket/key,
-   * these reads must be re-validated under the lock in {@link #renameKey}.
+   * path is resolved segment by segment. This rests on the serial-apply invariant, and rename needs it
+   * more than the other FSO writers: verifyToDirIsASubDirOfFromDirectory below is a predicate over the
+   * directory tree, not over a key, so no re-check on a single key can restore it. If OM ever applies
+   * transactions in parallel per bucket/key, the re-check in {@link #renameKey} is not enough - rename
+   * then has to hold a lock covering both subtrees (KEY_PATH_LOCK/PREFIX_LOCK) rather than narrow the
+   * bucket lock.
    *
    * @return the resolved rename, or {@code null} when there is nothing to apply (case-3, source and
    *         destination are the same file), in which case the caller takes no lock at all
@@ -348,8 +352,10 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         fromKeyValue.getVolumeName(), fromKeyValue.getBucketName());
 
     // Cheap O(1) re-check of the source resolved in Phase 1 without the bucket lock. Under serial
-    // apply this always holds; it is a tripwire that fails safe, the same way the Phase 1 existence
-    // check does, if that invariant is ever broken by a concurrent writer.
+    // apply this always holds, so it is unreachable; it is kept because it is a point lookup and it
+    // fails the way the Phase 1 existence check does. It does not make Phase 1 safe under concurrent
+    // apply and cannot: a concurrent rename can invalidate the subdirectory check after Phase 1 ran it
+    // and leave a directory as its own ancestor. See the note on prepareRename.
     final boolean fromKeyStillExists = isRenameDirectory
         ? dirTable.get(dbFromKey) != null
         : metadataMgr.getKeyTable(getBucketLayout()).get(dbFromKey) != null;
