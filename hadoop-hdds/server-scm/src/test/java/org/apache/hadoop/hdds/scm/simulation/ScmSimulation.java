@@ -112,12 +112,65 @@ import org.slf4j.LoggerFactory;
  * sources and an event queue whose handlers run on the simulation's scheduler, and the simulation runs the services SCM
  * would run on their own threads. A single thread runs everything through {@link SimScheduler}, so a run is fully
  * determined by its {@link SimConfig}: rerunning a seed reproduces the exact same trace.
- * <p>
+ * <pre>{@code
+ * +-------------------------------------------------------------------------+
+ * |                     real StorageContainerManager                        |
+ * |                                                                         |
+ * |   SCMDatanodeProtocolServer   SCMNodeManager      ReplicationManager    |
+ * |   ContainerManager            PipelineManager     DatanodeAdminMonitor  |
+ * |   event handlers: DeadNodeHandler, ContainerReportHandler, ...          |
+ * |                                                                         |
+ * |   injected through SCMConfigurator:                                     |
+ * |     SimEventQueue ... each handler call becomes a scheduler task        |
+ * |     MockClock ....... simulated time                                    |
+ * |     seeded Random ... topology, placement, pipeline IDs, RM shuffle     |
+ * +-------------------^-----------------------------------+-----------------+
+ *                     |                                   |
+ *       register and heartbeat,                 commands in the heartbeat
+ *       carrying node, container                response (replicate, delete,
+ *       and pipeline reports                    close, create pipeline, ...)
+ *                     |                                   v
+ * +-------------------+-----------------------------------+-----------------+
+ * |   SimDatanode x 8..12 on 3 racks                                        |
+ * |     SimReplica ...... ground truth: which replicas really exist         |
+ * |     SimRatisGroup ... one per pipeline: leader election, commits        |
+ * +-------------------^-----------------------------------^-----------------+
+ *                     |                                   |
+ *           +---------+---------+             +-----------+------------+
+ *           | SimWorkload       |             | SimChaos               |
+ *           | client writes     |             | crash, partition, lose |
+ *           | every ~2 s        |             | or corrupt replicas,   |
+ *           +-------------------+             | decommission (node or  |
+ *                                             | rack), maintenance,    |
+ *                                             | add node, restart SCM  |
+ *                                             +------------------------+
+ * }</pre>
  * A run has two phases. During the chaos phase a client writes to containers while {@link SimChaos} crashes,
  * partitions, decommissions and adds datanodes and damages replicas. Then faults stop, every datanode comes back, and
- * the settle phase gives SCM time to repair the cluster. Safety invariants are checked throughout, convergence at the
- * end.
- * <p>
+ * the settle phase gives SCM time to repair the cluster. Safety invariants are checked throughout. At the end SCM must
+ * have repaired everything, and then stay quiet: no more replicate or delete commands. With the default
+ * {@link SimConfig}:
+ * <pre>{@code
+ * simulated time
+ * 0                     2h                           3h            3h15m
+ * +---------------------+----------------------------+-------------+
+ * |        chaos        |           settle           |    quiet    |
+ * +---------------------+----------------------------+-------------+
+ * | client writes;      | writes and faults stop;    | SCM must    |
+ * | a fault every 1-3   | every datanode comes back; | send no     |
+ * | min, at most 2      | SCM repairs the cluster    | replicate / |
+ * | datanodes down      |                            | delete cmds |
+ * +---------------------+----------------------------+-------------+
+ * |<-------------- safety checks every 30 s, whole run ----------->|
+ *                                                    ^
+ *                                                    | convergence check:
+ *                                                    |  - every container correctly replicated
+ *                                                    |  - no CLOSING container, no ALLOCATED pipeline
+ *                                                    |  - every datanode registered, IN_SERVICE, HEALTHY
+ *                                                    |  - SCM's replicas == datanodes' replicas
+ *
+ * pass: next seed        fail: violations + seed + full trace in target/scm-simulation
+ * }</pre>
  * Not simulated: SCM HA (Ratis replication of SCM state), block deletion, EC containers, the container balancer and
  * security.
  */

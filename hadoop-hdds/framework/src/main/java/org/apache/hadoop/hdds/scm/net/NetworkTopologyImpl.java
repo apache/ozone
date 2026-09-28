@@ -74,7 +74,6 @@ public class NetworkTopologyImpl implements NetworkTopology {
   /**
    * Constructs a topology whose random choices and shuffles come from the given source, so they can be reproduced.
    */
-  @VisibleForTesting
   public NetworkTopologyImpl(ConfigurationSource conf, Random random) {
     schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(conf);

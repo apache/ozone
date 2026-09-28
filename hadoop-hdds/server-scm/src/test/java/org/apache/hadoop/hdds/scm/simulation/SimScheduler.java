@@ -40,7 +40,33 @@ import org.apache.ozone.test.MockClock;
  * Each step picks one runnable item (a non-empty lane or a due timer) using the seeded random source, which explores
  * the orderings that separate threads allow. Time only moves when nothing can run, to the next timer or to the end of a
  * slow handler: a picked handler is sometimes slow, which delays it and everything behind it on its lane while time
- * goes on.
+ * goes on. With the default {@link SimConfig}:
+ * <pre>{@code
+ *       lanes: FIFO task queues                   timers
+ *   +------------------------------+   +---------------------------------------+
+ *   | one per event handler, like  |   | SCM services: node health check 3 s,  |
+ *   | its single-thread executor   |   | RM 60 s, under/over-replication 10 s, |
+ *   |                              |   | pipeline creator and scrubbers 60 s,  |
+ *   | container reports: 10 lanes  |   | admin monitor 30 s                    |
+ *   | chosen by datanode ID        |   | datanode heartbeats 3 s and reports,  |
+ *   |                              |   | client writes, faults, safety check   |
+ *   +--------------+---------------+   +-------------------+-------------------+
+ *                  | ready tasks                           | due timers
+ *                  +-------------------+-------------------+
+ *                                      v
+ *     seed ---> +---------------------------------------+
+ *               | SimScheduler.step()                   |
+ *               |   pick ONE runnable item at random    |
+ *               |   run it to completion                |
+ *               |   5%: a handler is "slow" and holds   |
+ *               |       its lane for up to 10 s         |
+ *               +----------+--------------------+-------+
+ *                          |                    |
+ *         nothing runnable |                    | every step
+ *                          v                    v
+ *       MockClock jumps to the next         SimTrace ---> same seed = same trace
+ *       timer or busy lane                                (checked by hash)
+ * }</pre>
  */
 final class SimScheduler {
 

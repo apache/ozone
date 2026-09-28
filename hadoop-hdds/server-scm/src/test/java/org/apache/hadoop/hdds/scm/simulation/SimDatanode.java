@@ -60,7 +60,30 @@ import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
 /**
  * Simulated datanode. It registers, heartbeats and reports like the datanode state machine, and applies SCM commands to
  * its replicas the way the datanode command handlers do. Its replicas are the ground truth the simulation checks SCM
- * against.
+ * against. For example, this is how a lost replica gets repaired; every step on the SCM side is real SCM code:
+ * <pre>{@code
+ *  SimDatanode dn3                real SCM                                SimDatanode dn7
+ *  (holds #42)                                                            (target)
+ *       |                            |                                          |
+ *       |--- heartbeat ------------->| SCMDatanodeProtocolServer.sendHeartbeat  |
+ *       |                            |                                          |
+ *       |                            | RM timer: #42 is under-replicated        |
+ *       |                            | under-replication timer: placement picks |
+ *       |                            |   dn7 (seeded), queues "replicate #42    |
+ *       |                            |   to dn7" for dn3                        |
+ *       |<-- heartbeat response -----|                                          |
+ *       |    [replicate #42 to dn7]  |                                          |
+ *       |                            |                                          |
+ *       | decode the proto like      |                                          |
+ *       | HeartbeatEndpointTask,     |                                          |
+ *       | apply after a delay        |                                          |
+ *       |-------------------- push copy (transfer time) ----------------------->|
+ *       |                            |                                          |
+ *       |                            |<-- heartbeat with incremental report ----|
+ *       |                            | ContainerReportHandler (report lane):    |
+ *       |                            |   replica on dn7 recorded, pending op    |
+ *       |                            |   cleared                                |
+ * }</pre>
  */
 final class SimDatanode {
 
