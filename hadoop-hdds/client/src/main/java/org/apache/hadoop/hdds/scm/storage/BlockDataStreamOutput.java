@@ -120,7 +120,13 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   // be released from the buffer pool.
   private final StreamCommitWatcher commitWatcher;
 
-  private Queue<CompletableFuture<?>> putBlockFutures = new LinkedList<>();
+  // Futures of the PutBlock(s) sent through the Ratis write API, i.e. committed by the Raft log.
+  private Queue<CompletableFuture<ContainerCommandResponseProto>>
+      putBlockFutures = new LinkedList<>();
+
+  // Futures of the PutBlock(s) sent as data stream commands, i.e. committed without the Raft log.
+  private final Queue<CompletableFuture<DataStreamReply>>
+      putBlockCommandFutures = new LinkedList<>();
 
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
@@ -321,6 +327,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         if (!putBlockFutures.isEmpty()) {
           putBlockFutures.remove().get();
         }
+        if (!putBlockCommandFutures.isEmpty()) {
+          putBlockCommandFutures.remove().get();
+        }
       } catch (ExecutionException e) {
         handleExecutionException(e);
       } catch (InterruptedException ex) {
@@ -420,7 +429,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     waitFuturesComplete();
     if (close && config.isDatastreamPutBlockWithoutRaftEnabled()) {
       // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
-      waitPutBlockFuturesComplete();
+      waitPutBlockCommandFuturesComplete();
     }
     final BlockData blockData = containerBlockData.build();
     if (close) {
@@ -520,7 +529,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         PUT_BLOCK_REQUEST_LENGTH_MAX);
     RatisHelper.debug(command, "putBlockCommand", LOG);
     metrics.incrPendingContainerOpsMetrics(ContainerProtos.Type.PutBlock);
-    putBlockFutures.add(out.commandAsync(command)
+    putBlockCommandFutures.add(out.commandAsync(command)
         .whenCompleteAsync((reply, e) -> {
           metrics.decrPendingContainerOpsMetrics(ContainerProtos.Type.PutBlock);
           try {
@@ -612,12 +621,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
   }
 
-  private void waitPutBlockFuturesComplete() throws IOException {
-    if (putBlockFutures.isEmpty()) {
+  private void waitPutBlockCommandFuturesComplete() throws IOException {
+    if (putBlockCommandFutures.isEmpty()) {
       return;
     }
     try {
-      CompletableFuture.allOf(putBlockFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
+      CompletableFuture.allOf(putBlockCommandFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
       checkOpen();
     } catch (Exception e) {
       LOG.warn("Failed to commit PutBlock before stream close: " + e);
@@ -649,6 +658,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       executePutBlock(true, true);
     }
     CompletableFuture.allOf(putBlockFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
+    CompletableFuture.allOf(putBlockCommandFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
     watchForCommit(false);
     // just check again if the exception is hit while waiting for the
     // futures to ensure flush has indeed succeeded
