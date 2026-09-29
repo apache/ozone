@@ -709,7 +709,7 @@ public class TestContainerReconciliationWithMockDatanodes {
         int size = blockDataList.size();
         for (int i = 0; i < numBlocksToRemove; i++) {
           BlockData blockData = reverse ? blockDataList.get(size - 1 - i) : blockDataList.get(i);
-          File blockFile = TestContainerCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
+          File blockFile = ContainerTestCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
           Assertions.assertTrue(blockFile.delete());
           handle.getStore().getBlockDataTable().deleteWithBatch(batch,
               containerData.getBlockKey(blockData.getLocalID()));
@@ -728,7 +728,7 @@ public class TestContainerReconciliationWithMockDatanodes {
         int blockIndex = reverse ? size - 1 - (i % size) : i % size;
         BlockData blockData = blockDataList.get(blockIndex);
         int chunkIndex = i / size;
-        File blockFile = TestContainerCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
+        File blockFile = ContainerTestCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
         List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>(blockData.getChunks());
         ContainerProtos.ChunkInfo chunkInfo = chunks.remove(chunkIndex);
         corruptFileAtOffset(blockFile, chunkInfo.getOffset(), chunkInfo.getLen());

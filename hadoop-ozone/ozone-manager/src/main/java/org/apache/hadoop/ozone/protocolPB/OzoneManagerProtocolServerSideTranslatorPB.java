@@ -139,16 +139,15 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   public OMResponse processRequest(OMRequest request) throws ServiceException {
     OMResponse response = internalProcessRequest(request);
     if (response.hasOmLockDetails()) {
-      OzoneManagerProtocolProtos.OMLockDetailsProto omLockDetailsProto =
-          response.getOmLockDetails();
       Server.Call call = Server.getCurCall().get();
       if (call != null) {
-        call.getProcessingDetails().add(Timing.LOCKWAIT,
-            omLockDetailsProto.getWaitLockNanos(), TimeUnit.NANOSECONDS);
-        call.getProcessingDetails().add(Timing.LOCKSHARED,
-            omLockDetailsProto.getReadLockNanos(), TimeUnit.NANOSECONDS);
-        call.getProcessingDetails().add(Timing.LOCKEXCLUSIVE,
-            omLockDetailsProto.getWriteLockNanos(), TimeUnit.NANOSECONDS);
+        OzoneManagerProtocolProtos.OMLockDetailsProto lockDetails = response.getOmLockDetails();
+        call.getProcessingDetails().add(
+            Timing.LOCKWAIT, lockDetails.getWaitLockNanos(), TimeUnit.NANOSECONDS);
+        call.getProcessingDetails().add(
+            Timing.LOCKSHARED, lockDetails.getReadLockNanos(), TimeUnit.NANOSECONDS);
+        call.getProcessingDetails().add(
+            Timing.LOCKEXCLUSIVE, lockDetails.getWriteLockNanos(), TimeUnit.NANOSECONDS);
       }
     }
     return response;
