@@ -24,14 +24,12 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for SetLifecycleConfiguration request.
  */
-@CleanupTableInfo(cleanupTables = {LIFECYCLE_CONFIGURATION_TABLE})
 public class OMLifecycleConfigurationSetResponse extends OMClientResponse  {
 
   private final OmLifecycleConfiguration omLifecycleConfiguration;

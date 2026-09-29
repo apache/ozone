@@ -25,13 +25,11 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for put object tagging request for FSO bucket.
  */
-@CleanupTableInfo(cleanupTables = {FILE_TABLE})
 public class S3PutObjectTaggingResponseWithFSO extends S3PutObjectTaggingResponse {
 
   private long volumeId;

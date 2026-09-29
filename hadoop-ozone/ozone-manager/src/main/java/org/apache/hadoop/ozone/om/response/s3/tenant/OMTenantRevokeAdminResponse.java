@@ -25,16 +25,12 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for OMTenantAssignAdminRequest.
  */
-@CleanupTableInfo(cleanupTables = {
-    TENANT_ACCESS_ID_TABLE
-})
 public class OMTenantRevokeAdminResponse extends OMClientResponse {
 
   private String accessId;

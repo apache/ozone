@@ -25,14 +25,12 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for delete object tagging request.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE})
 public class S3DeleteObjectTaggingResponse extends OmKeyResponse {
 
   private OmKeyInfo omKeyInfo;

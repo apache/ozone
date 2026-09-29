@@ -28,17 +28,12 @@ import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for DeleteTenant request.
  */
-@CleanupTableInfo(cleanupTables = {
-    TENANT_STATE_TABLE,
-    VOLUME_TABLE
-})
 public class OMTenantDeleteResponse extends OMClientResponse {
 
   private String volumeName;

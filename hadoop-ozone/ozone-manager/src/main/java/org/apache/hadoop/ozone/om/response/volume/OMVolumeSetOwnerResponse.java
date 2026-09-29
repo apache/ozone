@@ -24,7 +24,6 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -33,7 +32,6 @@ import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.Persisted
 /**
  * Response for set owner request.
  */
-@CleanupTableInfo(cleanupTables = {VOLUME_TABLE})
 public class OMVolumeSetOwnerResponse extends OMClientResponse {
   private String oldOwner;
   private PersistedUserVolumeInfo oldOwnerVolumeList;

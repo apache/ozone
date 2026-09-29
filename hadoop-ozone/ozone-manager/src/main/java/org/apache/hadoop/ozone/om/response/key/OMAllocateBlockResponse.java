@@ -26,13 +26,11 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for AllocateBlock request.
  */
-@CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, BUCKET_TABLE})
 public class OMAllocateBlockResponse extends OmKeyResponse {
 
   private OmKeyInfo omKeyInfo;

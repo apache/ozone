@@ -28,13 +28,11 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
  * Response for Bucket acl request for prefix layout.
  */
-@CleanupTableInfo(cleanupTables = { FILE_TABLE, DIRECTORY_TABLE })
 public class OMKeySetTimesResponseWithFSO extends OMKeySetTimesResponse {
 
   private boolean isDirectory;
