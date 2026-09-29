@@ -39,6 +39,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
@@ -502,6 +503,24 @@ public class TestOzoneManagerRequestHandler {
     Assertions.assertTrue(response.hasQueryUpgradeStatusResponse());
     Assertions.assertEquals(expected, response.getQueryUpgradeStatusResponse());
     Mockito.verify(ozoneManager).queryUpgradeStatus();
+  }
+
+  /**
+   * Querying upgrade status is admin-only: {@link OzoneManager#queryUpgradeStatus()} must reject a
+   * non-admin caller with PERMISSION_DENIED before contacting SCM.
+   */
+  @Test
+  public void testQueryUpgradeStatusRequiresAdmin() throws IOException {
+    OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
+    Mockito.when(ozoneManager.queryUpgradeStatus()).thenCallRealMethod();
+    Mockito.doCallRealMethod().when(ozoneManager).checkAdminUserPrivilege(Mockito.anyString());
+    Mockito.when(ozoneManager.isAdminAuthorizationEnabled()).thenReturn(true);
+    Mockito.when(ozoneManager.isAdmin(any())).thenReturn(false);
+
+    // The admin check runs before the SCM block client is dereferenced (which is null on the mock),
+    // so a PERMISSION_DENIED here also confirms the query never reaches SCM.
+    OMException ex = Assertions.assertThrows(OMException.class, ozoneManager::queryUpgradeStatus);
+    Assertions.assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
   }
 
   @Test

@@ -440,6 +440,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerProtocolProtos.QueryUpgradeStatusResponse queryUpgradeStatusResponse =
             getOzoneManager().queryUpgradeStatus();
         responseBuilder.setQueryUpgradeStatusResponse(queryUpgradeStatusResponse);
+        break;
       default:
         responseBuilder.setSuccess(false);
         responseBuilder.setMessage("Unrecognized Command Type: " + cmdType);

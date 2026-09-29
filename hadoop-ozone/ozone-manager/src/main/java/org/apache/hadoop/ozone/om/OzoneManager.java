@@ -3778,6 +3778,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   @Override
   public QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException {
+    checkAdminUserPrivilege("query upgrade status.");
     HddsProtos.UpgradeStatus scmStatus;
     try {
       scmStatus = scmClient.getBlockClient().queryUpgradeStatus();
