@@ -235,45 +235,48 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
 
   private ContainerCommandResponseProto sendCommandWithTraceID(ContainerCommandRequestProto request)
       throws IOException {
-    return TracingUtil.executeInNewSpan(getSpanName(request.getCmdType()), () ->
-      {
-        try {
-          ContainerCommandRequestProto finalPayload =
-              ContainerCommandRequestProto.newBuilder(request)
-                  .setTraceID(TracingUtil.exportCurrentSpan()).build();
-          final CompletableFuture<ContainerCommandResponseProto> response;
+    return TracingUtil.executeInNewSpan(getSpanName(request.getCmdType()),
+        () -> sendCommandWithoutTraceID(request));
+  }
 
-          try {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Executing {} on {}", processForDebug(request), dn);
-            }
-            response = sendCommandInternal(finalPayload);
-          } catch (IOException e) {
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Failed: {} {}.", processForDebug(request), this, e);
-            }
-            throw e;
-          }
+  private ContainerCommandResponseProto sendCommandWithoutTraceID(ContainerCommandRequestProto request)
+      throws IOException {
+    try {
+      ContainerCommandRequestProto finalPayload =
+          ContainerCommandRequestProto.newBuilder(request)
+              .setTraceID(TracingUtil.exportCurrentSpan()).build();
+      final CompletableFuture<ContainerCommandResponseProto> response;
 
-          final ContainerCommandResponseProto proto = response.get();
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("request {} {} {} finished", request.getCmdType(),
-                request.getClientId().toStringUtf8(), request.getCallId());
-          }
-          return proto;
-        } catch (ExecutionException e) {
-          final Throwable cause = e.getCause();
-          if (Status.fromThrowable(cause).getCode() == Status.UNAUTHENTICATED.getCode()) {
-            throw new SCMSecurityException("Unauthenticated: " + processForDebug(request) + " " + this, cause);
-          }
-          throw getIOExceptionForSendCommand(request, e);
-        } catch (InterruptedException e) {
-          final String s = "Interrupted: " + processForDebug(request) + " " + this;
-          LOG.warn(s);
-          Thread.currentThread().interrupt();
-          throw (InterruptedIOException) new InterruptedIOException(s).initCause(e);
+      try {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Executing {} on {}", processForDebug(request), dn);
         }
-      });
+        response = sendCommandInternal(finalPayload);
+      } catch (IOException e) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Failed: {} {}.", processForDebug(request), this, e);
+        }
+        throw e;
+      }
+
+      final ContainerCommandResponseProto proto = response.get();
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("request {} {} {} finished", request.getCmdType(),
+            request.getClientId().toStringUtf8(), request.getCallId());
+      }
+      return proto;
+    } catch (ExecutionException e) {
+      final Throwable cause = e.getCause();
+      if (Status.fromThrowable(cause).getCode() == Status.UNAUTHENTICATED.getCode()) {
+        throw new SCMSecurityException("Unauthenticated: " + processForDebug(request) + " " + this, cause);
+      }
+      throw getIOExceptionForSendCommand(request, e);
+    } catch (InterruptedException e) {
+      final String s = "Interrupted: " + processForDebug(request) + " " + this;
+      LOG.warn(s);
+      Thread.currentThread().interrupt();
+      throw (InterruptedIOException) new InterruptedIOException(s).initCause(e);
+    }
   }
 
   private CompletableFuture<ContainerCommandResponseProto> sendCommandInternal(
