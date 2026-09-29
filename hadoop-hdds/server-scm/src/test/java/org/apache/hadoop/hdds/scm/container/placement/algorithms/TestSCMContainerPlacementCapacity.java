@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -107,13 +108,13 @@ public class TestSCMContainerPlacementCapacity {
         .thenReturn(new ArrayList<>(datanodes));
 
     when(mockNodeManager.getNodeStat(any()))
-        .thenReturn(new SCMNodeMetric(100L, 0L, 100L, 0, 90, 0));
+        .thenReturn(createSCMNodeMetric(100L, 0L, 100L, 0, 90, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(100L, 90L, 10L, 0, 9, 0));
+        .thenReturn(createSCMNodeMetric(100L, 90L, 10L, 0, 9, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(100L, 80L, 20L, 0, 19, 0));
+        .thenReturn(createSCMNodeMetric(100L, 80L, 20L, 0, 19, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(4)))
-        .thenReturn(new SCMNodeMetric(100L, 70L, 30L, 0, 20, 0));
+        .thenReturn(createSCMNodeMetric(100L, 70L, 30L, 0, 20, 0));
     when(mockNodeManager.getNode(any(DatanodeID.class))).thenAnswer(
             invocation -> datanodes.stream()
                 .filter(dn -> dn.getID().equals(invocation.getArgument(0)))
@@ -170,5 +171,16 @@ public class TestSCMContainerPlacementCapacity {
         .isLessThan(selectedCount.get(datanodes.get(6)));
     assertThat(selectedCount.get(datanodes.get(4)))
         .isLessThan(selectedCount.get(datanodes.get(6)));
+  }
+
+  private static SCMNodeMetric createSCMNodeMetric(long capacity, long used, long remaining,
+      long committed, long freeSpaceToSpare, long reserved) {
+    return new SCMNodeMetric(
+        singletonMap(StorageType.DEFAULT, capacity),
+        singletonMap(StorageType.DEFAULT, used),
+        singletonMap(StorageType.DEFAULT, remaining),
+        singletonMap(StorageType.DEFAULT, committed),
+        singletonMap(StorageType.DEFAULT, freeSpaceToSpare),
+        singletonMap(StorageType.DEFAULT, reserved));
   }
 }

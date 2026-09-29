@@ -18,7 +18,9 @@
 package org.apache.hadoop.hdds.scm.container.placement.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.fs.StorageType;
 
 /**
  * SCM Node Metric that is used in the placement classes.
@@ -37,18 +39,21 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
   }
 
   /**
-   * Set the capacity, used, remaining and committed space on a datanode.
+   * Set the capacity, used, remaining, committed, free-space-to-spare and reserved
+   * space on a datanode, keyed by StorageType.
    *
-   * @param capacity  in bytes
-   * @param used      in bytes
-   * @param remaining in bytes
-   * @param committed in bytes
+   * @param capacity  in bytes, per StorageType
+   * @param used      in bytes, per StorageType
+   * @param remaining in bytes, per StorageType
+   * @param committed in bytes, per StorageType
+   * @param freeSpaceToSpare in bytes, per StorageType
+   * @param reserved  in bytes, per StorageType
    */
   @VisibleForTesting
-  public SCMNodeMetric(long capacity, long used, long remaining,
-                       long committed, long freeSpaceToSpare, long reserved) {
-    this.stat = new SCMNodeStat();
-    this.stat.set(capacity, used, remaining, committed, freeSpaceToSpare, reserved);
+  public SCMNodeMetric(Map<StorageType, Long> capacity, Map<StorageType, Long> used,
+      Map<StorageType, Long> remaining, Map<StorageType, Long> committed,
+      Map<StorageType, Long> freeSpaceToSpare, Map<StorageType, Long> reserved) {
+    this.stat = new SCMNodeStat(capacity, used, remaining, committed, freeSpaceToSpare, reserved);
   }
 
   /**
@@ -58,26 +63,34 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public boolean isGreater(SCMNodeStat o) {
+    return isGreaterInternal(o, null);
+  }
+
+  public boolean isGreater(SCMNodeStat o, StorageType storageType) {
+    return isGreaterInternal(o, storageType);
+  }
+
+  private boolean isGreaterInternal(SCMNodeStat o, StorageType storageType) {
     Objects.requireNonNull(o, "o == null");
 
     // if zero, replace with 1 for the division to work.
-    long thisDenominator = (this.stat.getCapacity().get() == 0)
-        ? 1 : this.stat.getCapacity().get();
-    long otherDenominator = (o.getCapacity().get() == 0)
-        ? 1 : o.getCapacity().get();
+    long thisDenominator = (this.stat.getCapacity(storageType).get() == 0)
+        ? 1 : this.stat.getCapacity(storageType).get();
+    long otherDenominator = (o.getCapacity(storageType).get() == 0)
+        ? 1 : o.getCapacity(storageType).get();
 
     float thisNodeWeight =
-        stat.getScmUsed().get() / (float) thisDenominator;
+        stat.getScmUsed(storageType).get() / (float) thisDenominator;
 
     float oNodeWeight =
-        o.getScmUsed().get() / (float) otherDenominator;
+        o.getScmUsed(storageType).get() / (float) otherDenominator;
 
     if (Math.abs(thisNodeWeight - oNodeWeight) > 0.000001) {
       return thisNodeWeight > oNodeWeight;
     }
     // if these nodes have similar weight then return the node with more
     // used space as the greater node.
-    return stat.getScmUsed().isGreater(o.getScmUsed().get());
+    return stat.getScmUsed(storageType).isGreater(o.getScmUsed(storageType).get());
   }
 
   /**
@@ -88,19 +101,27 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public boolean isLess(SCMNodeStat o) {
+    return isLessInternal(o, null);
+  }
+
+  public boolean isLess(SCMNodeStat o, StorageType storageType) {
+    return isLessInternal(o, storageType);
+  }
+
+  private boolean isLessInternal(SCMNodeStat o, StorageType storageType) {
     Objects.requireNonNull(o, "Argument cannot be null");
 
     // if zero, replace with 1 for the division to work.
-    long thisDenominator = (this.stat.getCapacity().get() == 0)
-        ? 1 : this.stat.getCapacity().get();
-    long otherDenominator = (o.getCapacity().get() == 0)
-        ? 1 : o.getCapacity().get();
+    long thisDenominator = (this.stat.getCapacity(storageType).get() == 0)
+        ? 1 : this.stat.getCapacity(storageType).get();
+    long otherDenominator = (o.getCapacity(storageType).get() == 0)
+        ? 1 : o.getCapacity(storageType).get();
 
     float thisNodeWeight =
-        stat.getScmUsed().get() / (float) thisDenominator;
+        stat.getScmUsed(storageType).get() / (float) thisDenominator;
 
     float oNodeWeight =
-        o.getScmUsed().get() / (float) otherDenominator;
+        o.getScmUsed(storageType).get() / (float) otherDenominator;
 
     if (Math.abs(thisNodeWeight - oNodeWeight) > 0.000001) {
       return thisNodeWeight < oNodeWeight;
@@ -108,7 +129,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
 
     // if these nodes are have similar weight then return the node with less
     // used space as the lesser node.
-    return stat.getScmUsed().isLess(o.getScmUsed().get());
+    return stat.getScmUsed(storageType).isLess(o.getScmUsed(storageType).get());
   }
 
   /**
@@ -121,9 +142,17 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public boolean isEqual(SCMNodeStat o) {
-    float thisNodeWeight = stat.getScmUsed().get() / (float)
-        stat.getCapacity().get();
-    float oNodeWeight = o.getScmUsed().get() / (float) o.getCapacity().get();
+    return isEqualInternal(o, null);
+  }
+
+  public boolean isEqual(SCMNodeStat o, StorageType storageType) {
+    return isEqualInternal(o, storageType);
+  }
+
+  private boolean isEqualInternal(SCMNodeStat o, StorageType storageType) {
+    float thisNodeWeight = stat.getScmUsed(storageType).get() / (float)
+        stat.getCapacity(storageType).get();
+    float oNodeWeight = o.getScmUsed(storageType).get() / (float) o.getCapacity(storageType).get();
     return Math.abs(thisNodeWeight - oNodeWeight) < 0.000001;
   }
 
@@ -157,9 +186,7 @@ public class SCMNodeMetric implements DatanodeMetric<SCMNodeStat, Long>,
    */
   @Override
   public void set(SCMNodeStat value) {
-    stat.set(value.getCapacity().get(), value.getScmUsed().get(),
-        value.getRemaining().get(), value.getCommitted().get(),
-        value.getFreeSpaceToSpare().get(), value.getReserved().get());
+    stat.set(value);
   }
 
   /**

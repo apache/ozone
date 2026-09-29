@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -32,12 +34,12 @@ class TestDatanodeUsageInfo {
   void testToProtoDoesNotIncludeFilesystemFieldsByDefault() {
     DatanodeDetails dn = randomDatanodeDetails();
     SCMNodeStat stat = new SCMNodeStat(
-        1000L,  // capacity
-        100L,   // scmUsed
-        900L,   // remaining
-        10L,    // committed
-        5L,     // freeSpaceToSpare
-        0L      // reserved
+        singletonMap(StorageType.DEFAULT, 1000L),  // capacity
+        singletonMap(StorageType.DEFAULT, 100L),   // scmUsed
+        singletonMap(StorageType.DEFAULT, 900L),   // remaining
+        singletonMap(StorageType.DEFAULT, 10L),    // committed
+        singletonMap(StorageType.DEFAULT, 5L),     // freeSpaceToSpare
+        singletonMap(StorageType.DEFAULT, 0L)      // reserved
     );
 
     DatanodeUsageInfo info = new DatanodeUsageInfo(dn, stat);
@@ -54,7 +56,13 @@ class TestDatanodeUsageInfo {
   @Test
   void testToProtoIncludesFilesystemFieldsWhenPresent() {
     DatanodeDetails dn = randomDatanodeDetails();
-    SCMNodeStat stat = new SCMNodeStat(1000L, 100L, 900L, 10L, 5L, 0L);
+    SCMNodeStat stat = new SCMNodeStat(
+        singletonMap(StorageType.DEFAULT, 1000L),
+        singletonMap(StorageType.DEFAULT, 100L),
+        singletonMap(StorageType.DEFAULT, 900L),
+        singletonMap(StorageType.DEFAULT, 10L),
+        singletonMap(StorageType.DEFAULT, 5L),
+        singletonMap(StorageType.DEFAULT, 0L));
 
     DatanodeUsageInfo info = new DatanodeUsageInfo(dn, stat);
     info.setFilesystemUsage(2000L, 1500L);

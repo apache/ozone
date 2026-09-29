@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 
 import jakarta.annotation.Nonnull;
@@ -27,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -78,9 +80,13 @@ public final class MockCluster {
           ? storageUnit * RANDOM.nextInt(10, 60)
           : (long) (datanodeUsedSpace / nodeUtilizationList[i]);
 
-      SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace,
-          datanodeCapacity - datanodeUsedSpace, 0,
-          datanodeCapacity - datanodeUsedSpace - 1, 0);
+      SCMNodeStat stat = new SCMNodeStat(
+          singletonMap(StorageType.DEFAULT, datanodeCapacity),
+          singletonMap(StorageType.DEFAULT, datanodeUsedSpace),
+          singletonMap(StorageType.DEFAULT, datanodeCapacity - datanodeUsedSpace),
+          singletonMap(StorageType.DEFAULT, 0L),
+          singletonMap(StorageType.DEFAULT, datanodeCapacity - datanodeUsedSpace - 1),
+          singletonMap(StorageType.DEFAULT, 0L));
       nodesInCluster[i].setScmNodeStat(stat);
       clusterUsedSpace += datanodeUsedSpace;
       clusterCapacity += datanodeCapacity;

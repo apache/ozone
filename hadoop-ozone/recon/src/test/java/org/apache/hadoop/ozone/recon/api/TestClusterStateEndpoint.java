@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
@@ -38,6 +39,7 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.concurrent.TimeoutException;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
@@ -198,7 +200,12 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
         any(), anyLong(), anyLong(), anyInt())).thenReturn(Collections.emptyList());
 
     SCMNodeStat scmNodeStat = new SCMNodeStat(
-        1000L, 400L, 600L, 300L, 50L, 20L);
+        singletonMap(StorageType.DEFAULT, 1000L),
+        singletonMap(StorageType.DEFAULT, 400L),
+        singletonMap(StorageType.DEFAULT, 600L),
+        singletonMap(StorageType.DEFAULT, 300L),
+        singletonMap(StorageType.DEFAULT, 50L),
+        singletonMap(StorageType.DEFAULT, 20L));
     when(mockNodeManager.getStats()).thenReturn(scmNodeStat);
     when(mockNodeManager.getNodeCount(NodeStatus.inServiceHealthy())).thenReturn(1);
     when(mockNodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly()))
