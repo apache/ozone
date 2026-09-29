@@ -144,7 +144,11 @@ const NavBar: React.FC<NavBarProps> = ({
     <Menu.Item key='/Heatmap'
       icon={<LayoutOutlined />}>
       <span>Heatmap</span>
-      <Link to='/Heatmap' />
+      <Link to={{
+        pathname: '/Heatmap',
+        state: { isHeatmapEnabled: isHeatmapEnabled }
+      }}
+      />
     </Menu.Item>
   ),(
     isChatbotEnabled &&
