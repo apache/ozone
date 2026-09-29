@@ -68,7 +68,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   // scmNodeId -> ProxyInfo<rpcProxy>
   private final Map<String, ProxyInfo<T>> scmProxies;
   // scmNodeId -> SCMProxyInfo
-  private final Map<String, SCMProxyInfo> scmProxyInfoMap;
+  private Map<String, SCMProxyInfo> scmProxyInfoMap;
   private List<String> scmNodeIds;
 
   // As SCM Client is shared across threads, performFailOver()
@@ -122,7 +122,6 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     this.scmVersion = RPC.getProtocolVersion(protocol);
 
     this.scmProxies = new HashMap<>();
-    this.scmProxyInfoMap = new HashMap<>();
     loadConfigs();
 
     this.currentProxyIndex = 0;
@@ -176,8 +175,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   protected synchronized void loadConfigs() {
     ScmProxyConfig newConfig = buildConfigs();
     scmNodeIds = newConfig.nodeIds;
-    scmProxyInfoMap.clear();
-    scmProxyInfoMap.putAll(newConfig.proxyInfoMap);
+    scmProxyInfoMap = newConfig.proxyInfoMap;
   }
 
   /**
@@ -224,18 +222,17 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
 
     Map<String, ProxyInfo<T>> staleProxies = new HashMap<>();
     synchronized (this) {
-      Map<String, SCMProxyInfo> oldProxyInfoMap = new HashMap<>(scmProxyInfoMap);
+      Map<String, SCMProxyInfo> oldProxyInfoMap = scmProxyInfoMap;
       scmNodeIds = newConfig.nodeIds;
-      scmProxyInfoMap.clear();
-      scmProxyInfoMap.putAll(newConfig.proxyInfoMap);
+      scmProxyInfoMap = newConfig.proxyInfoMap;
 
       // Re-sync proxy index to the new list, or fall back to first node if removed.
-      if (!scmNodeIds.contains(currentProxySCMNodeId)) {
-        currentProxyIndex = 0;
-        currentProxySCMNodeId = scmNodeIds.get(currentProxyIndex);
-      } else {
-        currentProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
+      int newProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
+      if (newProxyIndex < 0) {
+        newProxyIndex = 0;
+        currentProxySCMNodeId = scmNodeIds.get(newProxyIndex);
       }
+      currentProxyIndex = newProxyIndex;
 
       // Drop removed failover target to prevent NPE on next failover.
       if (updatedLeaderNodeID != null
@@ -255,6 +252,9 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
           }
         }
       }
+
+      getLogger().info("Reloaded SCM proxy configuration for protocol {} with {} nodes: {}",
+          protocolClass.getSimpleName(), scmNodeIds.size(), scmProxyInfoMap.values());
     }
 
     for (Map.Entry<String, ProxyInfo<T>> entry : staleProxies.entrySet()) {
@@ -265,9 +265,6 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
             entry.getKey(), stopEx);
       }
     }
-
-    getLogger().info("Reloaded SCM proxy configuration for protocol {} with {} nodes: {}",
-        protocolClass.getSimpleName(), newConfig.nodeIds.size(), newConfig.proxyInfoMap.values());
   }
 
   /** Parsed node list and resolved addresses, built without touching shared state. */
