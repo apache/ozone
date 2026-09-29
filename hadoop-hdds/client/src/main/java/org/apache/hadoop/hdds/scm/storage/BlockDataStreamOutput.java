@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -120,8 +121,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   // be released from the buffer pool.
   private final StreamCommitWatcher commitWatcher;
 
-  private Queue<CompletableFuture<ContainerCommandResponseProto>>
-      putBlockFutures = new LinkedList<>();
+  private Queue<CompletableFuture<?>> putBlockFutures = new LinkedList<>();
+
+  // Buffers acknowledged by a PutBlock committed through a data stream command.
+  // They are released by the caller thread since bufferList is not thread safe.
+  private final Queue<List<StreamBuffer>> ackedBuffers
+      = new ConcurrentLinkedQueue<>();
 
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
@@ -379,6 +384,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    */
   public void watchForCommit(boolean bufferFull) throws IOException {
     checkOpen();
+    releaseAckedBuffers();
     try {
       XceiverClientReply reply = bufferFull ?
           commitWatcher.watchOnFirstIndex() :
@@ -449,6 +455,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         // is no need to continue.
         return;
       }
+    } else if (config.isDatastreamPutBlockCommandEnabled()) {
+      executePutBlockCommand(blockData, byteBufferList);
+      return;
     }
     try {
       XceiverClientReply asyncReply =
@@ -495,6 +504,66 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     } catch (InterruptedException ex) {
       Thread.currentThread().interrupt();
       handleInterruptedException(ex, false);
+    }
+  }
+
+  /**
+   * Commit a PutBlock in the middle of the stream by sending it as a data stream command,
+   * so that it does not go through the Raft log.  The command is ordered with the data written
+   * so far and the datanodes reply with the serialized {@link ContainerCommandResponseProto}.
+   *
+   * @param blockData the block metadata to commit
+   * @param byteBufferList the buffers covered by this PutBlock, to be released once it is acknowledged
+   */
+  private void executePutBlockCommand(BlockData blockData,
+      List<StreamBuffer> byteBufferList) throws IOException {
+    final ContainerCommandRequestProto putBlockRequest
+        = ContainerProtocolCalls.getPutBlockRequest(
+            xceiverClient.getPipeline(), blockData, false, tokenString);
+    final ByteBuffer command = ContainerCommandRequestMessage.toMessage(
+        putBlockRequest, null).getContent().asReadOnlyByteBuffer();
+    Preconditions.checkState(command.remaining() <= PUT_BLOCK_REQUEST_LENGTH_MAX,
+        "PutBlock command length %s > max %s", command.remaining(),
+        PUT_BLOCK_REQUEST_LENGTH_MAX);
+    RatisHelper.debug(command, "putBlockCommand", LOG);
+    metrics.incrPendingContainerOpsMetrics(ContainerProtos.Type.PutBlock);
+    putBlockFutures.add(out.commandAsync(command)
+        .whenCompleteAsync((reply, e) -> {
+          metrics.decrPendingContainerOpsMetrics(ContainerProtos.Type.PutBlock);
+          try {
+            validatePutBlockCommandReply(reply, e);
+          } catch (IOException ioe) {
+            setIoException(ioe);
+            throw new CompletionException(ioe);
+          }
+          ackedBuffers.add(byteBufferList);
+        }, responseExecutor));
+  }
+
+  private void validatePutBlockCommandReply(DataStreamReply reply, Throwable e)
+      throws IOException {
+    if (e != null || reply == null || !reply.isSuccess()) {
+      throw new IOException("Failed to commit PutBlock for blockID " + blockID
+          + " through the data stream, reply=" + reply, e);
+    }
+    final ByteBuffer response = reply.nioBuffer();
+    if (!response.hasRemaining()) {
+      throw new IOException("Datanodes in pipeline "
+          + xceiverClient.getPipeline().getId() + " did not handle the PutBlock"
+          + " command for blockID " + blockID
+          + "; they may be running a version which does not support it");
+    }
+    validateResponse(ContainerCommandResponseProto.parseFrom(response));
+  }
+
+  /**
+   * Release the buffers of the PutBlock(s) committed through data stream commands.
+   * This is called by the caller thread since {@link #bufferList} is not thread safe.
+   */
+  private void releaseAckedBuffers() {
+    for (List<StreamBuffer> buffers = ackedBuffers.poll(); buffers != null;
+         buffers = ackedBuffers.poll()) {
+      commitWatcher.releaseBuffers(buffers);
     }
   }
 

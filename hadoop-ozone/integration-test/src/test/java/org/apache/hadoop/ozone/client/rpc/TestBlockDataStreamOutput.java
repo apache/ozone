@@ -69,6 +69,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests BlockDataStreamOutput class.
@@ -294,6 +295,37 @@ public class TestBlockDataStreamOutput {
       assertEquals(
           metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
           putBlockCount + expectedPutBlocks);
+      validateData(client, keyName, data);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testPutBlockAtBoundaryByCommand(boolean putBlockOnCloseEnabled) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), false, putBlockOnCloseEnabled);
+    config.setDatastreamPutBlockCommandEnabled(true);
+    try (OzoneClient client = newClient(cluster.getConf(), config)) {
+      int dataLength = 500;
+      XceiverClientMetrics metrics = XceiverClientManager.getXceiverClientMetrics();
+      long putBlockCount = metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock);
+      String keyName = getKeyName();
+      OzoneDataStreamOutput key = createKey(client, keyName, 0);
+      byte[] data = ContainerTestHelper.getFixedLengthString(keyString, dataLength).getBytes(UTF_8);
+      key.write(ByteBuffer.wrap(data));
+      BlockDataStreamOutputEntry entry =
+          ((KeyDataStreamOutput) key.getByteBufStreamOutput()).getStreamEntries().get(0);
+      key.close();
+      // The PutBlock at the 400 byte flush boundary is sent as a data stream command; close adds another
+      // one only when it does not commit PutBlock through the stream.
+      int expectedPutBlocks = putBlockOnCloseEnabled ? 1 : 2;
+      assertEquals(metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
+          putBlockCount + expectedPutBlocks);
+      if (putBlockOnCloseEnabled) {
+        // No PutBlock went through Raft, so there is no log index to use as block commit sequence id.
+        assertEquals(0, entry.getBlockID().getBlockCommitSequenceId());
+      } else {
+        assertThat(entry.getBlockID().getBlockCommitSequenceId()).isPositive();
+      }
       validateData(client, keyName, data);
     }
   }
