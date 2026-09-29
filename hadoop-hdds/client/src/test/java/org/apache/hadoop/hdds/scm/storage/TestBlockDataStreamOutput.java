@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.junit.jupiter.api.Test;
@@ -128,6 +129,74 @@ class TestBlockDataStreamOutput {
     }
     // Close adds another putBlock
     assertEquals(2, pipeline.getReceivedPutBlocks().size());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void midStreamPutBlockUsesStreamCommandWhenEnabled(boolean putBlockOnCloseEnabled) throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockCommandEnabled(true);
+    config.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
+    byte[] data = randomBytes(400);
+    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
+      stream.write(ByteBuffer.wrap(data), 0, data.length);
+      // 4 chunks of 100B each → hits flush boundary → 1 PutBlock, sent as a stream command
+      assertEquals(4, pipeline.getReceivedChunks().size());
+      assertEquals(0, pipeline.getReceivedPutBlocks().size(), "The mid-stream PutBlock must not go through Raft");
+      assertEquals(1, pipeline.getReceivedCommands().size());
+
+      ContainerCommandRequestProto command = pipeline.getReceivedCommands().get(0);
+      assertEquals(Type.PutBlock, command.getCmdType());
+      assertThat(command.getPutBlock().getEof()).isFalse();
+      assertEquals(4, command.getPutBlock().getBlockData().getChunksCount());
+    }
+    // Close does not send another command; it commits PutBlock the way the other config selects.
+    assertEquals(1, pipeline.getReceivedCommands().size());
+    assertEquals(putBlockOnCloseEnabled ? 0 : 1, pipeline.getReceivedPutBlocks().size());
+    assertArrayEquals(data, pipeline.getAllReceivedData());
+  }
+
+  @Test
+  void midStreamPutBlockUsesRaftWhenCommandDisabled() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockOnCloseEnabled(true);
+    byte[] data = randomBytes(400);
+    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
+      stream.write(ByteBuffer.wrap(data), 0, data.length);
+      assertEquals(1, pipeline.getReceivedPutBlocks().size(), "The mid-stream PutBlock should still go through Raft");
+      assertEquals(0, pipeline.getReceivedCommands().size());
+    }
+    assertArrayEquals(data, pipeline.getAllReceivedData());
+  }
+
+  @Test
+  void midStreamPutBlockCommandReleasesBuffers() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockCommandEnabled(true);
+    BlockDataStreamOutput stream = createStream(pipeline, config);
+    byte[] data = randomBytes(400);
+    stream.write(ByteBuffer.wrap(data), 0, data.length);
+    stream.close();
+
+    assertEquals(400, stream.getTotalAckDataLength(),
+        "The buffers of a PutBlock committed by a stream command should be acknowledged");
+  }
+
+  @Test
+  void midStreamPutBlockFailsOnDatanodeWithoutCommandSupport() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline().withUnsupportedCommand();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockCommandEnabled(true);
+    BlockDataStreamOutput stream = createStream(pipeline, config);
+    byte[] data = randomBytes(400);
+    stream.write(ByteBuffer.wrap(data), 0, data.length);
+
+    IOException e = assertThrows(IOException.class, stream::hsync);
+    assertThat(e).hasStackTraceContaining("did not handle the PutBlock command");
+    assertThrows(IOException.class, stream::close);
   }
 
   @Test

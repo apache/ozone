@@ -325,6 +325,16 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean datastreamPutBlockOnCloseEnabled = false;
 
+  @Config(key = "ozone.client.datastream.putblock.command.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "When enabled, the PutBlock triggered by a flush in the middle of a Ratis data stream " +
+          "is sent as a data stream command instead of a separate WriteAsync PutBlock, " +
+          "so that it does not go through the Raft log. " +
+          "All the datanodes must support data stream commands.",
+      tags = ConfigTag.CLIENT)
+  private boolean datastreamPutBlockCommandEnabled = false;
+
   @Config(key = "ozone.client.key.write.concurrency",
       defaultValue = "1",
       description = "Maximum concurrent writes allowed on each key. " +
@@ -714,6 +724,14 @@ public class OzoneClientConfig {
 
   public void setDatastreamPutBlockOnCloseEnabled(boolean datastreamPutBlockOnCloseEnabled) {
     this.datastreamPutBlockOnCloseEnabled = datastreamPutBlockOnCloseEnabled;
+  }
+
+  public boolean isDatastreamPutBlockCommandEnabled() {
+    return datastreamPutBlockCommandEnabled;
+  }
+
+  public void setDatastreamPutBlockCommandEnabled(boolean datastreamPutBlockCommandEnabled) {
+    this.datastreamPutBlockCommandEnabled = datastreamPutBlockCommandEnabled;
   }
 
   /**
