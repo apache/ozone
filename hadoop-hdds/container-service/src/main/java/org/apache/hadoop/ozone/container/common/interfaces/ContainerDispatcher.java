@@ -59,6 +59,17 @@ public interface ContainerDispatcher {
     }
   }
 
+  /** Receives the responses of {@link #streamDataReadOnly}. */
+  interface ReadBlockObserver extends DataStreamObserver<ReadBlockResponse> {
+    /**
+     * @return the buffer to read the {@code length} bytes of data of {@code response} into, from position 0, before
+     *     they are passed to {@link #onNext}. The default is a new heap buffer, which the observer may keep.
+     */
+    default ByteBuffer allocate(ContainerCommandResponseProto response, int length) {
+      return ByteBuffer.allocate(length);
+    }
+  }
+
   /**
    * Dispatches commands to container layer.
    * @param msg - Command Request
@@ -122,7 +133,7 @@ public interface ContainerDispatcher {
    */
   default void streamDataReadOnly(
        ContainerCommandRequestProto msg,
-       DataStreamObserver<ReadBlockResponse> streamObserver,
+       ReadBlockObserver streamObserver,
        RandomAccessFileChannel blockFile,
        DispatcherContext dispatcherContext) {
     throw new UnsupportedOperationException("streamDataReadOnly not supported.");

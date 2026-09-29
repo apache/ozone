@@ -82,12 +82,12 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockObserver;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.proto.RaftProtos.LogEntryProto;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
@@ -113,8 +113,11 @@ import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.CodedOutputStream;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
+import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
@@ -900,13 +903,26 @@ public class ContainerStateMachine extends BaseStateMachine {
     final AtomicReference<Throwable> error = new AtomicReference<>();
     final AtomicBoolean responseSeen = new AtomicBoolean(false);
     final AtomicLong bytesTransferred = new AtomicLong();
-    final DataStreamObserver<ReadBlockResponse> observer =
-        new DataStreamObserver<ReadBlockResponse>() {
+    // The reply that allocate returned the data buffer of, until its data comes back in onNext
+    final AtomicReference<ByteBuf> allocated = new AtomicReference<>();
+    final ReadBlockObserver observer =
+        new ReadBlockObserver() {
+          @Override
+          public ByteBuffer allocate(ContainerCommandResponseProto response, int length) {
+            final ByteBuf reply = newReadBlockStreamReply(response, length);
+            release(allocated.getAndSet(reply));
+            return reply.nioBuffer(reply.writerIndex(), length);
+          }
+
           @Override
           public void onNext(ReadBlockResponse response) {
             responseSeen.set(true);
+            final ByteBuf reply = allocated.getAndSet(null);
             try {
-              long wirttenLength = writeReadBlockStreamResponse(stream, response.getResponse(), response.getData());
+              // The stream sends a direct buffer without copying it, and its write returns once the buffer is sent
+              long wirttenLength = reply != null && response.getData() != null
+                  ? writeFully(stream, reply.nioBuffer(0, reply.capacity()))
+                  : writeReadBlockStreamResponse(stream, response.getResponse(), response.getData());
               bytesTransferred.addAndGet(wirttenLength);
             } catch (IOException e) {
               error.compareAndSet(null, e);
@@ -914,6 +930,8 @@ public class ContainerStateMachine extends BaseStateMachine {
             } catch (RuntimeException e) {
               error.compareAndSet(null, e);
               throw e;
+            } finally {
+              release(reply);
             }
           }
 
@@ -936,6 +954,9 @@ public class ContainerStateMachine extends BaseStateMachine {
       }
       throw new IOException("Failed to stream ReadBlock " + requestProto,
           e.getCause() != null ? e.getCause() : e);
+    } finally {
+      // Left when reading the data failed and no response followed
+      release(allocated.getAndSet(null));
     }
 
     if (error.get() != null) {
@@ -1026,12 +1047,40 @@ public class ContainerStateMachine extends BaseStateMachine {
     return frame.asReadOnlyBuffer();
   }
 
+  /**
+   * @return a pooled direct buffer for a reply in the format of {@link #encodeReadBlockStreamResponse}: the header and
+   *     {@code response}, which carries no data, then room for the {@code dataLength} bytes of data
+   */
+  private static ByteBuf newReadBlockStreamReply(ContainerCommandResponseProto response, int dataLength) {
+    final int metadataLength = response.getSerializedSize();
+    final int dataOffset = RATIS_READ_BLOCK_STREAM_HEADER_BYTES + metadataLength;
+    final ByteBuf reply = PooledByteBufAllocator.DEFAULT.directBuffer(dataOffset + dataLength, dataOffset + dataLength);
+    try {
+      final ByteBuffer headerAndMetadata = reply.nioBuffer(0, dataOffset);
+      headerAndMetadata.putInt(metadataLength);
+      final CodedOutputStream out = CodedOutputStream.newInstance(headerAndMetadata);
+      response.writeTo(out);
+      out.flush();
+      out.checkNoSpaceLeft();
+    } catch (IOException | RuntimeException e) {
+      reply.release();
+      throw new IllegalStateException("Failed to encode the metadata of a ReadBlock reply", e);
+    }
+    return reply.writerIndex(dataOffset);
+  }
+
+  private static void release(ByteBuf buf) {
+    if (buf != null) {
+      buf.release();
+    }
+  }
+
   private ContainerCommandResponseProto queryReadBlock(
       ContainerCommandRequestProto requestProto) throws IOException {
     final List<ContainerCommandResponseProto> responses = new ArrayList<>();
     final AtomicReference<Throwable> error = new AtomicReference<>();
-    final DataStreamObserver<ReadBlockResponse> observer =
-        new DataStreamObserver<ReadBlockResponse>() {
+    final ReadBlockObserver observer =
+        new ReadBlockObserver() {
           @Override
           public void onNext(ReadBlockResponse response) {
             responses.add(response.getData() == null ? response.getResponse()

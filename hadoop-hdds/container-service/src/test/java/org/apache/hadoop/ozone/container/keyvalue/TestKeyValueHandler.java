@@ -46,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doAnswer;
@@ -108,6 +109,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockObserver;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
@@ -126,7 +128,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
@@ -1108,8 +1109,8 @@ public class TestKeyValueHandler {
 
       final AtomicInteger responseCount = new AtomicInteger(0);
 
-      DataStreamObserver<ReadBlockResponse> streamObserver =
-          new DataStreamObserver<ReadBlockResponse>() {
+      ReadBlockObserver streamObserver =
+          new ReadBlockObserver() {
             @Override
             public void onNext(ReadBlockResponse response) {
               assertEquals(ContainerProtos.Result.SUCCESS,
@@ -1349,7 +1350,7 @@ public class TestKeyValueHandler {
    * Collects everything a single readBlock call produced: the streamed data responses, the errors and the response
    * proto returned by the handler.
    */
-  private static final class ReadBlockResult implements DataStreamObserver<ReadBlockResponse> {
+  private static final class ReadBlockResult implements ReadBlockObserver {
     private final BlockID blockID;
     private final List<ContainerCommandResponseProto> dataResponses = new ArrayList<>();
     private final List<Throwable> errors = new ArrayList<>();
@@ -1584,8 +1585,7 @@ public class TestKeyValueHandler {
                 .build())
             .build();
 
-    @SuppressWarnings("unchecked")
-    DataStreamObserver<ReadBlockResponse> streamObserver = mock(DataStreamObserver.class);
+    ReadBlockObserver streamObserver = mock(ReadBlockObserver.class, CALLS_REAL_METHODS);
     List<ReadBlockResponse> capturedResponses = new java.util.ArrayList<>();
     doAnswer(invocation -> {
       capturedResponses.add(invocation.getArgument(0));

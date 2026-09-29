@@ -26,9 +26,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockObserver;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
-import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.MessageLite;
@@ -121,7 +121,7 @@ public class GrpcXceiverService extends
         try {
           if (request.getCmdType() == Type.ReadBlock) {
             dispatcher.streamDataReadOnly(request,
-                new DataStreamObserver<ReadBlockResponse>() {
+                new ReadBlockObserver() {
                   @Override
                   public void onNext(ReadBlockResponse response) {
                     responseObserver.onNext(response.getData() == null

@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockObserver;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -78,7 +79,6 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
-import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.CheckedConsumer;
@@ -835,7 +835,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   @Override
   public void streamDataReadOnly(ContainerCommandRequestProto msg,
-      DataStreamObserver<ReadBlockResponse> streamObserver,
+      ReadBlockObserver streamObserver,
       RandomAccessFileChannel blockFile, DispatcherContext dispatcherContext) {
     Objects.requireNonNull(msg, "msg == null");
     Type cmdType = msg.getCmdType();
