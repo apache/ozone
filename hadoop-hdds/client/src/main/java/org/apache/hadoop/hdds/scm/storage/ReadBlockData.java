@@ -18,6 +18,10 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -27,48 +31,88 @@ final class ReadBlockData {
       Integer.BYTES;
 
   private final ContainerCommandResponseProto response;
-  private final ByteBuffer data;
+  private final List<ByteBuffer> data;
 
   private ReadBlockData(ContainerCommandResponseProto response,
-      ByteBuffer data) {
+      List<ByteBuffer> data) {
     this.response = response;
     this.data = data;
   }
 
+  /**
+   * Parses a reply in the buffers it was received in. A reply may span many of them, so the data stays in them
+   * instead of being copied into one buffer.
+   */
   static ReadBlockData parse(DataStreamReply reply)
       throws InvalidProtocolBufferException {
-    return parse(reply.nioBuffer());
-  }
-
-  private static ReadBlockData parse(ByteBuffer replyBuffer)
-      throws InvalidProtocolBufferException {
-    final ByteBuffer duplicate = replyBuffer.duplicate();
-    if (duplicate.remaining() < RATIS_READ_BLOCK_STREAM_HEADER_BYTES) {
+    final ByteBuffer[] buffers = reply.nioBuffers();
+    final Deque<ByteBuffer> remaining = new ArrayDeque<>(buffers.length);
+    for (ByteBuffer buffer : buffers) {
+      if (buffer.hasRemaining()) {
+        remaining.add(buffer.slice());
+      }
+    }
+    final ByteBuffer header = take(remaining, RATIS_READ_BLOCK_STREAM_HEADER_BYTES);
+    if (header == null) {
       throw new InvalidProtocolBufferException(
           "Missing Ratis ReadBlock metadata length");
     }
-    final int metadataLength = duplicate.getInt(duplicate.position());
-    if (metadataLength < 0
-        || metadataLength > duplicate.remaining()
-            - RATIS_READ_BLOCK_STREAM_HEADER_BYTES) {
+    final int metadataLength = header.getInt(header.position());
+    final ByteBuffer metadata = metadataLength < 0 ? null : take(remaining, metadataLength);
+    if (metadata == null) {
       throw new InvalidProtocolBufferException(
           "Invalid Ratis ReadBlock metadata length " + metadataLength);
     }
-    duplicate.position(
-        duplicate.position() + RATIS_READ_BLOCK_STREAM_HEADER_BYTES);
-    final ByteBuffer metadata = duplicate.slice();
-    metadata.limit(metadataLength);
-    duplicate.position(duplicate.position() + metadataLength);
-    final ByteBuffer data = duplicate.slice();
+    final List<ByteBuffer> data = new ArrayList<>(remaining.size());
+    for (ByteBuffer buffer : remaining) {
+      data.add(buffer.slice());
+    }
     return new ReadBlockData(
         ContainerCommandResponseProto.parseFrom(metadata), data);
+  }
+
+  /**
+   * Removes the next {@code length} bytes from {@code buffers}. The header and metadata of a reply are small, so they
+   * are copied when they span two buffers.
+   *
+   * @return the bytes, or null when {@code buffers} have fewer
+   */
+  private static ByteBuffer take(Deque<ByteBuffer> buffers, int length) {
+    final ByteBuffer first = buffers.peekFirst();
+    if (first != null && first.remaining() >= length) {
+      final ByteBuffer taken = first.slice();
+      taken.limit(length);
+      first.position(first.position() + length);
+      if (!first.hasRemaining()) {
+        buffers.removeFirst();
+      }
+      return taken;
+    }
+    final ByteBuffer copy = ByteBuffer.allocate(length);
+    while (copy.hasRemaining()) {
+      final ByteBuffer buffer = buffers.pollFirst();
+      if (buffer == null) {
+        return null;
+      }
+      final int n = Math.min(buffer.remaining(), copy.remaining());
+      final ByteBuffer part = buffer.duplicate();
+      part.limit(part.position() + n);
+      copy.put(part);
+      buffer.position(buffer.position() + n);
+      if (buffer.hasRemaining()) {
+        buffers.addFirst(buffer);
+      }
+    }
+    copy.flip();
+    return copy;
   }
 
   ContainerCommandResponseProto getResponse() {
     return response;
   }
 
-  ByteBuffer getData() {
+  /** @return the data in the buffers the reply was received in, each from position 0 */
+  List<ByteBuffer> getData() {
     return data;
   }
 }

@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -497,7 +498,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   /** Verifies the checksums of the data of a ReadBlock response when checksum verification is enabled. */
-  void validateChecksums(ReadBlockResponseProto readBlock, ByteBuffer data) throws OzoneChecksumException {
+  void validateChecksums(ReadBlockResponseProto readBlock, List<ByteBuffer> data) throws OzoneChecksumException {
     if (verifyChecksum) {
       Checksum.validateChecksums(data, readBlock.getOffset(), 0, readBlock.getChunkInfoListList());
     }
@@ -636,7 +637,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       }
       final ReadBlockResponseProto readBlock = containerCommandResponseProto.getReadBlock();
       try {
-        validateChecksums(readBlock, readBlock.getData().asReadOnlyByteBuffer());
+        validateChecksums(readBlock, readBlock.getData().asReadOnlyByteBufferList());
         offerToQueue(readBlock);
       } catch (Exception e) {
         // Record the failure first: the log and observer calls below must not mask it.

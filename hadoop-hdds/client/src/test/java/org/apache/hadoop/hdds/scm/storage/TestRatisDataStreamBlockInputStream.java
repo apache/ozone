@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -41,6 +42,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockResponseProto;
@@ -54,9 +57,12 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientRatis;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.ratis.client.api.DataStreamApi;
 import org.apache.ratis.client.api.DataStreamInput;
 import org.apache.ratis.client.impl.ClientProtoUtils;
+import org.apache.ratis.datastream.impl.DataStreamReplyByteBuf;
 import org.apache.ratis.datastream.impl.DataStreamReplyByteBuffer;
 import org.apache.ratis.proto.RaftProtos.DataStreamPacketHeaderProto;
 import org.apache.ratis.protocol.ClientId;
@@ -67,8 +73,12 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
+import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
 import org.apache.ratis.util.ReferenceCountedObject;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.stubbing.Answer;
 
 /**
@@ -247,12 +257,15 @@ class TestRatisDataStreamBlockInputStream {
 
   /**
    * A reply covers whole checksum intervals around the requested range, so a reader stepping back or forward within it
-   * keeps reading from it without a new request; a seek outside it requests again.
+   * keeps reading from it without a new request; a seek outside it requests again. This holds also for a reply
+   * received in many buffers, back and forth between them.
    */
-  @Test
-  void seekWithinTheBufferedReplyReusesIt() throws Exception {
+  @ParameterizedTest
+  @ValueSource(ints = {Integer.MAX_VALUE, 3})
+  void seekWithinTheBufferedReplyReusesIt(int bufferSize) throws Exception {
     final byte[] block = block(64);
     final Streams streams = new Streams(block, 16, Integer.MAX_VALUE);
+    streams.bufferSize = bufferSize;
     final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
 
     try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 16)) {
@@ -269,6 +282,68 @@ class TestRatisDataStreamBlockInputStream {
     }
 
     assertEquals(Arrays.asList("20+1", "40+1"), streams.ranges());
+  }
+
+  /**
+   * Netty decodes a reply that spans many reads into as many buffers. The stream reads the data from them without
+   * merging them, and verifies the checksums across them, also when the header, the metadata or a checksum window is
+   * split between two.
+   */
+  @ParameterizedTest
+  @ValueSource(ints = {1, 3, 7, 64})
+  void readsReplyInManyBuffers(int bufferSize) throws Exception {
+    final byte[] block = block(256);
+    final Streams streams = new Streams(block, 16, 64);
+    streams.bufferSize = bufferSize;
+    streams.chunks = chunks(block, 16);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    final ByteBuffer out = ByteBuffer.allocate(block.length);
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 128, true)) {
+      final ByteBuffer chunk = ByteBuffer.allocate(5);
+      while (in.read(chunk) > 0) {
+        chunk.flip();
+        out.put(chunk);
+        chunk.clear();
+      }
+    }
+
+    assertArrayEquals(block, out.array());
+  }
+
+  @Test
+  void detectsCorruptionInReplyInManyBuffers() throws Exception {
+    final byte[] block = block(64);
+    final byte[] corrupt = block.clone();
+    corrupt[37]++;
+    final Streams streams = new Streams(corrupt, 16, 64);
+    streams.bufferSize = 3;
+    streams.chunks = chunks(block, 16);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 128, true)) {
+      assertThrows(OzoneChecksumException.class, () -> in.read(ByteBuffer.allocate(block.length)));
+    }
+  }
+
+  /** Parsing a reply leaves its data in the buffers it was received in: it does not copy it. */
+  @Test
+  void parsedDataIsInTheReceivedBuffers() throws Exception {
+    final byte[] data = block(64);
+    final ByteBuffer frame = frame(0, data, Collections.emptyList());
+    final List<ByteBuffer> parsed = ReadBlockData.parse(dataReply(frame, 7)).getData();
+
+    final byte[] received = frame.array();
+    for (int j = frame.limit() - data.length; j < frame.limit(); j++) {
+      received[j] = (byte) ~received[j];
+    }
+    int i = 0;
+    for (ByteBuffer buffer : parsed) {
+      while (buffer.hasRemaining()) {
+        assertEquals((byte) ~data[i++], buffer.get());
+      }
+    }
+    assertEquals(data.length, i);
   }
 
   /** A single-byte read returns the byte as 0 to 255: 0xFF must not look like the end of the stream. */
@@ -376,8 +451,13 @@ class TestRatisDataStreamBlockInputStream {
 
   private RatisDataStreamBlockInputStream newStream(Pipeline pipeline, XceiverClientFactory factory,
       long blockLength, long window) throws IOException {
+    return newStream(pipeline, factory, blockLength, window, false);
+  }
+
+  private RatisDataStreamBlockInputStream newStream(Pipeline pipeline, XceiverClientFactory factory,
+      long blockLength, long window, boolean verifyChecksum) throws IOException {
     final OzoneClientConfig config = new OzoneClientConfig();
-    config.setChecksumVerify(false);
+    config.setChecksumVerify(verifyChecksum);
     config.setRatisStreamReadWindowSize(window);
     return new RatisDataStreamBlockInputStream(blockID, blockLength, pipeline, null, factory, config);
   }
@@ -403,6 +483,10 @@ class TestRatisDataStreamBlockInputStream {
     private final List<DataStreamInput> inputs = new ArrayList<>();
     private int open;
     private int maxOpen;
+    /** The size of the buffers each reply is received in. */
+    private int bufferSize = Integer.MAX_VALUE;
+    /** The chunks, with their checksums, that each reply carries. */
+    private List<ChunkInfo> chunks = Collections.emptyList();
 
     Streams(byte[] block) {
       this(block, 1, Integer.MAX_VALUE);
@@ -433,7 +517,7 @@ class TestRatisDataStreamBlockInputStream {
       final Deque<DataStreamReply> replies = new ArrayDeque<>();
       for (int o = offset; o < end;) {
         final int length = Math.min(end - o, replySize);
-        replies.add(dataReply(o, Arrays.copyOfRange(block, o, o + length)));
+        replies.add(dataReply(o, Arrays.copyOfRange(block, o, o + length), chunks, bufferSize));
         o += length;
       }
       replies.add(successReply());
@@ -490,17 +574,56 @@ class TestRatisDataStreamBlockInputStream {
   }
 
   private static DataStreamReply dataReply(long offset, byte[] data) {
+    return dataReply(offset, data, Collections.emptyList(), Integer.MAX_VALUE);
+  }
+
+  /** A data reply carrying {@code chunks}, received in buffers of {@code bufferSize} bytes. */
+  private static DataStreamReply dataReply(long offset, byte[] data, List<ChunkInfo> chunks, int bufferSize) {
+    return dataReply(frame(offset, data, chunks), bufferSize);
+  }
+
+  /** The metadata length, the metadata and the data of a data reply, as a datanode sends them. */
+  private static ByteBuffer frame(long offset, byte[] data, List<ChunkInfo> chunks) {
     final ContainerCommandResponseProto response = ContainerCommandResponseProto.newBuilder()
         .setCmdType(Type.ReadBlock)
         .setResult(Result.SUCCESS)
         .setReadBlock(ReadBlockResponseProto.newBuilder()
             .setOffset(offset)
-            .setData(ByteString.EMPTY))
+            .setData(ByteString.EMPTY)
+            .addAllChunkInfoList(chunks))
         .build();
     final byte[] metadata = response.toByteArray();
     final ByteBuffer frame = ByteBuffer.allocate(Integer.BYTES + metadata.length + data.length);
     frame.putInt(metadata.length).put(metadata).put(data).flip();
-    return reply(DataStreamPacketHeaderProto.Type.STREAM_DATA, frame, true);
+    return frame;
+  }
+
+  /** A data reply of {@code frame}, received in buffers of {@code bufferSize} bytes. */
+  private static DataStreamReply dataReply(ByteBuffer frame, int bufferSize) {
+    if (bufferSize >= frame.remaining()) {
+      return reply(DataStreamPacketHeaderProto.Type.STREAM_DATA, frame, true);
+    }
+    final List<ByteBuf> buffers = new ArrayList<>();
+    for (int i = 0; i < frame.limit(); i += bufferSize) {
+      buffers.add(Unpooled.wrappedBuffer(frame.array(), i, Math.min(bufferSize, frame.limit() - i)));
+    }
+    final ByteBuf buf = Unpooled.wrappedBuffer(buffers.toArray(new ByteBuf[0]));
+    return DataStreamReplyByteBuf.newBuilder()
+        .setDataStreamReplyHeader(new DataStreamReplyHeader(ClientId.randomId(),
+            DataStreamPacketHeaderProto.Type.STREAM_DATA, 1, 0, buf.readableBytes(), 0, true, Collections.emptyList()))
+        .setBuf(buf)
+        .build();
+  }
+
+  /** The block as one chunk, with a CRC32C checksum per {@code bytesPerChecksum} bytes. */
+  private static List<ChunkInfo> chunks(byte[] block, int bytesPerChecksum) throws OzoneChecksumException {
+    return Collections.singletonList(ChunkInfo.newBuilder()
+        .setChunkName("chunk")
+        .setOffset(0)
+        .setLen(block.length)
+        .setChecksumData(new Checksum(ChecksumType.CRC32C, bytesPerChecksum).computeChecksum(block)
+            .getProtoBufMessage())
+        .build());
   }
 
   private DataStreamReply successReply() {

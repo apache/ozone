@@ -438,12 +438,20 @@ public class Checksum {
 
   public static void validateChecksums(ByteBuffer data, long blockOffset, int startIndex,
       final List<ChunkInfo> chunks) throws OzoneChecksumException {
+    validateChecksums(Collections.singletonList(data), blockOffset, startIndex, chunks);
+  }
 
-    if (!data.hasRemaining()) {
+  /** Same as {@link #validateChecksums(ByteBuffer, long, int, List)} for the data in several buffers, in order. */
+  public static void validateChecksums(List<ByteBuffer> data, long blockOffset, int startIndex,
+      final List<ChunkInfo> chunks) throws OzoneChecksumException {
+    int remaining = 0;
+    for (ByteBuffer buffer : data) {
+      remaining += buffer.remaining();
+    }
+    if (remaining == 0) {
       return;
     }
-    int dataOffset = data.position();
-    int remaining = data.remaining();
+    int dataOffset = 0;
     long offset = blockOffset;
     while (remaining > 0) {
       if (startIndex < 0 || startIndex >= chunks.size()) {
@@ -474,21 +482,39 @@ public class Checksum {
     }
   }
 
-  private static void verifySingleChunk(ByteBuffer data, int dataOffset, int dataLimit,
+  private static void verifySingleChunk(List<ByteBuffer> data, int dataOffset, int dataLimit,
       ContainerProtos.ChunkInfo chunkInfo, int checksumIndex) throws OzoneChecksumException {
 
     ContainerProtos.ChecksumData protoChecksum = chunkInfo.getChecksumData();
-    final ByteBuffer buffer = data.duplicate();
-    buffer.position(dataOffset);
-    buffer.limit(dataOffset + dataLimit);
-
     final ChecksumData checksum = new ChecksumData(
         protoChecksum.getType(),
         protoChecksum.getBytesPerChecksum(),
         protoChecksum.getChecksumsList()
     );
 
-    Checksum.verifyChecksum(buffer, checksum, checksumIndex);
+    Checksum.verifyChecksum(slice(data, dataOffset, dataLimit), checksumIndex, checksum);
+  }
+
+  /**
+   * @return the {@code length} bytes at {@code offset} of the remaining bytes of {@code data}, without copying them,
+   *     in buffers starting at position 0
+   */
+  private static List<ByteBuffer> slice(List<ByteBuffer> data, int offset, int length) {
+    final List<ByteBuffer> slices = new ArrayList<>();
+    for (ByteBuffer buffer : data) {
+      if (length == 0) {
+        break;
+      }
+      if (offset >= buffer.remaining()) {
+        offset -= buffer.remaining();
+        continue;
+      }
+      final int n = Math.min(buffer.remaining() - offset, length);
+      slices.add(BufferUtils.slice(buffer, buffer.position() + offset, n).slice());
+      offset = 0;
+      length -= n;
+    }
+    return slices;
   }
 
   /**

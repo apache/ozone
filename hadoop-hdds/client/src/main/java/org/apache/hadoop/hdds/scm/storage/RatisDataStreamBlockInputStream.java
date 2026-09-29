@@ -164,7 +164,7 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
   @Override
   synchronized void advancePosition(long delta, boolean preRead) {
     super.advancePosition(delta, preRead);
-    if (dataReply != null && !dataReply.getByteBuffer().hasRemaining()) {
+    if (dataReply != null && !dataReply.getByteBuffer().hasRemaining() && !dataReply.nextBuffer()) {
       releaseDataReply();
       if (current != null && getPos() >= current.end) {
         // All data of the request is consumed: close it now instead of waiting for its terminal reply, which would
@@ -260,22 +260,20 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
       }
 
       final ReadBlockResponseProto readBlock = response.getReadBlock();
-      final ByteBuffer dataBuffer = readBlockData.getData() != null ?
-          readBlockData.getData() : readBlock.getData().asReadOnlyByteBuffer();
-      validateChecksums(readBlock, dataBuffer);
+      final List<ByteBuffer> data = readBlockData.getData();
+      validateChecksums(readBlock, data);
 
       final long blockOffset = readBlock.getOffset();
       if (getPos() < blockOffset) {
         throw new IOException("ReadBlock response is ahead of requested "
             + "position " + getPos() + ", response offset " + blockOffset);
       }
-      dataBuffer.position(Math.toIntExact(
-          Math.min(getPos() - blockOffset, dataBuffer.limit())));
-      if (!dataBuffer.hasRemaining()) {
+      final DataReply read = new DataReply(readBlock, data, ref);
+      if (!read.seek(getPos())) {
         return null;
       }
       releaseReply = false;
-      return new DataReply(readBlock, dataBuffer, ref);
+      return read;
     } catch (InvalidProtocolBufferException e) {
       releaseClient(true);
       throw new IOException("Failed to parse ReadBlock response", e);
@@ -408,28 +406,66 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
     }
   }
 
-  /** The data of a reply, which keeps the netty buffer the reply was received in until it is released. */
+  /**
+   * The data of a reply, in the netty buffers the reply was received in, which it keeps until it is released. The
+   * reader reads them in turn: {@link #getByteBuffer()} is the current one.
+   */
   private static final class DataReply extends ReadBuffer {
     private final ReferenceCountedObject<DataStreamReply> reply;
+    /** Each from position 0. */
+    private final List<ByteBuffer> buffers;
+    private int current;
 
-    DataReply(ReadBlockResponseProto readBlock, ByteBuffer data, ReferenceCountedObject<DataStreamReply> reply) {
-      super(readBlock, data);
+    DataReply(ReadBlockResponseProto readBlock, List<ByteBuffer> buffers,
+        ReferenceCountedObject<DataStreamReply> reply) {
+      super(readBlock, null);
       this.reply = reply;
+      this.buffers = buffers;
     }
 
     void release() {
       reply.release();
     }
 
-    /** Moves to {@code pos}, when the reply has data there. */
-    boolean seek(long pos) {
-      final long offset = getProto().getOffset();
-      final ByteBuffer data = getByteBuffer();
-      if (pos < offset || pos >= offset + data.limit()) {
+    @Override
+    ByteBuffer getByteBuffer() {
+      return buffers.get(current);
+    }
+
+    /** Moves to the next buffer, if any. */
+    boolean nextBuffer() {
+      if (current + 1 >= buffers.size()) {
         return false;
       }
-      data.position(Math.toIntExact(pos - offset));
+      current++;
       return true;
+    }
+
+    /** Moves to {@code pos}, when the reply has data there. */
+    boolean seek(long pos) {
+      long offset = getProto().getOffset();
+      if (pos < offset) {
+        return false;
+      }
+      for (int i = 0; i < buffers.size(); i++) {
+        final ByteBuffer buffer = buffers.get(i);
+        if (pos < offset + buffer.limit()) {
+          buffer.position(Math.toIntExact(pos - offset));
+          current = i;
+          // Rewind the buffers after it, which a seek back leaves read
+          for (int j = i + 1; j < buffers.size(); j++) {
+            buffers.get(j).position(0);
+          }
+          return true;
+        }
+        offset += buffer.limit();
+      }
+      return false;
+    }
+
+    @Override
+    public String toString() {
+      return "DataReply: offset=" + getProto().getOffset() + ", buffer " + current + " of " + buffers.size();
     }
   }
 }
