@@ -507,7 +507,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
           } finally {
             exitApplyTransaction();
           }
-            }, executorService);
+        }, executorService);
       } catch (RuntimeException ex) {
         ozoneManagerDoubleBuffer.releaseUnFlushedTransactions(1);
         exitApplyTransaction();
