@@ -174,7 +174,7 @@ jobs:
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
       matrix:
-        java: [ 17, 25 ]
+        java: [ 25 ]
         include:
           - os: ubuntu-24.04
           - java: 21
@@ -187,7 +187,7 @@ jobs:
       ratis-args: ${{ inputs.ratis_args }}
       runner: ${{ matrix.os }}
       script: compile
-      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings -Dmaven.compiler.release=${{ matrix.java }}"
+      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings -Dozone.java.version.server=${{ matrix.java }}"
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.java }}
       timeout-minutes: 45
