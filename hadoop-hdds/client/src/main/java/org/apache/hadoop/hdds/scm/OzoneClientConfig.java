@@ -175,6 +175,15 @@ public class OzoneClientConfig {
           + "open block stream buffers.")
   private long ratisStreamReadWindowSize = 8L << 20;
 
+  @Config(key = "ozone.client.ratis.stream.read.connections",
+      defaultValue = "8",
+      type = ConfigType.INT,
+      tags = {ConfigTag.CLIENT},
+      description = "Connections to a datanode that the Ratis data stream reads of a pipeline take turns on. A "
+          + "datanode sends each reply whole and in order on its connection, so with few connections the reply to a "
+          + "small read waits behind the large replies of other readers.")
+  private int ratisStreamReadConnections = 8;
+
   @Config(key = "ozone.client.max.retries",
       defaultValue = "5",
       description = "Maximum number of retries by Ozone Client on "
@@ -440,6 +449,12 @@ public class OzoneClientConfig {
               "Resetting to default 8MB.",
           ratisStreamReadWindowSize);
       ratisStreamReadWindowSize = 8L << 20; // 8MB
+    }
+
+    if (ratisStreamReadConnections < 1) {
+      LOG.warn("Invalid ozone.client.ratis.stream.read.connections = {}. Resetting to default 8.",
+          ratisStreamReadConnections);
+      ratisStreamReadConnections = 8;
     }
 
     // Ensure response data size is positive.
@@ -724,6 +739,14 @@ public class OzoneClientConfig {
 
   public long getRatisStreamReadWindowSize() {
     return ratisStreamReadWindowSize;
+  }
+
+  public int getRatisStreamReadConnections() {
+    return ratisStreamReadConnections;
+  }
+
+  public void setRatisStreamReadConnections(int ratisStreamReadConnections) {
+    this.ratisStreamReadConnections = ratisStreamReadConnections;
   }
 
   public Duration getStreamReadTimeout() {

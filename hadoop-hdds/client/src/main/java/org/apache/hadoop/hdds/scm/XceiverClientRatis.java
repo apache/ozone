@@ -31,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -89,6 +90,9 @@ public final class XceiverClientRatis extends XceiverClientSpi {
   private final RaftProtos.ReplicationLevel watchType;
   private final int majority;
   private final ErrorInjector errorInjector;
+  /** Clients besides {@link #client} that read-only data streams take turns on, each with its own connection. */
+  private final RaftClient[] readClients;
+  private final AtomicInteger nextReadClient = new AtomicInteger();
 
   /**
    * Constructs a client.
@@ -122,6 +126,8 @@ public final class XceiverClientRatis extends XceiverClientSpi {
           new Throwable("TRACE"));
     }
     this.errorInjector = errorInjector;
+    this.readClients = new RaftClient[
+        configuration.getObject(OzoneClientConfig.class).getRatisStreamReadConnections() - 1];
   }
 
   public static XceiverClientRatis newXceiverClientRatis(
@@ -225,6 +231,14 @@ public final class XceiverClientRatis extends XceiverClientSpi {
     final RaftClient c = client.getAndSet(null);
     if (c != null) {
       closeRaftClient(c);
+    }
+    synchronized (readClients) {
+      for (int i = 0; i < readClients.length; i++) {
+        if (readClients[i] != null) {
+          closeRaftClient(readClients[i]);
+          readClients[i] = null;
+        }
+      }
     }
   }
 
@@ -423,5 +437,26 @@ public final class XceiverClientRatis extends XceiverClientSpi {
 
   public DataStreamApi getDataStreamApi() {
     return this.getClient().getDataStreamApi();
+  }
+
+  /**
+   * @return the data stream API for a read-only stream. Read-only streams take turns on
+   *     {@code ozone.client.ratis.stream.read.connections} clients, each with its own connection to the datanode: a
+   *     datanode sends each reply whole and in order on a connection, so on one shared connection the reply to a
+   *     small read would wait behind the large replies of other readers.
+   */
+  public DataStreamApi getReadStreamApi() throws IOException {
+    final int i = Math.floorMod(nextReadClient.getAndIncrement(), readClients.length + 1);
+    return i == 0 ? getDataStreamApi() : getReadClient(i - 1).getDataStreamApi();
+  }
+
+  private RaftClient getReadClient(int i) throws IOException {
+    synchronized (readClients) {
+      getClient(); // not closed
+      if (readClients[i] == null) {
+        readClients[i] = RatisHelper.newRaftClient(rpcType, getPipeline(), retryPolicy, tlsConfig, ozoneConfiguration);
+      }
+      return readClients[i];
+    }
   }
 }

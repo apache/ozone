@@ -419,7 +419,7 @@ class TestRatisDataStreamBlockInputStream {
       when(api.streamReadOnly(any(ByteBuffer.class))).thenAnswer(invocation -> newInput(invocation.getArgument(0)));
       final XceiverClientRatis client = mock(XceiverClientRatis.class);
       when(client.getPipeline()).thenReturn(pipeline);
-      when(client.getDataStreamApi()).thenReturn(api);
+      when(client.getReadStreamApi()).thenReturn(api);
       return client;
     }
 
@@ -462,7 +462,8 @@ class TestRatisDataStreamBlockInputStream {
   }
 
   /** A client of {@code pipeline} whose read-only stream returns {@code replies} and records its request header. */
-  private static XceiverClientRatis client(Pipeline pipeline, List<ByteBuffer> headers, DataStreamReply... replies) {
+  private static XceiverClientRatis client(Pipeline pipeline, List<ByteBuffer> headers, DataStreamReply... replies)
+      throws IOException {
     final Deque<DataStreamReply> queue = new ArrayDeque<>(Arrays.asList(replies));
     final DataStreamInput input = mock(DataStreamInput.class);
     when(input.readAsync()).thenAnswer(invocation -> CompletableFuture.completedFuture(retained(queue.remove())));
@@ -473,7 +474,7 @@ class TestRatisDataStreamBlockInputStream {
     });
     final XceiverClientRatis client = mock(XceiverClientRatis.class);
     when(client.getPipeline()).thenReturn(pipeline);
-    when(client.getDataStreamApi()).thenReturn(api);
+    when(client.getReadStreamApi()).thenReturn(api);
     return client;
   }
 

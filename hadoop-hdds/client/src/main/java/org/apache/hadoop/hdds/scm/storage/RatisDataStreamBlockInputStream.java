@@ -218,7 +218,7 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
     final ContainerCommandRequestMessage message =
         ContainerCommandRequestMessage.toMessage(request,
             TracingUtil.exportCurrentSpan());
-    return new ReadRequest(offset, length, xceiverClient.getDataStreamApi()
+    return new ReadRequest(offset, length, xceiverClient.getReadStreamApi()
         .streamReadOnly(message.getContent().asReadOnlyByteBuffer()));
   }
 
