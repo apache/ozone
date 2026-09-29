@@ -76,6 +76,9 @@ import org.slf4j.LoggerFactory;
  * {@link XceiverClientSpi} implementation, the client to read local replica through short circuit.
  */
 public class XceiverClientShortCircuit extends XceiverClientSpi {
+  private static final String GET_BLOCK_SPAN_NAME = "XceiverClientShortCircuit." + ContainerProtos.Type.GetBlock;
+  private static final String ECHO_SPAN_NAME = "XceiverClientShortCircuit." + ContainerProtos.Type.Echo;
+
   public static final Logger LOG = LoggerFactory.getLogger(XceiverClientShortCircuit.class);
   // the fields below are just for log or error messages
   private final AtomicReference<String> name = new AtomicReference<>();
@@ -195,30 +198,9 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     return callId.incrementAndGet();
   }
 
-  private InterruptedIOException newInterruptedIOException(
-      ContainerCommandRequestProto request, InterruptedException e) {
-    final String s = "Interrupted: " + processForDebug(request) + " " + this;
-    LOG.warn(s);
-    Thread.currentThread().interrupt();
-    return (InterruptedIOException) new InterruptedIOException(s).initCause(e);
-  }
-
-  private IOException newIOException(ContainerCommandRequestProto request, ExecutionException e) {
-    if (Status.fromThrowable(e.getCause()).getCode() == Status.UNAUTHENTICATED.getCode()) {
-      return new SCMSecurityException("Unauthenticated: " + processForDebug(request) + " " + this, e.getCause());
-    }
-    return getIOExceptionForSendCommand(request, e);
-  }
-
   @Override
   public ContainerCommandResponseProto sendCommand(ContainerCommandRequestProto request) throws IOException {
-    try {
-      return sendCommandWithTraceID(request).getResponse().get();
-    } catch (ExecutionException e) {
-      throw newIOException(request, e);
-    } catch (InterruptedException e) {
-      throw newInterruptedIOException(request, e);
-    }
+    return sendCommandWithTraceID(request);
   }
 
   @Override
@@ -232,45 +214,40 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
   public ContainerCommandResponseProto sendCommand(
       ContainerCommandRequestProto request, List<Validator> validators)
       throws IOException {
-    try {
-      final ContainerCommandResponseProto response = sendCommandWithTraceID(request).getResponse().get();
-      if (validators != null && !validators.isEmpty()) {
-        for (Validator validator : validators) {
-          validator.accept(request, response);
-        }
+    final ContainerCommandResponseProto response = sendCommandWithTraceID(request);
+    if (validators != null && !validators.isEmpty()) {
+      for (Validator validator : validators) {
+        validator.accept(request, response);
       }
-      return response;
-    } catch (ExecutionException e) {
-      throw newIOException(request, e);
-    } catch (InterruptedException e) {
-      throw newInterruptedIOException(request, e);
     }
+    return response;
   }
 
-  private XceiverClientReply sendCommandWithTraceID(ContainerCommandRequestProto request) throws IOException {
-    String spanName = "XceiverClientShortCircuit." + request.getCmdType().name();
-    return TracingUtil.executeInNewSpan(spanName,
-        () -> {
+  private String getSpanName(ContainerProtos.Type cmdType) {
+    if (cmdType == ContainerProtos.Type.GetBlock) {
+      return GET_BLOCK_SPAN_NAME;
+    } else if (cmdType == ContainerProtos.Type.Echo) {
+      return ECHO_SPAN_NAME;
+    }
+    throw new UnsupportedOperationException("Command " + cmdType +
+        " is not supported for " + DomainSocketFactory.FEATURE + " client");
+  }
+
+  private ContainerCommandResponseProto sendCommandWithTraceID(ContainerCommandRequestProto request)
+      throws IOException {
+    return TracingUtil.executeInNewSpan(getSpanName(request.getCmdType()), () ->
+      {
+        try {
           ContainerCommandRequestProto finalPayload =
               ContainerCommandRequestProto.newBuilder(request)
                   .setTraceID(TracingUtil.exportCurrentSpan()).build();
           final CompletableFuture<ContainerCommandResponseProto> response;
-
-          if (request.getCmdType() != ContainerProtos.Type.GetBlock &&
-              request.getCmdType() != ContainerProtos.Type.Echo) {
-            throw new UnsupportedOperationException("Command " + request.getCmdType() +
-                " is not supported for " + DomainSocketFactory.FEATURE + " client");
-          }
 
           try {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Executing {} on {}", processForDebug(request), dn);
             }
             response = sendCommandInternal(finalPayload);
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("request {} {} {} finished", request.getCmdType(),
-                  request.getClientId().toStringUtf8(), request.getCallId());
-            }
           } catch (IOException e) {
             if (LOG.isDebugEnabled()) {
               LOG.debug("Failed: {} {}.", processForDebug(request), this, e);
@@ -278,10 +255,25 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
             throw e;
           }
 
-          final XceiverClientReply reply = new XceiverClientReply(response);
-          reply.addDatanode(dn);
-          return reply;
-        });
+          final ContainerCommandResponseProto proto = response.get();
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("request {} {} {} finished", request.getCmdType(),
+                request.getClientId().toStringUtf8(), request.getCallId());
+          }
+          return proto;
+        } catch (ExecutionException e) {
+          final Throwable cause = e.getCause();
+          if (Status.fromThrowable(cause).getCode() == Status.UNAUTHENTICATED.getCode()) {
+            throw new SCMSecurityException("Unauthenticated: " + processForDebug(request) + " " + this, cause);
+          }
+          throw getIOExceptionForSendCommand(request, e);
+        } catch (InterruptedException e) {
+          final String s = "Interrupted: " + processForDebug(request) + " " + this;
+          LOG.warn(s);
+          Thread.currentThread().interrupt();
+          throw (InterruptedIOException) new InterruptedIOException(s).initCause(e);
+        }
+      });
   }
 
   private CompletableFuture<ContainerCommandResponseProto> sendCommandInternal(
@@ -379,9 +371,9 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
       }
 
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Sent command {} {}:{} on datanode {}, sent {}ms",
+        LOG.debug("Sent command {} {}:{} on datanode {}, sent {}ns",
             type, entry.getRequest().getClientId().toStringUtf8(), entry.getRequest().getCallId(), dn,
-            nsToMs(System.nanoTime() - entry.getCreateTimeNs()));
+            System.nanoTime() - entry.getCreateTimeNs());
       }
     } catch (IOException e) {
       LOG.error("Failed to send {}", processForDebug(request), e);
@@ -409,6 +401,8 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
       long timerTaskCancelledCount = 0;
       do {
         RequestEntry entry = null;
+        ContainerProtos.Type type = null;
+        long endToEndCost = 0;
         try {
           DataInputStream dataIn = new DataInputStream(domainSocket.getInputStream());
           final short version = dataIn.readShort();
@@ -418,7 +412,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
           }
           long receiveStartTime = System.nanoTime();
           final short typeNumber = dataIn.readShort();
-          ContainerProtos.Type type = ContainerProtos.Type.forNumber(typeNumber);
+          type = ContainerProtos.Type.forNumber(typeNumber);
           ContainerCommandResponseProto responseProto =
               ContainerCommandResponseProto.parseFrom(vintPrefixed(dataIn));
           if (LOG.isDebugEnabled()) {
@@ -484,37 +478,40 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
             entry.getFuture().complete(responseProto);
           }
           long currentTime = System.nanoTime();
-          long endToEndCost = currentTime - entry.getCreateTimeNs();
+          endToEndCost = currentTime - entry.getCreateTimeNs();
           if (LOG.isDebugEnabled()) {
-            LOG.debug("Executed command {} {}:{} on datanode {}, end-to-end {}ms, receive {}ms, process {}ms",
+            LOG.debug("Executed command {} {}:{} on datanode {}, end-to-end {}ns, receive {}ns, process {}ns",
                 type, entry.getRequest().getClientId().toStringUtf8(), entry.getRequest().getCallId(), dn,
-                nsToMs(endToEndCost),
-                nsToMs(processStartTime - receiveStartTime),
-                nsToMs(currentTime - processStartTime));
+                endToEndCost,
+                processStartTime - receiveStartTime,
+                currentTime - processStartTime);
           }
           responseReceived.incrementAndGet();
-          metrics.decrPendingContainerOpsMetrics(type);
-          metrics.addContainerOpsLatency(type, endToEndCost);
         } catch (SocketTimeoutException | EOFException | ClosedChannelException e) {
           isDomainSocketOpen.set(false);
-          LOG.debug("ReceiveResponseTask closed: {}", this, e);
+          LOG.info("ReceiveResponseTask closed:  (sent {}, received {}): {}",
+              requestSent, responseReceived, XceiverClientShortCircuit.this, e);
           // fail all requests pending responses
           sentRequests.values().forEach(i -> i.fail(e));
         } catch (Throwable e) {
           isDomainSocketOpen.set(false);
-          LOG.error("ReceiveResponseTask failed: {}", this, e);
+          LOG.error("ReceiveResponseTask failed:  (sent {}, received {}): {}",
+              requestSent, responseReceived, XceiverClientShortCircuit.this, e);
           if (entry != null) {
             entry.getFuture().completeExceptionally(e);
           }
           sentRequests.values().forEach(i -> i.fail(e));
           break;
+        } finally {
+          if (type != null) {
+            metrics.decrPendingContainerOpsMetrics(type);
+            if (endToEndCost > 0) {
+              metrics.addContainerOpsLatency(type, endToEndCost);
+            }
+          }
         }
       } while (isDomainSocketOpen.get());
     }
-  }
-
-  static long nsToMs(long ns) {
-    return ns / 1000_000;
   }
 
   public static InputStream vintPrefixed(final DataInputStream input) throws IOException {
@@ -629,14 +626,14 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     private Timer timer;
 
     synchronized void init(String prefix) {
-      Preconditions.assertNull(timer, "timer");
+      if (timer != null) {
+        timer.cancel();
+      }
       timer = new Timer(prefix + "-Timer");
     }
 
     synchronized void schedule(TimerTask task, int timeoutMs) {
-      if (timer == null) {
-        return;
-      }
+      Objects.requireNonNull(timer, "Timer is null");
       timer.schedule(task, timeoutMs);
     }
 
