@@ -357,8 +357,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     // apply and cannot: a concurrent rename can invalidate the subdirectory check after Phase 1 ran it
     // and leave a directory as its own ancestor. See the note on prepareRename.
     final boolean fromKeyStillExists = isRenameDirectory
-        ? dirTable.get(dbFromKey) != null
-        : metadataMgr.getKeyTable(getBucketLayout()).get(dbFromKey) != null;
+        ? dirTable.isExist(dbFromKey)
+        : metadataMgr.getKeyTable(getBucketLayout()).isExist(dbFromKey);
     if (!fromKeyStillExists) {
       throw new OMException("Key not found " + fromKeyName, KEY_NOT_FOUND);
     }

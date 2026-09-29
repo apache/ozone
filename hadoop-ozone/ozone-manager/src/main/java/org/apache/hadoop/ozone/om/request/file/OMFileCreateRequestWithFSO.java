@@ -261,8 +261,8 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
     // holds, so it is unreachable; it is kept because it is a point lookup and it fails the way
     // checkDirectoryResult would rather than silently overwriting. It does not make Phase 1 safe under
     // concurrent apply: it re-reads the leaf, not the ancestor chain lastKnownParentId came from.
-    if (!createFileRequest.getIsOverwrite() && OMFileRequest.getOmKeyInfoFromFileTable(false,
-        omMetadataManager, prepared.dbLeafFileKey, keyName) != null) {
+    if (!createFileRequest.getIsOverwrite()
+        && omMetadataManager.getKeyTable(getBucketLayout()).isExist(prepared.dbLeafFileKey)) {
       throw new OMException("File " + keyName + " already exists",
           OMException.ResultCodes.FILE_ALREADY_EXISTS);
     }
