@@ -35,16 +35,8 @@ class StreamCommitWatcher extends AbstractCommitWatcher<StreamBuffer> {
 
   @Override
   void releaseBuffers(long index) {
-    releaseBuffers(remove(index));
-  }
-
-  /**
-   * Release the given buffers, which have been acknowledged without a Raft log index,
-   * i.e. the PutBlock was committed by a data stream command.
-   */
-  void releaseBuffers(List<StreamBuffer> buffers) {
     long acked = 0;
-    for (StreamBuffer buffer : buffers) {
+    for (StreamBuffer buffer : remove(index)) {
       acked += buffer.position();
       bufferList.remove(buffer);
     }

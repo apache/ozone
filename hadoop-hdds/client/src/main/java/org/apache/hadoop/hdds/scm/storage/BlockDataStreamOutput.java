@@ -29,7 +29,6 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -122,11 +121,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private final StreamCommitWatcher commitWatcher;
 
   private Queue<CompletableFuture<?>> putBlockFutures = new LinkedList<>();
-
-  // Buffers acknowledged by a PutBlock committed through a data stream command.
-  // They are released by the caller thread since bufferList is not thread safe.
-  private final Queue<List<StreamBuffer>> ackedBuffers
-      = new ConcurrentLinkedQueue<>();
 
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
@@ -384,7 +378,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
    */
   public void watchForCommit(boolean bufferFull) throws IOException {
     checkOpen();
-    releaseAckedBuffers();
     try {
       XceiverClientReply reply = bufferFull ?
           commitWatcher.watchOnFirstIndex() :
@@ -536,7 +529,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             setIoException(ioe);
             throw new CompletionException(ioe);
           }
-          ackedBuffers.add(byteBufferList);
+          // The command has no log index; use 0 as for the standalone protocol
+          // so that the buffers are released by the next watchForCommit.
+          commitWatcher.updateCommitInfoMap(0, byteBufferList);
         }, responseExecutor));
   }
 
@@ -554,17 +549,6 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           + "; they may be running a version which does not support it");
     }
     validateResponse(ContainerCommandResponseProto.parseFrom(response));
-  }
-
-  /**
-   * Release the buffers of the PutBlock(s) committed through data stream commands.
-   * This is called by the caller thread since {@link #bufferList} is not thread safe.
-   */
-  private void releaseAckedBuffers() {
-    for (List<StreamBuffer> buffers = ackedBuffers.poll(); buffers != null;
-         buffers = ackedBuffers.poll()) {
-      commitWatcher.releaseBuffers(buffers);
-    }
   }
 
   public static CompletableFuture<DataStreamReply> executePutBlockClose(
