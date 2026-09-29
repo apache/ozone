@@ -75,6 +75,7 @@ import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -1362,6 +1363,75 @@ public class TestOzoneShellHA {
 
     objectStore.getVolume("spvol2").deleteBucket("bucket1");
     objectStore.deleteVolume("spvol2");
+  }
+
+  @Test
+  public void testShUpdateBucketStoragePolicyLocalStateStaysConsistent() throws Exception {
+    ObjectStore objectStore = client.getObjectStore();
+    objectStore.createVolume("spvol4");
+    objectStore.getVolume("spvol4").createBucket("bucket1");
+
+    OzoneBucket bucket = objectStore.getVolume("spvol4").getBucket("bucket1");
+    bucket.setStoragePolicyProperty(OzoneStoragePolicy.COLD, false, false);
+
+    // The in-memory bucket object reflects the new values immediately,
+    // without needing to be re-fetched.
+    assertThat(bucket.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    assertThat(bucket.getAllowFallbackStoragePolicy()).isFalse();
+
+    // And the update was actually applied to this bucket (vol/name it was
+    // constructed for), not some other bucket.
+    OzoneBucket refetched = objectStore.getVolume("spvol4").getBucket("bucket1");
+    assertThat(refetched.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    assertThat(refetched.getAllowFallbackStoragePolicy()).isFalse();
+
+    bucket.setStoragePolicyProperty(null, null, true);
+    assertThat(bucket.getStoragePolicy()).isNull();
+    assertThat(objectStore.getVolume("spvol4").getBucket("bucket1")
+        .getStoragePolicy()).isNull();
+
+    objectStore.getVolume("spvol4").deleteBucket("bucket1");
+    objectStore.deleteVolume("spvol4");
+  }
+
+  @Test
+  public void testShUpdateBucketRejectsOwnerCombinedWithStoragePolicy() throws Exception {
+    ObjectStore objectStore = client.getObjectStore();
+    execute(ozoneShell, new String[]{"volume", "create", "spvol3"});
+    out.reset();
+
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol3/bucket1"});
+    String baselineOwner = objectStore.getVolume("spvol3").getBucket("bucket1").getOwner();
+    StoragePolicy baselinePolicy = objectStore.getVolume("spvol3")
+        .getBucket("bucket1").getStoragePolicy();
+
+    // --user combined with --storage-policy is rejected before any RPC.
+    executeWithError(ozoneShell,
+        new String[]{"bucket", "update", "spvol3/bucket1", "-u", "bob", "-s", "COLD"},
+        "--user cannot be combined with --storage-policy");
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1").getOwner())
+        .isEqualTo(baselineOwner);
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1").getStoragePolicy())
+        .isEqualTo(baselinePolicy);
+
+    // --user combined with --allow-fallback-storage-policy is rejected too.
+    executeWithError(ozoneShell,
+        new String[]{"bucket", "update", "spvol3/bucket1", "-u", "bob", "-a", "false"},
+        "--user cannot be combined with");
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1").getOwner())
+        .isEqualTo(baselineOwner);
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1")
+        .getAllowFallbackStoragePolicy()).isTrue();
+
+    // --user alone still works as a single RPC.
+    execute(ozoneShell, new String[]{"bucket", "update", "spvol3/bucket1", "-u", "bob"});
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1").getOwner())
+        .isEqualTo("bob");
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1").getStoragePolicy())
+        .isEqualTo(baselinePolicy);
+
+    objectStore.getVolume("spvol3").deleteBucket("bucket1");
+    objectStore.deleteVolume("spvol3");
   }
 
   @Test

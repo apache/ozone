@@ -379,14 +379,52 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
-   * Sets the bucket's storage-policy properties carried in the given
-   * {@link OmBucketArgs} (storage policy, allowFallback, or unset). Used by the
-   * update path, where the policy may be absent or explicitly cleared.
-   * @param args Bucket arguments carrying the properties to update.
+   * Sets the bucket's storage-policy properties (storage policy, allowFallback,
+   * or unset) on this bucket. Used by the update path, where the policy may be
+   * absent or explicitly cleared.
+   * @param newPolicy new storage policy, or {@code null} to leave unchanged
+   * @param newFallback new allowFallbackStoragePolicy, or {@code null} to leave unchanged
+   * @param unsetPolicy whether to clear the bucket's storage policy
    * @throws IOException
    */
-  public void setStoragePolicyProperty(OmBucketArgs args) throws IOException {
-    proxy.setBucketStoragePolicy(args);
+  public void setStoragePolicyProperty(
+      StoragePolicy newPolicy,
+      Boolean newFallback,
+      boolean unsetPolicy) throws IOException {
+
+    if (newPolicy != null && unsetPolicy) {
+      throw new IllegalArgumentException(
+          "Set storagePolicy and unset storagePolicy cannot "
+              + "be given at the same time");
+    }
+
+    OmBucketArgs.Builder builder = OmBucketArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(name);
+
+    if (newPolicy != null) {
+      builder.setStoragePolicy(newPolicy);
+    }
+
+    if (newFallback != null) {
+      builder.setAllowFallbackStoragePolicy(newFallback);
+    }
+
+    if (unsetPolicy) {
+      builder.setUnsetStoragePolicy(true);
+    }
+
+    proxy.setBucketStoragePolicy(builder.build());
+
+    if (unsetPolicy) {
+      storagePolicy = null;
+    } else if (newPolicy != null) {
+      storagePolicy = newPolicy;
+    }
+
+    if (newFallback != null) {
+      allowFallbackStoragePolicy = newFallback;
+    }
   }
 
   /**

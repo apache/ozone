@@ -23,7 +23,6 @@ import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -58,6 +57,14 @@ public class UpdateBucketHandler extends BucketHandler {
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
 
+    if (ownerName != null && !ownerName.isEmpty()
+        && (hasStoragePolicy() || allowFallBackStoragePolicy != null)) {
+      throw new IllegalArgumentException(
+          "--user cannot be combined with --storage-policy or "
+              + "--allow-fallback-storage-policy. Run separate 'bucket "
+              + "update' commands for each property.");
+    }
+
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
     OzoneBucket bucket = client.getObjectStore().getVolume(volumeName)
@@ -72,27 +79,10 @@ public class UpdateBucketHandler extends BucketHandler {
     }
 
     // Update StoragePolicy / allowFallback if requested.
-    boolean shouldSetStoragePolicyProperty = false;
-    OmBucketArgs.Builder bucketArgsBuilder = OmBucketArgs.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName);
-
-    if (hasStoragePolicy()) {
-      shouldSetStoragePolicyProperty = true;
-      StoragePolicy storagePolicy = getStoragePolicy();
-      if (storagePolicy == null) {
-        bucketArgsBuilder.setUnsetStoragePolicy(true);
-      } else {
-        bucketArgsBuilder.setStoragePolicy(storagePolicy);
-      }
-    }
-
-    if (allowFallBackStoragePolicy != null) {
-      shouldSetStoragePolicyProperty = true;
-      bucketArgsBuilder.setAllowFallbackStoragePolicy(allowFallBackStoragePolicy);
-    }
-    if (shouldSetStoragePolicyProperty) {
-      bucket.setStoragePolicyProperty(bucketArgsBuilder.build());
+    if (hasStoragePolicy() || allowFallBackStoragePolicy != null) {
+      StoragePolicy newPolicy = hasStoragePolicy() ? getStoragePolicy() : null;
+      boolean unsetPolicy = hasStoragePolicy() && newPolicy == null;
+      bucket.setStoragePolicyProperty(newPolicy, allowFallBackStoragePolicy, unsetPolicy);
     }
 
     OzoneBucket updatedBucket = client.getObjectStore().getVolume(volumeName)
