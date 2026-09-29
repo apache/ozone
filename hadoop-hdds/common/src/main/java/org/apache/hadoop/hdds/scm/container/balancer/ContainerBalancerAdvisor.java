@@ -89,11 +89,6 @@ public final class ContainerBalancerAdvisor {
     return Collections.unmodifiableList(estimations);
   }
 
-  /** @see #estimate(OzoneConfiguration, AdvisorRequest) */
-  public static List<ContainerBalancerEstimation> estimateDryRun(OzoneConfiguration conf, AdvisorRequest request) {
-    return estimate(conf, request);
-  }
-
   /**
    * Recommends balancer configuration for one or more balancer profiles.
    *

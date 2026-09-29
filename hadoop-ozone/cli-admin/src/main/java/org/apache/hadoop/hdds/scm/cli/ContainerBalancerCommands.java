@@ -54,6 +54,11 @@ import picocli.CommandLine.Command;
  *        involved in balancing
  *      ozone admin containerbalancer start -s 10
  *        start balancer with maximum size of 10GB to move in one iteration
+ * To assess:
+ *      ozone admin containerbalancer assessment
+ *      [ -t/--threshold {@literal <threshold>}]
+ *      [ --include-datanodes {@literal <hostnames>}]
+ *      [ --exclude-datanodes {@literal <hostnames>}]
  * To estimate:
  *      ozone admin containerbalancer estimate
  *      [ --profile {@literal <slow|medium|fast>} ]
@@ -93,11 +98,6 @@ import picocli.CommandLine.Command;
  *        recommend with a 5% threshold
  * To stop:
  *      ozone admin containerbalancer stop
- * To assess:
- *      ozone admin containerbalancer assessment
- *      [ -t/--threshold {@literal <threshold>}]
- *      [ --include-datanodes {@literal <hostnames>}]
- *      [ --exclude-datanodes {@literal <hostnames>}]
  * </pre>
  *
  * <p>DESCRIPTION

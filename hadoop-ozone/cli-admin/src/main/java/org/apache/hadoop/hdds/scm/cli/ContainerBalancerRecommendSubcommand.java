@@ -20,22 +20,15 @@ package org.apache.hadoop.hdds.scm.cli;
 import static org.apache.hadoop.util.StringUtils.byteDesc;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerAdvisor;
-import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerEstimation;
-import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerProfile;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerRecommendation;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -52,7 +45,6 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class)
 public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
 
-  private static final double PLANNING_ITERATION_BUFFER = 1.3d;
   private static final int PARAM_COLUMN_WIDTH = 42;
   private static final int VALUE_COLUMN_WIDTH = 14;
 
@@ -111,20 +103,12 @@ public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
     ContainerBalancerAdvisor.AdvisorRequest request =
         new ContainerBalancerAdvisor.AdvisorRequest().setNodes(nodes);
     threshold.ifPresent(request::setThresholdPercent);
-    includeNodes.ifPresent(value -> request.setIncludeNodes(parseNodeSet(value)));
-    excludeNodes.ifPresent(value -> request.setExcludeNodes(parseNodeSet(value)));
+    includeNodes.ifPresent(value -> request.setIncludeNodes(ContainerBalancerCliHelper.parseNodeSet(value)));
+    excludeNodes.ifPresent(value -> request.setExcludeNodes(ContainerBalancerCliHelper.parseNodeSet(value)));
     if (profileName.isPresent()) {
-      request.setProfile(parseProfile(profileName.get()));
+      request.setProfile(ContainerBalancerCliHelper.parseProfile(profileName.get()));
     }
     return request;
-  }
-
-  private static ContainerBalancerProfile parseProfile(String name) throws IOException {
-    try {
-      return ContainerBalancerProfile.valueOf(name.trim().toUpperCase(Locale.ENGLISH));
-    } catch (IllegalArgumentException e) {
-      throw new IOException("Invalid profile: " + name + ". Expected SLOW, MEDIUM, or FAST.");
-    }
   }
 
   private void printRecommendation(ContainerBalancerRecommendation recommendation) {
@@ -139,7 +123,7 @@ public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
     printRecommendedParameters(recommendation);
     out().println();
     out().println(" Estimation:");
-    printEstimation(recommendation.getEstimation());
+    ContainerBalancerCliHelper.printEstimation(out(), recommendation.getEstimation());
   }
 
   private void printRecommendedParameters(ContainerBalancerRecommendation recommendation) {
@@ -186,43 +170,4 @@ public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
         parameter, value, rationale);
   }
 
-  private void printEstimation(ContainerBalancerEstimation estimation) {
-    long estimatedIterations = estimation.getEstimatedIterations();
-    long planningIterations = (long) Math.ceil(estimatedIterations * PLANNING_ITERATION_BUFFER);
-    long cycleTimeMillis = estimation.getMoveTimeoutMillis() + estimation.getBalancingIntervalMillis();
-    long baseDurationMillis = estimation.getEstimatedDurationMillis();
-    long planningDurationMillis = planningIterations * cycleTimeMillis;
-    out().printf(" Bytes to move:            %s%n", byteDesc(estimation.getBytesToMove()));
-    out().printf(" Per iteration (estimate): ~%s%n", byteDesc(estimation.getPerIterationBytes()));
-    out().printf(" Estimated iterations:     %d (planning estimate: %d, includes +30%% buffer)%n",
-        estimatedIterations, planningIterations);
-    out().printf(" Estimated duration:       upper bound %s (planning estimate: %s, includes +30%% buffer)%n",
-        formatEstimatedDuration(baseDurationMillis),
-        formatEstimatedDuration(planningDurationMillis));
-    out().println("                           (assumes full move timeout + interval each cycle)");
-    out().println();
-  }
-
-  private static String formatEstimatedDuration(long durationMillis) {
-    double days = durationMillis / 86400000d;
-    if (days >= 1) {
-      return String.format(Locale.ENGLISH, "~%.1f days", days);
-    }
-    double hours = durationMillis / 3600000d;
-    if (hours >= 1) {
-      return String.format(Locale.ENGLISH, "~%.1f hours", hours);
-    }
-    long minutes = durationMillis / 60000;
-    return String.format(Locale.ENGLISH, "~%d min", minutes);
-  }
-
-  private static Set<String> parseNodeSet(String nodes) {
-    if (StringUtils.isBlank(nodes)) {
-      return Collections.emptySet();
-    }
-    return Arrays.stream(nodes.split(","))
-        .map(String::trim)
-        .filter(s -> !s.isEmpty())
-        .collect(Collectors.toSet());
-  }
 }
