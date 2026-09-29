@@ -437,9 +437,9 @@ public class OzoneClientConfig {
 
     if (ratisStreamReadWindowSize < 0) {
       LOG.warn("Invalid ozone.client.ratis.stream.read.window-size = {}. " +
-              "Resetting to default 256MB.",
+              "Resetting to default 8MB.",
           ratisStreamReadWindowSize);
-      ratisStreamReadWindowSize = 256L << 20; // 256MB
+      ratisStreamReadWindowSize = 8L << 20; // 8MB
     }
 
     // Ensure response data size is positive.
