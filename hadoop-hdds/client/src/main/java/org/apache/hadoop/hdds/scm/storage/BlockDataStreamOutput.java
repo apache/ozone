@@ -216,7 +216,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     // TODO: The datanode UUID is not used meaningfully, consider deprecating
     //  it or remove it completely if possible
     String id = pipeline.getFirstNode().getUuidString();
-    ContainerProtos.Type streamInitType = config.isDatastreamPutBlockOnCloseEnabled()
+    ContainerProtos.Type streamInitType = config.isDatastreamPutBlockWithoutRaftEnabled()
         ? ContainerProtos.Type.StreamInitWithPutBlock
         : ContainerProtos.Type.StreamInit;
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
@@ -425,7 +425,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       byteBufferList = null;
     }
     waitFuturesComplete();
-    if (close && config.isDatastreamPutBlockOnCloseEnabled()) {
+    if (close && config.isDatastreamPutBlockWithoutRaftEnabled()) {
       // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
       waitPutBlockFuturesComplete();
     }
@@ -450,12 +450,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           }
         }
       });
-      if (config.isDatastreamPutBlockOnCloseEnabled()) {
+      if (config.isDatastreamPutBlockWithoutRaftEnabled()) {
         // PutBlock is supposed to be committed after the data stream close so there
         // is no need to continue.
         return;
       }
-    } else if (config.isDatastreamPutBlockCommandEnabled()) {
+    } else if (config.isDatastreamPutBlockWithoutRaftEnabled()) {
       executePutBlockCommand(blockData, byteBufferList);
       return;
     }
