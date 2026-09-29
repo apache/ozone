@@ -79,12 +79,12 @@ class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  void streamInitTypeFollowsClientConfig(boolean putBlockOnCloseEnabled) throws Exception {
+  void streamInitTypeFollowsClientConfig(boolean putBlockWithoutRaft) throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     OzoneClientConfig config = createConfig();
-    config.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
+    config.setDatastreamPutBlockWithoutRaftEnabled(putBlockWithoutRaft);
     try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
-      Type expected = putBlockOnCloseEnabled ? Type.StreamInitWithPutBlock : Type.StreamInit;
+      Type expected = putBlockWithoutRaft ? Type.StreamInitWithPutBlock : Type.StreamInit;
       assertEquals(expected, pipeline.getStreamInitType());
     }
   }
@@ -131,13 +131,11 @@ class TestBlockDataStreamOutput {
     assertEquals(2, pipeline.getReceivedPutBlocks().size());
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void midStreamPutBlockUsesStreamCommandWhenEnabled(boolean putBlockOnCloseEnabled) throws Exception {
+  @Test
+  void midStreamPutBlockUsesStreamCommandWhenEnabled() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     OzoneClientConfig config = createConfig();
-    config.setDatastreamPutBlockCommandEnabled(true);
-    config.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
     byte[] data = randomBytes(400);
     try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
       stream.write(ByteBuffer.wrap(data), 0, data.length);
@@ -151,23 +149,9 @@ class TestBlockDataStreamOutput {
       assertThat(command.getPutBlock().getEof()).isFalse();
       assertEquals(4, command.getPutBlock().getBlockData().getChunksCount());
     }
-    // Close does not send another command; it commits PutBlock the way the other config selects.
+    // Close does not add another PutBlock command: it is appended to the stream instead
     assertEquals(1, pipeline.getReceivedCommands().size());
-    assertEquals(putBlockOnCloseEnabled ? 0 : 1, pipeline.getReceivedPutBlocks().size());
-    assertArrayEquals(data, pipeline.getAllReceivedData());
-  }
-
-  @Test
-  void midStreamPutBlockUsesRaftWhenCommandDisabled() throws Exception {
-    MockDatanodePipeline pipeline = new MockDatanodePipeline();
-    OzoneClientConfig config = createConfig();
-    config.setDatastreamPutBlockOnCloseEnabled(true);
-    byte[] data = randomBytes(400);
-    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
-      stream.write(ByteBuffer.wrap(data), 0, data.length);
-      assertEquals(1, pipeline.getReceivedPutBlocks().size(), "The mid-stream PutBlock should still go through Raft");
-      assertEquals(0, pipeline.getReceivedCommands().size());
-    }
+    assertEquals(0, pipeline.getReceivedPutBlocks().size());
     assertArrayEquals(data, pipeline.getAllReceivedData());
   }
 
@@ -175,7 +159,7 @@ class TestBlockDataStreamOutput {
   void midStreamPutBlockCommandReleasesBuffers() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     OzoneClientConfig config = createConfig();
-    config.setDatastreamPutBlockCommandEnabled(true);
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
     BlockDataStreamOutput stream = createStream(pipeline, config);
     byte[] data = randomBytes(400);
     stream.write(ByteBuffer.wrap(data), 0, data.length);
@@ -189,7 +173,7 @@ class TestBlockDataStreamOutput {
   void midStreamPutBlockFailsOnDatanodeWithoutCommandSupport() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline().withUnsupportedCommand();
     OzoneClientConfig config = createConfig();
-    config.setDatastreamPutBlockCommandEnabled(true);
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
     BlockDataStreamOutput stream = createStream(pipeline, config);
     byte[] data = randomBytes(400);
     stream.write(ByteBuffer.wrap(data), 0, data.length);
