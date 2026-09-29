@@ -235,12 +235,12 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
     final String dbLeafKey = omMetadataManager.getOzonePathKey(prepared.volumeId,
         prepared.bucketId, prepared.omPathInfo.getLastKnownParentId(),
         prepared.omPathInfo.getLeafNodeName());
-    if (omMetadataManager.getDirectoryTable().get(dbLeafKey) != null) {
+    if (omMetadataManager.getDirectoryTable().isExist(dbLeafKey)) {
       throw new OMException("Unable to create directory: " + keyName
           + " in volume/bucket: " + volumeName + "/" + bucketName + " as it already exists",
           OMException.ResultCodes.DIRECTORY_ALREADY_EXISTS);
     }
-    if (omMetadataManager.getKeyTable(getBucketLayout()).get(dbLeafKey) != null) {
+    if (omMetadataManager.getKeyTable(getBucketLayout()).isExist(dbLeafKey)) {
       throw new OMException("Unable to create directory: " + keyName
           + " in volume/bucket: " + volumeName + "/" + bucketName
           + " as a file already exists at that path", FILE_ALREADY_EXISTS);

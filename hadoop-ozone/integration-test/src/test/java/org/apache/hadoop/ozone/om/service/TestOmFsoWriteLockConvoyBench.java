@@ -596,11 +596,12 @@ public class TestOmFsoWriteLockConvoyBench {
           int opIdx = i % WRITE_OPS.length;
           if (opIdx == 1) {
             lastDir = new Path(writerDir, "d" + i);
-            fs.mkdirs(lastDir);
+            checkWrite(fs.mkdirs(lastDir), "mkdirs", lastDir);
             ops[1]++;
           } else if (opIdx == 2 && lastCreated != null) {
             // Rename the file this thread created on its previous create op.
-            fs.rename(lastCreated, new Path(writerDir, "f" + i + "-r"));
+            Path renamed = new Path(writerDir, "f" + i + "-r");
+            checkWrite(fs.rename(lastCreated, renamed), "rename to " + renamed, lastCreated);
             lastCreated = null;
             ops[2]++;
           } else if (opIdx == 3 && lastDir != null) {
@@ -610,7 +611,7 @@ public class TestOmFsoWriteLockConvoyBench {
             // RocksDB seeks, the largest of the narrowed write-lock holds. Deleting a file instead would skip
             // hasChildren and add a createFakeParentDirectory round trip, so the directory case is both the
             // expensive one and the cleaner one to measure.
-            fs.delete(lastDir, false);
+            checkWrite(fs.delete(lastDir, false), "delete", lastDir);
             lastDir = null;
             ops[3]++;
           } else {
@@ -629,6 +630,18 @@ public class TestOmFsoWriteLockConvoyBench {
     }
     startLatch.countDown();
     return new RunningWriters(pool, futures, running, opCounts, writerFs);
+  }
+
+  /**
+   * Counts a write only if the client call reported success. FileSystem.mkdirs/rename/delete report failure with a
+   * {@code false} return rather than an exception, so leaving that unchecked would let the benchmark report writes
+   * that never reached the apply path. Thrown from a writer thread, this surfaces from
+   * {@link RunningWriters#await()}.
+   */
+  private static void checkWrite(boolean succeeded, String op, Path path) throws IOException {
+    if (!succeeded) {
+      throw new IOException(op + " returned false for " + path);
+    }
   }
 
   /** Handle to the reader pool: stop, then join and collect per-op samples. */

@@ -243,8 +243,8 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     // concurrent create can add a child after Phase 1's hasChildren scan and this delete would orphan
     // it. See the note on prepareKeyDelete.
     final boolean keyStillExists = prepared.isDirectory
-        ? omMetadataManager.getDirectoryTable().get(prepared.ozonePathKey) != null
-        : omMetadataManager.getKeyTable(getBucketLayout()).get(prepared.ozonePathKey) != null;
+        ? omMetadataManager.getDirectoryTable().isExist(prepared.ozonePathKey)
+        : omMetadataManager.getKeyTable(getBucketLayout()).isExist(prepared.ozonePathKey);
     if (!keyStillExists) {
       throw new OMException("Key not found. Key:" + keyName, KEY_NOT_FOUND);
     }
