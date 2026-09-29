@@ -1621,6 +1621,8 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     long prevNumTrashAtomicDirRenames = getOMMetrics()
         .getNumTrashAtomicDirRenames();
 
+    long prevNumTrashGetFileStatus = getOMMetrics().getNumTrashGetFileStatus();
+
     // Construct paths for first key
     String username = UserGroupInformation.getCurrentUser().getShortUserName();
     Path trashRoot = new Path(bucketPath, TRASH_PREFIX);
@@ -1653,6 +1655,12 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
         return false;
       }
     }, 1000, 180000);
+
+    // The emptier probes each bucket's trash root through
+    // TrashOzoneFileSystem, which counts as trash work rather than as a client
+    // GetFileStatus RPC.
+    assertThat(getOMMetrics().getNumTrashGetFileStatus())
+        .isGreaterThan(prevNumTrashGetFileStatus);
 
     if (isBucketFSOptimized) {
       assertThat(getOMMetrics().getNumTrashAtomicDirRenames())
@@ -1841,20 +1849,20 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     Path filePath = new Path(bucketPath, keyName);
     ContractTestUtils.touch(fs, filePath);
 
+    // Only the GetFileStatus count is asserted here. numBucketInfos is a
+    // cluster-global counter that OM's own trash emptier advances from a
+    // background thread, so "getFileStatus issues no InfoBucket" is asserted
+    // deterministically in TestBasicRootedOzoneClientAdapterHeadOp instead.
     OMMetrics metrics = getOMMetrics();
-    long bucketInfosBefore = metrics.getNumBucketInfos();
     long getFileStatusBefore = metrics.getNumGetFileStatus();
 
     FileStatus status = fs.getFileStatus(filePath);
     assertTrue(status.isFile());
 
-    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
-        "getFileStatus must not trigger InfoBucket");
     assertEquals(getFileStatusBefore + 1, metrics.getNumGetFileStatus());
 
     long getFileStatusAfterFirst = metrics.getNumGetFileStatus();
     fs.getFileStatus(filePath);
-    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos());
     assertEquals(getFileStatusAfterFirst + 1, metrics.getNumGetFileStatus());
   }
 
@@ -1870,15 +1878,10 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
         "data".getBytes(StandardCharsets.UTF_8));
     Path keyPath = new Path(obsBucketPath, keyName);
 
-    OMMetrics metrics = getOMMetrics();
-    long bucketInfosBefore = metrics.getNumBucketInfos();
-
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> fs.getFileStatus(keyPath));
     assertThat(exception.getMessage()).contains(obsBucket.getName());
     assertThat(exception.getMessage()).contains("OBJECT_STORE");
-    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
-        "getFileStatus must not trigger InfoBucket");
   }
 
   @Test
