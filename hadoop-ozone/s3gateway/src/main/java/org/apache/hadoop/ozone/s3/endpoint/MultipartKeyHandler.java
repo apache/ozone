@@ -60,7 +60,8 @@ class MultipartKeyHandler extends ObjectOperationHandler {
 
     try {
       int partMarker = parsePartNumberMarker(partNumberMarker);
-      Response response = listParts(context, keyPath, uploadId, partMarker, maxParts, perf);
+      Response response = listParts(context.getVolume(), context.getBucketName(), keyPath, uploadId,
+          partMarker, maxParts, perf);
       long opLatencyNs = getMetrics().updateListPartsSuccessStats(context.getStartNanos());
       perf.appendOpLatencyNanos(opLatencyNs);
       return response;
@@ -112,7 +113,8 @@ class MultipartKeyHandler extends ObjectOperationHandler {
   /**
    * Returns response for the listParts request.
    * See: https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadListParts.html
-   * @param context
+   * @param volume
+   * @param bucketName
    * @param key
    * @param uploadId
    * @param partNumberMarker
@@ -121,17 +123,16 @@ class MultipartKeyHandler extends ObjectOperationHandler {
    * @throws IOException
    * @throws OS3Exception
    */
-  private Response listParts(ObjectEndpoint.ObjectRequestContext context, String key, String uploadId,
+  private Response listParts(OzoneVolume volume, String bucketName, String key, String uploadId,
       int partNumberMarker, int maxParts,
       PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
 
     ListPartsResponse resp = new ListPartsResponse();
-    String bucketName = context.getBucketName();
 
     try {
       OzoneMultipartUploadPartListParts parts =
-          getClientProtocol().listParts(context.getVolume().getName(), bucketName, key, uploadId,
+          getClientProtocol().listParts(volume.getName(), bucketName, key, uploadId,
               partNumberMarker, maxParts);
 
       resp.setBucket(bucketName);

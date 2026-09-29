@@ -154,7 +154,6 @@ public class TestListParts {
     assertErrorResponse(S3ErrorTable.BUCKET_OWNER_MISMATCH,
         () -> EndpointTestUtils.listParts(endpoint, "bucket1", "key1", "upload1", 2, 3));
 
-    verify(proxy).getBucketDetails("volume1", "bucket1");
     verify(proxy, never()).listParts("volume1", "bucket1", "key1", "upload1", 3, 2);
   }
 
@@ -174,8 +173,22 @@ public class TestListParts {
     assertErrorResponse(expectedError,
         () -> EndpointTestUtils.listParts(endpoint, "bucket1", "key1", "upload1", 2, 3));
 
-    verify(proxy, never()).getBucketDetails("volume1", "bucket1");
     verify(proxy).listParts("volume1", "bucket1", "key1", "upload1", 3, 2);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"PERMISSION_DENIED, ACCESS_DENIED", "TOKEN_EXPIRED, EXPIRED_TOKEN"})
+  public void testListPartsVolumeLookupErrors(ResultCodes resultCode, S3ErrorTable expectedError) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    ObjectEndpoint endpoint = newEndpoint(proxy, mock(HttpHeaders.class));
+    when(endpoint.getClient().getObjectStore().getS3Volume())
+        .thenThrow(new OMException("Volume lookup failed", resultCode));
+
+    OS3Exception error = assertErrorResponse(expectedError,
+        () -> EndpointTestUtils.listParts(endpoint, "bucket1", "key1", "upload1", 2, 3));
+
+    assertThat(error.getResource()).isEqualTo("key1");
+    verify(proxy, never()).listParts("volume1", "bucket1", "key1", "upload1", 3, 2);
   }
 
   private ObjectEndpoint newEndpoint(ClientProtocol proxy, HttpHeaders headers) throws Exception {
