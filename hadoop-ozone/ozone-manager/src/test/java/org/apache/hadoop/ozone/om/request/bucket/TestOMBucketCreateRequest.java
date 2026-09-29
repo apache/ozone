@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
+import static org.apache.hadoop.ozone.om.request.validation.ValidationContext.of;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
@@ -44,12 +46,15 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
@@ -411,6 +416,63 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     } else {
       assertTrue(aclList.contains(OzoneAcl.parseAcl(acl)));
     }
+  }
+
+  @Test
+  public void testDisallowCreateBucketWithStoragePolicyBeforeFinalization() {
+    OMRequest request = newCreateBucketRequest(
+        newBucketInfoBuilder(UUID.randomUUID().toString(),
+            UUID.randomUUID().toString())
+            .setStoragePolicy(StoragePolicyProto.HOT)
+            .setAllowFallbackStoragePolicy(true)).build();
+
+    OMException ex = assertThrows(OMException.class, () ->
+        OMBucketCreateRequest.disallowCreateBucketWithStoragePolicy(
+            request, preFinalizedContext()));
+
+    assertThat(ex.getResult()).isEqualTo(
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+  }
+
+  /**
+   * A request that carries no storage-policy field must pass the gate
+   * untouched, since the validator's return value is chained into the next
+   * validator by the request validation framework.
+   */
+  @Test
+  public void testAllowCreateBucketWithoutStoragePolicyBeforeFinalization()
+      throws Exception {
+    OMRequest request = newCreateBucketRequest(
+        newBucketInfoBuilder(UUID.randomUUID().toString(),
+            UUID.randomUUID().toString())
+            .clearStoragePolicy()).build();
+
+    assertThat(OMBucketCreateRequest.disallowCreateBucketWithStoragePolicy(
+        request, preFinalizedContext())).isEqualTo(request);
+  }
+
+  @Test
+  public void testAllowCreateBucketWithStoragePolicyAfterFinalization()
+      throws Exception {
+    OMRequest request = newCreateBucketRequest(
+        newBucketInfoBuilder(UUID.randomUUID().toString(),
+            UUID.randomUUID().toString())
+            .setStoragePolicy(StoragePolicyProto.COLD)
+            .setAllowFallbackStoragePolicy(true)).build();
+
+    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
+    when(versionManager.isAllowed(
+        OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)).thenReturn(true);
+
+    assertThat(OMBucketCreateRequest.disallowCreateBucketWithStoragePolicy(
+        request, of(versionManager, omMetadataManager))).isEqualTo(request);
+  }
+
+  private ValidationContext preFinalizedContext() {
+    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
+    when(versionManager.isAllowed(
+        OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)).thenReturn(false);
+    return of(versionManager, omMetadataManager);
   }
 
   private void acceptBucketCreationHelper(String volumeName, String bucketName)

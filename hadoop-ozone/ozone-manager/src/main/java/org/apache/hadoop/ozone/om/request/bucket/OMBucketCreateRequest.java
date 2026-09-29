@@ -438,6 +438,28 @@ public class OMBucketCreateRequest extends OMClientRequest {
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateBucket
   )
+  public static OMRequest disallowCreateBucketWithStoragePolicy(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)) {
+      BucketInfo bucketInfo = req.getCreateBucketRequest().getBucketInfo();
+      if (bucketInfo.hasStoragePolicy()
+          || bucketInfo.hasAllowFallbackStoragePolicy()) {
+        throw new OMException("Cluster does not have the bucket storage policy"
+            + " support feature finalized yet, but the request contains storage"
+            + " policy arguments. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
+            ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateBucket
+  )
   public static OMRequest handleCreateBucketWithBucketLayoutDuringPreFinalize(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()

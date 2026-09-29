@@ -397,4 +397,28 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     }
     return req;
   }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.SetBucketProperty
+  )
+  public static OMRequest disallowSetBucketPropertyWithStoragePolicy(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)) {
+      SetBucketPropertyRequest propReq = req.getSetBucketPropertyRequest();
+      if (propReq.hasBucketArgs()
+          && (propReq.getBucketArgs().hasStoragePolicy()
+          || propReq.getBucketArgs().hasAllowFallbackStoragePolicy()
+          || propReq.getBucketArgs().hasUnsetStoragePolicy())) {
+        throw new OMException("Cluster does not have the bucket storage policy"
+            + " support feature finalized yet, but the request contains storage"
+            + " policy arguments. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
 }
