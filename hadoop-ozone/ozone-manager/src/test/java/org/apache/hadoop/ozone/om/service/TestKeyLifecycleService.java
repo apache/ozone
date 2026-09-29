@@ -73,7 +73,6 @@ import java.lang.reflect.Field;
 import java.security.PrivilegedExceptionAction;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -375,9 +374,14 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
       // Verify that scan state was updated through the DeleteKeysRequest
       String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
-      OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
-      assertNotNull(scanState);
-      assertNotNull(scanState.getScanEndTime());
+      GenericTestUtils.waitFor(() -> {
+        try {
+          OmLifecycleScanState scanState = metadataManager.getLifecycleScanStateTable().get(bucketKey);
+          return scanState != null && scanState.getScanEndTime() != null;
+        } catch (IOException e) {
+          return false;
+        }
+      }, WAIT_CHECK_INTERVAL, 10000);
 
       deleteLifecyclePolicy(volumeName, bucketName);
     }
@@ -1742,23 +1746,25 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
 
-      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
+      FaultInjectorImpl taskStart = new FaultInjectorImpl();
+      FaultInjectorImpl beforeDelete = new FaultInjectorImpl();
+      installInjectors(taskStart, beforeDelete);
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, rulePrefix, null, date.toString(), true);
       LOG.info("expiry date {}", date.toInstant().toEpochMilli());
 
-      GenericTestUtils.waitFor(() -> date.isBefore(ZonedDateTime.now(ZoneOffset.UTC)), WAIT_CHECK_INTERVAL, 10000);
+      taskStart.awaitPaused(10000);
 
       // rename a key under directory to change directory's Modification time
       writeClient.renameKey(keyList.get(0), keyList.get(0).getKeyName() + "-new");
       LOG.info("Dir {} refreshes its modification time", dirName);
 
-      // resume KeyLifecycleService bucket scan
-      KeyLifecycleService.getInjector(0).resume();
-      KeyLifecycleService.getInjector(1).resume();
+      taskStart.release();
+      beforeDelete.awaitPaused(10000);
+      beforeDelete.release();
 
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
@@ -2577,16 +2583,17 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
 
-      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
+      FaultInjectorImpl taskStart = new FaultInjectorImpl();
+      FaultInjectorImpl beforeDelete = new FaultInjectorImpl();
+      installInjectors(taskStart, beforeDelete);
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, rulePrefix, null, date.toString(), true);
       LOG.info("expiry date {}", date.toInstant());
 
-      ZonedDateTime endDate = date.plus(SERVICE_INTERVAL, ChronoUnit.MILLIS);
-      GenericTestUtils.waitFor(() -> endDate.isBefore(ZonedDateTime.now(ZoneOffset.UTC)), WAIT_CHECK_INTERVAL, 5000);
+      taskStart.awaitPaused(10000);
 
       // rename a key under directory to change directory's Modification time
       if (updateDirModificationTime) {
@@ -2594,11 +2601,12 @@ class TestKeyLifecycleService extends OzoneTestBase {
         LOG.info("Dir {} refreshes its modification time", dirName);
         KeyInfoWithVolumeContext keyInfo2 = getDirectory(volumeName, bucketName, dirName);
         assertNotEquals(keyInfo.getKeyInfo().getModificationTime(), keyInfo2.getKeyInfo().getModificationTime());
+        awaitDirCacheDrained(volumeName, bucketName);
       }
 
-      // resume KeyLifecycleService bucket scan
-      KeyLifecycleService.getInjector(0).resume();
-      KeyLifecycleService.getInjector(1).resume();
+      taskStart.release();
+      beforeDelete.awaitPaused(10000);
+      beforeDelete.release();
 
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeletedKeyCount, WAIT_CHECK_INTERVAL, 10000);

@@ -28,11 +28,11 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 /**
  * Test helper that reads all key versions from raw SST files.
  */
-final class TestRawSstFileRecords {
+final class RawSstFileRecords {
 
   private static final int DEFAULT_READ_AHEAD_SIZE = 2 * 1024 * 1024;
 
-  private TestRawSstFileRecords() {
+  private RawSstFileRecords() {
   }
 
   static List<SourceRecord> readFile(Path sstFile) throws IOException {

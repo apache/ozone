@@ -77,7 +77,7 @@ public class TestContainerSizeCountTask extends AbstractReconSqlDBTest {
         utilizationSchemaDefinition,
         reconTaskStatusUpdaterManager);
     // Truncate table before running each test
-    dslContext.truncate(CONTAINER_COUNT_BY_SIZE);
+    dslContext.truncate(CONTAINER_COUNT_BY_SIZE).execute();
   }
 
   @Test

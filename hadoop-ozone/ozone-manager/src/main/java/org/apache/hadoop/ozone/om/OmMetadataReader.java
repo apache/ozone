@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
@@ -307,6 +308,18 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
+      if (bucket.bucketLayout() != null) {
+        try {
+          OzoneFSUtils.validateBucketLayout(bucket.requestedBucket(),
+              bucket.bucketLayout());
+        } catch (IllegalArgumentException e) {
+          // Convert to an OMException so it is returned to the client as a
+          // normal (non-retryable) RPC response instead of escaping the read
+          // handler's IOException catch and triggering a client retry storm.
+          throw new OMException(e.getMessage(),
+              ResultCodes.NOT_SUPPORTED_OPERATION);
+        }
+      }
       if (isAclEnabled) {
         checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
       }

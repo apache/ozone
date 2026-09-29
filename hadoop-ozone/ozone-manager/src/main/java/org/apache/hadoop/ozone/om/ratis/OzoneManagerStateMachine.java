@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
 
@@ -25,7 +24,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -626,14 +624,19 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
 
       long startTime = Time.monotonicNow();
-      final TransactionInfo transactionInfo = TransactionInfo.valueOf(snapshot);
+      // The double buffer may have committed transactions past the index computed above, since it
+      // advances lastAppliedTermIndex only after its batch commit returns. Persisting through it
+      // keeps the stored index from moving backwards over that data, and yields whichever value is
+      // actually stored so the in-memory copy Ratis reads cannot disagree with the DB.
+      final TransactionInfo transactionInfo =
+          ozoneManagerDoubleBuffer.persistIfNewer(TransactionInfo.valueOf(snapshot));
       ozoneManager.setTransactionInfo(transactionInfo);
-      ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, transactionInfo);
       ozoneManager.getMetadataManager().getStore().flushDB();
       LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
           "notified = {}, current snapshot index = {}, took {} ms",
-              getId(), applied, lastSkippedIndex, notified, snapshot, Time.monotonicNow() - startTime);
-      return snapshot.getIndex();
+              getId(), applied, lastSkippedIndex, notified, transactionInfo.getTermIndex(),
+              Time.monotonicNow() - startTime);
+      return transactionInfo.getTermIndex().getIndex();
     }
   }
 
@@ -707,24 +710,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         OzoneManager.setS3Auth(s3Auth);
         isS3AuthThreadLocalSet = true;
 
-        if (s3Auth.hasSessionToken() && !s3Auth.getSessionToken().isEmpty()) {
-          // ThreadLocal carries session policy for OmMetadataReader
-          // Use Instant.MAX for creationTime so a future revocation check on this ThreadLocal
-          // identifier never treats the token as issued before a stored cutoff.
-          final STSTokenIdentifier rehydratedTokenIdentifier = new STSTokenIdentifier(
-              STSTokenIdentifier.Params.newBuilder()
-                  .setTempAccessKeyId(
-                      s3Auth.hasResolvedStsTempAccessKeyId() ? s3Auth.getResolvedStsTempAccessKeyId() : "")
-                  .setOriginalAccessKeyId(
-                      s3Auth.hasResolvedStsOriginalAccessKeyId() ? s3Auth.getResolvedStsOriginalAccessKeyId() : "")
-                  .setRoleArn(s3Auth.hasResolvedStsRoleArn() ? s3Auth.getResolvedStsRoleArn() : "")
-                  .setCreationTime(Instant.MAX)
-                  .setExpiry(Instant.MAX) // ensure it deterministically is not expired
-                  .setSecretAccessKey(null) // no secretAccessKey needed
-                  .setSessionPolicy(
-                      s3Auth.hasResolvedStsSessionPolicy() ? s3Auth.getResolvedStsSessionPolicy() : "")
-                  .setManagedSecretKey(null) // no ManagedSecretKey needed
-                  .build());
+        // ThreadLocal carries session policy for OmMetadataReader
+        final STSTokenIdentifier rehydratedTokenIdentifier = STSSecurityUtil.rehydrateStsTokenIdentifier(s3Auth);
+        if (rehydratedTokenIdentifier != null) {
           OzoneManager.setStsTokenIdentifier(rehydratedTokenIdentifier);
           isStsThreadLocalSet = true;
         }

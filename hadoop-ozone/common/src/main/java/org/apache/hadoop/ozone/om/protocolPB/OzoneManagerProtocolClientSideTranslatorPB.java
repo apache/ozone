@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -258,6 +259,8 @@ import org.apache.hadoop.ozone.security.proto.SecurityProtos.RenewDelegationToke
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotBucketCount;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
@@ -796,7 +799,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   private OMResponse handleError(OMResponse resp) throws OMException {
     if (resp.getStatus() != OK) {
       throw new OMException(resp.getMessage(),
-          ResultCodes.values()[resp.getStatus().ordinal()]);
+          ResultCodes.valueOf(resp.getStatus().name()));
     }
     return resp;
   }
@@ -1039,7 +1042,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMResponse omResponse = submitRequest(omRequest);
 
     Map<String, ErrorInfo> keyToErrors = new HashMap<>();
-    if (quiet) {
+    if (quiet && omResponse.getStatus() == PARTIAL_DELETE) {
+      // PARTIAL_DELETE means the batch was processed and only some keys failed; those are reported per key
+      // in the returned map. Any other non-OK status means the whole request failed.
       List<OzoneManagerProtocolProtos.DeleteKeyError> errors =
           omResponse.getDeleteKeysResponse().getErrorsList();
       for (OzoneManagerProtocolProtos.DeleteKeyError deleteKeyError : errors) {
@@ -1422,6 +1427,29 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
 
     return new ListSnapshotResponse(snapshotInfos, lastSnapshot);
+  }
+
+  @Override
+  public SnapshotCountResponse snapshotCount(String bucketFilter)
+      throws IOException {
+    final OzoneManagerProtocolProtos.SnapshotCountRequest.Builder requestBuilder =
+        OzoneManagerProtocolProtos.SnapshotCountRequest.newBuilder();
+    if (bucketFilter != null) {
+      requestBuilder.setBucketFilter(bucketFilter);
+    }
+    final OMRequest omRequest = createOMRequest(Type.SnapshotCount)
+        .setSnapshotCountRequest(requestBuilder)
+        .build();
+    final OMResponse omResponse = submitRequest(omRequest);
+    handleError(omResponse);
+
+    OzoneManagerProtocolProtos.SnapshotCountResponse response = omResponse.getSnapshotCountResponse();
+    List<SnapshotBucketCount> bucketCounts = response.getBucketsList().stream()
+        .map(count -> new SnapshotBucketCount(count.getVolumeName(), count.getBucketName(),
+            count.getActive(), count.getDeleted(), count.getTotal()))
+        .collect(Collectors.toList());
+
+    return new SnapshotCountResponse(response.getActive(), response.getDeleted(), response.getTotal(), bucketCounts);
   }
 
   /**

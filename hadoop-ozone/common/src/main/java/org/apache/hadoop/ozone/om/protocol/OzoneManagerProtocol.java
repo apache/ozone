@@ -76,6 +76,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
@@ -378,8 +379,9 @@ public interface OzoneManagerProtocol
    * through OzoneFileSystem.
    *
    * @param deleteKeys
-   * @param quiet - flag to not throw exception if delete fails
-   * @throws IOException
+   * @param quiet - if true, per-key failures are returned in the result map instead of being thrown
+   * @return key name to error for each key that could not be deleted, empty if all keys were deleted
+   * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true
    */
   default Map<String, ErrorInfo> deleteKeys(OmDeleteKeys deleteKeys, boolean quiet)
       throws IOException {
@@ -785,6 +787,17 @@ public interface OzoneManagerProtocol
   default ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented");
+  }
+
+  /**
+   * Bucket-wise snapshot count distribution from snapshotInfo table.
+   * @param bucketFilter optional filter, accepts either bucket or volume/bucket
+   * @return snapshot counts aggregated by bucket
+   * @throws IOException
+   */
+  default SnapshotCountResponse snapshotCount(String bucketFilter) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");
   }

@@ -45,7 +45,7 @@ public abstract class AbstractContractSafeModeTest extends AbstractFSContractTes
 
   private SafeMode verifyAndGetSafeModeInstance(FileSystem fs) {
     Assertions.assertThat(fs)
-        .describedAs("File system %s must be an instance of %s", fs, SafeMode.class.getClass())
+        .describedAs("File system %s must be an instance of %s", fs, SafeMode.class)
         .isInstanceOf(SafeMode.class);
     return (SafeMode) fs;
   }
