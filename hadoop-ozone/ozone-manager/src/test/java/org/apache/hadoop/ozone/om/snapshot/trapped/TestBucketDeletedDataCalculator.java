@@ -30,16 +30,16 @@ import java.util.Collections;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.ozone.om.DeleteKeysResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.BucketManager;
+import org.apache.hadoop.ozone.om.DeleteKeysResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmSnapshot;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -106,7 +106,8 @@ public class TestBucketDeletedDataCalculator extends SnapshotRequestAndResponseT
   private void ensureBucketContextInSnapshot(
       OMMetadataManager snapshotMetadataManager, String volume, String bucket) throws Exception {
     OmVolumeArgs volumeArgs = getOmMetadataManager().getVolumeTable().get(getOmMetadataManager().getVolumeKey(volume));
-    OmBucketInfo bucketInfo = getOmMetadataManager().getBucketTable().get(getOmMetadataManager().getBucketKey(volume, bucket));
+    OmBucketInfo bucketInfo = getOmMetadataManager().getBucketTable()
+        .get(getOmMetadataManager().getBucketKey(volume, bucket));
     if (volumeArgs != null) {
       snapshotMetadataManager.getVolumeTable().put(snapshotMetadataManager.getVolumeKey(volume), volumeArgs);
     }
