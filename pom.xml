@@ -74,7 +74,7 @@
     <distMgmtStagingId>apache.staging.https</distMgmtStagingId>
     <distMgmtStagingName>Apache Release Distribution Repository</distMgmtStagingName>
     <distMgmtStagingUrl>https://repository.apache.org/service/local/staging/deploy/maven2</distMgmtStagingUrl>
-    <download-maven-plugin.version>1.9.0</download-maven-plugin.version>
+    <download-maven-plugin.version>2.1.0</download-maven-plugin.version>
     <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
     <enforced.maven.version>[3.6.3,)</enforced.maven.version>
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
@@ -2224,7 +2224,7 @@
           <version>${jacoco.version}</version>
         </plugin>
         <plugin>
-          <groupId>com.googlecode.maven-download-plugin</groupId>
+          <groupId>io.github.download-maven-plugin</groupId>
           <artifactId>download-maven-plugin</artifactId>
           <version>${download-maven-plugin.version}</version>
         </plugin>
@@ -2678,9 +2678,8 @@
             </executions>
           </plugin>
           <plugin>
-            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <groupId>io.github.download-maven-plugin</groupId>
             <artifactId>download-maven-plugin</artifactId>
-            <version>${download-maven-plugin.version}</version>
             <inherited>false</inherited>
             <executions>
               <execution>
@@ -3061,9 +3060,8 @@
       <build>
         <plugins>
           <plugin>
-            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <groupId>io.github.download-maven-plugin</groupId>
             <artifactId>download-maven-plugin</artifactId>
-            <version>${download-maven-plugin.version}</version>
             <inherited>false</inherited>
             <executions>
               <execution>

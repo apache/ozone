@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.cli.datanode;
+package org.apache.hadoop.hdds.scm.cli;
 
 import static org.apache.hadoop.hdds.DatanodeVersion.DEFAULT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
