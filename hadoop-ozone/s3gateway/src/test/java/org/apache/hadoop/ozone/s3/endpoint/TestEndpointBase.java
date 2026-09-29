@@ -36,7 +36,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -304,12 +303,11 @@ public class TestEndpointBase {
     when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
         .thenReturn("eventual");
 
-    WebApplicationException e = assertThrows(WebApplicationException.class,
+    OS3Exception e = assertThrows(OS3Exception.class,
         () -> EndpointBuilder.newRootEndpointBuilder()
             .setHeaders(headers)
             .build());
-    assertThat(e.getResponse().getStatus()).isEqualTo(400);
-    assertThat(e.getResponse().getEntity().toString()).contains("InvalidArgument");
+    assertThat(e.getCode()).isEqualTo("InvalidArgument");
   }
 
   @Test
@@ -320,12 +318,11 @@ public class TestEndpointBase {
     when(headers.getHeaderString(LOCAL_LEASE_LOG_LIMIT_HEADER))
         .thenReturn("10");
 
-    WebApplicationException e = assertThrows(WebApplicationException.class,
+    OS3Exception e = assertThrows(OS3Exception.class,
         () -> EndpointBuilder.newRootEndpointBuilder()
             .setHeaders(headers)
             .build());
-    assertThat(e.getResponse().getStatus()).isEqualTo(400);
-    assertThat(e.getResponse().getEntity().toString()).contains("InvalidArgument");
+    assertThat(e.getCode()).isEqualTo("InvalidArgument");
   }
 
   @Test
@@ -336,12 +333,11 @@ public class TestEndpointBase {
     when(headers.getHeaderString(LOCAL_LEASE_LOG_LIMIT_HEADER))
         .thenReturn("abc");
 
-    WebApplicationException e = assertThrows(WebApplicationException.class,
+    OS3Exception e = assertThrows(OS3Exception.class,
         () -> EndpointBuilder.newRootEndpointBuilder()
             .setHeaders(headers)
             .build());
-    assertThat(e.getResponse().getStatus()).isEqualTo(400);
-    assertThat(e.getResponse().getEntity().toString()).contains("InvalidArgument");
+    assertThat(e.getCode()).isEqualTo("InvalidArgument");
   }
 
   private static Stream<String> reservedInternalMetadataKeyPrefixCases() {
