@@ -103,23 +103,25 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     }
   }
 
-  private void verifyBucketOwner(S3RequestContext context, String bucketName) throws OS3Exception {
+  private OzoneBucket verifyBucketOwner(S3RequestContext context, String bucketName) throws OS3Exception {
     HttpHeaders httpHeaders = getHeaders();
     if (httpHeaders == null) {
-      return;
+      return null;
     }
     String expectedBucketOwner = httpHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER);
     if (expectedBucketOwner == null || expectedBucketOwner.isEmpty()) {
-      return;
+      return null;
     }
 
     try {
-      String actualOwner = context.getVolume().getBucket(bucketName).getOwner();
+      OzoneBucket bucket = context.getVolume().getBucket(bucketName);
+      String actualOwner = bucket.getOwner();
       if (actualOwner != null && !actualOwner.equals(expectedBucketOwner)) {
         LOG.debug("Bucket: {}, ExpectedBucketOwner: {}, ActualBucketOwner: {}",
             bucketName, expectedBucketOwner, actualOwner);
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
       }
+      return bucket;
     } catch (Exception ex) {
       LOG.error("Owner verification failed for bucket: {}", bucketName, ex);
       throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
@@ -128,9 +130,11 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
 
   public Response putBucketLifecycleConfiguration(S3RequestContext context, String bucketName, InputStream body)
       throws IOException, OS3Exception {
-    verifyBucketOwner(context, bucketName);
+    OzoneBucket ozoneBucket = verifyBucketOwner(context, bucketName);
     S3LifecycleConfiguration s3LifecycleConfiguration;
-    OzoneBucket ozoneBucket = context.getVolume().getBucket(bucketName);
+    if (ozoneBucket == null) {
+      ozoneBucket = context.getVolume().getBucket(bucketName);
+    }
     OmLifecycleConfiguration lcc;
     try {
       s3LifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(body);
