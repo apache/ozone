@@ -182,11 +182,12 @@ public final class HttpServer2 implements FilterContainer {
    * behavior; a decoded backslash or control byte is opaque key/path data in
    * Ozone (which uses only "/" as a separator), so it does not open path
    * traversal. Rather than Jetty's broad LEGACY mode -- which would also
-   * re-admit %2e/%2e%2e path traversal, UTF-16 and truncated UTF-8 encodings and
-   * userinfo on the internet-facing S3 Gateway and HttpFS -- relax only those
-   * violations the use case needs. Genuinely illegal (unencoded) URI characters
-   * such as "[" and "]" remain rejected, since conforming clients percent-encode
-   * them.
+   * re-admit UTF-16 and truncated UTF-8 encodings and userinfo on the
+   * internet-facing S3 Gateway and HttpFS -- relax only those violations the use
+   * case needs. Encoded "." and ".." segments are relaxed separately, for the S3
+   * Gateway only; see {@link #OZONE_S3_URI_COMPLIANCE}. Genuinely illegal
+   * (unencoded) URI characters such as "[" and "]" remain rejected, since
+   * conforming clients percent-encode them.
    */
   private static final UriCompliance OZONE_AMBIGUOUS_URI_COMPLIANCE =
       UriCompliance.DEFAULT.with("OZONE",
@@ -194,6 +195,24 @@ public final class HttpServer2 implements FilterContainer {
           UriCompliance.Violation.AMBIGUOUS_PATH_ENCODING,
           UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR,
           UriCompliance.Violation.SUSPICIOUS_PATH_CHARACTERS);
+
+  /**
+   * URI compliance mode used when {@code allowEncodedDotSegments} is set, which
+   * relaxes {@link #OZONE_AMBIGUOUS_URI_COMPLIANCE} by one further violation.
+   * An S3 object key may contain "." or ".." segments, which clients
+   * percent-encode as "%2e"/"%2e%2e" so that they are not resolved away in
+   * transit. Jetty 9.4 (pre-migration) passed those through; Jetty 12 rejects
+   * them with 400. Jersey resolves the endpoint's key parameter from the raw
+   * request URI rather than from the canonicalized servlet path, so the segments
+   * survive dispatch and the key reaches the S3 endpoint verbatim. Jetty's
+   * single AMBIGUOUS_PATH_SEGMENT violation covers "%2e" and "%2e%2e" alike, so
+   * this mode is scoped to the S3 Gateway, where the key is opaque data; HttpFS
+   * keeps the narrower mode above, since WebHDFS resolves its paths against a
+   * file system hierarchy.
+   */
+  private static final UriCompliance OZONE_S3_URI_COMPLIANCE =
+      OZONE_AMBIGUOUS_URI_COMPLIANCE.with("OZONE_S3",
+          UriCompliance.Violation.AMBIGUOUS_PATH_SEGMENT);
 
   public static final String FILTER_INITIALIZER_PROPERTY
       = "ozone.http.filter.initializers";
@@ -279,6 +298,7 @@ public final class HttpServer2 implements FilterContainer {
     private XFrameOption xFrameOption = XFrameOption.SAMEORIGIN;
     private boolean skipDefaultApps;
     private boolean allowAmbiguousUri;
+    private boolean allowEncodedDotSegments;
 
     public Builder setName(String serverName) {
       this.name = serverName;
@@ -497,6 +517,17 @@ public final class HttpServer2 implements FilterContainer {
       return this;
     }
 
+    /**
+     * Allow percent-encoded "." and ".." path segments on the connector, in
+     * addition to {@link #allowAmbiguousUri(boolean)}. Jetty 9.4 accepted
+     * these; Jetty 12 rejects them with 400 by default. The S3 Gateway needs
+     * this because an object key can contain such segments.
+     */
+    public Builder allowEncodedDotSegments(boolean value) {
+      this.allowEncodedDotSegments = value;
+      return this;
+    }
+
     public HttpServer2 build() throws IOException {
       Objects.requireNonNull(name, "name is not set");
       Preconditions.checkState(!endpoints.isEmpty(), "No endpoints specified");
@@ -537,7 +568,9 @@ public final class HttpServer2 implements FilterContainer {
       httpConfig.setRequestHeaderSize(requestHeaderSize);
       httpConfig.setResponseHeaderSize(responseHeaderSize);
       httpConfig.setSendServerVersion(false);
-      if (allowAmbiguousUri) {
+      if (allowEncodedDotSegments) {
+        httpConfig.setUriCompliance(OZONE_S3_URI_COMPLIANCE);
+      } else if (allowAmbiguousUri) {
         httpConfig.setUriCompliance(OZONE_AMBIGUOUS_URI_COMPLIANCE);
       }
 

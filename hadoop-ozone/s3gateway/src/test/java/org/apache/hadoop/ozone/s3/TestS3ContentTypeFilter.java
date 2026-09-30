@@ -32,7 +32,8 @@ import org.junit.jupiter.api.Test;
  * <p>The filter preserves the Content-Type verbatim and resets the tracked
  * response encoding for bare values, so Jetty 12 does not append a charset to a
  * value that carries none. A value that already has a charset is left untouched
- * (both the value and the encoding).
+ * (both the value and the encoding). "Carries a charset" means an actual charset
+ * parameter, not the string {@code charset=} appearing anywhere in the value.
  */
 public class TestS3ContentTypeFilter {
 
@@ -81,6 +82,32 @@ public class TestS3ContentTypeFilter {
     wrap(delegate).setHeader("Content-Type", "application/xml; charset=ISO-8859-1");
     verify(delegate, never()).setCharacterEncoding(null);
     verify(delegate).setHeader("Content-Type", "application/xml; charset=ISO-8859-1");
+  }
+
+  @Test
+  public void resetsEncodingWhenCharsetOnlyAppearsInAQuotedParameterValue() throws Exception {
+    HttpServletResponse delegate = mock(HttpServletResponse.class);
+    String contentType = "application/octet-stream; name=\"charset=example\"";
+    wrap(delegate).setHeader("Content-Type", contentType);
+    verify(delegate).setCharacterEncoding(null);
+    verify(delegate).setHeader("Content-Type", contentType);
+  }
+
+  @Test
+  public void resetsEncodingForParameterNameMerelyEndingInCharset() throws Exception {
+    HttpServletResponse delegate = mock(HttpServletResponse.class);
+    wrap(delegate).setHeader("Content-Type", "text/plain; x-charset=foo");
+    verify(delegate).setCharacterEncoding(null);
+    verify(delegate).setHeader("Content-Type", "text/plain; x-charset=foo");
+  }
+
+  @Test
+  public void preservesRealCharsetFollowingAQuotedParameterValue() throws Exception {
+    HttpServletResponse delegate = mock(HttpServletResponse.class);
+    String contentType = "application/octet-stream; name=\"a;charset=b\"; charset=iso-8859-1";
+    wrap(delegate).setHeader("Content-Type", contentType);
+    verify(delegate, never()).setCharacterEncoding(null);
+    verify(delegate).setHeader("Content-Type", contentType);
   }
 
   @Test

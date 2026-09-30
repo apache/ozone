@@ -55,7 +55,7 @@ class TestS3GatewayHttpServers {
   void enabledServerInstallsCdiIntegrationAttribute() throws Exception {
     OzoneConfiguration conf = newConf();
     conf.set(S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY,
-        "127.0.0.1:" + PortAllocator.getFreePort());
+        PortAllocator.localhostWithFreePort());
 
     ExposedS3GatewayHttpServer server = new ExposedS3GatewayHttpServer(conf);
 

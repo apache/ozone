@@ -144,6 +144,24 @@ public class TestHttpServer2 {
   }
 
   /**
+   * The S3 Gateway additionally needs percent-encoded "." and ".." segments,
+   * which an object key may contain. Its mode is the relaxed mode plus
+   * AMBIGUOUS_PATH_SEGMENT; the HttpFS mode above stays without it.
+   */
+  @Test
+  public void testUriComplianceAllowsEncodedDotSegmentsForS3()
+      throws Exception {
+    HttpServer2 srv = buildServer(true, true);
+    assertEquals(EnumSet.of(
+        UriCompliance.Violation.AMBIGUOUS_EMPTY_SEGMENT,
+        UriCompliance.Violation.AMBIGUOUS_PATH_ENCODING,
+        UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR,
+        UriCompliance.Violation.SUSPICIOUS_PATH_CHARACTERS,
+        UriCompliance.Violation.AMBIGUOUS_PATH_SEGMENT),
+        uriComplianceOf(srv).getAllowed());
+  }
+
+  /**
    * The relaxed compliance mode is enforced at the wire level on a running
    * server: with allowAmbiguousUri the S3/WebHDFS use case (empty segments,
    * percent encodings and the suspicious path characters -- an encoded backslash
@@ -202,6 +220,36 @@ public class TestHttpServer2 {
       String base = "http://localhost:" + server.getConnectorAddress(0).getPort();
       assertEquals(HttpURLConnection.HTTP_BAD_REQUEST,
           statusOf(base + "/echo/a//b%25c"));
+    } finally {
+      server.stop();
+    }
+  }
+
+  /**
+   * With allowEncodedDotSegments -- the S3 Gateway mode -- the encoded "." and
+   * ".." segments an object key may contain reach the servlet instead of being
+   * rejected with a 400, as Jetty 9.4 (pre-migration) accepted them. The %u
+   * UTF-16 encodings that Jetty's LEGACY mode would re-admit stay rejected.
+   */
+  @Test
+  public void testEncodedDotSegmentsAdmittedWhenAllowed() throws Exception {
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .allowAmbiguousUri(true)
+        .allowEncodedDotSegments(true)
+        .build();
+    server.addServlet("echo", "/echo/*", OkServlet.class);
+    server.start();
+    try {
+      String base = "http://localhost:" + server.getConnectorAddress(0).getPort();
+      assertEquals(HttpURLConnection.HTTP_OK,
+          statusOf(base + "/echo/dir/%2e/file.txt"));
+      assertEquals(HttpURLConnection.HTTP_OK,
+          statusOf(base + "/echo/dir/%2e%2e/file.txt"));
+      assertEquals(HttpURLConnection.HTTP_BAD_REQUEST,
+          statusOf(base + "/echo/%u002e"));
     } finally {
       server.stop();
     }
@@ -350,11 +398,17 @@ public class TestHttpServer2 {
 
   private static HttpServer2 buildServer(boolean allowAmbiguousUri)
       throws Exception {
+    return buildServer(allowAmbiguousUri, false);
+  }
+
+  private static HttpServer2 buildServer(boolean allowAmbiguousUri,
+      boolean allowEncodedDotSegments) throws Exception {
     return new HttpServer2.Builder()
         .setConf(new OzoneConfiguration())
         .setName("test")
         .addEndpoint(URI.create("http://example.com/"))
         .allowAmbiguousUri(allowAmbiguousUri)
+        .allowEncodedDotSegments(allowEncodedDotSegments)
         .build();
   }
 

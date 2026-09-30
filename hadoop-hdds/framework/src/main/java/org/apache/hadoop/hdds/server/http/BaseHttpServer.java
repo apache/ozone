@@ -141,6 +141,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
       }
 
       builder.allowAmbiguousUri(shouldAllowAmbiguousUri());
+      builder.allowEncodedDotSegments(shouldAllowEncodedDotSegments());
 
       httpServer = builder.build();
 
@@ -534,6 +535,16 @@ public abstract class BaseHttpServer implements AutoCloseable {
    * that Jetty 12 rejects with 400 by default.
    */
   protected boolean shouldAllowAmbiguousUri() {
+    return false;
+  }
+
+  /**
+   * Override to accept percent-encoded "." and ".." path segments, in addition
+   * to {@link #shouldAllowAmbiguousUri()}. Needed by the S3 Gateway, whose
+   * object keys can contain such segments that Jetty 12 rejects with 400 by
+   * default.
+   */
+  protected boolean shouldAllowEncodedDotSegments() {
     return false;
   }
 

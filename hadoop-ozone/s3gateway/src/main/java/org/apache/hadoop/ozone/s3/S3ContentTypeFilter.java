@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.s3;
 
 import java.io.IOException;
-import java.util.Locale;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -27,6 +26,7 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpServletResponseWrapper;
+import org.eclipse.jetty.http.MimeTypes;
 
 /**
  * Preserve the S3 Content-Type verbatim, without an auto-appended charset.
@@ -53,6 +53,15 @@ import javax.servlet.http.HttpServletResponseWrapper;
  * Content-Type that already carries an explicit {@code charset} is written
  * unchanged. In all cases the value itself is passed through verbatim, so the
  * media type and any explicit charset are preserved.
+ *
+ * <p>Whether a value carries a charset is decided with Jetty's own
+ * {@link MimeTypes#getCharsetFromContentType(String)}, which parses the media
+ * type parameters rather than searching the raw string. A stored object's
+ * Content-Type is arbitrary client data, and a substring search would misread
+ * {@code charset=} inside another parameter's quoted value -- as in
+ * {@code application/octet-stream; name="charset=example"} -- or a parameter
+ * merely ending in it, such as {@code x-charset}. Using the parser Jetty itself
+ * consults keeps this decision aligned with the append it exists to suppress.
  */
 public class S3ContentTypeFilter implements Filter {
 
@@ -79,7 +88,7 @@ public class S3ContentTypeFilter implements Filter {
 
   private static boolean hasCharset(String contentType) {
     return contentType != null
-        && contentType.toLowerCase(Locale.ROOT).contains("charset=");
+        && MimeTypes.getCharsetFromContentType(contentType) != null;
   }
 
   private static final class VerbatimContentTypeResponse extends HttpServletResponseWrapper {
