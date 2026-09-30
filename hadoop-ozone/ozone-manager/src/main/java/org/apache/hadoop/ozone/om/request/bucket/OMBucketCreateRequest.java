@@ -445,11 +445,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
       BucketInfo bucketInfo = req.getCreateBucketRequest().getBucketInfo();
       if (bucketInfo.hasStoragePolicy()
           || bucketInfo.hasAllowFallbackStoragePolicy()) {
-        throw new OMException("Cluster does not have the bucket storage policy"
-            + " support feature finalized yet, but the request contains storage"
-            + " policy arguments. Rejecting the request, please finalize the"
-            + " cluster upgrade and then try again.",
-            ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+        return stripStoragePolicyFromRequest(req);
       }
     }
     return req;
@@ -519,6 +515,19 @@ public class OMBucketCreateRequest extends OMClientRequest {
         originalRequest.getCreateBucketRequest();
     BucketInfo newBucketInfo = createBucketRequest.getBucketInfo().toBuilder()
         .setBucketLayout(newLayout.toProto()).build();
+    CreateBucketRequest newCreateRequest = createBucketRequest.toBuilder()
+        .setBucketInfo(newBucketInfo).build();
+    return originalRequest.toBuilder()
+        .setCreateBucketRequest(newCreateRequest).build();
+  }
+
+  private static OMRequest stripStoragePolicyFromRequest(OMRequest originalRequest) {
+    CreateBucketRequest createBucketRequest =
+        originalRequest.getCreateBucketRequest();
+    BucketInfo newBucketInfo = createBucketRequest.getBucketInfo().toBuilder()
+        .clearStoragePolicy()
+        .clearAllowFallbackStoragePolicy()
+        .build();
     CreateBucketRequest newCreateRequest = createBucketRequest.toBuilder()
         .setBucketInfo(newBucketInfo).build();
     return originalRequest.toBuilder()

@@ -44,12 +44,20 @@ import org.junit.jupiter.api.function.Executable;
  * Upgrade testing for the bucket storage policy feature.
  * <p>
  * Expected behavior:
- * 1. Pre-Finalize: OM rejects CreateBucket and SetBucketProperty requests that
- *    carry storagePolicy, allowFallbackStoragePolicy or unsetStoragePolicy.
- *    Requests that carry none of them, such as those sent by an older client,
- *    are unaffected.
+ * 1. Pre-Finalize:
+ *    - CreateBucket requests that carry a storagePolicy and/or
+ *      allowFallbackStoragePolicy field succeed, but those fields are
+ *      silently stripped from the request before it is applied, so the
+ *      created bucket ends up with no storage policy, as if the fields had
+ *      never been sent.
+ *    - SetBucketProperty requests that carry storagePolicy,
+ *      allowFallbackStoragePolicy or unsetStoragePolicy are rejected.
+ *    - Requests that carry none of these fields, such as those sent by an
+ *      older client, are unaffected either way.
  * <p>
- * 2. Post-Finalize: the same requests succeed and the policy is persisted.
+ * 2. Post-Finalize: CreateBucket honors the requested storage policy fields
+ *    and SetBucketProperty requests carrying them succeed; in both cases the
+ *    policy is persisted.
  * <p>
  * The cluster starts at the layout version immediately below
  * {@link OMLayoutFeature#BUCKET_STORAGE_POLICY_SUPPORT} so that only this
@@ -108,8 +116,11 @@ public class TestOMStoragePolicyUpgrade {
         .getMetadataLayoutVersion())
         .isEqualTo(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT.layoutVersion());
 
-    // CreateBucket carrying BucketInfo storage policy field.
-    assertRejected(() -> createBucket(OzoneStoragePolicy.COLD, null));
+    // CreateBucket carrying BucketInfo storage policy field: the request
+    // succeeds, but the storage policy field is silently stripped.
+    String strippedPolicyBucket = createBucket(OzoneStoragePolicy.COLD, null);
+    assertThat(omClient.getBucketInfo(VOLUME_NAME, strippedPolicyBucket)
+        .getStoragePolicy()).isNull();
 
     // SetBucketProperty carrying any of the three BucketArgs fields.
     assertRejected(() -> setStoragePolicy(OzoneStoragePolicy.HOT, true, null));

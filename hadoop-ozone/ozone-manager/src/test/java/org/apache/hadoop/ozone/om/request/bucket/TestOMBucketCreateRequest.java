@@ -419,19 +419,21 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
   }
 
   @Test
-  public void testDisallowCreateBucketWithStoragePolicyBeforeFinalization() {
+  public void testStripStoragePolicyBeforeFinalization() throws Exception {
     OMRequest request = newCreateBucketRequest(
         newBucketInfoBuilder(UUID.randomUUID().toString(),
             UUID.randomUUID().toString())
             .setStoragePolicy(StoragePolicyProto.HOT)
             .setAllowFallbackStoragePolicy(true)).build();
 
-    OMException ex = assertThrows(OMException.class, () ->
-        OMBucketCreateRequest.disallowCreateBucketWithStoragePolicy(
-            request, preFinalizedContext()));
+    OMRequest result = OMBucketCreateRequest.disallowCreateBucketWithStoragePolicy(
+        request, preFinalizedContext());
 
-    assertThat(ex.getResult()).isEqualTo(
-        OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+    assertThat(result).isNotEqualTo(request);
+    assertThat(result.getCreateBucketRequest().getBucketInfo()
+        .hasStoragePolicy()).isFalse();
+    assertThat(result.getCreateBucketRequest().getBucketInfo()
+        .hasAllowFallbackStoragePolicy()).isFalse();
   }
 
   /**
