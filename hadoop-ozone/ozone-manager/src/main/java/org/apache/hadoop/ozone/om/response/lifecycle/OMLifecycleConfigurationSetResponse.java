@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.lifecycle;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;

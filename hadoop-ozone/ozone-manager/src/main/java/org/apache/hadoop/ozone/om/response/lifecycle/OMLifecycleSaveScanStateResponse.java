@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.lifecycle;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 
 import java.io.IOException;

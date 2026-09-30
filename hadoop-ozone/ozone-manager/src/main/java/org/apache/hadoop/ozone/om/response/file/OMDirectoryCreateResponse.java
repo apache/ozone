@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.file;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;

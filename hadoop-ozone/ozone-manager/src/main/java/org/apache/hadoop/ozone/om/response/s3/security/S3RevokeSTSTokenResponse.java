@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.s3.security;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 
 import jakarta.annotation.Nonnull;

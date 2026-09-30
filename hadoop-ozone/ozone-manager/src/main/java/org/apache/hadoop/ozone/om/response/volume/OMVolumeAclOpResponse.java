@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.volume;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
-
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;

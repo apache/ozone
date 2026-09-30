@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.bucket;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
-
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;

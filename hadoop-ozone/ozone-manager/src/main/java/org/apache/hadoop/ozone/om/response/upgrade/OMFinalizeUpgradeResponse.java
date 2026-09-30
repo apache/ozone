@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.response.upgrade;
 
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;

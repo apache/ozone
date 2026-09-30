@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.s3.security;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
-
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
