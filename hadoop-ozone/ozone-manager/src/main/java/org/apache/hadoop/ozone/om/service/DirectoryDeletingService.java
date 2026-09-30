@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -337,7 +337,8 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
     // Bucket grouping can submit recursive requests before some of the initial requests.
-    Set<PurgePathRequest> initialRequests = new HashSet<>(purgePathRequestList);
+    Set<PurgePathRequest> initialRequests = Collections.newSetFromMap(new IdentityHashMap<>());
+    initialRequests.addAll(purgePathRequestList);
     int subDirRecursiveCnt = 0;
     while (subDirRecursiveCnt < allSubDirList.size() && remainNum.get() > 0) {
       try {
