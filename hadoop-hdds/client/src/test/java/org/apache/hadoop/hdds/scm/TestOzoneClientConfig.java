@@ -93,6 +93,19 @@ class TestOzoneClientConfig {
   }
 
   @Test
+  void invalidRatisStreamReadConfigResetsToDefault() {
+    OzoneClientConfig defaults = new OzoneConfiguration().getObject(OzoneClientConfig.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setLong("ozone.client.ratis.stream.read.window-size", -1);
+    conf.setInt("ozone.client.ratis.stream.read.connections", 0);
+
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+
+    assertEquals(defaults.getRatisStreamReadWindowSize(), subject.getRatisStreamReadWindowSize());
+    assertEquals(defaults.getRatisStreamReadConnections(), subject.getRatisStreamReadConnections());
+  }
+
+  @Test
   void testDatastreamPutBlockOnCloseEnabledDefault() {
     OzoneClientConfig subject = new OzoneConfiguration()
         .getObject(OzoneClientConfig.class);

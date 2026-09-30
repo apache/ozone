@@ -158,6 +158,32 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean streamReadBlock = false;
 
+  @Config(key = "ozone.client.ratis.stream.readblock.enable",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Allow ReadBlock to use Ratis data stream read-only requests.",
+      tags = ConfigTag.CLIENT)
+  private boolean ratisStreamReadBlock = false;
+
+  @Config(key = "ozone.client.ratis.stream.read.window-size",
+      defaultValue = "8388608",
+      type = ConfigType.LONG,
+      tags = {ConfigTag.CLIENT},
+      description = "Maximum bytes a sequential read over Ratis data stream requests ahead of the reader, sent as "
+          + "two pipelined ReadBlock requests of half this size. A datanode sends the whole range of a request "
+          + "even if the reader stops or seeks, so this bounds both the bytes read in vain and the memory each "
+          + "open block stream buffers.")
+  private long ratisStreamReadWindowSize = 8L << 20;
+
+  @Config(key = "ozone.client.ratis.stream.read.connections",
+      defaultValue = "8",
+      type = ConfigType.INT,
+      tags = {ConfigTag.CLIENT},
+      description = "Connections to a datanode that the Ratis data stream reads of a pipeline take turns on. A "
+          + "datanode sends each reply whole and in order on its connection, so with few connections the reply to a "
+          + "small read waits behind the large replies of other readers.")
+  private int ratisStreamReadConnections = 8;
+
   @Config(key = "ozone.client.max.retries",
       defaultValue = "5",
       description = "Maximum number of retries by Ozone Client on "
@@ -416,6 +442,19 @@ public class OzoneClientConfig {
               "Resetting to default 32MB.",
           streamReadPreReadSize);
       streamReadPreReadSize = 32L << 20; // 32MB
+    }
+
+    if (ratisStreamReadWindowSize < 0) {
+      LOG.warn("Invalid ozone.client.ratis.stream.read.window-size = {}. " +
+              "Resetting to default 8MB.",
+          ratisStreamReadWindowSize);
+      ratisStreamReadWindowSize = 8L << 20; // 8MB
+    }
+
+    if (ratisStreamReadConnections < 1) {
+      LOG.warn("Invalid ozone.client.ratis.stream.read.connections = {}. Resetting to default 8.",
+          ratisStreamReadConnections);
+      ratisStreamReadConnections = 8;
     }
 
     // Ensure response data size is positive.
@@ -682,12 +721,32 @@ public class OzoneClientConfig {
     this.streamReadBlock = streamReadBlock;
   }
 
+  public boolean isRatisStreamReadBlock() {
+    return ratisStreamReadBlock;
+  }
+
+  public void setRatisStreamReadBlock(boolean ratisStreamReadBlock) {
+    this.ratisStreamReadBlock = ratisStreamReadBlock;
+  }
+
   public long getStreamReadPreReadSize() {
     return streamReadPreReadSize;
   }
 
   public int getStreamReadResponseDataSize() {
     return streamReadResponseDataSize;
+  }
+
+  public long getRatisStreamReadWindowSize() {
+    return ratisStreamReadWindowSize;
+  }
+
+  public int getRatisStreamReadConnections() {
+    return ratisStreamReadConnections;
+  }
+
+  public void setRatisStreamReadConnections(int ratisStreamReadConnections) {
+    this.ratisStreamReadConnections = ratisStreamReadConnections;
   }
 
   public Duration getStreamReadTimeout() {
@@ -700,6 +759,10 @@ public class OzoneClientConfig {
 
   public void setStreamReadResponseDataSize(int streamReadResponseDataSize) {
     this.streamReadResponseDataSize = streamReadResponseDataSize;
+  }
+
+  public void setRatisStreamReadWindowSize(long ratisStreamReadWindowSize) {
+    this.ratisStreamReadWindowSize = ratisStreamReadWindowSize;
   }
 
   public void setStreamReadTimeout(Duration streamReadTimeout) {

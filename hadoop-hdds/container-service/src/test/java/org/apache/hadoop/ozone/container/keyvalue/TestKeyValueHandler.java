@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.assertTreesSortedAndMatch;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
@@ -45,6 +46,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doAnswer;
@@ -71,7 +73,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
@@ -108,6 +109,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockObserver;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -128,11 +131,12 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -1105,11 +1109,12 @@ public class TestKeyValueHandler {
 
       final AtomicInteger responseCount = new AtomicInteger(0);
 
-      StreamObserver<ContainerCommandResponseProto> streamObserver =
-          new StreamObserver<ContainerCommandResponseProto>() {
+      ReadBlockObserver streamObserver =
+          new ReadBlockObserver() {
             @Override
-            public void onNext(ContainerCommandResponseProto response) {
-              assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+            public void onNext(ReadBlockResponse response) {
+              assertEquals(ContainerProtos.Result.SUCCESS,
+                  response.getResponse().getResult());
               responseCount.incrementAndGet();
             }
 
@@ -1125,7 +1130,7 @@ public class TestKeyValueHandler {
 
       blockFile = new RandomAccessFileChannel();
       ContainerCommandResponseProto response = kvHandler.readBlock(
-          readBlockRequest, container, blockFile, streamObserver, false);
+          readBlockRequest, container, blockFile, streamObserver);
 
       assertNull(response, "ReadBlock should return null on success");
       assertTrue(responseCount.get() > 0, "Should receive at least one response");
@@ -1210,6 +1215,23 @@ public class TestKeyValueHandler {
     }
   }
 
+  @Test
+  void testReadBlockResponseSizeLimit() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      assertResponses(fixture.read(0, BLOCK_SIZE, 0), 0, BLOCK_SIZE);
+      for (int responseSize : new int[] {OZONE_SCM_CHUNK_MAX_SIZE + 1, Integer.MAX_VALUE}) {
+        ReadBlockResult result = fixture.read(0, BLOCK_SIZE, responseSize);
+        assertNull(result.getResponse());
+        assertThat(result.getDataResponses()).isEmpty();
+        assertEquals(1, result.getErrors().size());
+        StatusRuntimeException error = assertInstanceOf(StatusRuntimeException.class, result.getErrors().get(0));
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode());
+        assertFalse(fixture.blockFile.isOpen());
+      }
+    }
+  }
+
   /** Each byte of the block is the low byte of its position. */
   private static byte[] writtenBytes(long offset, int length) {
     final byte[] bytes = new byte[length];
@@ -1220,7 +1242,7 @@ public class TestKeyValueHandler {
   }
 
   /** Asserts a successful read of {@code totalLength} contiguous bytes from {@code firstOffset}. */
-  private static void assertResponses(ReadBlockResult result, long firstOffset, long totalLength) {
+  private static void assertResponses(ReadBlockResult result, long firstOffset, long totalLength) throws Exception {
     assertNull(result.getResponse());
     assertThat(result.getErrors()).isEmpty();
     long offset = firstOffset;
@@ -1229,6 +1251,8 @@ public class TestKeyValueHandler {
       assertEquals(offset, response.getReadBlock().getOffset());
       final ByteString data = response.getReadBlock().getData();
       assertArrayEquals(writtenBytes(offset, data.size()), data.toByteArray());
+      Checksum.validateChecksums(data.asReadOnlyByteBuffer(), offset, 0,
+          response.getReadBlock().getChunkInfoListList());
       offset += data.size();
     }
     assertEquals(totalLength, offset - firstOffset, "total bytes delivered");
@@ -1299,7 +1323,7 @@ public class TestKeyValueHandler {
               .build())
           .build();
       ReadBlockResult result = new ReadBlockResult(blockID);
-      result.setResponse(kvHandler.readBlock(request, container, blockFile, result, false));
+      result.setResponse(kvHandler.readBlock(request, container, blockFile, result));
       return result;
     }
 
@@ -1326,7 +1350,7 @@ public class TestKeyValueHandler {
    * Collects everything a single readBlock call produced: the streamed data responses, the errors and the response
    * proto returned by the handler.
    */
-  private static final class ReadBlockResult implements StreamObserver<ContainerCommandResponseProto> {
+  private static final class ReadBlockResult implements ReadBlockObserver {
     private final BlockID blockID;
     private final List<ContainerCommandResponseProto> dataResponses = new ArrayList<>();
     private final List<Throwable> errors = new ArrayList<>();
@@ -1336,9 +1360,14 @@ public class TestKeyValueHandler {
       this.blockID = blockID;
     }
 
+    /** Keeps each response with its data inside, as GrpcXceiverService sends it. */
     @Override
-    public void onNext(ContainerCommandResponseProto dataResponse) {
-      dataResponses.add(dataResponse);
+    public void onNext(ReadBlockResponse dataResponse) {
+      final ContainerCommandResponseProto proto = dataResponse.getResponse();
+      dataResponses.add(dataResponse.getData() == null ? proto : proto.toBuilder()
+          .setReadBlock(proto.getReadBlock().toBuilder()
+              .setData(ByteString.copyFrom(dataResponse.getData().duplicate())))
+          .build());
     }
 
     @Override
@@ -1425,7 +1454,7 @@ public class TestKeyValueHandler {
       }
 
       byte[] rawData = new byte[totalLen];
-      ThreadLocalRandom.current().nextBytes(rawData);
+      new java.util.Random(16258).nextBytes(rawData);
       writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2, 2, 2, 2);
     } finally {
@@ -1453,7 +1482,7 @@ public class TestKeyValueHandler {
       }
 
       byte[] rawData = new byte[totalLen];
-      ThreadLocalRandom.current().nextBytes(rawData);
+      new java.util.Random(16258).nextBytes(rawData);
       writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2048, 2048, 1044, 3072);
     } finally {
@@ -1462,8 +1491,12 @@ public class TestKeyValueHandler {
     }
   }
 
-  @Test
-  public void testReadBlockMultipleResponse() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testReadBlockMultipleResponse(boolean validateChecksums) throws Exception {
+    DatanodeConfiguration datanodeConfig = conf.getObject(DatanodeConfiguration.class);
+    datanodeConfig.setChunkDataValidationCheck(validateChecksums);
+    conf.setFromObject(datanodeConfig);
     int[] chunkLens = {(1 << 20) + 10, 20, 4096};
     Path testDir = Files.createTempDirectory("testReadBlock");
     try {
@@ -1481,7 +1514,7 @@ public class TestKeyValueHandler {
       }
 
       byte[] rawData = new byte[totalLen];
-      ThreadLocalRandom.current().nextBytes(rawData);
+      new java.util.Random(16258).nextBytes(rawData);
       writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
       readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 20, (1 << 20) + 20, 0, (1 << 20) + 30 + 1024);
     } finally {
@@ -1538,7 +1571,8 @@ public class TestKeyValueHandler {
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
   private void readBlockAndVerify(HandlerWithVolumeSet handlerWithVolume, KeyValueContainer container,
-      BlockID blockID, byte[] rawData, long readOffset, long length, long readBackOffset, long readBackLength) {
+      BlockID blockID, byte[] rawData, long readOffset, long length, long readBackOffset, long readBackLength)
+      throws Exception {
     ContainerCommandRequestProto readBlockRequest =
         ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.ReadBlock)
@@ -1551,17 +1585,16 @@ public class TestKeyValueHandler {
                 .build())
             .build();
 
-    @SuppressWarnings("unchecked")
-    StreamObserver<ContainerCommandResponseProto> streamObserver = mock(StreamObserver.class);
-    List<ContainerCommandResponseProto> capturedResponses = new java.util.ArrayList<>();
+    ReadBlockObserver streamObserver = mock(ReadBlockObserver.class, CALLS_REAL_METHODS);
+    List<ReadBlockResponse> capturedResponses = new java.util.ArrayList<>();
     doAnswer(invocation -> {
       capturedResponses.add(invocation.getArgument(0));
       return null;
-    }).when(streamObserver).onNext(any(ContainerCommandResponseProto.class));
+    }).when(streamObserver).onNext(any(ReadBlockResponse.class));
 
     try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
       ContainerCommandResponseProto response = handlerWithVolume.getHandler().readBlock(
-          readBlockRequest, container, blockFile, streamObserver, true);
+          readBlockRequest, container, blockFile, streamObserver);
 
       assertNull(response, "ReadBlock should return null on success");
     }
@@ -1570,16 +1603,26 @@ public class TestKeyValueHandler {
     verify(streamObserver, atLeastOnce()).onNext(any());
 
     int returnedDataLen = 0;
-    for (ContainerCommandResponseProto resp : capturedResponses) {
-      returnedDataLen += resp.getReadBlock().getData().size();
+    for (ReadBlockResponse resp : capturedResponses) {
+      returnedDataLen += resp.getData().remaining();
     }
+    List<ContainerProtos.ChunkInfo> storedChunks = handlerWithVolume.getHandler().getBlockManager()
+        .getBlock(container, blockID).getChunks();
     ByteBuffer allData = ByteBuffer.allocate(returnedDataLen);
-    long firstResponseOffset = capturedResponses.get(0).getReadBlock().getOffset();
+    long firstResponseOffset = capturedResponses.get(0).getResponse().getReadBlock().getOffset();
 
-    for (ContainerCommandResponseProto resp : capturedResponses) {
-      assertEquals(ContainerProtos.Result.SUCCESS, resp.getResult());
-      assertTrue(resp.hasReadBlock());
-      allData.put(resp.getReadBlock().getData().asReadOnlyByteBuffer());
+    for (ReadBlockResponse resp : capturedResponses) {
+      assertEquals(ContainerProtos.Result.SUCCESS, resp.getResponse().getResult());
+      assertTrue(resp.getResponse().hasReadBlock());
+      final ContainerProtos.ReadBlockResponseProto readBlock = resp.getResponse().getReadBlock();
+      long responseOffset = readBlock.getOffset();
+      long responseEnd = responseOffset + resp.getData().remaining();
+      List<ContainerProtos.ChunkInfo> overlapping = storedChunks.stream()
+          .filter(chunk -> chunk.getOffset() < responseEnd && chunk.getOffset() + chunk.getLen() > responseOffset)
+          .collect(java.util.stream.Collectors.toList());
+      assertEquals(overlapping, readBlock.getChunkInfoListList());
+      Checksum.validateChecksums(resp.getData(), responseOffset, 0, readBlock.getChunkInfoListList());
+      allData.put(resp.getData().duplicate());
     }
 
     assertEquals(readBackOffset, firstResponseOffset);
@@ -1592,6 +1635,30 @@ public class TestKeyValueHandler {
     for (int i = 0; i < readBack.length; i++) {
       assertEquals(rawData[(int) firstResponseOffset + i], readBack[i],
           "Data mismatch at returned byte index " + i);
+    }
+  }
+
+  @Test
+  void testReadBlockZeroLengthAndOversizedRange() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      assertResponses(fixture.read(1, 0), 1, 0);
+      assertResponses(fixture.read(1, Long.MAX_VALUE), 0, BLOCK_SIZE);
+    }
+  }
+
+  @Test
+  void testReadBlockUnexpectedEof() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      File file = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(
+          fixture.container.getContainerData(), fixture.blockID, "unused");
+      try (java.io.RandomAccessFile truncated = new java.io.RandomAccessFile(file, "rw")) {
+        truncated.setLength(BLOCK_SIZE - 1);
+      }
+      ReadBlockResult result = fixture.read(0, BLOCK_SIZE);
+      assertEquals(ContainerProtos.Result.IO_EXCEPTION, result.getResponse().getResult());
+      assertThat(result.getDataResponses()).isEmpty();
     }
   }
 

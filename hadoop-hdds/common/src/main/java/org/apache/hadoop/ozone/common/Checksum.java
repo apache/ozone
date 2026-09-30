@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.common;
 
-import static org.apache.ratis.util.Preconditions.assertSame;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -440,55 +438,83 @@ public class Checksum {
 
   public static void validateChecksums(ByteBuffer data, long blockOffset, int startIndex,
       final List<ChunkInfo> chunks) throws OzoneChecksumException {
-
-    long firstChunkOffset = blockOffset - chunks.get(startIndex).getOffset();
-    int bytesPerChecksum = chunks.get(startIndex).getChecksumData().getBytesPerChecksum();
-    long readLength = data.remaining();
-    int dataOffset = data.position();
-
-    if (readLength <= 0) {
-      return;
-    }
-
-    assertSame(0, firstChunkOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
-    ContainerProtos.ChunkInfo firstChunk = chunks.get(startIndex);
-
-    // verify first chunk, only the first chunk is not start at zero.
-    int firstChunkIndex = (int) (firstChunkOffset / bytesPerChecksum);
-    int dataLimit = (int) Math.min(firstChunk.getLen() - firstChunkOffset, readLength);
-    Checksum.verifySingleChunk(data, dataOffset, dataLimit, firstChunk, firstChunkIndex);
-    dataOffset += dataLimit;
-    readLength -= dataLimit;
-    startIndex++;
-
-    while (readLength > 0) {
-      ContainerProtos.ChunkInfo chunkInfo = chunks.get(startIndex);
-      dataLimit = (int) Math.min(chunkInfo.getLen(), readLength);
-
-      Checksum.verifySingleChunk(data, dataOffset, dataLimit, chunkInfo, 0);
-
-      dataOffset += dataLimit;
-      readLength -= dataLimit;
-      startIndex++;
-    }
-
+    validateChecksums(Collections.singletonList(data), blockOffset, startIndex, chunks);
   }
 
-  private static void verifySingleChunk(ByteBuffer data, int dataOffset, int dataLimit,
+  /** Same as {@link #validateChecksums(ByteBuffer, long, int, List)} for the data in several buffers, in order. */
+  public static void validateChecksums(List<ByteBuffer> data, long blockOffset, int startIndex,
+      final List<ChunkInfo> chunks) throws OzoneChecksumException {
+    int remaining = 0;
+    for (ByteBuffer buffer : data) {
+      remaining += buffer.remaining();
+    }
+    if (remaining == 0) {
+      return;
+    }
+    int dataOffset = 0;
+    long offset = blockOffset;
+    while (remaining > 0) {
+      if (startIndex < 0 || startIndex >= chunks.size()) {
+        throw new OzoneChecksumException("Missing chunk metadata at offset " + offset);
+      }
+      ChunkInfo chunk = chunks.get(startIndex++);
+      long chunkOffset = chunk.getOffset();
+      long length = chunk.getLen();
+      if (chunkOffset < 0 || length <= 0 || length > Long.MAX_VALUE - chunkOffset
+          || offset < chunkOffset || offset - chunkOffset >= length
+          || (offset != blockOffset && offset != chunkOffset)) {
+        throw new OzoneChecksumException("Invalid chunk coverage at offset " + offset);
+      }
+      long relativeOffset = offset - chunkOffset;
+      int size = (int) Math.min(remaining, length - relativeOffset);
+      if (chunk.getChecksumData().getType() != ChecksumType.NONE) {
+        int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
+        if (bytesPerChecksum <= 0 || relativeOffset % bytesPerChecksum != 0
+            || (relativeOffset + size != length && (relativeOffset + size) % bytesPerChecksum != 0)
+            || relativeOffset / bytesPerChecksum > Integer.MAX_VALUE) {
+          throw new OzoneChecksumException("Invalid checksum boundary at offset " + offset);
+        }
+        verifySingleChunk(data, dataOffset, size, chunk, (int) (relativeOffset / bytesPerChecksum));
+      }
+      dataOffset += size;
+      offset += size;
+      remaining -= size;
+    }
+  }
+
+  private static void verifySingleChunk(List<ByteBuffer> data, int dataOffset, int dataLimit,
       ContainerProtos.ChunkInfo chunkInfo, int checksumIndex) throws OzoneChecksumException {
 
     ContainerProtos.ChecksumData protoChecksum = chunkInfo.getChecksumData();
-    final ByteBuffer buffer = data.duplicate();
-    buffer.position(dataOffset);
-    buffer.limit(dataOffset + dataLimit);
-
     final ChecksumData checksum = new ChecksumData(
         protoChecksum.getType(),
         protoChecksum.getBytesPerChecksum(),
         protoChecksum.getChecksumsList()
     );
 
-    Checksum.verifyChecksum(buffer, checksum, checksumIndex);
+    Checksum.verifyChecksum(slice(data, dataOffset, dataLimit), checksumIndex, checksum);
+  }
+
+  /**
+   * @return the {@code length} bytes at {@code offset} of the remaining bytes of {@code data}, without copying them,
+   *     in buffers starting at position 0
+   */
+  private static List<ByteBuffer> slice(List<ByteBuffer> data, int offset, int length) {
+    final List<ByteBuffer> slices = new ArrayList<>();
+    for (ByteBuffer buffer : data) {
+      if (length == 0) {
+        break;
+      }
+      if (offset >= buffer.remaining()) {
+        offset -= buffer.remaining();
+        continue;
+      }
+      final int n = Math.min(buffer.remaining() - offset, length);
+      slices.add(BufferUtils.slice(buffer, buffer.position() + offset, n).slice());
+      offset = 0;
+      length -= n;
+    }
+    return slices;
   }
 
   /**

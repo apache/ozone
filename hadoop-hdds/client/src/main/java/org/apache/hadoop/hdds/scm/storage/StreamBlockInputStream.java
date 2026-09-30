@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -54,7 +55,7 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.ozone.common.ChecksumData;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -142,7 +143,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!dataAvailableToRead(1, preRead)) {
       return EOF;
     }
-    final int value = readBuffer.getByteBuffer().get();
+    final int value = Byte.toUnsignedInt(readBuffer.getByteBuffer().get());
     advancePosition(1, preRead);
     return value;
   }
@@ -160,6 +161,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   synchronized int readFully(ByteBuffer targetBuf, boolean preRead) throws IOException {
     checkOpen();
+    if (!targetBuf.hasRemaining()) {
+      return 0;
+    }
     int read = 0;
     while (targetBuf.hasRemaining()) {
       if (!dataAvailableToRead(targetBuf.remaining(), preRead)) {
@@ -182,22 +186,32 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (position >= blockLength) {
       return false;
     }
+    if (!hasRemaining(readBuffer)) {
+      readBuffer = readNext(length, preRead);
+    }
+    return hasRemaining(readBuffer);
+  }
 
+  /**
+   * Reads the next data at {@link #getPos()} from the datanode, for a reader asking for {@code length} bytes;
+   * {@code preRead} allows requesting more ahead of them. The gRPC read retries on another datanode on failure.
+   *
+   * @return the data read, positioned at {@link #getPos()}, or null when there is no more data
+   */
+  synchronized ReadBuffer readNext(int length, boolean preRead) throws IOException {
     while (true) {
       try {
         initialize();
-        if (!hasRemaining(readBuffer)) {
-          readBuffer = streamingReader.read(length, preRead);
-        }
+        final ReadBuffer read = streamingReader.read(length, preRead);
         retries = 0;
-        return hasRemaining(readBuffer);
+        return read;
       } catch (IOException ex) {
         handleExceptions(ex);
       }
     }
   }
 
-  private synchronized void advancePosition(long delta, boolean preRead) {
+  synchronized void advancePosition(long delta, boolean preRead) {
     LOG.trace("{}: advance {} -> {}", getName(streamingReader), position, position + delta);
     position += delta;
     if (preRead && position >= blockLength) {
@@ -227,13 +241,23 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       return;
     }
     LOG.debug("{}: seek {} -> {}", getName(streamingReader), position, pos);
-    readBuffer = reuseReadBuffer(readBuffer, pos);
+    readBuffer = seekReader(readBuffer, pos);
     position = pos;
-    if (readBuffer == null) {
+  }
+
+  /**
+   * Prepares the reads in flight for reading from {@code pos} after a seek.
+   *
+   * @return the buffered data to keep reading from {@code pos}, or null to drop it
+   */
+  synchronized ReadBuffer seekReader(ReadBuffer buffered, long pos) {
+    final ReadBuffer reused = reuseReadBuffer(buffered, pos);
+    if (reused == null) {
       // Only rewind the request high-watermark when the buffered (already requested/served) data cannot be reused;
       // otherwise we would re-request data that is still buffered.
       requestedLength = pos;
     }
+    return reused;
   }
 
   static ReadBuffer reuseReadBuffer(ReadBuffer previous, long blockOffset) {
@@ -276,8 +300,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     releaseClient();
   }
 
-  private synchronized void closeReader(String reason) {
+  /** Drops the buffered data and closes the reads in flight. */
+  final synchronized void closeReader(String reason) {
     readBuffer = null;
+    closeReads(reason);
+  }
+
+  /** Closes the reads in flight: completes the gRPC stream of the {@link StreamingReader}. */
+  synchronized void closeReads(String reason) {
     if (streamingReader == null) {
       return;
     }
@@ -450,6 +480,30 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     return readTimeout;
   }
 
+  XceiverClientFactory getXceiverClientFactory() {
+    return xceiverClientFactory;
+  }
+
+  Pipeline getPipeline() {
+    return pipelineRef.get();
+  }
+
+  /** Reads from {@code pipeline} from now on, for example with another datanode moved to the front. */
+  void updatePipeline(Pipeline pipeline) {
+    pipelineRef.set(pipeline);
+  }
+
+  Token<OzoneBlockTokenIdentifier> getToken() {
+    return tokenRef.get();
+  }
+
+  /** Verifies the checksums of the data of a ReadBlock response when checksum verification is enabled. */
+  void validateChecksums(ReadBlockResponseProto readBlock, List<ByteBuffer> data) throws OzoneChecksumException {
+    if (verifyChecksum) {
+      Checksum.validateChecksums(data, readBlock.getOffset(), 0, readBlock.getChunkInfoListList());
+    }
+  }
+
   private Object getName(StreamingReader reader) {
     return reader != null ? reader : name;
   }
@@ -583,11 +637,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       }
       final ReadBlockResponseProto readBlock = containerCommandResponseProto.getReadBlock();
       try {
-        ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
-        if (verifyChecksum) {
-          ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
-          Checksum.verifyChecksum(data, checksumData, 0);
-        }
+        validateChecksums(readBlock, readBlock.getData().asReadOnlyByteBufferList());
         offerToQueue(readBlock);
       } catch (Exception e) {
         // Record the failure first: the log and observer calls below must not mask it.
@@ -598,7 +648,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         LOG.warn("Failed to process block {} response at offset={}, size={}: {}, {}",
             getBlockID().getContainerBlockID(),
             offset, data.size(), StringUtils.bytes2Hex(data.asReadOnlyByteBuffer(), 10),
-            readBlock.getChecksumData(), e);
+            readBlock.getChunkInfoListList(), e);
         if (r != null) {
           r.getRequestObserver().onError(e);
         }
@@ -672,10 +722,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     private void offerToQueue(ReadBlockResponseProto item) {
       if (LOG.isTraceEnabled()) {
-        final ContainerProtos.ChecksumData checksumData = item.getChecksumData();
-        LOG.trace("{}: enqueue response offset {}, length {}, numChecksums {}, bytesPerChecksum={}",
-            name, item.getOffset(), item.getData().size(),
-            checksumData.getChecksumsList().size(), checksumData.getBytesPerChecksum());
+        LOG.trace("{}: enqueue response offset {}, length {}, chunks {}",
+            name, item.getOffset(), item.getData().size(), item.getChunkInfoListCount());
       }
       final boolean offered = responseQueue.offer(item);
       Preconditions.assertTrue(offered, () -> "Failed to offer " + item);

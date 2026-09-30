@@ -398,9 +398,11 @@ message ReadBlockRequestProto {
 }
 
 message ReadBlockResponseProto {
-  required ChecksumData checksumData = 1;
+  reserved 1;
+  reserved "checksumData";
   required uint64 offset = 2;
   required bytes data = 3;
+  repeated ChunkInfo chunkInfoList = 4;
 }
 
 message EchoRequestProto {
