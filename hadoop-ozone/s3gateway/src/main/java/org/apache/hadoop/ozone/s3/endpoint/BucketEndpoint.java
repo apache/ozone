@@ -362,6 +362,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     }
     MultiDeleteResponse result = new MultiDeleteResponse();
     List<String> deleteKeys = new ArrayList<>();
+    List<String> failedDeletes = new ArrayList<>();
 
     if (request.getObjects() != null) {
       Map<String, ErrorInfo> undeletedKeyResultMap;
@@ -378,20 +379,22 @@ public class BucketEndpoint extends BucketOperationHandler {
               // if the key is not found, it is assumed to be successfully deleted
               ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
           if (deleted) {
-            deleteKeys.remove(d.getKey());
             if (!request.isQuiet()) {
               result.addDeleted(new DeletedObject(d.getKey()));
             }
           } else {
+            failedDeletes.add(d.getKey());
             result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
           }
         }
         getMetrics().updateDeleteKeySuccessStats(startNanos);
       } catch (IOException ex) {
         getMetrics().updateDeleteKeyFailureStats(startNanos);
+        // the batch delete failed as a whole, so no key is reported as deleted
+        failedDeletes.addAll(deleteKeys);
         final OMException omEx = (OMException) HddsClientUtils.containsException(ex, OMException.class);
         if (omEx != null) {
-          auditMultiDeleteFailure(context, deleteKeys, omEx);
+          auditMultiDeleteFailure(context, failedDeletes, omEx);
           throw newError(bucketName, omEx);
         }
         LOG.error("Delete key failed: {}", ex.getMessage());
@@ -402,10 +405,10 @@ public class BucketEndpoint extends BucketOperationHandler {
     }
 
     if (!result.getErrors().isEmpty()) {
-      auditMultiDeleteFailure(context, deleteKeys, new Exception("MultiDelete Exception"));
+      auditMultiDeleteFailure(context, failedDeletes, new Exception("MultiDelete Exception"));
     } else {
       AuditMessage.Builder message = auditMessageFor(context.getAction());
-      message.getParams().put("failedDeletes", deleteKeys.toString());
+      message.getParams().put("failedDeletes", failedDeletes.toString());
       AUDIT.logWriteSuccess(message.withResult(AuditEventStatus.SUCCESS).build());
     }
 

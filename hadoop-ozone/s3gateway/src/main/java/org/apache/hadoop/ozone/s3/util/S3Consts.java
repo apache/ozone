@@ -35,6 +35,7 @@ public final class S3Consts {
   // Constants related to AWS Signature Version V4 calculation
   // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
   public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
+  public static final String X_AMZ_TRAILER = "x-amz-trailer";
 
   public static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
   public static final String STREAMING_UNSIGNED_PAYLOAD_TRAILER = "STREAMING-UNSIGNED-PAYLOAD-TRAILER";

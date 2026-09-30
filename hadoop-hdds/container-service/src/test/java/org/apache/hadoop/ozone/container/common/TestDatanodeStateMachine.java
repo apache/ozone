@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -73,6 +74,7 @@ import org.apache.hadoop.ozone.container.replication.ReplicationServer.Replicati
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -237,6 +239,50 @@ public class TestDatanodeStateMachine {
     } finally {
       release.countDown();
       stateMachine.stopDaemon();
+    }
+  }
+
+  @Test
+  @Timeout(60)
+  void testStalledInitializationTimeoutTerminatesDatanode() throws Exception {
+    ExitUtils.disableSystemExit();
+    ExitUtils.clear();
+    conf.setFromObject(conf.getObject(ReplicationConfig.class).setPort(0));
+    // Enable the startup watchdog with a short timeout.
+    conf.setTimeDuration(DatanodeConfiguration.CONTAINER_INIT_TIMEOUT_KEY, 2, TimeUnit.SECONDS);
+    DatanodeDetails datanodeDetails = getNewDatanodeDetails();
+    ContainerTestUtils.initializeDatanodeLayout(conf, datanodeDetails);
+    CountDownLatch initializing = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    DatanodeStateMachine stateMachine = new DatanodeStateMachine(null, datanodeDetails, conf, null, null,
+        mock(HddsDatanodeStopService.class), new ReconfigurationHandler("DN", conf, op -> { }));
+    try {
+      OzoneContainer container = stateMachine.getContainer();
+      XceiverServerSpi writeChannel = spy(container.getWriteChannel());
+      Field writeChannelField = OzoneContainer.class.getDeclaredField("writeChannel");
+      writeChannelField.setAccessible(true);
+      writeChannelField.set(container, writeChannel);
+      // Stall Ratis startup: never returns and never throws, simulating a hang
+      // (for example a group recovery blocked on a failing volume).
+      doAnswer(invocation -> {
+        initializing.countDown();
+        assertThat(release.await(30, TimeUnit.SECONDS)).isTrue();
+        return null;
+      }).when(writeChannel).start();
+
+      stateMachine.startDaemon();
+      assertThat(initializing.await(10, TimeUnit.SECONDS)).isTrue();
+
+      // The watchdog must enter JVM shutdown even though writeChannel.start()
+      // never returns and never throws. Going straight to ExitUtils (System.exit)
+      // avoids the synchronous stop() path, which could itself block on the disk.
+      GenericTestUtils.waitFor(ExitUtils::isTerminated, 100, 20000);
+      assertThat(ExitUtils.getFirstExitException().getStatus()).isEqualTo(1);
+      assertThat(ExitUtils.getFirstExitException().getMessage()).contains("did not complete within");
+    } finally {
+      release.countDown();
+      stateMachine.stopDaemon();
+      ExitUtils.clear();
     }
   }
 
