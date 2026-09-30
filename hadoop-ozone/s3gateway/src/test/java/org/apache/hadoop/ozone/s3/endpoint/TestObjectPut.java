@@ -107,6 +107,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 /**
@@ -886,6 +887,22 @@ class TestObjectPut {
   }
 
   @Test
+  void testCopyObjectWithDestinationIfNoneMatchETag() throws Exception {
+    String etag = putObject(CONTENT).getHeaderString(HttpHeaders.ETAG);
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER)).thenReturn(etag);
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+
+    when(headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER)).thenReturn("\"different-etag\"");
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+  }
+
+  @Test
   void testCopyObjectWithDestinationIfMatchSuccess() throws Exception {
     assertSucceeds(() -> putObject(CONTENT));
 
@@ -1143,14 +1160,40 @@ class TestObjectPut {
     assertThat(ex.getErrorMessage()).contains("If-Match header cannot be empty");
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testIfNoneMatchETagMatchesPreconditionFailed(boolean quoted) throws Exception {
+    String etag = putObject(CONTENT).getHeaderString(HttpHeaders.ETAG);
+    when(headers.getHeaderString("If-None-Match")).thenReturn(quoted ? etag : parseETag(etag));
+
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED, () -> putObject("new-content"));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
+  }
+
   @Test
-  void testIfNoneMatchNotStarInvalidRequest() throws Exception {
+  void testIfNoneMatchETagMismatchSuccess() throws Exception {
+    putObject(CONTENT);
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+
+    assertSucceeds(() -> putObject("new-content"));
+    assertKeyContent(bucket, KEY_NAME, "new-content");
+  }
+
+  @Test
+  void testIfNoneMatchETagKeyAbsentSuccess() throws Exception {
     when(headers.getHeaderString("If-None-Match")).thenReturn("\"etag\"");
 
-    OS3Exception ex = assertErrorResponse(
-        INVALID_REQUEST, () -> putObject(CONTENT));
-    assertThat(ex.getErrorMessage()).contains(
-        "Only If-None-Match: * is supported");
+    assertSucceeds(() -> putObject(CONTENT));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
+  }
+
+  @Test
+  void testIfNoneMatchETagKeyWithoutETagSuccess() throws Exception {
+    createSourceKeyWithETag(KEY_NAME, null);
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"etag\"");
+
+    assertSucceeds(() -> putObject("new-content"));
+    assertKeyContent(bucket, KEY_NAME, "new-content");
   }
 
   @Test

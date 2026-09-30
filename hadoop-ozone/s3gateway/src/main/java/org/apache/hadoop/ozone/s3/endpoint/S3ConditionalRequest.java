@@ -178,14 +178,6 @@ final class S3ConditionalRequest {
       throw ex;
     }
 
-    if (trimmedIfNoneMatch != null
-        && !"*".equals(parseETag(trimmedIfNoneMatch))) {
-      OS3Exception ex = newError(INVALID_REQUEST, keyPath);
-      ex.setErrorMessage(
-          "Only If-None-Match: * is supported for conditional put.");
-      throw ex;
-    }
-
     return new WriteConditions(trimmedIfNoneMatch, trimmedIfMatch);
   }
 
@@ -289,6 +281,14 @@ final class S3ConditionalRequest {
 
     boolean hasIfNoneMatch() {
       return ifNoneMatch != null;
+    }
+
+    boolean isCreateIfAbsent() {
+      return "*".equals(parseETag(ifNoneMatch));
+    }
+
+    String getExcludedETag() {
+      return isCreateIfAbsent() ? null : parseETag(ifNoneMatch);
     }
 
     boolean hasIfMatch() {

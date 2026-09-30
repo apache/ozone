@@ -24,8 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -35,6 +38,11 @@ import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
@@ -249,12 +257,66 @@ public class TestRpcClient {
     }
   }
 
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, names = {"GET_FILE_STATUS_REJECTS_OBS", "S3_IF_NONE_MATCH_ETAG"})
+  public void testIfNoneMatchETagReachesOMOrRejectsOldVersion(OzoneManagerVersion version) throws IOException {
+    List<KeyArgs> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList)
+              .setStatus(org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK)
+              .setSuccess(true).setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(
+                  new ServiceInfo.Builder().setNodeType(HddsProtos.NodeType.OM).setHostname("localhost")
+                      .setOmVersion(version).build().getProtobuf())).build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          requests.add(request.getCreateKeyRequest().getKeyArgs());
+          throw new IOException("captured");
+        }
+        if (request.getCmdType() == Type.CompleteMultiPartUpload) {
+          requests.add(request.getCompleteMultiPartUploadRequest().getKeyArgs());
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      RatisReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      IOException putError = assertThrows(IOException.class, () -> client.createKeyIfNoneMatch("vol", "bucket", "key",
+          1L, "excluded-etag", replication, Collections.emptyMap(), Collections.emptyMap(), false));
+      IOException streamError = assertThrows(IOException.class, () -> client.createStreamKeyIfNoneMatch("vol", "bucket",
+          "key", 1L, "excluded-etag", replication, Collections.emptyMap(), Collections.emptyMap(), false));
+      IOException completeError = assertThrows(IOException.class, () -> client.completeMultipartUpload("vol", "bucket",
+          "key", "upload-id", Collections.singletonMap(1, "part-etag"), null, null, "excluded-etag"));
+      if (version == OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) {
+        assertEquals("captured", putError.getMessage());
+        assertEquals("captured", streamError.getMessage());
+        assertEquals("captured", completeError.getMessage());
+        assertThat(requests).hasSize(3).allSatisfy(args -> assertEquals("excluded-etag", args.getExcludedETag()));
+      } else {
+        assertThat(requests).isEmpty();
+        assertThat(putError.getMessage()).contains("does not support If-None-Match");
+        assertThat(streamError.getMessage()).contains("does not support If-None-Match");
+        assertThat(completeError.getMessage()).contains("does not support If-None-Match");
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   private static RpcClient createRpcClient() throws IOException {
+    return createRpcClient(new MockOmTransport());
+  }
+
+  private static RpcClient createRpcClient(OmTransport transport) throws IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     return new RpcClient(config, null) {
       @Override
       protected OmTransport createOmTransport(String omServiceId) {
-        return new MockOmTransport();
+        return transport;
       }
 
       @Override
