@@ -202,12 +202,6 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     }
   }
 
-  private static boolean allowFollowerRead(OMRequest omRequest) {
-    return !omRequest.hasReadConsistencyHint()
-        || ReadConsistency.fromProto(omRequest.getReadConsistencyHint()
-            .getReadConsistency()).allowFollowerRead();
-  }
-
   private static ReadConsistency getReadConsistency(OMRequest omRequest) {
     return omRequest.hasReadConsistencyHint()
         ? ReadConsistency.fromProto(omRequest.getReadConsistencyHint()
@@ -286,9 +280,9 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     public OMResponse submitRequest(RpcController controller, OMRequest omRequest) throws ServiceException {
       lastProxy = null;
       ReadConsistency readConsistency = getReadConsistency(omRequest);
-      boolean isExplicitFollowerRead = omRequest.hasReadConsistencyHint() && allowFollowerRead(omRequest);
-      boolean isFollowerReadEligible = omServiceSupportsFollowerRead && OmUtils.shouldSendToFollower(omRequest)
-          && allowFollowerRead(omRequest) && (defaultFollowerReadEnabled || isExplicitFollowerRead);
+      boolean isFollowerReadEligible =
+          OMFailoverProxyProviderBase.shouldUseFollowerRead(omRequest,
+              omServiceSupportsFollowerRead, defaultFollowerReadEnabled);
 
       if (isFollowerReadEligible) {
         int failedCount = 0;

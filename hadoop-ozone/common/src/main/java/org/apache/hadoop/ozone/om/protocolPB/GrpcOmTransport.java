@@ -51,7 +51,6 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc_.RemoteException;
-import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -216,22 +215,22 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   private boolean shouldUseFollowerRead(OMRequest payload) {
-    if (!omServiceSupportsFollowerRead || !OmUtils.shouldSendToFollower(payload)) {
-      return false;
-    }
-    return defaultFollowerReadEnabled || payload.hasReadConsistencyHint()
-        && ReadConsistency.fromProto(payload.getReadConsistencyHint()
-            .getReadConsistency()).allowFollowerRead();
+    return OMFailoverProxyProviderBase.shouldUseFollowerRead(payload,
+        omServiceSupportsFollowerRead, defaultFollowerReadEnabled);
   }
 
   private OMResponse submitRequestWithFollowerRead(OMRequest payload)
       throws IOException {
     OMRequest followerPayload = addReadConsistencyHint(payload,
         followerReadConsistency);
+    ReadConsistency readConsistency = getReadConsistency(payload);
     int failedCount = 0;
     for (int i = 0;
          i < omFailoverProxyProvider.getOMProxyMap().getNodeIds().size(); i++) {
-      String nodeId = getCurrentFollowerReadNodeId();
+      String nodeId = getCurrentFollowerReadNodeId(readConsistency);
+      if (nodeId == null) {
+        break;
+      }
       String followerHost = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
       try {
         OMResponse response = submitRequestToHost(followerPayload, followerHost);
@@ -335,12 +334,38 @@ public class GrpcOmTransport implements OmTransport {
         .get(currentFollowerReadIndex);
   }
 
+  private synchronized String getCurrentFollowerReadNodeId(
+      ReadConsistency readConsistency) {
+    String nodeId = getCurrentFollowerReadNodeId();
+    if (readConsistency != ReadConsistency.LOCAL_LEASE) {
+      return nodeId;
+    }
+
+    String leaderNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+    for (int i = 0; i < omFailoverProxyProvider.getOMProxyMap().getNodeIds().size();
+         i++) {
+      if (!nodeId.equals(leaderNodeId)) {
+        return nodeId;
+      }
+      changeFollowerReadProxy(nodeId);
+      nodeId = getCurrentFollowerReadNodeId();
+    }
+    return null;
+  }
+
   private synchronized void changeFollowerReadProxy(String currentNodeId) {
     String currentFollowerReadNodeId = getCurrentFollowerReadNodeId();
     if (currentFollowerReadNodeId.equals(currentNodeId)) {
       currentFollowerReadIndex = (currentFollowerReadIndex + 1) %
           omFailoverProxyProvider.getOMProxyMap().getNodeIds().size();
     }
+  }
+
+  private static ReadConsistency getReadConsistency(OMRequest request) {
+    return request.hasReadConsistencyHint()
+        ? ReadConsistency.fromProto(request.getReadConsistencyHint()
+            .getReadConsistency())
+        : ReadConsistency.DEFAULT;
   }
 
   private Exception unwrapException(Exception ex) {
