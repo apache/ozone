@@ -85,15 +85,18 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
 
   public Response deleteBucketLifecycleConfiguration(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
-    verifyBucketOwner(context, bucketName);
-    deleteLifecycleConfiguration(context, bucketName);
+    OzoneBucket bucket = verifyBucketOwner(context, bucketName);
+    deleteLifecycleConfiguration(context, bucketName, bucket);
     return Response.noContent().build();
   }
 
-  protected void deleteLifecycleConfiguration(S3RequestContext context, String bucketName)
+  protected void deleteLifecycleConfiguration(S3RequestContext context, String bucketName, OzoneBucket bucket)
       throws IOException, OS3Exception {
     try {
-      context.getVolume().getBucket(bucketName).deleteLifecycleConfiguration();
+      if (bucket == null) {
+        bucket = context.getVolume().getBucket(bucketName);
+      }
+      bucket.deleteLifecycleConfiguration();
     } catch (OMException ex) {
       // DeleteBucketLifecycle is idempotent: deleting a missing config
       // must still return 204, not 404 — same as normal key deletion.
@@ -103,23 +106,25 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     }
   }
 
-  private void verifyBucketOwner(S3RequestContext context, String bucketName) throws OS3Exception {
+  private OzoneBucket verifyBucketOwner(S3RequestContext context, String bucketName) throws OS3Exception {
     HttpHeaders httpHeaders = getHeaders();
     if (httpHeaders == null) {
-      return;
+      return null;
     }
     String expectedBucketOwner = httpHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER);
     if (expectedBucketOwner == null || expectedBucketOwner.isEmpty()) {
-      return;
+      return null;
     }
 
     try {
-      String actualOwner = context.getVolume().getBucket(bucketName).getOwner();
+      OzoneBucket bucket = context.getVolume().getBucket(bucketName);
+      String actualOwner = bucket.getOwner();
       if (actualOwner != null && !actualOwner.equals(expectedBucketOwner)) {
         LOG.debug("Bucket: {}, ExpectedBucketOwner: {}, ActualBucketOwner: {}",
             bucketName, expectedBucketOwner, actualOwner);
         throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
       }
+      return bucket;
     } catch (Exception ex) {
       LOG.error("Owner verification failed for bucket: {}", bucketName, ex);
       throw S3ErrorTable.newError(S3ErrorTable.ACCESS_DENIED, bucketName);
