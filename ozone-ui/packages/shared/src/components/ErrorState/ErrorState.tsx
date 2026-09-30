@@ -66,7 +66,7 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
         justifyContent: 'center',
         textAlign: 'center',
         gap: spacing.lg,
-        paddingTop: '25%',
+        paddingTop: '13%',
         paddingInline: spacing.xxl,
         paddingBottom: spacing.xxl,
         ...style,
