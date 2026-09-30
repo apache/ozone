@@ -285,8 +285,7 @@ public class KeyValueContainerData extends ContainerData {
         .setReplicaIndex(getReplicaIndex())
         .setBlockCommitSequenceId(getBlockCommitSequenceId())
         .setDeleteTransactionId(getDeleteTransactionId())
-        .setDataChecksum(getDataChecksum())
-        .setContainerPath(getContainerPath());
+        .setDataChecksum(getDataChecksum());
     if (getStorageType() != null) {
       builder.setStorageType(StorageTypeUtils.getStorageTypeProto(getStorageType()));
     }

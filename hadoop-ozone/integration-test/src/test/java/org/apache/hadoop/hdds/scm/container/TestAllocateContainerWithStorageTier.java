@@ -235,11 +235,11 @@ public class TestAllocateContainerWithStorageTier {
 
   /**
    * A replica written to a real datanode volume must report that volume's
-   * storage type and its on-disk path back to SCM over a real heartbeat, so
-   * that {@code ozone admin container info} can display them.
+   * storage type back to SCM over a real heartbeat, so that
+   * {@code ozone admin container info} can display it.
    */
   @Test
-  public void testReplicaReportsVolumeStorageTypeAndContainerPath() throws Exception {
+  public void testReplicaReportsVolumeStorageType() throws Exception {
     // All volumes are DISK so that the only available tier is DISK, which keeps
     // pipeline creation deterministic under the pipeline limit of 1.
     createCluster(Arrays.asList(
@@ -275,9 +275,6 @@ public class TestAllocateContainerWithStorageTier {
         // current type agree; a mismatch here would mean drift.
         assertThat(replica.getStorageType()).isEqualTo(StorageType.DISK);
         assertThat(replica.getVolumeStorageType()).isEqualTo(StorageType.DISK);
-        assertThat(replica.getContainerPath())
-            .contains("/hdds/")
-            .endsWith("/" + containerId);
       }
     } finally {
       cleanUp();

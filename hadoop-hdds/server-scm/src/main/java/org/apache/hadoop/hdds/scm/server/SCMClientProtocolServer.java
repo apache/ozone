@@ -380,9 +380,6 @@ public class SCMClientProtocolServer implements
         if (r.getStorageType() != null) {
           builder.setStorageType(StorageTypeUtils.getStorageTypeProto(r.getStorageType()));
         }
-        if (r.getContainerPath() != null) {
-          builder.setContainerPath(r.getContainerPath());
-        }
         if (r.getVolumeStorageType() != null) {
           builder.setVolumeStorageType(StorageTypeUtils.getStorageTypeProto(r.getVolumeStorageType()));
         }

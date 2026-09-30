@@ -41,7 +41,6 @@ public final class ContainerReplicaInfo {
   @JsonSerialize(using = JsonUtils.ChecksumSerializer.class)
   private long dataChecksum;
   private StorageType storageType;
-  private String containerPath;
   private StorageType volumeStorageType;
 
   public static ContainerReplicaInfo fromProto(
@@ -60,7 +59,6 @@ public final class ContainerReplicaInfo {
         .setDataChecksum(proto.getDataChecksum())
         .setStorageType(proto.hasStorageType()
             ? StorageTypeUtils.getFromProtobuf(proto.getStorageType()) : null)
-        .setContainerPath(proto.hasContainerPath() ? proto.getContainerPath() : null)
         .setVolumeStorageType(proto.hasVolumeStorageType()
             ? StorageTypeUtils.getFromProtobuf(proto.getVolumeStorageType()) : null);
     return builder.build();
@@ -107,10 +105,6 @@ public final class ContainerReplicaInfo {
 
   public StorageType getStorageType() {
     return storageType;
-  }
-
-  public String getContainerPath() {
-    return containerPath;
   }
 
   public StorageType getVolumeStorageType() {
@@ -171,11 +165,6 @@ public final class ContainerReplicaInfo {
 
     public Builder setStorageType(StorageType storageType) {
       subject.storageType = storageType;
-      return this;
-    }
-
-    public Builder setContainerPath(String containerPath) {
-      subject.containerPath = containerPath;
       return this;
     }
 

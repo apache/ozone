@@ -60,11 +60,10 @@ public class TestContainerReplicaInfo {
     // If replicaIndex is not in the proto, then -1 should be returned
     assertEquals(-1, info.getReplicaIndex());
     // Storage fields are absent in the proto, so they must be null rather than
-    // the protobuf defaults ("" for the path), otherwise they would show up in
-    // JSON output for datanodes that do not report them.
+    // the protobuf defaults, otherwise they would show up in JSON output for
+    // datanodes that do not report them.
     assertThat(info.getStorageType()).isNull();
     assertThat(info.getVolumeStorageType()).isNull();
-    assertThat(info.getContainerPath()).isNull();
   }
 
   @Test
@@ -81,7 +80,6 @@ public class TestContainerReplicaInfo {
             .setState("CLOSED")
             .setStorageType(HddsProtos.StorageTypeProto.SSD)
             .setVolumeStorageType(HddsProtos.StorageTypeProto.SSD)
-            .setContainerPath("/data/ssd1/hdds/CID-1/current/containerDir0/567")
             .build();
 
     ContainerReplicaInfo info = ContainerReplicaInfo.fromProto(proto);
@@ -89,8 +87,6 @@ public class TestContainerReplicaInfo {
     // The container was stamped SSD and sits on the SSD volume.
     assertThat(info.getStorageType()).isEqualTo(StorageType.SSD);
     assertThat(info.getVolumeStorageType()).isEqualTo(StorageType.SSD);
-    assertThat(info.getContainerPath())
-        .isEqualTo("/data/ssd1/hdds/CID-1/current/containerDir0/567");
   }
 
   @Test

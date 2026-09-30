@@ -204,13 +204,10 @@ public class TestSCMClientProtocolServer {
   @Test
   public void testGetContainerReplicasCopiesStorageFields() throws Exception {
     final long containerId = 1L;
-    final String containerPath =
-        "/data/disk1/hdds/CID-1/current/containerDir0/1";
     // Stamped SSD at creation, but currently sitting on an ARCHIVE volume.
     ContainerReplica replica = newReplica(containerId)
         .setStorageType(StorageType.SSD)
         .setVolumeStorageType(StorageType.ARCHIVE)
-        .setContainerPath(containerPath)
         .build();
 
     SCMClientProtocolServer scmServer = new SCMClientProtocolServer(
@@ -224,7 +221,6 @@ public class TestSCMClientProtocolServer {
       HddsProtos.SCMContainerReplicaProto proto = replicas.get(0);
       assertThat(proto.getStorageType()).isEqualTo(HddsProtos.StorageTypeProto.SSD);
       assertThat(proto.getVolumeStorageType()).isEqualTo(HddsProtos.StorageTypeProto.ARCHIVE);
-      assertThat(proto.getContainerPath()).isEqualTo(containerPath);
     } finally {
       scmServer.stop();
     }
@@ -247,7 +243,6 @@ public class TestSCMClientProtocolServer {
       HddsProtos.SCMContainerReplicaProto proto = replicas.get(0);
       assertThat(proto.hasStorageType()).isFalse();
       assertThat(proto.hasVolumeStorageType()).isFalse();
-      assertThat(proto.hasContainerPath()).isFalse();
     } finally {
       scmServer.stop();
     }

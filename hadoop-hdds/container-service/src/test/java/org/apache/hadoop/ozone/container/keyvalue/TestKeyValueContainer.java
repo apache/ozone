@@ -236,7 +236,7 @@ public class TestKeyValueContainer {
   }
 
   @ContainerTestVersionInfo.ContainerTest
-  public void testContainerReportHasPathAndVolumeStorageType(
+  public void testContainerReportHasVolumeStorageType(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);
 
@@ -260,8 +260,6 @@ public class TestKeyValueContainer {
     // The container was created on an SSD volume, so both types agree.
     assertThat(report.getStorageType()).isEqualTo(StorageTypeProto.SSD);
     assertThat(report.getVolumeStorageType()).isEqualTo(StorageTypeProto.SSD);
-    assertThat(report.getContainerPath())
-        .isEqualTo(keyValueContainerData.getContainerPath());
   }
 
   @ContainerTestVersionInfo.ContainerTest

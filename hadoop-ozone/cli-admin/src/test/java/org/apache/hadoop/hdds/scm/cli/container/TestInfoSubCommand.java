@@ -77,9 +77,6 @@ public class TestInfoSubCommand {
 
   private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
 
-  private static final String CONTAINER_PATH =
-      "/data/disk1/hdds/CID-1/current/containerDir0/1";
-
   @BeforeEach
   public void setup() throws IOException {
     scmClient = mock(ScmClient.class);
@@ -336,8 +333,7 @@ public class TestInfoSubCommand {
   }
 
   @Test
-  public void testContainerPathPrintedByDefaultButNotStorageTypes()
-      throws Exception {
+  public void testStorageTypesNotPrintedByDefault() throws Exception {
     when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicasWithStorageInfo());
     cmd = new InfoSubcommand();
@@ -345,7 +341,6 @@ public class TestInfoSubCommand {
     cmd.execute(scmClient);
 
     String output = outContent.toString(DEFAULT_ENCODING);
-    assertThat(output).contains("ContainerPath: " + CONTAINER_PATH);
     // Storage types stay hidden unless --with-storagetype is passed.
     assertThat(output).doesNotContain("ContainerStorageType");
     assertThat(output).doesNotContain("VolumeStorageType");
@@ -367,19 +362,6 @@ public class TestInfoSubCommand {
   }
 
   @Test
-  public void testStorageFieldsOmittedWhenNotReported() throws Exception {
-    when(scmClient.getContainerReplicas(anyLong())).thenReturn(getReplicas(true));
-    cmd = new InfoSubcommand();
-    new CommandLine(cmd).parseArgs("1");
-    cmd.execute(scmClient);
-
-    // Replicas from a datanode that reports no path must not render an empty
-    // "ContainerPath: ;" entry.
-    assertThat(outContent.toString(DEFAULT_ENCODING))
-        .doesNotContain("ContainerPath");
-  }
-
-  @Test
   public void testJsonIncludesStorageFields() throws Exception {
     when(scmClient.getContainerReplicas(anyLong()))
         .thenReturn(getReplicasWithStorageInfo());
@@ -391,7 +373,6 @@ public class TestInfoSubCommand {
     String output = outContent.toString(DEFAULT_ENCODING);
     assertThat(output).contains("\"storageType\" : \"SSD\"");
     assertThat(output).contains("\"volumeStorageType\" : \"ARCHIVE\"");
-    assertThat(output).contains("\"containerPath\" : \"" + CONTAINER_PATH + "\"");
   }
 
   @Test
@@ -402,10 +383,9 @@ public class TestInfoSubCommand {
     cmd.execute(scmClient);
 
     // Null fields are dropped by the NON_NULL serialization inclusion, so an
-    // unset path must not surface as "containerPath" : "".
+    // unset type must not surface as "storageType" : "".
     String output = outContent.toString(DEFAULT_ENCODING);
     assertThat(output).doesNotContain("storageType");
-    assertThat(output).doesNotContain("containerPath");
   }
 
   private List<ContainerReplicaInfo> getReplicasWithStorageInfo() {
@@ -423,7 +403,6 @@ public class TestInfoSubCommand {
           .setReplicaIndex(index++)
           .setStorageType(StorageType.SSD)
           .setVolumeStorageType(StorageType.ARCHIVE)
-          .setContainerPath(CONTAINER_PATH)
           .build());
     }
     return replicas;

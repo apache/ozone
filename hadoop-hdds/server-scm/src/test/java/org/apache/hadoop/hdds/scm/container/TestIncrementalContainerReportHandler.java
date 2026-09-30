@@ -798,7 +798,7 @@ public class TestIncrementalContainerReportHandler {
   }
 
   @Test
-  public void testReplicaContainerPathAndVolumeStorageType() throws IOException {
+  public void testReplicaVolumeStorageType() throws IOException {
     final IncrementalContainerReportHandler reportHandler =
         new IncrementalContainerReportHandler(
             nodeManager, containerManager, scmContext);
@@ -807,15 +807,12 @@ public class TestIncrementalContainerReportHandler {
     nodeManager.register(datanode, null, null);
     containerStateManager.addContainer(container.getProtobuf());
 
-    final String containerPath = "/data/ssd1/hdds/CID-1/current/containerDir0/"
-        + container.containerID().getIdForTesting();
     // The container was stamped SSD at creation but now sits on an ARCHIVE
     // volume, which is what a relabelled or migrated replica looks like.
     final ContainerReplicaProto replicaProto = newReplicaProto(container, datanode)
         .setStorageType(StorageTypeUtils.getStorageTypeProto(StorageType.SSD))
         .setVolumeStorageType(
             StorageTypeUtils.getStorageTypeProto(StorageType.ARCHIVE))
-        .setContainerPath(containerPath)
         .build();
     reportHandler.onMessage(new IncrementalContainerReportFromDatanode(
         datanode, getIncrementalContainerReportProto(replicaProto)), publisher);
@@ -823,7 +820,6 @@ public class TestIncrementalContainerReportHandler {
     final ContainerReplica replica = getOnlyReplica(container);
     assertThat(replica.getStorageType()).isEqualTo(StorageType.SSD);
     assertThat(replica.getVolumeStorageType()).isEqualTo(StorageType.ARCHIVE);
-    assertThat(replica.getContainerPath()).isEqualTo(containerPath);
   }
 
   @Test
@@ -844,7 +840,6 @@ public class TestIncrementalContainerReportHandler {
     final ContainerReplica replica = getOnlyReplica(container);
     assertThat(replica.getStorageType()).isNull();
     assertThat(replica.getVolumeStorageType()).isNull();
-    assertThat(replica.getContainerPath()).isNull();
   }
 
   private ContainerReplica getOnlyReplica(ContainerInfo container) {
