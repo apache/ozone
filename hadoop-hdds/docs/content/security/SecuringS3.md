@@ -68,6 +68,17 @@ the AWS credentials. The values will be printed out on the screen. You can
 set these values up in your _.aws_ file for automatic access while working
 against Ozone S3 buckets.
 
+If a secret already exists for the user, the endpoint responds with HTTP
+`400 Bad Request` and the error code `S3_SECRET_ALREADY_EXISTS` in the
+plain-text response body. The error code is carried in the body, not in the
+HTTP status line (reason phrase), so clients must read the body rather than
+parse the status message:
+```bash
+curl -X PUT --negotiate -u : -v https://localhost:9879/secret
+# < HTTP/1.1 400 Bad Request
+# S3_SECRET_ALREADY_EXISTS
+```
+
 <div class="alert alert-danger" role="alert">
  Please note: These S3 credentials are like your Kerberos passwords
  that give complete access to your buckets.
@@ -121,7 +132,13 @@ curl -X DELETE --negotiate -u : -v "http://localhost:9879/secret?username=testus
 ### Response
 
 - **Success:** Returns HTTP `200 OK` along with a confirmation message in JSON format.
-- **Failure:** Returns an appropriate HTTP error status and message if there are issues (e.g., authentication failures).
+- **Failure:** Returns an appropriate HTTP error status if there are issues (e.g., authentication failures). If no secret exists for the user, the endpoint responds with HTTP `404 Not Found` and the error code `S3_SECRET_NOT_FOUND` in the plain-text response body. The error code is carried in the body, not in the HTTP status line (reason phrase), so clients must read the body rather than parse the status message:
+
+```bash
+curl -X DELETE --negotiate -u : -v http://localhost:9879/secret
+# < HTTP/1.1 404 Not Found
+# S3_SECRET_NOT_FOUND
+```
 
 ### Testing and Verification
 
