@@ -169,11 +169,12 @@ This is a high level summary of all the steps that will happen during a rolling 
 5. Deploy the new software and rolling restart all client processes like S3 Gateway, HTTPFS, Prometheus etc. These processes are all Ozone clients and sit somewhat outside of the core Ozone cluster.
     - At this stage, the cluster is operating with the new software version, but is still “acting as” the older apparent version. No data will be written to disk in a new format, and new features will be unavailable.
 6. The finalize command is sent to OM by the admin - this is what is used to switch the cluster to act as the new version. Upon receipt of the finalize command:  
-   7. OM will forward the finalization request to SCM, and persist a marker in the DB indicating that the leader must poll SCM to learn when HDDS has finished finalizing. The command returns to the client and finalization continues throughout the cluster asynchronously.
+   7. OM will forward the finalization request to SCM.
    8. SCM will finalize itself over Ratis, saving the new finalized version.
-   9. SCM will notify datanodes over the heartbeat to finalize.
-   10. Only after SCM and all healthy datanodes have been finalized will OM get a “ready to finalize” response from the poll. The OM leader will then send a finalize command over Ratis to all OMs.
-   11. As OM is the entry point to the cluster for external clients, finalizing OM unlocks any new external facing features in the upgraded version.
+   9. After SCM returns success, OM will persist a marker in the DB indicating that the leader must poll SCM to learn when HDDS has finished finalizing. The command returns to the client and finalization continues throughout the cluster asynchronously.
+   10. SCM will notify datanodes over the heartbeat to finalize.
+   11. Only after SCM and all healthy datanodes have been finalized will OM get a “ready to finalize” response from the SCM poll. The OM leader will then send a finalize command over Ratis to all OMs.
+   12. As OM is the entry point to the cluster for external clients, finalizing OM unlocks any new external facing features in the upgraded version.
 
 If the previous upgrade was never finalized, the cluster can still be upgraded to the next version. This is because the logical versioning system is not tied to any particular Ozone release, it is just a relationship between the number written to the disk and the one saved in the code. Any features that have never been finalized will remain unfinalized until the finalize command is given.
 
