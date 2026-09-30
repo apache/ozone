@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import javax.net.SocketFactory;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.ObjectWritable;
-import org.apache.hadoop.ipc.Client;
-import org.apache.hadoop.ipc.ClientCache;
+import org.apache.hadoop.ipc_.Client;
+import org.apache.hadoop.ipc_.ClientCache;
 import org.apache.hadoop.net.NetUtils;
 import org.junit.jupiter.api.Test;
 
