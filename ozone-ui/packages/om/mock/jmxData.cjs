@@ -261,6 +261,13 @@ const omMetrics = {
   NumLinearizableRead: 5000,
   NumLeaderSkipLinearizableRead: 120,
   NumFollowerReadLocalLeaseSuccess: 800,
+
+  // Internal counters / gauges that are NOT RPC requests. These are not in the
+  // operation catalog, so they surface under the "Other" category instead of being
+  // mis-reported as requests (e.g. NumOpenKeysCleaned is a background-cleanup count,
+  // and NumKeyOps above is a cross-category aggregate).
+  NumOpenKeysCleaned: 340,
+  NumTrashActiveCycles: 27,
 };
 
 /**

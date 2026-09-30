@@ -16,46 +16,13 @@
  * limitations under the License.
  */
 
+import { METRIC_TYPES, OM_OPERATIONS, OTHER_TYPE, SUMMARY_KEYS } from './metricsCatalog';
+
+export { METRIC_TYPES, OTHER_TYPE } from './metricsCatalog';
+export type { MetricType, OmOperationDef } from './metricsCatalog';
+
 /** JMX query for the OM metrics bean (RPC operation counters + object counts). */
 export const OM_METRICS_QUERY = 'Hadoop:service=OzoneManager,name=OMMetrics';
-
-/**
- * Operation categories exposed by `OMMetrics` as `Num<Type><Op>` counters. Order
- * seeds the metric-type dropdown; a type with no activity is disabled there. Any
- * category found in the bean but missing here is still surfaced (appended), so a
- * newly added OM metric type is never silently dropped.
- */
-export const METRIC_TYPES = [
-  'Get',
-  'Abort',
-  'Add',
-  'Block',
-  'Bucket',
-  'Cancel',
-  'Commit',
-  'Complete',
-  'Create',
-  'Delete',
-  'Expired',
-  'Follower',
-  'Initiate',
-  'Key',
-  'Leader',
-  'Linearizable',
-  'List',
-  'Lookup',
-  'Open',
-  'Put',
-  'Recover',
-  'Remove',
-  'Set',
-  'Snapshot',
-  'Tenant',
-  'Trash',
-  'Volume',
-] as const;
-
-export type MetricType = (typeof METRIC_TYPES)[number];
 
 /** Raw OM metrics JMX bean — dynamic `Num*`/count keys plus string tags. */
 export type OMMetricsBean = Record<string, number | string>;
@@ -64,7 +31,7 @@ export type OperationStatus = 'Active' | 'Warning' | 'Inactive';
 
 export interface MetricOperation {
   key: string;
-  /** Canonical operation label (e.g. `Allocate`, `Commit`, `Delete`). */
+  /** Human-readable operation label (e.g. `Commit`, `Check Access`). */
   name: string;
   /** Successful request count for this operation. */
   requests: number;
@@ -95,108 +62,6 @@ export interface ParsedOmMetrics {
   byType: Record<string, MetricTypeData>;
 }
 
-/**
- * Request metric key: `Num<Type><Op>` — two CamelCase segments after `Num`, e.g.
- * `NumKeyCommits` → type `Key`, op `Commits`. Single-word counters such as
- * `NumKeys`/`NumVolumes` (no `<Op>` segment) intentionally do not match, so object
- * counts are never treated as operations.
- */
-const REQUEST_KEY_RE = /^Num([A-Z][a-z]+)([A-Z].+)$/;
-
-/**
- * Counters that are NOT per-operation request counts and must be excluded from the
- * operation rows (and therefore from the request total). These are the cross-category
- * aggregate `Num<Type>Ops` totals (e.g. `NumKeyOps` is incremented by GetKeyInfo, all
- * FSO ops and all multipart ops as well as plain key ops) and the snapshot
- * state/gauge counts. Cross-validated against `OMMetrics.java`.
- */
-const NON_OP_KEYS = new Set<string>([
-  'NumVolumeOps',
-  'NumBucketOps',
-  'NumKeyOps',
-  'NumFSOps',
-  'NumTenantOps',
-  'NumSnapshotActive',
-  'NumSnapshotDeleted',
-  'NumSnapshotCacheSize',
-]);
-
-/**
- * Every `*Fails` failure counter OM exposes, mapped to the exact request counter it
- * belongs to, so a failure is recognised by name and joined to its request row
- * explicitly — no plural-stripping guesswork. Cross-validated against the field
- * declarations in `OMMetrics.java`; note the two irregular names: the request for
- * `NumVolumeCheckAccessFails` is `NumVolumeCheckAccesses` (an -es plural that a
- * trailing-`s` heuristic gets wrong), and the `GetKeyInfo` failure field is
- * misnamed in OM so it is exposed as `GetNumGetKeyInfoFails` (no `Num` prefix).
- */
-const FAILURE_TO_REQUEST: Record<string, string> = {
-  NumVolumeCreateFails: 'NumVolumeCreates',
-  NumVolumeUpdateFails: 'NumVolumeUpdates',
-  NumVolumeInfoFails: 'NumVolumeInfos',
-  NumVolumeDeleteFails: 'NumVolumeDeletes',
-  NumVolumeCheckAccessFails: 'NumVolumeCheckAccesses',
-  NumVolumeListFails: 'NumVolumeLists',
-  NumBucketCreateFails: 'NumBucketCreates',
-  NumBucketInfoFails: 'NumBucketInfos',
-  NumBucketUpdateFails: 'NumBucketUpdates',
-  NumBucketDeleteFails: 'NumBucketDeletes',
-  NumBucketListFails: 'NumBucketLists',
-  NumBucketS3CreateFails: 'NumBucketS3Creates',
-  NumBucketS3DeleteFails: 'NumBucketS3Deletes',
-  NumBucketS3ListFails: 'NumBucketS3Lists',
-  NumKeyAllocateFails: 'NumKeyAllocate',
-  NumKeyLookupFails: 'NumKeyLookup',
-  NumKeyRenameFails: 'NumKeyRenames',
-  NumKeyDeleteFails: 'NumKeyDeletes',
-  NumKeyListFails: 'NumKeyLists',
-  NumKeyCommitFails: 'NumKeyCommits',
-  NumBlockAllocationFails: 'NumBlockAllocations',
-  NumGetServiceListFails: 'NumGetServiceLists',
-  NumInitiateMultipartUploadFails: 'NumInitiateMultipartUploads',
-  NumCommitMultipartUploadPartFails: 'NumCommitMultipartUploadParts',
-  NumCompleteMultipartUploadFails: 'NumCompleteMultipartUploads',
-  NumAbortMultipartUploadFails: 'NumAbortMultipartUploads',
-  NumListMultipartUploadPartFails: 'NumListMultipartUploadParts',
-  NumListMultipartUploadFails: 'NumListMultipartUploads',
-  NumOpenKeyDeleteRequestFails: 'NumOpenKeyDeleteRequests',
-  NumExpiredMPUAbortRequestFails: 'NumExpiredMPUAbortRequests',
-  NumSnapshotCreateFails: 'NumSnapshotCreates',
-  NumSnapshotRenameFails: 'NumSnapshotRenames',
-  NumSnapshotDeleteFails: 'NumSnapshotDeletes',
-  NumSnapshotListFails: 'NumSnapshotLists',
-  NumSnapshotDiffJobFails: 'NumSnapshotDiffJobs',
-  NumSnapshotInfoFails: 'NumSnapshotInfos',
-  NumCancelSnapshotDiffFails: 'NumCancelSnapshotDiffs',
-  NumListSnapshotDiffJobFails: 'NumListSnapshotDiffJobs',
-  NumTenantCreateFails: 'NumTenantCreates',
-  NumTenantDeleteFails: 'NumTenantDeletes',
-  NumTenantAssignUserFails: 'NumTenantAssignUsers',
-  NumTenantRevokeUserFails: 'NumTenantRevokeUsers',
-  NumTenantAssignAdminFails: 'NumTenantAssignAdmins',
-  NumTenantRevokeAdminFails: 'NumTenantRevokeAdmins',
-  NumGetFileStatusFails: 'NumGetFileStatus',
-  NumCreateDirectoryFails: 'NumCreateDirectory',
-  NumCreateFileFails: 'NumCreateFile',
-  NumLookupFileFails: 'NumLookupFile',
-  NumListStatusFails: 'NumListStatus',
-  NumListOpenFilesFails: 'NumListOpenFiles',
-  GetNumGetKeyInfoFails: 'NumGetKeyInfo',
-  NumGetObjectTaggingFails: 'NumGetObjectTagging',
-  NumPutObjectTaggingFails: 'NumPutObjectTagging',
-  NumDeleteObjectTaggingFails: 'NumDeleteObjectTagging',
-  NumRecoverLeaseFails: 'NumRecoverLease',
-};
-
-/**
- * Failure counters that have no matching request counter — an aggregate failure for
- * a whole category. Rendered as a failure-only row (0 requests) under its type.
- * `NumTrashFails` is OM's single generic trash-processing failure counter.
- */
-const ORPHAN_FAILURES: Record<string, { type: string; name: string }> = {
-  NumTrashFails: { type: 'Trash', name: 'Trash' },
-};
-
 function statusFor(requests: number, failures: number): OperationStatus {
   if (failures > 0) {
     return 'Warning';
@@ -207,14 +72,18 @@ function statusFor(requests: number, failures: number): OperationStatus {
   return 'Inactive';
 }
 
-/** Split a request key into its `{ type, name }` (e.g. `NumKeyCommits` → Key/Commits). */
-function parseRequestKey(key: string): { type: string; name: string } | null {
-  const match = key.match(REQUEST_KEY_RE);
-  return match ? { type: match[1], name: match[2] } : null;
+/** `Num<Type><Op>` shape, used only to derive a readable label for "Other" rows. */
+const OTHER_NAME_RE = /^Num([A-Z][a-z]+)([A-Z].+)$/;
+
+/** Readable label for an unlisted metric: `Num<Type><Op>` → "Type Op", else the raw name. */
+function otherDisplayName(key: string): string {
+  const match = key.match(OTHER_NAME_RE);
+  return match ? `${match[1]} ${match[2]}` : key;
 }
 
 interface OpRow {
   type: string;
+  key: string;
   name: string;
   requests: number;
   failures: number;
@@ -224,14 +93,13 @@ interface OpRow {
  * Parse the `OMMetrics` bean into per-type operation data and the object-count
  * summary.
  *
- * Metric identity is resolved from OM's actual JMX names rather than guessed:
- * failures are recognised via {@link FAILURE_TO_REQUEST}/{@link ORPHAN_FAILURES}
- * and joined to their request row by exact name; cross-category aggregate totals and
- * snapshot state counts ({@link NON_OP_KEYS}) are excluded so they never inflate a
- * request total. Everything else matching `Num<Type><Op>` is a request operation,
- * grouped by its `<Type>`. A failure whose request counter is absent still surfaces
- * as a failure-only row, and an unknown `*Fails` counter is treated as a failure
- * (never a phantom request op), so future OM metrics degrade gracefully.
+ * Operation identity comes from the explicit {@link OM_OPERATIONS} catalog (keyed by
+ * exact JMX name), so counts/gauges and cross-category aggregates are never mistaken
+ * for requests and failures are joined to their request by exact name. Any numeric
+ * metric the catalog does not describe (aggregate `Num<Type>Ops`, internal counters,
+ * or a future metric) is surfaced under the {@link OTHER_TYPE} category — labelled via
+ * a regex when it fits `Num<Type><Op>`, otherwise by its raw JMX name — so nothing is
+ * silently dropped.
  */
 export function parseOmMetrics(bean: OMMetricsBean | undefined): ParsedOmMetrics {
   const data = bean ?? {};
@@ -242,71 +110,43 @@ export function parseOmMetrics(bean: OMMetricsBean | undefined): ParsedOmMetrics
   };
 
   const summary: MetricsSummary = {
-    volumes: numeric('NumVolumes'),
-    buckets: numeric('NumBuckets'),
-    keys: numeric('NumKeys'),
-    totalCommittedBytes: numeric('TotalDataCommitted'),
+    volumes: numeric(SUMMARY_KEYS.volumes),
+    buckets: numeric(SUMMARY_KEYS.buckets),
+    keys: numeric(SUMMARY_KEYS.keys),
+    totalCommittedBytes: numeric(SUMMARY_KEYS.totalCommittedBytes),
   };
 
-  // Request op value keyed by its request JMX name, failure value keyed by the
-  // request JMX name it belongs to, and failure-only rows with no request counter.
-  const requestByKey = new Map<string, number>();
-  const failureByRequestKey = new Map<string, number>();
-  const orphanRows: OpRow[] = [];
-
-  const addFailure = (requestKey: string, value: number) => {
-    failureByRequestKey.set(requestKey, (failureByRequestKey.get(requestKey) ?? 0) + value);
-  };
+  // Keys the catalog/summary already account for — everything else numeric is "Other".
+  const referenced = new Set<string>(Object.values(SUMMARY_KEYS));
+  const rows: OpRow[] = OM_OPERATIONS.map((op) => {
+    if (op.requestKey) {
+      referenced.add(op.requestKey);
+    }
+    if (op.failureKey) {
+      referenced.add(op.failureKey);
+    }
+    return {
+      type: op.type,
+      key: op.requestKey ?? op.failureKey ?? op.name,
+      name: op.name,
+      requests: op.requestKey ? numeric(op.requestKey) : 0,
+      failures: op.failureKey ? numeric(op.failureKey) : 0,
+    };
+  });
 
   for (const [key, value] of Object.entries(data)) {
-    if (typeof value !== 'number' || NON_OP_KEYS.has(key)) {
+    if (typeof value !== 'number' || referenced.has(key)) {
       continue;
     }
-    const mappedRequest = FAILURE_TO_REQUEST[key];
-    if (mappedRequest) {
-      addFailure(mappedRequest, value);
-    } else if (ORPHAN_FAILURES[key]) {
-      const { type, name } = ORPHAN_FAILURES[key];
-      orphanRows.push({ type, name, requests: 0, failures: value });
-    } else if (key.endsWith('Fails')) {
-      // Unknown failure counter: surface it as a failure rather than misreading the
-      // `Fails` suffix as an operation name. Best-effort type/name from the base.
-      const base = `Num${key.replace(/^Num/, '').replace(/Fails$/, '')}`;
-      const parsed = parseRequestKey(base);
-      orphanRows.push({
-        type: parsed?.type ?? 'Other',
-        name: parsed?.name ?? key,
-        requests: 0,
-        failures: value,
-      });
-    } else if (REQUEST_KEY_RE.test(key)) {
-      requestByKey.set(key, (requestByKey.get(key) ?? 0) + value);
-    }
-  }
-
-  // Assemble operation rows: request rows (joined with their failure), leftover
-  // failures whose request counter was absent, and orphan failure rows.
-  const rows: OpRow[] = [];
-  for (const [key, requests] of requestByKey) {
-    const parsed = parseRequestKey(key);
-    if (!parsed) {
-      continue;
-    }
+    const isFailure = key.endsWith('Fails');
     rows.push({
-      type: parsed.type,
-      name: parsed.name,
-      requests,
-      failures: failureByRequestKey.get(key) ?? 0,
+      type: OTHER_TYPE,
+      key,
+      name: otherDisplayName(key),
+      requests: isFailure ? 0 : value,
+      failures: isFailure ? value : 0,
     });
-    failureByRequestKey.delete(key);
   }
-  for (const [key, failures] of failureByRequestKey) {
-    const parsed = parseRequestKey(key);
-    if (parsed) {
-      rows.push({ type: parsed.type, name: parsed.name, requests: 0, failures });
-    }
-  }
-  rows.push(...orphanRows);
 
   const rowsByType = new Map<string, OpRow[]>();
   for (const row of rows) {
@@ -318,7 +158,7 @@ export function parseOmMetrics(bean: OMMetricsBean | undefined): ParsedOmMetrics
     }
   }
 
-  // Build every known type plus any type discovered in the bean, so a new OM metric
+  // Every known type plus any discovered in the bean (e.g. "Other"), so a new metric
   // category is surfaced rather than dropped.
   const types = new Set<string>([...METRIC_TYPES, ...rowsByType.keys()]);
   const byType: Record<string, MetricTypeData> = {};
@@ -326,7 +166,7 @@ export function parseOmMetrics(bean: OMMetricsBean | undefined): ParsedOmMetrics
     const shown = (rowsByType.get(type) ?? [])
       .filter((op) => op.requests > 0 || op.failures > 0)
       .map((op) => ({
-        key: op.name,
+        key: op.key,
         name: op.name,
         requests: op.requests,
         failures: op.failures,

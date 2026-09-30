@@ -34,6 +34,7 @@ import {
 import {
   METRIC_TYPES,
   OM_METRICS_QUERY,
+  OTHER_TYPE,
   parseOmMetrics,
   type MetricOperation,
   type OMMetricsBean,
@@ -80,13 +81,15 @@ const MetricsContent: React.FC = () => {
   const { summary, byType } = useMemo(() => parseOmMetrics(bean), [bean]);
 
   // All types in a stable order: the known METRIC_TYPES first, then any extra type
-  // discovered in the bean (so a new OM metric category still appears), deduped.
+  // discovered in the bean (so a new OM metric category still appears), with the
+  // "Other" catch-all forced last.
   const orderedTypes = useMemo(() => {
     const known = METRIC_TYPES.filter((t) => byType[t]);
     const extra = Object.keys(byType)
-      .filter((t) => !(METRIC_TYPES as readonly string[]).includes(t))
+      .filter((t) => t !== OTHER_TYPE && !(METRIC_TYPES as readonly string[]).includes(t))
       .sort();
-    return [...known, ...extra];
+    const other = byType[OTHER_TYPE] ? [OTHER_TYPE] : [];
+    return [...known, ...extra, ...other];
   }, [byType]);
 
   const firstEnabled = orderedTypes.find((t) => byType[t]?.enabled);
