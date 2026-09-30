@@ -151,7 +151,9 @@ public class TestBucketDeletedDataCalculator extends SnapshotRequestAndResponseT
     OmKeyInfo keyInfo = newOmKeyInfo(volume, bucket, "key-in-snapshot", 201L);
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot =
              getOmSnapshotManager().getActiveSnapshot(volume, bucket, snapshotName)) {
-      putDeletedKey(snapshot.get().getMetadataManager(), volume, bucket, keyInfo);
+      OMMetadataManager snapshotMetadataManager = snapshot.get().getMetadataManager();
+      ensureBucketContextInSnapshot(snapshotMetadataManager, volume, bucket);
+      putDeletedKey(snapshotMetadataManager, volume, bucket, keyInfo);
     }
 
     BucketDeletedDataCalculator.BucketDeletedBytesStats stats =
