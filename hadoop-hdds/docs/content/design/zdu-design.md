@@ -1,5 +1,5 @@
 ---
-jira: HDDS-3331
+jira: HDDS-14496
 authors:
 - Stephen O'Donnell
 - Ethan Rose
@@ -103,7 +103,7 @@ This simplified version framework lets us enforce **three invariants** to reason
 * **At the time of finalization, all internal components must be running the new bits.**  
 * **For internal client/server relationships, the server will always finalize before the client.**
 
-This table provides a visual example of apparent and software version during a rolling upgrade of the Ozone Managers. Each component's version is indicated using the notation `<apparent version>/<software version>`, and bold versions are running the new software. This notation will be used throughout the document to refer to component versions. Note that the apparent versions of the OMs always match. See the [appendix](#Appendix%20Step%20by%20Step%20ZDU%20Process) for a complete cluster-wide example.
+This table provides a visual example of apparent and software version during a rolling upgrade of the Ozone Managers. Each component's version is indicated using the notation `<apparent version>/<software version>`, and bold versions are running the new software. This notation will be used throughout the document to refer to component versions. Note that the apparent versions of the OMs always match. See the [appendix](#appendix-step-by-step-zdu-process) for a complete cluster-wide example.
 
 | Status                                          | OM1         | OM2         | OM3         |
 | ----------------------------------------------- | ----------- | ----------- | ----------- |
@@ -131,7 +131,7 @@ SCM will need to know the software and apparent versions of the Datanodes, but n
 
 The existing component version enum will be the basis of the new unified versioning framework. This is because it is shared with external clients who can be in any version and may contact the cluster at any time. The existing layout feature enum is internal to components, and therefore easier to control during the migration.
 
-To migrate to one single layout version, we will add a new software version “100” to each existing component version enum. Version 100 will universally indicate the first version that is ZDU ready, and the point from which this unified version will be used to track all changes through the existing component version enum.
+To migrate to one unified component version, we will add a new software version “100” to each existing component version enum. Version 100 will universally indicate the first version that is ZDU ready, and the point from which this unified version will be used to track all changes through the existing component version enum.
 
 Note that the version number we use for this migration must be larger than both the largest existing component version and largest existing layout version to prevent either one from appearing to go back in time before the migrated version is finalized. 100 was chosen as an easily identifiable number that can be used across all components to indicate the epoch from which they all have migrated to the unified framework and support rolling upgrade.
 
@@ -139,7 +139,7 @@ This migration will be transparent in client/server interactions for network cha
 
 This migration will need some handling for disk changes. When the upgraded component starts up with software version 100 and sees a version less than that persisted to the disk, it must use the old `LayoutFeature` enum to look up that version until the cluster is finalized. After finalization, version 100 will be written to the disk and all versions from here on can be referenced from the `ComponentVersion` enum.
 
-In the current code, Datanodes use their own `DatanodeComponentVersion` and there is no `ScmComponentVersion`. However, Datanodes and SCM share the same `HDDSLayoutFeature` for disk versioning. We need to collapse these into a single `HDDSVersion` in the new versioning framework. The existing `DatanodeVersion` can simply be renamed to `HDDSVersion`, since there is no `ScmVersion` to merge it with. From there, migrating from `HDDSLayoutFeature` to `HDDSVersion` can be done using the same process outlined above.
+In the current code, Datanodes use their own `DatanodeVersion` and there is no `ScmVersion` component version enum. However, Datanodes and SCM share the same `HDDSLayoutFeature` for disk versioning. We need to collapse these into a single `HDDSVersion` in the new versioning framework. The existing `DatanodeVersion` can simply be renamed to `HDDSVersion`, since there is no `ScmVersion` to merge it with. From there, migrating from `HDDSLayoutFeature` to `HDDSVersion` can be done using the same process outlined above.
 
 ##  Strategy To Achieve ZDU
 
@@ -160,7 +160,7 @@ This is a summary of invariants for internal components outlined in earlier sect
 
 ###  Order of Operations During the Upgrade
 
-This is a high level summary of all the steps that will happen during a rolling upgrade. For a more detailed view, see the [appendix](#Appendix%20Step%20by%20Step%20ZDU%20Process). Note that rolling upgrade has stricter requirements than non-rolling upgrade, so this process can also be used for a non-rolling upgrade by performing steps 1-5 at the same time.
+This is a high level summary of all the steps that will happen during a rolling upgrade. For a more detailed view, see the [appendix](#appendix-step-by-step-zdu-process). Note that rolling upgrade has stricter requirements than non-rolling upgrade, so this process can also be used for a non-rolling upgrade by performing steps 1-5 at the same time.
 
 1. Deploy the new software version to SCM and rolling restart the SCMs.  
 2. Deploy the new software version to Recon and restart Recon.  
@@ -221,7 +221,7 @@ Although OM first receives the command, the first component to finalize is SCM. 
     - Datanodes which are dead/offline during finalization and are running an old software version will need to be updated to the new software version before a finalized SCM allows them to re-register.  
 3. SCM sends the finalize command over Ratis to finalize all SCMs.
 4. SCM returns success for the RPC command
-5. SCM instructs all Datanodes to finalize, and keeps track of their apparent versions for progress, resending the command as necessary.
+5. SCM instructs all live Datanodes to finalize, and keeps track of their apparent versions for progress, resending the command as necessary.
 6. Until all Datanodes finalize, SCM's upgrade status API will return a flag indicating that all of HDDS has not been finalized yet. Once all live Datanodes have finalized, this flag is set to true.
     - This flag combined with the OM DB marker key indicating a finalize command was given tells OM that it should finalize.
 
@@ -247,7 +247,7 @@ If a Datanode attempts to register with a software version greater than the max 
 
 If a Datanode attempts to register and its software version is less than the one known by SCM, it indicates that Datanode is still running the old software version. If SCM is pre-finalized, it is expected that datanodes can register with the older version, as the DNs will be upgraded after SCM. If SCM is finalized, any Datanodes attempting to register at an older software version should be rejected permanently until the datanode is upgraded so that the versions match.
 
-See the [appendix](#Appendix%20Step%20by%20Step%20ZDU%20Process) for a complete table of SCM to Datanode version relationships.
+See the [appendix](#appendix-step-by-step-zdu-process) for a complete table of SCM to Datanode version relationships.
 
 ####  Mixed Datanode Versions During Write
 
@@ -308,7 +308,7 @@ The non-rolling upgrade problem is a subset of the rolling upgrade problem. Ther
 
 ### Prepare For Upgrade
 
-The current upgrade process requires a "prepare for upgrade” step before the OMs are stopped in the old version and started in the new version. This flushes all Ratis transactions from the log to the state machine and puts the OM in a read-only mode, which it can leave when all the OMs are restarted in the new version. This prevents OMs from applying requests from the Ratis log in different versions and potentially diverging their state machines, but the read-only requirement will not work for ZDU. For this reason, the `ozone admin om prepare` command will be hidden and become a no-op for CLI compatibility and server side code can be removed. The new unified versioning framework will be used to handle applying requests in mixed versions as outlined in [Handling Apply Transaction in Mixed OM Versions](#Handling%20Apply%20Transaction%20in%20Mixed%20OM%20Versions).
+The current upgrade process requires a "prepare for upgrade” step before the OMs are stopped in the old version and started in the new version. This flushes all Ratis transactions from the log to the state machine and puts the OM in a read-only mode, which it can leave when all the OMs are restarted in the new version. This prevents OMs from applying requests from the Ratis log in different versions and potentially diverging their state machines, but the read-only requirement will not work for ZDU. For this reason, the `ozone admin om prepare` command will be hidden and become a no-op for CLI compatibility and server side code can be removed. The new unified versioning framework will be used to handle applying requests in mixed versions as outlined in [Handling Apply Transaction in Mixed OM Versions](#handling-apply-transaction-in-mixed-om-versions).
 
 ### Finalization Commands
 
@@ -346,7 +346,7 @@ For both client and server, the onus is only on the newest version to make decis
 
 Client changes can be categorized into two areas. Adapting an existing API, or making calls to a new API. In either case, the client gets to know the current OM version when it is initialized. Using that version it can make decisions about which APIs to call, or which fields to pass in an API call.
 
-For an existing API, if a new field is made available at OM, then the client should only pass it if OM is reporting an Apparent Version that is greater than the version which introduced the field.
+For an existing API, if a new field is made available at OM, then the client should only pass it if OM is reporting an Apparent Version that is greater than or equal to the version which introduced the field.
 
 For something like Atomic Rewrite, which added an extra field to an existing API, expecting different server behaviour if passed, then the client should give an error to the user if an attempt to use the feature occurs before OM can support it.
 
