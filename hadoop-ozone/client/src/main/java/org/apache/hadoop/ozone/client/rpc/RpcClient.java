@@ -1504,6 +1504,36 @@ public class RpcClient implements ClientProtocol {
     return openOutputStream(builder.build(), size);
   }
 
+  @Override
+  @SuppressWarnings("checkstyle:parameternumber")
+  public OzoneOutputStream createKeyIfNoneMatch(String volumeName, String bucketName, String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    checkIfNoneMatchETagSupport();
+    OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+    builder.setExcludedETag(excludedETag).setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    return openOutputStream(builder.build(), size);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:parameternumber")
+  public OzoneDataStreamOutput createStreamKeyIfNoneMatch(String volumeName, String bucketName, String keyName,
+      long size, String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    checkIfNoneMatchETagSupport();
+    OmKeyArgs.Builder builder = createStreamKeyArgsBuilder(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+    builder.setExcludedETag(excludedETag).setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    return openDataStreamOutput(builder.build());
+  }
+
+  private void checkIfNoneMatchETagSupport() throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) < 0) {
+      throw new IOException("OzoneManager does not support If-None-Match entity ETags for writes.");
+    }
+  }
+
   private OmKeyArgs.Builder createWriteKeyArgsBuilder(String volumeName,
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
@@ -2303,6 +2333,18 @@ public class RpcClient implements ClientProtocol {
       String volumeName, String bucketName, String keyName, String uploadID,
       Map<Integer, String> partsMap,
       Long expectedDataGeneration, String expectedETag) throws IOException {
+    return completeMultipartUpload(volumeName, bucketName, keyName, uploadID, partsMap, expectedDataGeneration,
+        expectedETag, null);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:parameternumber")
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
+      String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
+      String excludedETag) throws IOException {
+    if (excludedETag != null) {
+      checkIfNoneMatchETagSupport();
+    }
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     HddsClientUtils.checkNotNull(keyName, uploadID);
@@ -2322,6 +2364,7 @@ public class RpcClient implements ClientProtocol {
       builder.setExpectedETag(expectedETag);
     }
 
+    builder.setExcludedETag(excludedETag);
     OmKeyArgs keyArgs = builder.build();
 
     OmMultipartUploadCompleteList omMultipartUploadCompleteList =

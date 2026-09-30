@@ -358,6 +358,18 @@ public interface ClientProtocol {
                                 boolean hasSnapshot)
       throws IOException;
 
+  /** Creates a key if its current ETag differs, or if the key is absent. */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneOutputStream createKeyIfNoneMatch(String volumeName, String bucketName, String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException;
+
+  /** Creates a stream key if its current ETag differs, or if the key is absent. */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneDataStreamOutput createStreamKeyIfNoneMatch(String volumeName, String bucketName, String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException;
+
   /**
    * Writes a key in an existing bucket.
    * @param volumeName Name of the Volume
@@ -871,6 +883,12 @@ public interface ClientProtocol {
       String bucketName, String keyName, String uploadID,
       Map<Integer, String> partsMap,
       Long expectedDataGeneration, String expectedETag) throws IOException;
+
+  /** Completes a multipart upload with an additional If-None-Match entity ETag condition. */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
+      String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
+      String excludedETag) throws IOException;
 
   /**
    * Abort Multipart upload request for the given key with given uploadID.

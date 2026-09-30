@@ -557,6 +557,14 @@ public class OzoneBucket extends WithMetadata {
         replicationConfig, metadata, tags, derivedKeyPiggyBacking);
   }
 
+  /** Creates a key if its current ETag differs, or if the key is absent. */
+  public OzoneOutputStream createKeyIfNoneMatch(String keyName, long size, String excludedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return proxy.createKeyIfNoneMatch(volumeName, name, keyName, size, excludedETag, replicationConfig,
+        metadata, tags, derivedKeyPiggyBacking);
+  }
+
   /**
    * Rewrites a key only if its ETag matches (S3 If-Match semantics).
    *
@@ -682,6 +690,17 @@ public class OzoneBucket extends WithMetadata {
     }
     return proxy.createStreamKeyIfNotExists(volumeName, name, key, size,
         replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
+  }
+
+  /** Creates a stream key if its current ETag differs, or if the key is absent. */
+  public OzoneDataStreamOutput createStreamKeyIfNoneMatch(String keyName, long size, String excludedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKeyIfNoneMatch(volumeName, name, keyName, size, excludedETag, replicationConfig,
+        metadata, tags, derivedKeyPiggyBacking);
   }
 
   /**
@@ -1024,6 +1043,14 @@ public class OzoneBucket extends WithMetadata {
       String uploadID, Map<Integer, String> partsMap) throws IOException {
     return proxy.completeMultipartUpload(volumeName, name, key, uploadID,
         partsMap);
+  }
+
+  /** Completes a multipart upload with an additional If-None-Match entity ETag condition. */
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key, String uploadID,
+      Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag, String excludedETag)
+      throws IOException {
+    return proxy.completeMultipartUpload(volumeName, name, key, uploadID, partsMap, expectedDataGeneration,
+        expectedETag, excludedETag);
   }
 
   /**

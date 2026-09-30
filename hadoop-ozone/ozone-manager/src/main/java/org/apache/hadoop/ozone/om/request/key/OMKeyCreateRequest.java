@@ -97,6 +97,10 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
 
+    if (keyArgs.hasExcludedETag()) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
+    }
+
     final OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
 
     if (keyArgs.hasExpectedDataGeneration()) {
@@ -244,7 +248,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       OmKeyInfo dbKeyInfo = omMetadataManager.getKeyTable(getBucketLayout())
           .getIfExist(dbKeyName);
       validateAtomicRewrite(dbKeyInfo, keyArgs);
-      keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(keyArgs, dbKeyInfo);
+      keyArgs = validateAndRewriteETagConditionsAsExpectedGeneration(keyArgs, dbKeyInfo);
 
       OmBucketInfo bucketInfo =
           getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);

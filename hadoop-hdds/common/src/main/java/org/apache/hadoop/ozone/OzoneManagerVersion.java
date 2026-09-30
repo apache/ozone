@@ -67,6 +67,8 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "buckets server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check"),
 
+  S3_IF_NONE_MATCH_ETAG(15, "OzoneManager version that supports If-None-Match entity ETags for writes"),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 

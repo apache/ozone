@@ -1151,6 +1151,9 @@ message KeyArgs {
     // the given ETag for the operation to succeed. This is used for
     // S3 conditional writes with the If-Match header.
     optional string expectedETag = 24;
+
+    // If-None-Match entity ETag: an absent key or a different ETag is allowed.
+    optional string excludedETag = 25;
 }
 
 message KeyLocation {

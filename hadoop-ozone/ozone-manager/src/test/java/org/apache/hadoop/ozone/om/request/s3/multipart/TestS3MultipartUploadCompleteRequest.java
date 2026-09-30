@@ -74,6 +74,50 @@ public class TestS3MultipartUploadCompleteRequest
   }
 
   @Test
+  public void testCompleteWithExcludedETag() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName, new HashMap<>(), new HashMap<>());
+    OmKeyInfo existing = omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName));
+    String existingETag = existing.getMetadata().get(OzoneConsts.ETAG);
+    assertNotNull(existingETag);
+
+    OMRequest initiate = doPreExecuteInitiateMPU(volumeName, bucketName, keyName);
+    OMClientResponse initiateResponse = getS3InitiateMultipartUploadReq(initiate)
+        .validateAndUpdateCache(ozoneManager, 4L);
+    String uploadID = initiateResponse.getOMResponse().getInitiateMultiPartUploadResponse().getMultipartUploadID();
+    long clientID = Time.now();
+    OMRequest commit = doPreExecuteCommitMPU(volumeName, bucketName, keyName, clientID, uploadID, 1);
+    addKeyToTable(volumeName, bucketName, keyName, clientID);
+    getS3MultipartUploadCommitReq(commit).validateAndUpdateCache(ozoneManager, 5L);
+    String partETag = commit.getCommitMultiPartUploadRequest().getKeyArgs().getMetadataList().stream()
+        .filter(kv -> kv.getKey().equals(OzoneConsts.ETAG)).findFirst().get().getValue();
+    List<Part> parts = Collections.singletonList(Part.newBuilder().setETag(partETag).setPartName(partETag)
+        .setPartNumber(1).build());
+    OMRequest complete = doPreExecuteCompleteMPU(volumeName, bucketName, keyName, uploadID, parts);
+    OMRequest matching = complete.toBuilder().setCompleteMultiPartUploadRequest(
+        complete.getCompleteMultiPartUploadRequest().toBuilder().setKeyArgs(
+            complete.getCompleteMultiPartUploadRequest().getKeyArgs().toBuilder().setExcludedETag(existingETag)))
+        .build();
+    OMClientResponse failure = getS3MultipartUploadCompleteReq(matching).validateAndUpdateCache(ozoneManager, 6L);
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS, failure.getOMResponse().getStatus());
+    assertEquals(existingETag, omMetadataManager.getKeyTable(getBucketLayout())
+        .get(getOzoneDBKey(volumeName, bucketName, keyName)).getMetadata().get(OzoneConsts.ETAG));
+    assertNotNull(omMetadataManager.getMultipartInfoTable()
+        .get(getMultipartKey(volumeName, bucketName, keyName, uploadID)));
+
+    OMRequest nonMatching = matching.toBuilder().setCompleteMultiPartUploadRequest(
+        matching.getCompleteMultiPartUploadRequest().toBuilder().setKeyArgs(
+            matching.getCompleteMultiPartUploadRequest().getKeyArgs().toBuilder().setExcludedETag("different-etag")))
+        .build();
+    OMClientResponse success = getS3MultipartUploadCompleteReq(nonMatching).validateAndUpdateCache(ozoneManager, 7L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, success.getOMResponse().getStatus());
+  }
+
+  @Test
   public void testValidateAndUpdateCacheSuccess() throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
