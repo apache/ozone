@@ -571,10 +571,11 @@ public class TestDirectoryDeletingService {
     }
   }
 
-  @Test
+  @ParameterizedTest(name = "stoppedExecutor={0}")
+  @ValueSource(booleans = {false, true})
   @DisplayName("DirectoryDeletingService releases snapshot workers when submission is rejected")
-  void testRejectedSnapshotWorkerSubmission() throws Exception {
-    OzoneConfiguration conf = createConfAndInitValues(2);
+  void testRejectedSnapshotWorkerSubmission(boolean stoppedExecutor) throws Exception {
+    OzoneConfiguration conf = createConfAndInitValues(3);
     OmTestManagers managers = new OmTestManagers(conf);
     om = managers.getOzoneManager();
     KeyManager keyManager = managers.getKeyManager();
@@ -597,8 +598,11 @@ public class TestDirectoryDeletingService {
     awaitSnapshotFlushed(metadataManager, snapshotInfo);
 
     DirectoryDeletingService service = new DirectoryDeletingService(1, TimeUnit.HOURS, 1,
-        om, conf, 2, true);
+        om, conf, 3, true);
     RejectAfterFirstExecutor rejectionExecutor = new RejectAfterFirstExecutor();
+    if (stoppedExecutor) {
+      rejectionExecutor.shutdown();
+    }
     HddsWhiteboxTestUtils.setInternalState(service, "deletionThreadPool", rejectionExecutor);
     ExecutorService taskExecutor = Executors.newSingleThreadExecutor();
     try {
@@ -611,7 +615,9 @@ public class TestDirectoryDeletingService {
         return null;
       });
       processFuture.get(10, TimeUnit.SECONDS);
-      assertThat(rejectionExecutor.getCompletedTaskCount()).isEqualTo(1);
+      int expectedCompletedTasks = stoppedExecutor ? 0 : 1;
+      GenericTestUtils.waitFor(() -> rejectionExecutor.getCompletedTaskCount() == expectedCompletedTasks, 100, 5000);
+      assertThat(rejectionExecutor.getCompletedTaskCount()).isEqualTo(expectedCompletedTasks);
     } finally {
       taskExecutor.shutdownNow();
       service.shutdown();

@@ -44,7 +44,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -316,10 +315,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       pool.allowCoreThreadTimeOut(true);
     }
     return pool;
-  }
-
-  private boolean isThreadPoolActive(ExecutorService threadPoolExecutor) {
-    return threadPoolExecutor != null && !threadPoolExecutor.isShutdown() && !threadPoolExecutor.isTerminated();
   }
 
   @VisibleForTesting
@@ -748,7 +743,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
                 signalWorkerReady(workerReady, snapshotDbHandlesClosed);
               }
             }
-          }, isThreadPoolActive(deletionThreadPool) ? deletionThreadPool : ForkJoinPool.commonPool());
+          }, deletionThreadPool);
           workersCompleted = workersCompleted.thenCombine(future, (a, b) -> a && b);
         } catch (RejectedExecutionException e) {
           // Account for the rejected worker and every remaining worker that will not be submitted.
