@@ -461,7 +461,7 @@ public class BucketEndpoint extends BucketOperationHandler {
         .add(new ListMultipartUploadsHandler())
         .add(new BucketTaggingHandler())
         .add(new BucketLifecycleHandler())
-        .add(new BucketNotImplementedHandler())
+        .add(new BucketOperationNotImplementedHandler())
         .add(new BucketCrudHandler())
         .add(this)
         .build();

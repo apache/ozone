@@ -54,6 +54,7 @@ class ObjectAclHandler extends ObjectOperationHandler {
     }
   }
 
+  @Override
   S3GAction getAction() {
     if (queryParams().get(S3Consts.QueryParams.ACL) == null) {
       return null;
@@ -65,7 +66,7 @@ class ObjectAclHandler extends ObjectOperationHandler {
     case HttpMethod.PUT:
       return S3GAction.PUT_OBJECT_ACL;
     default:
-      return null;
+      return S3GAction.NOT_IMPLEMENTED;
     }
   }
 }

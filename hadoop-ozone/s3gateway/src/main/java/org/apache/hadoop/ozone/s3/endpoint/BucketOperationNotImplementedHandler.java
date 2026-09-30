@@ -24,27 +24,27 @@ import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 
 /**
- * Rejects bucket subresource operations that are not implemented.
+ * Rejects operations on bucket subresources that no other handler recognizes.
  * <p>
- * Must be added to the chain after the handlers of specific subresources ({@link BucketAclHandler},
- * {@link BucketGetLocationHandler}, {@link BucketLifecycleHandler}, {@link BucketTaggingHandler},
- * {@link ListMultipartUploadsHandler}) and before {@link BucketCrudHandler}, so that it only sees the HTTP methods
- * those handlers do not handle, e.g. DELETE {@code ?acl} or PUT {@code ?uploads}. Otherwise, the requests fall through
- * to another operation of the same HTTP method: a GET returns a {@code ListBucketResult} body, a PUT creates the bucket
- * and a DELETE deletes it.
+ * Subresources that have a handler ({@link BucketAclHandler}, {@link BucketGetLocationHandler},
+ * {@link BucketLifecycleHandler}, {@link BucketTaggingHandler}, {@link ListMultipartUploadsHandler}) reject their own
+ * unsupported HTTP methods.
+ * <p>
+ * Must be added to the chain before {@link BucketCrudHandler}. Otherwise, the requests fall through to another
+ * operation of the same HTTP method: a GET returns a {@code ListBucketResult} body, a PUT creates the bucket and a
+ * DELETE deletes it.
  * <p>
  * {@code ?delete} is only valid for POST ({@code DeleteObjects}), which does not go through this chain.
  */
-class BucketNotImplementedHandler extends BucketOperationHandler {
+class BucketOperationNotImplementedHandler extends BucketOperationHandler {
 
   private static final Set<String> SUBRESOURCES = ImmutableSet.of(
-      QueryParams.ABAC, QueryParams.ACCELERATE, QueryParams.ACL, QueryParams.ANALYTICS, QueryParams.CORS,
-      QueryParams.DELETE, QueryParams.ENCRYPTION, QueryParams.INTELLIGENT_TIERING, QueryParams.INVENTORY,
-      QueryParams.LOCATION, QueryParams.LOGGING, QueryParams.METADATA_ANNOTATION_TABLE,
-      QueryParams.METADATA_CONFIGURATION, QueryParams.METADATA_INVENTORY_TABLE, QueryParams.METADATA_JOURNAL_TABLE,
-      QueryParams.METADATA_TABLE, QueryParams.METRICS, QueryParams.NOTIFICATION, QueryParams.OBJECT_LOCK,
-      QueryParams.OWNERSHIP_CONTROLS, QueryParams.POLICY, QueryParams.POLICY_STATUS, QueryParams.PUBLIC_ACCESS_BLOCK,
-      QueryParams.REPLICATION, QueryParams.REQUEST_PAYMENT, QueryParams.SESSION, QueryParams.UPLOADS,
+      QueryParams.ABAC, QueryParams.ACCELERATE, QueryParams.ANALYTICS, QueryParams.CORS, QueryParams.DELETE,
+      QueryParams.ENCRYPTION, QueryParams.INTELLIGENT_TIERING, QueryParams.INVENTORY, QueryParams.LOGGING,
+      QueryParams.METADATA_ANNOTATION_TABLE, QueryParams.METADATA_CONFIGURATION, QueryParams.METADATA_INVENTORY_TABLE,
+      QueryParams.METADATA_JOURNAL_TABLE, QueryParams.METADATA_TABLE, QueryParams.METRICS, QueryParams.NOTIFICATION,
+      QueryParams.OBJECT_LOCK, QueryParams.OWNERSHIP_CONTROLS, QueryParams.POLICY, QueryParams.POLICY_STATUS,
+      QueryParams.PUBLIC_ACCESS_BLOCK, QueryParams.REPLICATION, QueryParams.REQUEST_PAYMENT, QueryParams.SESSION,
       QueryParams.VERSIONING, QueryParams.VERSIONS, QueryParams.WEBSITE);
 
   @Override

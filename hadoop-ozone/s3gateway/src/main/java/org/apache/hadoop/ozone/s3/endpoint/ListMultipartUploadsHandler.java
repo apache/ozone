@@ -35,6 +35,11 @@ import org.apache.hadoop.ozone.s3.util.S3StorageType;
 class ListMultipartUploadsHandler extends BucketOperationHandler {
 
   @Override
+  S3GAction getAction() {
+    return queryParams().get(QueryParams.UPLOADS) == null ? null : S3GAction.NOT_IMPLEMENTED;
+  }
+
+  @Override
   Response handleGetRequest(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
 

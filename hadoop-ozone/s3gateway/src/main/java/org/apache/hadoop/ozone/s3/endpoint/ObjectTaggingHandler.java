@@ -124,7 +124,8 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
     }
   }
 
-  private S3GAction getAction() {
+  @Override
+  S3GAction getAction() {
     if (queryParams().get(S3Consts.QueryParams.TAGGING) == null) {
       return null;
     }

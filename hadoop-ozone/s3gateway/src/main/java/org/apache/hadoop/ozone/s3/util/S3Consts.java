@@ -186,7 +186,7 @@ public final class S3Consts {
 
     // Subresources of S3 APIs that are not implemented. They are only recognized so that the
     // request can be rejected with NotImplemented instead of falling through to another operation.
-    // See BucketNotImplementedHandler and ObjectNotImplementedHandler.
+    // See BucketOperationNotImplementedHandler and ObjectOperationNotImplementedHandler.
     public static final String ABAC = "abac";
     public static final String ACCELERATE = "accelerate";
     public static final String ANALYTICS = "analytics";

@@ -25,21 +25,22 @@ import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint.ObjectRequestContext;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 
 /**
- * Rejects object subresource operations that are not implemented.
+ * Rejects operations on object subresources that no other handler recognizes.
  * <p>
- * Must be added to the chain after the handlers of specific subresources ({@link ObjectAclHandler},
- * {@link ObjectAttributesHandler}, {@link ObjectGetTorrentHandler}, {@link ObjectTaggingHandler},
- * {@link MultipartKeyHandler}), etc. so that it only sees the HTTP methods those handlers do not handle, e.g. DELETE
- * {@code ?acl} or PUT {@code ?attributes}. Otherwise, the requests fall through to another operation of the same HTTP
- * method: a GET returns the object body, a PUT overwrites the object with the request body and a DELETE deletes it.
+ * Subresources that have a handler ({@link ObjectAclHandler}, {@link ObjectAttributesHandler},
+ * {@link ObjectGetTorrentHandler}, {@link ObjectTaggingHandler}) reject their own unsupported HTTP methods.
+ * <p>
+ * Must be added to the chain before {@link ObjectEndpoint}. Otherwise, the requests fall through to another operation
+ * of the same HTTP method: a GET returns the object body, a PUT overwrites the object with the request body and a
+ * DELETE deletes it.
  * <p>
  * {@code ?uploads} is only valid for POST ({@code CreateMultipartUpload}), which does not go through this chain.
  */
-class ObjectNotImplementedHandler extends ObjectOperationHandler {
+class ObjectOperationNotImplementedHandler extends ObjectOperationHandler {
 
   private static final Set<String> SUBRESOURCES = ImmutableSet.of(
-      QueryParams.ACL, QueryParams.ANNOTATION, QueryParams.ATTRIBUTES, QueryParams.ENCRYPTION, QueryParams.LEGAL_HOLD,
-      QueryParams.RENAME_OBJECT, QueryParams.RETENTION, QueryParams.TORRENT, QueryParams.UPLOADS);
+      QueryParams.ANNOTATION, QueryParams.ENCRYPTION, QueryParams.LEGAL_HOLD, QueryParams.RENAME_OBJECT,
+      QueryParams.RETENTION, QueryParams.UPLOADS);
 
   // DeleteObject with versionId targets a specific version; ignoring it would delete the current object instead.
   private static final Set<String> DELETE_SUBRESOURCES = ImmutableSet.<String>builder()
