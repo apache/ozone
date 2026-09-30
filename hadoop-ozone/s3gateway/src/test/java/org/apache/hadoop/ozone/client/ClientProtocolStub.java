@@ -310,6 +310,25 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKeyIfNoneMatch(String volumeName, String bucketName, String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName).createKeyIfNoneMatch(keyName, size, excludedETag, replicationConfig,
+        metadata, tags, derivedKeyPiggyBacking);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput createStreamKeyIfNoneMatch(String volumeName, String bucketName,
+      String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName).createStreamKeyIfNoneMatch(keyName, size, excludedETag, replicationConfig,
+        metadata, tags, derivedKeyPiggyBacking);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKeyIfMatch(String volumeName,
       String bucketName, String keyName, long size, String expectedETag,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
@@ -497,6 +516,15 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
     objectStoreStub.getS3Volume().getBucket(bucketName).abortMultipartUpload(keyName, uploadID);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
+      String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
+      String excludedETag) throws IOException {
+    return getBucket(volumeName, bucketName).completeMultipartUpload(keyName, uploadID, partsMap,
+        expectedDataGeneration, expectedETag, excludedETag);
   }
 
   @Override
