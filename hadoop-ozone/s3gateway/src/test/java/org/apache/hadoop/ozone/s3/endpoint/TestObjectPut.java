@@ -59,9 +59,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -98,6 +100,7 @@ import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -735,6 +738,25 @@ class TestObjectPut {
       // next request in the same thread
       verify(messageDigest, times(1)).reset();
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testCopyObjectReusesSourceKeyDetails(boolean streaming) throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+    objectEndpoint.init();
+    doReturn(streaming).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    ClientProtocol protocol = spy(objectEndpoint.getClientProtocol());
+    doReturn(protocol).when(objectEndpoint).getClientProtocol();
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+
+    try (Response response = put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT)) {
+      assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+    }
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+    verify(protocol).getKeyDetails(bucket.getVolumeName(), BUCKET_NAME, KEY_NAME);
+    verify(protocol, never()).getKey(bucket.getVolumeName(), BUCKET_NAME, KEY_NAME);
   }
 
   @Test
