@@ -25,7 +25,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -79,7 +78,7 @@ public final class ContainerBalancerAdvisor {
 
     ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(nodes, thresholdRatio, 
         includeNodes, excludeNodes);
-    validateSnapshotForEstimation(snapshot, conf);
+    validateSnapshotForEstimation(snapshot);
 
     List<ContainerBalancerProfile> profiles = selectProfiles(request);
     List<ContainerBalancerEstimation> estimations = new ArrayList<>(profiles.size());
@@ -118,13 +117,34 @@ public final class ContainerBalancerAdvisor {
 
     ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
         nodes, thresholdRatio, includeNodes, excludeNodes);
-    validateSnapshotForEstimation(snapshot, conf);
 
     List<ContainerBalancerProfile> profiles = selectProfilesForRecommend(request);
+    if (isClusterAlreadyBalanced(snapshot)) {
+      return recommendationsForBalancedCluster(profiles, thresholdPercent);
+    }
+    validateSnapshotForEstimation(snapshot);
     List<ContainerBalancerRecommendation> recommendations = new ArrayList<>(profiles.size());
     for (ContainerBalancerProfile profile : profiles) {
       recommendations.add(recommendForProfile(
           conf, request, profile, balancerConfig, thresholdPercent, includeNodes, excludeNodes));
+    }
+    return Collections.unmodifiableList(recommendations);
+  }
+
+  private static boolean isClusterAlreadyBalanced(ContainerBalancerClusterSnapshot snapshot) {
+    return snapshot.getBytesToMove() <= 0
+        || (snapshot.getSourceCount() < 1 && snapshot.getTargetCount() < 1);
+  }
+
+  private static List<ContainerBalancerRecommendation> recommendationsForBalancedCluster(
+      List<ContainerBalancerProfile> profiles, double thresholdPercent) {
+    List<ContainerBalancerRecommendation> recommendations = new ArrayList<>(profiles.size());
+    for (ContainerBalancerProfile profile : profiles) {
+      recommendations.add(ContainerBalancerRecommendation.newBuilder()
+          .setProfile(profile)
+          .setThresholdPercent(thresholdPercent)
+          .setClusterBalanced(true)
+          .build());
     }
     return Collections.unmodifiableList(recommendations);
   }
@@ -227,31 +247,31 @@ public final class ContainerBalancerAdvisor {
     int profileDatanodesPercentage = profile.getDatanodesMaxPercentage();
     int usedDatanodesPercentage = estimation.getMaxDatanodesPercentage();
     if (usedDatanodesPercentage == profileDatanodesPercentage) {
-      rationale.put("maxDatanodesPercentage", String.format(Locale.ENGLISH,
+      rationale.put("maxDatanodesPercentage", String.format(
           "profile default (%d%%)", usedDatanodesPercentage));
     } else {
-      rationale.put("maxDatanodesPercentage", String.format(Locale.ENGLISH,
+      rationale.put("maxDatanodesPercentage", String.format(
           "profile %d%%, raised to %d%% (≥2 nodes)", profileDatanodesPercentage, usedDatanodesPercentage));
     }
-    rationale.put("maxSizeToMovePerIteration", String.format(Locale.ENGLISH,
+    rationale.put("maxSizeToMovePerIteration", String.format(
         "min(%s ceiling, max(per-iteration %s, entering %s, leaving %s))",
         byteDesc(balancerConfig.getMaxSizeToMovePerIteration()),
         byteDesc(estimation.getPerIterationBytes()),
         byteDesc(estimation.getMaxSizeEnteringTarget()),
         byteDesc(estimation.getMaxSizeLeavingSource())));
-    rationale.put("maxSizeEnteringTarget", String.format(Locale.ENGLISH,
+    rationale.put("maxSizeEnteringTarget", String.format(
         "profile default (%d GB)", estimation.getMaxSizeEnteringTarget() / OzoneConsts.GB));
-    rationale.put("maxSizeLeavingSource", String.format(Locale.ENGLISH,
+    rationale.put("maxSizeLeavingSource", String.format(
         "profile default (%d GB)", estimation.getMaxSizeLeavingSource() / OzoneConsts.GB));
-    rationale.put("moveTimeout", String.format(Locale.ENGLISH,
+    rationale.put("moveTimeout", String.format(
         "configuration default (%d min)", moveTimeoutMillis / 60000));
-    rationale.put("moveReplicationTimeout", String.format(Locale.ENGLISH,
+    rationale.put("moveReplicationTimeout", String.format(
         "configuration default (%d min)", moveReplicationTimeoutMillis / 60000));
-    rationale.put("balancingInterval", String.format(Locale.ENGLISH,
+    rationale.put("balancingInterval", String.format(
         "configuration default (%d min)", balancingIntervalMillis / 60000));
     long planningIterations = (long) Math.ceil(
         estimation.getEstimatedIterations() * PLANNING_ITERATION_BUFFER);
-    rationale.put("iterations", String.format(Locale.ENGLISH,
+    rationale.put("iterations", String.format(
         "includes +30%% buffer (planning estimate: %d)", planningIterations));
     return rationale;
   }
@@ -430,12 +450,7 @@ public final class ContainerBalancerAdvisor {
     return result;
   }
 
-  private static void validateSnapshotForEstimation(ContainerBalancerClusterSnapshot snapshot,
-      OzoneConfiguration conf) {
-    long containerSizeBytes = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-        StorageUnit.BYTES);
+  private static void validateSnapshotForEstimation(ContainerBalancerClusterSnapshot snapshot ) {
     if (snapshot.getSourceCount() < 1) {
       throw new IllegalArgumentException("No over-utilized datanodes (sources) found.");
     }
@@ -444,11 +459,6 @@ public final class ContainerBalancerAdvisor {
     }
     if (snapshot.getBytesToMove() <= 0) {
       throw new IllegalArgumentException("No bytes to move.");
-    }
-    if (snapshot.getBytesToMove() < containerSizeBytes) {
-      throw new IllegalArgumentException(
-              "Bytes to move (" + snapshot.getBytesToMove()
-                      + ") is less than container size (" + containerSizeBytes + ").");
     }
     if (snapshot.getTotalEligibleDatanodes() < 2) {
       throw new IllegalArgumentException(String.format(

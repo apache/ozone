@@ -21,7 +21,6 @@ import static org.apache.hadoop.util.StringUtils.byteDesc;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -111,8 +110,8 @@ public class ContainerBalancerEstimateSubcommand extends ScmSubcommand {
     long moveTimeoutMinutes = Math.round(estimation.getMoveTimeoutMillis() / 60000d);
     long balancingIntervalMinutes = Math.round(estimation.getBalancingIntervalMillis() / 60000d);
     out().println(" Based on:");
-    out().printf(Locale.ENGLISH, "   Threshold:                %.1f%%%n", estimation.getThresholdPercent());
-    out().printf(Locale.ENGLISH, "   Datanode involvement:     %d%%%n",
+    out().printf("   Threshold:                %.1f%%%n", estimation.getThresholdPercent());
+    out().printf("   Datanode involvement:     %d%%%n",
         estimation.getMaxDatanodesPercentage());
     out().printf("   Max entering target:      %s / node%n", byteDesc(estimation.getMaxSizeEnteringTarget()));
     out().printf("   Max leaving source:       %s / node%n", byteDesc(estimation.getMaxSizeLeavingSource()));

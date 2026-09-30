@@ -23,12 +23,14 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerEstimation;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerProfile;
+import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerRecommendation;
+import org.apache.hadoop.ozone.OzoneConsts;
 
 /** Shared parsing and CLI output for container balancer subcommands. */
 public final class ContainerBalancerCliHelper {
@@ -41,7 +43,7 @@ public final class ContainerBalancerCliHelper {
 
   public static ContainerBalancerProfile parseProfile(String name) throws IOException {
     try {
-      return ContainerBalancerProfile.valueOf(name.trim().toUpperCase(Locale.ENGLISH));
+      return ContainerBalancerProfile.valueOf(name.trim().toUpperCase());
     } catch (IllegalArgumentException e) {
       throw new IOException("Invalid profile: " + name + ". Expected SLOW, MEDIUM, or FAST.");
     }
@@ -77,13 +79,55 @@ public final class ContainerBalancerCliHelper {
   public static String formatEstimatedDuration(long durationMillis) {
     double days = durationMillis / 86400000d;
     if (days >= 1) {
-      return String.format(Locale.ENGLISH, "~%.1f days", days);
+      return String.format("~%.1f days", days);
     }
     double hours = durationMillis / 3600000d;
     if (hours >= 1) {
-      return String.format(Locale.ENGLISH, "~%.1f hours", hours);
+      return String.format("~%.1f hours", hours);
     }
     long minutes = durationMillis / 60000;
-    return String.format(Locale.ENGLISH, "~%d min", minutes);
+    return String.format("~%d min", minutes);
+  }
+
+  public static String formatStartCommand(
+      ContainerBalancerRecommendation recommendation,
+      Optional<String> includeNodes,
+      Optional<String> excludeNodes) {
+    StringBuilder sb = new StringBuilder("ozone admin containerbalancer start");
+    sb.append(" -t ").append(formatThreshold(recommendation.getThresholdPercent()));
+    sb.append(" -i ").append(recommendation.getRecommendedIterations());
+    sb.append(" -d ").append(recommendation.getMaxDatanodesPercentage());
+    sb.append(" -s ").append(bytesToGb(recommendation.getMaxSizeToMovePerIteration()));
+    sb.append(" -e ").append(bytesToGb(recommendation.getMaxSizeEnteringTarget()));
+    sb.append(" -l ").append(bytesToGb(recommendation.getMaxSizeLeavingSource()));
+    sb.append(" --balancing-iteration-interval-minutes ")
+        .append(recommendation.getBalancingIntervalMillis() / 60000);
+    sb.append(" --move-timeout-minutes ")
+        .append(recommendation.getMoveTimeoutMillis() / 60000);
+    sb.append(" --move-replication-timeout-minutes ")
+        .append(recommendation.getMoveReplicationTimeoutMillis() / 60000);
+    appendNodeFilters(sb, includeNodes, excludeNodes);
+    return sb.toString();
+  }
+
+  private static void appendNodeFilters(
+      StringBuilder sb,
+      Optional<String> includeNodes,
+      Optional<String> excludeNodes) {
+    includeNodes.filter(s -> !StringUtils.isBlank(s))
+        .ifPresent(s -> sb.append(" --include-datanodes ").append(s.trim()));
+    excludeNodes.filter(s -> !StringUtils.isBlank(s))
+        .ifPresent(s -> sb.append(" --exclude-datanodes ").append(s.trim()));
+  }
+
+  private static long bytesToGb(long bytes) {
+    return bytes / OzoneConsts.GB;
+  }
+
+  private static String formatThreshold(double thresholdPercent) {
+    if (thresholdPercent == Math.rint(thresholdPercent)) {
+      return String.valueOf((long) thresholdPercent);
+    }
+    return String.valueOf(thresholdPercent);
   }
 }

@@ -21,7 +21,6 @@ import static org.apache.hadoop.util.StringUtils.byteDesc;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -86,6 +85,13 @@ public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
       throw new IOException(e.getMessage(), e);
     }
 
+    if (!recommendations.isEmpty()
+        && recommendations.stream().allMatch(ContainerBalancerRecommendation::isClusterBalanced)) {
+      out().println("Cluster is already balanced within the configured threshold. "
+          + "No balancing recommended.");
+      return;
+    }
+
     boolean anySucceeded = false;
     for (ContainerBalancerRecommendation recommendation : recommendations) {
       printRecommendation(recommendation);
@@ -124,6 +130,11 @@ public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
     out().println();
     out().println(" Estimation:");
     ContainerBalancerCliHelper.printEstimation(out(), recommendation.getEstimation());
+
+    out().println(" Suggested commands:");
+    out().println("   " + ContainerBalancerCliHelper.formatStartCommand(
+        recommendation, includeNodes, excludeNodes));
+    out().println();
   }
 
   private void printRecommendedParameters(ContainerBalancerRecommendation recommendation) {
@@ -136,10 +147,10 @@ public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
     out().println(" Recommended parameters:");
     printParameterRow("Parameter", "Value", "Rationale");
     printParameterRow("--threshold",
-        String.format(Locale.ENGLISH, "%.1f%%", recommendation.getThresholdPercent()),
+        String.format("%.1f%%", recommendation.getThresholdPercent()),
         rationale.get("threshold"));
     printParameterRow("--max-datanodes-percentage-to-involve",
-        String.format(Locale.ENGLISH, "%d%%", recommendation.getMaxDatanodesPercentage()),
+        String.format("%d%%", recommendation.getMaxDatanodesPercentage()),
         rationale.get("maxDatanodesPercentage"));
     printParameterRow("--max-size-to-move-per-iteration-in-gb",
         byteDesc(recommendation.getMaxSizeToMovePerIteration()),
@@ -151,13 +162,13 @@ public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
         byteDesc(recommendation.getMaxSizeLeavingSource()) + " / node",
         rationale.get("maxSizeLeavingSource"));
     printParameterRow("--move-timeout-minutes",
-        String.format(Locale.ENGLISH, "%d min", moveTimeoutMinutes),
+        String.format("%d min", moveTimeoutMinutes),
         rationale.get("moveTimeout"));
     printParameterRow("--move-replication-timeout-minutes",
-        String.format(Locale.ENGLISH, "%d min", moveReplicationTimeoutMinutes),
+        String.format("%d min", moveReplicationTimeoutMinutes),
         rationale.get("moveReplicationTimeout"));
     printParameterRow("--balancing-iteration-interval-minutes",
-        String.format(Locale.ENGLISH, "%d min", balancingIntervalMinutes),
+        String.format("%d min", balancingIntervalMinutes),
         rationale.get("balancingInterval"));
     printParameterRow("--iterations",
         String.valueOf(recommendation.getRecommendedIterations()),
@@ -166,7 +177,7 @@ public class ContainerBalancerRecommendSubcommand extends ScmSubcommand {
 
   private void printParameterRow(String parameter, String value, String rationaleText) {
     String rationale = rationaleText == null ? "" : rationaleText;
-    out().printf(Locale.ENGLISH, " %-" + PARAM_COLUMN_WIDTH + "s %-" + VALUE_COLUMN_WIDTH + "s %s%n",
+    out().printf(" %-" + PARAM_COLUMN_WIDTH + "s %-" + VALUE_COLUMN_WIDTH + "s %s%n",
         parameter, value, rationale);
   }
 

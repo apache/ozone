@@ -39,6 +39,7 @@ public final class ContainerBalancerRecommendation {
   private final int recommendedIterations;
   private final Map<String, String> rationale;
   private final ContainerBalancerEstimation estimation;
+  private final boolean clusterBalanced;
 
   private ContainerBalancerRecommendation(Builder b) {
     this.profile = Objects.requireNonNull(b.profile, "profile == null");
@@ -56,6 +57,7 @@ public final class ContainerBalancerRecommendation {
         ? Collections.emptyMap()
         : Collections.unmodifiableMap(b.rationale);
     this.estimation = b.estimation;
+    this.clusterBalanced = b.clusterBalanced;
   }
 
   public static Builder newBuilder() {
@@ -68,6 +70,10 @@ public final class ContainerBalancerRecommendation {
 
   public boolean succeeded() {
     return failureMessage == null;
+  }
+
+  public boolean isClusterBalanced() {
+    return clusterBalanced;
   }
 
   public String getFailureMessage() {
@@ -133,6 +139,7 @@ public final class ContainerBalancerRecommendation {
     private int recommendedIterations;
     private Map<String, String> rationale;
     private ContainerBalancerEstimation estimation;
+    private boolean clusterBalanced;
 
     private Builder() {
     }
@@ -199,6 +206,11 @@ public final class ContainerBalancerRecommendation {
 
     public Builder setEstimation(ContainerBalancerEstimation estimationValue) {
       this.estimation = estimationValue;
+      return this;
+    }
+
+    public Builder setClusterBalanced(boolean balanced) {
+      this.clusterBalanced = balanced;
       return this;
     }
 

@@ -1050,7 +1050,10 @@ class TestContainerBalancerSubCommand {
         .contains("Bytes to move:")
         .contains("planning estimate:")
         .contains("assumes full move timeout + interval each cycle")
+        .contains("Suggested commands:")
+        .contains("ozone admin containerbalancer start")
         .doesNotContain("Recommendation failed:");
+    assertThat(output.split("Suggested commands:")).hasSize(4);
   }
 
   @Test
@@ -1062,7 +1065,9 @@ class TestContainerBalancerSubCommand {
     parseSubcommand(recommendCmd, "-t", "5");
     recommendCmd.execute(scmClient);
 
-    assertThat(out.get()).contains("RECOMMENDED CONFIGURATION (profile: SLOW)");
+    assertThat(out.get())
+        .contains("RECOMMENDED CONFIGURATION (profile: SLOW)")
+        .contains("ozone admin containerbalancer start -t 5");
   }
 
   @Test
@@ -1078,7 +1083,10 @@ class TestContainerBalancerSubCommand {
     assertThat(output)
         .contains("RECOMMENDED CONFIGURATION (profile: MEDIUM)")
         .doesNotContain("RECOMMENDED CONFIGURATION (profile: SLOW)")
-        .doesNotContain("RECOMMENDED CONFIGURATION (profile: FAST)");
+        .doesNotContain("RECOMMENDED CONFIGURATION (profile: FAST)")
+        .contains("Suggested commands:")
+        .contains("ozone admin containerbalancer start");
+    assertThat(output.split("Suggested commands:")).hasSize(2);
   }
 
   @Test
@@ -1090,6 +1098,24 @@ class TestContainerBalancerSubCommand {
     parseSubcommand(recommendCmd, "-t", "-1");
     IOException ex = assertThrows(IOException.class, () -> recommendCmd.execute(scmClient));
     assertThat(ex.getMessage()).contains("Threshold should be specified in the range [0.0, 100.0).");
+  }
+
+  @Test
+  void testContainerBalancerRecommendSubcommandWhenClusterBalanced() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.DatanodeUsageInfoProto> balanced = new ArrayList<>();
+    long capacity = OzoneConsts.TB;
+    balanced.add(datanodeUsageProto("dn-1", capacity, (long) (capacity * 0.70)));
+    balanced.add(datanodeUsageProto("dn-2", capacity, (long) (capacity * 0.70)));
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE)).thenReturn(balanced);
+
+    parseSubcommand(recommendCmd);
+    recommendCmd.execute(scmClient);
+
+    assertThat(out.get())
+        .contains("Cluster is already balanced within the configured threshold.")
+        .doesNotContain("Suggested commands:")
+        .doesNotContain("ozone admin containerbalancer start");
   }
 
   /**

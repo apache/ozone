@@ -357,16 +357,21 @@ public final class TestContainerBalancerAdvisor {
   }
 
   @Test
-  void testRecommendFailsWhenClusterBalanced() {
+  void testRecommendSucceedsWhenClusterBalanced() {
     OzoneConfiguration conf = new OzoneConfiguration();
     List<DatanodeUsageInfoProto> balanced = new ArrayList<>();
     balanced.add(proto("dn-1", OzoneConsts.TB, (long) (0.70 * OzoneConsts.TB)));
     balanced.add(proto("dn-2", OzoneConsts.TB, (long) (0.70 * OzoneConsts.TB)));
 
-    assertThrows(IllegalArgumentException.class, () ->
-        ContainerBalancerAdvisor.recommend(
-            conf,
-            new ContainerBalancerAdvisor.AdvisorRequest().setNodes(balanced)));
+    List<ContainerBalancerRecommendation> results = ContainerBalancerAdvisor.recommend(
+        conf,
+        new ContainerBalancerAdvisor.AdvisorRequest().setNodes(balanced));
+
+    assertEquals(3, results.size());
+    for (ContainerBalancerRecommendation result : results) {
+      assertThat(result.succeeded()).isTrue();
+      assertThat(result.isClusterBalanced()).isTrue();
+    }
   }
 
   @Test
