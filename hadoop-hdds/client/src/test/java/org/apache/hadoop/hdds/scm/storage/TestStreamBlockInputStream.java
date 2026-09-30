@@ -148,6 +148,8 @@ public class TestStreamBlockInputStream {
       ByteBuffer dst = ByteBuffer.allocate(10);
       assertEquals(-1, sbis.readPositioned(data.length, dst));
       assertEquals(-1, sbis.readPositioned(data.length + 1, dst));
+      // An empty buffer also gets -1, as PartInputStream#readPositioned documents.
+      assertEquals(-1, sbis.readPositioned(0, ByteBuffer.allocate(0)));
     }
   }
 
@@ -157,17 +159,11 @@ public class TestStreamBlockInputStream {
     clientConfig.setMaxReadRetryCount(0);
     BlockID blockID = new BlockID(1L, 18L);
     Pipeline pipeline = mockStandalonePipeline();
-    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
-        mock(ClientCallStreamObserver.class);
-    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
-    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
 
+    // Like XceiverClientGrpc, fail before the gRPC call starts: initStreamRead then releases its own permit.
     XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
-    doAnswer(invocation -> {
-      StreamingReaderSpi reader = invocation.getArgument(1);
-      reader.setStreamingReadResponse(streamingReadResponse);
-      throw new IOException("initStreamRead failed");
-    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+    doThrow(new IOException("initStreamRead failed"))
+        .when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
 
     XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
     when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
@@ -181,7 +177,6 @@ public class TestStreamBlockInputStream {
     }
 
     verify(xceiverClient, never()).completeStreamRead();
-    verify(requestObserver, times(1)).onCompleted();
   }
 
   @Test
@@ -402,7 +397,7 @@ public class TestStreamBlockInputStream {
       }
       byte[] slice = Arrays.copyOfRange(data, start, end);
       reader.onNext(buildResponseProto(slice, offset));
-      if (offset > 0 || end >= data.length) {
+      if (end >= data.length) {
         reader.onCompleted();
       }
       return null;
@@ -960,6 +955,68 @@ public class TestStreamBlockInputStream {
       assertThat(hasCause(thrown, StatusRuntimeException.class)).isTrue();
       assertThat(hasCause(thrown, TimeoutIOException.class)).isFalse();
       assertThat(elapsedMillis).isLessThan(sbis.getReadTimeout().toMillis());
+    }
+  }
+
+  /**
+   * A streamed error response (e.g. CONTAINER_NOT_FOUND) is retried after refreshing the block location,
+   * for both sequential and positioned reads.
+   */
+  @Test
+  public void testRetriesErrorResponseAfterRefresh() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setMaxReadRetryCount(1);
+    clientConfig.setReadRetryInterval(0);
+    byte[] data = new byte[] {1, 2, 3, 4};
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+    when(streamingReadResponse.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+
+    // Every other ReadBlock request gets an error response; only one reader is active at a time here.
+    AtomicInteger streamReads = new AtomicInteger();
+    AtomicReference<StreamingReaderSpi> lastReader = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      lastReader.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = lastReader.get();
+      if (streamReads.getAndIncrement() % 2 == 0) {
+        reader.onNext(ContainerCommandResponseProto.newBuilder()
+            .setCmdType(Type.ReadBlock)
+            .setResult(ContainerProtos.Result.CONTAINER_NOT_FOUND)
+            .setMessage("Container not found")
+            .build());
+      } else {
+        reader.onNext(buildResponseProto(data, 0));
+        reader.onCompleted();
+      }
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+    AtomicInteger refreshes = new AtomicInteger();
+    Function<BlockID, BlockLocationInfo> refresh = b -> {
+      refreshes.incrementAndGet();
+      return null;
+    };
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        new BlockID(1L, 22L), data.length, mockStandalonePipeline(), null, xceiverClientFactory,
+        refresh, clientConfig)) {
+      ByteBuffer positioned = ByteBuffer.allocate(data.length);
+      assertEquals(data.length, sbis.readPositioned(0, positioned));
+      assertArrayEquals(data, positioned.array());
+      assertEquals(1, refreshes.get());
+
+      ByteBuffer sequential = ByteBuffer.allocate(data.length);
+      assertEquals(data.length, sbis.read(sequential));
+      assertArrayEquals(data, sequential.array());
+      assertEquals(2, refreshes.get());
     }
   }
 
