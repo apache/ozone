@@ -162,8 +162,7 @@ public class TestPermissionCheck {
   @Test
   public void testListMultiUpload() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).listMultipartUploads(any(), any(), any(), anyInt());
+    doThrow(exception).when(clientProtocol).listMultipartUploads(any(), any(), any(), any(), any(), anyInt());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
