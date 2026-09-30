@@ -43,39 +43,35 @@ class UnsupportedBucketSubresourceHandler extends BucketOperationHandler {
     return null;
   }
 
-  @Override
-  Response handleGetRequest(S3RequestContext context, String bucketName)
-      throws IOException, OS3Exception {
+  private Response rejectUnsupported(S3RequestContext context,
+      S3GAction action) throws OS3Exception {
     String subresource = findUnsupportedSubresource();
     if (subresource == null) {
       return null;
     }
 
-    context.setAction(S3GAction.GET_UNSUPPORTED_BUCKET_SUBRESOURCE);
+    context.setAction(action);
     throw newError(NOT_IMPLEMENTED, subresource);
+  }
+
+  @Override
+  Response handleGetRequest(S3RequestContext context, String bucketName)
+      throws IOException, OS3Exception {
+    return rejectUnsupported(
+        context, S3GAction.GET_UNSUPPORTED_BUCKET_SUBRESOURCE);
   }
 
   @Override
   Response handlePutRequest(S3RequestContext context, String bucketName,
       InputStream body) throws IOException, OS3Exception {
-    String subresource = findUnsupportedSubresource();
-    if (subresource == null) {
-      return null;
-    }
-
-    context.setAction(S3GAction.PUT_UNSUPPORTED_BUCKET_SUBRESOURCE);
-    throw newError(NOT_IMPLEMENTED, subresource);
+    return rejectUnsupported(
+        context, S3GAction.PUT_UNSUPPORTED_BUCKET_SUBRESOURCE);
   }
 
   @Override
   Response handleDeleteRequest(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
-    String subresource = findUnsupportedSubresource();
-    if (subresource == null) {
-      return null;
-    }
-
-    context.setAction(S3GAction.DELETE_UNSUPPORTED_BUCKET_SUBRESOURCE);
-    throw newError(NOT_IMPLEMENTED, subresource);
+    return rejectUnsupported(
+        context, S3GAction.DELETE_UNSUPPORTED_BUCKET_SUBRESOURCE);
   }
 }
