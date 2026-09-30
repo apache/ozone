@@ -137,7 +137,8 @@ public class BlockID {
   }
 
   @JsonIgnore
-  public static BlockID getFromProtobuf(ContainerProtos.DatanodeBlockID blockID) {
+  public static BlockID getFromProtobuf(ContainerProtos.DatanodeBlockID blockID) throws
+      IllegalArgumentException {
     StorageType storageType = null;
     if (blockID.hasStorageTypeID() && blockID.getStorageTypeID() > 0) {
       storageType = StorageTypeUtils.getStorageTypeFromID(blockID.getStorageTypeID());

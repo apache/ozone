@@ -507,7 +507,8 @@ public final class HddsUtils {
    * @param msg container command
    * @return block ID.
    */
-  public static BlockID getBlockID(ContainerCommandRequestProtoOrBuilder msg) {
+  public static BlockID getBlockID(ContainerCommandRequestProtoOrBuilder msg) throws
+      IllegalArgumentException {
     DatanodeBlockID blockID = null;
     switch (msg.getCmdType()) {
     case DeleteBlock:
