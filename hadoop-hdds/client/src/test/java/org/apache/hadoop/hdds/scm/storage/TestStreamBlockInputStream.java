@@ -39,6 +39,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -56,11 +57,15 @@ import org.apache.hadoop.hdds.scm.StreamingReadResponse;
 import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.junit.jupiter.api.Test;
 
@@ -742,6 +747,115 @@ public class TestStreamBlockInputStream {
       assertThat(thrown).hasRootCauseInstanceOf(OzoneChecksumException.class);
     }
     verify(requestObserver, never()).onError(any());
+  }
+
+  /**
+   * A streamed error response (e.g. CONTAINER_NOT_FOUND) must fail the read immediately
+   * instead of stalling until the stream read timeout expires.
+   */
+  @Test
+  public void testFailFastOnErrorResponseProto() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setMaxReadRetryCount(0);
+    BlockID blockID = new BlockID(1L, 20L);
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+
+    XceiverClientGrpc xceiverClient = mockCapturingStreamingReadClient(requestObserver,
+        reader -> reader.onNext(ContainerCommandResponseProto.newBuilder()
+            .setCmdType(Type.ReadBlock)
+            .setResult(ContainerProtos.Result.CONTAINER_NOT_FOUND)
+            .setMessage("Container not found")
+            .build()));
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, 1024L, mockStandalonePipeline(), null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+
+      ByteBuffer buf = ByteBuffer.allocate(1024);
+      final long startTime = System.nanoTime();
+      IOException thrown = assertThrows(IOException.class, () -> sbis.read(buf),
+          "an error response proto should surface as an IOException");
+      final long elapsedMillis = Duration.ofNanos(System.nanoTime() - startTime).toMillis();
+
+      assertThat(hasCause(thrown, StorageContainerException.class)).isTrue();
+      assertThat(hasCause(thrown, TimeoutIOException.class)).isFalse();
+      assertThat(elapsedMillis).isLessThan(sbis.getReadTimeout().toMillis());
+      verify(requestObserver, times(1)).onError(any(StorageContainerException.class));
+    }
+  }
+
+  /**
+   * A server-sent gRPC status other than CANCELLED (here OUT_OF_RANGE) must fail the
+   * pending read promptly rather than waiting for the stream read timeout.
+   */
+  @Test
+  public void testFailFastOnGrpcOutOfRangeStatus() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setMaxReadRetryCount(0);
+    BlockID blockID = new BlockID(1L, 21L);
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+
+    XceiverClientGrpc xceiverClient = mockCapturingStreamingReadClient(requestObserver,
+        reader -> reader.onError(Status.OUT_OF_RANGE.asRuntimeException()));
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, 1024L, mockStandalonePipeline(), null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+
+      ByteBuffer buf = ByteBuffer.allocate(1024);
+      final long startTime = System.nanoTime();
+      IOException thrown = assertThrows(IOException.class, () -> sbis.read(buf),
+          "a gRPC OUT_OF_RANGE should surface as an IOException");
+      final long elapsedMillis = Duration.ofNanos(System.nanoTime() - startTime).toMillis();
+
+      assertThat(hasCause(thrown, StatusRuntimeException.class)).isTrue();
+      assertThat(hasCause(thrown, TimeoutIOException.class)).isFalse();
+      assertThat(elapsedMillis).isLessThan(sbis.getReadTimeout().toMillis());
+    }
+  }
+
+  /**
+   * Mocks a streaming read client which captures the StreamingReaderSpi during
+   * initStreamRead and drives the given callback when a ReadBlock request is sent.
+   */
+  private XceiverClientGrpc mockCapturingStreamingReadClient(
+      ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver,
+      Consumer<StreamingReaderSpi> onStreamRead) throws Exception {
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    doAnswer(inv -> {
+      onStreamRead.accept(readerRef.get());
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    return xceiverClient;
+  }
+
+  private static boolean hasCause(Throwable throwable, Class<? extends Throwable> type) {
+    for (Throwable t = throwable; t != null; t = t.getCause()) {
+      if (type.isInstance(t)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private ReadBlockResponseProto buildReadBlockResponse(byte[] data) {

@@ -25,6 +25,7 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -44,6 +45,9 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 @XmlRootElement(name = "LifecycleConfiguration",
     namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
 public class S3LifecycleConfiguration {
+  private static final String STATUS_ENABLED = "Enabled";
+  private static final String STATUS_DISABLED = "Disabled";
+
   @XmlElement(name = "Rule")
   private List<Rule> rules = new ArrayList<>();
 
@@ -134,18 +138,20 @@ public class S3LifecycleConfiguration {
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "Expiration")
   public static class Expiration {
+    // Bound to XML as the raw text so out-of-range values can be rejected explicitly, instead
+    // of JAXB's built-in Integer converter silently overflowing them (see parseDays).
     @XmlElement(name = "Days")
-    private Integer days;
+    private String days;
 
     @XmlElement(name = "Date")
     private String date;
 
     public Integer getDays() {
-      return days;
+      return parseDays(days);
     }
 
     public void setDays(Integer days) {
-      this.days = days;
+      this.days = days == null ? null : days.toString();
     }
 
     public String getDate() {
@@ -164,14 +170,30 @@ public class S3LifecycleConfiguration {
   @XmlRootElement(name = "AbortIncompleteMultipartUpload")
   public static class AbortIncompleteMultipartUpload {
     @XmlElement(name = "DaysAfterInitiation")
-    private Integer daysAfterInitiation;
+    private String daysAfterInitiation;
 
     public Integer getDaysAfterInitiation() {
-      return daysAfterInitiation;
+      return parseDays(daysAfterInitiation);
     }
 
     public void setDaysAfterInitiation(Integer daysAfterInitiation) {
-      this.daysAfterInitiation = daysAfterInitiation;
+      this.daysAfterInitiation = daysAfterInitiation == null ? null : daysAfterInitiation.toString();
+    }
+  }
+
+  /**
+   * Parses a lifecycle day-count element, rejecting a value that does not fit in an int instead
+   * of silently overflowing it the way JAXB's built-in Integer converter would.
+   */
+  private static Integer parseDays(String value) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      return Integer.parseInt(value.trim());
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException("Invalid lifecycle configuration: Days value '" + value
+          + "' is not a valid integer", e);
     }
   }
 
@@ -299,9 +321,10 @@ public class S3LifecycleConfiguration {
       if (ex.getCause() instanceof OMException) {
         throw (OMException) ex.getCause();
       }
-      throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, ozoneBucket.getName(), ex)
+          .withMessage(ex.getMessage());
     } catch (IllegalStateException ex) {
-      throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, ozoneBucket.getName(), ex);
     }
   }
 
@@ -312,13 +335,17 @@ public class S3LifecycleConfiguration {
    * @return OmLCRule internal rule representation
    */
   private OmLCRule convertToOmRule(Rule rule) throws OMException, OS3Exception {
-    if (rule.getStatus() == null || rule.getStatus().isEmpty()) {
+    String status = rule.getStatus();
+    if (StringUtils.isEmpty(status)) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML,
           "The Status element is required in LifecycleConfiguration");
     }
+    if (!STATUS_ENABLED.equals(status) && !STATUS_DISABLED.equals(status)) {
+      throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML);
+    }
 
     OmLCRule.Builder builder = new OmLCRule.Builder()
-        .setEnabled("Enabled".equals(rule.getStatus()))
+        .setEnabled(STATUS_ENABLED.equals(status))
         .setId(rule.getId())
         .setPrefix(rule.getPrefix());
 

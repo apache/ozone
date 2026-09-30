@@ -445,7 +445,7 @@ class TestReconAndAdminContainerCLI {
   private static List<Long> getContainerIdsForKey(OmKeyInfo omKeyInfo) {
     assertNotNull(omKeyInfo.getLatestVersionLocations());
     List<OmKeyLocationInfo> locations =
-        omKeyInfo.getLatestVersionLocations().getLocationList();
+        omKeyInfo.getLatestVersionLocations().createLocationList();
 
     List<Long> ids = new ArrayList<>();
     for (OmKeyLocationInfo location : locations) {

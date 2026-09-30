@@ -351,7 +351,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   synchronized void readBlock(int length, boolean preRead) throws IOException {
     final long required = position + length - requestedLength;
     final long preReadLength = preRead ? preReadSize : 0;
-    final long readLength = required + preReadLength;
+    // Clamp so requestedLength never exceeds blockLength: requesting past the end
+    // produces an offset the DataNode cannot serve, causing a read timeout.
+    final long readLength = Math.min(required + preReadLength, blockLength - requestedLength);
 
     if (readLength > 0) {
       LOG.debug("position {}, length {}, requested {}, diff {}, readLength {}, preReadSize={}",
@@ -573,6 +575,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     @Override
     public void onNext(ContainerProtos.ContainerCommandResponseProto containerCommandResponseProto) {
+      if (containerCommandResponseProto.getResult() != ContainerProtos.Result.SUCCESS) {
+        // The datanode streamed back an error (e.g. CONTAINER_NOT_FOUND or a token failure);
+        // fail the stream now instead of waiting for the read timeout.
+        failOnErrorResponse(containerCommandResponseProto);
+        return;
+      }
       final ReadBlockResponseProto readBlock = containerCommandResponseProto.getReadBlock();
       try {
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
@@ -598,13 +606,28 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       }
     }
 
+    private void failOnErrorResponse(ContainerProtos.ContainerCommandResponseProto errorResponse) {
+      try {
+        ContainerProtocolCalls.validateContainerResponse(errorResponse);
+      } catch (StorageContainerException e) {
+        // Record the failure first: the log and observer calls below must not mask it.
+        setFailed(e);
+        LOG.warn("Failed to read block {}: result={}",
+            getBlockID().getContainerBlockID(), errorResponse.getResult(), e);
+        final StreamingReadResponse r = getResponse();
+        if (r != null) {
+          r.getRequestObserver().onError(e);
+        }
+        releaseResources();
+      }
+    }
+
     @Override
     public void onError(Throwable throwable) {
-      if (throwable instanceof StatusRuntimeException) {
-        if (((StatusRuntimeException) throwable).getStatus().getCode() == CANCELLED) {
-          // This is expected when the client cancels the stream.
-          setCompleted();
-        }
+      if (throwable instanceof StatusRuntimeException
+          && ((StatusRuntimeException) throwable).getStatus().getCode() == CANCELLED) {
+        // This is expected when the client cancels the stream.
+        setCompleted();
       } else {
         setFailed(throwable);
       }

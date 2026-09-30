@@ -52,7 +52,6 @@ import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -163,7 +162,6 @@ public class TestMultiBlockWritesWithDnFailures {
     validateData(keyName, data.concat(data).getBytes(UTF_8));
   }
 
-  @Flaky("HDDS-11355")
   @Test
   public void testMultiBlockWritesWithIntermittentDnFailures()
       throws Exception {

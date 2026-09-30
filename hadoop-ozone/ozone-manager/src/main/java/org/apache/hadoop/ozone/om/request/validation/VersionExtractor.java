@@ -29,34 +29,24 @@ public enum VersionExtractor {
   /**
    * Extracts current apparent component version (legacy layout or {@link org.apache.hadoop.ozone.OzoneManagerVersion}).
    */
-  LAYOUT_VERSION_EXTRACTOR {
-    @Override
-    public ComponentVersion extractVersion(OMRequest req, ValidationContext ctx) {
-      return ctx.versionManager().getApparentVersion();
-    }
-
-    @Override
-    public Class<? extends Annotation> getValidatorClass() {
-      return OMLayoutVersionValidator.class;
-    }
-  },
+  LAYOUT_VERSION_EXTRACTOR,
 
   /**
    * Extracts client version from the OMRequests.
    */
-  CLIENT_VERSION_EXTRACTOR {
-    @Override
-    public ComponentVersion extractVersion(OMRequest req, ValidationContext ctx) {
-      return ClientVersion.deserialize(req.getVersion());
-    }
+  CLIENT_VERSION_EXTRACTOR;
 
-    @Override
-    public Class<? extends Annotation> getValidatorClass() {
-      return OMClientVersionValidator.class;
-    }
-  };
+  public ComponentVersion extractVersion(OMRequest req, ValidationContext ctx) {
+    return switch (this) {
+    case LAYOUT_VERSION_EXTRACTOR -> ctx.versionManager().getApparentVersion();
+    case CLIENT_VERSION_EXTRACTOR -> ClientVersion.deserialize(req.getVersion());
+    };
+  }
 
-  public abstract ComponentVersion extractVersion(OMRequest req, ValidationContext ctx);
-
-  public abstract Class<? extends Annotation> getValidatorClass();
+  public Class<? extends Annotation> getValidatorClass() {
+    return switch (this) {
+    case LAYOUT_VERSION_EXTRACTOR -> OMLayoutVersionValidator.class;
+    case CLIENT_VERSION_EXTRACTOR -> OMClientVersionValidator.class;
+    };
+  }
 }

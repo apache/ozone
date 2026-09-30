@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.ozone.s3secret.S3SecretConfigKeys;
+import org.apache.hadoop.ozone.s3sts.S3STSConfigKeys;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -59,6 +60,7 @@ public class TestOzoneConfigurationFields extends ConfigurationFieldsTests {
             ReconConfigKeys.class, ReconServerConfigKeys.class,
             S3GatewayConfigKeys.class,
             S3SecretConfigKeys.class,
+            S3STSConfigKeys.class
         };
     errorIfMissingConfigProps = true;
     errorIfMissingXmlProps = true;
@@ -168,6 +170,8 @@ public class TestOzoneConfigurationFields extends ConfigurationFieldsTests {
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         OMConfigKeys.OZONE_OM_HA_PREFIX,
         OMConfigKeys.OZONE_OM_GRPC_PORT_KEY,
+        // Security hardening toggle; documented on the OMConfigKeys constant.
+        OMConfigKeys.OZONE_OM_S3_GRPC_AUTH_REQUIRED,
         // TODO HDDS-2856
         OMConfigKeys.OZONE_RANGER_OM_IGNORE_SERVER_CERT,
         OMConfigKeys.OZONE_RANGER_OM_CONNECTION_TIMEOUT,

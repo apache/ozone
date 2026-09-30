@@ -197,7 +197,7 @@ class TestContainerReplication {
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
     Assertions.assertNotNull(locations);
-    return locations.getLocationList().get(0);
+    return locations.createLocationList().get(0);
   }
 
   public void assertState(MiniOzoneCluster cluster, Map<Integer, DatanodeDetails> expectedReplicaMap)

@@ -403,7 +403,7 @@ public final class HddsUtils {
         .orElse(conf.getInt(HDDS_DATANODE_CLIENT_PORT_KEY,
             HDDS_DATANODE_CLIENT_PORT_DEFAULT));
 
-    return NetUtils.createSocketAddr(host + ":" + port);
+    return NetUtils.createSocketAddr(getHostPortString(host, port));
   }
 
   /**
@@ -494,6 +494,7 @@ public final class HddsUtils {
     case DeleteContainer:
     case ReadContainer:
     case UpdateContainer:
+    case GetContainerChecksumInfo:
     case ListBlock:
       return true;
     default:

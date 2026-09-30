@@ -122,6 +122,7 @@ public class TestRDBStoreByteArrayIterator {
 
     assertTrue(iter.hasNext());
     assertFalse(iter.hasNext());
+    verify(rocksDBIteratorMock, times(1)).seekToFirst();
   }
 
   @Test
@@ -133,6 +134,7 @@ public class TestRDBStoreByteArrayIterator {
 
     iter.next();
 
+    verifier.verify(rocksDBIteratorMock).seekToFirst();
     verifier.verify(rocksDBIteratorMock).isValid();
     verifier.verify(rocksDBIteratorMock).key();
     verifier.verify(rocksDBIteratorMock).value();
@@ -140,10 +142,10 @@ public class TestRDBStoreByteArrayIterator {
   }
 
   @Test
-  public void testConstructorSeeksToFirstElement() {
-    newIterator();
+  public void testConstructorDoesNotSeek() {
+    newIterator().close();
 
-    verify(rocksDBIteratorMock, times(1)).seekToFirst();
+    verify(rocksDBIteratorMock, never()).seekToFirst();
   }
 
   @Test
@@ -152,7 +154,7 @@ public class TestRDBStoreByteArrayIterator {
 
     iter.seekToFirst();
 
-    verify(rocksDBIteratorMock, times(2)).seekToFirst();
+    verify(rocksDBIteratorMock, times(1)).seekToFirst();
   }
 
   @Test
@@ -161,23 +163,28 @@ public class TestRDBStoreByteArrayIterator {
 
     iter.seekToLast();
 
+    verify(rocksDBIteratorMock, never()).seekToFirst();
     verify(rocksDBIteratorMock, times(1)).seekToLast();
   }
 
   @Test
-  public void testSeekReturnsTheActualKey() throws Exception {
+  public void testSeekSkipsInitialPrefixSeekAndReturnsActualKey()
+      throws Exception {
     when(rocksDBIteratorMock.isValid()).thenReturn(true);
     when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x00});
     when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x7f});
 
-    RDBStoreByteArrayIterator iter = newIterator();
-    final Table.KeyValue<byte[], byte[]> val = iter.seek(new byte[]{0x55});
+    RDBStoreByteArrayIterator iter = newIterator(new byte[]{0x11});
+    byte[] target = new byte[]{0x55};
+    final Table.KeyValue<byte[], byte[]> val = iter.seek(target);
 
     InOrder verifier = inOrder(rocksDBIteratorMock);
+    ArgumentCaptor<byte[]> seekKey = forClass(byte[].class);
 
-    verify(rocksDBIteratorMock, times(1)).seekToFirst(); //at construct time
+    verify(rocksDBIteratorMock, never()).seekToFirst();
     verify(rocksDBIteratorMock, never()).seekToLast();
-    verifier.verify(rocksDBIteratorMock, times(1)).seek(any(byte[].class));
+    verifier.verify(rocksDBIteratorMock, times(1)).seek(seekKey.capture());
+    assertArrayEquals(target, seekKey.getValue());
     verifier.verify(rocksDBIteratorMock, times(1)).isValid();
     verifier.verify(rocksDBIteratorMock, times(1)).key();
     verifier.verify(rocksDBIteratorMock, times(1)).value();
@@ -261,7 +268,7 @@ public class TestRDBStoreByteArrayIterator {
   @Test
   public void testNullPrefixedIterator() throws IOException {
     RDBStoreByteArrayIterator iter = newIterator(null);
-    verify(rocksDBIteratorMock, times(1)).seekToFirst();
+    verify(rocksDBIteratorMock, never()).seekToFirst();
     clearInvocations(rocksDBIteratorMock);
 
     iter.seekToFirst();
@@ -283,7 +290,7 @@ public class TestRDBStoreByteArrayIterator {
   public void testNormalPrefixedIterator() throws IOException {
     byte[] testPrefix = "sample".getBytes(StandardCharsets.UTF_8);
     RDBStoreByteArrayIterator iter = newIterator(testPrefix);
-    verify(rocksDBIteratorMock, times(1)).seek(testPrefix);
+    verify(rocksDBIteratorMock, never()).seek(any(byte[].class));
     clearInvocations(rocksDBIteratorMock);
 
     iter.seekToFirst();

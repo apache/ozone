@@ -232,7 +232,7 @@ class TestDatanodeCurrentVersionEndToEnd {
         .setKeyName(keyName)
         .build();
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(args);
-    return keyInfo.getLatestVersionLocations().getLocationList().get(0).getPipeline();
+    return keyInfo.getLatestVersionLocations().createLocationList().get(0).getPipeline();
   }
 
   private static void assertNodesAt(HDDSVersion version, Pipeline pipeline, String path) {

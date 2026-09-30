@@ -33,7 +33,6 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,7 +83,8 @@ public class RootEndpoint extends EndpointBase {
    */
   private Response listDirectoryBuckets()
       throws OS3Exception, IOException {
-    long startNanos = Time.monotonicNowNanos();
+    S3RequestContext context = new S3RequestContext(this, S3GAction.LIST_DIRECTORY_BUCKETS);
+    long startNanos = context.getStartNanos();
     boolean auditSuccess = true;
     try {
       final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
@@ -139,18 +139,19 @@ public class RootEndpoint extends EndpointBase {
       return Response.ok(response).build();
     } catch (Exception ex) {
       auditSuccess = false;
-      auditReadFailure(S3GAction.LIST_DIRECTORY_BUCKETS, ex);
+      auditReadFailure(context.getAction(), ex);
       throw ex;
     } finally {
       if (auditSuccess) {
-        auditReadSuccess(S3GAction.LIST_DIRECTORY_BUCKETS);
+        auditReadSuccess(context.getAction());
       }
     }
   }
 
   private Response listAllBuckets()
       throws OS3Exception, IOException {
-    long startNanos = Time.monotonicNowNanos();
+    S3RequestContext context = new S3RequestContext(this, S3GAction.LIST_S3_BUCKETS);
+    long startNanos = context.getStartNanos();
     boolean auditSuccess = true;
     try {
       final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
@@ -200,11 +201,11 @@ public class RootEndpoint extends EndpointBase {
       return Response.ok(response).build();
     } catch (Exception ex) {
       auditSuccess = false;
-      auditReadFailure(S3GAction.LIST_S3_BUCKETS, ex);
+      auditReadFailure(context.getAction(), ex);
       throw ex;
     } finally {
       if (auditSuccess) {
-        auditReadSuccess(S3GAction.LIST_S3_BUCKETS);
+        auditReadSuccess(context.getAction());
       }
     }
   }

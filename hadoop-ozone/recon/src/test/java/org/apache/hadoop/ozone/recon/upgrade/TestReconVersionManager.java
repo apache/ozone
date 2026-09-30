@@ -57,9 +57,7 @@ import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.jooq.Configuration;
-import org.jooq.CreateTableColumnStep;
 import org.jooq.DSLContext;
-import org.jooq.InsertSetMoreStep;
 import org.jooq.impl.DSL;
 import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.Test;
@@ -119,20 +117,17 @@ class TestReconVersionManager extends AbstractComponentVersionManagerTest {
 
   private static void initializeVersionTable(Configuration configuration,
       int serializedApparentVersion) throws SQLException {
-    try (DSLContext dsl = DSL.using(configuration)) {
-      try (CreateTableColumnStep createTable = dsl.createTableIfNotExists(SCHEMA_VERSION_TABLE_NAME)
-          .column("version_number", SQLDataType.INTEGER.nullable(false))
-          .column("applied_on", SQLDataType.TIMESTAMP)) {
-        createTable.execute();
-      }
-      dsl.deleteFrom(DSL.table(SCHEMA_VERSION_TABLE_NAME)).execute();
-      if (serializedApparentVersion != ReconVersion.INITIAL_VERSION.serialize()) {
-        try (InsertSetMoreStep<?> insert = dsl.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
-            .set(DSL.field(name("version_number")), serializedApparentVersion)
-            .set(DSL.field(name("applied_on")), DSL.currentTimestamp())) {
-          insert.execute();
-        }
-      }
+    DSLContext dsl = DSL.using(configuration);
+    dsl.createTableIfNotExists(SCHEMA_VERSION_TABLE_NAME)
+        .column("version_number", SQLDataType.INTEGER.nullable(false))
+        .column("applied_on", SQLDataType.TIMESTAMP)
+        .execute();
+    dsl.deleteFrom(DSL.table(SCHEMA_VERSION_TABLE_NAME)).execute();
+    if (serializedApparentVersion != ReconVersion.INITIAL_VERSION.serialize()) {
+      dsl.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
+          .set(DSL.field(name("version_number")), serializedApparentVersion)
+          .set(DSL.field(name("applied_on")), DSL.currentTimestamp())
+          .execute();
     }
   }
 

@@ -63,7 +63,7 @@ public abstract class OMFinalizeUpgradeRequestBase extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest omRequest = super.preExecute(ozoneManager);
+    final OMRequest omRequest = super.preExecute(ozoneManager);
     if (ozoneManager.isAdminAuthorizationEnabled()) {
       UserGroupInformation ugi = createUGIForApi();
       if (!ozoneManager.isAdmin(ugi)) {

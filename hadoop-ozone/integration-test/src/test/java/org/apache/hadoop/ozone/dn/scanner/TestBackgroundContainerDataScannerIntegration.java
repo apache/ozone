@@ -32,8 +32,8 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
@@ -72,7 +72,7 @@ class TestBackgroundContainerDataScannerIntegration
   @ParameterizedTest
   // Background container data scanner should be able to detect all errors.
   @EnumSource
-  void testCorruptionDetected(TestContainerCorruptions corruption)
+  void testCorruptionDetected(ContainerTestCorruptions corruption)
       throws Exception {
     pauseScanner();
 
@@ -99,8 +99,8 @@ class TestBackgroundContainerDataScannerIntegration
     // Wait for SCM to get a report of the unhealthy replica with a different checksum than before.
     waitForScmToSeeReplicaState(containerID, UNHEALTHY);
     ContainerChecksums newReportedChecksum = getContainerReplica(containerID).getChecksums();
-    if (corruption == TestContainerCorruptions.MISSING_METADATA_DIR ||
-        corruption == TestContainerCorruptions.MISSING_CONTAINER_DIR) {
+    if (corruption == ContainerTestCorruptions.MISSING_METADATA_DIR ||
+        corruption == ContainerTestCorruptions.MISSING_CONTAINER_DIR) {
       // In these cases, the new tree will not be able to be written since it exists in the metadata directory.
       // When the tree write fails, the in-memory checksum should remain at its original value.
       assertEquals(initialReportedChecksum, newReportedChecksum);
@@ -113,8 +113,8 @@ class TestBackgroundContainerDataScannerIntegration
       verifyAllDataChecksumsMatch(containerData, getConf());
     }
 
-    if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK ||
-        corruption == TestContainerCorruptions.CORRUPT_BLOCK) {
+    if (corruption == ContainerTestCorruptions.TRUNCATED_BLOCK ||
+        corruption == ContainerTestCorruptions.CORRUPT_BLOCK) {
       // These errors will affect multiple chunks and result in multiple log messages.
       corruption.assertLogged(containerID, getContainerLogCapturer());
     } else {

@@ -185,8 +185,8 @@ public class TestFailureHandlingByClientFlushDelay {
       key.write(data.getBytes(UTF_8));
       key.flush();
       assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
-      assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
-      assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+      // Datanodes are not asserted: watchForCommit can time out against the two shut down
+      // followers, which then get recorded as failed servers and added to the exclude list.
       key.write(data.getBytes(UTF_8));
       // The close will just write to the buffer
     }

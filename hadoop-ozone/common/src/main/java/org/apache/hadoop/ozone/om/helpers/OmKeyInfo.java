@@ -74,6 +74,19 @@ public final class OmKeyInfo extends WithParentObjectId
   // name of key client specified
   private String keyName;
   private long dataSize;
+  /**
+   * Block locations of the key, one group per key version. When bucket versioning is enabled, an overwrite adds a
+   * group and keeps the earlier groups. Otherwise, it discards the existing groups and leaves the key with a single
+   * group.
+   * <p>
+   * For a committed key with multiple groups, {@code dataSize} contains only the size of the latest version. To account
+   * for all retained versions, callers must walk every group and use
+   * {@link OmKeyLocationInfoGroup#getBlocksLatestVersionOnly()} to count the blocks created by that group. Metadata
+   * written before HDDS-5472 may include blocks from earlier versions in later groups.
+   * <p>
+   * Object versioning (HDDS-15728) keeps each object version in a separate {@code OmKeyInfo} instead of adding groups
+   * here.
+   */
   private List<OmKeyLocationInfoGroup> keyLocationVersions;
   private final long creationTime;
   private long modificationTime;
@@ -352,12 +365,14 @@ public final class OmKeyInfo extends WithParentObjectId
     // the pipeline field by default and bcsId would be updated in Ratis mode.
     Map<ContainerBlockID, OmKeyLocationInfo> allocatedBlockLocations =
         new HashMap<>();
-    for (OmKeyLocationInfo existingLocationInfo : keyLocationInfoGroup.
-        getLocationList()) {
-      ContainerBlockID existingBlockID = existingLocationInfo.getBlockID().
-          getContainerBlockID();
-      // The case of overwriting value should never happen
-      allocatedBlockLocations.put(existingBlockID, existingLocationInfo);
+    for (List<OmKeyLocationInfo> existingLocationInfos :
+        keyLocationInfoGroup.getLocationLists()) {
+      for (OmKeyLocationInfo existingLocationInfo : existingLocationInfos) {
+        ContainerBlockID existingBlockID = existingLocationInfo.getBlockID().
+            getContainerBlockID();
+        // The case of overwriting value should never happen
+        allocatedBlockLocations.put(existingBlockID, existingLocationInfo);
+      }
     }
 
     List<OmKeyLocationInfo> updatedBlockLocations = new ArrayList<>();
@@ -537,7 +552,7 @@ public final class OmKeyInfo extends WithParentObjectId
       obj.keyLocationVersions.forEach(keyLocationVersion ->
           this.omKeyLocationInfoGroups.add(
               new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
-                  keyLocationVersion.getLocationList(),
+                  keyLocationVersion.createLocationList(),
                   keyLocationVersion.isMultipartKey())));
     }
 

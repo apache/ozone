@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_REQUEST;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -46,6 +48,8 @@ import org.apache.hadoop.ozone.om.request.upgrade.OMCompleteFinalizeUpgradeReque
 import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.ratis.protocol.ClientId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -163,5 +167,59 @@ public class TestOzoneManagerRatisRequest {
         serverSideTranslatorPB.processRequest(omRequest);
 
     assertEquals(expectedResponse, actualResponse);
+  }
+
+  @Test
+  public void testAssumeRoleRejectedWhenStsDisabled() {
+    ozoneManager = mock(OzoneManager.class, CALLS_REAL_METHODS);
+    when(ozoneManager.isS3STSEnabled()).thenReturn(false);
+
+    final OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.AssumeRole)
+            .setClientId(ClientId.randomId().toString())
+            .build();
+
+    final OMException omException = assertThrows(OMException.class,
+        () -> OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager));
+    assertEquals(OMException.ResultCodes.FEATURE_NOT_ENABLED, omException.getResult());
+  }
+
+  @Test
+  public void testAssumeRoleRejectedWhenStsEnabledButNativeAuthorizerUsed() {
+    ozoneManager = mock(OzoneManager.class, CALLS_REAL_METHODS);
+    when(ozoneManager.isS3STSEnabled()).thenReturn(true);
+
+    final IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
+    when(authorizer.isNative()).thenReturn(true);
+    when(ozoneManager.getAccessAuthorizer()).thenReturn(authorizer);
+
+    final OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.AssumeRole)
+            .setClientId(ClientId.randomId().toString())
+            .build();
+
+    final OMException omException = assertThrows(OMException.class,
+        () -> OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager));
+    assertEquals(OMException.ResultCodes.FEATURE_NOT_ENABLED, omException.getResult());
+  }
+
+  @Test
+  public void testAssumeRoleAllowedWhenStsEnabledAndNativeAuthorizerNotUsed() {
+    ozoneManager = mock(OzoneManager.class, CALLS_REAL_METHODS);
+    when(ozoneManager.isS3STSEnabled()).thenReturn(true);
+
+    final IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
+    when(authorizer.isNative()).thenReturn(false);
+    when(ozoneManager.getAccessAuthorizer()).thenReturn(authorizer);
+
+    final OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.AssumeRole)
+            .setClientId(ClientId.randomId().toString())
+            .build();
+
+    assertDoesNotThrow(() -> OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager));
   }
 }

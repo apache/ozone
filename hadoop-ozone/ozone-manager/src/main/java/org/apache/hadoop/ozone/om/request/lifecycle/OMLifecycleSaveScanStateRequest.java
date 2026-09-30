@@ -44,8 +44,8 @@ public class OMLifecycleSaveScanStateRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest omRequest = super.preExecute(ozoneManager);
-    if (ozoneManager.getAclsEnabled()) {
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+    if (ozoneManager.isAdminAuthorizationEnabled()) {
       UserGroupInformation ugi = createUGIForApi();
       if (!ozoneManager.isAdmin(ugi)) {
         throw new OMException("Access denied for user " + ugi + ". "

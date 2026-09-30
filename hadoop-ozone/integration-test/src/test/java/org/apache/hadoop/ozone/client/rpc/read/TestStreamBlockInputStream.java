@@ -29,7 +29,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
@@ -76,16 +75,12 @@ public class TestStreamBlockInputStream extends InputStreamTests {
 
   @Test
   void testReadKey() throws Exception {
-    try (MiniOzoneCluster cluster = newCluster()) {
-      cluster.waitForClusterToBeReady();
-      LOG.info("cluster ready");
-      OzoneConfiguration conf = cluster.getConf();
+    OzoneConfiguration conf = getCluster().getConf();
 
-      runTestReadKey(DATA_LENGTH, false, conf);
-      for (int i = 0; i < 2; i++) {
-        final int keyLength = DATA_LENGTH + ThreadLocalRandom.current().nextInt(DATA_LENGTH);
-        runTestReadKey(keyLength, true, conf);
-      }
+    runTestReadKey(DATA_LENGTH, false, conf);
+    for (int i = 0; i < 2; i++) {
+      final int keyLength = DATA_LENGTH + ThreadLocalRandom.current().nextInt(DATA_LENGTH);
+      runTestReadKey(keyLength, true, conf);
     }
   }
 
@@ -196,34 +191,30 @@ public class TestStreamBlockInputStream extends InputStreamTests {
   }
 
   void runTestAll(boolean preRead) throws Exception {
-    try (MiniOzoneCluster cluster = newCluster()) {
-      cluster.waitForClusterToBeReady();
-
-      OzoneConfiguration conf = cluster.getConf();
-      OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-      clientConfig.setStreamReadBlock(true);
-      if (!preRead) {
-        clientConfig.setStreamReadPreReadSize(0);
-      }
-      OzoneConfiguration copy = new OzoneConfiguration(conf);
-      copy.setFromObject(clientConfig);
-      String keyName = getNewKeyName();
-      try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
-        bucket = BucketForTesting.newBuilder(client).build();
-        inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
-        testReadKeyFully(keyName);
-        testSeek(keyName);
-        testReadEmptyBlock();
-      }
-      keyName = getNewKeyName();
-      clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
-      copy.setFromObject(clientConfig);
-      try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
-        bucket = BucketForTesting.newBuilder(client).build();
-        inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
-        testReadKeyFully(keyName);
-        testSeek(keyName);
-      }
+    OzoneConfiguration conf = getCluster().getConf();
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setStreamReadBlock(true);
+    if (!preRead) {
+      clientConfig.setStreamReadPreReadSize(0);
+    }
+    OzoneConfiguration copy = new OzoneConfiguration(conf);
+    copy.setFromObject(clientConfig);
+    String keyName = getNewKeyName();
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
+      bucket = BucketForTesting.newBuilder(client).build();
+      inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
+      testReadKeyFully(keyName);
+      testSeek(keyName);
+      testReadEmptyBlock();
+    }
+    keyName = getNewKeyName();
+    clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
+    copy.setFromObject(clientConfig);
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(copy)) {
+      bucket = BucketForTesting.newBuilder(client).build();
+      inputData = bucket.writeRandomBytes(keyName, DATA_LENGTH);
+      testReadKeyFully(keyName);
+      testSeek(keyName);
     }
   }
 

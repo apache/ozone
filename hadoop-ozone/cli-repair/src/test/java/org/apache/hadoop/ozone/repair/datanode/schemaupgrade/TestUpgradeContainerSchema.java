@@ -219,6 +219,15 @@ class TestUpgradeContainerSchema {
       }
     }
 
+    for (HddsVolume volume : volumes) {
+      File completeFile = UpgradeUtils.getVolumeUpgradeCompleteFile(volume);
+      if (dryRun) {
+        assertThat(completeFile).doesNotExist();
+      } else {
+        assertThat(completeFile).exists();
+      }
+    }
+
     if (!dryRun) {
       checkV3MetaData(keyValueContainerBlockDataMap, results);
     }

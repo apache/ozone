@@ -17,13 +17,19 @@
 
 package org.apache.hadoop.hdds.scm.container.export;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Container ID export job identifier.
+ * Metadata for a container ID export job.
  */
 public final class ExportJob {
+
+  private final Id id;
+  private final ExportScope scope;
+  private final String jobStartTime;
 
   /**
    * Unique job identifier.
@@ -69,6 +75,37 @@ public final class ExportJob {
     }
   }
 
-  private ExportJob() {
+  ExportJob(Id id, ExportScope scope, String jobStartTime) {
+    this.id = id;
+    this.scope = scope;
+    this.jobStartTime = jobStartTime;
+  }
+
+  String partFileName(int partIndex) {
+    return String.format("container-ids_%s_%s_part%03d.txt",
+        scope.getValue(), jobStartTime, partIndex);
+  }
+
+  void writeMetadataHeader(BufferedWriter writer, int partNumber, long partStartContainerId)
+      throws IOException {
+    writer.write("# jobId=" + id.getValue());
+    writer.newLine();
+    writer.write("# jobStartTime=" + jobStartTime);
+    writer.newLine();
+    if (scope.getHealthState() != null) {
+      writer.write("# healthState=" + scope.getHealthState().name());
+      writer.newLine();
+    }
+    if (scope.getLifeCycleState() != null) {
+      writer.write("# lifecycleState=" + scope.getLifeCycleState().name());
+      writer.newLine();
+    }
+    writer.write("# startContainerId=" + partStartContainerId);
+    writer.newLine();
+    writer.write("# part=" + partNumber);
+    writer.newLine();
+    writer.write("# format=container-id-per-line");
+    writer.newLine();
+    writer.newLine();
   }
 }

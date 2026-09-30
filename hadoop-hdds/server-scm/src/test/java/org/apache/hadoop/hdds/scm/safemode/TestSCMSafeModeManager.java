@@ -35,10 +35,7 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -47,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -86,7 +84,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** Test class for SCMSafeModeManager.
+/**
+ * Test class for SCMSafeModeManager.
  */
 public class TestSCMSafeModeManager {
 
@@ -478,13 +477,11 @@ public class TestSCMSafeModeManager {
    * @param stringToMatch string to match in the rule status.
    */
   private void validateRuleStatus(String safeModeRule, String stringToMatch) {
-    Set<Map.Entry<String, Pair<Boolean, String>>> ruleStatuses =
-        scmSafeModeManager.getRuleStatus().entrySet();
-    for (Map.Entry<String, Pair<Boolean, String>> entry : ruleStatuses) {
-      if (entry.getKey().equals(safeModeRule)) {
-        Pair<Boolean, String> value = entry.getValue();
-        assertEquals(false, value.getLeft());
-        assertThat(value.getRight()).containsIgnoringCase(stringToMatch);
+    List<SafeModeRuleStatusProto> ruleStatuses = scmSafeModeManager.getRuleStatus();
+    for (SafeModeRuleStatusProto proto : ruleStatuses) {
+      if (proto.getRuleName().equals(safeModeRule)) {
+        assertFalse(proto.getValidate());
+        assertThat(proto.getStatusText()).containsIgnoringCase(stringToMatch);
       }
     }
   }
@@ -1108,7 +1105,7 @@ public class TestSCMSafeModeManager {
    */
   private void verifyPeriodicLoggingActive(GenericTestUtils.LogCapturer logCapturer)
       throws InterruptedException {
-    Map<String, Pair<Boolean, String>> ruleStatuses = scmSafeModeManager.getRuleStatus();
+    List<SafeModeRuleStatusProto> ruleStatuses = scmSafeModeManager.getRuleStatus();
     for (int i = 0; i < 2; i++) {
       logCapturer.clearOutput();
       // Wait for configured interval (500ms + small buffer) for next log message
@@ -1116,8 +1113,8 @@ public class TestSCMSafeModeManager {
       String logOutput = logCapturer.getOutput();
 
       assertThat(logOutput).contains("SCM SafeMode Status | state=");
-      for (String ruleName : ruleStatuses.keySet()) {
-        assertThat(logOutput).contains("SCM SafeMode Status | " + ruleName);
+      for (SafeModeRuleStatusProto proto: ruleStatuses) {
+        assertThat(logOutput).contains("SCM SafeMode Status | " + proto.getRuleName());
       }
     }
   }

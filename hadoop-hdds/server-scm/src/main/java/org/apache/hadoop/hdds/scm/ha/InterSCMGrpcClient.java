@@ -81,7 +81,7 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
 
     channel = channelBuilder.build();
     client = InterSCMProtocolServiceGrpc.newStub(channel).
-        withDeadlineAfter(timeout, TimeUnit.SECONDS);
+        withDeadlineAfter(timeout, TimeUnit.MILLISECONDS);
   }
 
   @Override

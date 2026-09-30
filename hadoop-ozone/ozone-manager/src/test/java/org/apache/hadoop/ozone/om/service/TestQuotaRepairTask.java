@@ -20,7 +20,10 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -28,12 +31,19 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -335,5 +345,108 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
         .addCacheEntry(new CacheKey<>(dbKey),
             CacheValue.get(trxnLogIndex, bucketInfo));
     omMetadataManager.getBucketTable().put(dbKey, bucketInfo);
+  }
+
+  @Test
+  public void testScanTableInBatchesFailsFastOnWorkerFailure() throws Exception {
+    int totalEntries = QuotaRepairTask.BATCH_SIZE * 8;
+    AtomicInteger remaining = new AtomicInteger(totalEntries);
+    @SuppressWarnings("unchecked")
+    Table.KeyValueIterator<String, OmKeyInfo> keyIter = mock(Table.KeyValueIterator.class);
+    when(keyIter.hasNext()).thenAnswer(inv -> remaining.get() > 0);
+    when(keyIter.next()).thenAnswer(inv -> {
+      remaining.decrementAndGet();
+      return Table.newKeyValue("/vol/bucket/key", null);
+    });
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    try {
+      UncheckedExecutionException ex = assertThrows(UncheckedExecutionException.class,
+          () -> QuotaRepairTask.scanTableInBatches(executor, keyIter, "worker failure test", kv -> {
+            throw new UncheckedIOException(new IOException("injected worker failure"));
+          }));
+      assertInstanceOf(UncheckedIOException.class, ex.getCause().getCause());
+      // no worker may outlive the scan
+      executor.shutdown();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testScanTableInBatchesFailsOnProducerInterrupt() throws Exception {
+    @SuppressWarnings("unchecked")
+    Table.KeyValueIterator<String, OmKeyInfo> keyIter = mock(Table.KeyValueIterator.class);
+    when(keyIter.hasNext()).thenReturn(true);
+    when(keyIter.next()).thenAnswer(inv -> Table.newKeyValue("/vol/bucket/key", null));
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    AtomicReference<Throwable> thrown = new AtomicReference<>();
+    Thread producer = new Thread(() -> {
+      try {
+        QuotaRepairTask.scanTableInBatches(executor, keyIter, "interrupt test", kv -> { });
+      } catch (Throwable t) {
+        thrown.set(t);
+      }
+    });
+    try {
+      producer.start();
+      producer.interrupt();
+      producer.join(TimeUnit.SECONDS.toMillis(60));
+      assertFalse(producer.isAlive());
+      UncheckedExecutionException ex = assertInstanceOf(UncheckedExecutionException.class, thrown.get());
+      assertInstanceOf(InterruptedException.class, ex.getCause());
+      executor.shutdown();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testInterruptedScanStillAwaitsWorkers() throws Exception {
+    AtomicInteger remaining = new AtomicInteger(QuotaRepairTask.BATCH_SIZE);
+    @SuppressWarnings("unchecked")
+    Table.KeyValueIterator<String, OmKeyInfo> keyIter = mock(Table.KeyValueIterator.class);
+    when(keyIter.hasNext()).thenAnswer(inv -> remaining.get() > 0);
+    when(keyIter.next()).thenAnswer(inv -> {
+      remaining.decrementAndGet();
+      return Table.newKeyValue("/vol/bucket/key", null);
+    });
+    CountDownLatch workerStarted = new CountDownLatch(1);
+    CountDownLatch releaseWorker = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    AtomicReference<Throwable> thrown = new AtomicReference<>();
+    Thread producer = new Thread(() -> {
+      try {
+        QuotaRepairTask.scanTableInBatches(executor, keyIter, "await workers test", kv -> {
+          workerStarted.countDown();
+          try {
+            releaseWorker.await();
+          } catch (InterruptedException ex) {
+            throw new IllegalStateException(ex);
+          }
+        });
+      } catch (Throwable t) {
+        thrown.set(t);
+      }
+    });
+    try {
+      producer.start();
+      assertTrue(workerStarted.await(30, TimeUnit.SECONDS));
+      producer.interrupt();
+      // the interrupted producer must keep waiting for the blocked worker instead of exiting
+      producer.join(TimeUnit.SECONDS.toMillis(1));
+      assertTrue(producer.isAlive());
+      releaseWorker.countDown();
+      producer.join(TimeUnit.SECONDS.toMillis(60));
+      assertFalse(producer.isAlive());
+      UncheckedExecutionException ex = assertInstanceOf(UncheckedExecutionException.class, thrown.get());
+      assertInstanceOf(InterruptedException.class, ex.getCause());
+      executor.shutdown();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    } finally {
+      releaseWorker.countDown();
+      executor.shutdownNow();
+    }
   }
 }

@@ -33,8 +33,6 @@ import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.jooq.DSLContext;
-import org.jooq.InsertSetMoreStep;
-import org.jooq.UpdateSetMoreStep;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,18 +105,16 @@ public class ReconVersionManager extends ComponentVersionManager {
           .from(DSL.table(SCHEMA_VERSION_TABLE_NAME)));
 
       if (recordExists) {
-        try (UpdateSetMoreStep<?> update = dsl.update(DSL.table(SCHEMA_VERSION_TABLE_NAME))
+        dsl.update(DSL.table(SCHEMA_VERSION_TABLE_NAME))
             .set(DSL.field(name("version_number")), serializedVersion)
-            .set(DSL.field(name("applied_on")), DSL.currentTimestamp())) {
-          update.execute();
-        }
+            .set(DSL.field(name("applied_on")), DSL.currentTimestamp())
+            .execute();
         LOG.info("Updated apparent version to '{}'.", serializedVersion);
       } else {
-        try (InsertSetMoreStep<?> insert = dsl.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
+        dsl.insertInto(DSL.table(SCHEMA_VERSION_TABLE_NAME))
             .set(DSL.field(name("version_number")), serializedVersion)
-            .set(DSL.field(name("applied_on")), DSL.currentTimestamp())) {
-          insert.execute();
-        }
+            .set(DSL.field(name("applied_on")), DSL.currentTimestamp())
+            .execute();
         LOG.info("Inserted new apparent version '{}'.", serializedVersion);
       }
     } catch (SQLException e) {

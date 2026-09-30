@@ -482,8 +482,6 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
         }
       }
     }
-    innerNode.build();
-
     HddsProtos.NetworkNode networkNode =
         HddsProtos.NetworkNode.newBuilder()
             .setInnerNode(innerNode).build();

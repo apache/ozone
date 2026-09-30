@@ -137,7 +137,7 @@ on:
 env:
   HADOOP_IMAGE: ghcr.io/apache/hadoop
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Daether.connector.http.retryHandler.count=10
   OZONE_IMAGE: ghcr.io/apache/ozone
   OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
   OZONE_VOLUME_OWNER: 1000
@@ -223,7 +223,7 @@ jobs:
 
       - name: Setup java ${{ inputs.java-version }}
         if: ${{ inputs.java-version }}
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: 'temurin'
           java-version: ${{ inputs.java-version }}
@@ -266,6 +266,7 @@ jobs:
           hadoop-ozone/dev-support/checks/_summary.sh target/$SCRIPT/summary.txt
 
       - name: Archive build results
+        id: archive
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -273,6 +274,13 @@ jobs:
           # please keep path as a single item; move to that directory all files needed in the artifact
           path: target/${{ inputs.script }}
         continue-on-error: true
+
+      - name: Test summary
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python3 dev-support/ci/junit_summary.py >> "$GITHUB_STEP_SUMMARY"
+        env:
+          JUNIT_REPORT_URL: ${{ steps.archive.outputs.artifact-url }}
 
       # The following steps are hard-coded to be run only for 'build' check,
       # to avoid the need for 3 more inputs.

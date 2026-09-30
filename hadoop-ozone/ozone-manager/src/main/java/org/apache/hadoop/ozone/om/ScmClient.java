@@ -152,6 +152,20 @@ public class ScmClient {
     return this.containerClient;
   }
 
+  /** Don't keep empty pipelines or insufficient EC pipelines in the cache. */
+  static boolean shouldInvalidate(Pipeline pipeline) {
+    if (pipeline.isEmpty()) {
+      return true;
+    }
+
+    final ReplicationConfig repConfig = pipeline.getReplicationConfig();
+    if (!(repConfig instanceof ECReplicationConfig)) {
+      return false;
+    }
+    final int d = ((ECReplicationConfig) repConfig).getData();
+    return !pipeline.containsAllReplicaIndexes(1, d + 1); // 1 <= i <= d are the data strips
+  }
+
   public Map<Long, Pipeline> getContainerLocations(Iterable<Long> containerIds,
                                                   boolean forceRefresh)
       throws IOException {
@@ -160,29 +174,13 @@ public class ScmClient {
     }
     try {
       Map<Long, Pipeline> result = containerLocationCache.getAll(containerIds);
-      // Don't keep empty pipelines or insufficient EC pipelines in the cache.
-      List<Long> uncachePipelines = result.entrySet().stream()
-          .filter(e -> {
-            Pipeline pipeline = e.getValue();
-            // filter empty pipelines
-            if (pipeline.isEmpty()) {
-              return true;
-            }
-            // filter insufficient EC pipelines which missing any data index
-            ReplicationConfig repConfig = pipeline.getReplicationConfig();
-            if (repConfig instanceof ECReplicationConfig) {
-              int d = ((ECReplicationConfig) repConfig).getData();
-              for (int i = 1; i <= d; i++) {
-                if (!pipeline.getReplicaIndexes().containsValue(i)) {
-                  return true;
-                }
-              }
-            }
-            return false;
-          })
-          .map(Map.Entry::getKey)
-          .collect(Collectors.toList());
-      containerLocationCache.invalidateAll(uncachePipelines);
+
+      for (Map.Entry<Long, Pipeline> entry : result.entrySet()) {
+        if (shouldInvalidate(entry.getValue())) {
+          containerLocationCache.invalidate(entry.getKey());
+        }
+      }
+
       return result;
     } catch (ExecutionException e) {
       return handleCacheExecutionException(e);

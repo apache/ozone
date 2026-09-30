@@ -175,7 +175,7 @@ public class TestOMFileCreateRequest extends OMKeyRequestTests {
     omKeyInfo = verifyPathInOpenKeyTable(keyName, id, true);
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
-        omKeyInfo.getLatestVersionLocations().getLocationList();
+        omKeyInfo.getLatestVersionLocations().createLocationList();
     assertEquals(1, omKeyLocationInfoList.size());
 
     OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);
@@ -622,7 +622,7 @@ public class TestOMFileCreateRequest extends OMKeyRequestTests {
       OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(key, id, true);
 
       List< OmKeyLocationInfo > omKeyLocationInfoList =
-          omKeyInfo.getLatestVersionLocations().getLocationList();
+          omKeyInfo.getLatestVersionLocations().createLocationList();
       assertEquals(1, omKeyLocationInfoList.size());
 
       OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);
