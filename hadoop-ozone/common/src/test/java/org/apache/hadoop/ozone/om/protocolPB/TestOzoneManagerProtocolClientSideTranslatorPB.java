@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -169,6 +170,23 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
     client.getServiceList();
 
     assertThat(transport.getLastRequest().hasReadConsistencyHint()).isFalse();
+  }
+
+  @Test
+  void getS3VolumeContextUsesLeaderOnlyWithS3Authentication()
+      throws Exception {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+    client.setThreadLocalS3Auth(new S3Auth("string-to-sign", "signature",
+        "access-id", "user-principal"));
+    client.setThreadLocalReadConsistency(ReadConsistency.LOCAL_LEASE);
+
+    client.getS3VolumeContext();
+
+    assertThat(transport.getLastRequest().getReadConsistencyHint()
+        .getReadConsistency())
+        .isEqualTo(ReadConsistency.LINEARIZABLE_LEADER_ONLY.toProto());
   }
 
   @Test

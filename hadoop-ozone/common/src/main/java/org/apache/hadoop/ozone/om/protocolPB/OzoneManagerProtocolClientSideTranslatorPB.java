@@ -1767,9 +1767,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final GetS3VolumeContextRequest.Builder requestBuilder =
         GetS3VolumeContextRequest.newBuilder();
-    final OMRequest omRequest = createOMRequest(Type.GetS3VolumeContext)
-        .setGetS3VolumeContextRequest(requestBuilder)
-        .build();
+    OMRequest.Builder omRequestBuilder = createOMRequest(Type.GetS3VolumeContext)
+        .setGetS3VolumeContextRequest(requestBuilder);
+    if (getThreadLocalS3Auth() != null) {
+      omRequestBuilder.setReadConsistencyHint(
+          ReadConsistency.LINEARIZABLE_LEADER_ONLY.getHint());
+    }
+    final OMRequest omRequest = omRequestBuilder.build();
     final OMResponse omResponse = submitRequest(omRequest);
     final GetS3VolumeContextResponse resp =
         handleError(omResponse).getGetS3VolumeContextResponse();
