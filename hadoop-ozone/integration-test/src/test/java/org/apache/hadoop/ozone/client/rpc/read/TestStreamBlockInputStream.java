@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -144,8 +143,8 @@ public class TestStreamBlockInputStream extends InputStreamTests {
         if (read == -1) {
           break;
         }
-        assertArrayEquals(Arrays.copyOfRange(inputData, pos, pos + read),
-            Arrays.copyOfRange(buffer, 0, read), "pos=" + pos);
+        assertEquals(ByteBuffer.wrap(inputData, pos, read),
+            ByteBuffer.wrap(buffer, 0, read), "pos=" + pos);
         pos += read;
       }
       assertEquals(keyLength, pos);
@@ -194,10 +193,7 @@ public class TestStreamBlockInputStream extends InputStreamTests {
   void assertData(int pos, int length, ByteBuffer buffer) {
     buffer.flip();
     assertEquals(length, buffer.remaining());
-    byte[] actual = new byte[length];
-    buffer.get(actual);
-    assertArrayEquals(Arrays.copyOfRange(inputData, pos, pos + length), actual,
-        () -> "pos=" + pos);
+    assertEquals(ByteBuffer.wrap(inputData, pos, length), buffer, () -> "pos=" + pos);
   }
 
   @ParameterizedTest
