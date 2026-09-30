@@ -53,8 +53,8 @@ const NavBar: React.FC<NavBarProps> = ({
   onCollapse = () => { }
 }) => {
   const location = useLocation();
-  
-  const { data: disabledFeatures, error } = useApiData<string[]>(
+
+  const { data: disabledFeatures, success: disabledFeaturesLoaded } = useApiData<string[]>(
     '/api/v1/features/disabledFeatures',
     [],
     {
@@ -73,7 +73,7 @@ const NavBar: React.FC<NavBarProps> = ({
     }
   );
 
-  const isHeatmapEnabled = !disabledFeatures.includes('HEATMAP');
+  const isHeatmapEnabled = disabledFeaturesLoaded && !disabledFeatures.includes('HEATMAP');
   const isChatbotEnabled = chatbotHealthLoaded && chatbotHealth.enabled;
 
   const menuItems = [(
