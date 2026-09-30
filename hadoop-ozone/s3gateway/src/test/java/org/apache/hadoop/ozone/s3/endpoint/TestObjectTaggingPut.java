@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.createObjectEndpoint;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putTagging;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
@@ -38,7 +39,6 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -81,17 +81,9 @@ public class TestObjectTaggingPut {
 
   @Test
   public void testPutTaggingWithoutBucketLookup() throws Exception {
-    OzoneClient mockClient = mock(OzoneClient.class);
-    ObjectStore objectStore = mock(ObjectStore.class);
     OzoneVolume volume = mock(OzoneVolume.class);
     ClientProtocol protocol = mock(ClientProtocol.class);
-    when(mockClient.getObjectStore()).thenReturn(objectStore);
-    when(mockClient.getProxy()).thenReturn(protocol);
-    when(objectStore.getClientProxy()).thenReturn(protocol);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getName()).thenReturn("s3Volume");
-    when(volume.getBucket(BUCKET_NAME)).thenReturn(mock(OzoneBucket.class));
-    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder().setClient(mockClient).build();
+    ObjectEndpoint endpoint = createObjectEndpoint(protocol, volume, BUCKET_NAME);
 
     putTagging(endpoint, BUCKET_NAME, KEY_NAME, twoTags());
 

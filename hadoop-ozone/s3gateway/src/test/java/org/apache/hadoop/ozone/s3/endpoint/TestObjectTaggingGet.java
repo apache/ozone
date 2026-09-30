@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.createObjectEndpoint;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.getTagging;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
@@ -33,14 +34,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.List;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -80,17 +78,9 @@ public class TestObjectTaggingGet {
 
   @Test
   public void testGetTaggingWithoutBucketLookup() throws Exception {
-    OzoneClient mockClient = mock(OzoneClient.class);
-    ObjectStore objectStore = mock(ObjectStore.class);
     OzoneVolume volume = mock(OzoneVolume.class);
     ClientProtocol protocol = mock(ClientProtocol.class);
-    when(mockClient.getObjectStore()).thenReturn(objectStore);
-    when(mockClient.getProxy()).thenReturn(protocol);
-    when(objectStore.getClientProxy()).thenReturn(protocol);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getName()).thenReturn("s3Volume");
-    when(volume.getBucket(BUCKET_NAME)).thenReturn(mock(OzoneBucket.class));
-    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder().setClient(mockClient).build();
+    ObjectEndpoint endpoint = createObjectEndpoint(protocol, volume, BUCKET_NAME);
 
     getTagging(endpoint, BUCKET_NAME, KEY_WITH_TAG);
 
