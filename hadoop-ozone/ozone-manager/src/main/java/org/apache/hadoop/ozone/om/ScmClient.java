@@ -132,8 +132,11 @@ public class ScmClient {
     for (DatanodeDetails node : pipeline.getNodes()) {
       DatanodeDetails datanodeDetails =
           datanodeDetailsCache.getIfPresent(node.getID());
-      // Call compareNodeValues to handle IP / hostname changes
-      if (datanodeDetails != null && node.compareNodeValues(datanodeDetails)) {
+      // Use the cached entry only when it matches on both network identity
+      // (compareNodeValues: hostname / IP / ports) and wire-protocol capability
+      // version (compareNodeVersions: currentVersion).
+      if (datanodeDetails != null && node.compareNodeValues(datanodeDetails)
+          && node.compareNodeVersions(datanodeDetails)) {
         nodes.add(datanodeDetails);
       } else {
         datanodeDetailsCache.put(node.getID(), node);
