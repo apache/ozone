@@ -195,7 +195,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       HDDSLayoutVersionManager layoutVersionManager,
       Function<String, String> nodeResolver) {
     this.scmNodeEventPublisher = eventPublisher;
-    this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
+    this.nodeStateManager = new NodeStateManager(conf, eventPublisher, networkTopology,
         layoutVersionManager, scmContext);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
