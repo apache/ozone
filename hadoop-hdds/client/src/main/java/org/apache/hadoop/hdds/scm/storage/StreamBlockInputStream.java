@@ -625,6 +625,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         // checked first, an item delivered by onNext() just before onCompleted()
         // fired would be silently dropped, causing data corruption.
         if (future.isDone()) {
+          // The stream may have failed while waiting above; surface the error instead of returning EOF.
+          checkError();
           return null; // Stream ended, queue is empty
         }
 

@@ -959,6 +959,51 @@ public class TestStreamBlockInputStream {
   }
 
   /**
+   * An error response (e.g. UNKNOWN_BCSID from a replica that has not applied the block yet) arrives
+   * asynchronously, while poll() is waiting on the empty response queue. It must surface as an IOException
+   * so that handleExceptions() can fail over, not as EOF.
+   */
+  @Test
+  public void testErrorResponseDuringPollWaitIsNotEof() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setMaxReadRetryCount(0);
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+
+    AtomicReference<Thread> responseThreadRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mockCapturingStreamingReadClient(requestObserver, reader -> {
+      // Deliver the error well inside the first poll() wait (100 ms), as a gRPC executor thread would.
+      Thread responseThread = new Thread(() -> {
+        try {
+          Thread.sleep(50);
+        } catch (InterruptedException ignored) {
+          Thread.currentThread().interrupt();
+        }
+        reader.onNext(ContainerCommandResponseProto.newBuilder()
+            .setCmdType(Type.ReadBlock)
+            .setResult(ContainerProtos.Result.UNKNOWN_BCSID)
+            .setMessage("Unable to find the block with bcsID 2")
+            .build());
+      });
+      responseThreadRef.set(responseThread);
+      responseThread.start();
+    });
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        new BlockID(1L, 23L), 1024L, mockStandalonePipeline(), null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(1024);
+      IOException thrown = assertThrows(IOException.class, () -> sbis.read(buf),
+          "an error response during the poll wait should surface as an IOException, not EOF");
+      responseThreadRef.get().join();
+
+      assertThat(hasCause(thrown, StorageContainerException.class)).isTrue();
+      assertThat(hasCause(thrown, TimeoutIOException.class)).isFalse();
+    }
+  }
+
+  /**
    * A streamed error response (e.g. CONTAINER_NOT_FOUND) is retried after refreshing the block location,
    * for both sequential and positioned reads.
    */
