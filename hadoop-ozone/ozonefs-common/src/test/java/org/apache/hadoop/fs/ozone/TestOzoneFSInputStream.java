@@ -60,8 +60,6 @@ import org.junit.jupiter.api.Timeout;
  */
 public class TestOzoneFSInputStream {
 
-  private static final byte CORRUPT_BYTE = (byte) 0x5A;
-
   private static final List<IntFunction<ByteBuffer>> BUFFER_CONSTRUCTORS =
       ImmutableList.of(ByteBuffer::allocate, ByteBuffer::allocateDirect);
 
