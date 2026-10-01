@@ -41,6 +41,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
@@ -257,6 +258,11 @@ public class TestDefaultContainerChoosingPolicy {
 
   private HddsVolume createVolume(String name, double utilization, long capacity)
       throws IOException {
+    return createVolume(name, utilization, capacity, StorageType.DEFAULT);
+  }
+
+  private HddsVolume createVolume(String name, double utilization, long capacity,
+      StorageType storageType) throws IOException {
     long usedSpace = (long) (capacity * utilization);
     Path volumePath = baseDir.resolve(name);
 
@@ -272,6 +278,7 @@ public class TestDefaultContainerChoosingPolicy {
     return new HddsVolume.Builder(volumePath.toString())
         .conf(volumeConf)
         .usageCheckFactory(factory)
+        .storageType(storageType)
         .build();
   }
 
@@ -448,6 +455,79 @@ public class TestDefaultContainerChoosingPolicy {
     ContainerCandidate result = policy.chooseVolumesAndContainer(ozoneContainer,
         volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD,
         DEFAULT_MOVABLE_STATES);
+
+    assertNull(result);
+  }
+
+  /**
+   * With volumes of two StorageTypes, the chosen pair comes from a single type. Here the SSD volumes
+   * have the widest utilization spread, so SSD is balanced first.
+   */
+  @Test
+  public void testChooseVolumesStaysWithinStorageType() throws IOException {
+    HddsVolume ssdHigh = createVolume("ssd-high", 0.60, VOLUME_CAPACITY, StorageType.SSD);
+    HddsVolume ssdMid = createVolume("ssd-mid", 0.30, VOLUME_CAPACITY, StorageType.SSD);
+    HddsVolume ssdLow = createVolume("ssd-low", 0.20, VOLUME_CAPACITY, StorageType.SSD);
+    HddsVolume diskHigh = createVolume("disk-high", 0.75, VOLUME_CAPACITY, StorageType.DISK);
+    HddsVolume diskLow = createVolume("disk-low", 0.50, VOLUME_CAPACITY, StorageType.DISK);
+    volumeSet = createVolumeSetForUsages(
+        Arrays.asList(ssdHigh, ssdMid, ssdLow, diskHigh, diskLow));
+
+    containerSet = newContainerSet();
+    createContainer(1L, DEFAULT_CONTAINER_SIZE, ssdHigh, containerSet);
+    createContainer(2L, DEFAULT_CONTAINER_SIZE, diskHigh, containerSet);
+    mockContainerSet(containerSet);
+
+    ContainerCandidate result = policy.chooseVolumesAndContainer(ozoneContainer,
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD, DEFAULT_MOVABLE_STATES);
+
+    assertNotNull(result);
+    assertEquals(ssdHigh, result.getSourceVolume());
+    assertEquals(ssdLow, result.getDestVolume());
+    assertEquals(StorageType.SSD, result.getSourceVolume().getStorageType());
+    assertEquals(StorageType.SSD, result.getDestVolume().getStorageType());
+  }
+
+  /**
+   * A StorageType with a single volume has no same-type peer, so it is skipped instead of being
+   * paired with a volume of another type. Here the lone SSD volume is left alone and the DISK pair
+   * is balanced.
+   */
+  @Test
+  public void testChooseVolumesSkipsStorageTypeWithSingleVolume() throws IOException {
+    HddsVolume lonelySsd = createVolume("ssd-only", 0.20, VOLUME_CAPACITY, StorageType.SSD);
+    HddsVolume diskHigh = createVolume("disk-high", 0.75, VOLUME_CAPACITY, StorageType.DISK);
+    HddsVolume diskLow = createVolume("disk-low", 0.50, VOLUME_CAPACITY, StorageType.DISK);
+    volumeSet = createVolumeSetForUsages(Arrays.asList(lonelySsd, diskHigh, diskLow));
+
+    containerSet = newContainerSet();
+    createContainer(1L, DEFAULT_CONTAINER_SIZE, diskHigh, containerSet);
+    mockContainerSet(containerSet);
+
+    ContainerCandidate result = policy.chooseVolumesAndContainer(ozoneContainer,
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD, DEFAULT_MOVABLE_STATES);
+
+    assertNotNull(result);
+    assertEquals(diskHigh, result.getSourceVolume());
+    assertEquals(diskLow, result.getDestVolume());
+  }
+
+  /**
+   * When every StorageType has a single volume there is no valid pair, even though the volumes are
+   * unevenly used. Nothing moves across types.
+   */
+  @Test
+  public void testChooseVolumesReturnsNullWhenEveryStorageTypeHasOneVolume() throws IOException {
+    HddsVolume ssd = createVolume("ssd-only", 0.95, VOLUME_CAPACITY, StorageType.SSD);
+    HddsVolume disk = createVolume("disk-only", 0.10, VOLUME_CAPACITY, StorageType.DISK);
+    volumeSet = createVolumeSetForUsages(Arrays.asList(ssd, disk));
+
+    containerSet = newContainerSet();
+    createContainer(1L, DEFAULT_CONTAINER_SIZE, ssd, containerSet);
+    mockContainerSet(containerSet);
+
+    ContainerCandidate result = policy.chooseVolumesAndContainer(ozoneContainer,
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD, DEFAULT_MOVABLE_STATES);
 
     assertNull(result);
   }

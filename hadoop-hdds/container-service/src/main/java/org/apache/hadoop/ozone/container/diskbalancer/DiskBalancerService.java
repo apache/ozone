@@ -458,8 +458,11 @@ public class DiskBalancerService extends BackgroundService {
 
     if (queue.isEmpty() && inProgressContainers.isEmpty()) {
       if (stopAfterDiskEven) {
-        LOG.info("Disk balancer is stopped due to disk even as" +
-            " the property StopAfterDiskEven is set to true.");
+        // Containers only move between volumes of the same StorageType, so no volume pair is also
+        // reported when every StorageType has fewer than two volumes, even if those volumes are
+        // unevenly used.
+        LOG.info("Disk balancer is stopped because no volume pair of the same StorageType needs" +
+            " balancing as the property StopAfterDiskEven is set to true.");
         this.operationalState = DiskBalancerRunningStatus.STOPPED;
         try {
           // Persist the updated shouldRun status into the YAML file
