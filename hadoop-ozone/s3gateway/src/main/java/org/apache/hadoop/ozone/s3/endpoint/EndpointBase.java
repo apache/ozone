@@ -60,6 +60,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -762,6 +763,30 @@ public abstract class EndpointBase {
         throw newError(INVALID_URI, keyPath);
       }
     }
+  }
+
+  /**
+   * Rejects the request with {@code NotImplemented} if it has any of the {@code subresources}.
+   *
+   * @return null if the request has none of the {@code subresources}
+   */
+  Response rejectNotImplemented(S3RequestContext s3RequestContext, Set<String> subresources, String resource) {
+    final boolean requested = subresources.stream().anyMatch(subresource -> queryParams().get(subresource) != null);
+    return rejectNotImplemented(s3RequestContext, requested ? S3GAction.NOT_IMPLEMENTED : null, resource);
+  }
+
+  /**
+   * Rejects the request with {@code NotImplemented} unless {@code action} is null.
+   * The {@code action} is stored in the request context for audit logging.
+   *
+   * @param action the action determined by the handler, null if the handler is not responsible for the request
+   * @return null if {@code action} is null
+   */
+  Response rejectNotImplemented(S3RequestContext s3RequestContext, @Nullable S3GAction action, String resource) {
+    if (s3RequestContext.ignore(action)) {
+      return null;
+    }
+    throw newError(S3ErrorTable.NOT_IMPLEMENTED, resource);
   }
 
   protected ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket) throws OS3Exception {
