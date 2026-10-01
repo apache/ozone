@@ -66,6 +66,45 @@ public class TestMultiDeleteRequestUnmarshaller {
     assertEquals(3, multiDeleteRequest.getObjects().size());
   }
 
+  @Test
+  public void fromStreamWithEtag() throws IOException {
+    ByteArrayInputStream inputBody =
+        new ByteArrayInputStream(
+            ("<Delete xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">"
+                + "<Object><Key>key1</Key><ETag>\"abc\"</ETag></Object>"
+                + "<Object><Key>key2</Key><ETag>*</ETag></Object>"
+                + "</Delete>")
+                .getBytes(UTF_8));
+
+    MultiDeleteRequest multiDeleteRequest = unmarshall(inputBody);
+
+    assertEquals(2, multiDeleteRequest.getObjects().size());
+    assertEquals("key1", multiDeleteRequest.getObjects().get(0).getKey());
+    assertEquals("\"abc\"", multiDeleteRequest.getObjects().get(0).getETag());
+    assertEquals("\"abc\"", multiDeleteRequest.getObjects().get(0).getDeletePreconditionEtag());
+    assertEquals("key2", multiDeleteRequest.getObjects().get(1).getKey());
+    assertEquals("*", multiDeleteRequest.getObjects().get(1).getETag());
+  }
+
+  @Test
+  public void fromStreamWithIfMatch() throws IOException {
+    ByteArrayInputStream inputBody =
+        new ByteArrayInputStream(
+            ("<Delete xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">"
+                + "<Object><Key>key1</Key><If-Match>\"abc\"</If-Match></Object>"
+                + "<Object><Key>key2</Key><If-Match>*</If-Match></Object>"
+                + "</Delete>")
+                .getBytes(UTF_8));
+
+    MultiDeleteRequest multiDeleteRequest = unmarshall(inputBody);
+
+    assertEquals(2, multiDeleteRequest.getObjects().size());
+    assertEquals("key1", multiDeleteRequest.getObjects().get(0).getKey());
+    assertEquals("\"abc\"", multiDeleteRequest.getObjects().get(0).getIfMatch());
+    assertEquals("key2", multiDeleteRequest.getObjects().get(1).getKey());
+    assertEquals("*", multiDeleteRequest.getObjects().get(1).getIfMatch());
+  }
+
   private MultiDeleteRequest unmarshall(ByteArrayInputStream inputBody)
       throws IOException {
     return new MultiDeleteRequestUnmarshaller()

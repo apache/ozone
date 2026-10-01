@@ -366,25 +366,35 @@ public class BucketEndpoint extends BucketOperationHandler {
 
     if (request.getObjects() != null) {
       Map<String, ErrorInfo> undeletedKeyResultMap;
+      boolean hasConditionalDeletes = request.getObjects().stream()
+          .anyMatch(MultiDeleteRequest.DeleteObject::hasDeletePrecondition);
       for (DeleteObject keyToDelete : request.getObjects()) {
         deleteKeys.add(keyToDelete.getKey());
       }
       long startNanos = context.getStartNanos();
       try {
         S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-        undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
-        for (DeleteObject d : request.getObjects()) {
-          ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
-          boolean deleted = error == null ||
-              // if the key is not found, it is assumed to be successfully deleted
-              ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
-          if (deleted) {
-            if (!request.isQuiet()) {
-              result.addDeleted(new DeletedObject(d.getKey()));
+        if (hasConditionalDeletes) {
+          String volumeName = getVolume().getName();
+          for (DeleteObject keyToDelete : request.getObjects()) {
+            deleteSingleObject(volumeName, bucketName, keyToDelete, result, request.isQuiet(),
+                failedDeletes);
+          }
+        } else {
+          undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
+          for (DeleteObject d : request.getObjects()) {
+            ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
+            boolean deleted = error == null ||
+                // if the key is not found, it is assumed to be successfully deleted
+                ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
+            if (deleted) {
+              if (!request.isQuiet()) {
+                result.addDeleted(new DeletedObject(d.getKey()));
+              }
+            } else {
+              failedDeletes.add(d.getKey());
+              result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
             }
-          } else {
-            failedDeletes.add(d.getKey());
-            result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
           }
         }
         getMetrics().updateDeleteKeySuccessStats(startNanos);
@@ -413,6 +423,42 @@ public class BucketEndpoint extends BucketOperationHandler {
     }
 
     return result;
+  }
+
+  private void deleteSingleObject(String volumeName, String bucketName,
+      DeleteObject deleteObject, MultiDeleteResponse result, boolean quiet,
+      List<String> failedDeletes) throws IOException {
+    String key = deleteObject.getKey();
+    S3ConditionalDelete.Result deleteResult = S3ConditionalDelete.deleteKey(
+        getClientProtocol(), volumeName, bucketName, key,
+        deleteObject.getDeletePreconditionEtag());
+    switch (deleteResult.getOutcome()) {
+    case DELETED:
+    case NOT_FOUND_UNCONDITIONAL:
+    case DIRECTORY_NOT_EMPTY:
+      if (!quiet) {
+        result.addDeleted(new DeletedObject(key));
+      }
+      break;
+    case PRECONDITION_FAILED:
+      addPreconditionFailedError(result, key);
+      failedDeletes.add(key);
+      break;
+    case FAILED:
+      OMException ex = deleteResult.getOmException();
+      failedDeletes.add(key);
+      result.addError(new Error(key, ex.getResult().name(), ex.getMessage()));
+      break;
+    default:
+      throw new IllegalStateException("Unexpected delete outcome: "
+          + deleteResult.getOutcome());
+    }
+  }
+
+  private static void addPreconditionFailedError(MultiDeleteResponse result,
+      String key) {
+    result.addError(new Error(key, S3ErrorTable.PRECOND_FAILED.getCode(),
+        S3ErrorTable.PRECOND_FAILED.getErrorMessage()));
   }
 
   void auditMultiDeleteFailure(S3RequestContext context, List<String> deleteKeys, Throwable ex) {

@@ -207,7 +207,7 @@ final class S3ConditionalRequest {
     return responseBuilder.build();
   }
 
-  private static boolean eTagMatches(String headerValue, String currentETag) {
+  public static boolean eTagMatches(String headerValue, String currentETag) {
     if (headerValue == null) {
       return false;
     }
