@@ -349,6 +349,18 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
+      if (bucket.bucketLayout() != null) {
+        try {
+          OzoneFSUtils.validateBucketLayout(bucket.requestedBucket(),
+              bucket.bucketLayout());
+        } catch (IllegalArgumentException e) {
+          // Convert to an OMException so it is returned to the client as a
+          // normal (non-retryable) RPC response instead of escaping the read
+          // handler's IOException catch and triggering a client retry storm.
+          throw new OMException(e.getMessage(),
+              ResultCodes.NOT_SUPPORTED_OPERATION);
+        }
+      }
       if (isAclEnabled) {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
             bucket, args.getKeyName());
