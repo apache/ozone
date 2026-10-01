@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.Optional;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -37,7 +38,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -93,19 +93,14 @@ public class TestReconAsPassiveScm {
     // complete SCM snapshot inside the retry loop so a pipeline created after
     // Recon reaches the expected count does not cause a one-shot failure.
     LambdaTestUtils.await(60000, 5000, () -> {
-      if (scmPipelineManager.getPipelines().size() < 4) {
+      List<Pipeline> scmPipelines = scmPipelineManager.getPipelines();
+      if (scmPipelines.size() < 4) {
         return false;
       }
-      try {
-        for (Pipeline pipeline : scmPipelineManager.getPipelines()) {
-          if (reconPipelineManager.getPipeline(pipeline.getId()) == null) {
-            return false;
-          }
-        }
-        return true;
-      } catch (PipelineNotFoundException e) {
-        return false;
+      for (Pipeline pipeline : scmPipelines) {
+        reconPipelineManager.getPipeline(pipeline.getId());
       }
+      return true;
     });
 
     // Verify we can never create a pipeline in Recon.
