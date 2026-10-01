@@ -55,6 +55,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
+import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -375,6 +376,55 @@ public class OzoneBucket extends WithMetadata {
   public void setStoragePolicy(StoragePolicy newStoragePolicy) throws IOException {
     proxy.setBucketStoragePolicy(volumeName, name, newStoragePolicy);
     storagePolicy = newStoragePolicy;
+  }
+
+  /**
+   * Sets the bucket's storage-policy properties (storage policy, allowFallback,
+   * or unset) on this bucket. Used by the update path, where the policy may be
+   * absent or explicitly cleared.
+   * @param newPolicy new storage policy, or {@code null} to leave unchanged
+   * @param newFallback new allowFallbackStoragePolicy, or {@code null} to leave unchanged
+   * @param unsetPolicy whether to clear the bucket's storage policy
+   * @throws IOException
+   */
+  public void setStoragePolicyProperty(
+      StoragePolicy newPolicy,
+      Boolean newFallback,
+      boolean unsetPolicy) throws IOException {
+
+    if (newPolicy != null && unsetPolicy) {
+      throw new IllegalArgumentException(
+          "Set storagePolicy and unset storagePolicy cannot "
+              + "be given at the same time");
+    }
+
+    OmBucketArgs.Builder builder = OmBucketArgs.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(name);
+
+    if (newPolicy != null) {
+      builder.setStoragePolicy(newPolicy);
+    }
+
+    if (newFallback != null) {
+      builder.setAllowFallbackStoragePolicy(newFallback);
+    }
+
+    if (unsetPolicy) {
+      builder.setUnsetStoragePolicy(true);
+    }
+
+    proxy.setBucketStoragePolicy(builder.build());
+
+    if (unsetPolicy) {
+      storagePolicy = null;
+    } else if (newPolicy != null) {
+      storagePolicy = newPolicy;
+    }
+
+    if (newFallback != null) {
+      allowFallbackStoragePolicy = newFallback;
+    }
   }
 
   /**
