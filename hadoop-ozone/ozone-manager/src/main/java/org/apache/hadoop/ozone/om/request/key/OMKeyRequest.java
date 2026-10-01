@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
@@ -188,11 +189,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /** Allocate multiple blocks using one rpc to SCM. */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected List<OmKeyLocationInfo> allocateBlock(
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, boolean shouldSortDatanodes,
-      UserInfo userInfo, OzoneManager ozoneManager)
+      UserInfo userInfo, OzoneManager ozoneManager,
+      @Nonnull StoragePolicy storagePolicy, boolean allowFallbackStoragePolicy)
       throws IOException {
+    Objects.requireNonNull(storagePolicy, "storagePolicy == null");
     final long scmBlockSize = ozoneManager.getScmBlockSize();
     final KeyManager keyManager = ozoneManager.getKeyManager();
 
@@ -232,10 +236,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     final List<AllocatedBlock> allocatedBlocks;
     try {
-      // TODO Use the actually passed `allowFallbackStoragePolicy` instead of `true`
       allocatedBlocks = ozoneManager.getScmClient().getBlockClient().allocateBlock(
           scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, scmClientMachine,
-          OzoneStoragePolicy.getDefaultPolicy(), true);
+          storagePolicy, allowFallbackStoragePolicy);
     } catch (IOException ex) {
       ozoneManager.getMetrics().incNumBlockAllocateCallFails();
       if (ex instanceof SCMException) {
@@ -972,6 +975,33 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
+   * Resolves the storage policy for a key: the policy explicitly requested on the
+   * key wins, otherwise the bucket's policy, otherwise the cluster default.
+   */
+  @Nonnull
+  protected StoragePolicy getStoragePolicy(OmBucketInfo bucketInfo, KeyArgs keyArgs) {
+    if (keyArgs.hasStoragePolicy()) {
+      return OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy());
+    }
+    if (bucketInfo != null && bucketInfo.getStoragePolicy() != null) {
+      return bucketInfo.getStoragePolicy();
+    }
+    return OzoneStoragePolicy.getDefaultPolicy();
+  }
+
+  /**
+   * Whether SCM may fall back to the policy's fallback tier when the creation tier
+   * has no space. Taken from the bucket; defaults to true when the bucket does not
+   * set it, matching the behaviour before storage policy support.
+   */
+  protected boolean getAllowFallbackStoragePolicy(OmBucketInfo bucketInfo) {
+    if (bucketInfo == null || bucketInfo.getAllowFallbackStoragePolicy() == null) {
+      return true;
+    }
+    return bucketInfo.getAllowFallbackStoragePolicy();
+  }
+
+  /**
    * Prepare OmKeyInfo which will be persisted to openKeyTable.
    * @return OmKeyInfo
    * @throws IOException
@@ -1093,6 +1123,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setFile(true);
     if (keyArgs.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+    }
+    if (keyArgs.hasStoragePolicy()) {
+      builder.setStoragePolicy(OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()));
     }
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.client.protocol;
 
 import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
@@ -449,6 +450,30 @@ public interface ClientProtocol {
       String keyName, long size, ReplicationConfig replicationConfig,
       Map<String, String> metadata, Map<String, String> tags)
       throws IOException;
+
+  /**
+   * Writes a key in an existing bucket, placing it according to the given storage
+   * policy.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param metadata Custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @param storagePolicy storage policy for the key, or null to inherit the
+   *                      bucket's policy
+   * @return {@link OzoneOutputStream}
+   *
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  default OzoneOutputStream createKey(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      @Nullable StoragePolicy storagePolicy)
+      throws IOException {
+    return createKey(volumeName, bucketName, keyName, size, replicationConfig,
+        metadata, tags);
+  }
 
   /**
    * Writes a key in an existing bucket.

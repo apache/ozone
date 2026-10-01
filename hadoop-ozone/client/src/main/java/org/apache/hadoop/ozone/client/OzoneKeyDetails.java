@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -59,8 +60,24 @@ public class OzoneKeyDetails extends OzoneKey {
       FileEncryptionInfo feInfo,
       CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
       boolean isFile, String owner, Map<String, String> tags, Long generation) {
+    this(volumeName, bucketName, keyName, size, creationTime, modificationTime,
+        ozoneKeyLocations, replicationConfig, metadata, feInfo, contentSupplier,
+        isFile, owner, tags, generation, null);
+  }
+
+  @SuppressWarnings("parameternumber")
+  public OzoneKeyDetails(String volumeName, String bucketName, String keyName,
+      long size, long creationTime, long modificationTime,
+      List<OzoneKeyLocation> ozoneKeyLocations,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata,
+      FileEncryptionInfo feInfo,
+      CheckedSupplier<OzoneInputStream, IOException> contentSupplier,
+      boolean isFile, String owner, Map<String, String> tags, Long generation,
+      StoragePolicy storagePolicy) {
     super(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, metadata, isFile, owner, tags);
+        modificationTime, replicationConfig, metadata, isFile, owner, tags,
+        storagePolicy);
     this.ozoneKeyLocations = ozoneKeyLocations;
     this.feInfo = feInfo;
     this.contentSupplier = contentSupplier;

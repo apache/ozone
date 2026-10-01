@@ -21,11 +21,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -63,6 +66,8 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   private Long expectedDataGeneration = null;
   private final String expectedETag;
   private final boolean derivedKeyPiggyBacking;
+  // When null, OM resolves the policy from the bucket, then the cluster default.
+  private final StoragePolicy storagePolicy;
 
   private OmKeyArgs(Builder b) {
     super(b);
@@ -86,6 +91,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.expectedDataGeneration = b.expectedDataGeneration;
     this.expectedETag = b.expectedETag;
     this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
+    this.storagePolicy = b.storagePolicy;
   }
 
   public boolean getIsMultipartKey() {
@@ -176,6 +182,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return derivedKeyPiggyBacking;
   }
 
+  @Nullable
+  public StoragePolicy getStoragePolicy() {
+    return storagePolicy;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -224,6 +235,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     if (expectedETag != null) {
       builder.setExpectedETag(expectedETag);
     }
+    if (storagePolicy != null) {
+      builder.setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy));
+    }
     return builder.build();
   }
 
@@ -251,6 +265,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private Long expectedDataGeneration = null;
     private String expectedETag;
     private boolean derivedKeyPiggyBacking;
+    private StoragePolicy storagePolicy;
 
     public Builder() {
       this(AclListBuilder.empty());
@@ -298,6 +313,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
       this.derivedKeyPiggyBacking = obj.derivedKeyPiggyBacking;
+      this.storagePolicy = obj.storagePolicy;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
     }
@@ -440,6 +456,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setDerivedKeyPiggyBacking(boolean derivedKeyPiggyBacking) {
       this.derivedKeyPiggyBacking = derivedKeyPiggyBacking;
+      return this;
+    }
+
+    public Builder setStoragePolicy(StoragePolicy storagePolicy) {
+      this.storagePolicy = storagePolicy;
       return this;
     }
 

@@ -1428,6 +1428,21 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  @SuppressWarnings("checkstyle:parameternumber")
+  public OzoneOutputStream createKey(
+      String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      StoragePolicy storagePolicy) throws IOException {
+    String ownerName = getRealUserInfo().getShortUserName();
+    OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
+        bucketName, keyName, size, replicationConfig, metadata, tags);
+    builder.setOwnerName(ownerName);
+    builder.setStoragePolicy(storagePolicy);
+    return openOutputStream(builder.build(), size);
+  }
+
+  @Override
   public OzoneOutputStream rewriteKey(String volumeName, String bucketName, String keyName,
       long size, long existingKeyGeneration, ReplicationConfig replicationConfig,
       Map<String, String> metadata) throws IOException {
@@ -1918,7 +1933,7 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getFileEncryptionInfo(),
         () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(),
         keyInfo.getOwnerName(), keyInfo.getTags(),
-        keyInfo.getGeneration()
+        keyInfo.getGeneration(), keyInfo.getStoragePolicy()
     );
   }
 
