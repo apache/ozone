@@ -86,10 +86,20 @@ public class OzoneInputStream extends ExtendedInputStream implements CanUnbuffer
 
   @Override
   public boolean hasCapability(String capability) {
+    if (!super.hasCapability(capability)) {
+      return false;
+    }
+    if (inputStream instanceof StreamCapabilities
+        && !((StreamCapabilities) inputStream).hasCapability(capability)) {
+      return false;
+    }
     if (StreamCapabilities.PREADBYTEBUFFER.equalsIgnoreCase(capability)) {
       return inputStream instanceof ByteBufferPositionedReadable;
     }
-    return super.hasCapability(capability);
+    if (StreamCapabilities.READBYTEBUFFER.equalsIgnoreCase(capability)) {
+      return inputStream instanceof ByteBufferReadable;
+    }
+    return inputStream instanceof CanUnbuffer;
   }
 
   @Override

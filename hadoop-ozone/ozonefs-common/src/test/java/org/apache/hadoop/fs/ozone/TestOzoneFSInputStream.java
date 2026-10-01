@@ -205,6 +205,8 @@ public class TestOzoneFSInputStream {
          OzoneInputStream client = new OzoneInputStream(new SeekableOnlyInputStream(source))) {
       assertFalse(fs.hasCapability(StreamCapabilities.PREADBYTEBUFFER));
       assertFalse(client.hasCapability(StreamCapabilities.PREADBYTEBUFFER));
+      assertFalse(client.hasCapability(StreamCapabilities.READBYTEBUFFER));
+      assertFalse(client.hasCapability(StreamCapabilities.UNBUFFER));
       assertThrows(EOFException.class, () -> fs.read(-1, ByteBuffer.allocate(1)));
       assertThrows(UnsupportedOperationException.class, () -> fs.read(0, ByteBuffer.allocate(1)));
       assertThrows(UnsupportedOperationException.class, () -> client.read(0, ByteBuffer.allocate(1)));
@@ -212,6 +214,17 @@ public class TestOzoneFSInputStream {
       assertEquals(0, client.getPos());
       assertEquals(Byte.toUnsignedInt(source[0]), fs.read());
       assertEquals(Byte.toUnsignedInt(source[0]), client.read());
+    }
+  }
+
+  @Test
+  void clientRespectsDelegateCapabilities() throws Exception {
+    KeyInputStream key = mock(KeyInputStream.class);
+    when(key.hasCapability(anyString())).thenReturn(false);
+    try (OzoneInputStream client = new OzoneInputStream(key)) {
+      assertFalse(client.hasCapability(StreamCapabilities.PREADBYTEBUFFER));
+      assertFalse(client.hasCapability(StreamCapabilities.READBYTEBUFFER));
+      assertFalse(client.hasCapability(StreamCapabilities.UNBUFFER));
     }
   }
 
