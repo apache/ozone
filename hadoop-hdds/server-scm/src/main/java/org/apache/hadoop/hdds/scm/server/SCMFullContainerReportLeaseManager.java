@@ -117,17 +117,16 @@ public class SCMFullContainerReportLeaseManager {
       return Optional.empty();
     }
 
-    long now = clock.getAsLong();
-    if (isExpired(lease, now)) {
+    if (lease.claimed) {
+      incrementInvalidLeaseReports();
+      return Optional.empty();
+    }
+
+    if (isExpired(lease, clock.getAsLong())) {
       pendingLeases.remove(datanodeId);
       incrementLeaseExpired();
       incrementInvalidLeaseReports();
       updateOutstandingLeaseMetric();
-      return Optional.empty();
-    }
-
-    if (lease.claimed) {
-      incrementInvalidLeaseReports();
       return Optional.empty();
     }
 
@@ -146,7 +145,6 @@ public class SCMFullContainerReportLeaseManager {
     }
 
     lease.claimed = true;
-    lease.claimedAtMs = now;
     return Optional.of(new LeaseClaim(this, datanodeId, leaseId,
         lease.deferredRegistrationId != 0));
   }
@@ -192,18 +190,13 @@ public class SCMFullContainerReportLeaseManager {
 
   public synchronized void removeDatanode(DatanodeDetails datanode) {
     String datanodeId = datanode.getUuidString();
-    boolean leaseRemoved = pendingLeases.remove(datanodeId) != null;
-    pendingRequests.remove(datanodeId);
-    deferredRegistrationReports.remove(datanodeId);
-    if (leaseRemoved) {
+    Lease lease = pendingLeases.get(datanodeId);
+    if (lease != null && !lease.claimed) {
+      pendingLeases.remove(datanodeId);
       updateOutstandingLeaseMetric();
     }
-  }
-
-  public synchronized int getOutstandingLeaseCount() {
-    pruneExpiredLeases(clock.getAsLong());
-    updateOutstandingLeaseMetric();
-    return pendingLeases.size();
+    pendingRequests.remove(datanodeId);
+    deferredRegistrationReports.remove(datanodeId);
   }
 
   private long nextLeaseId() {
@@ -220,7 +213,7 @@ public class SCMFullContainerReportLeaseManager {
     boolean removed = false;
     while (iterator.hasNext()) {
       Lease lease = iterator.next().getValue();
-      if (!lease.processing && isExpired(lease, now)) {
+      if (!lease.claimed && isExpired(lease, now)) {
         iterator.remove();
         incrementLeaseExpired();
         removed = true;
@@ -262,8 +255,7 @@ public class SCMFullContainerReportLeaseManager {
   }
 
   private boolean isExpired(Lease lease, long now) {
-    long startTime = lease.claimed ? lease.claimedAtMs : lease.createdAtMs;
-    return now - startTime >= leaseExpiryMs;
+    return now - lease.createdAtMs >= leaseExpiryMs;
   }
 
   private synchronized boolean startProcessing(String datanodeId,
@@ -271,12 +263,6 @@ public class SCMFullContainerReportLeaseManager {
     Lease lease = pendingLeases.get(datanodeId);
     if (lease == null || lease.leaseId != leaseId || !lease.claimed
         || lease.processing) {
-      return false;
-    }
-    if (isExpired(lease, clock.getAsLong())) {
-      pendingLeases.remove(datanodeId);
-      incrementLeaseExpired();
-      updateOutstandingLeaseMetric();
       return false;
     }
     lease.processing = true;
@@ -331,7 +317,6 @@ public class SCMFullContainerReportLeaseManager {
     private final long createdAtMs;
     private final long deferredRegistrationId;
     private boolean claimed;
-    private long claimedAtMs;
     private boolean processing;
 
     private Lease(long leaseId, long term, long createdAtMs,

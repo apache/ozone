@@ -55,7 +55,7 @@ public class EndpointStateMachine
   // RunningDatanodeState reads this without the endpoint lock and must see late SHUTDOWN transitions,
   // even after its wait for the endpoint task has timed out.
   private volatile EndPointStates state = EndPointStates.FIRST;
-  private VersionResponse version;
+  private volatile VersionResponse version;
   private ZonedDateTime lastSuccessfulHeartbeat;
   private boolean isPassive;
   private FullContainerReportLeaseProto fullContainerReportLease;
@@ -118,8 +118,9 @@ public class EndpointStateMachine
   }
 
   public boolean supportsFullContainerReportLease() {
-    return !isPassive && version != null
-        && Boolean.parseBoolean(version.getValue(
+    VersionResponse currentVersion = version;
+    return !isPassive && currentVersion != null
+        && Boolean.parseBoolean(currentVersion.getValue(
             OzoneConsts.SCM_FCR_LEASE_SUPPORTED));
   }
 

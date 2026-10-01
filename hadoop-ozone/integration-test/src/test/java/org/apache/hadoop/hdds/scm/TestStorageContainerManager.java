@@ -79,6 +79,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FullContainerReportLeaseProto;
@@ -692,30 +693,60 @@ public class TestStorageContainerManager {
         .setNumDatanodes(2)
         .build()) {
       cluster.waitForClusterToBeReady();
+      cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
       StorageContainerManager scm = cluster.getStorageContainerManager();
       List<HddsDatanodeService> datanodes = cluster.getHddsDatanodes();
+      DatanodeDetails firstDatanode = datanodes.get(0).getDatanodeDetails();
+      DatanodeDetails secondDatanode = datanodes.get(1).getDatanodeDetails();
+      ContainerInfo container = scm.getClientProtocolServer()
+          .allocateContainer(HddsProtos.ReplicationType.RATIS, HddsProtos.ReplicationFactor.ONE, OzoneConsts.OZONE)
+          .getContainerInfo();
       cluster.shutdownHddsDatanodes();
+      assertThat(scm.getContainerManager().getContainerReplicas(container.containerID())).isEmpty();
 
       SCMHeartbeatResponseProto first;
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
       do {
-        first = requestFullContainerReportLease(
-            scm, datanodes.get(0).getDatanodeDetails());
+        first = requestFullContainerReportLease(scm, firstDatanode);
         if (!first.hasFullContainerReportLease()) {
           Thread.sleep(100L);
         }
       } while (!first.hasFullContainerReportLease()
           && System.nanoTime() < deadline);
-      SCMHeartbeatResponseProto second = requestFullContainerReportLease(
-          scm, datanodes.get(1).getDatanodeDetails());
-
       assertTrue(first.hasFullContainerReportLease());
-      assertFalse(second.hasFullContainerReportLease());
+
+      SCMHeartbeatRequestProto report = SCMHeartbeatRequestProto.newBuilder()
+          .setDatanodeDetails(firstDatanode.getProtoBufMessage())
+          .setContainerReport(ContainerReportsProto.newBuilder()
+              .setFullContainerReportLease(first.getFullContainerReportLease())
+              .addReports(ContainerReplicaProto.newBuilder()
+                  .setContainerID(container.getContainerID())
+                  .setState(ContainerReplicaProto.State.OPEN)
+                  .setOriginNodeId(firstDatanode.getUuidString())
+                  .setKeyCount(1)
+                  .setUsed(1024)))
+          .build();
+      DatanodeInfo datanodeInfo = scm.getScmNodeManager().getNode(firstDatanode.getID());
+      assertNotNull(datanodeInfo);
+      // Keep the accepted FCR from updating replicas until after the unused-grant duration.
+      synchronized (datanodeInfo) {
+        assertFalse(scm.getDatanodeProtocolServer().sendHeartbeat(report).getFullContainerReportLeaseRejected());
+        Thread.sleep(1_100L);
+        assertThat(scm.getContainerManager().getContainerReplicas(container.containerID())).isEmpty();
+        assertFalse(requestFullContainerReportLease(scm, secondDatanode).hasFullContainerReportLease());
+      }
+
+      GenericTestUtils.waitFor(() -> assertDoesNotThrow(() ->
+          scm.getContainerManager().getContainerReplicas(container.containerID())).stream()
+          .anyMatch(replica -> replica.getDatanodeDetails().getID().equals(firstDatanode.getID())
+              && replica.getState() == ContainerReplicaProto.State.OPEN
+              && replica.getKeyCount() == 1 && replica.getBytesUsed() == 1024), 100, 10000);
+      GenericTestUtils.waitFor(() -> assertDoesNotThrow(() ->
+          requestFullContainerReportLease(scm, secondDatanode)).hasFullContainerReportLease(), 100, 10000);
 
       Thread.sleep(1_100L);
 
-      SCMHeartbeatResponseProto afterExpiry = requestFullContainerReportLease(
-          scm, datanodes.get(1).getDatanodeDetails());
+      SCMHeartbeatResponseProto afterExpiry = requestFullContainerReportLease(scm, firstDatanode);
       assertTrue(afterExpiry.hasFullContainerReportLease());
     }
   }

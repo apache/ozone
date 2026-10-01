@@ -23,8 +23,10 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.INCREMENTAL_CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REGISTRATION_CONT_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -35,6 +37,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
@@ -43,6 +46,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
@@ -54,6 +58,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
@@ -262,6 +267,36 @@ public class TestSCMDatanodeHeartbeatDispatcher {
   }
 
   @Test
+  public void testRegistrationContainerReportDoesNotRetainReplicaPayload() {
+    DatanodeDetails datanode = randomDatanodeDetails();
+    ContainerReportsProto report = ContainerReportsProto.newBuilder()
+        .addReports(ContainerReplicaProto.newBuilder().setContainerID(42L)
+            .setState(ContainerReplicaProto.State.CLOSED).setUsed(1024L).setKeyCount(100L))
+        .addReports(ContainerReplicaProto.newBuilder().setContainerID(Long.MAX_VALUE)
+            .setState(ContainerReplicaProto.State.QUASI_CLOSED).setDataChecksum(99L))
+        .build();
+
+    NodeRegistrationContainerReport registration = new NodeRegistrationContainerReport(datanode, report);
+
+    assertSame(datanode, registration.getDatanodeDetails());
+    assertArrayEquals(new long[] {42L, Long.MAX_VALUE}, registration.getContainerIDs());
+    assertEquals(Object.class, NodeRegistrationContainerReport.class.getSuperclass());
+    for (Field field : NodeRegistrationContainerReport.class.getDeclaredFields()) {
+      assertTrue(field.getType() == DatanodeDetails.class || field.getType() == long[].class,
+          "Registration events must only retain datanode details and primitive container IDs");
+    }
+  }
+
+  @Test
+  public void testRegistrationContainerReportWithNullOrEmptyReport() {
+    DatanodeDetails datanode = randomDatanodeDetails();
+
+    assertArrayEquals(new long[0], new NodeRegistrationContainerReport(datanode, null).getContainerIDs());
+    assertArrayEquals(new long[0],
+        new NodeRegistrationContainerReport(datanode, ContainerReportsProto.getDefaultInstance()).getContainerIDs());
+  }
+
+  @Test
   public void testContainerReportDispatcherUsesProvidedReport() {
     AtomicBoolean providedReportDispatched = new AtomicBoolean();
     AtomicBoolean registrationReportDispatched = new AtomicBoolean();
@@ -273,15 +308,19 @@ public class TestSCMDatanodeHeartbeatDispatcher {
           EVENT event, PAYLOAD payload) {
         if (event.equals(CONTAINER_REPORT)) {
           providedReportDispatched.set(((ContainerReportFromDatanode) payload).isRegister());
+          assertEquals(1, ((ContainerReportFromDatanode) payload).getReport().getReportsCount());
         } else if (event.equals(NODE_REGISTRATION_CONT_REPORT)) {
           registrationReportDispatched.set(true);
+          assertArrayEquals(new long[0], ((NodeRegistrationContainerReport) payload).getContainerIDs());
         }
       }
     };
     SCMDatanodeHeartbeatDispatcher dispatcher =
         new SCMDatanodeHeartbeatDispatcher(nodeManager, publisher);
     DatanodeDetails datanode = randomDatanodeDetails();
-    ContainerReportsProto report = ContainerReportsProto.getDefaultInstance();
+    ContainerReportsProto report = ContainerReportsProto.newBuilder()
+        .addReports(ContainerReplicaProto.newBuilder().setContainerID(42L).setState(ContainerReplicaProto.State.CLOSED))
+        .build();
     ContainerReportFromDatanode providedReport =
         new ContainerReportFromDatanode(datanode, report, true);
     SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()

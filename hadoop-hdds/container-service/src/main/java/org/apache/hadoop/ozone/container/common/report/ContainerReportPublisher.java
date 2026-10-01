@@ -75,6 +75,6 @@ public class ContainerReportPublisher extends
 
   @Override
   protected ContainerReportsProto getReport() throws IOException {
-    return getContext().getFullContainerReportDiscardPendingICR();
+    return getContext().getFullContainerReport();
   }
 }

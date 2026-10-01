@@ -218,23 +218,25 @@ public class HeartbeatEndpointTask
    *
    * @param requestBuilder builder to which the report has to be added.
    */
-  private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder)
-      throws IOException {
+  private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
     boolean fcrReady = context.isFullContainerReportReady(
         rpcEndpoint.getAddress());
     boolean supportsFCRLease = rpcEndpoint.supportsFullContainerReportLease();
     boolean hasFCRLease = rpcEndpoint.hasFullContainerReportLease();
     if (supportsFCRLease && fcrReady) {
       if (hasFCRLease) {
-        ContainerReportsProto report =
-            context.getFullContainerReportDiscardPendingICR(
-                rpcEndpoint.getAddress());
-        if (report != null) {
-          FullContainerReportLeaseProto lease =
-              rpcEndpoint.takeFullContainerReportLease();
-          requestBuilder.setContainerReport(report.toBuilder()
-              .setFullContainerReportLease(lease)
-              .build());
+        try {
+          ContainerReportsProto report = context.getFullContainerReportDiscardPendingICR(rpcEndpoint.getAddress());
+          if (report != null) {
+            FullContainerReportLeaseProto lease =
+                rpcEndpoint.takeFullContainerReportLease();
+            requestBuilder.setContainerReport(report.toBuilder()
+                .setFullContainerReportLease(lease)
+                .build());
+          }
+        } catch (IOException | RuntimeException ex) {
+          LOG.warn("Failed to generate full container report for {}. Continuing heartbeat.",
+              rpcEndpoint.getAddress(), ex);
         }
       } else {
         requestBuilder.setRequestFullContainerReportLease(true);

@@ -180,8 +180,8 @@
     <tag>OZONE, SCM, CONTAINER</tag>
     <description>The time SCM waits for a datanode to send a full container
       report after granting a full container report lease. Once the report
-      arrives, the same duration limits how long it may wait to start
-      processing.</description>
+      arrives, its lease remains outstanding until processing completes or
+      the queued report is discarded.</description>
   </property>
   <property>
     <name>hdds.datanode.dir</name>

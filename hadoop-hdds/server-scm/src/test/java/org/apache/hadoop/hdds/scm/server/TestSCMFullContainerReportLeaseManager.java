@@ -25,6 +25,9 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.junit.jupiter.api.Test;
 
 class TestSCMFullContainerReportLeaseManager {
@@ -52,21 +55,17 @@ class TestSCMFullContainerReportLeaseManager {
 
     assertThat(firstLease).isNotZero();
     assertThat(secondLease).isEmpty();
-    assertThat(leaseManager.getOutstandingLeaseCount()).isEqualTo(1);
-
     SCMFullContainerReportLeaseManager.LeaseClaim claim =
         requireClaim(leaseManager, firstDn, 7L, firstLease);
     assertThat(claim).isNotNull();
     assertThat(leaseManager.claimLease(firstDn, OptionalLong.of(7L), 7L,
         firstLease)).isEmpty();
-    assertThat(leaseManager.getOutstandingLeaseCount()).isEqualTo(1);
     assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
 
     claim.complete(true);
 
     long secondLeaseAfterRelease = requireLease(leaseManager, secondDn, 7L);
     assertThat(secondLeaseAfterRelease).isNotZero();
-    assertThat(leaseManager.getOutstandingLeaseCount()).isEqualTo(1);
   }
 
   @Test
@@ -86,7 +85,7 @@ class TestSCMFullContainerReportLeaseManager {
     now.addAndGet(101L);
     assertThat(leaseManager.claimLease(expiredDatanode,
         OptionalLong.of(3L), 3L, expiredLease)).isEmpty();
-    assertThat(leaseManager.getOutstandingLeaseCount()).isZero();
+    assertThat(leaseManager.requestLease(wrongTermDatanode, 3L)).isPresent();
   }
 
   @Test
@@ -141,7 +140,7 @@ class TestSCMFullContainerReportLeaseManager {
   }
 
   @Test
-  void shouldExpireClaimedLeaseBeforeProcessingStarts() {
+  void shouldRetainClaimedLeaseBeforeProcessingStarts() {
     AtomicLong now = new AtomicLong(1_000L);
     SCMFullContainerReportLeaseManager leaseManager =
         new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
@@ -157,9 +156,98 @@ class TestSCMFullContainerReportLeaseManager {
 
     now.addAndGet(100L);
 
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
+    assertThat(claim.startProcessing()).isTrue();
+    claim.complete(true);
     assertThat(leaseManager.requestLease(secondDn, 7L)).isPresent();
-    assertThat(claim.startProcessing()).isFalse();
-    assertThat(leaseManager.getOutstandingLeaseCount()).isEqualTo(1);
+  }
+
+  @Test
+  void shouldRetainQueuedRegistrationReportAfterGrantExpiry() {
+    AtomicLong now = new AtomicLong(1_000L);
+    SCMFullContainerReportLeaseManager leaseManager =
+        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
+    DatanodeDetails firstDn = randomDatanodeDetails();
+    DatanodeDetails secondDn = randomDatanodeDetails();
+    ContainerReportQueue queue = new ContainerReportQueue();
+    leaseManager.markFullContainerReportDeferred(firstDn);
+    long lease = requireLease(leaseManager, firstDn, 7L);
+    SCMFullContainerReportLeaseManager.LeaseClaim claim = requireClaim(leaseManager, firstDn, 7L, lease);
+    ContainerReportsProto report = ContainerReportsProto.newBuilder()
+        .addReports(ContainerReplicaProto.newBuilder().setContainerID(1L).setState(ContainerReplicaProto.State.CLOSED))
+        .build();
+    queue.add(new ContainerReportFromDatanode(firstDn, report, claim.isRegistrationReport(), claim));
+
+    now.addAndGet(1_000L);
+
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
+    ContainerReportFromDatanode queuedReport = (ContainerReportFromDatanode) queue.remove();
+    assertThat(queuedReport.isRegister()).isTrue();
+    assertThat(queuedReport.getReport().getReportsCount()).isEqualTo(1);
+    assertThat(queuedReport.startProcessing()).isTrue();
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
+    queuedReport.complete(true);
+    long secondLease = requireLease(leaseManager, secondDn, 7L);
+    requireClaim(leaseManager, secondDn, 7L, secondLease).complete(true);
+
+    long nextLease = requireLease(leaseManager, firstDn, 7L);
+    assertThat(requireClaim(leaseManager, firstDn, 7L, nextLease).isRegistrationReport()).isFalse();
+  }
+
+  @Test
+  void shouldNotReleaseProcessingLeaseForRepeatedExpiredReport() {
+    AtomicLong now = new AtomicLong(1_000L);
+    SCMFullContainerReportLeaseManager leaseManager =
+        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
+    DatanodeDetails firstDn = randomDatanodeDetails();
+    DatanodeDetails secondDn = randomDatanodeDetails();
+    long lease = requireLease(leaseManager, firstDn, 7L);
+    SCMFullContainerReportLeaseManager.LeaseClaim claim = requireClaim(leaseManager, firstDn, 7L, lease);
+    assertThat(claim.startProcessing()).isTrue();
+
+    now.addAndGet(1_000L);
+
+    assertThat(leaseManager.claimLease(firstDn, OptionalLong.of(7L), 7L, lease)).isEmpty();
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
+    claim.complete(true);
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isPresent();
+  }
+
+  @Test
+  void shouldRetainClaimedLeaseUntilRemovedReportIsReleased() {
+    AtomicLong now = new AtomicLong(1_000L);
+    SCMFullContainerReportLeaseManager leaseManager =
+        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
+    DatanodeDetails firstDn = randomDatanodeDetails();
+    DatanodeDetails secondDn = randomDatanodeDetails();
+    long lease = requireLease(leaseManager, firstDn, 7L);
+    SCMFullContainerReportLeaseManager.LeaseClaim claim = requireClaim(leaseManager, firstDn, 7L, lease);
+    ContainerReportQueue queue = new ContainerReportQueue();
+    queue.add(new ContainerReportFromDatanode(firstDn, ContainerReportsProto.getDefaultInstance(), false, claim));
+
+    leaseManager.removeDatanode(firstDn);
+
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
+    queue.clear();
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isPresent();
+  }
+
+  @Test
+  void shouldRetainClaimedLeaseAcrossTermChange() {
+    AtomicLong now = new AtomicLong(1_000L);
+    SCMFullContainerReportLeaseManager leaseManager =
+        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
+    DatanodeDetails firstDn = randomDatanodeDetails();
+    DatanodeDetails secondDn = randomDatanodeDetails();
+    long lease = requireLease(leaseManager, firstDn, 7L);
+    SCMFullContainerReportLeaseManager.LeaseClaim claim = requireClaim(leaseManager, firstDn, 7L, lease);
+
+    now.addAndGet(1_000L);
+
+    assertThat(leaseManager.requestLease(secondDn, 8L)).isEmpty();
+    assertThat(claim.startProcessing()).isTrue();
+    claim.complete(true);
+    assertThat(leaseManager.requestLease(secondDn, 8L)).isPresent();
   }
 
   @Test

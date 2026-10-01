@@ -55,6 +55,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -406,6 +407,17 @@ public class StateContext {
   }
 
   /**
+   * Gets a periodic snapshot, preserving ICRs for endpoints that must wait for an FCR lease.
+   */
+  public ContainerReportsProto getFullContainerReport() throws IOException {
+    Set<HostAndPort> leasedEndpoints = parentDatanodeStateMachine.getConnectionManager().getValues().stream()
+        .filter(EndpointStateMachine::supportsFullContainerReportLease)
+        .map(EndpointStateMachine::getAddress)
+        .collect(Collectors.toSet());
+    return getFullContainerReportDiscardPendingICR(endpoint -> !leasedEndpoints.contains(endpoint));
+  }
+
+  /**
    * Gets a point in time snapshot of all containers, any pending incremental
    * container reports (ICR) for containers will be included in this report
    * and this call will drop any pending ICRs.
@@ -413,15 +425,20 @@ public class StateContext {
    */
   public ContainerReportsProto getFullContainerReportDiscardPendingICR()
       throws IOException {
+    return getFullContainerReportDiscardPendingICR(endpoint -> true);
+  }
 
+  private ContainerReportsProto getFullContainerReportDiscardPendingICR(Predicate<HostAndPort> discardPendingICR)
+      throws IOException {
     ContainerSet containerSet =
         parentDatanodeStateMachine.getContainer().getContainerSet();
     // Block ICRs from being generated
     synchronized (containerSet) {
+      ContainerReportsProto report = containerSet.getContainerReport();
       synchronized (incrementalReportsQueue) {
         for (Map.Entry<HostAndPort, List<Message>>
             entry : incrementalReportsQueue.entrySet()) {
-          if (entry.getValue() != null) {
+          if (entry.getValue() != null && discardPendingICR.test(entry.getKey())) {
             entry.getValue().removeIf(
                 generatedMessage ->
                     generatedMessage instanceof
@@ -429,7 +446,7 @@ public class StateContext {
           }
         }
       }
-      return containerSet.getContainerReport();
+      return report;
     }
   }
 
@@ -452,20 +469,8 @@ public class StateContext {
       return null;
     }
 
-    ContainerSet containerSet =
-        parentDatanodeStateMachine.getContainer().getContainerSet();
     try {
-      synchronized (containerSet) {
-        synchronized (incrementalReportsQueue) {
-          List<Message> incrementalReports =
-              incrementalReportsQueue.get(endpoint);
-          if (incrementalReports != null) {
-            incrementalReports.removeIf(report ->
-                report instanceof IncrementalContainerReportProto);
-          }
-        }
-        return containerSet.getContainerReport();
-      }
+      return getFullContainerReportDiscardPendingICR(endpoint::equals);
     } catch (IOException | RuntimeException ex) {
       ready.set(true);
       throw ex;

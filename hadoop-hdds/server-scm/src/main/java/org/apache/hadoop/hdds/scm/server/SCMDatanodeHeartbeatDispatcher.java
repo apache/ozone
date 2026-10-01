@@ -145,7 +145,7 @@ public final class SCMDatanodeHeartbeatDispatcher {
         if (fullContainerReport != null && fullContainerReport.isRegister()) {
           eventPublisher.fireEvent(NODE_REGISTRATION_CONT_REPORT,
               new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(
-                  datanodeDetails, heartbeat.getContainerReport()));
+                  datanodeDetails, ContainerReportsProto.getDefaultInstance()));
         }
         ContainerReportFromDatanode report = fullContainerReport != null
             ? fullContainerReport : new ContainerReportFromDatanode(
