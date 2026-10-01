@@ -45,11 +45,13 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KE
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_REGEX_PATTERN;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.hasMultiChunksPayload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.hasUnsignedPayload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
@@ -58,6 +60,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -111,6 +114,7 @@ import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
 import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.commontypes.RequestParameters;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -761,6 +765,30 @@ public abstract class EndpointBase {
     }
   }
 
+  /**
+   * Rejects the request with {@code NotImplemented} if it has any of the {@code subresources}.
+   *
+   * @return null if the request has none of the {@code subresources}
+   */
+  Response rejectNotImplemented(S3RequestContext s3RequestContext, Set<String> subresources, String resource) {
+    final boolean requested = subresources.stream().anyMatch(subresource -> queryParams().get(subresource) != null);
+    return rejectNotImplemented(s3RequestContext, requested ? S3GAction.NOT_IMPLEMENTED : null, resource);
+  }
+
+  /**
+   * Rejects the request with {@code NotImplemented} unless {@code action} is null.
+   * The {@code action} is stored in the request context for audit logging.
+   *
+   * @param action the action determined by the handler, null if the handler is not responsible for the request
+   * @return null if {@code action} is null
+   */
+  Response rejectNotImplemented(S3RequestContext s3RequestContext, @Nullable S3GAction action, String resource) {
+    if (s3RequestContext.ignore(action)) {
+      return null;
+    }
+    throw newError(S3ErrorTable.NOT_IMPLEMENTED, resource);
+  }
+
   protected ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket) throws OS3Exception {
     String storageType = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
     String storageConfig = getHeaders().getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
@@ -822,7 +850,9 @@ public abstract class EndpointBase {
       if (hasUnsignedPayload(amzContentSha256Header)) {
         chunkInputStream = new UnsignedChunksInputStream(body);
       } else {
-        chunkInputStream = new SignedChunksInputStream(body, keyPath);
+        TrailerHeader trailerHeader = STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header)
+            ? TrailerHeader.fromHeader(getHeaders().getHeaderString(X_AMZ_TRAILER), keyPath) : TrailerHeader.NONE;
+        chunkInputStream = new SignedChunksInputStream(body, keyPath, trailerHeader);
       }
       effectiveLength = Long.parseLong(amzDecodedLength);
     } else {
@@ -846,7 +876,8 @@ public abstract class EndpointBase {
     // Header auth only: for a presigned (query) request the payload hash is not part of the signed
     // canonical request, so its seed signature cannot start the chunk signature chain.
     boolean verifyChunkSignature = signatureInfo.isSignPayload()
-        && STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header);
+        && (STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header)
+        || STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header));
     return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength, verifyChunkSignature);
   }
 

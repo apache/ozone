@@ -184,8 +184,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
-      CreateKeyResponse.Builder createKeyResponseBuilder =
-          getResponseBuilderWithDerivedKey(getOmRequest(), ozoneManager, createKeyRequest);
+      CreateKeyResponse.Builder createKeyResponseBuilder = CreateKeyResponse.newBuilder();
       perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       omBucketInfo.incrUsedNamespace(numKeysCreated);
 

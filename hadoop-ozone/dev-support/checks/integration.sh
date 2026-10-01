@@ -29,8 +29,12 @@ if [[ "$@" =~ "-Ptest-" ]]; then
   fi
 
   if [[ "$@" =~ "-Ptest-filesystem" ]]; then
-    # shading is performed in `package` phase, which is after `test`
-    PHASE=verify
+    if [[ "${CI:-}" == "true" ]]; then
+      args="$args -DskipShade --activate-profiles CI"
+    else
+      # shading is performed in `package` phase, which is after `test`
+      PHASE=verify
+    fi
   else
     args="$args -DskipShade"
   fi

@@ -261,6 +261,7 @@ import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -312,6 +313,7 @@ import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
+import org.apache.hadoop.ozone.om.snapshot.trapped.BucketDeletedDataCalculator;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
@@ -1922,6 +1924,47 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public OmSnapshotManager getOmSnapshotManager() {
     return omSnapshotManager;
+  }
+
+  /**
+   * Compute deleted bytes split for a bucket.
+   *
+   * @return stats containing snapshot-trapped bytes and purgeable bytes.
+   */
+  public BucketDeletedDataCalculator.BucketDeletedBytesStats
+      calculateDeletedBytesForBucket(String volume, String bucket)
+      throws IOException {
+    return new BucketDeletedDataCalculator(this).calculate(volume, bucket);
+  }
+
+  /**
+   * Compute deleted bytes split for a bucket path in {@code volume/bucket}
+   * format.
+   */
+  public BucketDeletedDataCalculator.BucketDeletedBytesStats
+      calculateDeletedBytesForBucket(String bucketPath)
+      throws IOException {
+    String[] tokens = bucketPath.split("/", 2);
+    if (tokens.length != 2 || tokens[0].isEmpty() || tokens[1].isEmpty()) {
+      throw new OMException("bucketPath must be in volume/bucket format: " + bucketPath, INVALID_PATH);
+    }
+    ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(tokens[0], tokens[1]));
+    return calculateDeletedBytesForBucket(resolvedBucket.realVolume(), resolvedBucket.realBucket());
+  }
+
+  @Override
+  public BucketDeletedBytes getBucketDeletedBytes(String bucketPath)
+      throws IOException {
+    checkAdminUserPrivilege("get bucket deleted bytes.");
+    BucketDeletedDataCalculator.BucketDeletedBytesStats stats =
+        calculateDeletedBytesForBucket(bucketPath);
+    return new BucketDeletedBytes(
+        stats.getSnapshotTrappedBytes(),
+        stats.getPurgeableBytes(),
+        stats.getSnapshotTrappedKeys(),
+        stats.getPurgeableKeys(),
+        stats.getSnapshotTrappedDirs(),
+        stats.getPurgeableDirs());
   }
 
   /**
@@ -5744,9 +5787,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     new QuotaRepairTask(this).repair(buckets);
   }
 
-  public byte[] getS3DerivedKey(String accessId, String signingKey) throws IOException {
-    String awsSecretKey = s3SecretManager.getSecretString(accessId);
-    return AWSV4AuthValidator.getSigningKey(awsSecretKey, signingKey);
+  /** Derives the signing key on the RPC thread after S3 authentication has succeeded. */
+  public byte[] getS3DerivedKey(S3Authentication s3Auth) throws IOException {
+    final String awsSecretKey;
+    if (StringUtils.isNotEmpty(s3Auth.getSessionToken())) {
+      STSTokenIdentifier stsToken = getStsTokenIdentifier();
+      if (stsToken == null || !s3Auth.getAccessId().equals(stsToken.getTempAccessKeyId())
+          || StringUtils.isEmpty(stsToken.getSecretAccessKey())) {
+        throw new OMException("Missing authenticated STS credentials for signing key derivation",
+            OMException.ResultCodes.INVALID_TOKEN);
+      }
+      awsSecretKey = stsToken.getSecretAccessKey();
+    } else {
+      awsSecretKey = getS3SecretManager().getSecretString(s3Auth.getAccessId());
+    }
+    return AWSV4AuthValidator.getSigningKey(awsSecretKey, s3Auth.getStringToSign());
   }
 
   @Override
