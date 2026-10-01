@@ -104,12 +104,6 @@ public class TestCommitWatcher {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(3));
     conf.setFromObject(raftClientConfig);
 
-    RatisClientConfig ratisClientConfig =
-        conf.getObject(RatisClientConfig.class);
-    ratisClientConfig.setWriteRequestTimeout(Duration.ofSeconds(10));
-    ratisClientConfig.setWatchRequestTimeout(Duration.ofSeconds(10));
-    conf.setFromObject(ratisClientConfig);
-
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ChecksumType.NONE);
     conf.setFromObject(clientConfig);
@@ -158,12 +152,14 @@ public class TestCommitWatcher {
         assertEquals(1, xceiverClient.getRefcount());
         XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
         CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
-        BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
         List<XceiverClientReply> replies = new ArrayList<>();
         long length = 0;
         List<CompletableFuture<ContainerCommandResponseProto>>
             futures = new ArrayList<>();
         for (int i = 0; i < capacity; i++) {
+          // Use a distinct block per iteration; a real client never rewrites the
+          // same blockID and offset with different data.
+          BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
           ContainerCommandRequestProto writeChunkRequest =
               ContainerTestHelper
                   .getWriteChunkRequest(pipeline, blockID, CHUNK_SIZE);
@@ -224,12 +220,14 @@ public class TestCommitWatcher {
         assertEquals(1, xceiverClient.getRefcount());
         XceiverClientRatis ratisClient = assertInstanceOf(XceiverClientRatis.class, xceiverClient);
         CommitWatcher watcher = new CommitWatcher(bufferPool, ratisClient);
-        BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
         List<XceiverClientReply> replies = new ArrayList<>();
         long length = 0;
         List<CompletableFuture<ContainerCommandResponseProto>>
             futures = new ArrayList<>();
         for (int i = 0; i < capacity; i++) {
+          // Use a distinct block per iteration; a real client never rewrites the
+          // same blockID and offset with different data.
+          BlockID blockID = ContainerTestHelper.getTestBlockID(containerId);
           ContainerCommandRequestProto writeChunkRequest =
               ContainerTestHelper
                   .getWriteChunkRequest(pipeline, blockID, CHUNK_SIZE);
@@ -274,9 +272,8 @@ public class TestCommitWatcher {
         IOException ioe =
             assertThrows(IOException.class, () -> watcher.watchForCommit(replies.get(1).getLogIndex() + 100));
         Throwable t = HddsClientUtils.checkForException(ioe);
-        // with retry count set to noRetry and a lower watch request
-        // timeout, watch request will eventually
-        // fail with TimeoutIOException from ratis client or the client
+        // Two of the three datanodes are down, so the watch can never be satisfied. It fails once the
+        // client watch timeout expires, with TimeoutIOException from the ratis client, or the client
         // can itself get AlreadyClosedException from the Ratis Server
         // and the write may fail with RaftRetryFailureException
         assertTrue(
