@@ -477,7 +477,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         }
       }
       // Check if the DN to which the GetBlock command was sent has been cached.
-      DatanodeDetails cachedDN = getBlockDNcache.get(blockID);
+      DatanodeDetails cachedDN = getBlockDNcache.get(toCacheKey(blockID));
       if (cachedDN != null && !topologyAwareRead) {
         datanodeList = pipeline.getNodes();
         int getBlockDNCacheIndex = datanodeList.indexOf(cachedDN);
@@ -540,9 +540,17 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     }
     if (request.getCmdType() == ContainerProtos.Type.GetBlock) {
       DatanodeBlockID getBlockID = request.getGetBlock().getBlockID();
-      getBlockDNcache.put(getBlockID, dn);
+      getBlockDNcache.put(toCacheKey(getBlockID), dn);
     }
     return responseProto;
+  }
+
+  /**
+   * The replicaIndex is unset or 0 depending on how the caller built the block ID,
+   * so it is dropped from the key of {@link #getBlockDNcache}.
+   */
+  private static DatanodeBlockID toCacheKey(DatanodeBlockID blockID) {
+    return blockID.hasReplicaIndex() ? blockID.toBuilder().clearReplicaIndex().build() : blockID;
   }
 
   /**

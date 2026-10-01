@@ -132,6 +132,34 @@ public class TestXceiverClientGrpc {
   }
 
   @Test
+  public void testGetBlockUsesCachedDatanodeAfterFailover() throws IOException {
+    conf.setBoolean(OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY, false);
+    final List<DatanodeDetails> seenDNs = new ArrayList<>();
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf) {
+      @Override
+      public XceiverClientReply sendCommandAsync(
+          ContainerProtos.ContainerCommandRequestProto request,
+          DatanodeDetails dn) throws IOException {
+        seenDNs.add(dn);
+        // The first datanode tried, i.e. the leader, always fails.
+        if (dn.equals(seenDNs.get(0))) {
+          throw new IOException("Failed " + dn);
+        }
+        return buildValidResponse();
+      }
+    }) {
+      invokeXceiverClientGetBlock(client);
+      assertEquals(2, seenDNs.size());
+      final DatanodeDetails cached = seenDNs.get(1);
+
+      // The next GetBlock goes to the cached datanode instead of retrying the failed leader.
+      invokeXceiverClientGetBlock(client);
+      assertEquals(3, seenDNs.size());
+      assertEquals(cached, seenDNs.get(2));
+    }
+  }
+
+  @Test
   public void testReadChunkRetryAllNodes() throws IOException {
     final List<DatanodeDetails> seenDNs = new ArrayList<>();
     try (XceiverClientGrpc client = failingClient(seenDNs)) {
