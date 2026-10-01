@@ -18,27 +18,27 @@
 package org.apache.hadoop.hdds.server.http;
 
 import java.io.IOException;
-import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.eclipse.jetty.ee8.servlet.DefaultServlet;
+import org.apache.hadoop.jmx.JMXJsonServlet;
 
 /**
- * General servlet which is admin-authorized.
+ * JMX servlet whose admin access check runs against Ozone's {@link HttpServer2}.
  *
+ * <p>hadoop-common's {@link JMXJsonServlet} delegates the check to
+ * {@code org.apache.hadoop.http.HttpServer2}, which cannot be loaded on a Jetty 12
+ * classpath: it references {@code org.eclipse.jetty.servlet.ServletContextHandler},
+ * removed in Jetty 12, so every {@code /jmx} request would fail with
+ * NoClassDefFoundError. Overriding only the check keeps the endpoint working
+ * without forking the servlet, and reads the ACL from the attributes Ozone's
+ * HttpServer2 actually sets.
  */
-public class AdminAuthorizedServlet extends DefaultServlet {
-
-  private static final long serialVersionUID = 1L;
+public class HddsJMXJsonServlet extends JMXJsonServlet {
 
   @Override
-  protected void doGet(HttpServletRequest request, HttpServletResponse response)
-      throws ServletException, IOException {
-    // Do the authorization
-    if (HttpServer2.hasAdministratorAccess(getServletContext(), request,
-        response)) {
-      // Authorization is done. Just call super.
-      super.doGet(request, response);
-    }
+  protected boolean isInstrumentationAccessAllowed(HttpServletRequest request,
+      HttpServletResponse response) throws IOException {
+    return HttpServer2.isInstrumentationAccessAllowed(getServletContext(),
+        request, response);
   }
 }
