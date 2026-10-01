@@ -26,9 +26,6 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.security.AccessController;
-import java.security.PrivilegedActionException;
-import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -669,17 +666,11 @@ public class TestOmMixedWorkloadUnderDeletionBench {
     static Profiler load() throws Exception {
       String jar = requireProfilerPath("bench.profiler.jar");
       String lib = requireProfilerPath("bench.profiler.lib");
-      try {
-        return AccessController.doPrivileged((PrivilegedExceptionAction<Profiler>) () -> {
-          URLClassLoader loader = new URLClassLoader(new URL[] {new File(jar).toURI().toURL()},
-              Profiler.class.getClassLoader());
-          Class<?> clazz = Class.forName("one.profiler.AsyncProfiler", true, loader);
-          Object instance = clazz.getMethod("getInstance", String.class).invoke(null, lib);
-          return new Profiler(instance, clazz.getMethod("execute", String.class));
-        });
-      } catch (PrivilegedActionException e) {
-        throw (Exception) e.getCause();
-      }
+      URLClassLoader loader = new URLClassLoader(new URL[] {new File(jar).toURI().toURL()},
+          Profiler.class.getClassLoader());
+      Class<?> clazz = Class.forName("one.profiler.AsyncProfiler", true, loader);
+      Object instance = clazz.getMethod("getInstance", String.class).invoke(null, lib);
+      return new Profiler(instance, clazz.getMethod("execute", String.class));
     }
 
     private static String requireProfilerPath(String property) {
