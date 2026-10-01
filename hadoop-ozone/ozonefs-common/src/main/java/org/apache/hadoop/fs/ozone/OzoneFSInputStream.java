@@ -190,7 +190,8 @@ public class OzoneFSInputStream extends FSInputStream
   }
 
   protected boolean supportsPositionedRead() {
-    // Require the interface and, if capabilities are reported, an explicit opt-in.
+    // The wrapped stream must implement ByteBufferPositionedReadable.
+    // If it also implements StreamCapabilities, it must report support for PREADBYTEBUFFER.
     return inputStream instanceof ByteBufferPositionedReadable
         && (!(inputStream instanceof StreamCapabilities)
             || ((StreamCapabilities) inputStream).hasCapability(StreamCapabilities.PREADBYTEBUFFER));

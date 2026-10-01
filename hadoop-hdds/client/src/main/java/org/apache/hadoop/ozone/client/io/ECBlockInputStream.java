@@ -303,13 +303,11 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   @Override
   protected int readPositioned(long offset, ByteBuffer buffer) {
-    // The proxy creates an independent reader for each call; this reader owns a single cursor.
     throw new UnsupportedOperationException("Use ECBlockInputStreamProxy for positioned reads");
   }
 
   @Override
   public boolean hasCapability(String capability) {
-    // The inherited interface must not advertise a positioned read that this reader cannot perform.
     return !StreamCapabilities.PREADBYTEBUFFER.equalsIgnoreCase(capability)
         && super.hasCapability(capability);
   }

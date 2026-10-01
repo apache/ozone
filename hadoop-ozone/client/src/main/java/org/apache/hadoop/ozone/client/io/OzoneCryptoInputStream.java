@@ -190,7 +190,6 @@ public class OzoneCryptoInputStream extends CryptoInputStream
       throw new ReadOnlyBufferException();
     }
     if (!dst.hasRemaining()) {
-      // A zero-length read returns zero, even at EOF.
       return 0;
     }
     if (position >= length) {
