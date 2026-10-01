@@ -391,7 +391,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       return;
     }
     if (!pendingFlush.hasBuffersForPutBlock()) {
-      Objects.requireNonNull(null, "byteBufferList == null"); // or explicit check
+      return;
     }
     executePutBlock(pendingFlush.seal(), close, false);
   }
@@ -584,7 +584,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         writeChunk(currentBuffer);
         currentBuffer = null;
       }
-      executePutBlock(close, false);
+      PendingFlush.FlushBatch batch = pendingFlush.seal();
+      executePutBlock(batch, close, false);
     } else if (close) {
       // forcing an "empty" putBlock if stream is being closed without new
       // data since latest flush - we need to send the "EOF" flag
