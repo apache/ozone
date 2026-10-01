@@ -38,13 +38,20 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.anyBoolean;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -59,10 +66,12 @@ import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
@@ -241,6 +250,47 @@ public class TestPartUpload {
     assertErrorResponse(S3ErrorTable.INTERNAL_ERROR,
         () -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, signedChunkedBody("")));
     assertNoParts(uploadID, keyName);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {STREAMING_AWS4_HMAC_SHA256_PAYLOAD, STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER})
+  void testPartUploadRejectsUnsupportedOmBeforeOpeningKey(String algorithm) throws Exception {
+    String keyName = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+    rest.getOzoneConfiguration().setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
+    configureSignedChunkHeaders(4);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(algorithm);
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
+    doReturn(0L).when(rest).getDatastreamMinLength();
+    OzoneClient clientSpy = spy(client);
+    ClientProtocol protocol = spy(clientSpy.getProxy());
+    when(protocol.getOmVersion()).thenReturn(OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS);
+    doReturn(protocol).when(clientSpy).getProxy();
+    rest.setClient(clientSpy);
+    // Rebuild the handler chain to use the spied endpoint and client.
+    rest.init();
+    String chunkedBody = STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(algorithm)
+        ? signedChunkedBodyWithTrailer("data", "x-amz-checksum-crc32c", "AAAAAA==") : signedChunkedBody("data");
+    byte[] payload = chunkedBody.getBytes(StandardCharsets.UTF_8);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH)).thenReturn(String.valueOf(payload.length));
+    when(rest.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    rest.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
+    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 1);
+
+    try (MockedStatic<ObjectEndpointStreaming> streaming = mockStatic(ObjectEndpointStreaming.class);
+         ByteArrayInputStream body = new ByteArrayInputStream(payload)) {
+      long failures = rest.getMetrics().getCreateMultipartKeyFailure();
+      long successes = rest.getMetrics().getCreateMultipartKeySuccess();
+      assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> rest.put(OzoneConsts.S3_BUCKET, keyName, body));
+      assertThat(rest.getMetrics().getCreateMultipartKeyFailure()).isEqualTo(failures + 1);
+      assertThat(rest.getMetrics().getCreateMultipartKeySuccess()).isEqualTo(successes);
+      assertThat(body.available()).isEqualTo(payload.length);
+      verify(protocol).getOmVersion();
+      verify(protocol, never()).createMultipartKey(anyString(), anyString(), anyString(), anyLong(), anyInt(),
+          anyString(), anyBoolean());
+      streaming.verifyNoInteractions();
+      assertNoParts(uploadID, keyName);
+    }
   }
 
   private void configureSignedChunks(int contentLength) throws IOException {

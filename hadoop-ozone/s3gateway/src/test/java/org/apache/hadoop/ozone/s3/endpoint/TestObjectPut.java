@@ -58,11 +58,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyMap;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -93,12 +98,14 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -396,6 +403,36 @@ class TestObjectPut {
     assertErrorResponse(S3ErrorTable.INTERNAL_ERROR, () -> putObject(signedChunkedBody("")));
 
     assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testPutObjectRejectsUnsupportedOmBeforeOpeningKey(boolean datastream) throws Exception {
+    objectEndpoint.getOzoneConfiguration().setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
+    configureSignedChunkHeaders(CONTENT.length());
+    doReturn(datastream).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    OzoneClient client = spy(objectEndpoint.getClient());
+    ClientProtocol protocol = spy(client.getProxy());
+    when(protocol.getOmVersion()).thenReturn(OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS);
+    doReturn(protocol).when(client).getProxy();
+    objectEndpoint.setClient(client);
+    // Rebuild the handler chain to use the spied endpoint and client.
+    objectEndpoint.init();
+    byte[] payload = signedChunkedBody(CONTENT).getBytes(StandardCharsets.UTF_8);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH)).thenReturn(String.valueOf(payload.length));
+    when(objectEndpoint.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+
+    try (MockedStatic<ObjectEndpointStreaming> streaming = mockStatic(ObjectEndpointStreaming.class);
+         ByteArrayInputStream body = new ByteArrayInputStream(payload)) {
+      assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> objectEndpoint.put(BUCKET_NAME, KEY_NAME, body));
+      assertThat(body.available()).isEqualTo(payload.length);
+      verify(protocol).getOmVersion();
+      verify(protocol, never()).createKey(anyString(), anyString(), anyString(), anyLong(), any(), anyMap(), anyMap(),
+          anyBoolean());
+      streaming.verifyNoInteractions();
+      assertKeyWasNotCommitted();
+    }
   }
 
   @Test

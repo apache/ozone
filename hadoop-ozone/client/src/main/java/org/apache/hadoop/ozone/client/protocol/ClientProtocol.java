@@ -1067,9 +1067,9 @@ public interface ClientProtocol {
   OzoneFsServerDefaults getServerDefaults() throws IOException;
 
   /**
-   * Returns the negotiated Ozone Manager version for the connected cluster.
-   * In an HA cluster this is the minimum version across all OMs, so callers
-   * can safely gate client behavior on new server-side features.
+   * Returns the Ozone Manager version negotiated when the client was created.
+   * This is based on the minimum OM version advertised in the service list.
+   * The service list currently assumes all OM peers are at the same version.
    * @return the effective Ozone Manager version.
    */
   OzoneManagerVersion getOmVersion();
