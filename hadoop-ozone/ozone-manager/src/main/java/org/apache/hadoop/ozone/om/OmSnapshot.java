@@ -29,6 +29,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.LeakDetector;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
@@ -48,6 +50,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneAuthorizerFactory;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,6 +75,8 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   private static final AuditLogger AUDIT = new AuditLogger(
       AuditLoggerType.OMLOGGER);
 
+  private static final LeakDetector LEAK_DETECTOR = new LeakDetector(OmSnapshot.class.getName());
+
   private final OmMetadataReader omMetadataReader;
   private final String volumeName;
   private final String bucketName;
@@ -80,6 +85,8 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   // To access snapshot checkpoint DB metadata
   private final OMMetadataManager omMetadataManager;
   private final KeyManager keyManager;
+  /** Warns if this snapshot is garbage collected without being closed. Assigned in the constructor. */
+  private final UncheckedAutoCloseable leakTracker;
 
   public OmSnapshot(KeyManager keyManager,
                     PrefixManager prefixManager,
@@ -100,6 +107,7 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     this.snapshotID = snapshotID;
     this.keyManager = keyManager;
     this.omMetadataManager = keyManager.getMetadataManager();
+    this.leakTracker = LEAK_DETECTOR.track(this, newLeakReporter(omMetadataManager.getStore(), snapshotName));
   }
 
   @Override
@@ -345,19 +353,21 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   public void close() throws IOException {
     // Close DB
     omMetadataManager.getStore().close();
+    // Closed properly: stop tracking so the leak reporter does not fire at GC.
+    leakTracker.close();
   }
 
-  @Override
-  protected void finalize() throws Throwable {
-    // Verify that the DB handle has been closed, log warning otherwise
-    // https://softwareengineering.stackexchange.com/a/288724
-    if (!omMetadataManager.getStore().isClosed()) {
-      LOG.warn("{} is not closed properly. snapshotName: {}",
-          // Print hash code for debugging
-          omMetadataManager.getStore().toString(),
-          snapshotName);
-    }
-    super.finalize();
+  /**
+   * @return a leak reporter that captures only the {@code store} and {@code snapshotName} objects,
+   *     never the {@link OmSnapshot} itself.
+   */
+  static Runnable newLeakReporter(DBStore store, String snapshotName) {
+    return () -> {
+      if (!store.isClosed()) {
+        // Print hash code for debugging
+        LOG.warn("{} is not closed properly. snapshotName: {}", store, snapshotName);
+      }
+    };
   }
 
   @VisibleForTesting
