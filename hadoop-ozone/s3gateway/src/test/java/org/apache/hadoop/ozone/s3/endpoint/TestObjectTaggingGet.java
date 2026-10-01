@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.createObjectEndpoint;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.getTagging;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
@@ -29,6 +30,10 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.util.List;
@@ -36,6 +41,8 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,6 +74,19 @@ public class TestObjectTaggingGet {
         .setClient(client)
         .setHeaders(headers)
         .build();
+  }
+
+  @Test
+  public void testGetTaggingWithoutBucketLookup() throws Exception {
+    OzoneVolume volume = mock(OzoneVolume.class);
+    ClientProtocol protocol = mock(ClientProtocol.class);
+    ObjectEndpoint endpoint = createObjectEndpoint(protocol, volume, BUCKET_NAME);
+
+    getTagging(endpoint, BUCKET_NAME, KEY_WITH_TAG);
+
+    verify(volume, never()).getBucket(anyString());
+    verify(protocol, never()).getBucketDetails(anyString(), anyString());
+    verify(protocol).getObjectTagging("s3Volume", BUCKET_NAME, KEY_WITH_TAG);
   }
 
   @Test

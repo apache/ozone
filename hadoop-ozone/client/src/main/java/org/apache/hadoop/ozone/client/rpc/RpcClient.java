@@ -2392,6 +2392,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
 
     OmMultipartUploadList omMultipartUploadList;
     if (omVersion.compareTo(OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION) >= 0) {

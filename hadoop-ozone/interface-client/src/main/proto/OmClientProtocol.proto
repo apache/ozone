@@ -171,6 +171,7 @@ enum Type {
   DeleteRevokedSTSTokens = 155;
   GetCallerIdentity = 156;
   SnapshotCount = 157;
+  GetBucketDeletedBytes = 158;
 }
 
 enum SafeMode {
@@ -337,6 +338,7 @@ message OMRequest {
   optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 157;
   optional GetCallerIdentityRequest         getCallerIdentityRequest       = 158;
   optional SnapshotCountRequest snapshotCountRequest = 159;
+  optional GetBucketDeletedBytesRequest     getBucketDeletedBytesRequest   = 160;
 }
 
 message OMResponse {
@@ -487,6 +489,7 @@ message OMResponse {
   optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 155;
   optional GetCallerIdentityResponse         getCallerIdentityResponse      = 156;
   optional SnapshotCountResponse snapshotCountResponse = 157;
+  optional GetBucketDeletedBytesResponse     getBucketDeletedBytesResponse  = 158;
 }
 
 enum Status {
@@ -1768,6 +1771,19 @@ message ListOpenFilesResponse {
   repeated KeyInfo keyInfo = 5;
 }
 
+message GetBucketDeletedBytesRequest {
+  required string bucketPath = 1;
+}
+
+message GetBucketDeletedBytesResponse {
+  required uint64 snapshotTrappedBytes = 1;
+  required uint64 purgeableBytes = 2;
+  optional uint64 snapshotTrappedKeys = 3;
+  optional uint64 purgeableKeys = 4;
+  optional uint64 snapshotTrappedDirs = 5;
+  optional uint64 purgeableDirs = 6;
+}
+
 message ServicePort {
     enum Type {
         RPC = 1;
@@ -2436,6 +2452,9 @@ message S3Authentication {
     // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
     // in finer-grained STS permissions.
     optional string s3Action = 10;
+    // Resolved so GetCallerIdentity can return the assumed-role identity from the session token.
+    optional string resolvedStsAssumedRoleId = 11;
+    optional string resolvedStsAssumedRoleUserArn = 12;
 }
 
 message RecoverLeaseRequest {
@@ -2480,6 +2499,10 @@ message BucketQuotaCount {
     required bool supportOldQuota = 5 [default=false];
     optional int64 diffSnapshotUsedBytes = 6;
     optional int64 diffSnapshotUsedNamespace = 7;
+    // objectID of the bucket the delta was computed against, so the apply can
+    // reject a stale delta if the bucket was deleted and recreated under the
+    // same name during the repair window. Optional for backward compatibility.
+    optional uint64 bucketObjectID = 8;
 }
 
 message QuotaRepairResponse {

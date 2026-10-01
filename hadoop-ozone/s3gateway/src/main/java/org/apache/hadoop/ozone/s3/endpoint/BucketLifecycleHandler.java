@@ -172,8 +172,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
   protected OzoneLifecycleConfiguration getLifecycleConfiguration(
       S3RequestContext context, String bucketName) throws IOException, OS3Exception {
     try {
-      OzoneBucket ozoneBucket = context.getVolume().getBucket(bucketName);
-      return ozoneBucket.getLifecycleConfiguration();
+      return getClientProtocol().getLifecycleConfiguration(context.getVolume().getName(), bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND) {
         throw S3ErrorTable.newError(

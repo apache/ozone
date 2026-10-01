@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKE
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -60,6 +61,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -142,6 +144,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Finaliz
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetAclResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetDelegationTokenResponseProto;
@@ -1041,7 +1045,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMResponse omResponse = submitRequest(omRequest);
 
     Map<String, ErrorInfo> keyToErrors = new HashMap<>();
-    if (quiet) {
+    if (quiet && omResponse.getStatus() == PARTIAL_DELETE) {
+      // PARTIAL_DELETE means the batch was processed and only some keys failed; those are reported per key
+      // in the returned map. Any other non-OK status means the whole request failed.
       List<OzoneManagerProtocolProtos.DeleteKeyError> errors =
           omResponse.getDeleteKeysResponse().getErrorsList();
       for (OzoneManagerProtocolProtos.DeleteKeyError deleteKeyError : errors) {
@@ -2062,6 +2068,28 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         resp.hasContinuationToken() ? resp.getContinuationToken() : null,
         resp.getClientIDList(),
         resp.getKeyInfoList());
+  }
+
+  @Override
+  public BucketDeletedBytes getBucketDeletedBytes(String bucketPath)
+      throws IOException {
+    GetBucketDeletedBytesRequest request = GetBucketDeletedBytesRequest
+        .newBuilder()
+        .setBucketPath(bucketPath)
+        .build();
+    OMRequest omRequest = createOMRequest(Type.GetBucketDeletedBytes)
+        .setGetBucketDeletedBytesRequest(request)
+        .build();
+
+    GetBucketDeletedBytesResponse response = handleError(submitRequest(omRequest))
+        .getGetBucketDeletedBytesResponse();
+    return new BucketDeletedBytes(
+        response.getSnapshotTrappedBytes(),
+        response.getPurgeableBytes(),
+        response.getSnapshotTrappedKeys(),
+        response.getPurgeableKeys(),
+        response.getSnapshotTrappedDirs(),
+        response.getPurgeableDirs());
   }
 
   @Override
