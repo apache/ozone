@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.UnsafeByteOperations;
@@ -73,6 +75,7 @@ import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
@@ -292,17 +295,16 @@ public class TestHeartbeatEndpointTask {
     ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
         .forClass(SCMHeartbeatRequestProto.class);
     when(scm.sendHeartbeat(argument.capture()))
-        .thenAnswer(invocation ->
-            SCMHeartbeatResponseProto.newBuilder()
-                .setDatanodeUUID(
-                    ((SCMHeartbeatRequestProto)invocation.getArgument(0))
-                        .getDatanodeDetails().getUuid())
-                .setTerm(7L)
-                .setFullContainerReportLease(
-                    FullContainerReportLeaseProto.newBuilder()
-                        .setId(99L)
-                        .setTerm(7L))
-                .build());
+        .thenAnswer(invocation -> {
+          SCMHeartbeatRequestProto request = invocation.getArgument(0);
+          SCMHeartbeatResponseProto.Builder response = SCMHeartbeatResponseProto.newBuilder()
+              .setDatanodeUUID(request.getDatanodeDetails().getUuid()).setTerm(7L);
+          if (request.getRequestFullContainerReportLease()) {
+            response.setFullContainerReportLease(
+                FullContainerReportLeaseProto.newBuilder().setId(99L).setTerm(7L));
+          }
+          return response.build();
+        });
 
     DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
@@ -311,6 +313,7 @@ public class TestHeartbeatEndpointTask {
         .build();
     EndpointStateMachine endpointStateMachine = new EndpointStateMachine(
         TEST_SCM_ENDPOINT, scm, conf, "");
+    endpointStateMachine.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
     endpointStateMachine.setVersion(VersionResponse.newBuilder()
         .setVersion(1)
         .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString())
@@ -334,18 +337,77 @@ public class TestHeartbeatEndpointTask {
     context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
 
     endpointTask.call();
-    SCMHeartbeatRequestProto firstHeartbeat = argument.getValue();
+    assertEquals(2, argument.getAllValues().size());
+    SCMHeartbeatRequestProto firstHeartbeat = argument.getAllValues().get(0);
     assertFalse(firstHeartbeat.hasContainerReport());
     assertTrue(firstHeartbeat.getRequestFullContainerReportLease());
 
-    endpointTask.call();
-    SCMHeartbeatRequestProto secondHeartbeat = argument.getValue();
+    SCMHeartbeatRequestProto secondHeartbeat = argument.getAllValues().get(1);
     assertTrue(secondHeartbeat.hasContainerReport());
     assertEquals(99L, secondHeartbeat.getContainerReport()
         .getFullContainerReportLease().getId());
     assertEquals(7L, secondHeartbeat.getContainerReport()
         .getFullContainerReportLease().getTerm());
     assertFalse(secondHeartbeat.getRequestFullContainerReportLease());
+    assertFalse(context.isFullContainerReportReady(TEST_SCM_ENDPOINT));
+    assertFalse(endpointStateMachine.hasFullContainerReportLease());
+
+    endpointTask.call();
+    assertEquals(3, argument.getAllValues().size());
+    assertFalse(argument.getValue().hasContainerReport());
+    assertFalse(argument.getValue().getRequestFullContainerReportLease());
+    verify(datanodeStateMachine, never()).triggerHeartbeat();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, 0, false", "true, 0, false", "true, 99, true"})
+  public void leasedFCRDoesNotTriggerHeartbeatWithoutUsableGrant(boolean grantPresent, long leaseId,
+      boolean reregister) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
+    stubFullContainerReport(datanode, ContainerReportsProto.getDefaultInstance());
+    when(datanode.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture())).thenAnswer(invocation -> {
+      SCMHeartbeatResponseProto.Builder response = SCMHeartbeatResponseProto.newBuilder()
+          .setDatanodeUUID(((SCMHeartbeatRequestProto) invocation.getArgument(0)).getDatanodeDetails().getUuid());
+      if (grantPresent) {
+        response.setFullContainerReportLease(
+            FullContainerReportLeaseProto.newBuilder().setId(leaseId).setTerm(7L));
+      }
+      if (reregister) {
+        response.addCommands(SCMCommandProto.newBuilder().setCommandType(SCMCommandProto.Type.reregisterCommand));
+      }
+      return response.build();
+    });
+    try (EndpointStateMachine endpoint = new EndpointStateMachine(TEST_SCM_ENDPOINT, scm, conf, "")) {
+      endpoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
+      endpoint.setVersion(VersionResponse.newBuilder().setVersion(1)
+          .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build());
+      HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
+          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setLayoutVersionManager(mock(HDDSLayoutVersionManager.class)).setEndpointStateMachine(endpoint).build();
+
+      task.call();
+
+      assertTrue(argument.getValue().getRequestFullContainerReportLease());
+      assertFalse(argument.getValue().hasContainerReport());
+      assertFalse(endpoint.hasFullContainerReportLease());
+      assertTrue(context.isFullContainerReportReady(TEST_SCM_ENDPOINT));
+      if (reregister) {
+        assertEquals(EndpointStateMachine.EndPointStates.GETVERSION, endpoint.getState());
+      } else {
+        task.call();
+        assertTrue(argument.getValue().getRequestFullContainerReportLease());
+        assertFalse(argument.getValue().hasContainerReport());
+      }
+      verify(datanode, never()).triggerHeartbeat();
+    }
   }
 
   @Test

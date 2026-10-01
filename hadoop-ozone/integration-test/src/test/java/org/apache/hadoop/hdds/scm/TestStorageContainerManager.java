@@ -686,6 +686,7 @@ public class TestStorageContainerManager {
   @Test
   void testFullContainerReportLeaseRateLimiting() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 5, TimeUnit.SECONDS);
     conf.setInt(OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES, 1);
     conf.setTimeDuration(OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION, 1, TimeUnit.SECONDS);
 
@@ -696,6 +697,8 @@ public class TestStorageContainerManager {
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
       StorageContainerManager scm = cluster.getStorageContainerManager();
       List<HddsDatanodeService> datanodes = cluster.getHddsDatanodes();
+      datanodes.forEach(dn -> assertThat(dn.getDatanodeStateMachine().getContext().getHeartbeatFrequency())
+          .isEqualTo(5_000L));
       DatanodeDetails firstDatanode = datanodes.get(0).getDatanodeDetails();
       DatanodeDetails secondDatanode = datanodes.get(1).getDatanodeDetails();
       ContainerInfo container = scm.getClientProtocolServer()

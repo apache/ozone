@@ -132,6 +132,20 @@ public class HeartbeatEndpointTask
   @Override
   public EndpointStateMachine.EndPointStates call() throws Exception {
     rpcEndpoint.lock();
+    try {
+      if (sendHeartbeat()) {
+        sendHeartbeat();
+      }
+    } finally {
+      rpcEndpoint.unlock();
+    }
+    return rpcEndpoint.getState();
+  }
+
+  /**
+   * Sends a heartbeat and returns whether a granted lease is ready for a pending FCR.
+   */
+  private boolean sendHeartbeat() {
     SCMHeartbeatRequestProto.Builder requestBuilder = null;
     try {
       DatanodeVersionProto versionInfo = toVersionProto(
@@ -161,6 +175,8 @@ public class HeartbeatEndpointTask
       processResponse(response, datanodeDetailsProto);
       rpcEndpoint.setLastSuccessfulHeartbeat(ZonedDateTime.now());
       rpcEndpoint.zeroMissedCount();
+      return request.getRequestFullContainerReportLease() && rpcEndpoint.hasFullContainerReportLease()
+          && context.isFullContainerReportReady(rpcEndpoint.getAddress());
     } catch (IOException ex) {
       Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
@@ -171,10 +187,8 @@ public class HeartbeatEndpointTask
       }
       rpcEndpoint.logIfNeeded(ex);
       maybeRefreshScmAddress(ex);
-    } finally {
-      rpcEndpoint.unlock();
     }
-    return rpcEndpoint.getState();
+    return false;
   }
 
   /**

@@ -22,12 +22,15 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -62,12 +65,14 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.states.endpoint.HeartbeatEndpointTask;
@@ -510,8 +515,7 @@ public class TestEndPoint {
         .createNodeReport(Arrays.asList(getStorageReports(datanodeID)),
             Arrays.asList(getMetadataStorageReports(datanodeID))));
     ContainerController controller = mock(ContainerController.class);
-    when(controller.getContainerReport()).thenReturn(
-        HddsTestUtils.getRandomContainerReports(10));
+    when(controller.getContainerReport()).thenThrow(new IOException("snapshot unavailable"));
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getPipelineReport()).thenReturn(
         HddsTestUtils.getRandomPipelineReports());
@@ -525,6 +529,21 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndpoint = new EndpointStateMachine(
         new HostAndPort(serverAddress.getHostName(), serverAddress.getPort()),
         scm, conf, "")) {
+      DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
+      when(datanode.getContainer()).thenReturn(ozoneContainer);
+      when(datanode.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+      StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
+      HostAndPort otherScm = new HostAndPort("other-scm", 9861);
+      context.addEndpoint(rpcEndpoint.getAddress());
+      context.addEndpoint(otherScm);
+      context.refreshFullReport(ContainerReportsProto.getDefaultInstance());
+      context.getAllAvailableReports(rpcEndpoint.getAddress());
+      context.getAllAvailableReports(otherScm);
+      assertFalse(context.isFullContainerReportReady(rpcEndpoint.getAddress()));
+      assertFalse(context.isFullContainerReportReady(otherScm));
+      ArgumentCaptor<SCMHeartbeatRequestProto> heartbeat = ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+      when(scm.sendHeartbeat(heartbeat.capture())).thenReturn(SCMHeartbeatResponseProto.newBuilder()
+          .setDatanodeUUID(datanodeDetails.getUuidString()).build());
       rpcEndpoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
       rpcEndpoint.setVersion(VersionResponse.newBuilder()
           .setVersion(1)
@@ -532,11 +551,21 @@ public class TestEndPoint {
               Boolean.TRUE.toString())
           .build());
       RegisterEndpointTask endpointTask = new RegisterEndpointTask(
-          rpcEndpoint, ozoneContainer, mock(StateContext.class),
+          rpcEndpoint, ozoneContainer, context,
           versionManager);
       endpointTask.setDatanodeDetails(datanodeDetails);
 
       endpointTask.call();
+      assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndpoint.getState());
+      assertTrue(context.isFullContainerReportReady(rpcEndpoint.getAddress()));
+      assertFalse(context.isFullContainerReportReady(otherScm));
+      verify(controller, never()).getContainerReport();
+
+      HeartbeatEndpointTask heartbeatTask = new HeartbeatEndpointTask(rpcEndpoint, conf, context, versionManager);
+      heartbeatTask.setDatanodeDetailsProto(datanodeDetails.getProtoBufMessage());
+      heartbeatTask.call();
+      assertTrue(heartbeat.getValue().getRequestFullContainerReportLease());
+      assertFalse(heartbeat.getValue().hasContainerReport());
     }
 
     assertTrue(containerReport.getValue().getFullContainerReportDeferred());
