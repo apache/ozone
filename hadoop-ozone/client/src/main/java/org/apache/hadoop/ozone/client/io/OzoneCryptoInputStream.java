@@ -177,11 +177,6 @@ public class OzoneCryptoInputStream extends CryptoInputStream
     return super.available();
   }
 
-  @Override
-  public synchronized int readPositioned(long partOffset, ByteBuffer buffer) throws IOException {
-    return read(partOffset, buffer);
-  }
-
   /**
    * Hadoop decrypts positioned reads with request-local buffers and a separate decryptor.
    */
