@@ -81,8 +81,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final long blockLength;
   private final int responseDataSize;
   private final long preReadSize;
-  // Refill the pre-read window in bulk once it drains below this, instead of after every response.
-  private final long preReadRefillThreshold;
   private final Duration readTimeout;
   private final long readTimeoutNanos;
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
@@ -117,7 +115,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     this.retryPolicy = getReadRetryPolicy(config);
     this.refreshFunction = refreshFunction;
     this.preReadSize = config.getStreamReadPreReadSize();
-    this.preReadRefillThreshold = preReadSize / 2;
     this.responseDataSize = config.getStreamReadResponseDataSize();
     this.readTimeout = config.getStreamReadTimeout();
     this.readTimeoutNanos = readTimeout.toNanos();
@@ -450,11 +447,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   synchronized void readBlock(int length, boolean preRead) throws IOException {
-    final long required = position + length - requestedLength;
+    final long outstanding = requestedLength - position;  // bytes requested from the datanode but not yet consumed
+    final long required = length - outstanding;           // bytes required to fulfill this call
     final long preReadLength = preRead ? preReadSize : 0;
-    final long refillThreshold = preRead ? preReadRefillThreshold : 0;
-    // Safe to skip: required <= 0 means the DataNode still owes bytes that poll() is waiting for.
-    if (required <= 0 && requestedLength - position >= refillThreshold) {
+    if (required <= 0 && outstanding >= getPreReadRefillThreshold(preReadLength)) {
+      // Safe to skip: already has the required bytes and exceeded the refill threshold
       return;
     }
     // Clamp so requestedLength never exceeds blockLength: requesting past the end
@@ -545,8 +542,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     return preReadSize;
   }
 
-  long getPreReadRefillThreshold() {
-    return preReadRefillThreshold;
+  /** Refill the pre-read window in bulk once it drains below this, instead of after every response. */
+  static long getPreReadRefillThreshold(long preRead) {
+    return preRead / 2;
   }
 
   public int getResponseDataSize() {

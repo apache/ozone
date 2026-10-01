@@ -462,7 +462,7 @@ public class TestStreamBlockInputStream {
     try (StreamBlockInputStream sbis = new StreamBlockInputStream(
         blockID, blockLength, mockStandalonePipeline(), null, xceiverClientFactory,
         NO_REFRESH, clientConfig)) {
-      refillThreshold = sbis.getPreReadRefillThreshold();
+      refillThreshold = StreamBlockInputStream.getPreReadRefillThreshold(sbis.getPreReadSize());
       // Read one small buffer at a time, as KeyInputStream does, so every response reaches readBlock again.
       byte[] all = new byte[blockLength];
       for (int off = 0; off < blockLength; off += responseSize) {
