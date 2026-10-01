@@ -178,7 +178,8 @@ public class OzoneCryptoInputStream extends CryptoInputStream
   }
 
   /**
-   * Hadoop decrypts positioned reads with request-local buffers and a separate decryptor.
+   * Reads and decrypts at the given offset without moving the sequential cursor.
+   * This method needs no synchronization: CryptoInputStream uses separate buffers and a decryptor for each call.
    */
   @Override
   public int read(long position, ByteBuffer dst) throws IOException {
@@ -189,6 +190,7 @@ public class OzoneCryptoInputStream extends CryptoInputStream
       throw new ReadOnlyBufferException();
     }
     if (!dst.hasRemaining()) {
+      // A zero-length read returns zero, even at EOF.
       return 0;
     }
     if (position >= length) {
