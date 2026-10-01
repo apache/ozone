@@ -187,6 +187,7 @@ public class BlockManagerImpl implements BlockManager {
     Objects.requireNonNull(data, "data == null");
     Preconditions.checkState(data.getContainerID() >= 0, "Container Id " +
         "cannot be negative");
+    BlockUtils.verifyStorageType(container.getContainerData(), data.getBlockID());
 
     KeyValueContainerData containerData = container.getContainerData();
 

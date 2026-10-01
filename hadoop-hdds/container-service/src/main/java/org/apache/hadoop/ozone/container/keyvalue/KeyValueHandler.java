@@ -295,6 +295,7 @@ public class KeyValueHandler extends Handler {
     if (msg.hasWriteChunk()) {
       BlockID blockID =
           BlockID.getFromProtobuf(msg.getWriteChunk().getBlockID());
+      BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockID);
 
       return chunkManager.getStreamDataChannel(kvContainer,
           blockID, putBlock, metrics);
@@ -692,6 +693,8 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Objects.requireNonNull(blockData, "blockData == null");
+      Objects.requireNonNull(blockData.getBlockID());
+      BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockData.getBlockID());
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
@@ -1114,6 +1117,8 @@ public class KeyValueHandler extends Handler {
 
       WriteChunkRequestProto writeChunk = request.getWriteChunk();
       BlockID blockID = BlockID.getFromProtobuf(writeChunk.getBlockID());
+      BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockID);
+      BlockData blockData = validateWriteChunkBlockData(writeChunk, kvContainer, blockID);
       ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
 
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
@@ -1137,8 +1142,6 @@ public class KeyValueHandler extends Handler {
       if (isCommit && writeChunk.hasBlock()) {
         long startTime = Time.monotonicNowNanos();
         metrics.incContainerOpsMetrics(Type.PutBlock);
-        BlockData blockData = BlockData.getFromProtoBuf(
-            writeChunk.getBlock().getBlockData());
         // optimization for hsync when WriteChunk is in commit phase:
         //
         // block metadata is piggybacked in the same message.
@@ -1173,6 +1176,24 @@ public class KeyValueHandler extends Handler {
 
     updateRecoveringContainerTimeout(kvContainer);
     return getWriteChunkResponseSuccess(request, blockDataProto);
+  }
+
+  private static BlockData validateWriteChunkBlockData(WriteChunkRequestProto writeChunk,
+      KeyValueContainer kvContainer, BlockID blockID) throws IOException {
+    if (!writeChunk.hasBlock()) {
+      return null;
+    }
+    final BlockData blockData;
+    try {
+      blockData = BlockData.getFromProtoBuf(writeChunk.getBlock().getBlockData());
+    } catch (IllegalArgumentException ex) {
+      throw new StorageContainerException(ex.getMessage(), ex, INVALID_ARGUMENT);
+    }
+    BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockData.getBlockID());
+    if (!blockID.getContainerBlockID().equals(blockData.getBlockID().getContainerBlockID())) {
+      throw new StorageContainerException("WriteChunk and PutBlock have different block IDs", INVALID_ARGUMENT);
+    }
+    return blockData;
   }
 
   private void updateRecoveringContainerTimeout(KeyValueContainer kvContainer) {
@@ -1272,6 +1293,7 @@ public class KeyValueHandler extends Handler {
       BlockData blockData = BlockData.getFromProtoBuf(
           putSmallFileReq.getBlock().getBlockData());
       Objects.requireNonNull(blockData, "blockData == null");
+      BlockUtils.verifyStorageType(kvContainer.getContainerData(), blockData.getBlockID());
 
       ContainerProtos.ChunkInfo chunkInfoProto = putSmallFileReq.getChunkInfo();
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
