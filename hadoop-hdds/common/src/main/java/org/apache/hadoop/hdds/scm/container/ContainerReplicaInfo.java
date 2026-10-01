@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.container;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -38,6 +40,8 @@ public final class ContainerReplicaInfo {
   private int replicaIndex = -1;
   @JsonSerialize(using = JsonUtils.ChecksumSerializer.class)
   private long dataChecksum;
+  private StorageType storageType;
+  private StorageType volumeStorageType;
 
   public static ContainerReplicaInfo fromProto(
       HddsProtos.SCMContainerReplicaProto proto) {
@@ -52,7 +56,11 @@ public final class ContainerReplicaInfo {
         .setBytesUsed(proto.getBytesUsed())
         .setReplicaIndex(
             proto.hasReplicaIndex() ? (int)proto.getReplicaIndex() : -1)
-        .setDataChecksum(proto.getDataChecksum());
+        .setDataChecksum(proto.getDataChecksum())
+        .setStorageType(proto.hasStorageType()
+            ? StorageTypeUtils.getFromProtobuf(proto.getStorageType()) : null)
+        .setVolumeStorageType(proto.hasVolumeStorageType()
+            ? StorageTypeUtils.getFromProtobuf(proto.getVolumeStorageType()) : null);
     return builder.build();
   }
 
@@ -93,6 +101,14 @@ public final class ContainerReplicaInfo {
 
   public long getDataChecksum() {
     return dataChecksum;
+  }
+
+  public StorageType getStorageType() {
+    return storageType;
+  }
+
+  public StorageType getVolumeStorageType() {
+    return volumeStorageType;
   }
 
   /**
@@ -144,6 +160,16 @@ public final class ContainerReplicaInfo {
 
     public Builder setDataChecksum(long dataChecksum) {
       subject.dataChecksum = dataChecksum;
+      return this;
+    }
+
+    public Builder setStorageType(StorageType storageType) {
+      subject.storageType = storageType;
+      return this;
+    }
+
+    public Builder setVolumeStorageType(StorageType volumeStorageType) {
+      subject.volumeStorageType = volumeStorageType;
       return this;
     }
 

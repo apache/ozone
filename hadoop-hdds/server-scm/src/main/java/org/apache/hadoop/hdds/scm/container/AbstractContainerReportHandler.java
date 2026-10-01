@@ -414,6 +414,9 @@ abstract class AbstractContainerReportHandler {
     if (replicaProto.hasStorageType()) {
       replicaBuilder.setStorageType(StorageTypeUtils.getFromProtobuf(replicaProto.getStorageType()));
     }
+    if (replicaProto.hasVolumeStorageType()) {
+      replicaBuilder.setVolumeStorageType(StorageTypeUtils.getFromProtobuf(replicaProto.getVolumeStorageType()));
+    }
     ContainerReplica replica = replicaBuilder.setChecksums(ContainerChecksums.of(replicaProto.getDataChecksum()))
         .build();
 

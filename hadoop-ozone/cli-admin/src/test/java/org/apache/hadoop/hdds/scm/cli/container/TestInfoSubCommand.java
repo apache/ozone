@@ -43,6 +43,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -329,6 +330,82 @@ public class TestInfoSubCommand {
         Pattern.DOTALL);
     Matcher matcher = pattern.matcher(json);
     assertTrue(matcher.matches());
+  }
+
+  @Test
+  public void testStorageTypesNotPrintedByDefault() throws Exception {
+    when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicasWithStorageInfo());
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1");
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    // Storage types stay hidden unless --with-storagetype is passed.
+    assertThat(output).doesNotContain("ContainerStorageType");
+    assertThat(output).doesNotContain("VolumeStorageType");
+  }
+
+  @Test
+  public void testStorageTypesPrintedWithFlag() throws Exception {
+    when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicasWithStorageInfo());
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1", "--with-storagetype");
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    // Both ContainerStorageType and VolumeStorageType
+    // must appear, and the volume line must not echo the container's value.
+    assertThat(output).contains("ContainerStorageType: SSD");
+    assertThat(output).contains("VolumeStorageType: ARCHIVE");
+  }
+
+  @Test
+  public void testJsonIncludesStorageFields() throws Exception {
+    when(scmClient.getContainerReplicas(anyLong()))
+        .thenReturn(getReplicasWithStorageInfo());
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1", "--json");
+    cmd.execute(scmClient);
+
+    // JSON carries the fields regardless of --with-storagetype, for scripting.
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).contains("\"storageType\" : \"SSD\"");
+    assertThat(output).contains("\"volumeStorageType\" : \"ARCHIVE\"");
+  }
+
+  @Test
+  public void testJsonOmitsStorageFieldsWhenNotReported() throws Exception {
+    when(scmClient.getContainerReplicas(anyLong())).thenReturn(getReplicas(true));
+    cmd = new InfoSubcommand();
+    new CommandLine(cmd).parseArgs("1", "--json");
+    cmd.execute(scmClient);
+
+    // Null fields are dropped by the NON_NULL serialization inclusion, so an
+    // unset type must not surface as "storageType" : "".
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertThat(output).doesNotContain("storageType");
+  }
+
+  private List<ContainerReplicaInfo> getReplicasWithStorageInfo() {
+    List<ContainerReplicaInfo> replicas = new ArrayList<>();
+    int index = 1;
+    for (DatanodeDetails dn : datanodes) {
+      replicas.add(new ContainerReplicaInfo.Builder()
+          .setContainerID(1)
+          .setBytesUsed(1234)
+          .setState("CLOSED")
+          .setPlaceOfBirth(dn.getID())
+          .setDatanodeDetails(dn)
+          .setKeyCount(1)
+          .setSequenceId(1)
+          .setReplicaIndex(index++)
+          .setStorageType(StorageType.SSD)
+          .setVolumeStorageType(StorageType.ARCHIVE)
+          .build());
+    }
+    return replicas;
   }
 
   private List<ContainerReplicaInfo> getReplicas(boolean includeIndex) {
