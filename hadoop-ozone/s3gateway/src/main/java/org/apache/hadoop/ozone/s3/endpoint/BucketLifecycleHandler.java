@@ -133,9 +133,11 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
 
   public Response putBucketLifecycleConfiguration(S3RequestContext context, String bucketName, InputStream body)
       throws IOException, OS3Exception {
-    verifyBucketOwner(context, bucketName);
+    OzoneBucket ozoneBucket = verifyBucketOwner(context, bucketName);
     S3LifecycleConfiguration s3LifecycleConfiguration;
-    OzoneBucket ozoneBucket = context.getVolume().getBucket(bucketName);
+    if (ozoneBucket == null) {
+      ozoneBucket = context.getVolume().getBucket(bucketName);
+    }
     OmLifecycleConfiguration lcc;
     try {
       s3LifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(body);
