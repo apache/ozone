@@ -63,6 +63,7 @@ import org.apache.hadoop.hdds.scm.StreamingReadResponse;
 import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
@@ -177,6 +178,18 @@ public class TestStreamBlockInputStream {
     }
 
     verify(xceiverClient, never()).completeStreamRead();
+  }
+
+  @Test
+  public void testPositionedReadReleasesUnexpectedClient() throws Exception {
+    XceiverClientSpi client = mock(XceiverClientSpi.class);
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any(Pipeline.class))).thenReturn(client);
+    try (StreamBlockInputStream stream = new StreamBlockInputStream(
+        new BlockID(1, 25), 64, mockStandalonePipeline(), null, factory, NO_REFRESH, newStreamReadConfig())) {
+      assertThrows(IOException.class, () -> stream.readPositioned(0, ByteBuffer.allocate(1)));
+    }
+    verify(factory).releaseClientForReadData(client, false);
   }
 
   @Test
