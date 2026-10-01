@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -221,7 +222,8 @@ class TestBlockOutputStreamCorrectness {
         null,
         ContainerClientMetrics.acquire(),
         streamBufferArgs,
-        () -> newFixedThreadPool(10));
+        () -> newFixedThreadPool(10),
+        StorageType.DISK);
   }
 
   private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,

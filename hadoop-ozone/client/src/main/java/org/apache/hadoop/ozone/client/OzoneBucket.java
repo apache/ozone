@@ -528,6 +528,31 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Creates a new key in this bucket and places it according to the given storage
+   * policy.
+   *
+   * @param key               Name of the key to be created.
+   * @param size              Size of the data the key will hold.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata       Custom key metadata.
+   * @param tags              Tags used for S3 object tags.
+   * @param keyStoragePolicy  Storage policy for the key, or null to inherit this
+   *                          bucket's policy.
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  public OzoneOutputStream createKey(String key, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata,
+      Map<String, String> tags,
+      StoragePolicy keyStoragePolicy)
+      throws IOException {
+    return proxy
+        .createKey(volumeName, name, key, size, replicationConfig, keyMetadata, tags, keyStoragePolicy);
+  }
+
+  /**
    * This API allows to atomically update an existing key. The key read before invoking this API
    * should remain unchanged for this key to be written. This is controlled by the generation
    * field in the existing Key param. If the key is replaced or updated the generation will change. If the
