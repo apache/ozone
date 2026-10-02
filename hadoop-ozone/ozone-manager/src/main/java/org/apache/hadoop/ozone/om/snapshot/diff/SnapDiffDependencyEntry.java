@@ -147,8 +147,7 @@ public final class SnapDiffDependencyEntry {
   }
 
   byte[] toResolvedBytes() {
-    String sourcePathStr = new String(reportEntry.getSourcePath(), StandardCharsets.UTF_8);
-    byte[] sourcePathBytes = sourcePathStr.getBytes(StandardCharsets.UTF_8);
+    byte[] sourcePathBytes = reportEntry.getSourcePath();
     byte[] targetPathBytes = reportEntry.getTargetPath();
     int targetLenField = targetPathBytes == null ? -1 : targetPathBytes.length;
     int targetPayload = targetPathBytes == null ? 0 : targetPathBytes.length;

@@ -366,7 +366,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     }
   }
 
-  static String getReportKeyForIndex(String jobId, String index) {
+  public static String getReportKeyForIndex(String jobId, String index) {
     return jobId + DELIMITER + index;
   }
 
@@ -1500,6 +1500,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     }
 
     for (int i = 0; i < batchSize; i++) {
+      // if hasDeletedAncestor == true only ??
       for (Long ancestor : ancestorPaths.get(i)) {
         ancestorMemo.put(ancestor, hasDeletedAncestor[i]);
       }
@@ -1656,8 +1657,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   }
 
   /**
-   * Optimized full-diff report generation (Stages 1–4). Reachable from tests only
-   * until the feature flag in HDDS-15397 wires it into production traffic.
+   * Optimized full-diff report generation.
    */
   @VisibleForTesting
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -1674,11 +1674,12 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final String volumeName,
       final String bucketName,
       final String fromSnapshotName,
-      final String toSnapshotName) throws IOException {
+      final String toSnapshotName,
+      boolean dependencyOrderingEnabled) throws IOException {
     LOG.info("Starting optimized diff report generation for jobId: {}.", jobId);
     try (SnapDiffJobStore store = SnapDiffJobStore.open(db, codecRegistry, familyOptions, jobId,
-        isFSOBucket, SnapDiffJobStore.Mode.FULL, SnapDiffJobStore.DEFAULT_BATCH_SIZE,
-        maxInMemoryEntriesPerJob, snapDiffReportCfh)) {
+        isFSOBucket, snapDiffReportCfh, null,
+        maxInMemoryEntriesPerJob)) {
       FullDiffSequentialReader reader = updateIdGate != null
           ? new FullDiffSequentialReader(store, updateIdGate)
           : new FullDiffSequentialReader(store);
@@ -1690,7 +1691,8 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
           fromSnapshotName, toSnapshotName)) {
         return Pair.of(-1L, null);
       }
-      return MergeJoinSnapDiffWriter.writeReport(this, store, bucketObjectId, isFSOBucket);
+      return MergeJoinSnapDiffWriter.writeReport(this, store, bucketObjectId, isFSOBucket,
+          dependencyOrderingEnabled);
     }
   }
 

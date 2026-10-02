@@ -25,9 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -69,6 +74,7 @@ class TestFullDiffSequentialReader {
   private static ManagedDBOptions dbOptions;
   private static ManagedColumnFamilyOptions columnFamilyOptions;
   private static CodecRegistry codecRegistry;
+  private static ColumnFamilyHandle snapDiffReportCfh;
   private static final AtomicInteger JOB_ID = new AtomicInteger(0);
 
   @BeforeAll
@@ -83,6 +89,8 @@ class TestFullDiffSequentialReader {
         new ColumnFamilyDescriptor(StringUtils.string2Bytes(DEFAULT_COLUMN_FAMILY_NAME), columnFamilyOptions));
     List<ColumnFamilyHandle> handles = new ArrayList<>();
     db = ManagedRocksDB.open(dbOptions, dbDir.getAbsolutePath(), descriptors, handles);
+    snapDiffReportCfh = db.get().createColumnFamily(
+        new ColumnFamilyDescriptor(StringUtils.string2Bytes("snap-diff-report"), columnFamilyOptions));
   }
 
   @AfterAll
@@ -215,18 +223,20 @@ class TestFullDiffSequentialReader {
     putKey(fromTable, "k2", keyInfo("b", 2L, 0L, 10L, 100L));
     putKey(fromTable, "k3", keyInfo("c", 3L, 0L, 10L, 100L));
 
-    try (SnapDiffJobStore store = SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
-        "job" + JOB_ID.incrementAndGet(), false, SnapDiffJobStore.Mode.FULL,
-        SnapDiffJobStore.DEFAULT_BATCH_SIZE, 2L)) {
-      new FullDiffSequentialReader(store, 50L).scanFileTables(fromTable, toTable, null);
+    SnapDiffJobStore store = spy(SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
+        "job" + JOB_ID.incrementAndGet(), false, snapDiffReportCfh, null, 2L));
+    try (SnapDiffJobStore ignored = store) {
+      doAnswer(invocation -> invocation.callRealMethod()).when(store).spillDiffCandidates();
+      doAnswer(invocation -> {
+        assertTrue(store.isDiffCandidate(1L));
+        assertTrue(store.isDiffCandidate(2L));
+        assertTrue(store.isDiffCandidate(3L));
+        assertEquals(0, store.getDiffCandidateCount());
+        return invocation.callRealMethod();
+      }).when(store).clearDiffCandidates();
 
-      assertTrue(isNewListCandidate(store, 1L));
-      assertTrue(isNewListCandidate(store, 2L));
-      assertTrue(isNewListCandidate(store, 3L));
-      assertNotNull(store.getOldList(1L));
-      assertNotNull(store.getOldList(2L));
-      assertNotNull(store.getOldList(3L));
-      assertEquals(0, store.getDiffCandidateCount());
+      new FullDiffSequentialReader(store, 50L).scanFileTables(fromTable, toTable, null);
+      verify(store, times(1)).spillDiffCandidates();
     }
   }
 
@@ -254,25 +264,31 @@ class TestFullDiffSequentialReader {
   @Test
   void testFsoDirectoryEdgesPopulated() throws Exception {
     Table<byte[], byte[]> toTable = InMemoryTestTable.forRawBytes();
-    putDir(toTable, "d100", dirInfo("a", 100L, BUCKET_OBJECT_ID, 60L));
-    putDir(toTable, "d101", dirInfo("b", 101L, 100L, 60L));
+    putDir(toTable, "d100", dirInfo("parent", 100L, BUCKET_OBJECT_ID, 60L));
+    putDir(toTable, "d101", dirInfo("left", 101L, 100L, 60L));
+    putDir(toTable, "d102", dirInfo("right", 102L, 100L, 60L));
 
     Table<byte[], byte[]> fromTable = InMemoryTestTable.forRawBytes();
-    putDir(fromTable, "d100", dirInfo("a", 100L, BUCKET_OBJECT_ID, 10L));
-    putDir(fromTable, "d101", dirInfo("b", 101L, 100L, 10L));
+    putDir(fromTable, "d100", dirInfo("parent", 100L, BUCKET_OBJECT_ID, 10L));
+    putDir(fromTable, "d101", dirInfo("left", 101L, 100L, 10L));
+    putDir(fromTable, "d102", dirInfo("right", 102L, 100L, 10L));
 
-    try (SnapDiffJobStore store = newStore(true)) {
+    SnapDiffJobStore store = spy(newStore(true));
+    try (SnapDiffJobStore ignored = store) {
       new FullDiffSequentialReader(store, 50L).scanDirectoryTables(fromTable, toTable, null);
       store.flushWrites();
 
-      SnapDiffPathResolver toResolver = store.newToPathResolver(BUCKET_OBJECT_ID);
-      SnapDiffPathResolver fromResolver = store.newFromPathResolver(BUCKET_OBJECT_ID);
-      assertEquals("a", toResolver.resolvePath(100L));
-      assertEquals("a/b", toResolver.resolvePath(101L));
-      assertEquals("a", fromResolver.resolvePath(100L));
-      assertEquals("a/b", fromResolver.resolvePath(101L));
-      assertEquals(0, store.getDiffCandidateCount());
+      verify(store).putToEdge(BUCKET_OBJECT_ID, 100L, nameBytes("parent"));
+      verify(store).putToEdge(100L, 101L, nameBytes("left"));
+      verify(store).putToEdge(100L, 102L, nameBytes("right"));
+      verify(store).putFromEdge(BUCKET_OBJECT_ID, 100L, nameBytes("parent"));
+      verify(store).putFromEdge(100L, 101L, nameBytes("left"));
+      verify(store).putFromEdge(100L, 102L, nameBytes("right"));
     }
+  }
+
+  private static byte[] nameBytes(String name) {
+    return name.getBytes(StandardCharsets.UTF_8);
   }
 
   private static boolean hasNewListEntry(SnapDiffJobStore store, long objectId) throws IOException {
@@ -286,7 +302,7 @@ class TestFullDiffSequentialReader {
 
   private static SnapDiffJobStore newStore(boolean fso) throws IOException {
     return SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
-        "job" + JOB_ID.incrementAndGet(), fso, SnapDiffJobStore.Mode.FULL);
+        "job" + JOB_ID.incrementAndGet(), fso, snapDiffReportCfh, null, null);
   }
 
   private static void putKey(Table<byte[], byte[]> table, String key, OmKeyInfo keyInfo)
