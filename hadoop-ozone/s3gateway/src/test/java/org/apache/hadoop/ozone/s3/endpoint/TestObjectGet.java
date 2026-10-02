@@ -244,6 +244,44 @@ public class TestObjectGet {
   }
 
   @Test
+  public void getKeyWithQEncodedRfc2047CustomMetadata()
+      throws IOException, OS3Exception {
+    final String keyName = "key-with-rfc2047-meta";
+    final String metaValue = "Hello Worldé";
+    final String encodedMetaValue = "=?UTF-8?Q?Hello_World=C3=A9?=";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1",
+        encodedMetaValue);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+
+    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
+
+    assertEquals(metaValue, bucket.getKey(keyName).getMetadata().get("meta1"));
+    Response response = get(rest, BUCKET_NAME, keyName);
+    assertEquals(encodedMetaValue,
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
+  }
+
+  @Test
+  public void getKeyWithBase64Rfc2047CustomMetadata()
+      throws IOException, OS3Exception {
+    final String keyName = "key-with-base64-rfc2047-meta";
+    final String metaValue = "\u0000";
+    final String encodedMetaValue = "=?UTF-8?B?AA==?=";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1",
+        encodedMetaValue);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+
+    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
+
+    assertEquals(metaValue, bucket.getKey(keyName).getMetadata().get("meta1"));
+    Response response = get(rest, BUCKET_NAME, keyName);
+    assertEquals(encodedMetaValue,
+        response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
+  }
+
+  @Test
   public void getKeyWithTag() throws IOException, OS3Exception {
     //WHEN
     Response response = get(rest, BUCKET_NAME, KEY_WITH_TAG);

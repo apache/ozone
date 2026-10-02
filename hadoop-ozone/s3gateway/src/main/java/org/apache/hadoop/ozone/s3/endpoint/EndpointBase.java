@@ -87,6 +87,10 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import net.jcip.annotations.Immutable;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.EncoderException;
+import org.apache.commons.codec.net.BCodec;
+import org.apache.commons.codec.net.QCodec;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -137,6 +141,9 @@ import org.slf4j.LoggerFactory;
  * Basic helpers for all the REST endpoints.
  */
 public abstract class EndpointBase {
+
+  private static final BCodec RFC_2047_B_CODEC = new BCodec(UTF_8);
+  private static final QCodec RFC_2047_Q_CODEC = createRfc2047QCodec();
 
   protected static final String ETAG_CUSTOM =
       RESERVED_USER_METADATA_KEY_PREFIX + "etag";
@@ -451,7 +458,9 @@ public abstract class EndpointBase {
           throw ex;
         }
         List<String> values = requestHeaders.get(key);
-        String value = StringUtils.join(values, ",");
+        String value = values.stream()
+            .map(EndpointBase::decodeRfc2047MetadataValue)
+            .collect(Collectors.joining(","));
         sizeInBytes += mapKey.getBytes(UTF_8).length;
         sizeInBytes += value.getBytes(UTF_8).length;
 
@@ -468,6 +477,58 @@ public abstract class EndpointBase {
         remapReservedMetadataKey(customMetadata, headerName, customKey));
 
     return customMetadata;
+  }
+
+  private static String decodeRfc2047MetadataValue(String value) {
+    if (!value.startsWith("=?") || !value.endsWith("?=")) {
+      return value;
+    }
+
+    try {
+      return RFC_2047_Q_CODEC.decode(value);
+    } catch (DecoderException ex) {
+      try {
+        return RFC_2047_B_CODEC.decode(value);
+      } catch (DecoderException ignored) {
+        return value;
+      }
+    }
+  }
+
+  private static String encodeRfc2047MetadataValue(String value) {
+    if (value.chars().allMatch(EndpointBase::isSafeAsciiMetadataCharacter)) {
+      return value;
+    }
+
+    try {
+      return containsUnprintableCharacters(value)
+          ? RFC_2047_B_CODEC.encode(value)
+          : RFC_2047_Q_CODEC.encode(value);
+    } catch (EncoderException ex) {
+      throw new IllegalStateException("Failed to encode S3 metadata", ex);
+    }
+  }
+
+  private static boolean isSafeAsciiMetadataCharacter(int value) {
+    return value == '\t' || value >= ' ' && value <= '~';
+  }
+
+  private static QCodec createRfc2047QCodec() {
+    QCodec codec = new QCodec(UTF_8);
+    codec.setEncodeBlanks(true);
+    return codec;
+  }
+
+  private static boolean containsUnprintableCharacters(String value) {
+    return value.codePoints().anyMatch(codePoint -> {
+      int type = Character.getType(codePoint);
+      return codePoint == '\ufffd'
+          || type == Character.CONTROL
+          || type == Character.FORMAT
+          || type == Character.PRIVATE_USE
+          || type == Character.SURROGATE
+          || type == Character.UNASSIGNED;
+    });
   }
 
   /**
@@ -500,7 +561,7 @@ public abstract class EndpointBase {
       metadataKey = REBUILT_RESERVED_KEYS.getOrDefault(metadataKey, metadataKey);
       responseBuilder
           .header(CUSTOM_METADATA_HEADER_PREFIX + metadataKey,
-              entry.getValue());
+              encodeRfc2047MetadataValue(entry.getValue()));
     }
   }
 
