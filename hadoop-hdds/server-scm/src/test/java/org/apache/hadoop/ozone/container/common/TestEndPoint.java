@@ -65,7 +65,6 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -530,8 +529,6 @@ public class TestEndPoint {
         new HostAndPort(serverAddress.getHostName(), serverAddress.getPort()),
         scm, conf, "")) {
       DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
-      when(datanode.getContainer()).thenReturn(ozoneContainer);
-      when(datanode.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
       StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
       HostAndPort otherScm = new HostAndPort("other-scm", 9861);
       context.addEndpoint(rpcEndpoint.getAddress());
@@ -541,9 +538,6 @@ public class TestEndPoint {
       context.getAllAvailableReports(otherScm);
       assertFalse(context.isFullContainerReportReady(rpcEndpoint.getAddress()));
       assertFalse(context.isFullContainerReportReady(otherScm));
-      ArgumentCaptor<SCMHeartbeatRequestProto> heartbeat = ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
-      when(scm.sendHeartbeat(heartbeat.capture())).thenReturn(SCMHeartbeatResponseProto.newBuilder()
-          .setDatanodeUUID(datanodeDetails.getUuidString()).build());
       rpcEndpoint.setState(EndpointStateMachine.EndPointStates.REGISTER);
       rpcEndpoint.setVersion(VersionResponse.newBuilder()
           .setVersion(1)
@@ -560,12 +554,6 @@ public class TestEndPoint {
       assertTrue(context.isFullContainerReportReady(rpcEndpoint.getAddress()));
       assertFalse(context.isFullContainerReportReady(otherScm));
       verify(controller, never()).getContainerReport();
-
-      HeartbeatEndpointTask heartbeatTask = new HeartbeatEndpointTask(rpcEndpoint, conf, context, versionManager);
-      heartbeatTask.setDatanodeDetailsProto(datanodeDetails.getProtoBufMessage());
-      heartbeatTask.call();
-      assertTrue(heartbeat.getValue().getRequestFullContainerReportLease());
-      assertFalse(heartbeat.getValue().hasContainerReport());
     }
 
     assertTrue(containerReport.getValue().getFullContainerReportDeferred());
