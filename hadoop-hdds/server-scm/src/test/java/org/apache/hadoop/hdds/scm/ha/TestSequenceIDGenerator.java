@@ -282,9 +282,11 @@ public class TestSequenceIDGenerator {
 
   /**
    * Regression test for HDDS-14337. Simulates SCM first start when UTC is
-   * already in the new year but the JVM local timezone is still on Dec 31.
-   * Verifies upgradeToSequenceId succeeds and block localIds are allocated.
+   * already in the new year (Jan 1 2026) while the old formula used the
+   * local timezone year (2025). Verifies upgradeToSequenceId succeeds and
+   * block localIds are allocated.
    */
+  @SuppressWarnings("ReturnValueIgnored")
   @Test
   public void testUpgradeToSequenceIdNearYearBoundary() throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
@@ -294,7 +296,6 @@ public class TestSequenceIDGenerator {
         .getInstance(true, new SCMDBTransactionBufferImpl());
 
     LocalDate utcDate = LocalDate.of(2026, 1, 1);
-    LocalDate localTimezoneDate = LocalDate.of(2025, 12, 31);
     long simulatedUtcMillis = TimeUnit.DAYS.toMillis(utcDate.toEpochDay())
         + TimeUnit.HOURS.toMillis(6);
     // UTC year is 2026; seed is Jan 2, 2027 (Jan 1 of next year + 1 day).
@@ -305,7 +306,6 @@ public class TestSequenceIDGenerator {
          MockedStatic<LocalDate> mockedLocalDate = mockStatic(LocalDate.class, CALLS_REAL_METHODS)) {
       mockedTime.when(HddsUtils::getTime).thenReturn(simulatedUtcMillis);
       mockedLocalDate.when(() -> LocalDate.now(ZoneOffset.UTC)).thenReturn(utcDate);
-      mockedLocalDate.when(LocalDate::now).thenReturn(localTimezoneDate);
 
       long legacyLocalId = TimeUnit.DAYS.toMillis(
           LocalDate.of(2026, 1, 1).toEpochDay()) << Short.SIZE;
