@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -179,26 +180,30 @@ public class TestRootList {
     assertNull(response.getContinuationToken());
   }
 
-  @ParameterizedTest
+  @ParameterizedTest(name = "directory={0}, buckets={1}, limit={2}, previous={3}")
   @CsvSource({
-      "false, 0, 2, -1, 0, false, 1",
-      "false, 1, 2, -1, 1, false, 2",
-      "false, 2, 2, -1, 2, false, 2",
-      "false, 3, 2, -1, 2, true, 2",
-      "false, 5, 2, -1, 2, true, 2",
-      "false, 3, 5, -1, 3, false, 3",
-      "false, 3, 2, 1, 1, false, 2",
-      "true, 0, 2, -1, 0, false, 1",
-      "true, 1, 2, -1, 1, false, 2",
-      "true, 2, 2, -1, 1, false, 2",
-      "true, 3, 2, -1, 2, false, 3",
-      "true, 4, 2, -1, 2, true, 2",
-      "true, 3, 5, -1, 2, false, 3",
-      "true, 3, 0, -1, 0, false, 1",
-      "true, 5, 2, 2, 1, false, 2"
+      // directory, total buckets, response limit, previous index, expected names, continuation token, RPC calls
+      "false, 0, 2, -1, '', false, 1",
+      "false, 1, 2, -1, bucket-0, false, 2",
+      "false, 2, 2, -1, bucket-0;bucket-1, false, 2",
+      "false, 3, 2, -1, bucket-0;bucket-1, true, 2",
+      "false, 2, 1, -1, bucket-0, true, 1",
+      "false, 3, 5, -1, bucket-0;bucket-1;bucket-2, false, 3",
+      "false, 3, 2, 1, bucket-2, false, 2",
+      "false, 3, , -1, bucket-0;bucket-1;bucket-2, false, 3",
+      "true, 0, 2, -1, '', false, 1",
+      "true, 1, 2, -1, bucket-0, false, 2",
+      "true, 2, 2, -1, bucket-0, false, 2",
+      "true, 3, 2, -1, bucket-0;bucket-2, false, 3",
+      "true, 4, 2, -1, bucket-0;bucket-2, true, 2",
+      "true, 2, 1, -1, bucket-0, true, 1",
+      "true, 3, 5, -1, bucket-0;bucket-2, false, 3",
+      "true, 3, 0, -1, '', false, 1",
+      "true, 5, 2, 2, bucket-4, false, 2",
+      "true, 2, 2, 0, '', false, 2"
   })
-  void testListBucketsRpcCount(boolean directory, int total, int limit, int previous,
-      int expectedCount, boolean hasToken, int expectedCalls) throws Exception {
+  void testListBucketsRpcCount(boolean directory, int total, Integer limit, int previous,
+      String expectedNames, boolean hasToken, int expectedCalls) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE, 2);
     ClientProtocol proxy = mock(ClientProtocol.class);
@@ -210,10 +215,9 @@ public class TestRootList {
     when(proxy.listBuckets(eq(DEFAULT_VOLUME), isNull(), nullable(String.class), eq(2), eq(false)))
         .thenAnswer(invocation -> {
           String marker = invocation.getArgument(2);
-          List<OzoneBucket> remaining = buckets.stream()
+          return buckets.stream()
               .filter(bucket -> marker == null || bucket.getName().compareTo(marker) > 0)
               .limit(2).collect(Collectors.toList());
-          return remaining;
         });
     OzoneVolume volume = OzoneVolume.newBuilder(conf, proxy).setName(DEFAULT_VOLUME).setOwner("root")
         .setAcls(Collections.emptyList()).build();
@@ -227,8 +231,10 @@ public class TestRootList {
         .setSignatureInfo(new SignatureInfo.Builder(SignatureInfo.Version.V4)
             .setCredentialScope("20260101/us-west-2/" + (directory ? "s3express" : "s3") + "/aws4_request").build())
         .build();
-    endpoint.queryParamsForTest().setInt(
-        directory ? QueryParams.MAX_DIRECTORY_BUCKETS : QueryParams.MAX_BUCKETS, limit);
+    if (limit != null) {
+      endpoint.queryParamsForTest().setInt(
+          directory ? QueryParams.MAX_DIRECTORY_BUCKETS : QueryParams.MAX_BUCKETS, limit);
+    }
     if (previous >= 0) {
       endpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN,
           new ContinueToken("bucket-" + previous, null).encodeToString());
@@ -247,11 +253,7 @@ public class TestRootList {
         token = response.getContinuationToken();
         assertThat(response.getOwner().getDisplayName()).isEqualTo("root");
       }
-      assertThat(names).hasSize(expectedCount);
-      assertThat(names).containsExactlyElementsOf(buckets.stream()
-          .filter(bucket -> previous < 0 || bucket.getName().compareTo("bucket-" + previous) > 0)
-          .filter(bucket -> !directory || bucket.getBucketLayout().isFileSystemOptimized()).limit(limit)
-          .map(OzoneBucket::getName).collect(Collectors.toList()));
+      assertThat(names).containsExactly(StringUtils.split(expectedNames, ';'));
       if (hasToken) {
         assertThat(token).isNotNull();
         assertThat(ContinueToken.decodeFromString(token).getLastKey()).isEqualTo(names.get(names.size() - 1));
