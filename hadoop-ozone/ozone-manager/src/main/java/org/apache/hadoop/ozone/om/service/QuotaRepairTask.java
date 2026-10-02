@@ -55,9 +55,13 @@ import java.util.function.Consumer;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
+import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -65,6 +69,7 @@ import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainInfo;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -362,9 +367,8 @@ public class QuotaRepairTask {
 
       Map<Long, OmBucketInfo> bucketById = buildBucketByObjectId(idBucketInfoMap);
 
-      tasks.add(executor.submit(() -> recalculateDeletedKeyUsages(
-          metadataManager.getDeletedTable(), bucketById, snapshotDeletedKeyMap,
-          "active DB checkpoint")));
+      tasks.add(executor.submit(() -> recalculateActiveDeletedKeyUsages(
+          metadataManager, bucketById, snapshotDeletedKeyMap)));
       tasks.add(executor.submit(() -> recalculateDeletedDirNamespace(
           metadataManager.getDeletedDirTable(), snapshotDeletedDirMap,
           "active DB checkpoint")));
@@ -503,6 +507,28 @@ public class QuotaRepairTask {
         snapshotDeletedDirMap, sourceLabel);
   }
 
+  private void recalculateActiveDeletedKeyUsages(
+      OMMetadataManager metadataManager,
+      Map<Long, OmBucketInfo> bucketById,
+      Map<String, CountPair> snapshotCountByBucketNameKey)
+      throws UncheckedIOException, UncheckedExecutionException {
+    Codec<RepeatedOmKeyInfo> codec = OMDBDefinition.DELETED_TABLE_DEF.getValueCodec();
+    // a typed iterator decodes on this thread, so keep values raw and let the workers decode
+    try (Table.KeyValueIterator<String, byte[]> keyIter = metadataManager.getStore()
+        .getTable(OMDBDefinition.DELETED_TABLE, StringCodec.get(), ByteArrayCodec.get(), CacheType.NO_CACHE)
+        .iterator()) {
+      scanTableInBatches(executor, keyIter, "snapshot usages from deletedTable (active DB checkpoint)", kv -> {
+        try {
+          countDeletedKey(codec.fromPersistedFormat(kv.getValue()), bucketById, snapshotCountByBucketNameKey);
+        } catch (IOException ex) {
+          throw new UncheckedIOException(ex);
+        }
+      });
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
   private void recalculateDeletedKeyUsages(
       Table<String, RepeatedOmKeyInfo> deletedTable,
       Map<Long, OmBucketInfo> bucketById,
@@ -518,24 +544,30 @@ public class QuotaRepairTask {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
         count++;
-        RepeatedOmKeyInfo val = kv.getValue();
-        OmBucketInfo bucket = bucketById.get(val.getBucketId());
-        if (bucket == null) {
-          continue;
-        }
-        String nameKey = buildNamePath(bucket.getVolumeName(), bucket.getBucketName());
-        CountPair usage = snapshotCountByBucketNameKey.get(nameKey);
-        if (usage == null) {
-          continue;
-        }
-        usage.incrSpace(val.getTotalSize().getRight());
-        usage.incrNamespace(val.getOmKeyInfoList().size());
+        countDeletedKey(kv.getValue(), bucketById, snapshotCountByBucketNameKey);
       }
       LOG.info("Recalculate snapshot usages from deletedTable ({}) completed, count {} time {}ms",
           sourceLabel, count, (Time.monotonicNow() - startTime));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     }
+  }
+
+  private static void countDeletedKey(
+      RepeatedOmKeyInfo val,
+      Map<Long, OmBucketInfo> bucketById,
+      Map<String, CountPair> snapshotCountByBucketNameKey) {
+    OmBucketInfo bucket = bucketById.get(val.getBucketId());
+    if (bucket == null) {
+      return;
+    }
+    String nameKey = buildNamePath(bucket.getVolumeName(), bucket.getBucketName());
+    CountPair usage = snapshotCountByBucketNameKey.get(nameKey);
+    if (usage == null) {
+      return;
+    }
+    usage.incrSpace(val.getTotalSize().getRight());
+    usage.incrNamespace(val.getOmKeyInfoList().size());
   }
 
   private void recalculateDeletedDirNamespace(

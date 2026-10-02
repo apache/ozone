@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,6 +58,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -380,6 +382,67 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(0, repaired.getSnapshotUsedBytes());
     assertEquals(dirs, repaired.getSnapshotUsedNamespace());
+  }
+
+  @Test
+  public void testQuotaRepairCountsDeletedKeysAcrossBatches() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    long bucketId = omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
+
+    // a partial last batch, so a dropped tail batch would show up in the totals
+    int rows = QuotaRepairTask.BATCH_SIZE * 2 + 1;
+    for (int i = 0; i < rows; i++) {
+      putDeletedKey(bucketName, bucketId, "key" + i, i == 0 ? 2 : 1, RATIS_ONE);
+    }
+    // replicated size differs from data size only with more than one replica
+    putDeletedKey(bucketName, bucketId, "threeReplicaKey", 1, RatisReplicationConfig.getInstance(THREE));
+    String bucketKey = corruptSnapshotUsage(bucketName, 1L);
+
+    applyQuotaRepair(request, 2L, bucketKey);
+
+    OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals((rows + 1) * 1000L + 3000L, repaired.getSnapshotUsedBytes());
+    assertEquals(rows + 2, repaired.getSnapshotUsedNamespace());
+  }
+
+  @Test
+  public void testQuotaRepairSkipsDeletedKeysOfRecreatedBucket() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    long bucketId = omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
+
+    putDeletedKey(bucketName, bucketId, "liveKey", 1, RATIS_ONE);
+    // left by an earlier bucket with the same name: the key prefix matches, the bucket id does not
+    putDeletedKey(bucketName, bucketId + 1000, "staleKey", 1, RATIS_ONE);
+    // written before deletedTable rows carried a bucket id, so it decodes to 0
+    putDeletedKey(bucketName, 0, "legacyKey", 1, RATIS_ONE);
+    String bucketKey = corruptSnapshotUsage(bucketName, 1L);
+
+    applyQuotaRepair(request, 2L, bucketKey);
+
+    OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(1000L, repaired.getSnapshotUsedBytes());
+    assertEquals(1, repaired.getSnapshotUsedNamespace());
+  }
+
+  @Test
+  public void testQuotaRepairFailsOnUndecodableDeletedKey() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+    // a zero tag is never valid protobuf
+    omMetadataManager.getStore().getTable(OMDBDefinition.DELETED_TABLE).put(
+        ("/" + volumeName + "/" + bucketName + "/badKey/1").getBytes(StandardCharsets.UTF_8), new byte[] {0});
+    corruptSnapshotUsage(bucketName, 1L);
+
+    assertFalse(awaitRepair(new QuotaRepairTask(ozoneManager).repair()));
+    // the scan failed, so no partial counts reach the bucket
+    assertNull(request.get());
   }
 
   private void zeroOutBucketUsedBytes(String volumeName, String bucketName,
@@ -741,6 +804,18 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(bucketKey), CacheValue.get(transactionIndex, corrupted));
     return bucketKey;
+  }
+
+  // repair scans a RocksDB checkpoint, so rows must be written to the table, not the cache
+  private void putDeletedKey(String bucket, long bucketId, String keyName, int versions,
+      ReplicationConfig replicationConfig) throws IOException {
+    RepeatedOmKeyInfo row = new RepeatedOmKeyInfo(bucketId);
+    for (int i = 0; i < versions; i++) {
+      row.addOmKeyInfo(OMRequestTestUtils.createOmKeyInfo(volumeName, bucket, keyName, replicationConfig)
+          .setObjectID(i + 1L).build());
+    }
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucket, keyName);
+    omMetadataManager.getDeletedTable().put(omMetadataManager.getOzoneDeletePathKey(1L, ozoneKey), row);
   }
 
   private void applyQuotaRepair(AtomicReference<OzoneManagerProtocolProtos.OMRequest> request,
