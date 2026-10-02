@@ -20,7 +20,10 @@ package org.apache.hadoop.ozone.s3.util;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.LOCAL_LEASE_LOG_LIMIT_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.READ_CONSISTENCY_FOLLOWER_LINEARIZABLE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.READ_CONSISTENCY_FOLLOWER_STALE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.READ_CONSISTENCY_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.READ_CONSISTENCY_LEADER_ONLY;
 
 import java.util.Locale;
 import javax.ws.rs.core.HttpHeaders;
@@ -53,7 +56,8 @@ public final class ReadConsistencyContext {
     if (readConsistency != ReadConsistency.LOCAL_LEASE
         && localLeaseLogLimit != null) {
       OS3Exception ex = newError(INVALID_ARGUMENT, READ_CONSISTENCY_HEADER);
-      ex.setErrorMessage("Local lease context requires read consistency: follower-stale");
+      ex.setErrorMessage("Local lease context requires read consistency: "
+          + READ_CONSISTENCY_FOLLOWER_STALE);
       throw ex;
     }
     return new ReadConsistencyContext(readConsistency, localLeaseLogLimit);
@@ -72,11 +76,11 @@ public final class ReadConsistencyContext {
       return null;
     }
     switch (header.trim().toLowerCase(Locale.ROOT)) {
-    case "follower-stale":
+    case READ_CONSISTENCY_FOLLOWER_STALE:
       return ReadConsistency.LOCAL_LEASE;
-    case "leader-only":
+    case READ_CONSISTENCY_LEADER_ONLY:
       return ReadConsistency.LINEARIZABLE_LEADER_ONLY;
-    case "follower-linearizable":
+    case READ_CONSISTENCY_FOLLOWER_LINEARIZABLE:
       return ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER;
     default:
       OS3Exception ex = newError(INVALID_ARGUMENT, READ_CONSISTENCY_HEADER);
