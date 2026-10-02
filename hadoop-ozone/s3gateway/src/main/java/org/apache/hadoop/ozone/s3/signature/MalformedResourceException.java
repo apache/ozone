@@ -17,20 +17,37 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+
 /**
  * This exception is used to communicate validation errors when parsing
  * signatures.
  */
 public class MalformedResourceException extends Exception {
+  private final OS3Exception errorCode;
   private final String resource;
 
   public MalformedResourceException(String resource) {
-    this.resource = resource;
+    this(null, null, resource);
   }
 
   public MalformedResourceException(String message, String resource) {
+    this(null, message, resource);
+  }
+
+  public MalformedResourceException(OS3Exception errorCode, String resource) {
+    this(errorCode, null, resource);
+  }
+
+  private MalformedResourceException(OS3Exception errorCode, String message,
+      String resource) {
     super(message);
+    this.errorCode = errorCode;
     this.resource = resource;
+  }
+
+  public OS3Exception getErrorCode() {
+    return errorCode;
   }
 
   public String getResource() {

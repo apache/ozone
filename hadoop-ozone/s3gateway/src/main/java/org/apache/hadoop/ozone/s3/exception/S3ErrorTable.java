@@ -69,6 +69,11 @@ public final class S3ErrorTable {
       "AuthorizationHeaderMalformed", "The authorization header you provided " +
       "is invalid.", HTTP_BAD_REQUEST);
 
+  public static final OS3Exception MALFORMED_CREDENTIAL_DATE = new OS3Exception(
+      "AuthorizationHeaderMalformed", "The authorization header is malformed; "
+      + "Invalid credential date. Date is not the same as X-Amz-Date.",
+      HTTP_BAD_REQUEST);
+
   public static final OS3Exception NO_SUCH_KEY = new OS3Exception(
       "NoSuchKey", "The specified key does not exist", HTTP_NOT_FOUND);
 
@@ -113,6 +118,10 @@ public final class S3ErrorTable {
   public static final OS3Exception ACCESS_DENIED = new OS3Exception(
       "AccessDenied", "User doesn't have the right to access this " +
       "resource.", HTTP_FORBIDDEN);
+
+  public static final OS3Exception REQUEST_TIME_TOO_SKEWED = new OS3Exception(
+      "RequestTimeTooSkewed", "The difference between the request time and " +
+      "the server's time is too large.", HTTP_FORBIDDEN);
 
   public static final OS3Exception PRECOND_FAILED = new OS3Exception(
       "PreconditionFailed", "At least one of the pre-conditions you " +

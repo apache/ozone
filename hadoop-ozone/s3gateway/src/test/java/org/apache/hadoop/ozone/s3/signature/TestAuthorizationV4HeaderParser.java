@@ -18,12 +18,17 @@
 package org.apache.hadoop.ozone.s3.signature;
 
 import static java.time.temporal.ChronoUnit.DAYS;
+import static java.time.temporal.ChronoUnit.MINUTES;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_CREDENTIAL_DATE;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.REQUEST_TIME_TOO_SKEWED;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -33,14 +38,15 @@ import org.junit.jupiter.api.Test;
 
 public class TestAuthorizationV4HeaderParser {
 
-  private static final String SAMPLE_DATE = "20210202T144559Z";
-
   private String curDate;
+  private String sampleDate;
 
   @BeforeEach
   public void setup() {
-    LocalDate now = LocalDate.now();
+    LocalDate now = LocalDate.now(ZoneOffset.UTC);
     curDate = DATE_FORMATTER.format(now);
+    sampleDate = StringToSignProducer.TIME_FORMATTER.format(
+        LocalDateTime.now(ZoneOffset.UTC));
   }
 
   @Test
@@ -50,7 +56,7 @@ public class TestAuthorizationV4HeaderParser {
         "SignedHeaders=host;range;x-amz-date, " +
         "Signature=fe5f80f77d5fa3beca038a248ff027";
     AuthorizationV4HeaderParser v4 =
-        new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
+        new AuthorizationV4HeaderParser(auth, sampleDate);
     final SignatureInfo signatureInfo = v4.parseSignature();
     assertEquals("ozone", signatureInfo.getAwsAccessId());
     assertEquals(curDate, signatureInfo.getDate());
@@ -65,7 +71,7 @@ public class TestAuthorizationV4HeaderParser {
         "Credential=ozone/" + curDate + "/us-east-1/s3/aws4_request, " +
         "SignedHeaders=host;range;x-amz-date,";
     AuthorizationV4HeaderParser v4 =
-        new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
+        new AuthorizationV4HeaderParser(auth, sampleDate);
     assertThrows(MalformedResourceException.class, () -> v4.parseSignature());
   }
 
@@ -76,7 +82,7 @@ public class TestAuthorizationV4HeaderParser {
         "SignedHeaders=host;range;x-amz-date, " +
         "Signature=fe5f80f77d5fa3beca038a248ff027";
     AuthorizationV4HeaderParser v4 =
-        new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
+        new AuthorizationV4HeaderParser(auth, sampleDate);
     assertThrows(MalformedResourceException.class, () -> v4.parseSignature());
   }
 
@@ -91,7 +97,7 @@ public class TestAuthorizationV4HeaderParser {
             + "=fe5f80f77d5fa3beca038a248ff027";
 
     AuthorizationV4HeaderParser v4 = new AuthorizationV4HeaderParser(auth,
-        SAMPLE_DATE);
+        sampleDate);
     SignatureInfo signature = v4.parseSignature();
 
     assertEquals("AWS4-HMAC-SHA256", signature.getAlgorithm());
@@ -106,45 +112,63 @@ public class TestAuthorizationV4HeaderParser {
   @Test
   public void testV4HeaderDateValidationSuccess()
       throws MalformedResourceException {
-    // Case 1: valid date within range.
-    LocalDate now = LocalDate.now();
-    String dateStr = DATE_FORMATTER.format(now);
-    testRequestWithSpecificDate(dateStr);
+    testRequestWithSpecificDate(curDate);
 
-    // Case 2: Valid date with in range.
-    dateStr = DATE_FORMATTER.format(now.plus(1, DAYS));
-    testRequestWithSpecificDate(dateStr);
+    String amzDatePlus14Min = StringToSignProducer.TIME_FORMATTER.format(
+        LocalDateTime.now(ZoneOffset.UTC).plus(14, MINUTES));
+    testRequestWithSpecificDate(curDate, amzDatePlus14Min);
+  }
 
-    // Case 3: Valid date with in range.
-    dateStr = DATE_FORMATTER.format(now.minus(1, DAYS));
-    testRequestWithSpecificDate(dateStr);
+  @Test
+  public void testV4HeaderCredentialDateMismatch() {
+    LocalDate yesterday = LocalDate.now(ZoneOffset.UTC).minus(1, DAYS);
+    String mismatchedCredentialDate = DATE_FORMATTER.format(yesterday);
+    String auth =
+        "AWS4-HMAC-SHA256 Credential=ozone/" + mismatchedCredentialDate
+            + "/us-east-1/s3/aws4_request,"
+            + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
+            + "Signature=fe5f80f77d5fa3beca038a248ff027";
+    AuthorizationV4HeaderParser v4 =
+        new AuthorizationV4HeaderParser(auth, sampleDate);
+    MalformedResourceException ex = assertThrows(MalformedResourceException.class,
+        () -> v4.parseSignature());
+    assertEquals(MALFORMED_CREDENTIAL_DATE, ex.getErrorCode());
+  }
+
+  @Test
+  public void testV4HeaderDateSkewValidationFailure() {
+    String staleDateTime = StringToSignProducer.TIME_FORMATTER.format(
+        LocalDateTime.now(ZoneOffset.UTC).minusMinutes(16));
+    String auth = "AWS4-HMAC-SHA256 Credential=ozone/" + curDate
+        + "/us-east-1/s3/aws4_request, "
+        + "SignedHeaders=host;x-amz-content-sha256;x-amz-date, "
+        + "Signature=fe5f80f77d5fa3beca038a248ff027";
+    AuthorizationV4HeaderParser v4 =
+        new AuthorizationV4HeaderParser(auth, staleDateTime);
+    MalformedResourceException ex = assertThrows(MalformedResourceException.class,
+        () -> v4.parseSignature());
+    assertEquals(REQUEST_TIME_TOO_SKEWED, ex.getErrorCode());
   }
 
   @Test
   public void testV4HeaderDateValidationFailure() {
     // Case 1: Empty date.
-    LocalDate now = LocalDate.now();
     String dateStr = "";
     assertThrows(MalformedResourceException.class,
         () -> testRequestWithSpecificDate(dateStr));
 
-    // Case 2: Date after yesterday.
-    String dateStr2 = DATE_FORMATTER.format(now.plus(2, DAYS));
+    // Case 2: Invalid date format
+    String dateStr2 = LocalDate.now(ZoneOffset.UTC).toString();
     assertThrows(MalformedResourceException.class,
         () -> testRequestWithSpecificDate(dateStr2));
-
-    // Case 3: Date before yesterday.
-    String dateStr3 = DATE_FORMATTER.format(now.minus(2, DAYS));
-    assertThrows(MalformedResourceException.class,
-        () -> testRequestWithSpecificDate(dateStr3));
-
-    // Case 4: Invalid date format
-    String dateStr4 = now.toString();
-    assertThrows(MalformedResourceException.class,
-        () -> testRequestWithSpecificDate(dateStr4));
   }
 
   private void testRequestWithSpecificDate(String dateStr)
+      throws MalformedResourceException {
+    testRequestWithSpecificDate(dateStr, sampleDate);
+  }
+
+  private void testRequestWithSpecificDate(String dateStr, String amzDate)
       throws MalformedResourceException {
     String auth =
         "AWS4-HMAC-SHA256 Credential=ozone/" + dateStr + "/us-east-1/s3" +
@@ -153,12 +177,13 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     AuthorizationV4HeaderParser v4 =
-        new AuthorizationV4HeaderParser(auth, SAMPLE_DATE);
+        new AuthorizationV4HeaderParser(auth, amzDate);
     SignatureInfo signature = v4.parseSignature();
 
     assertEquals("AWS4-HMAC-SHA256", signature.getAlgorithm());
     assertEquals("ozone", signature.getAwsAccessId());
     assertEquals(dateStr, signature.getDate());
+    assertEquals(amzDate, signature.getDateTime());
     assertEquals("host;x-amz-content-sha256;x-amz-date",
         signature.getSignedHeaders());
     assertEquals("fe5f80f77d5fa3beca038a248ff027", signature.getSignature());
@@ -173,7 +198,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027%";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth, sampleDate)
             .parseSignature());
     String auth2 =
         "AWS4-HMAC-SHA256 Credential=ozone/" + curDate + "s3/aws4_request,"
@@ -181,7 +206,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027%";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth2, sampleDate)
             .parseSignature());
   }
 
@@ -194,7 +219,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth, sampleDate)
             .parseSignature());
 
     String auth2 =
@@ -204,7 +229,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth2, sampleDate)
             .parseSignature());
   }
 
@@ -217,7 +242,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth, sampleDate)
             .parseSignature());
 
     String auth2 =
@@ -227,7 +252,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth2, sampleDate)
             .parseSignature());
 
     String auth3 =
@@ -237,7 +262,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth3, sampleDate)
             .parseSignature());
 
     String auth4 =
@@ -247,7 +272,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-            () -> new AuthorizationV4HeaderParser(auth4, SAMPLE_DATE)
+            () -> new AuthorizationV4HeaderParser(auth4, sampleDate)
                 .parseSignature());
   }
 
@@ -260,7 +285,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth, sampleDate)
             .parseSignature());
 
     String auth2 =
@@ -270,7 +295,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth2, sampleDate)
             .parseSignature());
 
     String auth3 =
@@ -280,7 +305,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth3, sampleDate)
             .parseSignature());
 
     String auth4 =
@@ -290,7 +315,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth4, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth4, sampleDate)
             .parseSignature());
   }
 
@@ -303,7 +328,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027%";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth, sampleDate)
             .parseSignature());
 
     String auth2 =
@@ -313,7 +338,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth2, sampleDate)
             .parseSignature());
 
     String auth3 =
@@ -322,7 +347,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "=";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth3, sampleDate)
             .parseSignature());
   }
 
@@ -335,7 +360,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth, sampleDate)
             .parseSignature());
 
     String auth2 =
@@ -344,7 +369,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    assertNull(new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+    assertNull(new AuthorizationV4HeaderParser(auth2, sampleDate)
         .parseSignature());
 
     String auth3 =
@@ -353,7 +378,7 @@ public class TestAuthorizationV4HeaderParser {
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date,"
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
-    assertNull(new AuthorizationV4HeaderParser(auth3, SAMPLE_DATE)
+    assertNull(new AuthorizationV4HeaderParser(auth3, sampleDate)
         .parseSignature());
 
     // Invalid algorithm
@@ -362,7 +387,7 @@ public class TestAuthorizationV4HeaderParser {
         "SignedHeaders=host;range;x-amz-date, " +
         "Signature=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth4, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth4, sampleDate)
             .parseSignature());
   }
 
@@ -375,7 +400,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth, sampleDate)
             .parseSignature());
 
     String auth2 =
@@ -385,7 +410,7 @@ public class TestAuthorizationV4HeaderParser {
             + "Signature"
             + "=fe5f80f77d5fa3beca038a248ff027";
     assertThrows(MalformedResourceException.class,
-        () -> new AuthorizationV4HeaderParser(auth2, SAMPLE_DATE)
+        () -> new AuthorizationV4HeaderParser(auth2, sampleDate)
             .parseSignature());
   }
 
