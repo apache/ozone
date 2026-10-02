@@ -82,7 +82,8 @@ public class AWSSignatureProcessor implements SignatureProcessor {
       } catch (MalformedResourceException e) {
         AuditMessage message = buildAuthFailureMessage(e);
         AUDIT.logAuthFailure(message);
-        throw S3ErrorTable.newError(MALFORMED_HEADER, e.getResource());
+        S3ErrorTable error = e.getErrorCode() != null ? e.getErrorCode() : MALFORMED_HEADER;
+        throw S3ErrorTable.newError(error, e.getResource());
       }
       if (signatureInfo != null) {
         break;

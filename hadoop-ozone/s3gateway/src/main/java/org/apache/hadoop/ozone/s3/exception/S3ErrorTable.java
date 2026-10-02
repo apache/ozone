@@ -65,6 +65,11 @@ public enum S3ErrorTable {
       "AuthorizationHeaderMalformed", "The authorization header you provided " +
       "is invalid.", HTTP_BAD_REQUEST),
 
+  MALFORMED_CREDENTIAL_DATE(
+      "AuthorizationHeaderMalformed", "The authorization header is malformed; "
+      + "Invalid credential date. Date is not the same as X-Amz-Date.",
+      HTTP_BAD_REQUEST),
+
   NO_SUCH_KEY(
       "NoSuchKey", "The specified key does not exist", HTTP_NOT_FOUND),
 
@@ -109,6 +114,10 @@ public enum S3ErrorTable {
   ACCESS_DENIED(
       "AccessDenied", "User doesn't have the right to access this " +
       "resource.", HTTP_FORBIDDEN),
+
+  REQUEST_TIME_TOO_SKEWED(
+      "RequestTimeTooSkewed", "The difference between the request time and " +
+      "the server's time is too large.", HTTP_FORBIDDEN),
 
   PRECOND_FAILED(
       "PreconditionFailed", "At least one of the pre-conditions you " +
