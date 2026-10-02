@@ -111,6 +111,9 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
         .map(a -> a.proxyInfo)
         .reduce((a, b) -> a + ", " + b).orElse("") + "]";
     combinedProxy = new ProxyInfo<>(new FollowerReadProxy(), combinedInfo);
+    // At the start, we don't know whether OM service supports follower read. Therefore, if the client
+    // is configured to use follower read, we should assume that OM service supports follower read and
+    // only sets this to false if there is an evidence otherwise (i.e. OM throws OMNotLeaderException).
     this.omServiceSupportsFollowerRead = true;
     this.defaultFollowerReadEnabled = defaultFollowerReadEnabled;
     this.followerReadConsistency = followerReadConsistencyType.getHint();
