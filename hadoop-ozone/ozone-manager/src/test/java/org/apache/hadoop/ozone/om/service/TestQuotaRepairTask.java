@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -441,6 +442,7 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     corruptSnapshotUsage(bucketName, 1L);
 
     assertFalse(awaitRepair(new QuotaRepairTask(ozoneManager).repair()));
+    assertThat(QuotaRepairTask.getStatus()).contains("CodecException");
     // the scan failed, so no partial counts reach the bucket
     assertNull(request.get());
   }
