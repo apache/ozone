@@ -355,6 +355,33 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     assertEquals(1, repaired.getSnapshotUsedNamespace());
   }
 
+  @Test
+  public void testQuotaRepairCountsDeletedDirectories() throws Exception {
+    AtomicReference<OzoneManagerProtocolProtos.OMRequest> request = mockQuotaRepairRequest();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
+
+    int dirs = 3;
+    for (int i = 0; i < dirs; i++) {
+      String dirName = "dir" + i;
+      long objectId = 100L + i;
+      OmKeyInfo dirInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, dirName, RATIS_ONE)
+          .setObjectID(objectId).setParentObjectID(bucketId).build();
+      omMetadataManager.getDeletedDirTable().put(omMetadataManager.getOzoneDeletePathKey(objectId,
+          omMetadataManager.getOzonePathKey(volumeId, bucketId, bucketId, dirName)), dirInfo);
+    }
+    String bucketKey = corruptSnapshotUsage(bucketName, 1L);
+
+    applyQuotaRepair(request, 2L, bucketKey);
+
+    OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
+    assertEquals(0, repaired.getSnapshotUsedBytes());
+    assertEquals(dirs, repaired.getSnapshotUsedNamespace());
+  }
+
   private void zeroOutBucketUsedBytes(String volumeName, String bucketName,
                                       long trxnLogIndex)
       throws IOException {
@@ -700,6 +727,16 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
     OmBucketInfo corrupted = omMetadataManager.getBucketTable().get(bucketKey).toBuilder()
         .setUsedBytes(usedBytes).setUsedNamespace(usedNamespace).build();
+    omMetadataManager.getBucketTable().put(bucketKey, corrupted);
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(bucketKey), CacheValue.get(transactionIndex, corrupted));
+    return bucketKey;
+  }
+
+  private String corruptSnapshotUsage(String bucket, long transactionIndex) throws IOException {
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
+    OmBucketInfo corrupted = omMetadataManager.getBucketTable().get(bucketKey).toBuilder()
+        .setSnapshotUsedBytes(7L).setSnapshotUsedNamespace(99L).build();
     omMetadataManager.getBucketTable().put(bucketKey, corrupted);
     omMetadataManager.getBucketTable().addCacheEntry(
         new CacheKey<>(bucketKey), CacheValue.get(transactionIndex, corrupted));

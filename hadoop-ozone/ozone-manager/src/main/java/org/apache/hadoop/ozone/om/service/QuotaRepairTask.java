@@ -549,7 +549,7 @@ public class QuotaRepairTask {
     int count = 0;
     long startTime = Time.monotonicNow();
     try (Table.KeyValueIterator<String, OmKeyInfo> keyIter
-        = deletedDirTable.iterator()) {
+        = deletedDirTable.iterator(null, KEY_ONLY)) {
       while (keyIter.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
         count++;
