@@ -33,27 +33,6 @@ import org.junit.jupiter.api.Test;
  */
 class TestOmSnapshotLeakDetection {
 
-  /** The reporter warns only when the store was not closed. Exercised directly with a mocked store. */
-  @Test
-  void reporterWarnsWhenStoreNotClosed() {
-    DBStore store = mock(DBStore.class);
-    when(store.isClosed()).thenReturn(false);
-    try (LogCapturer logs = LogCapturer.captureLogs(OmSnapshot.class)) {
-      OmSnapshot.newLeakReporter(store, "snap-1").run();
-      assertThat(logs.getOutput()).contains("is not closed properly. snapshotName: snap-1");
-    }
-  }
-
-  @Test
-  void reporterSilentWhenStoreClosed() {
-    DBStore store = mock(DBStore.class);
-    when(store.isClosed()).thenReturn(true);
-    try (LogCapturer logs = LogCapturer.captureLogs(OmSnapshot.class)) {
-      OmSnapshot.newLeakReporter(store, "snap-1").run();
-      assertThat(logs.getOutput()).doesNotContain("is not closed properly");
-    }
-  }
-
   /**
    * Drive an actual {@link OmSnapshot} instance through GC without closing it and verify the leak
    * is detected. Collaborators (including the {@link DBStore}) are mocked, so no metadata store is
@@ -61,8 +40,37 @@ class TestOmSnapshotLeakDetection {
    */
   @Test
   void leakDetectedForUnclosedSnapshot() throws Exception {
+    try (LogCapturer logs = LogCapturer.captureLogs(OmSnapshot.class)) {
+      OmSnapshot snapshot = newSnapshotWithMockedStore();
+      assertThat(snapshot).isNotNull();
+
+      // Drop the only strong reference; the reporter captures no reference back to the snapshot,
+      // so it becomes collectible. The report runs asynchronously on the LeakDetector thread.
+      snapshot = null;
+      for (int i = 0; i < 50 && !logs.getOutput().contains("is not closed properly"); i++) {
+        System.gc();
+        Thread.sleep(100);
+      }
+      assertThat(logs.getOutput()).contains("is not closed properly. snapshotName: snap-1");
+    }
+  }
+
+  /** Closing the snapshot stops the leak tracker, so a GC afterwards must not report a leak. */
+  @Test
+  void closedSnapshotDoesNotReportLeak() throws Exception {
+    try (LogCapturer logs = LogCapturer.captureLogs(OmSnapshot.class)) {
+      OmSnapshot snapshot = newSnapshotWithMockedStore();
+      snapshot.close();
+
+      snapshot = null;
+      System.gc();
+      Thread.sleep(100);
+      assertThat(logs.getOutput()).doesNotContain("is not closed properly");
+    }
+  }
+
+  private static OmSnapshot newSnapshotWithMockedStore() {
     DBStore store = mock(DBStore.class);
-    when(store.isClosed()).thenReturn(false);
     OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     when(metadataManager.getStore()).thenReturn(store);
     KeyManager keyManager = mock(KeyManager.class);
@@ -73,19 +81,7 @@ class TestOmSnapshotLeakDetection {
     when(authorizer.isNative()).thenReturn(false);
     PrefixManager prefixManager = mock(PrefixManager.class);
 
-    try (LogCapturer logs = LogCapturer.captureLogs(OmSnapshot.class)) {
-      OmSnapshot snapshot = new OmSnapshot(keyManager, prefixManager, ozoneManager,
-          "vol", "bucket", "snap-1", UUID.randomUUID());
-      assertThat(snapshot).isNotNull();
-
-      // Drop the only strong reference; the reporter captures the store, not the snapshot,
-      // so it becomes collectible. The report runs asynchronously on the LeakDetector thread.
-      snapshot = null;
-      for (int i = 0; i < 50 && !logs.getOutput().contains("is not closed properly"); i++) {
-        System.gc();
-        Thread.sleep(100);
-      }
-      assertThat(logs.getOutput()).contains("is not closed properly. snapshotName: snap-1");
-    }
+    return new OmSnapshot(keyManager, prefixManager, ozoneManager,
+        "vol", "bucket", "snap-1", UUID.randomUUID());
   }
 }

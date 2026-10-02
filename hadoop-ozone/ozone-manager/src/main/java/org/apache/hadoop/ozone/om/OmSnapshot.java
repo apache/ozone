@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.LeakDetector;
-import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
@@ -107,7 +106,8 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
     this.snapshotID = snapshotID;
     this.keyManager = keyManager;
     this.omMetadataManager = keyManager.getMetadataManager();
-    this.leakTracker = LEAK_DETECTOR.track(this, newLeakReporter(omMetadataManager.getStore(), snapshotName));
+    this.leakTracker = LEAK_DETECTOR.track(this,
+        newLeakReporter(omMetadataManager.getStore().toString(), snapshotName));
   }
 
   @Override
@@ -351,23 +351,21 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
 
   @Override
   public void close() throws IOException {
-    // Close DB
-    omMetadataManager.getStore().close();
-    // Closed properly: stop tracking so the leak reporter does not fire at GC.
-    leakTracker.close();
+    try {
+      // Close DB
+      omMetadataManager.getStore().close();
+    } finally {
+      // Closed properly: stop tracking so the leak reporter does not fire at GC.
+      leakTracker.close();
+    }
   }
 
   /**
-   * @return a leak reporter that captures only the {@code store} and {@code snapshotName} objects,
+   * @return a leak reporter that captures only the store's hashcode and the snapshot name,
    *     never the {@link OmSnapshot} itself.
    */
-  static Runnable newLeakReporter(DBStore store, String snapshotName) {
-    return () -> {
-      if (!store.isClosed()) {
-        // Print hash code for debugging
-        LOG.warn("{} is not closed properly. snapshotName: {}", store, snapshotName);
-      }
-    };
+  static Runnable newLeakReporter(String storeHashCode, String snapshotName) {
+    return () -> LOG.warn("{} is not closed properly. snapshotName: {}", storeHashCode, snapshotName);
   }
 
   @VisibleForTesting
