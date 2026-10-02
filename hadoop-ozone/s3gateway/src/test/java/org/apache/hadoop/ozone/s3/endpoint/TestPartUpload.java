@@ -24,11 +24,14 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMult
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signatureInfo;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBody;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBodyWithTrailer;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signingKey;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -199,6 +202,35 @@ public class TestPartUpload {
   }
 
   @Test
+  public void testPartUploadWithValidSignedTrailer() throws Exception {
+    String keyName = UUID.randomUUID().toString();
+    String content = "1234567890abcde";
+    String chunkedContent = signedChunkedBodyWithTrailer(
+        content, "x-amz-checksum-crc32c", "sOO8/Q==");
+    configureSignedChunksWithTrailer(content.length());
+
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+
+    assertSucceeds(() -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, chunkedContent));
+    assertContentLength(uploadID, keyName, content.length());
+  }
+
+  @Test
+  public void testPartUploadRejectsTamperedTrailer() throws Exception {
+    String keyName = UUID.randomUUID().toString();
+    String content = "1234567890abcde";
+    String chunkedContent = signedChunkedBodyWithTrailer(
+        content, "x-amz-checksum-crc32c", "sOO8/Q==").replace("sOO8/Q==", "tampered");
+    configureSignedChunksWithTrailer(content.length());
+
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+
+    assertErrorResponse(S3ErrorTable.SIGNATURE_DOES_NOT_MATCH,
+        () -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, chunkedContent));
+    assertNoParts(uploadID, keyName);
+  }
+
+  @Test
   public void testPartUploadRejectsMissingDerivedKeyInSecureMode() throws Exception {
     String keyName = UUID.randomUUID().toString();
     configureSignedChunkHeaders(0);
@@ -216,6 +248,13 @@ public class TestPartUpload {
         .getS3Bucket(OzoneConsts.S3_BUCKET);
     bucket.setDerivedKey(signingKey());
     configureSignedChunkHeaders(contentLength);
+  }
+
+  private void configureSignedChunksWithTrailer(int contentLength) throws IOException {
+    configureSignedChunks(contentLength);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
   }
 
   private void configureSignedChunkHeaders(int contentLength) {

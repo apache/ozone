@@ -102,6 +102,11 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
   }
 
   @Override
+  S3GAction getAction() {
+    return queryParams().get(QueryParams.ATTRIBUTES) == null ? null : S3GAction.NOT_IMPLEMENTED;
+  }
+
+  @Override
   Response handleGetRequest(ObjectRequestContext context, String keyPath)
       throws IOException, OS3Exception {
 

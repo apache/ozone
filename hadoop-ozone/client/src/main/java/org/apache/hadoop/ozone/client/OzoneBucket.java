@@ -862,8 +862,9 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Deletes the given list of keys from the bucket.
    * @param keyList List of the key name to be deleted.
-   * @param quiet flag to not throw exception if delete fails
-   * @throws IOException
+   * @param quiet if true, per-key failures are returned in the result map instead of being thrown
+   * @return key name to error for each key that could not be deleted, empty if all keys were deleted
+   * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true
    */
   public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
     return proxy.deleteKeys(volumeName, name, keyList, quiet);
