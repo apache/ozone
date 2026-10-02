@@ -21,10 +21,11 @@ import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.CREATE
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.DELETE;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.MODIFY;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.RENAME;
-import static org.apache.hadoop.ozone.om.snapshot.diff.SnapDiffJobStore.DEFAULT_BATCH_SIZE;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntry;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -39,13 +40,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Stages 2–4 of the optimized full snapshot diff pipeline: merge join and
- * classification, top-level delete retention, ancestor backtrack path resolution,
- * dependency ordering, and batched report write.
+ * Merge join and classification, top-level delete retention, ancestor backtrack path resolution,
+ * dependency ordering, and batched report write of diff entries.
  *
- * <p>Classified rows are persisted in per-type column families as minimal parent-id
- * payloads encoded by {@link SnapDiffJobStore}. Only directory delete/rename object ids
- * are held in heap during processing besides path-resolution LRU state.
  */
 public final class MergeJoinSnapDiffWriter {
 
@@ -57,11 +54,6 @@ public final class MergeJoinSnapDiffWriter {
   private MergeJoinSnapDiffWriter() {
   }
 
-  public static Pair<Long, String> writeReport(SnapshotDiffManager manager, SnapDiffJobStore store,
-      long bucketObjectId, boolean isFso) throws IOException {
-    return writeReport(manager, store, bucketObjectId, isFso, false);
-  }
-
   /**
    * {@code dependencyOrderingEnabled} applies to FSO buckets only; OBS entries are always
    * resolved and written directly to the report table.
@@ -71,12 +63,11 @@ public final class MergeJoinSnapDiffWriter {
       boolean dependencyOrderingEnabled) throws IOException {
     store.beginReportWrite();
     if (isFso) {
-      // Classified CFs hold only objectId + parentId(s). Paths are always resolved before emission.
+      // Classified CFs hold only objectId + (parentId, name). Paths are always resolved before emission.
       classifyMergeJoin(store, true);
       store.dropListColumnFamilies();
 
       SnapDiffPathResolver fromResolver = store.newFromPathResolver(bucketObjectId);
-      SnapDiffPathResolver toResolver = store.newToPathResolver(bucketObjectId);
       boolean[] dependencyOrderingEnabledRef = {dependencyOrderingEnabled};
       int nodeCount = filterAndResolveTopLevelDeletes(manager, store, bucketObjectId,
           fromResolver, dependencyOrderingEnabledRef);
@@ -86,8 +77,11 @@ public final class MergeJoinSnapDiffWriter {
       // Remaining classified entries are resolved and emitted straight to the report table,
       // if dependency ordering is disabled.
       // Otherwise, entries are emitted into {jobId}-dependency-nodes for ordering.
+      SnapDiffPathResolver toResolver = store.newToPathResolver(bucketObjectId);
       nodeCount = resolveDiffPaths(store, fromResolver, toResolver, dependencyOrderingEnabledRef,
           nodeCount);
+      fromResolver.clearPathCache();
+      toResolver.clearPathCache();
       for (DiffType diffType : FSO_RESOLVE_ORDER) {
         store.dropClassifiedColumnFamily(diffType);
       }
@@ -98,7 +92,6 @@ public final class MergeJoinSnapDiffWriter {
         orderAndWriteReport(store, nodeCount);
       }
       store.dropDependencyGraphColumnFamilies();
-      store.markTemporaryColumnFamiliesDropped();
 
     } else {
       classifyMergeJoin(store, false);
@@ -141,7 +134,7 @@ public final class MergeJoinSnapDiffWriter {
     EntryValue value = EntryValue.fromBytes(newEntry.getValue());
     if (isFso) {
       store.putClassified(CREATE, newEntry.getKey(),
-          SnapDiffJobStore.encodeClassifiedParent(value.getParentId()));
+          SnapDiffJobStore.encodeEdgeLink(value.getParentId(), nameBytes(value.getName())));
     } else {
       store.putReportEntry(getDiffReportEntry(CREATE, value.getName()));
     }
@@ -156,7 +149,7 @@ public final class MergeJoinSnapDiffWriter {
         store.addDeletedDirectoryId(oldEntry.getKey());
       }
       store.putClassified(DELETE, oldEntry.getKey(),
-          SnapDiffJobStore.encodeClassifiedParent(value.getParentId()));
+          SnapDiffJobStore.encodeEdgeLink(value.getParentId(), nameBytes(value.getName())));
     } else {
       store.putReportEntry(getDiffReportEntry(DELETE, value.getName()));
     }
@@ -184,12 +177,13 @@ public final class MergeJoinSnapDiffWriter {
     boolean contentDiffers = !Arrays.equals(newValue.getSignature(), oldValue.getSignature());
     if (pathDiffers) {
       if (isFso) {
-        store.putClassified(RENAME, newEntry.getKey(), SnapDiffJobStore.encodeClassifiedRename(
-            oldValue.getParentId(), newValue.getParentId()));
+        store.putClassified(RENAME, oldEntry.getKey(), SnapDiffJobStore.encodeClassifiedRename(
+            oldValue.getParentId(), nameBytes(oldValue.getName()),
+            newValue.getParentId(), nameBytes(newValue.getName())));
         // Check should be on oldId so that it is read as this entry from old snapshot has been renamed.
         // Even in top-level deletes the ID here is checked against old snapshot namespace.
-        if (newValue.isDir()) {
-          store.addRenamedDirectoryId(newEntry.getKey());
+        if (oldValue.isDir()) {
+          store.addRenamedDirectoryId(oldEntry.getKey());
         }
       } else {
         store.putReportEntry(getDiffReportEntry(RENAME, oldValue.getName(), newValue.getName()));
@@ -197,8 +191,8 @@ public final class MergeJoinSnapDiffWriter {
     }
     if (contentDiffers) {
       if (isFso) {
-        store.putClassified(MODIFY, oldEntry.getKey(),
-            SnapDiffJobStore.encodeClassifiedParent(oldValue.getParentId()));
+        store.putClassified(MODIFY, oldEntry.getKey(), SnapDiffJobStore.encodeEdgeLink(
+            oldValue.getParentId(), nameBytes(oldValue.getName())));
       } else {
         store.putReportEntry(getDiffReportEntry(MODIFY, oldValue.getName()));
       }
@@ -211,11 +205,12 @@ public final class MergeJoinSnapDiffWriter {
       boolean[] dependencyOrderingEnabled) throws IOException {
     Map<Long, Boolean> ancestorMemo = newAncestorMemo(store);
     int nodeIndex = 0;
-    List<Map.Entry<Long, byte[]>> deleteBatch = new ArrayList<>(DEFAULT_BATCH_SIZE);
+    int writeBatchSize = store.getWriteBatchSize();
+    List<Map.Entry<Long, byte[]>> deleteBatch = new ArrayList<>(writeBatchSize);
     try (SnapDiffJobStore.ClassifiedIterator deleteIter = store.classifiedIterator(DELETE)) {
       while (deleteIter.hasNext()) {
         deleteBatch.add(deleteIter.next());
-        if (deleteBatch.size() == DEFAULT_BATCH_SIZE) {
+        if (deleteBatch.size() == writeBatchSize) {
           nodeIndex = filterAndResolveTopLevelDeleteBatch(manager, store, bucketObjectId,
               fromResolver, dependencyOrderingEnabled, ancestorMemo, nodeIndex, deleteBatch);
           deleteBatch.clear();
@@ -229,6 +224,7 @@ public final class MergeJoinSnapDiffWriter {
           fromResolver, dependencyOrderingEnabled, ancestorMemo, nodeIndex, deleteBatch);
     }
     store.flushWrites();
+    ancestorMemo.clear();
     return dependencyOrderingEnabled[0] ? nodeIndex : 0;
   }
 
@@ -249,39 +245,46 @@ public final class MergeJoinSnapDiffWriter {
       List<Map.Entry<Long, byte[]>> deleteBatch) throws IOException {
     List<Long> parentObjectIds = new ArrayList<>(deleteBatch.size());
     for (Map.Entry<Long, byte[]> row : deleteBatch) {
-      parentObjectIds.add(SnapDiffJobStore.decodeClassifiedParent(row.getValue()));
+      parentObjectIds.add(SnapDiffJobStore.decodeEdgeLinkParentId(row.getValue()));
     }
     boolean[] hasDeletedAncestor = manager.hasDeletedAncestors(parentObjectIds,
         store::isDeletedDirectoryId, store::isRenamedDirectoryId, store::multiGetFromParentIds,
         bucketObjectId, ancestorMemo);
-    List<Map.Entry<Long, byte[]>> survivorRows = new ArrayList<>();
     List<Long> survivorObjectIds = new ArrayList<>();
+    List<String> survivorNames = new ArrayList<>();
+    int survivorIndex = 0;
     for (int i = 0; i < deleteBatch.size(); i++) {
       if (hasDeletedAncestor[i]) {
         continue;
       }
       Map.Entry<Long, byte[]> row = deleteBatch.get(i);
-      survivorRows.add(row);
       survivorObjectIds.add(row.getKey());
+      survivorNames.add(SnapDiffJobStore.decodeEdgeLinkName(row.getValue()));
+      if (survivorIndex != i) {
+        parentObjectIds.set(survivorIndex, parentObjectIds.get(i));
+      }
+      survivorIndex++;
     }
-    if (survivorRows.isEmpty()) {
+    if (survivorIndex == 0) {
       return nodeIndex;
     }
-    List<DiffReportEntry> reportEntries = resolveReportEntries(DELETE, survivorObjectIds,
-        fromResolver, null);
-    return writeReportEntriesForRows(store, DELETE, survivorRows, reportEntries,
-        dependencyOrderingEnabled, nodeIndex);
+    parentObjectIds.subList(survivorIndex, parentObjectIds.size()).clear();
+    List<DiffReportEntry> reportEntries = resolveReportEntries(DELETE, parentObjectIds, null, survivorNames,
+        null, fromResolver, null);
+    return writeReportEntriesForRows(store, DELETE, survivorObjectIds, parentObjectIds, null,
+        reportEntries, dependencyOrderingEnabled, nodeIndex);
   }
 
   private static int resolveDiffPaths(SnapDiffJobStore store,
       SnapDiffPathResolver fromResolver, SnapDiffPathResolver toResolver,
       boolean[] dependencyOrderingEnabled, int nodeIndex) throws IOException {
+    int writeBatchSize = store.getWriteBatchSize();
     for (DiffType diffType : FSO_RESOLVE_ORDER) {
-      List<Map.Entry<Long, byte[]>> batch = new ArrayList<>(DEFAULT_BATCH_SIZE);
+      List<Map.Entry<Long, byte[]>> batch = new ArrayList<>(writeBatchSize);
       try (SnapDiffJobStore.ClassifiedIterator iter = store.classifiedIterator(diffType)) {
         while (iter.hasNext()) {
           batch.add(iter.next());
-          if (batch.size() == DEFAULT_BATCH_SIZE) {
+          if (batch.size() == writeBatchSize) {
             nodeIndex = resolveDiffPathBatch(store, diffType, fromResolver, toResolver,
                 dependencyOrderingEnabled, nodeIndex, batch);
             batch.clear();
@@ -304,110 +307,135 @@ public final class MergeJoinSnapDiffWriter {
       boolean[] dependencyOrderingEnabled, int nodeIndex,
       List<Map.Entry<Long, byte[]>> batch) throws IOException {
     List<Long> objectIds = new ArrayList<>(batch.size());
+    List<Long> sourceParentIds = new ArrayList<>(batch.size());
+    List<Long> targetParentIds = new ArrayList<>(batch.size());
+    List<String> sourceNames = new ArrayList<>(batch.size());
+    List<String> targetNames = new ArrayList<>(batch.size());
+    decodeClassifiedBatch(diffType, batch, objectIds, sourceParentIds,
+        targetParentIds, sourceNames, targetNames);
+    List<DiffReportEntry> reportEntries = resolveReportEntries(diffType, sourceParentIds, targetParentIds,
+        sourceNames, targetNames, fromResolver, toResolver);
+    return writeReportEntriesForRows(store, diffType, objectIds, sourceParentIds,
+        targetParentIds, reportEntries, dependencyOrderingEnabled, nodeIndex);
+  }
+
+  private static void decodeClassifiedBatch(DiffType diffType, List<Map.Entry<Long, byte[]>> batch,
+      List<Long> objectIds, List<Long> sourceParentIds, List<Long> targetParentIds,
+      List<String> sourceNames, List<String> targetNames) {
     for (Map.Entry<Long, byte[]> row : batch) {
       objectIds.add(row.getKey());
+      byte[] value = row.getValue();
+      if (diffType == RENAME) {
+        byte[] sourceLink = SnapDiffJobStore.decodeClassifiedRenameSourceLink(value);
+        byte[] targetLink = SnapDiffJobStore.decodeClassifiedRenameTargetLink(value);
+        sourceParentIds.add(SnapDiffJobStore.decodeEdgeLinkParentId(sourceLink));
+        targetParentIds.add(SnapDiffJobStore.decodeEdgeLinkParentId(targetLink));
+        sourceNames.add(SnapDiffJobStore.decodeEdgeLinkName(sourceLink));
+        targetNames.add(SnapDiffJobStore.decodeEdgeLinkName(targetLink));
+      } else {
+        sourceParentIds.add(SnapDiffJobStore.decodeEdgeLinkParentId(value));
+        sourceNames.add(SnapDiffJobStore.decodeEdgeLinkName(value));
+      }
     }
-    List<DiffReportEntry> reportEntries = resolveReportEntries(diffType, objectIds, fromResolver,
-        toResolver);
-    return writeReportEntriesForRows(store, diffType, batch, reportEntries,
-        dependencyOrderingEnabled, nodeIndex);
   }
 
   private static List<DiffReportEntry> resolveReportEntries(DiffType diffType,
-      List<Long> objectIds, SnapDiffPathResolver fromResolver,
-      SnapDiffPathResolver toResolver) throws IOException {
-    List<DiffReportEntry> reportEntries = new ArrayList<>(objectIds.size());
+      List<Long> sourceParentIds, List<Long> targetParentIds,
+      List<String> sourceNames, List<String> targetNames,
+      SnapDiffPathResolver fromResolver, SnapDiffPathResolver toResolver) throws IOException {
     switch (diffType) {
     case CREATE:
-      List<String> toPaths = toResolver.resolvePaths(objectIds);
-      for (String toPath : toPaths) {
-        reportEntries.add(toPath != null ? getDiffReportEntry(CREATE, toPath) : null);
-      }
-      break;
+      return resolvePathsFromParentAndName(toResolver, sourceParentIds, sourceNames, CREATE);
     case DELETE:
     case MODIFY:
-      List<String> fromPaths = fromResolver.resolvePaths(objectIds);
-      for (String fromPath : fromPaths) {
-        reportEntries.add(fromPath != null ? getDiffReportEntry(diffType, fromPath) : null);
-      }
-      break;
+      return resolvePathsFromParentAndName(fromResolver, sourceParentIds, sourceNames, diffType);
     case RENAME:
-      List<String> sourcePaths = fromResolver.resolvePaths(objectIds);
-      List<String> targetPaths = toResolver.resolvePaths(objectIds);
-      for (int i = 0; i < objectIds.size(); i++) {
-        String sourcePath = sourcePaths.get(i);
-        String targetPath = targetPaths.get(i);
+      List<String> sourceParentPaths = fromResolver.resolvePaths(sourceParentIds);
+      List<String> targetParentPaths = toResolver.resolvePaths(targetParentIds);
+      List<DiffReportEntry> reportEntries = new ArrayList<>(sourceNames.size());
+      for (int i = 0; i < sourceNames.size(); i++) {
+        String sourcePath = buildChildPath(sourceParentPaths.get(i), sourceNames.get(i));
+        String targetPath = buildChildPath(targetParentPaths.get(i), targetNames.get(i));
         if (sourcePath != null && targetPath != null) {
           reportEntries.add(getDiffReportEntry(RENAME, sourcePath, targetPath));
         } else {
           reportEntries.add(null);
         }
       }
-      break;
+      return reportEntries;
     default:
       throw new IllegalArgumentException("Unsupported diff type: " + diffType);
+    }
+  }
+
+  private static List<DiffReportEntry> resolvePathsFromParentAndName(
+      SnapDiffPathResolver resolver, List<Long> parentIds, List<String> names, DiffType diffType)
+      throws IOException {
+    List<String> parentPaths = resolver.resolvePaths(parentIds);
+    List<DiffReportEntry> reportEntries = new ArrayList<>(names.size());
+    for (int i = 0; i < names.size(); i++) {
+      String path = buildChildPath(parentPaths.get(i), names.get(i));
+      reportEntries.add(path != null ? getDiffReportEntry(diffType, path) : null);
     }
     return reportEntries;
   }
 
+  private static String buildChildPath(String parentPath, String name) {
+    if (parentPath == null) {
+      return null;
+    }
+    return parentPath.isEmpty() ? name : parentPath + OM_KEY_PREFIX + name;
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
   private static int writeReportEntriesForRows(SnapDiffJobStore store, DiffType diffType,
-      List<Map.Entry<Long, byte[]>> rows, List<DiffReportEntry> reportEntries,
-      boolean[] dependencyOrderingEnabled, int nodeIndex) throws IOException {
-    if (!dependencyOrderingEnabled[0]) {
-      writeDirectReportEntries(store, diffType, rows, reportEntries);
-      return 0;
-    }
-
-    List<SnapDiffDependencyEntry> dependencyEntries = new ArrayList<>();
-    for (int i = 0; i < rows.size(); i++) {
+      List<Long> objectIds, List<Long> sourceParentIds, List<Long> targetParentIds,
+      List<DiffReportEntry> reportEntries, boolean[] dependencyOrderingEnabled, int nodeIndex) throws IOException {
+    for (int i = 0; i < objectIds.size(); i++) {
       DiffReportEntry reportEntry = reportEntries.get(i);
       if (reportEntry == null) {
         LOG.debug("SnapDiff job {}: dropping {} report entry for unresolvable objectId: {}",
-            store.getJobId(), diffType.name(), rows.get(i).getKey());
+            store.getJobId(), diffType.name(), objectIds.get(i));
         continue;
       }
-      dependencyEntries.add(buildDependencyEntry(rows.get(i).getKey(), rows.get(i).getValue(),
-          reportEntry));
-    }
-    if (dependencyEntries.isEmpty()) {
-      return nodeIndex;
-    }
-    if (nodeIndex + dependencyEntries.size() > store.getMaxInMemoryEntries()) {
-      LOG.error("SnapDiff job {}: dependency node count exceeds limit of {} for job; "
-              + "falling back to direct report write",
-          store.getJobId(), store.getMaxInMemoryEntries());
-      if (nodeIndex > 0) {
-        flushUnorderedDependencyNodes(store, nodeIndex);
+      nodeIndex++;
+      if (!dependencyOrderingEnabled[0]) {
+        store.putReportEntry(reportEntry);
+      } else {
+        if (nodeIndex > store.getMaxInMemoryEntries()) {
+          LOG.error("SnapDiff job {}: dependency node count exceeds limit of {} for job; "
+                  + "falling back to direct report write",
+              store.getJobId(), store.getMaxInMemoryEntries());
+          flushUnorderedDependencyNodes(store, nodeIndex);
+          dependencyOrderingEnabled[0] = false;
+          store.putReportEntry(reportEntry);
+        } else {
+          long sourceParentId;
+          long targetParentId;
+          if (diffType == RENAME) {
+            sourceParentId = sourceParentIds.get(i);
+            targetParentId = targetParentIds.get(i);
+          } else {
+            sourceParentId = sourceParentIds.get(i);
+            targetParentId = sourceParentId;
+          }
+          store.putDependencyNode(nodeIndex,
+              buildDependencyEntry(objectIds.get(i), sourceParentId, targetParentId, reportEntry));
+        }
       }
-      dependencyOrderingEnabled[0] = false;
-      writeDirectReportEntries(store, diffType, rows, reportEntries);
-      return 0;
     }
-    store.putDependencyNodes(nodeIndex, dependencyEntries);
-    return nodeIndex + dependencyEntries.size();
+    return nodeIndex;
   }
 
-  private static void writeDirectReportEntries(SnapDiffJobStore store, DiffType diffType,
-      List<Map.Entry<Long, byte[]>> rows, List<DiffReportEntry> reportEntries) throws IOException {
-    List<DiffReportEntry> directReportEntries = new ArrayList<>();
-    for (int i = 0; i < rows.size(); i++) {
-      DiffReportEntry reportEntry = reportEntries.get(i);
-      if (reportEntry == null) {
-        LOG.debug("SnapDiff job {}: dropping {} report entry for unresolvable objectId: {}",
-            store.getJobId(), diffType.name(), rows.get(i).getKey());
-        continue;
-      }
-      directReportEntries.add(reportEntry);
-    }
-    if (!directReportEntries.isEmpty()) {
-      store.putReportEntries(directReportEntries);
-    }
-  }
-
-  private static void flushUnorderedDependencyNodes(SnapDiffJobStore store, int nodeCount)
+  private static void flushUnorderedDependencyNodes(SnapDiffJobStore store, int nodeIndex)
       throws IOException {
-    for (int position = 0; position < nodeCount; position += DEFAULT_BATCH_SIZE) {
-      int end = Math.min(position + DEFAULT_BATCH_SIZE, nodeCount);
+    if (nodeIndex <= 1) {
+      return;
+    }
+    store.flushWrites();
+    int writeBatchSize = store.getWriteBatchSize();
+    for (int position = 1; position < nodeIndex; position += writeBatchSize) {
+      int end = Math.min(position + writeBatchSize, nodeIndex);
       List<Integer> nodeBatch = new ArrayList<>(end - position);
       for (int batchPosition = position; batchPosition < end; batchPosition++) {
         nodeBatch.add(batchPosition);
@@ -417,45 +445,34 @@ public final class MergeJoinSnapDiffWriter {
     }
   }
 
-  private static SnapDiffDependencyEntry buildDependencyEntry(long objectId, byte[] classifiedValue,
-      DiffReportEntry reportEntry) {
-    long sourceParentId;
-    long targetParentId;
-    if (reportEntry.getType() == RENAME) {
-      sourceParentId = SnapDiffJobStore.decodeClassifiedRenameSourceParent(classifiedValue);
-      targetParentId = SnapDiffJobStore.decodeClassifiedRenameTargetParent(classifiedValue);
-    } else {
-      sourceParentId = SnapDiffJobStore.decodeClassifiedParent(classifiedValue);
-      targetParentId = sourceParentId;
-    }
+  private static SnapDiffDependencyEntry buildDependencyEntry(long objectId, long sourceParentId,
+      long targetParentId, DiffReportEntry reportEntry) {
     return new SnapDiffDependencyEntry(objectId, sourceParentId, targetParentId, reportEntry);
   }
 
   private static void orderAndWriteReport(SnapDiffJobStore store, int nodeCount)
       throws IOException {
+    List<Integer> orderedNodeIds;
     try (SnapDiffJobStore.DependencyNodeIterator dependencyEntries = store.dependencyNodeIterator()) {
-      buildOrderedNodeIds(store.getJobId(), store, dependencyEntries);
+      orderedNodeIds = buildOrderedNodeIds(store.getJobId(), dependencyEntries);
     }
-    for (int position = 0; position < nodeCount; position += DEFAULT_BATCH_SIZE) {
-      int end = Math.min(position + DEFAULT_BATCH_SIZE, nodeCount);
+    int writeBatchSize = store.getWriteBatchSize();
+    for (int position = 0; position < nodeCount; position += writeBatchSize) {
+      int end = Math.min(position + writeBatchSize, nodeCount);
       List<Integer> nodeBatch = new ArrayList<>(end - position);
       for (int batchPosition = position; batchPosition < end; batchPosition++) {
-        nodeBatch.add(store.getDepOrderNodeIndex(batchPosition));
+        nodeBatch.add(orderedNodeIds.get(batchPosition) + 1);
       }
       List<DiffReportEntry> reportEntries = store.multiGetDependencyReportEntries(nodeBatch);
-      store.putReportEntries(reportEntries);
+      store.putOrderedReportEntries(reportEntries);
     }
   }
 
   private static List<Integer> buildOrderedNodeIds(String jobId,
-      SnapDiffJobStore store, java.util.Iterator<SnapDiffDependencyEntry> dependencyEntries)
-      throws IOException {
+      java.util.Iterator<SnapDiffDependencyEntry> dependencyEntries) throws IOException {
     SnapDiffDependencyGraph graph = new SnapDiffDependencyGraph(dependencyEntries);
     try {
-      List<Integer> orderedNodeIds = graph.getOrderedNodeIds();
-      graph.persistToStore(store, orderedNodeIds);
-      store.flushWrites();
-      return orderedNodeIds;
+      return graph.getOrderedNodeIds();
     } catch (IllegalStateException e) {
       if (e.getMessage() != null && e.getMessage().contains("Cycle detected")) {
         LOG.error("SnapDiff job {} dependency graph cycle: {}", jobId, e.getMessage());
@@ -463,5 +480,9 @@ public final class MergeJoinSnapDiffWriter {
       }
       throw e;
     }
+  }
+
+  private static byte[] nameBytes(String name) {
+    return name.getBytes(StandardCharsets.UTF_8);
   }
 }

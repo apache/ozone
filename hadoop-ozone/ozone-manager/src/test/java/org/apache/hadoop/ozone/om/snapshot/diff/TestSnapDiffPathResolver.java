@@ -19,6 +19,11 @@ package org.apache.hadoop.ozone.om.snapshot.diff;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mockStatic;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -36,6 +41,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -54,6 +60,7 @@ class TestSnapDiffPathResolver {
   private static ManagedDBOptions dbOptions;
   private static ManagedColumnFamilyOptions columnFamilyOptions;
   private static CodecRegistry codecRegistry;
+  private static ColumnFamilyHandle snapDiffReportCfh;
 
   @BeforeAll
   static void init() throws RocksDBException {
@@ -67,6 +74,8 @@ class TestSnapDiffPathResolver {
         Collections.singletonList(new ColumnFamilyDescriptor(
             StringUtils.string2Bytes("default"), columnFamilyOptions)),
         handles);
+    snapDiffReportCfh = db.get().createColumnFamily(
+        new ColumnFamilyDescriptor(StringUtils.string2Bytes("snap-diff-report"), columnFamilyOptions));
   }
 
   @AfterAll
@@ -91,10 +100,14 @@ class TestSnapDiffPathResolver {
       store.flushWrites();
 
       SnapDiffPathResolver resolver = store.newFromPathResolver(BUCKET_OBJECT_ID);
-      assertEquals("", resolver.resolvePath(BUCKET_OBJECT_ID));
-      assertEquals("a", resolver.resolvePath(10L));
-      assertEquals("a/b", resolver.resolvePath(11L));
-      assertEquals("a/b/c", resolver.resolvePath(12L));
+
+      List<Long> objectIds = Arrays.asList(BUCKET_OBJECT_ID, 10L, 11L, 12L);
+      List<String> paths = resolver.resolvePaths(objectIds);
+
+      assertEquals("", paths.get(0));
+      assertEquals("a", paths.get(1));
+      assertEquals("a/b", paths.get(2));
+      assertEquals("a/b/c", paths.get(3));
     }
   }
 
@@ -107,8 +120,26 @@ class TestSnapDiffPathResolver {
       store.flushWrites();
 
       SnapDiffPathResolver resolver = store.newFromPathResolver(BUCKET_OBJECT_ID);
-      assertEquals("dir/left", resolver.resolvePath(21L));
-      assertEquals("dir/right", resolver.resolvePath(22L));
+      AtomicInteger dbLookupKeyCount = new AtomicInteger();
+
+      try (MockedStatic<SnapDiffJobStore> mockedStore = mockStatic(SnapDiffJobStore.class, CALLS_REAL_METHODS)) {
+        mockedStore.when(() -> SnapDiffJobStore.multiGet(any(ManagedRocksDB.class),
+            any(ColumnFamilyHandle.class), anyList())).thenAnswer(invocation -> {
+              dbLookupKeyCount.addAndGet(((List<?>) invocation.getArgument(2)).size());
+              return invocation.callRealMethod();
+            });
+
+        // Lookup dir and left from DB.
+        assertEquals("dir/left", resolver.resolvePaths(Collections.singletonList(21L)).get(0));
+        assertEquals(2, dbLookupKeyCount.get());
+
+        // Only lookup right from DB since dir is already in cache.
+        assertEquals("dir/right", resolver.resolvePaths(Collections.singletonList(22L)).get(0));
+        assertEquals(3, dbLookupKeyCount.get());
+      }
+      assertTrue(resolver.isPathCached(20L));
+      assertTrue(resolver.isPathCached(21L));
+      assertTrue(resolver.isPathCached(22L));
     }
   }
 
@@ -117,7 +148,7 @@ class TestSnapDiffPathResolver {
     try (SnapDiffJobStore store = newStore()) {
       store.flushWrites();
       SnapDiffPathResolver resolver = store.newFromPathResolver(BUCKET_OBJECT_ID);
-      assertNull(resolver.resolvePath(99L));
+      assertNull(resolver.resolvePaths(Collections.singletonList(99L)).get(0));
     }
   }
 
@@ -128,7 +159,7 @@ class TestSnapDiffPathResolver {
       store.flushWrites();
 
       SnapDiffPathResolver resolver = store.newFromPathResolver(BUCKET_OBJECT_ID);
-      assertNull(resolver.resolvePath(31L));
+      assertNull(resolver.resolvePaths(Collections.singletonList(31L)).get(0));
     }
   }
 
@@ -141,28 +172,8 @@ class TestSnapDiffPathResolver {
 
       SnapDiffPathResolver toResolver = store.newToPathResolver(BUCKET_OBJECT_ID);
       SnapDiffPathResolver fromResolver = store.newFromPathResolver(BUCKET_OBJECT_ID);
-      assertEquals("to-name", toResolver.resolvePath(40L));
-      assertEquals("from-name", fromResolver.resolvePath(40L));
-    }
-  }
-
-  @Test
-  void testResolvePathsBatchMatchesSingleResolve() throws Exception {
-    try (SnapDiffJobStore store = newStore()) {
-      putFromEdge(store, BUCKET_OBJECT_ID, 50L, "dir");
-      putFromEdge(store, 50L, 51L, "left");
-      putFromEdge(store, 50L, 52L, "right");
-      store.flushWrites();
-
-      SnapDiffPathResolver resolver = store.newFromPathResolver(BUCKET_OBJECT_ID);
-      List<Long> objectIds = Arrays.asList(51L, 52L, BUCKET_OBJECT_ID);
-      List<String> batchPaths = resolver.resolvePaths(objectIds);
-      assertEquals(3, batchPaths.size());
-      assertEquals("dir/left", batchPaths.get(0));
-      assertEquals("dir/right", batchPaths.get(1));
-      assertEquals("", batchPaths.get(2));
-      assertEquals(batchPaths.get(0), resolver.resolvePath(51L));
-      assertEquals(batchPaths.get(1), resolver.resolvePath(52L));
+      assertEquals("to-name", toResolver.resolvePaths(Collections.singletonList(40L)).get(0));
+      assertEquals("from-name", fromResolver.resolvePaths(Collections.singletonList(40L)).get(0));
     }
   }
 
@@ -182,6 +193,6 @@ class TestSnapDiffPathResolver {
 
   private static SnapDiffJobStore newStore() throws IOException {
     return SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
-        "path-resolver-" + JOB_ID.incrementAndGet(), true, SnapDiffJobStore.Mode.FULL);
+        "path-resolver-" + JOB_ID.incrementAndGet(), true, snapDiffReportCfh, null, null);
   }
 }

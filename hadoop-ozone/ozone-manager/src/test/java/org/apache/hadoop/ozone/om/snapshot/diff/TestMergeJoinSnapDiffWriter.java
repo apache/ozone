@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.CREATE
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.DELETE;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.MODIFY;
 import static org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType.RENAME;
+import static org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter.writeReport;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone.getDiffReportEntryCodec;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,6 +56,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -72,6 +76,7 @@ class TestMergeJoinSnapDiffWriter {
   private static ManagedDBOptions dbOptions;
   private static ManagedColumnFamilyOptions columnFamilyOptions;
   private static CodecRegistry codecRegistry;
+  private static ColumnFamilyHandle snapDiffReportCfh;
 
   @BeforeAll
   static void init() throws RocksDBException {
@@ -87,6 +92,8 @@ class TestMergeJoinSnapDiffWriter {
         Collections.singletonList(new ColumnFamilyDescriptor(
             StringUtils.string2Bytes("default"), columnFamilyOptions)),
         handles);
+    snapDiffReportCfh = db.get().createColumnFamily(
+        new ColumnFamilyDescriptor(StringUtils.string2Bytes("snap-diff-report"), columnFamilyOptions));
   }
 
   @AfterAll
@@ -117,12 +124,18 @@ class TestMergeJoinSnapDiffWriter {
       store.putOldList(50L, entry(0L, "modified", false, sig));
       store.flushWrites();
 
-      List<DiffReportEntry> entries = runWriteReport(store, BUCKET_OBJECT_ID, false);
+      // dependency ordering flag is not relevant for OBS entries
+      List<DiffReportEntry> entries = runWriteReport(store, BUCKET_OBJECT_ID, false, true);
       assertEquals(4, entries.size());
-      assertTrue(containsType(entries, CREATE));
-      assertTrue(containsType(entries, DELETE));
-      assertTrue(containsType(entries, RENAME));
-      assertTrue(containsType(entries, MODIFY));
+      assertEquals(DELETE, entries.get(0).getType());
+      assertEquals("deleted", new String(entries.get(0).getSourcePath(), StandardCharsets.UTF_8));
+      assertEquals(MODIFY, entries.get(1).getType());
+      assertEquals("modified", new String(entries.get(1).getSourcePath(), StandardCharsets.UTF_8));
+      assertEquals(RENAME, entries.get(2).getType());
+      assertEquals("oldname", new String(entries.get(2).getSourcePath(), StandardCharsets.UTF_8));
+      assertEquals("newname", new String(entries.get(2).getTargetPath(), StandardCharsets.UTF_8));
+      assertEquals(CREATE, entries.get(3).getType());
+      assertEquals("created", new String(entries.get(3).getSourcePath(), StandardCharsets.UTF_8));
     }
   }
 
@@ -136,7 +149,7 @@ class TestMergeJoinSnapDiffWriter {
       store.putOldList(61L, entry(0L, "changed-meta", false, sig));
       store.flushWrites();
 
-      List<DiffReportEntry> entries = runWriteReport(store, BUCKET_OBJECT_ID, false);
+      List<DiffReportEntry> entries = runWriteReport(store, BUCKET_OBJECT_ID, false, false);
       assertTrue(entries.isEmpty());
     }
   }
@@ -150,7 +163,7 @@ class TestMergeJoinSnapDiffWriter {
 
       SnapshotDiffManager manager = mockManagerPassthroughDeletes();
       assertThrows(IOException.class,
-          () -> MergeJoinSnapDiffWriter.writeReport(manager, store, BUCKET_OBJECT_ID, false));
+          () -> writeReport(manager, store, BUCKET_OBJECT_ID, false, false));
     }
   }
 
@@ -160,14 +173,14 @@ class TestMergeJoinSnapDiffWriter {
     try (SnapDiffJobStore store = newStore(true)) {
       store.putFromEdge(BUCKET_OBJECT_ID, 100L, nameBytes("dirA"));
       store.putFromEdge(100L, 101L, nameBytes("dirB"));
-      store.putFromEdge(101L, 102L, nameBytes("fileC"));
       store.putOldList(100L, entry(BUCKET_OBJECT_ID, "dirA", true, sig));
       store.putOldList(101L, entry(100L, "dirB", true, sig));
       store.putOldList(102L, entry(101L, "fileC", false, sig));
       store.flushWrites();
 
       SnapshotDiffManager manager = mockManagerWithRealDeleteRetention();
-      List<DiffReportEntry> entries = runWriteReportWithManager(store, BUCKET_OBJECT_ID, true, manager);
+      List<DiffReportEntry> entries = runWriteReportWithManager(store, BUCKET_OBJECT_ID, true,
+          manager, false);
       assertEquals(1, entries.size());
       assertEquals(DELETE, entries.get(0).getType());
       assertEquals("dirA", new String(entries.get(0).getSourcePath(), StandardCharsets.UTF_8));
@@ -183,8 +196,7 @@ class TestMergeJoinSnapDiffWriter {
         long dirObjectId = 10_000L + i;
         long fileObjectId = 20_000L + i;
         store.putFromEdge(BUCKET_OBJECT_ID, dirObjectId, nameBytes("dir-" + i));
-        store.putFromEdge(dirObjectId, fileObjectId, nameBytes("file-" + i));
-        store.putOldList(fileObjectId, entry(dirObjectId, "dir-" + i + "/file-" + i, false, sig));
+        store.putOldList(fileObjectId, entry(dirObjectId, "file-" + i, false, sig));
       }
       store.flushWrites();
 
@@ -194,35 +206,64 @@ class TestMergeJoinSnapDiffWriter {
         return invocation.callRealMethod();
       }).when(store).multiGetFromEdgeValues(any());
 
-      MergeJoinSnapDiffWriter.writeReport(mockManagerWithRealDeleteRetention(), store,
-          BUCKET_OBJECT_ID, true);
+      long reportIndex = writeReport(mockManagerWithRealDeleteRetention(), store,
+          BUCKET_OBJECT_ID, true, false).getKey();
 
       assertEquals(2, multiGetCalls.get());
+      assertEquals(1001, reportIndex);
     }
   }
 
-  @Test
-  void testFsoPathResolutionAndOrdering() throws Exception {
-    byte[] sig = signature("s");
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testFsoPathResolutionAndOrdering(boolean ordering) throws Exception {
+    byte[] oldSig = signature("o");
+    byte[] newSig = signature("n");
     try (SnapDiffJobStore store = newStore(true)) {
-      store.putToEdge(BUCKET_OBJECT_ID, 200L, nameBytes("parent"));
-      store.putFromEdge(BUCKET_OBJECT_ID, 200L, nameBytes("parent"));
-      store.putToEdge(200L, 201L, nameBytes("child"));
-      store.putFromEdge(200L, 202L, nameBytes("gone"));
-      store.putNewList(201L, entry(200L, "child", false, sig));
-      store.putOldList(202L, entry(200L, "gone", false, sig));
+      store.putToEdge(BUCKET_OBJECT_ID, 203L, nameBytes("parent1"));
+      store.putToEdge(BUCKET_OBJECT_ID, 201L, nameBytes("parent2"));
+      store.putFromEdge(BUCKET_OBJECT_ID, 200L, nameBytes("parent1"));
+      store.putFromEdge(BUCKET_OBJECT_ID, 201L, nameBytes("parent2"));
+
+      store.putNewListPresentMarker(201L);
+      store.putNewList(203L, entry(BUCKET_OBJECT_ID, "parent1", true, newSig));
+      store.putNewList(204L, entry(203L, "child", false, newSig));
+      store.putNewList(202L, entry(201L, "child", false, newSig));
+
+      store.putOldList(200L, entry(BUCKET_OBJECT_ID, "parent1", true, oldSig));
+      store.putOldList(201L, entry(BUCKET_OBJECT_ID, "parent2", true, null));
+      store.putOldList(202L, entry(200L, "child", false, oldSig));
+
       store.flushWrites();
 
-      List<DiffReportEntry> entries = runWriteReport(store, BUCKET_OBJECT_ID, true);
-      assertEquals(2, entries.size());
-      DiffReportEntry create = entries.stream()
-          .filter(e -> e.getType() == CREATE).findFirst()
-          .orElseThrow(() -> new AssertionError("missing CREATE"));
-      DiffReportEntry delete = entries.stream()
-          .filter(e -> e.getType() == DELETE).findFirst()
-          .orElseThrow(() -> new AssertionError("missing DELETE"));
-      assertEquals("parent/child", new String(create.getSourcePath(), StandardCharsets.UTF_8));
-      assertEquals("parent/gone", new String(delete.getSourcePath(), StandardCharsets.UTF_8));
+      List<DiffReportEntry> entries = runWriteReport(store, BUCKET_OBJECT_ID, true, ordering);
+      assertEquals(5, entries.size());
+      if (ordering) {
+        assertEquals(MODIFY, entries.get(0).getType());
+        assertEquals("parent1/child", new String(entries.get(0).getSourcePath(), StandardCharsets.UTF_8));
+        assertEquals(RENAME, entries.get(1).getType());
+        assertEquals("parent1/child", new String(entries.get(1).getSourcePath(), StandardCharsets.UTF_8));
+        assertEquals("parent2/child", new String(entries.get(1).getTargetPath(), StandardCharsets.UTF_8));
+        assertEquals(DELETE, entries.get(2).getType());
+        assertEquals("parent1", new String(entries.get(2).getSourcePath(), StandardCharsets.UTF_8));
+        assertEquals(CREATE, entries.get(3).getType());
+        assertEquals("parent1", new String(entries.get(3).getSourcePath(), StandardCharsets.UTF_8));
+        assertEquals(CREATE, entries.get(4).getType());
+        assertEquals("parent1/child", new String(entries.get(4).getSourcePath(), StandardCharsets.UTF_8));
+      } else {
+        assertEquals(DELETE, entries.get(0).getType());
+        assertEquals("parent1", new String(entries.get(0).getSourcePath(), StandardCharsets.UTF_8));
+        assertEquals(MODIFY, entries.get(1).getType());
+        assertEquals("parent1/child", new String(entries.get(1).getSourcePath(), StandardCharsets.UTF_8));
+        assertEquals(RENAME, entries.get(2).getType());
+        assertEquals("parent1/child", new String(entries.get(2).getSourcePath(), StandardCharsets.UTF_8));
+        assertEquals("parent2/child", new String(entries.get(2).getTargetPath(), StandardCharsets.UTF_8));
+        assertEquals(CREATE, entries.get(3).getType());
+        assertEquals("parent1", new String(entries.get(3).getSourcePath(), StandardCharsets.UTF_8));
+        assertEquals(CREATE, entries.get(4).getType());
+        assertEquals("parent1/child", new String(entries.get(4).getSourcePath(), StandardCharsets.UTF_8));
+      }
+
     }
   }
 
@@ -231,10 +272,10 @@ class TestMergeJoinSnapDiffWriter {
     byte[] sig = signature("s");
     SnapDiffJobStore store = spy(newStore(true));
     try (SnapDiffJobStore ignored = store) {
+      store.putToEdge(BUCKET_OBJECT_ID, 199L, nameBytes("parent"));
       for (long objectId = 200L; objectId < 1201L; objectId++) {
         String name = "child-" + objectId;
-        store.putToEdge(BUCKET_OBJECT_ID, objectId, nameBytes(name));
-        store.putNewList(objectId, entry(BUCKET_OBJECT_ID, name, false, sig));
+        store.putNewList(objectId, entry(199L, name, false, sig));
       }
       store.flushWrites();
 
@@ -244,7 +285,7 @@ class TestMergeJoinSnapDiffWriter {
         return invocation.callRealMethod();
       }).when(store).multiGetDependencyReportEntries(any());
 
-      MergeJoinSnapDiffWriter.writeReport(mockManagerPassthroughDeletes(), store,
+      writeReport(mockManagerPassthroughDeletes(), store,
           BUCKET_OBJECT_ID, true, true);
 
       assertEquals(2, batchLookups.get());
@@ -257,33 +298,28 @@ class TestMergeJoinSnapDiffWriter {
     SnapDiffJobStore store = spy(newStore(true, 1L));
     try (SnapDiffJobStore ignored = store) {
       store.putToEdge(BUCKET_OBJECT_ID, 200L, nameBytes("parent"));
-      store.putToEdge(200L, 201L, nameBytes("child1"));
-      store.putToEdge(200L, 202L, nameBytes("child2"));
       store.putNewList(201L, entry(200L, "child1", false, sig));
       store.putNewList(202L, entry(200L, "child2", false, sig));
       store.flushWrites();
 
-      SnapshotDiffManager manager = mockManagerPassthroughDeletes();
-      List<DiffReportEntry> captured = new ArrayList<>();
-      doAnswer(invocation -> {
-        captured.addAll(invocation.getArgument(0));
-        return invocation.callRealMethod();
-      }).when(store).putReportEntries(anyList());
+      writeReport(mockManagerPassthroughDeletes(), store,
+          BUCKET_OBJECT_ID, true, true);
 
-      MergeJoinSnapDiffWriter.writeReport(manager, store, BUCKET_OBJECT_ID, true, true);
-      assertEquals(2, captured.size());
-      verify(store, never()).putDependencyNodes(anyInt(), anyList());
+      List<DiffReportEntry> entries = store.readReportEntriesForTest();
+      assertEquals(2, entries.size());
+      verify(store, times(1)).putDependencyNode(anyInt(), any());
+      verify(store, never()).putOrderedReportEntries(anyList());
     }
   }
 
   private static List<DiffReportEntry> runWriteReport(SnapDiffJobStore store, long bucketObjectId,
-      boolean fso) throws Exception {
-    return runWriteReportWithManager(store, bucketObjectId, fso, mockManagerPassthroughDeletes());
+      boolean fso, boolean ordering) throws Exception {
+    return runWriteReportWithManager(store, bucketObjectId, fso, mockManagerPassthroughDeletes(), ordering);
   }
 
   private static List<DiffReportEntry> runWriteReportWithManager(SnapDiffJobStore store,
-      long bucketObjectId, boolean fso, SnapshotDiffManager manager) throws IOException {
-    MergeJoinSnapDiffWriter.writeReport(manager, store, bucketObjectId, fso);
+      long bucketObjectId, boolean fso, SnapshotDiffManager manager, boolean ordering) throws IOException {
+    writeReport(manager, store, bucketObjectId, fso, ordering);
     return store.readReportEntriesForTest();
   }
 
@@ -303,19 +339,13 @@ class TestMergeJoinSnapDiffWriter {
     return manager;
   }
 
-  private static boolean containsType(List<DiffReportEntry> entries,
-      org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType type) {
-    return entries.stream().anyMatch(e -> e.getType() == type);
-  }
-
   private static SnapDiffJobStore newStore(boolean fso) throws IOException {
     return newStore(fso, 1_000_000L);
   }
 
   private static SnapDiffJobStore newStore(boolean fso, long maxInMemoryEntries) throws IOException {
     return SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
-        jobName(), fso, SnapDiffJobStore.Mode.FULL, SnapDiffJobStore.DEFAULT_BATCH_SIZE,
-        maxInMemoryEntries, null);
+        jobName(), fso, snapDiffReportCfh, null, maxInMemoryEntries);
   }
 
   private static String jobName() {

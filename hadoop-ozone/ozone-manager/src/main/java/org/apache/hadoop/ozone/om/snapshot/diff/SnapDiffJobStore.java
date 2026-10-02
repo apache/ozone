@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot.diff;
 
+import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getReportKeyForIndex;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
@@ -78,9 +79,6 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /** Reverse edge value header: parentId (8 BE) + nameLen (4 BE). */
   static final int EDGE_LINK_HEADER_BYTES = Long.BYTES + Integer.BYTES;
 
-  /** Classified RENAME value length: sourceParentId + targetParentId. */
-  private static final int CLASSIFIED_RENAME_BYTES = 2 * Long.BYTES;
-
   private static final String NEW_LIST_SUFFIX = "-new-list";
   private static final String OLD_LIST_SUFFIX = "-old-list";
   private static final String CAND_IDS_SUFFIX = "-cand-ids";
@@ -91,24 +89,18 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private static final String CLASSIFIED_MODIFY_SUFFIX = "-cls-modify";
   private static final String CLASSIFIED_RENAME_SUFFIX = "-cls-rename";
   private static final String DEPENDENCY_NODE_SUFFIX = "-dependency-nodes";
-  private static final String DEP_ADJ_OFF_SUFFIX = "-dep-adj-off";
-  private static final String DEP_ADJ_TGT_SUFFIX = "-dep-adj-tgt";
-  private static final String DEP_IN_DEG_SUFFIX = "-dep-in-deg";
-  private static final String DEP_ORDER_SUFFIX = "-dep-order";
   private static final String DELETED_DIR_IDS_SUFFIX = "-deleted-dir-ids";
   private static final String RENAMED_DIR_IDS_SUFFIX = "-renamed-dir-ids";
-  private static final String REPORT_SUFFIX = "-report";
 
   private final ManagedRocksDB db;
   private final String jobId;
   private final boolean fso;
   private final CodecRegistry codecRegistry;
-  private ColumnFamilyHandle reportCfh;
-  private final boolean ownsReportColumnFamily;
+  private final ColumnFamilyHandle reportCfh;
   private final byte[] presentMarker;
   private final ManagedColumnFamilyOptions familyOptions;
-  private final ManagedColumnFamilyOptions tempColumnFamilyOptions;
   private final long maxInMemoryEntries;
+  private final List<ColumnFamilyHandle> temporaryColumnFamilies = new ArrayList<>();
 
   private ColumnFamilyHandle newListCf;
   private ColumnFamilyHandle oldListCf;
@@ -119,10 +111,6 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private ColumnFamilyHandle classifiedModifyCf;
   private ColumnFamilyHandle classifiedRenameCf;
   private ColumnFamilyHandle dependencyNodesCf;
-  private ColumnFamilyHandle depAdjOffCf;
-  private ColumnFamilyHandle depAdjTgtCf;
-  private ColumnFamilyHandle depInDegCf;
-  private ColumnFamilyHandle depOrderCf;
 
   private String diffCandCfName;
   private Set<Long> diffCandidates;
@@ -146,7 +134,6 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private long reportIndex;
   private String largestReportKey;
   private boolean reportWriteStarted;
-  private boolean temporaryColumnFamiliesDropped;
 
   /** Reusable big-endian key buffers; safe because RocksDB copies keys on put/get. */
   private final byte[] objectIdKeyBuffer = new byte[Long.BYTES];
@@ -154,23 +141,22 @@ public final class SnapDiffJobStore implements AutoCloseable {
 
   /** Full diff: shared new/old lists plus FSO edge column families. */
   public enum Mode {
-    FULL
+    FULL,
+    DAG
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   private SnapDiffJobStore(ManagedRocksDB db, String jobId, CodecRegistry codecRegistry, boolean fso,
       int writeBatchSize, ManagedColumnFamilyOptions familyOptions, long maxInMemoryEntries,
-      @Nullable ColumnFamilyHandle reportCfh) throws IOException {
+      @Nonnull ColumnFamilyHandle reportCfh) throws IOException {
     this.db = db;
     this.jobId = jobId;
     this.fso = fso;
     this.codecRegistry = codecRegistry;
     this.reportCfh = reportCfh;
-    this.ownsReportColumnFamily = reportCfh == null;
     this.writeBatchSize = writeBatchSize;
     this.familyOptions = familyOptions;
-    this.tempColumnFamilyOptions = new ManagedColumnFamilyOptions(familyOptions);
-    this.tempColumnFamilyOptions.setDisableAutoCompactions(true);
+    this.familyOptions.setDisableAutoCompactions(true);
     this.maxInMemoryEntries = maxInMemoryEntries;
     this.presentMarker = codecRegistry.asRawData(Boolean.TRUE);
     this.writeBatch = new ManagedWriteBatch();
@@ -181,55 +167,20 @@ public final class SnapDiffJobStore implements AutoCloseable {
     this.renamedDirectoryIds = new HashSet<>();
   }
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public static SnapDiffJobStore open(@Nonnull ManagedRocksDB db,
       @Nonnull CodecRegistry codecRegistry,
       @Nonnull ManagedColumnFamilyOptions familyOptions,
       @Nonnull String jobId,
       boolean fso,
-      @Nonnull Mode mode) throws IOException {
-    return open(db, codecRegistry, familyOptions, jobId, fso, mode, DEFAULT_BATCH_SIZE,
-        OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT);
-  }
-
-  public static SnapDiffJobStore open(@Nonnull ManagedRocksDB db,
-      @Nonnull CodecRegistry codecRegistry,
-      @Nonnull ManagedColumnFamilyOptions familyOptions,
-      @Nonnull String jobId,
-      boolean fso,
-      @Nonnull Mode mode,
-      int writeBatchSize) throws IOException {
-    return open(db, codecRegistry, familyOptions, jobId, fso, mode, writeBatchSize,
-        OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT);
-  }
-
-  @SuppressWarnings("parameternumber")
-  public static SnapDiffJobStore open(@Nonnull ManagedRocksDB db,
-      @Nonnull CodecRegistry codecRegistry,
-      @Nonnull ManagedColumnFamilyOptions familyOptions,
-      @Nonnull String jobId,
-      boolean fso,
-      @Nonnull Mode mode,
-      int writeBatchSize,
-      long maxInMemoryEntries) throws IOException {
-    return open(db, codecRegistry, familyOptions, jobId, fso, mode, writeBatchSize,
-        maxInMemoryEntries, null);
-  }
-
-  @SuppressWarnings("parameternumber")
-  public static SnapDiffJobStore open(@Nonnull ManagedRocksDB db,
-      @Nonnull CodecRegistry codecRegistry,
-      @Nonnull ManagedColumnFamilyOptions familyOptions,
-      @Nonnull String jobId,
-      boolean fso,
-      @Nonnull Mode mode,
-      int writeBatchSize,
-      long maxInMemoryEntries,
-      @Nullable ColumnFamilyHandle reportCfh) throws IOException {
-    if (mode != Mode.FULL) {
-      throw new IllegalArgumentException("Unsupported mode: " + mode);
-    }
-    SnapDiffJobStore store = new SnapDiffJobStore(db, jobId, codecRegistry, fso, writeBatchSize,
-        familyOptions, maxInMemoryEntries, reportCfh);
+      @Nonnull ColumnFamilyHandle reportCfh,
+      @Nullable Integer writeBatchSize,
+      @Nullable Long maxInMemoryEntries) throws IOException {
+    int resolvedWriteBatchSize = writeBatchSize != null ? writeBatchSize : DEFAULT_BATCH_SIZE;
+    long resolvedMaxInMemoryEntries = maxInMemoryEntries != null ? maxInMemoryEntries
+        : OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT;
+    SnapDiffJobStore store = new SnapDiffJobStore(db, jobId, codecRegistry, fso, resolvedWriteBatchSize,
+        familyOptions, resolvedMaxInMemoryEntries, reportCfh);
     try {
       store.initColumnFamilies(familyOptions);
       return store;
@@ -243,20 +194,22 @@ public final class SnapDiffJobStore implements AutoCloseable {
     return maxInMemoryEntries;
   }
 
-  /** Marks job-scoped column families already dropped by the merge-join writer. */
-  void markTemporaryColumnFamiliesDropped() {
-    temporaryColumnFamiliesDropped = true;
+  int getWriteBatchSize() {
+    return writeBatchSize;
   }
 
   /** Returns report entries written during a test run. */
   List<DiffReportEntry> readReportEntriesForTest() throws IOException {
-    if (reportCfh == null) {
-      return Collections.emptyList();
-    }
     List<DiffReportEntry> entries = new ArrayList<>();
     try (ManagedRocksIterator iterator = new ManagedRocksIterator(db.get().newIterator(reportCfh))) {
-      for (iterator.get().seekToFirst(); iterator.get().isValid(); iterator.get().next()) {
+      iterator.get().seek(codecRegistry.asRawData(jobId));
+      while (iterator.get().isValid()) {
+        String key = codecRegistry.asObject(iterator.get().key(), String.class);
+        if (!key.startsWith(jobId)) {
+          break;
+        }
         entries.add(codecRegistry.asObject(iterator.get().value(), DiffReportEntry.class));
+        iterator.get().next();
       }
     }
     return entries;
@@ -318,13 +271,17 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /** Builds a from-snapshot path resolver over the reverse edge index. */
   SnapDiffPathResolver newFromPathResolver(long bucketObjectId) {
     requireFso();
-    return new SnapDiffPathResolver(db, fromEdgesCf, bucketObjectId);
+    return new SnapDiffPathResolver(db, fromEdgesCf, bucketObjectId, pathResolverLruCapacity());
   }
 
   /** Builds a to-snapshot path resolver over the reverse edge index. */
   SnapDiffPathResolver newToPathResolver(long bucketObjectId) {
     requireFso();
-    return new SnapDiffPathResolver(db, toEdgesCf, bucketObjectId);
+    return new SnapDiffPathResolver(db, toEdgesCf, bucketObjectId, pathResolverLruCapacity());
+  }
+
+  private int pathResolverLruCapacity() {
+    return (int) maxInMemoryEntries / 2;
   }
 
   List<byte[]> multiGetFromEdgeValues(List<Long> objectIds) throws IOException {
@@ -335,12 +292,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     for (Long objectId : objectIds) {
       keys.add(objectIdKey(objectId));
     }
-    List<ColumnFamilyHandle> cfs = Collections.nCopies(objectIds.size(), fromEdgesCf);
-    try {
-      return db.get().multiGetAsList(cfs, keys);
-    } catch (RocksDBException e) {
-      throw new IOException(e);
-    }
+    return multiGet(db, fromEdgesCf, keys);
   }
 
   public List<Long> multiGetFromParentIds(List<Long> objectIds) throws IOException {
@@ -361,16 +313,16 @@ public final class SnapDiffJobStore implements AutoCloseable {
   void dropClassifiedColumnFamily(DiffType diffType) {
     switch (diffType) {
     case CREATE:
-      classifiedCreateCf = dropAndClose(classifiedCreateCf);
+      dropAndClose(classifiedCreateCf);
       break;
     case DELETE:
-      classifiedDeleteCf = dropAndClose(classifiedDeleteCf);
+      dropAndClose(classifiedDeleteCf);
       break;
     case MODIFY:
-      classifiedModifyCf = dropAndClose(classifiedModifyCf);
+      dropAndClose(classifiedModifyCf);
       break;
     case RENAME:
-      classifiedRenameCf = dropAndClose(classifiedRenameCf);
+      dropAndClose(classifiedRenameCf);
       break;
     default:
       throw new IllegalArgumentException("Unsupported diff type: " + diffType);
@@ -379,23 +331,19 @@ public final class SnapDiffJobStore implements AutoCloseable {
 
   /** Drops merge-join list column families after classification. */
   void dropListColumnFamilies() {
-    newListCf = dropAndClose(newListCf);
-    oldListCf = dropAndClose(oldListCf);
+    dropAndClose(newListCf);
+    dropAndClose(oldListCf);
   }
 
   /** Drops FSO reverse-edge column families after path resolution. */
   void dropEdgeColumnFamilies() {
-    toEdgesCf = dropAndClose(toEdgesCf);
-    fromEdgesCf = dropAndClose(fromEdgesCf);
+    dropAndClose(toEdgesCf);
+    dropAndClose(fromEdgesCf);
   }
 
   /** Drops persisted dependency-graph column families. */
   void dropDependencyGraphColumnFamilies() {
-    dependencyNodesCf = dropAndClose(dependencyNodesCf);
-    depAdjOffCf = dropAndClose(depAdjOffCf);
-    depAdjTgtCf = dropAndClose(depAdjTgtCf);
-    depInDegCf = dropAndClose(depInDegCf);
-    depOrderCf = dropAndClose(depOrderCf);
+    dropAndClose(dependencyNodesCf);
   }
 
   /** Ascending iterator over one classified column family. */
@@ -404,11 +352,9 @@ public final class SnapDiffJobStore implements AutoCloseable {
   }
 
   /** Writes dependency node entries starting at {@code startNodeIndex}. */
-  public void putDependencyNodes(int startNodeIndex, List<SnapDiffDependencyEntry> entries)
+  public void putDependencyNode(int nodeIndex, SnapDiffDependencyEntry entry)
       throws IOException {
-    for (int i = 0; i < entries.size(); i++) {
-      batchPut(dependencyNodesCf, intKeyBuffer(startNodeIndex + i), entries.get(i).toResolvedBytes());
-    }
+    batchPut(dependencyNodesCf, intKeyBuffer(nodeIndex), entry.toResolvedBytes());
   }
 
   /** Ascending iterator over the dependency-node column family. */
@@ -423,52 +369,18 @@ public final class SnapDiffJobStore implements AutoCloseable {
     }
     List<byte[]> keys = new ArrayList<>(nodeIndices.size());
     for (Integer nodeIndex : nodeIndices) {
-      keys.add(intValueBuffer(nodeIndex));
+      keys.add(intKey(nodeIndex));
     }
-    List<ColumnFamilyHandle> cfs = Collections.nCopies(nodeIndices.size(), dependencyNodesCf);
-    try {
-      List<byte[]> values = db.get().multiGetAsList(cfs, keys);
-      List<DiffReportEntry> reportEntries = new ArrayList<>(values.size());
-      for (int i = 0; i < values.size(); i++) {
-        byte[] value = values.get(i);
-        if (value == null) {
-          throw new IOException("Missing dependency node at index " + nodeIndices.get(i));
-        }
-        reportEntries.add(SnapDiffDependencyEntry.fromResolvedBytes(value).getReportEntry());
+    List<byte[]> values = multiGet(db, dependencyNodesCf, keys);
+    List<DiffReportEntry> reportEntries = new ArrayList<>(values.size());
+    for (int i = 0; i < values.size(); i++) {
+      byte[] value = values.get(i);
+      if (value == null) {
+        throw new IOException("Missing dependency node at index " + nodeIndices.get(i));
       }
-      return reportEntries;
-    } catch (RocksDBException e) {
-      throw new IOException(e);
+      reportEntries.add(SnapDiffDependencyEntry.fromResolvedBytes(value).getReportEntry());
     }
-  }
-
-  /** Persists CSR adjacency offset for {@code nodeIndex}. Key: 4-byte BE index. */
-  public void putDepAdjOffset(int nodeIndex, int offset) throws IOException {
-    batchPut(depAdjOffCf, intKeyBuffer(nodeIndex), intValueBuffer(offset));
-  }
-
-  /** Persists one CSR adjacency target. Key: 4-byte BE edge index. */
-  public void putDepAdjTarget(int edgeIndex, int targetNodeIndex) throws IOException {
-    batchPut(depAdjTgtCf, intKeyBuffer(edgeIndex), intValueBuffer(targetNodeIndex));
-  }
-
-  /** Persists in-degree for {@code nodeIndex}. Key: 4-byte BE index. */
-  public void putDepInDegree(int nodeIndex, int inDegree) throws IOException {
-    batchPut(depInDegCf, intKeyBuffer(nodeIndex), intValueBuffer(inDegree));
-  }
-
-  /** Persists topological order position {@code position -> nodeIndex}. */
-  public void putDepOrder(int position, int nodeIndex) throws IOException {
-    batchPut(depOrderCf, intKeyBuffer(position), intValueBuffer(nodeIndex));
-  }
-
-  /** Reads one node index from the persisted topological order. */
-  public int getDepOrderNodeIndex(int position) throws IOException {
-    byte[] value = get(depOrderCf, intKeyBuffer(position));
-    if (value == null || value.length < Integer.BYTES) {
-      throw new IOException("Missing dependency order entry at position " + position);
-    }
-    return decodeInt(value, 0);
+    return reportEntries;
   }
 
   /**
@@ -502,7 +414,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
   public void clearDiffCandidates() throws IOException {
     diffCandidates.clear();
     if (diffCandidatesSpilled) {
-      diffCandidatesCf = dropAndClose(diffCandidatesCf);
+      dropAndClose(diffCandidatesCf);
       diffCandidatesSpilled = false;
     }
   }
@@ -563,10 +475,10 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /** Drops directory-id sets after delete filtering completes. */
   void dropDirectoryIdColumnFamilies() {
     deletedDirectoryIds.clear();
-    deletedDirectoryIdsCf = dropAndClose(deletedDirectoryIdsCf);
+    dropAndClose(deletedDirectoryIdsCf);
     deletedDirectoryIdsSpilled = false;
     renamedDirectoryIds.clear();
-    renamedDirectoryIdsCf = dropAndClose(renamedDirectoryIdsCf);
+    dropAndClose(renamedDirectoryIdsCf);
     renamedDirectoryIdsSpilled = false;
   }
 
@@ -587,9 +499,6 @@ public final class SnapDiffJobStore implements AutoCloseable {
    * Starts batched emission of resolved rows to the snap diff report table.
    */
   public void beginReportWrite() {
-    if (reportCfh == null) {
-      throw new IllegalStateException("Snap diff report column family not configured for job store");
-    }
     if (reportWriteStarted) {
       throw new IllegalStateException("Snap diff report write already started for job " + jobId);
     }
@@ -621,6 +530,19 @@ public final class SnapDiffJobStore implements AutoCloseable {
   }
 
   /**
+   * Appends a batch of resolved and ordered {@link DiffReportEntry}s to the snap diff report table.
+   */
+  public void putOrderedReportEntries(List<DiffReportEntry> entries) throws IOException {
+    if (!reportWriteStarted) {
+      throw new IllegalStateException("Snap diff report write not started for job " + jobId);
+    }
+    for (DiffReportEntry entry : entries) {
+      String jobReportKey = getReportKeyForIndex(jobId, leftPad(String.valueOf(reportIndex++), 21, '0'));
+      putReportEntry(jobReportKey, entry);
+    }
+  }
+
+  /**
    * Flushes pending report rows and returns the entry count and largest report key.
    */
   public Pair<Long, String> finishReportWrite() throws IOException {
@@ -642,14 +564,12 @@ public final class SnapDiffJobStore implements AutoCloseable {
     return intKeyBuffer;
   }
 
-  private byte[] intValueBuffer(int value) {
-    byte[] buffer = new byte[Integer.BYTES];
-    encodeInt(buffer, 0, value);
-    return buffer;
-  }
-
   private void appendReportEntry(DiffReportEntry entry) throws IOException {
     String jobReportKey = getReportKeyForIndex(jobId, entry.getType(), reportIndex++);
+    putReportEntry(jobReportKey, entry);
+  }
+
+  private void putReportEntry(String jobReportKey, DiffReportEntry entry) throws IOException {
     batchPut(reportCfh, codecRegistry.asRawData(jobReportKey), codecRegistry.asRawData(entry));
     if (jobReportKey.compareTo(largestReportKey) > 0) {
       largestReportKey = jobReportKey;
@@ -692,20 +612,13 @@ public final class SnapDiffJobStore implements AutoCloseable {
     classifiedModifyCf = createColumnFamily(this.jobId + CLASSIFIED_MODIFY_SUFFIX);
     classifiedRenameCf = createColumnFamily(this.jobId + CLASSIFIED_RENAME_SUFFIX);
     dependencyNodesCf = createColumnFamily(this.jobId + DEPENDENCY_NODE_SUFFIX);
-    depAdjOffCf = createColumnFamily(this.jobId + DEP_ADJ_OFF_SUFFIX);
-    depAdjTgtCf = createColumnFamily(this.jobId + DEP_ADJ_TGT_SUFFIX);
-    depInDegCf = createColumnFamily(this.jobId + DEP_IN_DEG_SUFFIX);
-    depOrderCf = createColumnFamily(this.jobId + DEP_ORDER_SUFFIX);
     if (fso) {
       toEdgesCf = createColumnFamily(this.jobId + TO_EDGES_SUFFIX);
       fromEdgesCf = createColumnFamily(this.jobId + FROM_EDGES_SUFFIX);
     }
-    if (ownsReportColumnFamily) {
-      reportCfh = createColumnFamily(this.jobId + REPORT_SUFFIX);
-    }
   }
 
-  private void spillDiffCandidates() throws IOException {
+  void spillDiffCandidates() throws IOException {
     try {
       diffCandidatesCf = createColumnFamily(diffCandCfName);
     } catch (RocksDBException e) {
@@ -773,8 +686,10 @@ public final class SnapDiffJobStore implements AutoCloseable {
   }
 
   private ColumnFamilyHandle createColumnFamily(String name) throws RocksDBException {
-    return db.get().createColumnFamily(
-        new ColumnFamilyDescriptor(StringUtils.string2Bytes(name), tempColumnFamilyOptions));
+    ColumnFamilyHandle handle = db.get().createColumnFamily(
+        new ColumnFamilyDescriptor(StringUtils.string2Bytes(name), familyOptions));
+    temporaryColumnFamilies.add(handle);
+    return handle;
   }
 
   private void requireFso() {
@@ -788,30 +703,9 @@ public final class SnapDiffJobStore implements AutoCloseable {
     flushWrites();
     writeBatch.close();
     writeOptions.close();
-    if (temporaryColumnFamiliesDropped) {
-      tempColumnFamilyOptions.close();
-      return;
+    while (!temporaryColumnFamilies.isEmpty()) {
+      dropAndClose(temporaryColumnFamilies.get(0));
     }
-    newListCf = dropAndClose(newListCf);
-    oldListCf = dropAndClose(oldListCf);
-    diffCandidatesCf = dropAndClose(diffCandidatesCf);
-    deletedDirectoryIdsCf = dropAndClose(deletedDirectoryIdsCf);
-    renamedDirectoryIdsCf = dropAndClose(renamedDirectoryIdsCf);
-    toEdgesCf = dropAndClose(toEdgesCf);
-    fromEdgesCf = dropAndClose(fromEdgesCf);
-    classifiedCreateCf = dropAndClose(classifiedCreateCf);
-    classifiedDeleteCf = dropAndClose(classifiedDeleteCf);
-    classifiedModifyCf = dropAndClose(classifiedModifyCf);
-    classifiedRenameCf = dropAndClose(classifiedRenameCf);
-    dependencyNodesCf = dropAndClose(dependencyNodesCf);
-    depAdjOffCf = dropAndClose(depAdjOffCf);
-    depAdjTgtCf = dropAndClose(depAdjTgtCf);
-    depInDegCf = dropAndClose(depInDegCf);
-    depOrderCf = dropAndClose(depOrderCf);
-    if (ownsReportColumnFamily) {
-      reportCfh = dropAndClose(reportCfh);
-    }
-    tempColumnFamilyOptions.close();
   }
 
   private void closeQuietly() {
@@ -822,13 +716,13 @@ public final class SnapDiffJobStore implements AutoCloseable {
     }
   }
 
-  private ColumnFamilyHandle dropAndClose(ColumnFamilyHandle handle) {
+  private void dropAndClose(ColumnFamilyHandle handle) {
     if (handle == null) {
-      return null;
+      return;
     }
+    temporaryColumnFamilies.remove(handle);
     dropColumnFamilyHandle(db, handle);
     handle.close();
-    return null;
   }
 
   /** Big-endian 8-byte objectId key used by {@code newList}/{@code oldList}. */
@@ -838,6 +732,31 @@ public final class SnapDiffJobStore implements AutoCloseable {
     return key;
   }
 
+  /** Big-endian 4-byte int key for multi-get lookups. */
+  static byte[] intKey(int value) {
+    byte[] key = new byte[Integer.BYTES];
+    encodeInt(key, 0, value);
+    return key;
+  }
+
+  static List<byte[]> multiGet(ManagedRocksDB db, ColumnFamilyHandle cf, List<byte[]> keys)
+      throws IOException {
+    if (keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<ColumnFamilyHandle> columnFamilies = Collections.nCopies(keys.size(), cf);
+    try {
+      List<byte[]> values = db.get().multiGetAsList(columnFamilies, keys);
+      if (values.size() != keys.size()) {
+        throw new IOException("RocksDB multiGet returned " + values.size()
+            + " values for " + keys.size() + " keys");
+      }
+      return values;
+    } catch (RocksDBException e) {
+      throw new IOException(e);
+    }
+  }
+
   static long decodeObjectId(byte[] key) {
     if (key.length < Long.BYTES) {
       throw new IllegalArgumentException("objectId key too short: " + key.length);
@@ -845,40 +764,31 @@ public final class SnapDiffJobStore implements AutoCloseable {
     return decodeLong(key, 0);
   }
 
-  /** Classified CREATE/DELETE/MODIFY value: {@code | parentId (8 BE) |}. */
-  static byte[] encodeClassifiedParent(long parentId) {
-    byte[] value = new byte[Long.BYTES];
-    encodeLong(value, 0, parentId);
+  /**
+   * Classified RENAME value: source edge link followed by target edge link, each in
+   * the same wire format as {@link #encodeEdgeLink(long, byte[])}.
+   */
+  static byte[] encodeClassifiedRename(long sourceParentId, byte[] sourceName,
+      long targetParentId, byte[] targetName) {
+    byte[] sourceLink = encodeEdgeLink(sourceParentId, sourceName);
+    byte[] targetLink = encodeEdgeLink(targetParentId, targetName);
+    byte[] value = new byte[sourceLink.length + targetLink.length];
+    System.arraycopy(sourceLink, 0, value, 0, sourceLink.length);
+    System.arraycopy(targetLink, 0, value, sourceLink.length, targetLink.length);
     return value;
   }
 
-  /** Classified RENAME value: {@code | sourceParentId (8 BE) | targetParentId (8 BE) |}. */
-  static byte[] encodeClassifiedRename(long sourceParentId, long targetParentId) {
-    byte[] value = new byte[CLASSIFIED_RENAME_BYTES];
-    encodeLong(value, 0, sourceParentId);
-    encodeLong(value, Long.BYTES, targetParentId);
-    return value;
+  static byte[] decodeClassifiedRenameSourceLink(byte[] bytes) {
+    int sourceLen = edgeLinkByteLength(bytes, 0);
+    return Arrays.copyOfRange(bytes, 0, sourceLen);
   }
 
-  static long decodeClassifiedParent(byte[] bytes) {
-    if (bytes.length < Long.BYTES) {
-      throw new IllegalArgumentException("Classified parent value too short: " + bytes.length);
+  static byte[] decodeClassifiedRenameTargetLink(byte[] bytes) {
+    int sourceLen = edgeLinkByteLength(bytes, 0);
+    if (bytes.length <= sourceLen) {
+      throw new IllegalArgumentException("Classified rename value missing target link");
     }
-    return decodeLong(bytes, 0);
-  }
-
-  static long decodeClassifiedRenameSourceParent(byte[] bytes) {
-    if (bytes.length < CLASSIFIED_RENAME_BYTES) {
-      throw new IllegalArgumentException("Classified rename value too short: " + bytes.length);
-    }
-    return decodeLong(bytes, 0);
-  }
-
-  static long decodeClassifiedRenameTargetParent(byte[] bytes) {
-    if (bytes.length < CLASSIFIED_RENAME_BYTES) {
-      throw new IllegalArgumentException("Classified rename value too short: " + bytes.length);
-    }
-    return decodeLong(bytes, Long.BYTES);
+    return Arrays.copyOfRange(bytes, sourceLen, bytes.length);
   }
 
   /** Reverse edge value: {@code | parentId (8 BE) | nameLen (4 BE) | name |}. */
@@ -930,6 +840,18 @@ public final class SnapDiffJobStore implements AutoCloseable {
     return value;
   }
 
+  private static int edgeLinkByteLength(byte[] bytes, int offset) {
+    if (bytes == null || bytes.length - offset < EDGE_LINK_HEADER_BYTES) {
+      throw new IllegalArgumentException("Edge link value too short: "
+          + (bytes == null ? 0 : bytes.length - offset));
+    }
+    int nameLen = decodeInt(bytes, offset + Long.BYTES);
+    if (nameLen < 0 || nameLen > bytes.length - offset - EDGE_LINK_HEADER_BYTES) {
+      throw new IllegalArgumentException("Invalid edge link name length: " + nameLen);
+    }
+    return EDGE_LINK_HEADER_BYTES + nameLen;
+  }
+
   private static byte[] decodeEdgeLinkNameBytes(byte[] bytes) {
     if (bytes == null || bytes.length < EDGE_LINK_HEADER_BYTES) {
       throw new IllegalArgumentException("Edge link value too short: "
@@ -949,7 +871,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     private final ManagedRocksIterator iterator;
     private Map.Entry<Long, byte[]> next;
 
-    private ListIterator(ColumnFamilyHandle cf) throws RocksDatabaseException {
+    private ListIterator(ColumnFamilyHandle cf) {
       this.iterator = new ManagedRocksIterator(db.get().newIterator(cf));
       iterator.get().seekToFirst();
       advance();

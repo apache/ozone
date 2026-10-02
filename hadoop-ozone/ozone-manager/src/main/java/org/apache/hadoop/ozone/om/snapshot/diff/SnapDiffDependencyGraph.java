@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.snapshot.diff;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -221,28 +220,6 @@ public final class SnapDiffDependencyGraph {
       reportEntries.add(entry.getReportEntry());
     }
     return reportEntries;
-  }
-
-  /**
-   * Persists CSR adjacency and topological order into the job store. Keys use
-   * 4-byte big-endian node or edge indices so iterators read in emission order.
-   */
-  void persistToStore(SnapDiffJobStore store, List<Integer> orderedNodeIds)
-      throws IOException {
-    int nodeCount = nodes.size();
-    for (int i = 0; i < nodeCount; i++) {
-      store.putDepAdjOffset(i, adjOffsets[i]);
-      store.putDepInDegree(i, inDegree[i]);
-    }
-    for (int i = 0; i < adjTargets.length; i++) {
-      store.putDepAdjTarget(i, adjTargets[i]);
-    }
-    if (orderedNodeIds.size() != nodeCount) {
-      throw new IllegalStateException("Ordered node id count does not match dependency graph");
-    }
-    for (int position = 0; position < orderedNodeIds.size(); position++) {
-      store.putDepOrder(position, orderedNodeIds.get(position));
-    }
   }
 
   private void addEdge(int fromNodeId, int toNodeId) {

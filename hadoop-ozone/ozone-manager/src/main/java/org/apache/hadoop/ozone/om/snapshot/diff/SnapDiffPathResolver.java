@@ -23,14 +23,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
 
 /**
  * Resolves bucket-relative paths by walking reverse edge links upward from each
@@ -43,26 +40,29 @@ final class SnapDiffPathResolver {
   private final ManagedRocksDB db;
   private final ColumnFamilyHandle edgesCf;
   private final long bucketObjectId;
+  private final int lruCapacity;
   private final LinkedHashMap<Long, String> pathCache;
 
   SnapDiffPathResolver(ManagedRocksDB db, ColumnFamilyHandle edgesCf, long bucketObjectId) {
+    this(db, edgesCf, bucketObjectId, DEFAULT_LRU_CAPACITY);
+  }
+
+  SnapDiffPathResolver(ManagedRocksDB db, ColumnFamilyHandle edgesCf, long bucketObjectId,
+      int lruCapacity) {
     this.db = db;
     this.edgesCf = edgesCf;
     this.bucketObjectId = bucketObjectId;
-    this.pathCache = new LinkedHashMap<Long, String>(DEFAULT_LRU_CAPACITY, 0.75f, true) {
+    this.lruCapacity = lruCapacity > 0 ? lruCapacity : DEFAULT_LRU_CAPACITY;
+    this.pathCache = new LinkedHashMap<Long, String>(this.lruCapacity, 0.75f, true) {
       @Override
       protected boolean removeEldestEntry(Map.Entry<Long, String> eldest) {
-        return size() > DEFAULT_LRU_CAPACITY;
+        return size() > SnapDiffPathResolver.this.lruCapacity;
       }
     };
-    pathCache.put(bucketObjectId, "");
   }
 
-  String resolvePath(long objectId) throws IOException {
-    return resolvePath(objectId, null);
-  }
-
-  List<String> resolvePaths(List<Long> objectIds) throws IOException {
+  List<String> resolvePaths(List<Long> objectIds)
+      throws IOException {
     if (objectIds.isEmpty()) {
       return Collections.emptyList();
     }
@@ -90,47 +90,57 @@ final class SnapDiffPathResolver {
    * Walks the single-parent chain from {@code objectId} toward the bucket, then
    * materializes bucket-relative paths root-to-leaf for every uncached ancestor.
    */
-  private void populatePathCache(long objectId, Map<Long, byte[]> prefetchedEdges)
-      throws IOException {
+  private void populatePathCache(long objectId, Map<Long, byte[]> prefetchedEdges) {
     List<Long> chain = new ArrayList<>();
-    List<byte[]> linkValues = new ArrayList<>();
+    List<String> linkValues = new ArrayList<>();
     long current = objectId;
     while (current != bucketObjectId && !pathCache.containsKey(current)) {
-      byte[] value = getEdgeValue(current, prefetchedEdges);
+      byte[] value = prefetchedEdges.get(current);
       if (value == null) {
         return;
       }
       chain.add(current);
-      linkValues.add(value);
+      linkValues.add(SnapDiffJobStore.decodeEdgeLinkName(value));
       current = SnapDiffJobStore.decodeEdgeLinkParentId(value);
     }
-    String suffix = pathCache.get(current);
+    String suffix = current == bucketObjectId ? "" : pathCache.get(current);
     if (suffix == null) {
       return;
     }
     for (int i = chain.size() - 1; i >= 0; i--) {
-      String name = SnapDiffJobStore.decodeEdgeLinkName(linkValues.get(i));
-      suffix = suffix.isEmpty() ? name : suffix + OM_KEY_PREFIX + name;
+      suffix = suffix.isEmpty() ? linkValues.get(i) : suffix + OM_KEY_PREFIX + linkValues.get(i);
       pathCache.put(chain.get(i), suffix);
     }
   }
 
   private Map<Long, byte[]> prefetchEdgeChains(List<Long> objectIds) throws IOException {
     Map<Long, byte[]> prefetchedEdges = new HashMap<>();
-    Set<Long> toFetch = new HashSet<>();
+    List<Long> lookupIds = new ArrayList<>();
     for (Long objectId : objectIds) {
       if (objectId != bucketObjectId && !pathCache.containsKey(objectId)) {
-        toFetch.add(objectId);
+        lookupIds.add(objectId);
       }
     }
-    while (!toFetch.isEmpty()) {
-      List<Long> lookupIds = new ArrayList<>(toFetch);
-      List<byte[]> values = multiGetEdgeValues(lookupIds);
-      Set<Long> nextFetch = new HashSet<>();
-      for (int i = 0; i < lookupIds.size(); i++) {
-        long lookupId = lookupIds.get(i);
-        byte[] value = values.get(i);
-        prefetchedEdges.put(lookupId, value);
+    while (!lookupIds.isEmpty()) {
+      List<Long> dbLookupIds = new ArrayList<>();
+      for (Long lookupId : lookupIds) {
+        if (!prefetchedEdges.containsKey(lookupId)) {
+          dbLookupIds.add(lookupId);
+        }
+      }
+      if (!dbLookupIds.isEmpty()) {
+        List<byte[]> keys = new ArrayList<>(dbLookupIds.size());
+        for (Long lookupId : dbLookupIds) {
+          keys.add(SnapDiffJobStore.objectIdKey(lookupId));
+        }
+        List<byte[]> values = SnapDiffJobStore.multiGet(db, edgesCf, keys);
+        for (int i = 0; i < dbLookupIds.size(); i++) {
+          prefetchedEdges.put(dbLookupIds.get(i), values.get(i));
+        }
+      }
+      List<Long> nextFetch = new ArrayList<>();
+      for (Long lookupId : lookupIds) {
+        byte[] value = prefetchedEdges.get(lookupId);
         if (value != null) {
           long parent = SnapDiffJobStore.decodeEdgeLinkParentId(value);
           if (parent != bucketObjectId && !pathCache.containsKey(parent)
@@ -139,35 +149,16 @@ final class SnapDiffPathResolver {
           }
         }
       }
-      toFetch = nextFetch;
+      lookupIds = nextFetch;
     }
     return prefetchedEdges;
   }
 
-  private List<byte[]> multiGetEdgeValues(List<Long> objectIds) throws IOException {
-    if (objectIds.isEmpty()) {
-      return Collections.emptyList();
-    }
-    List<byte[]> keys = new ArrayList<>(objectIds.size());
-    for (Long objectId : objectIds) {
-      keys.add(SnapDiffJobStore.objectIdKey(objectId));
-    }
-    List<ColumnFamilyHandle> cfs = Collections.nCopies(objectIds.size(), edgesCf);
-    try {
-      return db.get().multiGetAsList(cfs, keys);
-    } catch (RocksDBException e) {
-      throw new IOException(e);
-    }
+  void clearPathCache() {
+    pathCache.clear();
   }
 
-  private byte[] getEdgeValue(long objectId, Map<Long, byte[]> prefetchedEdges) throws IOException {
-    if (prefetchedEdges != null && prefetchedEdges.containsKey(objectId)) {
-      return prefetchedEdges.get(objectId);
-    }
-    try {
-      return db.get().get(edgesCf, SnapDiffJobStore.objectIdKey(objectId));
-    } catch (RocksDBException e) {
-      throw new IOException(e);
-    }
+  boolean isPathCached(long objectId) {
+    return pathCache.containsKey(objectId);
   }
 }
