@@ -176,6 +176,14 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     return rcSnaps.peek();
   }
 
+  private UncheckedAutoCloseableSupplier<OmSnapshot> getCurrentSnapshot(SnapshotInfo snapshotInfo) throws IOException {
+    if (snapshotInfo == null) {
+      return null;
+    }
+    return om.getOmSnapshotManager().getActiveSnapshot(
+        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), snapshotInfo.getName());
+  }
+
   @Test
   @Order(2)
   public void testSnapshotSplitAndMove() throws Exception {
@@ -776,8 +784,7 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       KeyDeletingService.KeyDeletingTask task = kds.new KeyDeletingTask(snap3Id);
 
       CompletableFuture<?> kdsFuture = CompletableFuture.supplyAsync(() -> {
-        try (UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot =
-                 kdsRunningOnAOS ? null : om.getOmSnapshotManager().getActiveSnapshot(volume, bucket, "snap2")) {
+        try (UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot = getCurrentSnapshot(snapInfo)) {
           KeyManager keyManager = kdsRunningOnAOS ? om.getKeyManager() : currentSnapshot.get().getKeyManager();
           try (ReclaimableKeyFilter keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
                    snapshotChainManager, snapInfo, keyManager, om.getMetadataManager().getLock());
