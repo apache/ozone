@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -775,16 +776,16 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       KeyDeletingService.KeyDeletingTask task = kds.new KeyDeletingTask(snap3Id);
 
       CompletableFuture<?> kdsFuture = CompletableFuture.supplyAsync(() -> {
-        try (UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot = kdsRunningOnAOS ? null :
-                 om.getOmSnapshotManager().getActiveSnapshot(volume, bucket, "snap2");
-             ReclaimableKeyFilter keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
-                 snapshotChainManager, snapInfo,
-                 kdsRunningOnAOS ? om.getKeyManager() : currentSnapshot.get().getKeyManager(),
-                 om.getMetadataManager().getLock());
-             MockedConstruction<ReclaimableKeyFilter> mockedReclaimableFilter = getMockedReclaimableKeyFilter(
-                 ozoneBucket, kdsWaitStarted, sdsLockWaitStarted, sdsLockAcquired, kdsFinished, keyFilter,
-                 currentSnapshot)) {
-          return task.call();
+        try (UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot =
+                 kdsRunningOnAOS ? null : om.getOmSnapshotManager().getActiveSnapshot(volume, bucket, "snap2")) {
+          KeyManager keyManager = kdsRunningOnAOS ? om.getKeyManager() : currentSnapshot.get().getKeyManager();
+          try (ReclaimableKeyFilter keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
+                   snapshotChainManager, snapInfo, keyManager, om.getMetadataManager().getLock());
+               MockedConstruction<ReclaimableKeyFilter> mockedReclaimableFilter = getMockedReclaimableKeyFilter(
+                   ozoneBucket, kdsWaitStarted, sdsLockWaitStarted, sdsLockAcquired, kdsFinished, keyFilter,
+                   currentSnapshot)) {
+            return task.call();
+          }
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
