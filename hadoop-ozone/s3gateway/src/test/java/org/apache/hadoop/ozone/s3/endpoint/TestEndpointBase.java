@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests the s3 EndpointBase class methods.
@@ -274,6 +276,37 @@ public class TestEndpointBase {
         clientProtocol.getThreadLocalReadConsistency());
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"follower-stale", "follower-linearizable"})
+  public void testReadConsistencyHeaderUsesLeaderInSecureMode(
+      String readConsistency) {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
+        .thenReturn(readConsistency);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+
+    RootEndpoint endpoint = newRootEndpoint(headers, conf);
+
+    ClientProtocol clientProtocol =
+        endpoint.getClient().getObjectStore().getClientProxy();
+    assertEquals(ReadConsistency.LINEARIZABLE_LEADER_ONLY,
+        clientProtocol.getThreadLocalReadConsistency());
+  }
+
+  @Test
+  public void testReadConsistencyHeaderUnsetUsesLeaderInSecureMode() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+
+    RootEndpoint endpoint = newRootEndpoint(null, conf);
+
+    ClientProtocol clientProtocol =
+        endpoint.getClient().getObjectStore().getClientProxy();
+    assertEquals(ReadConsistency.LINEARIZABLE_LEADER_ONLY,
+        clientProtocol.getThreadLocalReadConsistency());
+  }
+
   @Test
   public void testReadConsistencyHeaderLeaderOnly() {
     HttpHeaders headers = mock(HttpHeaders.class);
@@ -347,12 +380,18 @@ public class TestEndpointBase {
   }
 
   private static RootEndpoint newRootEndpoint(HttpHeaders headers) {
+    return newRootEndpoint(headers, new OzoneConfiguration());
+  }
+
+  private static RootEndpoint newRootEndpoint(HttpHeaders headers,
+      OzoneConfiguration conf) {
     ClientProtocol clientProtocol = new ClientProtocolStub(null);
     ObjectStoreStub objectStore =
-        new ObjectStoreStub(new OzoneConfiguration(), clientProtocol);
+        new ObjectStoreStub(conf, clientProtocol);
     EndpointBuilder<RootEndpoint> builder = EndpointBuilder
         .newRootEndpointBuilder()
-        .setClient(new OzoneClientStub(objectStore));
+        .setClient(new OzoneClientStub(objectStore))
+        .setConfig(conf);
     if (headers != null) {
       builder.setHeaders(headers);
     }

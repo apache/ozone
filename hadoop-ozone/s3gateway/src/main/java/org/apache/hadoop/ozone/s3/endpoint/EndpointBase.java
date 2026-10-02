@@ -289,6 +289,13 @@ public abstract class EndpointBase {
     ReadConsistencyContext readConsistencyContext =
         ReadConsistencyContext.fromHeaders(getHeaders());
     ReadConsistency readConsistency = readConsistencyContext.getReadConsistency();
+    if (OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())) {
+      // S3 credential validation currently requires the OM leader so that
+      // revoked credentials are never accepted by a stale follower.
+      clientProtocol.setThreadLocalReadConsistency(
+          ReadConsistency.LINEARIZABLE_LEADER_ONLY);
+      return;
+    }
     if (readConsistency == null) {
       clientProtocol.clearThreadLocalReadConsistency();
     } else if (readConsistency == ReadConsistency.LOCAL_LEASE) {

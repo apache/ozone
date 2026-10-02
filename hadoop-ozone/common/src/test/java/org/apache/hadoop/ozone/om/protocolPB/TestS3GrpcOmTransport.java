@@ -406,6 +406,16 @@ public class TestS3GrpcOmTransport {
     assertEquals(0, followerRequestCount.get());
     assertEquals(ReadConsistencyProto.LINEARIZABLE_LEADER_ONLY,
         leaderRequest.get().getReadConsistencyHint().getReadConsistency());
+
+    client.submitRequest(OMRequest.newBuilder()
+        .setCmdType(Type.ListVolume)
+        .setVersion(CURRENT_VERSION)
+        .setClientId("test")
+        .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
+            .setReadConsistency(ReadConsistencyProto.LINEARIZABLE_ALLOW_FOLLOWER))
+        .build());
+
+    assertEquals(1, followerRequestCount.get());
   }
 
   @Test
