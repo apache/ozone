@@ -98,7 +98,11 @@ public class TestReconAsPassiveScm {
         return false;
       }
       for (Pipeline pipeline : scmPipelines) {
-        reconPipelineManager.getPipeline(pipeline.getId());
+        Pipeline reconPipeline =
+            reconPipelineManager.getPipeline(pipeline.getId());
+        if (reconPipeline == null) {
+          return false;
+        }
       }
       return true;
     });
