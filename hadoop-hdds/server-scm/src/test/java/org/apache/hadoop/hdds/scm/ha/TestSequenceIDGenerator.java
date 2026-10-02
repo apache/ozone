@@ -297,8 +297,9 @@ public class TestSequenceIDGenerator {
     LocalDate localTimezoneDate = LocalDate.of(2025, 12, 31);
     long simulatedUtcMillis = TimeUnit.DAYS.toMillis(utcDate.toEpochDay())
         + TimeUnit.HOURS.toMillis(6);
+    // UTC year is 2026; seed is Jan 2, 2027 (Jan 1 of next year + 1 day).
     long expectedLocalId = TimeUnit.DAYS.toMillis(
-        LocalDate.of(2027, 1, 1).toEpochDay()) << Short.SIZE;
+        LocalDate.of(2027, 1, 2).toEpochDay()) << Short.SIZE;
 
     try (MockedStatic<HddsUtils> mockedTime = mockStatic(HddsUtils.class);
          MockedStatic<LocalDate> mockedLocalDate = mockStatic(LocalDate.class, CALLS_REAL_METHODS)) {
@@ -306,9 +307,10 @@ public class TestSequenceIDGenerator {
       mockedLocalDate.when(() -> LocalDate.now(ZoneOffset.UTC)).thenReturn(utcDate);
       mockedLocalDate.when(LocalDate::now).thenReturn(localTimezoneDate);
 
-      long legacyLocalId = legacyInitialLocalId(localTimezoneDate.getYear());
+      long legacyLocalId = TimeUnit.DAYS.toMillis(
+          LocalDate.of(2026, 1, 1).toEpochDay()) << Short.SIZE;
       assertFalse(legacyLocalId > UniqueId.next(),
-          "pre-HDDS-14337 local timezone formula would fail the upgrade check");
+          "pre-HDDS-14337 local timezone year would fail the upgrade check");
 
       SequenceIdGenerator.upgradeToSequenceId(scmMetadataStore);
       Long initialLocalId = scmMetadataStore.getSequenceIdTable().get(SequenceIdType.localId);
@@ -320,11 +322,5 @@ public class TestSequenceIDGenerator {
       assertEquals(expectedLocalId + 1, sequenceIdGen.getNextId(SequenceIdType.localId));
       assertEquals(expectedLocalId + 2, sequenceIdGen.getNextId(SequenceIdType.localId));
     }
-  }
-
-  private static long legacyInitialLocalId(int currentYear) {
-    long millisSinceEpoch = TimeUnit.DAYS.toMillis(
-        LocalDate.of(currentYear + 1, 1, 1).toEpochDay());
-    return millisSinceEpoch << Short.SIZE;
   }
 }
