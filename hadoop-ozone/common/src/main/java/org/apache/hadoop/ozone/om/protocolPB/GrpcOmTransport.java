@@ -102,7 +102,7 @@ public class GrpcOmTransport implements OmTransport {
   private volatile boolean omServiceSupportsFollowerRead;
   private final ReadConsistencyHint followerReadConsistency;
   private final ReadConsistencyHint leaderReadConsistency;
-  private int currentFollowerReadIndex = -1;
+  private int currentFollowerReadIndex;
 
   public static void setCaCerts(List<X509Certificate> x509Certificates) {
     caCerts = x509Certificates;
@@ -227,7 +227,7 @@ public class GrpcOmTransport implements OmTransport {
     int failedCount = 0;
     for (int i = 0;
          i < omFailoverProxyProvider.getOMProxyMap().getNodeIds().size(); i++) {
-      String nodeId = getCurrentFollowerReadNodeId(readConsistency);
+      String nodeId = selectFollowerReadNodeId(readConsistency);
       if (nodeId == null) {
         break;
       }
@@ -327,14 +327,11 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   private synchronized String getCurrentFollowerReadNodeId() {
-    if (currentFollowerReadIndex < 0) {
-      currentFollowerReadIndex = 0;
-    }
     return new ArrayList<>(omFailoverProxyProvider.getOMProxyMap().getNodeIds())
         .get(currentFollowerReadIndex);
   }
 
-  private synchronized String getCurrentFollowerReadNodeId(
+  private synchronized String selectFollowerReadNodeId(
       ReadConsistency readConsistency) {
     String nodeId = getCurrentFollowerReadNodeId();
     if (readConsistency != ReadConsistency.LOCAL_LEASE) {
