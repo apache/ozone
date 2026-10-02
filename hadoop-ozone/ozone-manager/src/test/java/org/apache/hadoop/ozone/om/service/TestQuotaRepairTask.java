@@ -37,7 +37,6 @@ import static org.mockito.Mockito.when;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,6 +53,8 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -437,13 +438,13 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager, BucketLayout.OBJECT_STORE);
     // a zero tag is never valid protobuf
-    omMetadataManager.getStore().getTable(OMDBDefinition.DELETED_TABLE).put(
-        ("/" + volumeName + "/" + bucketName + "/badKey/1").getBytes(StandardCharsets.UTF_8), new byte[] {0});
+    String ozoneKey = omMetadataManager.getOzoneKey(volumeName, bucketName, "badKey");
+    omMetadataManager.getStore().getTable(OMDBDefinition.DELETED_TABLE, StringCodec.get(), ByteArrayCodec.get())
+        .put(omMetadataManager.getOzoneDeletePathKey(1L, ozoneKey), new byte[] {0});
     corruptSnapshotUsage(bucketName, 1L);
 
     assertFalse(awaitRepair(new QuotaRepairTask(ozoneManager).repair()));
     assertThat(QuotaRepairTask.getStatus()).contains("CodecException");
-    // the scan failed, so no partial counts reach the bucket
     assertNull(request.get());
   }
 
