@@ -176,12 +176,21 @@ public class TestSnapshotDeletingServiceIntegrationTest {
     return rcSnaps.peek();
   }
 
-  private UncheckedAutoCloseableSupplier<OmSnapshot> getCurrentSnapshot(SnapshotInfo snapshotInfo) throws IOException {
-    if (snapshotInfo == null) {
+  private UncheckedAutoCloseableSupplier<OmSnapshot> openCurrentSnapshot(boolean kdsRunningOnAOS, String volume,
+      String bucket) throws IOException {
+    if (kdsRunningOnAOS) {
       return null;
     }
-    return om.getOmSnapshotManager().getActiveSnapshot(
-        snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), snapshotInfo.getName());
+    return om.getOmSnapshotManager().getActiveSnapshot(volume, bucket, "snap2");
+  }
+
+  private ReclaimableKeyFilter createReclaimableKeyFilter(boolean kdsRunningOnAOS, SnapshotInfo snapInfo,
+      UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot) {
+    KeyManager keyManager = kdsRunningOnAOS ? om.getKeyManager() : currentSnapshot.get().getKeyManager();
+    SnapshotChainManager snapshotChainManager =
+        ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager();
+    return new ReclaimableKeyFilter(om, om.getOmSnapshotManager(), snapshotChainManager, snapInfo, keyManager,
+        om.getMetadataManager().getLock());
   }
 
   @Test
@@ -784,13 +793,12 @@ public class TestSnapshotDeletingServiceIntegrationTest {
       KeyDeletingService.KeyDeletingTask task = kds.new KeyDeletingTask(snap3Id);
 
       CompletableFuture<?> kdsFuture = CompletableFuture.supplyAsync(() -> {
-        try (UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot = getCurrentSnapshot(snapInfo)) {
-          KeyManager keyManager = kdsRunningOnAOS ? om.getKeyManager() : currentSnapshot.get().getKeyManager();
-          try (ReclaimableKeyFilter keyFilter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
-                   snapshotChainManager, snapInfo, keyManager, om.getMetadataManager().getLock());
-               MockedConstruction<ReclaimableKeyFilter> mockedReclaimableFilter = getMockedReclaimableKeyFilter(
-                   ozoneBucket, kdsWaitStarted, sdsLockWaitStarted, sdsLockAcquired, kdsFinished, keyFilter,
-                   currentSnapshot)) {
+        try (UncheckedAutoCloseableSupplier<OmSnapshot> currentSnapshot =
+                 openCurrentSnapshot(kdsRunningOnAOS, volume, bucket);
+             ReclaimableKeyFilter keyFilter = createReclaimableKeyFilter(kdsRunningOnAOS, snapInfo, currentSnapshot)) {
+          try (MockedConstruction<ReclaimableKeyFilter> mockedReclaimableFilter = getMockedReclaimableKeyFilter(
+              ozoneBucket, kdsWaitStarted, sdsLockWaitStarted, sdsLockAcquired, kdsFinished, keyFilter,
+              currentSnapshot)) {
             return task.call();
           }
         } catch (IOException e) {
