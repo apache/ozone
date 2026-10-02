@@ -111,6 +111,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EmptySource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -741,18 +742,21 @@ class TestObjectPut {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testCopyObjectReusesSourceKeyDetails(boolean streaming) throws Exception {
-    assertSucceeds(() -> putObject(CONTENT));
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  void testCopyObjectReusesSourceKeyDetails(boolean streamingUpload, boolean streamingCopy) throws Exception {
     objectEndpoint.init();
-    doReturn(streaming).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(streamingUpload).when(objectEndpoint).isDatastreamEnabled();
     doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    assertSucceeds(() -> putObject(CONTENT));
+
+    doReturn(streamingCopy).when(objectEndpoint).isDatastreamEnabled();
     ClientProtocol protocol = spy(objectEndpoint.getClientProtocol());
     doReturn(protocol).when(objectEndpoint).getClientProtocol();
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
 
     try (Response response = put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT)) {
       assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+      assertThat(((CopyObjectResponse) response.getEntity()).getETag()).isEqualTo("\"" + contentMd5Hex() + "\"");
     }
     assertKeyContent(destBucket, DEST_KEY, CONTENT);
     verify(protocol).getKeyDetails(bucket.getVolumeName(), BUCKET_NAME, KEY_NAME);
