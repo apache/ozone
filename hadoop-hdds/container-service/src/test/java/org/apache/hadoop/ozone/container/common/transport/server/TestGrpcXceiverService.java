@@ -98,21 +98,25 @@ class TestGrpcXceiverService {
   void idleStreamClosesBlockFileAndNextRequestReopensIt() throws Exception {
     File blockFile = Files.createFile(tempDir.resolve("block")).toFile();
     AtomicReference<RandomAccessFileChannel> channelRef = new AtomicReference<>();
-    service = new GrpcXceiverService(mockDispatcher(blockFile, channelRef, () -> { }), IDLE_TIMEOUT, "test-");
+    // Checked while the request is in flight: after onNext returns, the idle closer may already have run.
+    AtomicReference<Boolean> openInFlight = new AtomicReference<>();
+    Runnable recordOpen = () -> openInFlight.set(channelRef.get().isOpen());
+    service = new GrpcXceiverService(mockDispatcher(blockFile, channelRef, recordOpen), IDLE_TIMEOUT, "test-");
     StreamObserver<ContainerCommandResponseProto> responseObserver = mock(StreamObserver.class);
     StreamObserver<ContainerCommandRequestProto> requestObserver = service.send(responseObserver);
 
     requestObserver.onNext(readBlockRequest());
     RandomAccessFileChannel channel = channelRef.get();
     assertNotNull(channel);
-    assertTrue(channel.isOpen(), "block file should be open right after a request");
+    assertTrue(openInFlight.get(), "block file should be open while a request is served");
 
     GenericTestUtils.waitFor(() -> !channel.isOpen(), 20, 5000);
     verify(responseObserver, never()).onError(any());
     verify(responseObserver, never()).onCompleted();
 
+    openInFlight.set(null);
     requestObserver.onNext(readBlockRequest());
-    assertTrue(channel.isOpen(), "next request should reopen the block file");
+    assertTrue(openInFlight.get(), "next request should reopen the block file");
     GenericTestUtils.waitFor(() -> !channel.isOpen(), 20, 5000);
 
     requestObserver.onCompleted();
