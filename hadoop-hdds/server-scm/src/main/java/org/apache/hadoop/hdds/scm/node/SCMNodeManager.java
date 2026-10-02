@@ -1561,7 +1561,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
         }
       }
       LOG.debug("Datanode {} has no volumes with committed space >= {} bytes",
-          dnInfo.getID(), blockSize);
+          dnInfo, blockSize);
       return false;
     }
   }
@@ -1727,7 +1727,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       }
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-          dn.getID());
+          dn);
     }
     return 0;
   }
@@ -1736,7 +1736,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
     try {
       return nodeStateManager.getNode(dn).getHealthyVolumeCount();
     } catch (NodeNotFoundException e) {
-      LOG.warn("Failed to getHealthyVolumeCount, datanode {} not found.", dn.getID());
+      LOG.warn("Failed to getHealthyVolumeCount, datanode {} not found.", dn);
       return 0;
     }
   }
