@@ -377,13 +377,17 @@ public class TestQuotaRepairTask extends OMKeyRequestTests {
       omMetadataManager.getDeletedDirTable().put(omMetadataManager.getOzoneDeletePathKey(objectId,
           omMetadataManager.getOzonePathKey(volumeId, bucketId, bucketId, dirName)), dirInfo);
     }
+    // the scan reads keys only, so an undecodable value is still counted
+    omMetadataManager.getStore().getTable(OMDBDefinition.DELETED_DIR_TABLE, StringCodec.get(), ByteArrayCodec.get())
+        .put(omMetadataManager.getOzoneDeletePathKey(200L,
+            omMetadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "badDir")), new byte[] {0});
     String bucketKey = corruptSnapshotUsage(bucketName, 1L);
 
     applyQuotaRepair(request, 2L, bucketKey);
 
     OmBucketInfo repaired = omMetadataManager.getBucketTable().get(bucketKey);
     assertEquals(0, repaired.getSnapshotUsedBytes());
-    assertEquals(dirs, repaired.getSnapshotUsedNamespace());
+    assertEquals(dirs + 1, repaired.getSnapshotUsedNamespace());
   }
 
   @Test
