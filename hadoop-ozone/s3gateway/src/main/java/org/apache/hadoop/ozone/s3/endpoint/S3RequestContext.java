@@ -32,7 +32,6 @@ class S3RequestContext {
   private final EndpointBase endpoint;
   private S3GAction action;
   private OzoneVolume volume;
-  private String bucketName;
   private OzoneBucket bucket;
 
   S3RequestContext(EndpointBase endpoint, S3GAction action) {
@@ -61,9 +60,8 @@ class S3RequestContext {
   OzoneBucket getBucket(String name) throws IOException {
     if (bucket == null) {
       bucket = getVolume().getBucket(name);
-      bucketName = name;
     } else {
-      Preconditions.assertTrue(bucketName.equals(name), "Multiple buckets in one request are not supported");
+      Preconditions.assertEquals(bucket.getName(), name, "Multiple buckets in one request are not supported");
     }
     return bucket;
   }

@@ -44,6 +44,7 @@ class TestS3RequestContext {
     endpoint = mock(EndpointBase.class);
     volume = mock(OzoneVolume.class);
     bucket = mock(OzoneBucket.class);
+    when(bucket.getName()).thenReturn("bucket1");
     when(endpoint.getVolume()).thenReturn(volume);
     when(volume.getBucket("bucket1")).thenReturn(bucket);
     context = new S3RequestContext(endpoint, S3GAction.PUT_BUCKET_LIFECYCLE);
