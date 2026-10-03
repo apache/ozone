@@ -17,10 +17,18 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signatureInfo;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -30,18 +38,27 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.SignatureTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /**
@@ -207,6 +224,71 @@ public class TestEndpointBase {
     return Stream.of(
         RESERVED_USER_METADATA_KEY_PREFIX + "cache-control",
         RESERVED_USER_METADATA_KEY_PREFIX.toUpperCase(Locale.ROOT) + "cache-control");
+  }
+
+  static Stream<Arguments> signedChunkOmVersionCases() {
+    String payloadHash = SignatureTestUtils.sha256Hex(new byte[0], 0, 0);
+    return Stream.of(OzoneManagerVersion.DEFAULT_VERSION, OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS,
+        OzoneManagerVersion.S3_DERIVED_KEY, OzoneManagerVersion.FUTURE_VERSION).flatMap(version -> {
+          boolean unsupported = version.compareTo(OzoneManagerVersion.S3_DERIVED_KEY) < 0;
+          return Stream.of(
+              Arguments.of(version, true, true, STREAMING_AWS4_HMAC_SHA256_PAYLOAD, unsupported, true),
+              Arguments.of(version, true, true, STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER, unsupported, true),
+              Arguments.of(version, false, true, STREAMING_AWS4_HMAC_SHA256_PAYLOAD, false, true),
+              Arguments.of(version, false, true, STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER, false, true),
+              Arguments.of(version, true, false, STREAMING_AWS4_HMAC_SHA256_PAYLOAD, false, false),
+              Arguments.of(version, true, false, STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER, false, false),
+              Arguments.of(version, true, true, STREAMING_UNSIGNED_PAYLOAD_TRAILER, false, false),
+              Arguments.of(version, true, true, UNSIGNED_PAYLOAD, false, false),
+              Arguments.of(version, true, true, payloadHash, false, false));
+        });
+  }
+
+  @ParameterizedTest
+  @MethodSource("signedChunkOmVersionCases")
+  void testSignedChunksRequireSupportingOm(OzoneManagerVersion version, boolean secure, boolean signPayload,
+      String algorithm, boolean unsupported, boolean verificationRequired) throws Exception {
+    ClientProtocol protocol = mock(ClientProtocol.class);
+    when(protocol.getOmVersion()).thenReturn(version);
+    EndpointBase endpoint = new EndpointBase() {
+      @Override
+      protected ClientProtocol getClientProtocol() {
+        return protocol;
+      }
+    };
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, secure);
+    endpoint.setOzoneConfiguration(conf);
+    endpoint.setSignatureInfo(signatureInfo(signPayload));
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(algorithm);
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
+    endpoint.setHeaders(headers);
+
+    byte[] payload = "body".getBytes(StandardCharsets.UTF_8);
+    try (ByteArrayInputStream body = new ByteArrayInputStream(payload)) {
+      if (unsupported) {
+        OS3Exception ex = assertThrows(OS3Exception.class,
+            () -> endpoint.getS3ChunkInputStreamInfo(body, payload.length, "4", "key"));
+        assertThat(ex.getCode()).isEqualTo(S3ErrorTable.NOT_IMPLEMENTED.getCode());
+        assertThat(ex.getHttpCode()).isEqualTo(501);
+        assertThat(ex.getErrorMessage()).contains("Ozone Manager", "signed chunk verification");
+      } else {
+        EndpointBase.S3ChunkInputStreamInfo info = endpoint.getS3ChunkInputStreamInfo(body, payload.length, "4", "key");
+        try (MultiDigestInputStream stream = info.getMultiDigestInputStream()) {
+          assertThat(info.isChunkSignatureVerificationRequired()).isEqualTo(verificationRequired);
+          assertThat(info.getEffectiveLength()).isEqualTo(payload.length);
+          if (secure && verificationRequired) {
+            OS3Exception ex = assertThrows(OS3Exception.class, () -> endpoint.attachChunkValidator(info, "key", null));
+            assertThat(ex.getCode()).isEqualTo(S3ErrorTable.INTERNAL_ERROR.getCode());
+          } else {
+            endpoint.attachChunkValidator(info, "key", null);
+          }
+          assertThat(body.available()).isEqualTo(payload.length);
+        }
+      }
+      assertThat(body.available()).isEqualTo(payload.length);
+    }
   }
 
 }

@@ -67,6 +67,8 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "buckets server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check"),
 
+  S3_DERIVED_KEY(15, "OzoneManager version supporting derived signing keys for S3 chunk verification"),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 
