@@ -457,7 +457,7 @@ public class TestOmUtils {
     assertEquals("[2001:db8::1]:9999", OmUtils.getOmRpcAddress(conf));
 
     String peerAddressKey = OZONE_OM_ADDRESS_KEY + ".omservice.om1";
-    conf.set(peerAddressKey, "2001:db8::2");
+    conf.set(peerAddressKey, "[2001:db8::2]");
     assertEquals("[2001:db8::2]:" + OMConfigKeys.OZONE_OM_PORT_DEFAULT,
         OmUtils.getOmRpcAddress(conf, peerAddressKey));
 
