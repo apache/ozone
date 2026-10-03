@@ -92,6 +92,16 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   }
 
   @Override
+  public long getLatestSnapshotIndex() {
+    return 0L;
+  }
+
+  @Override
+  public long getLastSnapshotTimeMs() {
+    return 0L;
+  }
+
+  @Override
   public void setLatestSnapshot(SnapshotInfo latestSnapshot) {
 
   }
