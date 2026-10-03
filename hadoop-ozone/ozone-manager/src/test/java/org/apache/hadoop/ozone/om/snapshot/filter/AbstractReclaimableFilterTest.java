@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.BucketManager;
+import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -67,6 +68,8 @@ import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
@@ -103,6 +106,7 @@ public abstract class AbstractReclaimableFilterTest {
   private Path testDir;
   private SnapshotChainManager snapshotChainManager;
   private KeyManager keyManager;
+  private boolean layoutFeatureAllowed = true;
 
   protected abstract ReclaimableFilter initializeFilter(
       OzoneManager om, OmSnapshotManager snapshotManager, SnapshotChainManager chainManager,
@@ -158,8 +162,18 @@ public abstract class AbstractReclaimableFilterTest {
 
   @AfterEach
   protected void teardown() throws IOException {
+    this.layoutFeatureAllowed = true;
     this.mockedSnapshotUtils.close();
     this.reclaimableFilter.close();
+  }
+
+  /**
+   * Controls what the mocked {@link OMLayoutVersionManager} reports for every layout feature. Must
+   * be called before {@code setup(...)}, since filters read the flag when they are constructed. It
+   * is reset to {@code true} after each test.
+   */
+  protected void setLayoutFeatureAllowed(boolean allowed) {
+    this.layoutFeatureAllowed = allowed;
   }
 
   private void mockOzoneManager(BucketLayout bucketLayout) throws IOException {
@@ -167,6 +181,10 @@ public abstract class AbstractReclaimableFilterTest {
     BucketManager bucketManager = mock(BucketManager.class);
     when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
     when(ozoneManager.getBucketManager()).thenReturn(bucketManager);
+    when(ozoneManager.getDeletionMetrics()).thenReturn(mock(DeletingServiceMetrics.class));
+    OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
+    when(versionManager.isAllowed(any(OMLayoutFeature.class))).thenReturn(layoutFeatureAllowed);
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
     when(metadataManager.getSnapshotChainManager()).thenReturn(snapshotChainManager);
     long volumeCount = 0;
     for (String volume : volumes) {
