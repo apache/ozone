@@ -515,9 +515,7 @@ public abstract class EndpointBase {
     }
 
     try {
-      return containsUnprintableCharacters(value)
-          ? RFC_2047_B_CODEC.encode(value)
-          : RFC_2047_Q_CODEC.encode(value);
+      return RFC_2047_Q_CODEC.encode(value);
     } catch (EncoderException ex) {
       throw new IllegalStateException("Failed to encode S3 metadata", ex);
     }
@@ -531,18 +529,6 @@ public abstract class EndpointBase {
     QCodec codec = new QCodec(UTF_8);
     codec.setEncodeBlanks(true);
     return codec;
-  }
-
-  private static boolean containsUnprintableCharacters(String value) {
-    return value.codePoints().anyMatch(codePoint -> {
-      int type = Character.getType(codePoint);
-      return codePoint == '\ufffd'
-          || type == Character.CONTROL
-          || type == Character.FORMAT
-          || type == Character.PRIVATE_USE
-          || type == Character.SURROGATE
-          || type == Character.UNASSIGNED;
-    });
   }
 
   /**

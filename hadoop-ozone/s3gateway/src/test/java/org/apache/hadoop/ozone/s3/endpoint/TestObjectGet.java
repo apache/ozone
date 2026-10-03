@@ -266,8 +266,9 @@ public class TestObjectGet {
   public void getKeyWithBase64Rfc2047CustomMetadata()
       throws IOException, OS3Exception {
     final String keyName = "key-with-base64-rfc2047-meta";
-    final String metaValue = "\u0000";
-    final String encodedMetaValue = "=?UTF-8?B?AA==?=";
+    final String metaValue = "café";
+    final String encodedMetaValue = "=?UTF-8?B?Y2Fmw6k=?=";
+    final String responseMetaValue = "=?UTF-8?Q?caf=C3=A9?=";
     MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
     requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1",
         encodedMetaValue);
@@ -277,7 +278,7 @@ public class TestObjectGet {
 
     assertEquals(metaValue, bucket.getKey(keyName).getMetadata().get("meta1"));
     Response response = get(rest, BUCKET_NAME, keyName);
-    assertEquals(encodedMetaValue,
+    assertEquals(responseMetaValue,
         response.getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + "meta1"));
   }
 
