@@ -59,7 +59,7 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -98,7 +98,7 @@ public class TestScmDataDistributionFinalization {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestScmDataDistributionFinalization.class);
 
-  private StorageContainerLocationProtocol scmClient;
+  private StorageContainerLocationInternalInterface scmClient;
   private MiniOzoneHAClusterImpl cluster;
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;
