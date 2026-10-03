@@ -1884,10 +1884,20 @@ public class OzoneBucket extends WithMetadata {
       if (!addedKeyPrefix()) {
         initDelimiterKeyPrefix();
 
+        final boolean listRoot = getKeyPrefix().isEmpty() && StringUtils.isEmpty(prevKey);
         if (!prepareStack(prevKey)) {
           return new ArrayList<>();
         }
 
+        if (listRoot) {
+          startKey = "";
+          findFirstStartKey = true;
+          setAddedKeyPrefix(true);
+        }
+      }
+
+      // Root listings above are ready; other initial listings still need a start key.
+      if (!addedKeyPrefix()) {
         // 1. Get first element as startKey.
         List<OzoneKey> firstKeyResult = new ArrayList<>();
         if (stack.isEmpty()) {
