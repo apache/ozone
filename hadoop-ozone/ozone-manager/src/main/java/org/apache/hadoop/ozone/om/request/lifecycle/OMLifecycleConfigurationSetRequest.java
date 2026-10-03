@@ -235,15 +235,22 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
             String expireThresholdConfig = ozoneManager.getConfiguration().get(
                 OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD,
                 OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD_DEFAULT);
+            long maxEffectiveDays = (expireThresholdMillis - 1) / TimeUnit.DAYS.toMillis(1);
+            String remediation = maxEffectiveDays >= 1
+                ? "Set daysAfterInitiation to " + maxEffectiveDays + " day(s) or fewer, or increase "
+                    + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + "."
+                : "DaysAfterInitiation can only be configured in whole days, so no value satisfies the "
+                    + "current threshold. Increase " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD
+                    + " to more than 1 day to use this rule.";
             throw new OMException(
                 "Invalid lifecycle configuration: rule '" + rule.getId() + "' has an " +
                 "AbortIncompleteMultipartUpload action with daysAfterInitiation=" + daysAfterInitiation +
-                " day(s), which is not less than the cluster MPU expire threshold (" +
-                OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + "=" + expireThresholdConfig +
-                "). The MultipartUploadCleanupService will clean up the upload before the " +
-                "lifecycle rule fires, making the rule ineffective. " +
-                "Set daysAfterInitiation to a value less than " + expireThresholdConfig +
-                ", or increase " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + ".",
+                " day(s), but the configured " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + "=" +
+                expireThresholdConfig + " does not allow this rule to take effect. " +
+                "The MultipartUploadCleanupService will clean up the upload before the lifecycle rule " +
+                "fires, making the rule ineffective. DaysAfterInitiation is specified in whole days and " +
+                "cannot be set directly in the same unit as " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD +
+                ". " + remediation,
                 OMException.ResultCodes.INVALID_REQUEST);
           }
         }
