@@ -448,7 +448,8 @@ Apache License 2.0
    org.apache.ratis:ratis-tools
    org.apache.zookeeper:zookeeper
    org.apache.zookeeper:zookeeper-jute
-   org.eclipse.jetty:jetty-ee
+   org.eclipse.jetty:jetty-annotations
+   org.eclipse.jetty:jetty-ee-webapp
    org.eclipse.jetty:jetty-http
    org.eclipse.jetty:jetty-io
    org.eclipse.jetty:jetty-jndi
