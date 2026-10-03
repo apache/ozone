@@ -94,6 +94,14 @@ Link to non-existent bucket
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/dangling-link
                         Should Contain              ${result}         BUCKET_NOT_FOUND
 
+Link to non-existent source volume
+    ${missing} =        Generate Random String  5  [NUMBERS]
+    ${missingVol} =     Set Variable              ${missing}-missing-source
+                        Execute                     ozone sh bucket link ${missingVol}/any-bucket ${target}/dangling-missing-vol
+    ${result} =         Execute And Ignore Error    ozone sh key list ${target}/dangling-missing-vol
+                        Should Contain              ${result}         BUCKET_NOT_FOUND
+                        Should Contain              ${result}         Cannot follow bucket link
+
 Key create passthrough
                         Ozone Shell Batch           bucket link ${source}/bucket1 ${target}/link1
                         ...                         bucket create ${source}/bucket1

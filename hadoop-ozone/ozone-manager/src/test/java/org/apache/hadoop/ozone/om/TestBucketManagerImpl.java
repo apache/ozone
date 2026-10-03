@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -44,6 +45,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -658,6 +660,60 @@ class TestBucketManagerImpl extends OzoneTestBase {
       }
       return null;
     }).when(metadataReader).checkAcls(any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void testResolveBucketLinkMissingSourceVolume() throws Exception {
+    String targetVolume = volumeName();
+    String missingSourceVolume = volumeName();
+    OmBucketInfo danglingLink = OmBucketInfo.newBuilder()
+        .setVolumeName(targetVolume)
+        .setBucketName("dangling-link")
+        .setSourceVolume(missingSourceVolume)
+        .setSourceBucket("any-bucket")
+        .build();
+    BucketManager bucketManager = mock(BucketManager.class);
+    when(bucketManager.getBucketInfo(targetVolume, "dangling-link")).thenReturn(danglingLink);
+    when(bucketManager.getBucketInfo(missingSourceVolume, "any-bucket"))
+        .thenThrow(new OMException("Volume doesn't exist", ResultCodes.VOLUME_NOT_FOUND));
+    OzoneManager omSpy = spy(omTestManagers.getOzoneManager());
+    HddsWhiteboxTestUtils.setInternalState(omSpy, "bucketManager", bucketManager);
+    when(omSpy.getAclsEnabled()).thenReturn(false);
+
+    OMException omEx = assertThrows(OMException.class,
+        () -> omSpy.resolveBucketLink(Pair.of(targetVolume, "dangling-link")));
+    assertEquals(ResultCodes.BUCKET_NOT_FOUND, omEx.getResult());
+    assertTrue(omEx.getMessage().contains("Cannot follow bucket link"));
+  }
+
+  @Test
+  void testListKeysOnLinkWithMissingSourceVolume() throws Exception {
+    String targetVolume = volumeName();
+    String missingSourceVolume = volumeName();
+    OmBucketInfo danglingLink = OmBucketInfo.newBuilder()
+        .setVolumeName(targetVolume)
+        .setBucketName("dangling-link-list")
+        .setSourceVolume(missingSourceVolume)
+        .setSourceBucket("any-bucket")
+        .build();
+    BucketManager bucketManager = mock(BucketManager.class);
+    when(bucketManager.getBucketInfo(targetVolume, "dangling-link-list")).thenReturn(danglingLink);
+    when(bucketManager.getBucketInfo(missingSourceVolume, "any-bucket"))
+        .thenThrow(new OMException("Volume doesn't exist", ResultCodes.VOLUME_NOT_FOUND));
+    OzoneManager om = omTestManagers.getOzoneManager();
+    OzoneManager omSpy = spy(om);
+    HddsWhiteboxTestUtils.setInternalState(omSpy, "bucketManager", bucketManager);
+    when(omSpy.getAclsEnabled()).thenReturn(false);
+    OmMetadataReader metadataReader = (OmMetadataReader) HddsWhiteboxTestUtils.getInternalState(om,
+        "omMetadataReader");
+    HddsWhiteboxTestUtils.setInternalState(metadataReader, "ozoneManager", omSpy);
+
+    OMException omEx = assertThrows(OMException.class,
+        () -> omSpy.listKeys(targetVolume, "dangling-link-list", null, null, 100));
+    assertEquals(ResultCodes.BUCKET_NOT_FOUND, omEx.getResult());
+    assertTrue(omEx.getMessage().contains("Cannot follow bucket link"));
+    verify(bucketManager).getBucketInfo(eq(targetVolume), eq("dangling-link-list"));
+    verify(bucketManager).getBucketInfo(eq(missingSourceVolume), eq("any-bucket"));
   }
 
   private OzoneManager createAclEnabledOmSpy(BucketManager bucketManager, OmMetadataReader metadataReader) {
