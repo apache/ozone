@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -35,6 +36,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -51,6 +53,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
@@ -253,5 +256,34 @@ public class TestRDBSnapshotProvider {
     // Confirm setting different leader does reinitialize.
     rdbSnapshotProvider.checkLeaderConsistency("node2");
     assertEquals(3, rdbSnapshotProvider.getInitCount());
+  }
+
+  /**
+   * A leader which keeps sending parts that bring no new file cannot complete the transfer,
+   * so the download has to fail instead of looping forever.
+   */
+  @Test
+  @Timeout(60)
+  public void testDownloadAbortsWhenPartsBringNoNewFile() throws Exception {
+    AtomicInteger numParts = new AtomicInteger();
+    RDBSnapshotProvider provider = new RDBSnapshotProvider(testDir, "noprogress.db") {
+      @Override
+      public void close() {
+      }
+
+      @Override
+      public void downloadSnapshot(String leaderNodeID, File targetFile) throws IOException {
+        // A tarball with neither a new file nor the completion flag.
+        numParts.incrementAndGet();
+        try (OutputStream outputStream = Files.newOutputStream(targetFile.toPath())) {
+          Archiver.tar(outputStream).close();
+        }
+      }
+    };
+
+    IOException ioe = assertThrows(IOException.class, () -> provider.downloadDBSnapshotFromLeader(LEADER_ID));
+    assertThat(ioe.getMessage()).contains("brought no new file");
+    // The first part is tolerated, the second one aborts the download.
+    assertEquals(2, numParts.get());
   }
 }
