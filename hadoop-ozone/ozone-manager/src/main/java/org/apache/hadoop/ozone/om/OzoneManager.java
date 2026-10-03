@@ -195,6 +195,7 @@ import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolOmPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.recon.ReconConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
@@ -261,6 +262,7 @@ import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -312,6 +314,7 @@ import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
 import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
+import org.apache.hadoop.ozone.om.snapshot.trapped.BucketDeletedDataCalculator;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizer;
@@ -447,6 +450,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OzoneAdmins s3OzoneAdmins;
   private final OzoneBlacklist omBlacklist;
   private final OzoneBlacklist readBlacklist;
+  /** Short name of the Recon service principal, null when Recon is not configured. */
+  private final String reconUser;
 
   private final OMMetrics metrics;
   private final OmSnapshotInternalMetrics omSnapshotIntMetrics;
@@ -750,6 +755,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     readOnlyAdmins = OzoneAdmins.getReadonlyAdmins(conf);
     readBlacklist = OzoneBlacklist.getReadonlyBlacklist(conf);
 
+    reconUser = resolveReconUserShortName(conf);
+
     s3OzoneAdmins = OzoneAdmins.getS3Admins(conf);
 
     serviceManager = new OMServiceManager();
@@ -833,9 +840,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     @Override
     public void run() {
-      LOG.info("Warming up {} EDEKs... (initialDelay={}, "
-              + "retryInterval={}, maxRetries={})", keyNames.length, initialDelay, retryInterval,
-          maxRetries);
+      LOG.info("Warming up {} EDEKs: {} (initialDelay={}, "
+              + "retryInterval={}, maxRetries={})", keyNames.length, Arrays.asList(keyNames),
+          initialDelay, retryInterval, maxRetries);
       try {
         Thread.sleep(initialDelay);
       } catch (InterruptedException ie) {
@@ -1922,6 +1929,47 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   public OmSnapshotManager getOmSnapshotManager() {
     return omSnapshotManager;
+  }
+
+  /**
+   * Compute deleted bytes split for a bucket.
+   *
+   * @return stats containing snapshot-trapped bytes and purgeable bytes.
+   */
+  public BucketDeletedDataCalculator.BucketDeletedBytesStats
+      calculateDeletedBytesForBucket(String volume, String bucket)
+      throws IOException {
+    return new BucketDeletedDataCalculator(this).calculate(volume, bucket);
+  }
+
+  /**
+   * Compute deleted bytes split for a bucket path in {@code volume/bucket}
+   * format.
+   */
+  public BucketDeletedDataCalculator.BucketDeletedBytesStats
+      calculateDeletedBytesForBucket(String bucketPath)
+      throws IOException {
+    String[] tokens = bucketPath.split("/", 2);
+    if (tokens.length != 2 || tokens[0].isEmpty() || tokens[1].isEmpty()) {
+      throw new OMException("bucketPath must be in volume/bucket format: " + bucketPath, INVALID_PATH);
+    }
+    ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(tokens[0], tokens[1]));
+    return calculateDeletedBytesForBucket(resolvedBucket.realVolume(), resolvedBucket.realBucket());
+  }
+
+  @Override
+  public BucketDeletedBytes getBucketDeletedBytes(String bucketPath)
+      throws IOException {
+    checkAdminUserPrivilege("get bucket deleted bytes.");
+    BucketDeletedDataCalculator.BucketDeletedBytesStats stats =
+        calculateDeletedBytesForBucket(bucketPath);
+    return new BucketDeletedBytes(
+        stats.getSnapshotTrappedBytes(),
+        stats.getPurgeableBytes(),
+        stats.getSnapshotTrappedKeys(),
+        stats.getPurgeableKeys(),
+        stats.getSnapshotTrappedDirs(),
+        stats.getPurgeableDirs());
   }
 
   /**
@@ -5177,10 +5225,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throws IOException {
     // getDBUpdates returns the raw RocksDB delta of the entire OM metadata DB (all
     // volume/bucket/key names, ACLs, block locations, tenant/S3-secret state). It backs
-    // OM->Recon replication and is not a per-object client read, so restrict it to admins
-    // and read-only admins (the Recon service principal is expected to be one), consistent
-    // with the gating already applied to the other whole-system reads such as listOpenFiles
-    // and getQuotaRepairStatus.
+    // OM->Recon replication and is not a per-object client read, so restrict it to admins,
+    // read-only admins and the configured Recon service principal, matching
+    // {@link OMDBCheckpointServlet} checkpoint download access.
     checkGetDBUpdatesPrivilege();
     long limitCount = Long.MAX_VALUE;
     if (dbUpdatesRequest.hasLimitCount()) {
@@ -5289,10 +5336,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   /**
    * Authorize a getDBUpdates call, which returns the raw whole-DB metadata delta.
-   * Allowed for full OM admins and read-only admins (the read-only-admin allow-list is the
-   * mechanism intended to grant the Recon service principal read access to the metadata feed
-   * without full admin rights). Only enforced when admin authorization is enabled, matching
-   * {@link #checkAdminUserPrivilege(String)}.
+   * Allowed for full OM admins, read-only admins and the configured Recon service principal,
+   * which consumes this feed to replicate the OM DB. Only enforced when admin authorization is
+   * enabled. Recon access follows the same {@code ozone.recon.kerberos.principal} config as
+   * {@link OMDBCheckpointServlet}.
    */
   private void checkGetDBUpdatesPrivilege() throws IOException {
     // Skip check if authorization is disabled
@@ -5301,10 +5348,39 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
 
     final UserGroupInformation ugi = getRemoteUser();
-    if (!isAdmin(ugi) && !isReadOnlyAdmin(ugi)) {
-      throw new OMException("Only Ozone admins and read-only admins are allowed to "
+    if (!isAdmin(ugi) && !isReadOnlyAdmin(ugi) && !isReconUser(ugi)) {
+      throw new OMException("Only Ozone admins, read-only admins and Recon are allowed to "
           + "access the OM metadata database via getDBUpdates.", PERMISSION_DENIED);
     }
+  }
+
+  /**
+   * Resolve the short name of the Recon service principal from {@code ozone.recon.kerberos.principal},
+   * using the same mapping as {@link OMDBCheckpointServlet}.
+   *
+   * @return the Recon short name, or null when Recon is unconfigured or the principal cannot be mapped
+   */
+  private static String resolveReconUserShortName(OzoneConfiguration conf) {
+    String reconPrincipal = conf.getObject(ReconConfig.class).getKerberosPrincipal();
+    if (reconPrincipal.isEmpty()) {
+      return null;
+    }
+    try {
+      return UserGroupInformation.createRemoteUser(reconPrincipal).getShortUserName();
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Unable to map Recon principal {} to a short name. Recon will be denied access to"
+          + " getDBUpdates unless it is listed in {} or {}.", reconPrincipal, OZONE_ADMINISTRATORS,
+          OZONE_READONLY_ADMINISTRATORS, e);
+      return null;
+    }
+  }
+
+  /**
+   * @param callerUgi Caller UserGroupInformation
+   * @return true if {@code callerUgi} is the configured Recon service principal
+   */
+  private boolean isReconUser(UserGroupInformation callerUgi) {
+    return reconUser != null && callerUgi != null && reconUser.equals(callerUgi.getShortUserName());
   }
 
   public boolean isS3Admin(UserGroupInformation callerUgi) {
@@ -5744,9 +5820,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     new QuotaRepairTask(this).repair(buckets);
   }
 
-  public byte[] getS3DerivedKey(String accessId, String signingKey) throws IOException {
-    String awsSecretKey = s3SecretManager.getSecretString(accessId);
-    return AWSV4AuthValidator.getSigningKey(awsSecretKey, signingKey);
+  /** Derives the signing key on the RPC thread after S3 authentication has succeeded. */
+  public byte[] getS3DerivedKey(S3Authentication s3Auth) throws IOException {
+    final String awsSecretKey;
+    if (StringUtils.isNotEmpty(s3Auth.getSessionToken())) {
+      STSTokenIdentifier stsToken = getStsTokenIdentifier();
+      if (stsToken == null || !s3Auth.getAccessId().equals(stsToken.getTempAccessKeyId())
+          || StringUtils.isEmpty(stsToken.getSecretAccessKey())) {
+        throw new OMException("Missing authenticated STS credentials for signing key derivation",
+            OMException.ResultCodes.INVALID_TOKEN);
+      }
+      awsSecretKey = stsToken.getSecretAccessKey();
+    } else {
+      awsSecretKey = getS3SecretManager().getSecretString(s3Auth.getAccessId());
+    }
+    return AWSV4AuthValidator.getSigningKey(awsSecretKey, s3Auth.getStringToSign());
   }
 
   @Override
