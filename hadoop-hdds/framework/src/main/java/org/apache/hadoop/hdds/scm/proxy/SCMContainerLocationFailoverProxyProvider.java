@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.proxy;
 
+import jakarta.annotation.Nullable;
+import javax.net.SocketFactory;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
@@ -32,14 +34,14 @@ public class SCMContainerLocationFailoverProxyProvider extends
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerLocationFailoverProxyProvider.class);
 
-  /**
-   * Construct SCMContainerLocationFailoverProxyProvider.
-   * If userGroupInformation is not null, use the passed ugi, else obtain
-   * from {@link UserGroupInformation#getCurrentUser()}
-   */
   public SCMContainerLocationFailoverProxyProvider(ConfigurationSource conf,
       UserGroupInformation userGroupInformation) {
-    super(StorageContainerLocationProtocolPB.class, conf, userGroupInformation);
+    this(conf, userGroupInformation, null);
+  }
+
+  public SCMContainerLocationFailoverProxyProvider(ConfigurationSource conf,
+      UserGroupInformation userGroupInformation, @Nullable SocketFactory socketFactory) {
+    super(StorageContainerLocationProtocolPB.class, conf, userGroupInformation, socketFactory);
   }
 
   @Override

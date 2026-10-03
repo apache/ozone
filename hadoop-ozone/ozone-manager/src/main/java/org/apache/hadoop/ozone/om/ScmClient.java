@@ -52,8 +52,8 @@ import org.apache.hadoop.ozone.util.CacheMetrics;
  * Wrapper class for Scm protocol clients.
  */
 public class ScmClient {
-
   private final ScmBlockLocationProtocol blockClient;
+  private final ScmBlockLocationProtocol blockClientForKeyDeletion;
   private final StorageContainerLocationProtocol containerClient;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
@@ -62,8 +62,16 @@ public class ScmClient {
   ScmClient(ScmBlockLocationProtocol blockClient,
             StorageContainerLocationProtocol containerClient,
             OzoneConfiguration configuration) {
+    this(blockClient, containerClient, configuration, blockClient);
+  }
+
+  ScmClient(ScmBlockLocationProtocol blockClient,
+            StorageContainerLocationProtocol containerClient,
+            OzoneConfiguration configuration,
+            ScmBlockLocationProtocol blockClientForKeyDeletion) {
     this.containerClient = containerClient;
     this.blockClient = blockClient;
+    this.blockClientForKeyDeletion = blockClientForKeyDeletion;
     Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache =
         createDatanodeDetailsCache(configuration);
     this.containerLocationCache =
@@ -148,6 +156,10 @@ public class ScmClient {
     return this.blockClient;
   }
 
+  public ScmBlockLocationProtocol getBlockClientForKeyDeletion() {
+    return this.blockClientForKeyDeletion;
+  }
+
   public StorageContainerLocationProtocol getContainerClient() {
     return this.containerClient;
   }
@@ -211,6 +223,9 @@ public class ScmClient {
   public void close() {
     containerCacheMetrics.unregister();
     datanodeDetailsCacheMetrics.unregister();
+    // OzoneManager.stop() is also used before restarting the same OM instance.
+    // The protocol clients are final fields reused by OzoneManager.restart(),
+    // so closing them here would leave the restarted OM with stopped clients.
   }
 
 }

@@ -710,7 +710,8 @@ public final class OzoneConfigKeys {
       "hdds.scmclient.max.retry.timeout";
   public static final String HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY =
       "hdds.scmclient.failover.max.retry";
-
+  public static final String HDDS_SCM_CLIENT_FAILOVER_RETRY_INTERVAL =
+      "hdds.scmclient.failover.retry.interval";
   public static final String OZONE_XCEIVER_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
       "ozone.xceiver.client.metrics.percentiles.intervals.seconds";
 
