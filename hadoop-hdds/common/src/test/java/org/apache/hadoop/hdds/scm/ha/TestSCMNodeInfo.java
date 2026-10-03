@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
@@ -213,16 +214,30 @@ public class TestSCMNodeInfo {
     assertThat(e.getMessage()).contains(addressKey).contains("[::]");
   }
 
+  /**
+   * A non-HA SCM rewrites its address properties with the bound host, so a
+   * process that shares its configuration reads the wildcard back.
+   */
   @Test
-  public void testNonHARejectsWildcardDatanodeAddress() {
+  public void testNonHAAcceptsWildcardListenAddress() {
     OzoneConfiguration config = new OzoneConfiguration();
-    config.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "localhost");
+    config.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:9860");
     config.set(OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0:9861");
+
+    List<SCMNodeInfo> scmNodeInfos = SCMNodeInfo.buildNodeInfo(config);
+
+    assertEquals("0.0.0.0:9860", scmNodeInfos.get(0).getScmClientAddress());
+    assertEquals("0.0.0.0:9861", scmNodeInfos.get(0).getScmDatanodeAddress());
+  }
+
+  @Test
+  public void testNonHARejectsWildcardScmNames() {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_SCM_NAMES, "0.0.0.0");
 
     ConfigurationException e = assertThrows(ConfigurationException.class,
         () -> SCMNodeInfo.buildNodeInfo(config));
 
-    assertThat(e.getMessage()).contains(OZONE_SCM_DATANODE_ADDRESS_KEY)
-        .contains("0.0.0.0");
+    assertThat(e.getMessage()).contains(OZONE_SCM_NAMES).contains("0.0.0.0");
   }
 }

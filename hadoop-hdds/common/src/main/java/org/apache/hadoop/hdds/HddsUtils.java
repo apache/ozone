@@ -140,7 +140,10 @@ public final class HddsUtils {
       String address = conf.getTrimmed(OZONE_SCM_CLIENT_ADDRESS_KEY);
       int port = -1;
 
-      validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, address);
+      // Only the bracket rule applies: SCM rewrites this property with its
+      // bound host, a wildcard by default, and a process sharing its
+      // configuration reads that back here.
+      validateHostPortAuthority(OZONE_SCM_CLIENT_ADDRESS_KEY, address);
 
       if (address == null) {
         // fall back to ozone.scm.names for non-ha

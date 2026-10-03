@@ -170,7 +170,11 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf, confKey);
 
     if (host.isPresent()) {
-      validateAdvertisedHost(confKey, host.get());
+      // Without a service and node suffix this is the non-HA OM's own RPC
+      // address, which defaults to a wildcard.
+      if (!OZONE_OM_ADDRESS_KEY.equals(confKey)) {
+        validateAdvertisedHost(confKey, host.get());
+      }
       return getHostPortString(host.get(),
           getPortNumberFromConfigKeys(conf, confKey)
               .orElse(OZONE_OM_PORT_DEFAULT));

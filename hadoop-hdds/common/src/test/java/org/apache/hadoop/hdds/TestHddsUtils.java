@@ -393,15 +393,19 @@ public class TestHddsUtils {
     assertEquals("dn1.example.com", HddsUtils.getHostName(conf));
   }
 
+  /**
+   * SCM rewrites its client address with the bound host, so a process that
+   * shares its configuration reads the wildcard back.
+   */
   @Test
-  void getScmAddressForClientsRejectsUnadvertisableClientAddress() {
+  void getScmAddressForClientsAcceptsWildcardListenAddress() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:9860");
 
-    ConfigurationException e = assertThrows(ConfigurationException.class,
-        () -> HddsUtils.getScmAddressForClients(conf));
+    InetSocketAddress addr = HddsUtils.getScmAddressForClients(conf).iterator().next();
 
-    assertThat(e.getMessage()).contains(OZONE_SCM_CLIENT_ADDRESS_KEY);
+    assertEquals("0.0.0.0", addr.getHostString());
+    assertEquals(9860, addr.getPort());
   }
 
   @Test

@@ -511,12 +511,12 @@ public class TestOmUtils {
   }
 
   /**
-   * The unsuffixed property ships as a wildcard and doubles as the non-HA bind
-   * address, so it is not an advertised-only property and stays accepted.
+   * The non-HA client failover proxy reads the unsuffixed property, which is
+   * the non-HA OM's own RPC address and ships as a wildcard.
    */
   @Test
   void getOmRpcAddressKeepsWildcardDefault() {
     assertEquals("0.0.0.0:" + OZONE_OM_PORT_DEFAULT,
-        OmUtils.getOmRpcAddress(new OzoneConfiguration()));
+        OmUtils.getOmRpcAddress(new OzoneConfiguration(), OZONE_OM_ADDRESS_KEY));
   }
 }

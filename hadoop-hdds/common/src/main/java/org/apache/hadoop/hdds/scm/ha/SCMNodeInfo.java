@@ -127,10 +127,10 @@ public class SCMNodeInfo {
     } else {
       scmServiceId = SCM_DUMMY_SERVICE_ID;
 
-      HddsUtils.validateAdvertisedAddressConfig(conf,
-          OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-          OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY, OZONE_SCM_DATANODE_ADDRESS_KEY,
-          OZONE_SCM_NAMES);
+      // The *.address properties double as the non-HA SCM's listen addresses,
+      // which it rewrites with its bound host (a wildcard by default) once its
+      // RPC servers start, so only ozone.scm.names is checked for the host.
+      HddsUtils.validateAdvertisedAddressConfig(conf, OZONE_SCM_NAMES);
 
       // Following current approach of fall back to
       // OZONE_SCM_CLIENT_ADDRESS_KEY to figure out hostname.
