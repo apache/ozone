@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -92,6 +93,7 @@ public class ContainerImporter {
   public void importContainer(long containerID, Path tarFilePath,
       HddsVolume targetVolume, CopyContainerCompression compression)
       throws IOException {
+    Objects.requireNonNull(targetVolume, "targetVolume == null");
     if (!importContainerProgress.add(containerID)) {
       deleteFileQuietely(tarFilePath);
       String log = "Container import in progress with container Id " + containerID;
@@ -118,12 +120,10 @@ public class ContainerImporter {
       }
       ContainerUtils.verifyContainerFileChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
-      if (targetVolume != null) {
-        // The descriptor carries the source volume's storage type. Record the
-        // type of the volume actually chosen here, so the replica reports where
-        // it really lives rather than where its source lived.
-        containerData.setStorageType(targetVolume.getStorageType());
-      }
+      // The descriptor carries the source volume's storage type. Record the
+      // type of the volume actually chosen here, so the replica reports where
+      // it really lives rather than where its source lived.
+      containerData.setStorageType(targetVolume.getStorageType());
       // lastDataScanTime should be cleared for an imported container
       containerData.setDataScanTimestamp(null);
 

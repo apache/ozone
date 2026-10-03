@@ -128,7 +128,7 @@ class TestContainerImporter {
     // second import should fail immediately
     StorageContainerException ex = assertThrows(StorageContainerException.class,
         () -> containerImporter.importContainer(containerId, tarFile.toPath(),
-            null, NO_COMPRESSION));
+            mock(HddsVolume.class), NO_COMPRESSION));
     assertEquals(ContainerProtos.Result.CONTAINER_EXISTS, ex.getResult());
     assertThat(ex.getMessage()).contains("Container already exists");
   }
@@ -147,7 +147,7 @@ class TestContainerImporter {
     CompletableFuture.runAsync(() -> {
       try {
         containerImporter.importContainer(containerId, tarFile.toPath(),
-            null, NO_COMPRESSION);
+            mock(HddsVolume.class), NO_COMPRESSION);
       } catch (Exception ex) {
         // do nothing
       }
@@ -158,7 +158,7 @@ class TestContainerImporter {
     StorageContainerException ex = assertThrows(
         StorageContainerException.class,
         () -> containerImporter.importContainer(containerId, tarFile.toPath(),
-            null, NO_COMPRESSION));
+            mock(HddsVolume.class), NO_COMPRESSION));
     assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
         ex.getResult());
     assertThat(ex.getMessage()).contains("import in progress");
@@ -190,7 +190,7 @@ class TestContainerImporter {
     StorageContainerException scException =
         assertThrows(StorageContainerException.class,
             () -> importer.importContainer(containerId,
-                tarFile.toPath(), null, NO_COMPRESSION));
+                tarFile.toPath(), mock(HddsVolume.class), NO_COMPRESSION));
     Assertions.assertTrue(scException.getMessage().
         contains("Container checksum error"));
   }

@@ -471,13 +471,6 @@ public class RatisUnderReplicationHandler
         currentContainerSize, replicaCount.getContainer(), StorageType.DEFAULT);
   }
 
-  private int sendReplicationCommands(
-      ContainerInfo containerInfo, List<DatanodeDetails> sources,
-      List<DatanodeDetails> targets) throws CommandTargetOverloadedException,
-      NotLeaderException {
-    return sendReplicationCommands(containerInfo, sources, targets, null);
-  }
-
   /**
    * All Ratis replicas of a container are interchangeable, so the tier of any
    * reported replica tells us where new copies belong.
