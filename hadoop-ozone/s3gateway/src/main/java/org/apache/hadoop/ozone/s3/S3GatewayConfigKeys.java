@@ -103,6 +103,15 @@ public final class S3GatewayConfigKeys {
   public static final int OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT = 1000;
 
   /**
+   * How long the gateway remembers that a bucket carries no lifecycle
+   * configuration, so that repeated object requests do not each ask OM again.
+   * Zero disables the cache.
+   */
+  public static final String OZONE_S3G_LIFECYCLE_MISSING_CONFIGURATION_CACHE_TTL =
+      "ozone.s3g.lifecycle.missing-configuration.cache.ttl";
+  public static final String OZONE_S3G_LIFECYCLE_MISSING_CONFIGURATION_CACHE_TTL_DEFAULT = "30s";
+
+  /**
    * Never constructed.
    */
   private S3GatewayConfigKeys() {
