@@ -1559,6 +1559,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numTrashGetFileStatus.incr();
   }
 
+  public long getNumTrashGetFileStatus() {
+    return numTrashGetFileStatus.value();
+  }
+
   public void incNumTrashGetTrashRoots() {
     numTrashGetTrashRoots.incr();
   }

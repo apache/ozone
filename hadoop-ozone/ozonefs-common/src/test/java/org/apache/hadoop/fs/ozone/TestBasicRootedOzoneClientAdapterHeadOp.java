@@ -124,6 +124,21 @@ public class TestBasicRootedOzoneClientAdapterHeadOp {
   }
 
   @Test
+  public void keyPathDoesNotFetchBucket() throws IOException {
+    // HDDS-15925: the OM validates the bucket layout server-side, so
+    // getFileStatus must reach OM once and issue no InfoBucket RPC.
+    when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
+        .thenReturn(fileStatus(false));
+
+    assertFalse(adapter.getFileStatus("/vol/bucket/key", URI_OFS, WORKING_DIR,
+        "user", true).isDir());
+
+    verify(adapter, never()).getBucket(any(OFSPath.class), anyBoolean());
+    verify(proxy).getOzoneFileStatus(eq("vol"), eq("bucket"), eq("key"),
+        anyBoolean());
+  }
+
+  @Test
   public void fourArgOverloadDoesNotUseHeadOp() throws IOException {
     when(proxy.getOzoneFileStatus(anyString(), anyString(), anyString(), anyBoolean()))
         .thenReturn(fileStatus(true));
