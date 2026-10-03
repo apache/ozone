@@ -268,8 +268,9 @@ public class TestOzoneManagerSnapshotAcl {
         recursive, keyName, numEntries, allowPartialPrefixes));
   }
 
+  // LookupFile is rejected on OBJECT_STORE buckets, which have no file system semantics.
   @ParameterizedTest
-  @EnumSource(BucketLayout.class)
+  @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
   public void testLookupFileWithAllowedUser(BucketLayout bucketLayout)
       throws Exception {
     // GIVEN
@@ -281,8 +282,9 @@ public class TestOzoneManagerSnapshotAcl {
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
   }
 
+  // LookupFile is rejected on OBJECT_STORE buckets, which have no file system semantics.
   @ParameterizedTest
-  @EnumSource(BucketLayout.class)
+  @EnumSource(value = BucketLayout.class, names = {"FILE_SYSTEM_OPTIMIZED", "LEGACY"})
   public void testLookupFileWithNotAllowedUser(BucketLayout bucketLayout)
       throws Exception {
     // GIVEN

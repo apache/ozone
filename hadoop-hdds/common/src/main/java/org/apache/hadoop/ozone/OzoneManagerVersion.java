@@ -67,6 +67,11 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "buckets server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check"),
 
+  LOOKUP_FILE_REJECTS_OBS(15,
+      "OzoneManager version that rejects lookupFile on OBJECT_STORE buckets "
+          + "server-side, so file system clients no longer need the "
+          + "client-side InfoBucket layout check for getFileChecksum"),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 

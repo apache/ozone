@@ -1377,13 +1377,40 @@ public class BasicRootedOzoneClientAdapterImpl
       return null;
     }
     OFSPath ofsPath = new OFSPath(keyName, config);
-    OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
-    OzoneBucket bucket = getBucket(ofsPath, false);
-    return OzoneClientUtils.getFileChecksumWithCombineMode(
-        volume, bucket, ofsPath.getKeyName(),
-        length, combineMode,
-        ozoneClient.getObjectStore().getClientProxy());
-
+    if (ofsPath.getBucketName().isEmpty()) {
+      // throw FileNotFoundException in this case to make Hadoop common happy
+      throw new FileNotFoundException(
+          "getFileChecksum: Invalid argument: given bucket string is empty.");
+    }
+    // OM LookupFile rejects OBJECT_STORE buckets (HDDS-15951), so the volume and
+    // bucket no longer have to be fetched up front. During a rolling upgrade a new
+    // client can talk to an older OM that lacks that check, so when the negotiated
+    // OM version predates LOOKUP_FILE_REJECTS_OBS, fall back to LookupKey and
+    // validate the bucket layout client-side as before.
+    boolean omRejectsObs = proxy.getOmVersion()
+        .compareTo(OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS) >= 0;
+    if (!omRejectsObs) {
+      // Called for its layout validation side effect; the bucket itself is not needed.
+      getBucket(ofsPath, false);
+    }
+    try {
+      return OzoneClientUtils.getFileChecksumWithCombineMode(
+          ofsPath.getVolumeName(), ofsPath.getBucketName(), ofsPath.getKeyName(),
+          length, combineMode,
+          ozoneClient.getObjectStore().getClientProxy(), omRejectsObs);
+    } catch (OMException e) {
+      if (e.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+        // OM rejects LookupFile on an OBJECT_STORE bucket (no file system
+        // semantics). Surface it as IllegalArgumentException, matching the
+        // pre-HDDS-15951 client-side layout check.
+        throw new IllegalArgumentException(e.getMessage());
+      } else if (e.getResult() == OMException.ResultCodes.NOT_A_FILE) {
+        // LookupFile reports a directory this way; a checksum only exists for a
+        // file, so report it the same way HDFS does.
+        throw new FileNotFoundException(e.getMessage());
+      }
+      throw e;
+    }
   }
 
   @Override
