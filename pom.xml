@@ -56,7 +56,7 @@
     <commons-csv.version>1.14.1</commons-csv.version>
     <commons-fileupload.version>1.6.0</commons-fileupload.version>
     <commons-io.version>2.22.0</commons-io.version>
-    <commons-lang3.version>3.20.0</commons-lang3.version>
+    <commons-lang3.version>3.21.0</commons-lang3.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-text.version>1.15.0</commons-text.version>
     <commons-validator.version>1.11.0</commons-validator.version>
