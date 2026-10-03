@@ -551,7 +551,9 @@ public class KeyValueHandler extends Handler {
       HddsVolume hddsVolume) throws IOException {
     volumeSet.readLock();
     try {
-      // TODO StoragePolicy Check whether need to adapt storageType
+      // The caller has already chosen hddsVolume for the container's storage
+      // type and recorded that type on the container data, so there is nothing
+      // storage-type specific to adapt here.
       String idDir = VersionedDatanodeFeatures.ScmHA.chooseContainerPathID(
           hddsVolume, clusterId);
       container.populatePathFields(idDir, hddsVolume);

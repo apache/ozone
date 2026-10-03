@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -387,10 +388,27 @@ public abstract class SCMCommonPlacementPolicy implements
   public List<DatanodeDetails> getResultSet(
       int nodesRequired, List<DatanodeDetails> healthyNodes)
       throws SCMException {
+    return getResultSet(nodesRequired, healthyNodes, null);
+  }
+
+  /**
+   * Picks the required number of nodes, comparing candidates on the given
+   * storage type where the policy ranks nodes by usage.
+   *
+   * @param storageType storage type the container will be placed on, or null to
+   *                    compare nodes on their overall usage. The healthy node
+   *                    list is already filtered to this storage type by
+   *                    {@link #chooseDatanodesInternal}; this only affects how
+   *                    the remaining candidates are ranked against each other.
+   */
+  public List<DatanodeDetails> getResultSet(
+      int nodesRequired, List<DatanodeDetails> healthyNodes,
+      @Nullable StorageType storageType)
+      throws SCMException {
     List<DatanodeDetails> results = new ArrayList<>();
     for (int x = 0; x < nodesRequired; x++) {
       // invoke the choose function defined in the derived classes.
-      DatanodeDetails nodeId = chooseNode(healthyNodes);
+      DatanodeDetails nodeId = chooseNode(healthyNodes, storageType);
       if (nodeId != null) {
         removePeers(nodeId, healthyNodes);
         results.add(nodeId);
@@ -417,6 +435,24 @@ public abstract class SCMCommonPlacementPolicy implements
    */
   public abstract DatanodeDetails chooseNode(
       List<DatanodeDetails> healthyNodes);
+
+  /**
+   * Choose a datanode according to the policy, ranking candidates by their usage
+   * of the given storage type.
+   *
+   * Policies that rank nodes by usage should override this to compare on
+   * {@code storageType}; the default ignores it, which is correct for policies
+   * that choose on topology or at random.
+   *
+   * @param healthyNodes - Set of healthy nodes we can choose from.
+   * @param storageType  - storage type to compare node usage on, or null to
+   *                     compare overall usage.
+   * @return DatanodeDetails
+   */
+  public DatanodeDetails chooseNode(List<DatanodeDetails> healthyNodes,
+      @Nullable StorageType storageType) {
+    return chooseNode(healthyNodes);
+  }
 
   /**
    * Default implementation to return the number of racks containers should span

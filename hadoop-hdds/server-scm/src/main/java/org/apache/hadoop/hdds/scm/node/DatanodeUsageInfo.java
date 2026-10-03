@@ -17,7 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import jakarta.annotation.Nullable;
 import java.util.Comparator;
+import java.util.EnumSet;
+import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
@@ -102,6 +106,54 @@ public class DatanodeUsageInfo {
    */
   public double calculateUtilization() {
     return calculateUtilization(0);
+  }
+
+  /**
+   * Calculates utilization of a single storage type on this datanode, so the
+   * balancer can compare nodes on the tier it is actually moving data within.
+   *
+   * @param plusSize    the increased size
+   * @param storageType the storage type to measure, or null to measure the
+   *                    datanode as a whole
+   * @return (capacity - remaining) / capacity for that storage type, or 0 when
+   *         the datanode has no volume of that type
+   */
+  public double calculateUtilization(long plusSize,
+      @Nullable StorageType storageType) {
+    if (storageType == null) {
+      return calculateUtilization(plusSize);
+    }
+    long capacity = scmNodeStat.getCapacity(storageType).get();
+    if (capacity == 0) {
+      return 0;
+    }
+    long numerator =
+        capacity - scmNodeStat.getRemaining(storageType).get() + plusSize;
+    return numerator / (double) capacity;
+  }
+
+  /**
+   * Calculates current utilization of a single storage type on this datanode.
+   *
+   * @param storageType the storage type to measure, or null to measure the
+   *                    datanode as a whole
+   */
+  public double calculateUtilization(@Nullable StorageType storageType) {
+    return calculateUtilization(0, storageType);
+  }
+
+  /**
+   * Storage types this datanode actually has capacity for. Used by the balancer
+   * to decide which tiers are worth considering on this node.
+   */
+  public Set<StorageType> getStorageTypes() {
+    Set<StorageType> types = EnumSet.noneOf(StorageType.class);
+    for (StorageType type : StorageType.values()) {
+      if (scmNodeStat.getCapacity(type).get() > 0) {
+        types.add(type);
+      }
+    }
+    return types;
   }
 
   /**

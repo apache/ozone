@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.E
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
@@ -517,6 +518,23 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
       List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex)
       throws CommandTargetOverloadedException, NotLeaderException {
+    sendThrottledReplicationCommand(containerInfo, sources, target, replicaIndex,
+        null);
+  }
+
+  /**
+   * As {@link #sendThrottledReplicationCommand(ContainerInfo, List,
+   * DatanodeDetails, int)}, but asks the target to place the replica on a
+   * specific storage type so it stays on the same tier as the replica it is
+   * replacing.
+   *
+   * @param targetVolumeStorageType storage type for the new replica, or null to
+   *        let the target choose any volume
+   */
+  public void sendThrottledReplicationCommand(ContainerInfo containerInfo,
+      List<DatanodeDetails> sources, DatanodeDetails target, int replicaIndex,
+      @Nullable StorageType targetVolumeStorageType)
+      throws CommandTargetOverloadedException, NotLeaderException {
     long containerID = containerInfo.getContainerID();
     List<Pair<Integer, DatanodeDetails>> sourceWithCmds =
         getAvailableDatanodesForReplication(sources);
@@ -532,6 +550,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(containerID, target);
     cmd.setReplicaIndex(replicaIndex);
+    cmd.setTargetVolumeStorageType(targetVolumeStorageType);
     sendDatanodeCommand(cmd, containerInfo, source);
   }
 
@@ -629,10 +648,30 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       final ContainerInfo container, int replicaIndex, DatanodeDetails source,
       DatanodeDetails target, long scmDeadlineEpochMs)
       throws NotLeaderException {
+    sendLowPriorityReplicateContainerCommand(container, replicaIndex, source,
+        target, scmDeadlineEpochMs, null);
+  }
+
+  /**
+   * As {@link #sendLowPriorityReplicateContainerCommand(ContainerInfo, int,
+   * DatanodeDetails, DatanodeDetails, long)}, but asks the target to place the
+   * replica on a specific storage type. Used by the balancer so a move stays
+   * within one tier.
+   *
+   * @param targetVolumeStorageType storage type for the new replica, or null to
+   *        let the target choose any volume
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  public void sendLowPriorityReplicateContainerCommand(
+      final ContainerInfo container, int replicaIndex, DatanodeDetails source,
+      DatanodeDetails target, long scmDeadlineEpochMs,
+      @Nullable StorageType targetVolumeStorageType)
+      throws NotLeaderException {
     final ReplicateContainerCommand command = ReplicateContainerCommand
         .toTarget(container.getContainerID(), target);
     command.setReplicaIndex(replicaIndex);
     command.setPriority(ReplicationCommandPriority.LOW);
+    command.setTargetVolumeStorageType(targetVolumeStorageType);
     sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);
   }
 

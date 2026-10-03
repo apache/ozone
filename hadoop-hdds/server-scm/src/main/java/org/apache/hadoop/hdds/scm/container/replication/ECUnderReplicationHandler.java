@@ -598,9 +598,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       throws CommandTargetOverloadedException, NotLeaderException {
     DatanodeDetails source = replica.getDatanodeDetails();
     DatanodeDetails target = iterator.next();
+    // Place the new replica on the same storage type as the one being copied.
     replicationManager.sendThrottledReplicationCommand(
         container, Collections.singletonList(source), target,
-        replica.getReplicaIndex());
+        replica.getReplicaIndex(), replica.getTargetStorageTypeForCopy());
     adjustPendingOps(replicaCount, target, replica.getReplicaIndex());
   }
 

@@ -463,11 +463,14 @@ public final class MoveManager implements
       final DatanodeDetails src)
       throws ContainerReplicaNotFoundException, ContainerNotFoundException,
       NotLeaderException {
-    int replicaIndex = getContainerReplicaIndex(
-        containerInfo.containerID(), src);
+    ContainerReplica sourceReplica =
+        getContainerReplica(containerInfo.containerID(), src);
     long now = clock.millis();
+    // Keep the moved replica on the same storage type as the source, so a move
+    // between datanodes does not silently change the tier the data lives on.
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
-        replicaIndex, src, tgt, now + replicationTimeout);
+        sourceReplica.getReplicaIndex(), src, tgt, now + replicationTimeout,
+        sourceReplica.getTargetStorageTypeForCopy());
     pendingMoves.get(containerInfo.containerID()).setMoveStartTime(now);
   }
 
@@ -493,13 +496,18 @@ public final class MoveManager implements
   private int getContainerReplicaIndex(
       final ContainerID id, final DatanodeDetails dn)
       throws ContainerNotFoundException, ContainerReplicaNotFoundException {
+    return getContainerReplica(id, dn).getReplicaIndex();
+  }
+
+  private ContainerReplica getContainerReplica(
+      final ContainerID id, final DatanodeDetails dn)
+      throws ContainerNotFoundException, ContainerReplicaNotFoundException {
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(id);
     return replicas.stream().filter(r -> r.getDatanodeDetails().equals(dn))
         //there should not be more than one replica of a container on the same
         //datanode. handle this if found in the future.
         .findFirst().orElseThrow(() ->
-            new ContainerReplicaNotFoundException(id, dn))
-        .getReplicaIndex();
+            new ContainerReplicaNotFoundException(id, dn));
   }
 
   @Override

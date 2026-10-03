@@ -91,7 +91,9 @@ public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
     if (healthyNodes.size() == nodesRequired) {
       return healthyNodes;
     }
-    return getResultSet(nodesRequired, healthyNodes);
+    // Selection is random, so storageType does not affect ranking here; the
+    // healthy node list is already filtered to it.
+    return getResultSet(nodesRequired, healthyNodes, storageType);
   }
 
   /**

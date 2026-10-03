@@ -461,7 +461,7 @@ public class TestRatisUnderReplicationHandler {
 
     // Ensure that the replica with SEQ=2 is the only source sent
     verify(replicationManager).sendThrottledReplicationCommand(any(ContainerInfo.class),
-        eq(Collections.singletonList(valid.getDatanodeDetails())), any(DatanodeDetails.class), anyInt());
+        eq(Collections.singletonList(valid.getDatanodeDetails())), any(DatanodeDetails.class), anyInt(), any());
   }
 
   @Test

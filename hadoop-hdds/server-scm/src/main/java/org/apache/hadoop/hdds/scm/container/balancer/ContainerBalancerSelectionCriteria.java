@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import jakarta.annotation.Nullable;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -185,6 +187,21 @@ public class ContainerBalancerSelectionCriteria {
    */
   public boolean shouldBeExcluded(ContainerID containerID,
       DatanodeDetails node, long sizeMovedAlready) {
+    return shouldBeExcluded(containerID, node, sizeMovedAlready, null);
+  }
+
+  /**
+   * As {@link #shouldBeExcluded(ContainerID, DatanodeDetails, long)}, but also
+   * excludes containers whose replica on {@code node} is not on
+   * {@code storageType}. The balancer uses this to move data within one storage
+   * tier at a time, so a move never relocates data to a different tier.
+   *
+   * @param storageType the storage type being balanced, or null to consider
+   *                    containers on any storage type
+   */
+  public boolean shouldBeExcluded(ContainerID containerID,
+      DatanodeDetails node, long sizeMovedAlready,
+      @Nullable StorageType storageType) {
     ContainerInfo container;
     //If includeContainers is specified, exclude containers not in the include list
     if (!includeContainers.isEmpty() && !includeContainers.contains(containerID)) {
@@ -216,6 +233,13 @@ public class ContainerBalancerSelectionCriteria {
       LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
           "this container.", container.getContainerID(), e);
       addToExcludeNotFoundContainers(containerID);
+      return true;
+    }
+
+    if (storageType != null
+        && !isReplicaOnStorageType(replicas, node, storageType)) {
+      // The replica on this source is not on the tier being balanced. Moving it
+      // would relocate data across tiers, so leave it for that tier's pass.
       return true;
     }
 
@@ -404,6 +428,23 @@ public class ContainerBalancerSelectionCriteria {
 
   Set<ContainerID> getExcludeNotFoundContainers() {
     return excludeContainersNotFound;
+  }
+
+  /**
+   * Whether the container's replica on {@code node} sits on {@code storageType}.
+   * A replica that does not report a storage type is treated as a match, so
+   * balancing still works against datanodes that predate storage type reporting.
+   */
+  private static boolean isReplicaOnStorageType(Set<ContainerReplica> replicas,
+      DatanodeDetails node, StorageType storageType) {
+    for (ContainerReplica replica : replicas) {
+      if (replica.getDatanodeDetails().equals(node)) {
+        StorageType replicaType = replica.getTargetStorageTypeForCopy();
+        return replicaType == null || replicaType == storageType;
+      }
+    }
+    // No replica on this node; nothing to move from here.
+    return false;
   }
 
   private NavigableSet<ContainerID> getCandidateContainers(DatanodeDetails node) {

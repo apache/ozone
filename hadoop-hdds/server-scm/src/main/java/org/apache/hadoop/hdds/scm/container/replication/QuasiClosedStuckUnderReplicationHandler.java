@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.StorageType;
@@ -118,10 +119,16 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
       List<DatanodeDetails> sourceDatanodes = origin.getSources().stream()
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
+      // Keep the new copies on the same tier as the replicas being copied.
+      StorageType targetStorageType = origin.getSources().stream()
+          .map(ContainerReplica::getTargetStorageTypeForCopy)
+          .filter(Objects::nonNull)
+          .findFirst()
+          .orElse(null);
       for (DatanodeDetails target : targets) {
         try {
           replicationManager.sendThrottledReplicationCommand(
-              containerInfo, sourceDatanodes, target, 0);
+              containerInfo, sourceDatanodes, target, 0, targetStorageType);
           // Add the pending op, so we exclude the node for subsequent origins
           mutablePendingOps.add(new ContainerReplicaOp(
               ContainerReplicaOp.PendingOpType.ADD, target, 0,
