@@ -676,13 +676,12 @@ public class TestDirectoryDeletingServiceWithFSO {
     assertTableRowCount(deletedDirTable, initialDeletedCount + 1);
     assertTableRowCount(renameTable, initialRenameCount + 1);
     Mockito.doAnswer(i -> {
-      List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList = i.getArgument(4);
+      List<OzoneManagerProtocolProtos.PurgePathRequest> purgePathRequestList = i.getArgument(1);
       for (OzoneManagerProtocolProtos.PurgePathRequest purgeRequest : purgePathRequestList) {
         Assertions.assertNotEquals(deletePathKey, purgeRequest.getDeletedDir());
       }
       return null;
-    }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
-        anyLong(), anyList(), anyList(), eq(null), anyLong(), any(),
+    }).when(service).optimizeDirDeletesAndSubmitRequest(anyList(), anyList(), eq(null), anyLong(), any(),
         any(ReclaimableDirFilter.class), any(ReclaimableKeyFilter.class), anyMap(), any(),
         anyLong(), any(AtomicInteger.class));
 
