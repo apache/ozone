@@ -17,7 +17,10 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
+import jakarta.annotation.Nullable;
 import java.util.Objects;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto.Builder;
@@ -36,6 +39,12 @@ public final class ReplicateContainerCommand
   private int replicaIndex = 0;
   private ReplicationCommandPriority priority =
       ReplicationCommandPriority.NORMAL;
+  /**
+   * StorageType the replica should be written to on the target, so a copy stays
+   * on the same tier as its source. Null for containers created before storage
+   * policy support, which leaves the target free to choose any volume.
+   */
+  private StorageType targetVolumeStorageType;
 
   public static ReplicateContainerCommand toTarget(long containerID,
       DatanodeDetails target) {
@@ -63,6 +72,10 @@ public final class ReplicateContainerCommand
     this.priority = priority;
   }
 
+  public void setTargetVolumeStorageType(@Nullable StorageType storageType) {
+    this.targetVolumeStorageType = storageType;
+  }
+
   @Override
   public Type getType() {
     return SCMCommandProto.Type.replicateContainerCommand;
@@ -81,6 +94,10 @@ public final class ReplicateContainerCommand
         .setReplicaIndex(replicaIndex)
         .setTarget(targetDatanode.getProtoBufMessage())
         .setPriority(priority);
+    if (targetVolumeStorageType != null) {
+      builder.setVolumeStorageType(
+          StorageTypeUtils.getStorageTypeProto(targetVolumeStorageType));
+    }
     return builder.build();
   }
 
@@ -99,6 +116,10 @@ public final class ReplicateContainerCommand
     }
     if (protoMessage.hasPriority()) {
       cmd.setPriority(protoMessage.getPriority());
+    }
+    if (protoMessage.hasVolumeStorageType()) {
+      cmd.setTargetVolumeStorageType(
+          StorageTypeUtils.getFromProtobuf(protoMessage.getVolumeStorageType()));
     }
     return cmd;
   }
@@ -119,6 +140,11 @@ public final class ReplicateContainerCommand
     return priority;
   }
 
+  @Nullable
+  public StorageType getTargetVolumeStorageType() {
+    return targetVolumeStorageType;
+  }
+
   @Override
   public String toString() {
     return getType()
@@ -129,6 +155,7 @@ public final class ReplicateContainerCommand
         + ", containerId=" + getContainerID()
         + ", replicaIndex=" + getReplicaIndex()
         + ", targetNode=" + targetDatanode
-        + ", priority=" + priority;
+        + ", priority=" + priority
+        + ", targetVolumeStorageType=" + targetVolumeStorageType;
   }
 }

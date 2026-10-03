@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -147,8 +148,10 @@ public class RatisUnderReplicationHandler
       throw e;
     }
 
+    // Keep new replicas on the same tier as the existing ones.
     int commandsSent = sendReplicationCommands(
-        containerInfo, sourceDatanodes, targetDatanodes);
+        containerInfo, sourceDatanodes, targetDatanodes,
+        targetStorageTypeFor(replicaCount.getReplicas()));
 
     if (targetDatanodes.size() < replicaCount.additionalReplicaNeeded()) {
       // The placement policy failed to find enough targets to satisfy fix
@@ -244,7 +247,8 @@ public class RatisUnderReplicationHandler
               excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container, StorageType.DEFAULT);
       int count = 0;
       try {
-        count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()), target);
+        count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()), target,
+            replica.getTargetStorageTypeForCopy());
       } catch (CommandTargetOverloadedException e) {
         LOG.info("Exception while replicating {} to target {} for container {}.", replica, target, container, e);
         if (firstException == null) {
@@ -471,10 +475,37 @@ public class RatisUnderReplicationHandler
       ContainerInfo containerInfo, List<DatanodeDetails> sources,
       List<DatanodeDetails> targets) throws CommandTargetOverloadedException,
       NotLeaderException {
+    return sendReplicationCommands(containerInfo, sources, targets, null);
+  }
+
+  /**
+   * All Ratis replicas of a container are interchangeable, so the tier of any
+   * reported replica tells us where new copies belong.
+   *
+   * @return the storage type new replicas should use, or null when no replica
+   *         reported one
+   */
+  private static StorageType targetStorageTypeFor(
+      List<ContainerReplica> replicas) {
+    return replicas.stream()
+        .map(ContainerReplica::getTargetStorageTypeForCopy)
+        .filter(Objects::nonNull)
+        .findFirst()
+        .orElse(null);
+  }
+
+  /**
+   * @param targetStorageType storage type the new replicas should land on, so a
+   *        re-replicated container stays on its tier, or null to allow any volume
+   */
+  private int sendReplicationCommands(
+      ContainerInfo containerInfo, List<DatanodeDetails> sources,
+      List<DatanodeDetails> targets, StorageType targetStorageType)
+      throws CommandTargetOverloadedException, NotLeaderException {
     int commandsSent = 0;
     for (DatanodeDetails target : targets) {
       replicationManager.sendThrottledReplicationCommand(
-          containerInfo, sources, target, 0);
+          containerInfo, sources, target, 0, targetStorageType);
       commandsSent++;
     }
     return commandsSent;

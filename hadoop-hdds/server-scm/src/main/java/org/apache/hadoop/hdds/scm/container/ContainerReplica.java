@@ -150,6 +150,19 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return volumeStorageType;
   }
 
+  /**
+   * The storage type a copy of this replica should be placed on to stay on the
+   * same tier. Prefers the volume the replica actually lives on, since that is
+   * ground truth, and falls back to the type the container was created for.
+   *
+   * @return the storage type to target, or null when neither was reported, which
+   *         leaves the target free to choose any volume
+   */
+  @Nullable
+  public StorageType getTargetStorageTypeForCopy() {
+    return volumeStorageType != null ? volumeStorageType : storageType;
+  }
+
   @Override
   public int hashCode() {
     return new HashCodeBuilder(61, 71)

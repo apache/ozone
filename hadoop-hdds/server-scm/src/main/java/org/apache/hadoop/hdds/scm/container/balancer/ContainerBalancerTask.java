@@ -23,12 +23,14 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL_DE
 import static org.apache.hadoop.util.StringUtils.byteDesc;
 
 import com.google.common.annotations.VisibleForTesting;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -46,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -96,6 +99,9 @@ public class ContainerBalancerTask implements Runnable {
   private ContainerBalancerConfiguration config;
   private ContainerBalancerMetrics metrics;
   private final ContainerMoveFailureTracker moveFailureTracker;
+  // Utilization bounds for the whole cluster. Storage types are balanced in
+  // separate passes, but all passes share these bounds, since a datanode's
+  // utilization is measured across all of its volumes.
   private double upperLimit;
   private double lowerLimit;
   private ContainerBalancerSelectionCriteria selectionCriteria;
@@ -659,15 +665,84 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   private IterationResult doIteration() {
+    moveSelectionToFutureMap = new ConcurrentHashMap<>();
+    iterationResult = IterationResult.ITERATION_COMPLETED;
+    boolean isMoveGeneratedInThisIteration = false;
+
+    // Balance one storage type at a time so a container never moves to a
+    // datanode volume of a different tier. Iterating StorageType.values() keeps
+    // the order stable across iterations.
+    for (StorageType storageType : storageTypesToBalance()) {
+      if (balanceStorageType(storageType)) {
+        isMoveGeneratedInThisIteration = true;
+      }
+      // Stop early when the balancer was stopped, or when the iteration-wide
+      // size limit is reached, since both apply across all storage types.
+      if (iterationResult == IterationResult.ITERATION_INTERRUPTED
+          || reachedMaxSizeToMovePerIteration()) {
+        break;
+      }
+    }
+
+    checkIterationResults(isMoveGeneratedInThisIteration);
+    return iterationResult;
+  }
+
+  /**
+   * Storage types worth balancing, that is those present on at least one of the
+   * unbalanced datanodes. Returns a single null element when no datanode reports
+   * a storage type, which runs one tier-agnostic pass and preserves the behaviour
+   * from before storage type support.
+   */
+  private List<StorageType> storageTypesToBalance() {
+    Set<StorageType> present = EnumSet.noneOf(StorageType.class);
+    for (DatanodeUsageInfo node : overUtilizedNodes) {
+      present.addAll(node.getStorageTypes());
+    }
+    for (DatanodeUsageInfo node : underUtilizedNodes) {
+      present.addAll(node.getStorageTypes());
+    }
+    if (present.isEmpty()) {
+      return Collections.singletonList(null);
+    }
+    List<StorageType> ordered = new ArrayList<>();
+    for (StorageType type : StorageType.values()) {
+      if (present.contains(type)) {
+        ordered.add(type);
+      }
+    }
+    return ordered;
+  }
+
+  /**
+   * Runs one source-to-target matching pass restricted to a single storage type.
+   *
+   * @param storageType the tier to balance, or null to consider all tiers
+   * @return true if at least one move was generated
+   */
+  private boolean balanceStorageType(@Nullable StorageType storageType) {
+    // Only consider nodes that actually have a volume of this storage type,
+    // otherwise a source with no capacity on this tier would be picked and then
+    // find no container to move.
+    List<DatanodeUsageInfo> potentialTargets =
+        nodesWithStorageType(getPotentialTargets(), storageType);
+    List<DatanodeUsageInfo> potentialSources =
+        nodesWithStorageType(getPotentialSources(), storageType);
+    if (potentialSources.isEmpty() || potentialTargets.isEmpty()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Skipping storage type {}: {} sources and {} targets have a "
+            + "volume of this type.", storageType, potentialSources.size(),
+            potentialTargets.size());
+      }
+      return false;
+    }
+
     // note that potential and selected targets are updated in the following
     // loop
-    List<DatanodeUsageInfo> potentialTargets = getPotentialTargets();
     findTargetStrategy.reInitialize(potentialTargets, config, upperLimit);
-    findSourceStrategy.reInitialize(getPotentialSources(), config, lowerLimit);
+    findSourceStrategy.reInitialize(potentialSources, config, lowerLimit);
 
-    moveSelectionToFutureMap = new ConcurrentHashMap<>();
     boolean isMoveGeneratedInThisIteration = false;
-    iterationResult = IterationResult.ITERATION_COMPLETED;
     boolean canAdaptWhenNearingLimits = true;
     boolean canAdaptOnReachingLimits = true;
 
@@ -680,6 +755,9 @@ public class ContainerBalancerTask implements Runnable {
 
       // break out if we've reached max size to move limit
       if (reachedMaxSizeToMovePerIteration()) {
+        // Record that this pass was cut short by the size limit rather than by
+        // running out of sources or targets.
+        metrics.incrementNumIterationLimitsSkipped();
         break;
       }
 
@@ -706,7 +784,8 @@ public class ContainerBalancerTask implements Runnable {
         break;
       }
 
-      ContainerMoveSelection moveSelection = matchSourceWithTarget(source);
+      ContainerMoveSelection moveSelection =
+          matchSourceWithTarget(source, storageType);
       if (moveSelection != null) {
         if (processMoveSelection(source, moveSelection)) {
           isMoveGeneratedInThisIteration = true;
@@ -717,8 +796,25 @@ public class ContainerBalancerTask implements Runnable {
       }
     }
 
-    checkIterationResults(isMoveGeneratedInThisIteration);
-    return iterationResult;
+    return isMoveGeneratedInThisIteration;
+  }
+
+  /**
+   * Filters nodes down to those with a volume of the given storage type. Returns
+   * the list unchanged when no storage type is given.
+   */
+  private static List<DatanodeUsageInfo> nodesWithStorageType(
+      List<DatanodeUsageInfo> nodes, @Nullable StorageType storageType) {
+    if (storageType == null) {
+      return nodes;
+    }
+    List<DatanodeUsageInfo> filtered = new ArrayList<>(nodes.size());
+    for (DatanodeUsageInfo node : nodes) {
+      if (node.getStorageTypes().contains(storageType)) {
+        filtered.add(node);
+      }
+    }
+    return filtered;
   }
 
   private boolean processMoveSelection(DatanodeDetails source,
@@ -780,7 +876,11 @@ public class ContainerBalancerTask implements Runnable {
        If no move was generated during this iteration then we don't need to
        check the move results
        */
-      iterationResult = IterationResult.CAN_NOT_BALANCE_ANY_MORE;
+      if (iterationResult != IterationResult.ITERATION_INTERRUPTED) {
+        // Keep an interrupted result: the balancer was stopped before it could
+        // generate a move, which is not the same as having nothing to balance.
+        iterationResult = IterationResult.CAN_NOT_BALANCE_ANY_MORE;
+      }
     } else {
       checkIterationMoveResults();
     }
@@ -882,7 +982,8 @@ public class ContainerBalancerTask implements Runnable {
    *
    * @return ContainerMoveSelection containing the selected target and container
    */
-  private ContainerMoveSelection matchSourceWithTarget(DatanodeDetails source) {
+  private ContainerMoveSelection matchSourceWithTarget(DatanodeDetails source,
+      @Nullable StorageType storageType) {
     Set<ContainerID> sourceContainerIDSet =
         selectionCriteria.getContainerIDSet(source);
 
@@ -903,8 +1004,13 @@ public class ContainerBalancerTask implements Runnable {
     Set<ContainerID> toRemoveContainerIds = new HashSet<>();
     for (ContainerID containerId: sourceContainerIDSet) {
       if (selectionCriteria.shouldBeExcluded(containerId, source,
-          sizeScheduledForMoveInLatestIteration)) {
-        toRemoveContainerIds.add(containerId);
+          sizeScheduledForMoveInLatestIteration, storageType)) {
+        // Containers excluded only because they are on another tier must stay in
+        // the cached set, so the pass for that tier can still consider them.
+        if (selectionCriteria.shouldBeExcluded(containerId, source,
+            sizeScheduledForMoveInLatestIteration)) {
+          toRemoveContainerIds.add(containerId);
+        }
         continue;
       }
       moveSelection = findTargetStrategy.findTargetForContainerMove(source,

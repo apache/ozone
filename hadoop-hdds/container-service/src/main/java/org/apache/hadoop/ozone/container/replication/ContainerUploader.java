@@ -17,16 +17,23 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 
 /**
  * Client-side interface for sending a container to a target datanode.
  */
 public interface ContainerUploader {
+  /**
+   * @param targetVolumeStorageType StorageType the target should place the
+   *        container on, or null to let the target choose any volume
+   */
   OutputStream startUpload(long containerId, DatanodeDetails target,
-      CompletableFuture<Void> callback, CopyContainerCompression compression)
+      CompletableFuture<Void> callback, CopyContainerCompression compression,
+      @Nullable StorageType targetVolumeStorageType)
       throws IOException;
 }

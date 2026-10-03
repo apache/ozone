@@ -178,7 +178,7 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
     ReplicationManager replicationManager = getReplicationManager();
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
-            anyList(), any(), anyInt());
+            anyList(), any(), anyInt(), any());
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
             Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),

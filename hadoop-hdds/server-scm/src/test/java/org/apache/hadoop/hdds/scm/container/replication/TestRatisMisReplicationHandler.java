@@ -179,7 +179,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
     ReplicationManager replicationManager = getReplicationManager();
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
-            anyList(), any(), anyInt());
+            anyList(), any(), anyInt(), any());
 
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),

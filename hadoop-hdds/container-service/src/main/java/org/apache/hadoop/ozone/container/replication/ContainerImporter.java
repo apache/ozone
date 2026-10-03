@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.replication;
 
 import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -26,6 +27,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -116,6 +118,12 @@ public class ContainerImporter {
       }
       ContainerUtils.verifyContainerFileChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
+      if (targetVolume != null) {
+        // The descriptor carries the source volume's storage type. Record the
+        // type of the volume actually chosen here, so the replica reports where
+        // it really lives rather than where its source lived.
+        containerData.setStorageType(targetVolume.getStorageType());
+      }
       // lastDataScanTime should be cleared for an imported container
       containerData.setDataScanTimestamp(null);
 
@@ -147,13 +155,26 @@ public class ContainerImporter {
   }
 
   HddsVolume chooseNextVolume(long spaceToReserve) throws IOException {
+    return chooseNextVolume(spaceToReserve, null);
+  }
+
+  /**
+   * Chooses a volume for an incoming container.
+   *
+   * @param spaceToReserve space the container needs in both tmp and dest dirs
+   * @param storageType    storage type the container should be placed on, or
+   *                       null to allow any volume. Null is used for containers
+   *                       replicated from a datanode without storage type
+   *                       support.
+   */
+  HddsVolume chooseNextVolume(long spaceToReserve,
+      @Nullable StorageType storageType) throws IOException {
     // Choose volume that can hold both container in tmp and dest directory
-    LOG.debug("Choosing volume to reserve space : {}", spaceToReserve);
-    // TODO: Use the target container storage type once replication/import
-    // requests carry it. Null preserves the existing any-volume behavior.
+    LOG.debug("Choosing volume to reserve space : {}, storageType: {}",
+        spaceToReserve, storageType);
     return volumeChoosingPolicy.chooseVolume(
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        spaceToReserve, null);
+        spaceToReserve, storageType);
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)

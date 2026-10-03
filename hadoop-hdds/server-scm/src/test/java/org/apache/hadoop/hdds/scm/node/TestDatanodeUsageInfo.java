@@ -20,7 +20,10 @@ package org.apache.hadoop.hdds.scm.node;
 import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.data.Offset.offset;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
@@ -73,6 +76,60 @@ class TestDatanodeUsageInfo {
     assertThat(proto.hasFsAvailable()).isTrue();
     assertThat(proto.getFsCapacity()).isEqualTo(2000L);
     assertThat(proto.getFsAvailable()).isEqualTo(1500L);
+  }
+
+  /**
+   * The balancer uses this to decide which tiers a node can take part in, so it
+   * must report only storage types the node actually has capacity for.
+   */
+  @Test
+  void testGetStorageTypesReportsOnlyTypesWithCapacity() {
+    DatanodeUsageInfo info = new DatanodeUsageInfo(randomDatanodeDetails(),
+        twoTierStat());
+
+    assertThat(info.getStorageTypes())
+        .containsExactlyInAnyOrder(StorageType.SSD, StorageType.DISK);
+  }
+
+  /**
+   * Utilization must be measured per storage type, otherwise the balancer cannot
+   * tell a node that is full on one tier from one that is full overall.
+   */
+  @Test
+  void testCalculateUtilizationPerStorageType() {
+    DatanodeUsageInfo info = new DatanodeUsageInfo(randomDatanodeDetails(),
+        twoTierStat());
+
+    // SSD: 100 capacity, 10 remaining -> 90% used.
+    assertThat(info.calculateUtilization(StorageType.SSD))
+        .isEqualTo(0.9, offset(0.0001));
+    // DISK: 100 capacity, 80 remaining -> 20% used.
+    assertThat(info.calculateUtilization(StorageType.DISK))
+        .isEqualTo(0.2, offset(0.0001));
+    // Whole node: 200 capacity, 90 remaining -> 55% used.
+    assertThat(info.calculateUtilization(null))
+        .isEqualTo(info.calculateUtilization());
+    // A tier the node does not have reports no usage rather than failing.
+    assertThat(info.calculateUtilization(StorageType.ARCHIVE)).isEqualTo(0.0);
+  }
+
+  /**
+   * A node with one unevenly used tier: SSD nearly full, DISK mostly free.
+   */
+  private static SCMNodeStat twoTierStat() {
+    Map<StorageType, Long> capacity = new HashMap<>();
+    capacity.put(StorageType.SSD, 100L);
+    capacity.put(StorageType.DISK, 100L);
+    Map<StorageType, Long> used = new HashMap<>();
+    used.put(StorageType.SSD, 90L);
+    used.put(StorageType.DISK, 20L);
+    Map<StorageType, Long> remaining = new HashMap<>();
+    remaining.put(StorageType.SSD, 10L);
+    remaining.put(StorageType.DISK, 80L);
+    Map<StorageType, Long> zeros = new HashMap<>();
+    zeros.put(StorageType.SSD, 0L);
+    zeros.put(StorageType.DISK, 0L);
+    return new SCMNodeStat(capacity, used, remaining, zeros, zeros, zeros);
   }
 }
 
