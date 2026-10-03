@@ -60,20 +60,19 @@ server-side handling, client translation code, and integration tests.
 
 Default local build flags:
 
-- Use `-DskipShade -DskipRecon -DskipDocs` for iterative local work.
+- Use `-DskipShade -DskipRecon` for iterative local work.
 - Drop `-DskipShade` only when you need filesystem artifacts or tests that depend on the shaded Ozone FS jar.
 - Drop `-DskipRecon` only when you are changing Recon UI or server behavior that must be built locally.
-- Drop `-DskipDocs` only when you are changing docs or doc-generation logic.
 
 Primary commands:
 
-- Iterative full build: `mvn clean install -DskipTests -DskipShade -DskipRecon -DskipDocs`
-- Full compile/verify smoke check: `mvn clean verify -DskipTests -DskipShade -DskipRecon -DskipDocs`
+- Iterative full build: `mvn clean install -DskipTests -DskipShade -DskipRecon`
+- Full compile/verify smoke check: `mvn clean verify -DskipTests -DskipShade -DskipRecon`
 - Rebuild one module and its dependencies:
-  `mvn -pl :ozone-manager -am install -DskipTests -DskipShade -DskipRecon -DskipDocs`
-- Run one unit test class: `mvn -pl :ozone-manager test -Dtest=TestOzoneManagerLock -DskipShade -DskipRecon -DskipDocs`
+  `mvn -pl :ozone-manager -am install -DskipTests -DskipShade -DskipRecon`
+- Run one unit test class: `mvn -pl :ozone-manager test -Dtest=TestOzoneManagerLock -DskipShade -DskipRecon`
 - Run one unit test method:
-  `mvn -pl :ozone-manager test -Dtest=TestOzoneManagerLock#testLockingOrder -DskipShade -DskipRecon -DskipDocs`
+  `mvn -pl :ozone-manager test -Dtest=TestOzoneManagerLock#testLockingOrder -DskipShade -DskipRecon`
 - Run one integration test class:
   `mvn -pl :ozone-integration-test test -Dtest=TestOmContainerLocationCache -DskipShade -DskipRecon`
 
