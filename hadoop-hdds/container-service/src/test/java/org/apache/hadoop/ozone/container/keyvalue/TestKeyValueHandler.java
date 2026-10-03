@@ -616,6 +616,32 @@ public class TestKeyValueHandler {
     }
   }
 
+  @Test
+  public void testDeleteRecoveringContainer() throws IOException {
+    HandlerWithVolumeSet handlerCtx = createKeyValueHandler(tempDir);
+    KeyValueHandler keyValueHandler = handlerCtx.getHandler();
+    ContainerSet containerSet = handlerCtx.getContainerSet();
+    try {
+      ContainerCommandRequestProto.Builder request = createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID)
+          .toBuilder();
+      request.getCreateContainerBuilder().setState(State.RECOVERING);
+      assertThat(keyValueHandler.handleCreateContainer(request.build(), null).getResult())
+          .isEqualTo(ContainerProtos.Result.SUCCESS);
+      Container<?> container = containerSet.getContainer(DUMMY_CONTAINER_ID);
+      assertThat(container).isNotNull();
+      assertThat(container.getContainerState()).isEqualTo(State.RECOVERING);
+      assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
+
+      keyValueHandler.deleteContainer(container, true);
+
+      assertThat(containerSet.getContainer(DUMMY_CONTAINER_ID)).isNull();
+      assertThat(containerSet.getRecoveringContainerMap()).doesNotContainKey(DUMMY_CONTAINER_ID);
+    } finally {
+      keyValueHandler.stop();
+      handlerCtx.getVolumeSet().getVolumesList().forEach(StorageVolume::shutdown);
+    }
+  }
+
   /**
    * Tests that deleting a container decrements the cached used space of its volume.
    */
