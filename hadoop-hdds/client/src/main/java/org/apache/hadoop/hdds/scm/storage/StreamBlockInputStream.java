@@ -637,7 +637,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
           if (setFailed(e)) {
             throw e;
           }
-          return null;
+          // The stream completed concurrently: re-check for an error or a queued response instead of returning EOF.
+          continue;
         }
       }
     }
