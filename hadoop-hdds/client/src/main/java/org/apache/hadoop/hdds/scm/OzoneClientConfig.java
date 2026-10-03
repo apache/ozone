@@ -338,7 +338,9 @@ public class OzoneClientConfig {
       defaultValue = "33554432",
       type = ConfigType.LONG,
       tags = {ConfigTag.CLIENT},
-      description = "Extra bytes to prefetch during streaming reads.")
+      description = "Size of the pre-read window for streaming reads: the number of bytes requested from the " +
+          "datanode ahead of the current read position. The window is refilled in bulk once the bytes requested " +
+          "ahead drop below half of this value. Set to 0 to disable pre-read.")
   private long streamReadPreReadSize = 32L << 20;
 
   @Config(key = "ozone.client.stream.read.response-data-size",

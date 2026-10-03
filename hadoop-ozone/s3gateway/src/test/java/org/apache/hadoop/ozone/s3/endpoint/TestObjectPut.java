@@ -59,6 +59,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -735,6 +736,25 @@ class TestObjectPut {
       // next request in the same thread
       verify(messageDigest, times(1)).reset();
     }
+  }
+
+  @Test
+  void testStreamingCopyReusesDestinationBucket() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
+    objectEndpoint.init();
+    OzoneVolume volume = spy(objectEndpoint.getVolume());
+    doReturn(volume).when(objectEndpoint).getVolume();
+    doReturn(true).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+
+    try (Response response = put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT)) {
+      assertThat(response.getStatus()).isEqualTo(HttpStatus.SC_OK);
+      assertThat(((CopyObjectResponse) response.getEntity()).getETag()).isEqualTo("\"" + contentMd5Hex() + "\"");
+    }
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+    assertThat(destBucket.getKey(DEST_KEY).getMetadata().get(OzoneConsts.ETAG)).isEqualTo(contentMd5Hex());
+    verify(volume).getBucket(DEST_BUCKET_NAME);
   }
 
   @Test
