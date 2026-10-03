@@ -272,15 +272,19 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     Table<String, OmDirectoryInfo> dirTable = omMetadataManager.getDirectoryTable();
 
     // Per-worker maps for lockless updates
-    Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+    Map<Thread, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+    ThreadLocal<Map<Long, NSSummary>> workerMaps = ThreadLocal.withInitial(() -> {
+      Map<Long, NSSummary> workerMap = new HashMap<>();
+      allWorkerMaps.put(Thread.currentThread(), workerMap);
+      return workerMap;
+    });
 
     // Divide threshold by worker count
     final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
 
     Function<Table.KeyValue<String, OmDirectoryInfo>, Void> kvOperation = kv -> {
       // Get this worker's private map
-      long threadId = Thread.currentThread().getId();
-      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
+      Map<Long, NSSummary> workerMap = workerMaps.get();
 
       try {
         // Check if async flusher has failed - stop immediately if so
@@ -293,7 +297,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         if (workerMap.size() >= perWorkerThreshold) {
           asyncFlusher.submitForFlush(workerMap);
           // Get fresh map for this worker
-          allWorkerMaps.put(threadId, new HashMap<>());
+          Map<Long, NSSummary> newWorkerMap = new HashMap<>();
+          workerMaps.set(newWorkerMap);
+          allWorkerMaps.put(Thread.currentThread(), newWorkerMap);
         }
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -311,6 +317,10 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     } catch (Exception ex) {
       LOG.error("Unable to process dirTable in parallel", ex);
       return false;
+    } finally {
+      // The small-table fallback runs the per-key operation on this (reused
+      // Recon pool) thread, so clear the per-worker ThreadLocal here.
+      workerMaps.remove();
     }
 
     long dirEndTime = System.currentTimeMillis();
@@ -342,15 +352,19 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     Table<String, OmKeyInfo> fileTable = omMetadataManager.getFileTable();
 
     // Per-worker maps for lockless updates
-    Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+    Map<Thread, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
+    ThreadLocal<Map<Long, NSSummary>> workerMaps = ThreadLocal.withInitial(() -> {
+      Map<Long, NSSummary> workerMap = new HashMap<>();
+      allWorkerMaps.put(Thread.currentThread(), workerMap);
+      return workerMap;
+    });
 
     // Divide threshold by worker count
     final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
 
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
       // Get this worker's private map
-      long threadId = Thread.currentThread().getId();
-      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
+      Map<Long, NSSummary> workerMap = workerMaps.get();
 
       try {
         // Check if async flusher has failed - stop immediately if so
@@ -364,7 +378,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         if (workerMap.size() >= perWorkerThreshold) {
           asyncFlusher.submitForFlush(workerMap);
           // Get fresh map for this worker
-          allWorkerMaps.put(threadId, new HashMap<>());
+          Map<Long, NSSummary> newWorkerMap = new HashMap<>();
+          workerMaps.set(newWorkerMap);
+          allWorkerMaps.put(Thread.currentThread(), newWorkerMap);
         }
       } catch (Exception e) {
         throw new RuntimeException(e);
@@ -382,6 +398,10 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     } catch (Exception ex) {
       LOG.error("Unable to process fileTable in parallel", ex);
       return false;
+    } finally {
+      // The small-table fallback runs the per-key operation on this (reused
+      // Recon pool) thread, so clear the per-worker ThreadLocal here.
+      workerMaps.remove();
     }
 
     long fileEndTime = System.currentTimeMillis();
