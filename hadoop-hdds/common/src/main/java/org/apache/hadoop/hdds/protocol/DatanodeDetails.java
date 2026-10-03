@@ -676,6 +676,8 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
         ", certSerialId: " + certSerialId +
         ", persistedOpState: " + persistedOpState +
         ", persistedOpStateExpiryEpochSec: " + persistedOpStateExpiryEpochSec +
+        ", version: " + version +
+        ", currentVersion: " + currentVersion +
         "}";
   }
 
@@ -701,6 +703,18 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     }
     return Objects.equals(ipAddress, datanodeDetails.ipAddress)
         && Objects.equals(hostName, datanodeDetails.hostName) && Objects.equals(ports, datanodeDetails.ports);
+  }
+
+  /**
+   * Checks whether the wire-protocol capability version (currentVersion) of
+   * the two nodes matches. Caching layers need to evict a cached
+   * entry when the DN advertises a newer capability version.
+   *
+   * @param datanodeDetails the other DatanodeDetails to compare.
+   * @return true if both nodes advertise the same currentVersion.
+   */
+  public boolean compareNodeVersions(DatanodeDetails datanodeDetails) {
+    return this.currentVersion == datanodeDetails.currentVersion;
   }
 
   @Override
