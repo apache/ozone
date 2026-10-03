@@ -27,7 +27,7 @@
 
   <properties>
     <classpath.skip>false</classpath.skip>
-    <iceberg.version>1.11.0</iceberg.version>
+    <iceberg.version>1.12.0</iceberg.version>
     <orc.version>1.9.9</orc.version>
     <parquet.version>1.17.1</parquet.version>
   </properties>
