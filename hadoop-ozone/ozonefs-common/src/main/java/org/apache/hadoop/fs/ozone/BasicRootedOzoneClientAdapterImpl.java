@@ -29,6 +29,9 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,6 +44,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -134,6 +139,10 @@ public class BasicRootedOzoneClientAdapterImpl
   private final OzoneConfiguration config;
   private final OzoneClientConfig clientConfig;
 
+  // Client-side cache of resolved bucket layouts keyed by "volumeName/bucketName".
+  // TTL and max-size are configurable via OzoneClientConfig.
+  private final Cache<String, BucketLayout> bucketLayoutCache;
+
   /**
    * Create new OzoneClientAdapter implementation.
    *
@@ -221,6 +230,10 @@ public class BasicRootedOzoneClientAdapterImpl
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
 
       clientConfig = conf.getObject(OzoneClientConfig.class);
+      bucketLayoutCache = CacheBuilder.newBuilder()
+          .expireAfterWrite(clientConfig.getFsBucketLayoutCacheExpiry().toMillis(), TimeUnit.MILLISECONDS)
+          .maximumSize(clientConfig.getFsBucketLayoutCacheSize())
+          .build();
       // Fetches the bucket layout to be used by OFS.
       try {
         initDefaultFsBucketLayout(conf);
@@ -300,9 +313,7 @@ public class BasicRootedOzoneClientAdapterImpl
       bucket = proxy.getBucketDetails(volumeStr, bucketStr);
 
       // resolve the bucket layout in case of Link Bucket
-      BucketLayout resolvedBucketLayout =
-          OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
-              new HashSet<>());
+      BucketLayout resolvedBucketLayout = resolveAndCacheBucketLayout(volumeStr, bucketStr, bucket);
 
       OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
     } catch (OMException ex) {
@@ -347,9 +358,7 @@ public class BasicRootedOzoneClientAdapterImpl
         // Try get bucket again
         bucket = proxy.getBucketDetails(volumeStr, bucketStr);
 
-        BucketLayout resolvedBucketLayout =
-            OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore,
-                new HashSet<>());
+        BucketLayout resolvedBucketLayout = resolveAndCacheBucketLayout(volumeStr, bucketStr, bucket);
 
         OzoneFSUtils.validateBucketLayout(bucket.getName(), resolvedBucketLayout);
       } else {
@@ -1368,6 +1377,40 @@ public class BasicRootedOzoneClientAdapterImpl
     return false;
   }
 
+  /**
+   * Resolves the layout of an already fetched bucket and records it in {@link #bucketLayoutCache}.
+   * Link resolution always runs, because it also marks an orphan link bucket via
+   * {@link OzoneBucket#setSourcePathExist}, which callers such as listStatus rely on.
+   */
+  private BucketLayout resolveAndCacheBucketLayout(String volumeStr, String bucketStr, OzoneBucket bucket)
+      throws IOException {
+    BucketLayout layout = OzoneClientUtils.resolveLinkBucketLayout(bucket, objectStore, new HashSet<>());
+    bucketLayoutCache.put(volumeStr + OZONE_URI_DELIMITER + bucketStr, layout);
+    return layout;
+  }
+
+  /**
+   * Returns the resolved {@link BucketLayout} for the given bucket, populating
+   * {@link #bucketLayoutCache} on a miss. Uses an atomic get-or-load so that
+   * concurrent callers on the same bucket do not each issue a redundant InfoBucket RPC.
+   * OBJECT_STORE layouts are cached like any other; callers are responsible for validating
+   * the returned layout with {@link OzoneFSUtils#validateBucketLayout}.
+   */
+  private BucketLayout getResolvedBucketLayout(String volumeStr, String bucketStr) throws IOException {
+    String cacheKey = volumeStr + OZONE_URI_DELIMITER + bucketStr;
+    try {
+      return bucketLayoutCache.get(cacheKey, () -> OzoneClientUtils.resolveLinkBucketLayout(
+          proxy.getBucketDetails(volumeStr, bucketStr), objectStore, new HashSet<>()));
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      throw new IOException("Failed to resolve bucket layout for " + cacheKey, e.getCause());
+    } catch (UncheckedExecutionException e) {
+      throw (RuntimeException) e.getCause();
+    }
+  }
+
   @Override
   public FileChecksum getFileChecksum(String keyName, long length)
       throws IOException {
@@ -1377,8 +1420,24 @@ public class BasicRootedOzoneClientAdapterImpl
       return null;
     }
     OFSPath ofsPath = new OFSPath(keyName, config);
-    OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
-    OzoneBucket bucket = getBucket(ofsPath, false);
+    String volumeName = ofsPath.getVolumeName();
+    String bucketName = ofsPath.getBucketName();
+    if (bucketName.isEmpty()) {
+      // throw FileNotFoundException in this case to make Hadoop common happy
+      throw new FileNotFoundException("getFileChecksum: Invalid argument: given bucket string is empty.");
+    }
+
+    // getFileChecksumWithCombineMode uses only volume.getName() and bucket.getName(), so minimal
+    // objects built from the path skip the volume info RPC, and the bucket info RPC on a cache hit.
+    BucketLayout resolvedLayout = getResolvedBucketLayout(volumeName, bucketName);
+    OzoneFSUtils.validateBucketLayout(bucketName, resolvedLayout);
+    OzoneVolume volume = OzoneVolume.newBuilder(config, proxy).setName(volumeName)
+        .setAcls(Collections.emptyList()).build();
+    OzoneBucket bucket = OzoneBucket.newBuilder(config, proxy)
+        .setVolumeName(volumeName)
+        .setName(bucketName)
+        .setBucketLayout(resolvedLayout)
+        .build();
     return OzoneClientUtils.getFileChecksumWithCombineMode(
         volume, bucket, ofsPath.getKeyName(),
         length, combineMode,

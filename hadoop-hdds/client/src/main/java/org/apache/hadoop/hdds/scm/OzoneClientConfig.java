@@ -357,6 +357,23 @@ public class OzoneClientConfig {
       description = "Timeout for receiving streaming read responses.")
   private Duration streamReadTimeout = Duration.ofSeconds(10);
 
+  @Config(key = "ozone.client.fs.bucket.layout.cache.expiry",
+      defaultValue = "2m",
+      type = ConfigType.TIME,
+      description = "Expiry of entries in the client-side cache of resolved bucket layouts used by OFS operations. "
+          + "A cached layout lets operations skip the per-call InfoBucket RPC; the expiry bounds staleness if a "
+          + "bucket is deleted and recreated with a different layout.",
+      tags = ConfigTag.CLIENT)
+  private Duration fsBucketLayoutCacheExpiry = Duration.ofMinutes(2);
+
+  @Config(key = "ozone.client.fs.bucket.layout.cache.size",
+      defaultValue = "1000",
+      description = "Maximum number of resolved bucket layouts cached client-side for OFS operations. Bounds the "
+          + "memory used by the layout cache; a value of 0 disables caching, so every operation re-fetches and "
+          + "re-validates the bucket layout.",
+      tags = ConfigTag.CLIENT)
+  private long fsBucketLayoutCacheSize = 1000;
+
   @PostConstruct
   public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -706,6 +723,14 @@ public class OzoneClientConfig {
 
   public void setStreamReadTimeout(Duration streamReadTimeout) {
     this.streamReadTimeout = streamReadTimeout;
+  }
+
+  public Duration getFsBucketLayoutCacheExpiry() {
+    return fsBucketLayoutCacheExpiry;
+  }
+
+  public long getFsBucketLayoutCacheSize() {
+    return fsBucketLayoutCacheSize;
   }
 
   public boolean isDatastreamPutBlockOnCloseEnabled() {
