@@ -135,6 +135,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -1327,8 +1328,21 @@ public class RpcClient implements ClientProtocol {
       String volumeName, String bucketName) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
-    OmBucketInfo bucketInfo =
-        ozoneManagerClient.getBucketInfo(volumeName, bucketName);
+    return buildOzoneBucket(ozoneManagerClient.getBucketInfo(volumeName, bucketName));
+  }
+
+  @Override
+  public OzoneBucket getS3BucketDetails(String bucketName) throws IOException {
+    if (!OzoneManagerVersion.S3_BUCKET_INFO_CONTEXT.isSupportedBy(omVersion)) {
+      String volumeName = getS3VolumeContext().getOmVolumeArgs().getVolume();
+      return getBucketDetails(volumeName, bucketName);
+    }
+    BucketInfoWithS3Context result = ozoneManagerClient.getS3BucketInfo(bucketName);
+    updateS3Principal(result.getUserPrincipal());
+    return buildOzoneBucket(result.getBucketInfo());
+  }
+
+  private OzoneBucket buildOzoneBucket(OmBucketInfo bucketInfo) {
     return OzoneBucket.newBuilder(conf, this)
         .setVolumeName(bucketInfo.getVolumeName())
         .setName(bucketInfo.getBucketName())

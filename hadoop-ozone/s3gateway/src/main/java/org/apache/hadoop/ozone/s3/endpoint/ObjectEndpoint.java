@@ -784,7 +784,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     long startNanos = context.getStartNanos();
 
     try {
-      OzoneBucket ozoneBucket = getVolume().getBucket(bucket);
+      OzoneBucket ozoneBucket = getClientProtocol().getS3BucketDetails(bucket);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucket, ozoneBucket.getOwner());
 
       Map<String, String> customMetadata =

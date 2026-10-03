@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -36,17 +37,29 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.event.Level;
 
 /**
@@ -352,6 +365,112 @@ public class TestRpcClient {
 
   private static ServiceInfoEx serviceInfoEx(ServiceInfo... serviceInfos) {
     return new ServiceInfoEx(Arrays.asList(serviceInfos), null, null);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"DEFAULT_VERSION, true", "LOOKUP_FILE_REJECTS_OBS, true", "ZDU, true",
+      "S3_BUCKET_INFO_CONTEXT, false", "UNKNOWN_VERSION, false"})
+  public void testS3BucketContext(OzoneManagerVersion omVersion, boolean legacyOm) throws Exception {
+    List<OMRequest> requests = new ArrayList<>();
+    OmBucketInfo info = OmBucketInfo.newBuilder().setVolumeName("tenant-volume").setBucketName("bucket")
+        .setOwner("bucket-owner").build();
+    RpcClient client = createS3BucketClient(omVersion, requests,
+        InfoBucketResponse.newBuilder().setBucketInfo(info.getProtobuf()).setUserPrincipal("principal").build(),
+        Status.OK);
+    try {
+      client.setThreadLocalS3Auth(new S3Auth("string", "signature", "tenant$principal", "tenant$principal"));
+      OzoneBucket bucket = client.getS3BucketDetails("bucket");
+      assertThat(bucket.getVolumeName()).isEqualTo("tenant-volume");
+      assertThat(bucket.getName()).isEqualTo("bucket");
+      assertThat(bucket.getOwner()).isEqualTo("bucket-owner");
+      assertThat(client.getThreadLocalS3Auth().getUserPrincipal()).isEqualTo("principal");
+      assertThat(requests).extracting(OMRequest::getCmdType).containsExactlyElementsOf(legacyOm
+          ? Arrays.asList(Type.GetS3VolumeContext, Type.InfoBucket) : Arrays.asList(Type.InfoBucket));
+      OMRequest lookup = requests.get(requests.size() - 1);
+      assertThat(lookup.getInfoBucketRequest().getAssumeS3Context()).isEqualTo(!legacyOm);
+      assertThat(lookup.getInfoBucketRequest().getVolumeName()).isEqualTo(legacyOm ? "tenant-volume" : "");
+    } finally {
+      client.clearThreadLocalS3Auth();
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testS3BucketMissingContextDoesNotFallback(boolean missingPrincipal) throws Exception {
+    List<OMRequest> requests = new ArrayList<>();
+    OmBucketInfo info = OmBucketInfo.newBuilder().setVolumeName("wrong-volume").setBucketName("bucket").build();
+    InfoBucketResponse.Builder response = InfoBucketResponse.newBuilder();
+    if (missingPrincipal) {
+      response.setBucketInfo(info.getProtobuf());
+    } else {
+      response.setUserPrincipal("principal");
+    }
+    RpcClient client = createS3BucketClient(OzoneManagerVersion.S3_BUCKET_INFO_CONTEXT, requests,
+        response.build(), Status.OK);
+    try {
+      IOException error = assertThrows(IOException.class, () -> client.getS3BucketDetails("bucket"));
+      assertThat(error).hasMessageContaining("missing S3 context");
+      assertThat(requests).extracting(OMRequest::getCmdType).containsExactly(Type.InfoBucket);
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = Status.class, names = {"PERMISSION_DENIED", "BUCKET_NOT_FOUND", "VOLUME_NOT_FOUND"})
+  public void testS3BucketErrorsDoNotFallback(Status status) throws Exception {
+    List<OMRequest> requests = new ArrayList<>();
+    RpcClient client = createS3BucketClient(OzoneManagerVersion.S3_BUCKET_INFO_CONTEXT, requests,
+        InfoBucketResponse.getDefaultInstance(), status);
+    try {
+      OMException error = assertThrows(OMException.class, () -> client.getS3BucketDetails("bucket"));
+      assertThat(error.getResult().name()).isEqualTo(status.name());
+      assertThat(requests).extracting(OMRequest::getCmdType).containsExactly(Type.InfoBucket);
+    } finally {
+      client.close();
+    }
+  }
+
+  private static RpcClient createS3BucketClient(OzoneManagerVersion omVersion, List<OMRequest> requests,
+      InfoBucketResponse bucketResponse, Status status) throws IOException {
+    return new RpcClient(new OzoneConfiguration(), null) {
+      @Override
+      protected OmTransport createOmTransport(String omServiceId) {
+        return new MockOmTransport() {
+          @Override
+          public OMResponse submitRequest(OMRequest request) throws IOException {
+            OMResponse.Builder response = OMResponse.newBuilder().setCmdType(request.getCmdType())
+                .setStatus(Status.OK).setSuccess(true);
+            if (request.getCmdType() == Type.ServiceList) {
+              ServiceListResponse.Builder services = ServiceListResponse.newBuilder();
+              for (OzoneManagerVersion version : Arrays.asList(OzoneManagerVersion.SOFTWARE_VERSION, omVersion)) {
+                services.addServiceInfo(om(version).getProtobuf());
+              }
+              return response.setServiceListResponse(services).build();
+            }
+            requests.add(request);
+            if (request.getCmdType() == Type.GetS3VolumeContext) {
+              return response.setGetS3VolumeContextResponse(GetS3VolumeContextResponse.newBuilder()
+                  .setUserPrincipal("principal").setVolumeInfo(OmVolumeArgs.newBuilder()
+                      .setVolume("tenant-volume").setOwnerName("principal").setAdminName("admin").build()
+                      .getProtobuf()))
+                  .build();
+            }
+            if (request.getCmdType() == Type.InfoBucket) {
+              return response.setStatus(status).setSuccess(status == Status.OK)
+                  .setInfoBucketResponse(bucketResponse).build();
+            }
+            return super.submitRequest(request);
+          }
+        };
+      }
+
+      @Override
+      protected XceiverClientFactory createXceiverClientFactory(ServiceInfoEx serviceInfo) {
+        return new MockXceiverClientFactory();
+      }
+    };
   }
 
   private static RpcClient createRpcClient() throws IOException {

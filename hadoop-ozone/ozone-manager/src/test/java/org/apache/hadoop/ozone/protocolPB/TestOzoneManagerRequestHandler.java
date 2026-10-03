@@ -41,8 +41,10 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -65,6 +67,36 @@ import org.mockito.Mockito;
  * Test class to test out OzoneManagerRequestHandler.
  */
 public class TestOzoneManagerRequestHandler {
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testInfoBucketS3Context(boolean assumeS3Context) throws IOException {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager om = handler.getOzoneManager();
+    OmBucketInfo bucket = OmBucketInfo.newBuilder().setVolumeName("resolved-volume").setBucketName("bucket").build();
+    if (assumeS3Context) {
+      Mockito.when(om.getS3BucketInfo("bucket")).thenReturn(new BucketInfoWithS3Context(bucket, "principal"));
+    } else {
+      Mockito.when(om.getBucketInfo("volume", "bucket")).thenReturn(bucket);
+    }
+    OzoneManagerProtocolProtos.InfoBucketRequest.Builder lookup =
+        OzoneManagerProtocolProtos.InfoBucketRequest.newBuilder().setVolumeName("volume").setBucketName("bucket");
+    if (assumeS3Context) {
+      lookup.setAssumeS3Context(true);
+    }
+    OzoneManagerProtocolProtos.OMResponse response = handler.handleReadRequest(
+        OzoneManagerProtocolProtos.OMRequest.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.InfoBucket)
+            .setClientId("client").setInfoBucketRequest(lookup).build());
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getStatus());
+    Assertions.assertEquals(bucket.getProtobuf(), response.getInfoBucketResponse().getBucketInfo());
+    Assertions.assertEquals(assumeS3Context, response.getInfoBucketResponse().hasUserPrincipal());
+    if (assumeS3Context) {
+      Assertions.assertEquals("principal", response.getInfoBucketResponse().getUserPrincipal());
+      Mockito.verify(om, Mockito.never()).getBucketInfo(Mockito.anyString(), Mockito.anyString());
+    } else {
+      Mockito.verify(om, Mockito.never()).getS3BucketInfo(Mockito.anyString());
+    }
+  }
 
   private OzoneManagerRequestHandler getRequestHandler(int limitListKeySize) {
     OmConfig config = OzoneConfiguration.newInstanceOf(OmConfig.class);
