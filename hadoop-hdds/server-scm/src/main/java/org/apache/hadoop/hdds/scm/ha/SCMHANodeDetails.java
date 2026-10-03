@@ -266,7 +266,8 @@ public class SCMHANodeDetails {
         LOG.info("Found matching SCM address with SCMServiceId: {}, " +
                 "SCMNodeId: {}, RPC Address: {} and Ratis port: {}",
             localScmServiceId, localScmNodeId,
-            NetUtils.getHostPortString(localRpcAddress), localRatisPort);
+            HddsUtils.getHostPortString(localRpcAddress.getHostName(), localRpcAddress.getPort()),
+            localRatisPort);
 
         // Set SCM node specific config keys.
         ConfUtils.setNodeSpecificConfigs(nodeSpecificConfigKeys, conf,
