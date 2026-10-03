@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.storage;
 import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.primitives.Bytes;
+import java.io.EOFException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -75,7 +77,9 @@ public class TestMultipartInputStream {
       int position = 12;
       int expectedBytes = fileLen - position;
       ByteBuffer buffer = ByteBuffer.allocate(expectedBytes * 2);
-      assertTrue(multipartStream.readFully(position, buffer));
+      assertEquals(expectedBytes, multipartStream.read(position, buffer));
+      buffer.clear();
+      assertThrows(EOFException.class, () -> multipartStream.readFully(position, buffer));
       assertEquals(expectedBytes, buffer.position());
     }
   }
@@ -92,7 +96,9 @@ public class TestMultipartInputStream {
       int position = 12;
       int expectedBytes = fileLen - position;
       ByteBuffer buffer = ByteBuffer.allocate(expectedBytes * 2);
-      assertTrue(multipartStream.readFully(position, buffer));
+      assertEquals(expectedBytes, multipartStream.read(position, buffer));
+      buffer.clear();
+      assertThrows(EOFException.class, () -> multipartStream.readFully(position, buffer));
       assertEquals(expectedBytes, buffer.position());
       verify(part, never()).seek(anyLong());
     }
@@ -113,11 +119,7 @@ public class TestMultipartInputStream {
       multipartStream.initialize();
       assertTrue(multipartStream.isStreamBlockInputStream());
       PositionedReadTestHelper.runConcurrentPositionedReads(keyData,
-          (offset, buf) -> {
-            if (!multipartStream.readFully(offset, buf)) {
-              throw new AssertionError("stateless readFully returned false at " + offset);
-            }
-          });
+          multipartStream::readFully);
       verify(part0, never()).seek(anyLong());
       verify(part1, never()).seek(anyLong());
     }
@@ -147,11 +149,7 @@ public class TestMultipartInputStream {
     try (MultipartInputStream multipartStream = new MultipartInputStream("test-key", parts)) {
       multipartStream.initialize();
       PositionedReadTestHelper.runConcurrentPositionedReads(keyData,
-          (offset, buf) -> {
-            if (!multipartStream.readFully(offset, buf)) {
-              throw new AssertionError("stateless readFully returned false at " + offset);
-            }
-          });
+          multipartStream::readFully);
     }
   }
 
@@ -159,7 +157,7 @@ public class TestMultipartInputStream {
     StreamBlockInputStream part = mock(StreamBlockInputStream.class);
     when(part.getLength()).thenReturn((long) partData.length);
     doAnswer(invocation -> readPositionedFrom(partData, invocation)).when(part)
-        .readPositioned(anyLong(), any(ByteBuffer.class));
+        .read(anyLong(), any(ByteBuffer.class));
     return part;
   }
 

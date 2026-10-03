@@ -82,6 +82,7 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
+import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
@@ -721,6 +722,19 @@ class TestOzoneAtRestEncryption {
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
 
       assertInstanceOf(MultipartInputStream.class, inputStream.getInputStream());
+      if (numParts == 2) {
+        inputStream.seek(123);
+        PositionedReadTestHelper.runConcurrentPositionedReads(inputData, inputStream::readFully);
+        int offset = partsData.get(0).length - 17;
+        ByteBuffer destination = ByteBuffer.allocateDirect(DEFAULT_CRYPTO_BUFFER_SIZE + 37);
+        inputStream.readFully(offset, destination);
+        destination.flip();
+        byte[] actual = new byte[destination.remaining()];
+        destination.get(actual);
+        assertArrayEquals(Arrays.copyOfRange(inputData, offset, offset + actual.length), actual);
+        assertEquals(123, inputStream.getPos());
+        inputStream.seek(0);
+      }
 
       // Test complete read
       byte[] completeRead = new byte[keySize];

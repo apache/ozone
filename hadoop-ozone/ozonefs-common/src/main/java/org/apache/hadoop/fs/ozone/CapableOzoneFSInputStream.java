@@ -34,8 +34,9 @@ final class CapableOzoneFSInputStream extends OzoneFSInputStream
     switch (StringUtils.toLowerCase(capability)) {
     case StreamCapabilities.READBYTEBUFFER:
     case StreamCapabilities.UNBUFFER:
-    case StreamCapabilities.PREADBYTEBUFFER:
       return true;
+    case StreamCapabilities.PREADBYTEBUFFER:
+      return supportsPositionedRead();
     default:
       return false;
     }

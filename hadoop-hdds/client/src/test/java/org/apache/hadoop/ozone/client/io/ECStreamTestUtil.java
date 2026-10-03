@@ -266,7 +266,7 @@ public final class ECStreamTestUtil {
       int repInd = currentPipeline.getReplicaIndex(pipeline.getNodes().get(0));
       TestBlockInputStream stream = new TestBlockInputStream(
           blockInfo.getBlockID(), blockInfo.getLength(),
-          blockStreamData.get(repInd - 1), repInd);
+          blockStreamData.get(repInd - 1).duplicate(), repInd);
       if (failIndexes.remove(Integer.valueOf(repInd))) {
         stream.setShouldError(true);
       }
@@ -322,6 +322,19 @@ public final class ECStreamTestUtil {
 
     public int getEcReplicaIndex() {
       return ecReplicaIndex;
+    }
+
+    @Override
+    protected int readPositioned(long position, ByteBuffer buffer) {
+      if (position >= length) {
+        return EOF;
+      }
+      ByteBuffer source = data.duplicate();
+      source.position((int) position);
+      int n = (int) Math.min(buffer.remaining(), length - position);
+      source.limit(source.position() + n);
+      buffer.put(source);
+      return n;
     }
 
     @Override

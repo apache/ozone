@@ -57,7 +57,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   private BlockExtendedInputStream blockReader;
   private boolean reconstructionReader = false;
   private List<DatanodeDetails> failedLocations = new ArrayList<>();
-  private boolean closed = false;
+  private volatile boolean closed = false;
   private OzoneClientConfig config;
 
   /**
@@ -195,6 +195,20 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
       }
     }
     return totalRead;
+  }
+
+  @Override
+  protected int readPositioned(long position, ByteBuffer buffer) throws IOException {
+    ensureNotClosed();
+    if (position >= blockInfo.getLength()) {
+      return EOF;
+    }
+    // Each request owns its cursor, reconstruction buffers and failure recovery.
+    try (ECBlockInputStreamProxy reader = new ECBlockInputStreamProxy(repConfig, blockInfo,
+        xceiverClientFactory, refreshFunction, ecBlockInputStreamFactory, config)) {
+      reader.seek(position);
+      return reader.read(buffer);
+    }
   }
 
   private synchronized void failoverToReconstructionRead(

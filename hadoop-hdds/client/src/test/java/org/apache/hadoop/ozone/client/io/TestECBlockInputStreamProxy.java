@@ -18,16 +18,26 @@
 package org.apache.hadoop.ozone.client.io;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.SplittableRandom;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -40,6 +50,9 @@ import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Unit tests for the  ECBlockInputStreamProxy class.
@@ -326,6 +339,75 @@ public class TestECBlockInputStreamProxy {
       streamFactory.getStreams().get(true).setShouldErrorOnSeek(true);
       assertThrows(IOException.class, () -> bis.seek(1024));
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"healthy", "missing", "failover", "failure"})
+  @Timeout(30)
+  void positionedReadsOverlapAndCloseTheirReaders(String mode) throws Exception {
+    byte[] data = generateData(1024).array();
+    BlockLocationInfo info = ECStreamTestUtil.createKeyInfo(repConfig, data.length,
+        "missing".equals(mode) ? ECStreamTestUtil.createIndexMap(2, 3, 4, 5)
+            : ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5));
+    CyclicBarrier reads = new CyclicBarrier(2);
+    AtomicInteger opened = new AtomicInteger();
+    AtomicInteger closed = new AtomicInteger();
+    ECBlockInputStreamFactory factory = (missing, failed, replication, block, xceiver, refresh, config) -> {
+      opened.incrementAndGet();
+      return new ECStreamTestUtil.TestBlockInputStream(block.getBlockID(), block.getLength(), ByteBuffer.wrap(data)) {
+        @Override
+        public int read(ByteBuffer destination) throws IOException {
+          if ("failover".equals(mode) && !missing) {
+            destination.put((byte) 0); // Retry must overwrite bytes from the failed attempt.
+            throw new BadDataLocationException(info.getPipeline().getFirstNode(), "failed data replica");
+          }
+          try {
+            reads.await(10, TimeUnit.SECONDS);
+          } catch (Exception e) {
+            throw new IOException("EC positioned reads did not overlap", e);
+          }
+          if ("failure".equals(mode)) {
+            throw new IOException("injected failure");
+          }
+          return super.read(destination);
+        }
+
+        @Override
+        public void close() {
+          closed.incrementAndGet();
+        }
+      };
+    };
+    ExecutorService pool = Executors.newFixedThreadPool(2);
+    try (ECBlockInputStreamProxy stream = new ECBlockInputStreamProxy(repConfig, info, null, null,
+        factory, conf.getObject(OzoneClientConfig.class))) {
+      stream.seek(71);
+      List<Future<?>> futures = new ArrayList<>();
+      for (int offset : new int[] {17, 203}) {
+        futures.add(pool.submit((Callable<Void>) () -> {
+          ByteBuffer destination = ByteBuffer.allocateDirect(333);
+          if ("failure".equals(mode)) {
+            assertThrows(IOException.class, () -> stream.readFully(offset, destination));
+          } else {
+            stream.readFully(offset, destination);
+            destination.flip();
+            byte[] actual = new byte[destination.remaining()];
+            destination.get(actual);
+            assertArrayEquals(Arrays.copyOfRange(data, offset, offset + 333), actual);
+          }
+          return null;
+        }));
+      }
+      for (Future<?> future : futures) {
+        future.get(20, TimeUnit.SECONDS);
+      }
+      assertEquals(71, stream.getPos());
+      assertEquals(opened.get() - 1, closed.get());
+      assertEquals(-1, stream.read(data.length, ByteBuffer.allocate(1)));
+    } finally {
+      pool.shutdownNow();
+    }
+    assertEquals(opened.get(), closed.get());
   }
 
   private ByteBuffer generateData(int length) {
