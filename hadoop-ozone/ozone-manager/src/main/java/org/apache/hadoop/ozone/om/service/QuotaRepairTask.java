@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.service;
 
 import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
 import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.VALUE_ONLY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
@@ -516,7 +517,7 @@ public class QuotaRepairTask {
     // a typed iterator decodes on this thread, so keep values raw and let the workers decode
     try (Table.KeyValueIterator<String, byte[]> keyIter = metadataManager.getStore()
         .getTable(OMDBDefinition.DELETED_TABLE, StringCodec.get(), ByteArrayCodec.get(), CacheType.NO_CACHE)
-        .iterator()) {
+        .iterator(null, VALUE_ONLY)) {
       scanTableInBatches(executor, keyIter, "snapshot usages from deletedTable (active DB checkpoint)", kv -> {
         try {
           countDeletedKey(codec.fromPersistedFormat(kv.getValue()), bucketById, snapshotCountByBucketNameKey);
