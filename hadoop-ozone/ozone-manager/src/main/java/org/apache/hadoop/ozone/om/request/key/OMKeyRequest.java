@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -200,32 +201,22 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final int numBlocks = (int) Math.min(ozoneManager.getPreallocateBlocksMax(),
         (requestedSize - 1) / (scmBlockSize * dataGroupSize) + 1);
 
-    final String scmClientMachine;
-    final String omClientMachine;
-    // Sorted order cached by datanode set so blocks whose pipelines share the
-    // same datanodes are sorted once (mirrors the read path's caching). Keyed by
-    // the UUID set so it is order-insensitive and dedups across pipelines.
-    final Map<Set<String>, List<? extends DatanodeDetails>> sortedByNodes;
     final String remoteAddress = userInfo.getRemoteAddress();
     final NetworkTopology clusterMap = shouldSortDatanodes
         && keyManager.isSortDatanodesForWriteEnabled()
         ? ozoneManager.getClusterMapAllowNull() : null;
-    if (!shouldSortDatanodes) {
-      scmClientMachine = "";
-      omClientMachine = "";
-      sortedByNodes = null;
-    } else if (clusterMap != null && !remoteAddress.isEmpty()) {
-      // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
-      scmClientMachine = "";
-      omClientMachine = remoteAddress;
-      sortedByNodes = new HashMap<>();
-    } else {
-      // Sort in SCM (or keep order when remoteAddress is empty, since SCM skips
-      // sorting for an empty client machine).
-      scmClientMachine = remoteAddress;
-      omClientMachine = "";
-      sortedByNodes = null;
-    }
+    // Resolve the client once per request, before the block loop, so the
+    // DNS-to-switch mapping is consulted at most once.
+    final Node omClient = clusterMap != null && !remoteAddress.isEmpty()
+        ? keyManager.resolveClientForWrite(remoteAddress, clusterMap) : null;
+    // Let SCM sort when OM sorting is disabled or its topology/client lookup is unavailable.
+    // An empty client address tells SCM to skip sorting.
+    final String scmClientMachine = shouldSortDatanodes && omClient == null ? remoteAddress : "";
+    // Sorted order cached by datanode set so blocks whose pipelines share the
+    // same datanodes are sorted once (mirrors the read path's caching). Keyed by
+    // the UUID set so it is order-insensitive and dedups across pipelines.
+    final Map<Set<String>, List<? extends DatanodeDetails>> sortedByNodes =
+        omClient != null ? new HashMap<>() : null;
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
@@ -250,15 +241,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .map(DatanodeDetails::getUuidString).collect(Collectors.toSet());
         List<? extends DatanodeDetails> sorted = sortedByNodes.get(uuidSet);
         if (sorted == null) {
-          sorted = keyManager.sortDatanodesForWrite(nodes, omClientMachine, clusterMap);
-          // Cache only a freshly sorted order, not an input list returned
-          // unchanged when the client is unresolved: that order is per-pipeline
-          // and must not be reused for another pipeline with the same node set.
-          if (sorted != nodes) {
+          sorted = keyManager.sortDatanodesForWrite(nodes, remoteAddress, omClient, clusterMap);
+          // Cache only sorted results; a skipped sort must preserve each pipeline's own order.
+          if (sorted != null) {
             sortedByNodes.put(uuidSet, sorted);
           }
         }
-        if (!Objects.equals(sorted, pipeline.getNodesInOrder())) {
+        if (sorted != null && !Objects.equals(sorted, pipeline.getNodesInOrder())) {
           pipeline = pipeline.copyWithNodesInOrder(sorted);
         }
       }
