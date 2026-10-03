@@ -152,8 +152,8 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         OZONE_OM_ADDRESS_KEY);
 
-    return host.orElse(OZONE_OM_BIND_HOST_DEFAULT) + ":" +
-        getOmRpcPort(conf);
+    return getHostPortString(host.orElse(OZONE_OM_BIND_HOST_DEFAULT),
+        getOmRpcPort(conf));
   }
 
   /**
@@ -171,8 +171,9 @@ public final class OmUtils {
 
     if (host.isPresent()) {
       validateAdvertisedHost(confKey, host.get());
-      return host.get() + ":" + getPortNumberFromConfigKeys(conf, confKey)
-              .orElse(OZONE_OM_PORT_DEFAULT);
+      return getHostPortString(host.get(),
+          getPortNumberFromConfigKeys(conf, confKey)
+              .orElse(OZONE_OM_PORT_DEFAULT));
     } else {
       // The specified confKey is not set
       return null;
@@ -267,6 +268,7 @@ public final class OmUtils {
     case GetSnapshotInfo:
     case GetObjectTagging:
     case GetBucketTagging:
+    case GetBucketDeletedBytes:
       return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
@@ -401,6 +403,7 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetLifecycleConfiguration:
     case GetLifecycleServiceStatus:
+    case GetBucketDeletedBytes:
       return true;
     case GetBucketTagging:
       return true;
@@ -630,7 +633,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" + addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT));
   }
 
   /**
@@ -656,8 +660,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" +
-        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT));
   }
 
   public static File createOMDir(String dirPath) {

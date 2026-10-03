@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.HddsUtils.processForLogging;
 import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddress;
@@ -31,6 +33,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
@@ -110,6 +114,18 @@ public class TestHddsUtils {
 
     // Already-bracketed IPv6 literals keep a single pair of brackets.
     assertEquals("[2001:db8::1]:9858", HddsUtils.getHostPortString("[2001:db8::1]", 9858));
+  }
+
+  @Test
+  void testGetDatanodeRpcAddressWithIPv6BindHost() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_CLIENT_BIND_HOST_KEY, "::");
+    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, "[2001:db8::1]:100");
+
+    InetSocketAddress addr = HddsUtils.getDatanodeRpcAddress(conf);
+
+    assertEquals(InetAddress.getByName("::"), addr.getAddress());
+    assertEquals(100, addr.getPort());
   }
 
   @Test

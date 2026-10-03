@@ -208,6 +208,51 @@ public class TestSnapshotChain {
   }
 
   @Test
+  public void testFailedAddPreservesChains() throws Exception {
+    UUID id = UUID.randomUUID();
+    SnapshotInfo info = createSnapshotInfo(id, UUID.randomUUID(), null, 1L);
+
+    assertThrows(IOException.class, () -> chainManager.addSnapshot(info));
+
+    assertTrue(chainManager.getGlobalSnapshotChain().isEmpty());
+    assertTrue(chainManager.getSnapshotChainByPath().isEmpty());
+  }
+
+  @Test
+  public void testFailedAddPreservesExistingSnapshot() throws Exception {
+    UUID firstId = UUID.randomUUID();
+    chainManager.addSnapshot(createSnapshotInfo(firstId, null, null, 1L));
+
+    UUID rejectedId = UUID.randomUUID();
+    SnapshotInfo rejected = createSnapshotInfo(rejectedId, UUID.randomUUID(), firstId, 2L);
+
+    assertThrows(IOException.class, () -> chainManager.addSnapshot(rejected));
+
+    assertEquals(1, chainManager.getGlobalSnapshotChain().size());
+    assertEquals(1, chainManager.getSnapshotChainPath("vol1/bucket1").size());
+    assertEquals(firstId, chainManager.getOldestGlobalSnapshotId());
+    assertEquals(firstId, chainManager.getLatestGlobalSnapshotId());
+    assertEquals(firstId, chainManager.getLatestPathSnapshotId("vol1/bucket1"));
+    assertFalse(chainManager.hasNextGlobalSnapshot(firstId));
+    assertFalse(chainManager.hasNextPathSnapshot("vol1/bucket1", firstId));
+    assertFalse(chainManager.getGlobalSnapshotChain().containsKey(rejectedId));
+  }
+
+  @Test
+  public void testWrongPathDeletePreservesGlobalChain() throws Exception {
+    UUID id = UUID.randomUUID();
+    chainManager.addSnapshot(createSnapshotInfo(id, null, null, 1L));
+
+    SnapshotInfo wrongPath = createSnapshotInfo(id, null, null, 1L);
+    wrongPath.setSnapshotPath("vol1/bucket2");
+
+    assertThrows(IOException.class, () -> chainManager.deleteSnapshot(wrongPath));
+
+    assertTrue(chainManager.getGlobalSnapshotChain().containsKey(id));
+    assertTrue(chainManager.getSnapshotChainPath("vol1/bucket1").containsKey(id));
+  }
+
+  @Test
   public void testDeleteSnapshot() throws Exception {
     // add three snapshots
     UUID snapshotID1 = UUID.randomUUID();
