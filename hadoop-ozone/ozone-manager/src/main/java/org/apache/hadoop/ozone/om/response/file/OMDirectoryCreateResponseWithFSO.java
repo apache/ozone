@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.file;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
@@ -28,7 +26,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
@@ -37,7 +34,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Response for create directory request.
  */
-@CleanupTableInfo(cleanupTables = {DIRECTORY_TABLE})
 public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
 
   private static final Logger LOG =
@@ -45,7 +41,6 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
 
   private OmDirectoryInfo dirInfo;
   private List<OmDirectoryInfo> parentDirInfos;
-  private Result result;
   private long volumeId;
   private long bucketId;
   private OmBucketInfo bucketInfo;
@@ -59,7 +54,6 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
     super(omResponse, bucketLayout);
     this.dirInfo = dirInfo;
     this.parentDirInfos = pDirInfos;
-    this.result = result;
     this.volumeId = volumeId;
     this.bucketId = bucketId;
     this.bucketInfo = bucketInfo;
@@ -71,7 +65,6 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
   public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse,
                                      @Nonnull Result result) {
     super(omResponse);
-    this.result = result;
   }
 
   @Override
