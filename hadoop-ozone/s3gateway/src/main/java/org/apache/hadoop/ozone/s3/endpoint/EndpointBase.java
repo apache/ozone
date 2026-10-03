@@ -69,6 +69,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -480,19 +481,32 @@ public abstract class EndpointBase {
   }
 
   private static String decodeRfc2047MetadataValue(String value) {
-    if (!value.startsWith("=?") || !value.endsWith("?=")) {
+    if (!value.startsWith("=?")) {
       return value;
     }
 
-    try {
-      return RFC_2047_Q_CODEC.decode(value);
-    } catch (DecoderException ex) {
-      try {
-        return RFC_2047_B_CODEC.decode(value);
-      } catch (DecoderException ignored) {
-        return value;
-      }
+    int charsetEnd = value.indexOf('?', 2);
+    int encodingEnd = charsetEnd < 0 ? -1 : value.indexOf('?', charsetEnd + 1);
+    int encodedTextEnd = encodingEnd < 0
+        ? -1 : value.indexOf("?=", encodingEnd + 1);
+    if (encodedTextEnd != value.length() - 2) {
+      return value;
     }
+
+    String encoding = value.substring(charsetEnd + 1, encodingEnd);
+    try {
+      if (encoding.equalsIgnoreCase("Q")) {
+        return RFC_2047_Q_CODEC.decode(value);
+      }
+      if (encoding.equalsIgnoreCase("B")) {
+        Base64.getDecoder().decode(
+            value.substring(encodingEnd + 1, encodedTextEnd));
+        return RFC_2047_B_CODEC.decode(value);
+      }
+    } catch (DecoderException | IllegalArgumentException ex) {
+      return value;
+    }
+    return value;
   }
 
   private static String encodeRfc2047MetadataValue(String value) {
