@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
@@ -560,7 +559,6 @@ public class TestSnapshotDiffManager {
         new SnapshotTestUtils.StubbedPersistentMap<>();
     Map<Long, SnapshotDiffReport.DiffType> diffMap = new HashMap<>();
     AtomicInteger count = new AtomicInteger(0);
-    AtomicInteger maxIndex = new AtomicInteger(0);
     LongStream.range(0, 100).forEach(objectId -> {
       try {
         String key = "key" + objectId;
@@ -598,7 +596,6 @@ public class TestSnapshotDiffManager {
         }
         if (objectId >= 0 && objectId <= 25 && objectId % 4 == 2) {
           diffMap.put(objectId, SnapshotDiffReport.DiffType.MODIFY);
-          maxIndex.set(count.get());
           count.getAndIncrement();
         }
       } catch (IOException e) {
@@ -660,16 +657,16 @@ public class TestSnapshotDiffManager {
       assertEquals(100, totalDiffEntries.getKey());
       SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, "jobId",
           JobStatus.DONE, "vol", "buck", "fs", "ts", false,
-          true, diffMap.size(), null, 0.0, "jobId-4" + leftPad(String.valueOf(maxIndex.get()), 20, '0'));
+          true, diffMap.size(), null, 0.0, totalDiffEntries.getRight());
       SnapshotDiffReportOzone snapshotDiffReportOzone =
           snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
               "buck", "fs", "ts",
               "", Integer.MAX_VALUE);
       Set<SnapshotDiffReport.DiffType> expectedOrder = new LinkedHashSet<>();
       expectedOrder.add(SnapshotDiffReport.DiffType.DELETE);
+      expectedOrder.add(SnapshotDiffReport.DiffType.MODIFY);
       expectedOrder.add(SnapshotDiffReport.DiffType.RENAME);
       expectedOrder.add(SnapshotDiffReport.DiffType.CREATE);
-      expectedOrder.add(SnapshotDiffReport.DiffType.MODIFY);
 
       Set<SnapshotDiffReport.DiffType> actualOrder = new LinkedHashSet<>();
       for (DiffReportEntry entry :
@@ -724,7 +721,7 @@ public class TestSnapshotDiffManager {
       }
     }
     List<SnapshotDiffReport.DiffType> orderedList = Arrays.asList(SnapshotDiffReport.DiffType.DELETE,
-        SnapshotDiffReport.DiffType.RENAME, SnapshotDiffReport.DiffType.CREATE, SnapshotDiffReport.DiffType.MODIFY);
+        SnapshotDiffReport.DiffType.MODIFY, SnapshotDiffReport.DiffType.RENAME, SnapshotDiffReport.DiffType.CREATE);
 
     indexList.sort((idx1, idx2) -> {
       if (typeMap.get(idx1) != typeMap.get(idx2)) {
@@ -1702,20 +1699,19 @@ public class TestSnapshotDiffManager {
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("filterTopLevelDeletedEntryScenarios")
-  public void testFilterTopLevelDeletedEntries(
+  public void testHasDeletedAncestorsBatch(
       String scenarioDescription,
       List<WithParentObjectId> deletedEntries,
       Set<Long> renamedDirectoryIds,
       Map<Long, Long> objectIdToParentId,
-      Set<Long> expectedObjectIds) {
+      Set<Long> expectedObjectIds) throws IOException {
     long bucketObjectId = 0L;
     Map<Long, Long> parentMap = objectIdToParentId != null
         ? objectIdToParentId
         : buildDirATreeParentMap(bucketObjectId);
 
-    List<WithParentObjectId> filteredDeletes = snapshotDiffManager
-        .filterTopLevelDeletedEntries(deletedEntries, OmDirectoryInfo.class::isInstance,
-            parentMap, renamedDirectoryIds, bucketObjectId);
+    List<WithParentObjectId> filteredDeletes = filterTopLevelDeletedEntriesBatch(
+        deletedEntries, renamedDirectoryIds, parentMap, bucketObjectId);
 
     assertThat(filteredDeletes)
         .extracting(WithParentObjectId::getObjectID)
@@ -1782,17 +1778,19 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testFilterTopLevelDeletedEntriesRejectsNullArguments() {
+  public void testHasDeletedAncestorsBatchRejectsNullArguments() {
     long bucketObjectId = 0L;
     OmDirectoryInfo dirA = newDeletedDir(100L, bucketObjectId);
-    List<OmDirectoryInfo> deletedEntries = Collections.singletonList(dirA);
+    List<Long> parentObjectIds = Collections.singletonList(dirA.getParentObjectID());
 
     assertThrows(NullPointerException.class, () -> snapshotDiffManager
-        .filterTopLevelDeletedEntries(deletedEntries, OmDirectoryInfo.class::isInstance,
-            null, Collections.emptySet(), bucketObjectId));
+        .hasDeletedAncestors(parentObjectIds, null, id -> false,
+            ids -> ids.stream().map(id -> dirA.getParentObjectID()).collect(Collectors.toList()),
+            bucketObjectId, new HashMap<>()));
     assertThrows(NullPointerException.class, () -> snapshotDiffManager
-        .filterTopLevelDeletedEntries(deletedEntries, OmDirectoryInfo.class::isInstance,
-            Collections.emptyMap(), null, bucketObjectId));
+        .hasDeletedAncestors(parentObjectIds, id -> false, null,
+            ids -> ids.stream().map(id -> dirA.getParentObjectID()).collect(Collectors.toList()),
+            bucketObjectId, new HashMap<>()));
   }
 
   private static Map<Long, Long> buildDirATreeParentMap(long bucketObjectId) {
@@ -1804,6 +1802,29 @@ public class TestSnapshotDiffManager {
         .put(104L, 102L)
         .put(105L, 101L)
         .build();
+  }
+
+  private List<WithParentObjectId> filterTopLevelDeletedEntriesBatch(
+      List<WithParentObjectId> deletedEntries, Set<Long> renamedDirectoryIds,
+      Map<Long, Long> objectIdToParentId, long bucketObjectId) throws IOException {
+    List<Long> parentObjectIds = deletedEntries.stream()
+        .map(WithParentObjectId::getParentObjectID)
+        .collect(Collectors.toList());
+    Set<Long> deletedDirectoryIds = deletedEntries.stream()
+        .filter(OmDirectoryInfo.class::isInstance)
+        .map(WithParentObjectId::getObjectID)
+        .collect(Collectors.toSet());
+    boolean[] hasDeletedAncestor = snapshotDiffManager.hasDeletedAncestors(parentObjectIds,
+        deletedDirectoryIds::contains, renamedDirectoryIds::contains,
+        objectIds -> objectIds.stream().map(objectIdToParentId::get).collect(Collectors.toList()),
+        bucketObjectId, new HashMap<>());
+    List<WithParentObjectId> filteredDeletes = new ArrayList<>();
+    for (int i = 0; i < deletedEntries.size(); i++) {
+      if (!hasDeletedAncestor[i]) {
+        filteredDeletes.add(deletedEntries.get(i));
+      }
+    }
+    return filteredDeletes;
   }
 
   @ParameterizedTest
