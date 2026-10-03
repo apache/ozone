@@ -322,17 +322,15 @@ public class SCMStateMachine extends BaseStateMachine {
     // leader (a leader has applied all committed entries) and refresh safe mode.
     tryStartDNServerAndRefreshSafeMode();
 
-    try {
-      transactionBuffer.flush();
-    } catch (Exception ex) {
-      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
-    }
-
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
     Preconditions.checkArgument(
         deletedBlockLog instanceof DeletedBlockLogImpl);
-    ((DeletedBlockLogImpl) deletedBlockLog).onBecomeLeader();
+    try {
+      transactionBuffer.flushAndRun(((DeletedBlockLogImpl) deletedBlockLog)::onBecomeLeader);
+    } catch (Exception ex) {
+      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
+    }
     scm.getScmDecommissionManager().onBecomeLeader();
 
     scm.scmHAMetricsUpdate(newLeaderId.toString());
