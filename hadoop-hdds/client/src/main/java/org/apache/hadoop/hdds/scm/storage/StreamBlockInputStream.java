@@ -459,17 +459,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private synchronized void initialize() throws IOException {
-    while (streamingReader == null) {
-      try {
-        acquireClient();
-        final StreamingReader reader = new StreamingReader(xceiverClient);
-        LOG.debug("{}: new StreamingReader", getName(reader));
-        xceiverClient.initStreamRead(blockID, reader, failedStreamingDatanodes);
-        streamingReader = reader;
-      } catch (IOException ioe) {
-        handleExceptions(ioe);
-      }
+    if (streamingReader != null) {
+      return;
     }
+    // A single attempt: the caller owns the retry loop, so a failed start is handled exactly once.
+    acquireClient();
+    final StreamingReader reader = new StreamingReader(xceiverClient);
+    LOG.debug("{}: new StreamingReader", getName(reader));
+    xceiverClient.initStreamRead(blockID, reader, failedStreamingDatanodes);
+    streamingReader = reader;
   }
 
   synchronized void readBlock(int length, boolean preRead) throws IOException {
@@ -514,21 +512,34 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private void handleExceptions(IOException cause) throws IOException {
-    IOException root = ConnectionFailureUtils.unwrapCause(cause);
-    if (root instanceof StorageContainerException || isConnectivityIssue(root) ||
-         root instanceof TimeoutIOException) {
-      if (shouldRetryRead(root, retryPolicy, retries++)) {
-        recordFailedStreamingDatanode();
-        releaseClient();
-        refreshBlockInfo(root);
-        requestedLength = position;
-        LOG.warn("Refreshing block data to read block {} due to {}", blockID, cause.getMessage());
-      } else {
+    final IOException root = ConnectionFailureUtils.unwrapCause(cause);
+    try {
+      final boolean retriable = root instanceof StorageContainerException || isConnectivityIssue(root) ||
+          root instanceof TimeoutIOException;
+      if (!retriable || !shouldRetryRead(root, retryPolicy, retries++)) {
         throw cause;
       }
-    } else {
-      throw cause;
+      recordFailedStreamingDatanode();
+      releaseClient();
+      refreshBlockInfo(root);
+      requestedLength = position;
+      LOG.warn("Refreshing block data to read block {} due to {}", blockID, cause.getMessage());
+    } catch (IOException | RuntimeException e) {
+      // Any way out other than a retry is a give-up: do not leave the failed stream, the excluded datanodes or
+      // the used retry budget behind for the next read.
+      resetAfterTerminalFailure();
+      throw e;
     }
+  }
+
+  /**
+   * Tear down the failed stream and forget the excluded datanodes and the used retry budget, so the next read
+   * starts a fresh stream with a full set of datanodes and retries instead of replaying the stale failure.
+   */
+  private void resetAfterTerminalFailure() {
+    releaseClient();
+    failedStreamingDatanodes.clear();
+    retries = 0;
   }
 
   private void recordFailedStreamingDatanode() {
