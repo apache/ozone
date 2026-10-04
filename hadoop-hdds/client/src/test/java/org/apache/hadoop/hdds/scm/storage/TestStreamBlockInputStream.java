@@ -245,8 +245,12 @@ public class TestStreamBlockInputStream {
       ByteBuffer dst = ByteBuffer.allocate(10);
       assertEquals(-1, sbis.readPositioned(data.length, dst));
       assertEquals(-1, sbis.readPositioned(data.length + 1, dst));
-      // An empty buffer also gets -1, as PartInputStream#readPositioned documents.
-      assertEquals(-1, sbis.readPositioned(0, ByteBuffer.allocate(0)));
+      ByteBuffer empty = ByteBuffer.allocate(1);
+      empty.position(1);
+      for (long position : new long[] {0, data.length, data.length + 1}) {
+        assertEquals(0, sbis.readPositioned(position, empty));
+        assertEquals(0, sbis.read(position, empty));
+      }
     }
   }
 

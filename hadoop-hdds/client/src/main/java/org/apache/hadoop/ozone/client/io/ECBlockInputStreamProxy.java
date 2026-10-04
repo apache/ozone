@@ -200,6 +200,9 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   @Override
   protected int readPositioned(long position, ByteBuffer buffer) throws IOException {
     ensureNotClosed();
+    if (!buffer.hasRemaining()) {
+      return 0;
+    }
     if (position >= blockInfo.getLength()) {
       return EOF;
     }

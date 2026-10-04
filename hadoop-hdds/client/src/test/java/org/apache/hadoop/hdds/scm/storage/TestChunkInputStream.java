@@ -189,6 +189,9 @@ public class TestChunkInputStream {
     ByteBuffer dst = ByteBuffer.allocate(10);
     assertEquals(-1, chunkStream.readPositioned(CHUNK_SIZE, dst));
     assertEquals(-1, chunkStream.readPositioned(CHUNK_SIZE + 1, dst));
+    for (long position : new long[] {0, CHUNK_SIZE, CHUNK_SIZE + 1}) {
+      assertEquals(0, chunkStream.readPositioned(position, ByteBuffer.allocate(0)));
+    }
   }
 
   @Test

@@ -192,6 +192,9 @@ public class MultipartInputStream extends ExtendedInputStream {
   @Override
   protected int readPositioned(long position, ByteBuffer buffer) throws IOException {
     checkOpen();
+    if (!buffer.hasRemaining()) {
+      return 0;
+    }
     long pos = position;
     int bytesRead = 0;
     while (buffer.hasRemaining() && pos < length) {

@@ -81,6 +81,11 @@ public class TestMultipartInputStream {
       buffer.clear();
       assertThrows(EOFException.class, () -> multipartStream.readFully(position, buffer));
       assertEquals(expectedBytes, buffer.position());
+      ByteBuffer empty = ByteBuffer.allocate(0);
+      for (long offset : new long[] {0, fileLen, fileLen + 1}) {
+        assertEquals(0, multipartStream.readPositioned(offset, empty));
+        assertEquals(0, multipartStream.read(offset, empty));
+      }
     }
   }
 

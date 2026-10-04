@@ -476,7 +476,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
   @Override
   public int readPositioned(long blockRelativePosition, ByteBuffer dst) throws IOException {
     if (!dst.hasRemaining()) {
-      return EOF;
+      return 0;
     }
     if (blockRelativePosition < 0) {
       return EOF;

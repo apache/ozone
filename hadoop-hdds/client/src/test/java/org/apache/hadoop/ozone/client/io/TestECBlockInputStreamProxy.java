@@ -342,6 +342,26 @@ public class TestECBlockInputStreamProxy {
   }
 
   @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void emptyPositionedReadsDoNotCreateReaders(boolean missing) throws Exception {
+    int length = 100;
+    generateData(length);
+    BlockLocationInfo info = ECStreamTestUtil.createKeyInfo(repConfig, length,
+        missing ? ECStreamTestUtil.createIndexMap(2, 3, 4, 5) : ECStreamTestUtil.createIndexMap(1, 2, 3, 4, 5));
+    try (ECBlockInputStreamProxy stream = createBISProxy(repConfig, info)) {
+      BlockExtendedInputStream reader = streamFactory.getStreams().get(missing);
+      ByteBuffer empty = ByteBuffer.allocate(0);
+      for (long position : new long[] {0, length, length + 1}) {
+        assertEquals(0, stream.readPositioned(position, empty));
+        assertEquals(0, stream.read(position, empty));
+      }
+      assertThat(streamFactory.getStreams().get(missing)).isSameAs(reader);
+      assertEquals(-1, stream.readPositioned(length, ByteBuffer.allocate(1)));
+      assertEquals(-1, stream.readPositioned(length + 1, ByteBuffer.allocate(1)));
+    }
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"healthy", "missing", "failover", "failure"})
   @Timeout(30)
   void positionedReadsOverlapAndCloseTheirReaders(String mode) throws Exception {
