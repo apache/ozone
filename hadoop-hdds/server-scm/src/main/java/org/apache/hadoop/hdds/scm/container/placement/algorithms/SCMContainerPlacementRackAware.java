@@ -31,7 +31,6 @@ import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -460,14 +459,15 @@ public final class SCMContainerPlacementRackAware
     }
 
     boolean isFallbacked = false;
+    int affinityIndex = 0;
     while (true) {
       metrics.incrDatanodeChooseAttemptCount();
       DatanodeDetails node = null;
       if (affinityNodes != null) {
-        for (Node affinityNode : affinityNodes) {
+        for (; affinityIndex < affinityNodes.size(); affinityIndex++) {
           node = (DatanodeDetails)networkTopology.chooseRandom(
               NetConstants.ROOT, excludedNodesForCapacity, excludedNodes,
-              affinityNode, ancestorGen);
+              affinityNodes.get(affinityIndex), ancestorGen);
           if (node != null) {
             break;
           }
@@ -519,9 +519,14 @@ public final class SCMContainerPlacementRackAware
       }
 
       maxRetry--;
-      if (maxRetry == 0) {
+      if (maxRetry == 0 && affinityNodes != null) {
+        // Out-of-service nodes stay in the topology, so this rack may have no valid node left.
+        // Try the next affinity node's rack, then the fallback, with new retries.
+        affinityIndex++;
+        maxRetry = MAX_RETRY;
+      } else if (maxRetry == 0) {
         // avoid the infinite loop
-        String errMsg = "No satisfied datanode to meet the space constrains. "
+        String errMsg = "No writable datanode with enough space was found. "
             + "metadata size required: " + metadataSizeRequired +
             " data size required: " + dataSizeRequired;
         LOG.info(errMsg);

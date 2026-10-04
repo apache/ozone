@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
@@ -676,6 +677,43 @@ public class TestSCMContainerPlacementRackAware {
     assertTrue(cluster.isSameParent(
         datanodes.get(0), datanodeDetails.get(0)) ||
         cluster.isSameParent(datanodes.get(5), datanodeDetails.get(0)));
+  }
+
+  @Test
+  public void chooseNodeWhenUsedNodeRackHasOnlyDecommissionedNodes() throws SCMException {
+    setup(3 * NODE_PER_RACK);
+    // Apart from used node5, rack1 has only decommissioned nodes, which stay in the topology.
+    for (int i = 6; i < 10; i++) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    // Replicas on rack1 (node5, tried first) and rack0 (node0)
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(5), datanodes.get(0)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, new ArrayList<>(), null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // The new replica goes to rack0, the rack of the other used node
+    assertTrue(cluster.isSameParent(datanodes.get(0), datanodeDetails.get(0)));
+    assertNotEquals(datanodes.get(0), datanodeDetails.get(0));
+  }
+
+  @Test
+  public void fallbackWhenUsedNodeRacksHaveOnlyDecommissionedNodes() throws SCMException {
+    setup(3 * NODE_PER_RACK);
+    // Apart from used node0 and node5, rack0 and rack1 have only out-of-service nodes.
+    // node1 and node6 hold replicas being decommissioned, so they are excluded.
+    dnInfos.get(1).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    for (int i : new int[] {2, 3, 4, 6, 7, 8, 9}) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(5)));
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(Arrays.asList(datanodes.get(1), datanodes.get(6)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // The new replica goes to rack2, the only rack with in-service nodes left
+    assertTrue(cluster.isSameParent(datanodes.get(10), datanodeDetails.get(0)));
   }
 
   @Test
