@@ -94,12 +94,16 @@ class TestOzoneClientConfig {
     conf.set("ozone.client.stream.read.pre-read-size", "67108864");
     conf.set("ozone.client.stream.read.response-data-size", "2097152");
     conf.set("ozone.client.stream.read.timeout", "5s");
+    conf.set("ozone.client.stream.read.max-concurrent-streams", "12");
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
 
     assertEquals(64L << 20, clientConfig.getStreamReadPreReadSize());
     assertEquals(2 << 20, clientConfig.getStreamReadResponseDataSize());
     assertEquals(Duration.ofSeconds(5), clientConfig.getStreamReadTimeout());
+    assertEquals(12, clientConfig.getStreamReadMaxConcurrentStreams());
+
+    assertEquals(-1, new OzoneConfiguration().getObject(OzoneClientConfig.class).getStreamReadMaxConcurrentStreams());
   }
 
   @Test
