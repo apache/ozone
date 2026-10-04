@@ -524,6 +524,12 @@ public final class SCMContainerPlacementRackAware
         // Try the next affinity node's rack, then the fallback, with new retries.
         affinityIndex++;
         maxRetry = MAX_RETRY;
+      } else if (maxRetry == 0 && fallback && ancestorGen == RACK_LEVEL) {
+        // The other racks ran out of retries too, e.g. while a whole rack is being decommissioned.
+        // Fall back to any rack, with new retries.
+        isFallbacked = true;
+        ancestorGen--;
+        maxRetry = MAX_RETRY;
       } else if (maxRetry == 0) {
         // avoid the infinite loop
         String errMsg = "No writable datanode with enough space was found. "

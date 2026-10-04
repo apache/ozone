@@ -174,6 +174,19 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
   }
 
   @Test
+  public void testMisReplicationWithTargetsNotReducingIt() throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
+    // e.g. placement falls back to the rack that already has all the replicas
+    PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
+    ContainerPlacementStatus mockedContainerPlacementStatus = mock(ContainerPlacementStatus.class);
+    when(mockedContainerPlacementStatus.isPolicySatisfied()).thenReturn(false);
+    when(mockedContainerPlacementStatus.misReplicationCount()).thenReturn(1);
+    when(placementPolicy.validateContainerPlacement(anyList(), anyInt())).thenReturn(mockedContainerPlacementStatus);
+    testMisReplication(availableReplicas, placementPolicy, Collections.emptyList(), 0, 1, 1, 0);
+  }
+
+  @Test
   public void testAllSourcesOverloaded() throws IOException {
     ReplicationManager replicationManager = getReplicationManager();
     doThrow(new CommandTargetOverloadedException("Overloaded"))

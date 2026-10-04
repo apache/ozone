@@ -717,6 +717,29 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   @Test
+  public void fallbackToSameRackWhenOtherRackHasOnlyDecommissionedNodes() throws SCMException {
+    setup(2 * NODE_PER_RACK);
+    // All of rack1 is being decommissioned; node5 holds a replica being decommissioned, so it is excluded.
+    dnInfos.get(5).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    for (int i = 6; i < 10; i++) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    // The other 2 replicas are on rack0
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(1)));
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(Arrays.asList(datanodes.get(5)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // rack1 has no writable node, so the new replica falls back to rack0
+    assertTrue(cluster.isSameParent(datanodes.get(0), datanodeDetails.get(0)));
+    assertThat(usedNodes).doesNotContain(datanodeDetails.get(0));
+    assertEquals(1, metrics.getDatanodeChooseFallbackCount());
+    // Without fallback, placement fails
+    assertThrows(SCMException.class, () -> policyNoFallback.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5));
+  }
+
+  @Test
   public void chooseSingleNodeRackWithUsedAndExcludeNodes()
       throws SCMException {
     int datanodeCount = 5;
