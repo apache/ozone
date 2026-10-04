@@ -261,17 +261,7 @@
       snapshot: '@',
       snapshotLinkHref: '@'
     },
-    templateUrl: 'static/templates/menu.html',
-    controller: function($http) {
-      var ctrl = this;
-      ctrl.docs = false;
-      $http.head("docs/index.html")
-        .then(function(result) {
-          ctrl.docs = true;
-        }, function() {
-          ctrl.docs = false;
-        });
-    }
+    templateUrl: 'static/templates/menu.html'
   });
 
   angular.module('ozone').component('config', {
