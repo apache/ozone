@@ -29,7 +29,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Test {@link OmSnapshot}'s leak detection: the snapshot registers with a shared LeakDetector
- * and warns if it is garbage collected while its underlying store is still open.
+ * and warns if it is garbage collected without being closed.
  */
 class TestOmSnapshotLeakDetection {
 

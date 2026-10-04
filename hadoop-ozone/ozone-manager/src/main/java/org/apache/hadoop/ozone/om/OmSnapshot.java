@@ -361,11 +361,11 @@ public class OmSnapshot implements IOmMetadataReader, Closeable {
   }
 
   /**
-   * @return a leak reporter that captures only the store's hashcode and the snapshot name,
+   * @return a leak reporter that captures only the store description and the snapshot name,
    *     never the {@link OmSnapshot} itself.
    */
-  static Runnable newLeakReporter(String storeHashCode, String snapshotName) {
-    return () -> LOG.warn("{} is not closed properly. snapshotName: {}", storeHashCode, snapshotName);
+  private static Runnable newLeakReporter(String storeDescription, String snapshotName) {
+    return () -> LOG.warn("{} is not closed properly. snapshotName: {}", storeDescription, snapshotName);
   }
 
   @VisibleForTesting
