@@ -188,8 +188,8 @@ public class OzoneFSInputStream extends FSInputStream
     return readImpl(position, ByteBuffer.wrap(array, offset, length));
   }
 
-  protected boolean supportsPositionedRead() {
-    return inputStream instanceof ByteBufferPositionedReadable;
+  protected InputStream getWrappedInputStream() {
+    return inputStream;
   }
 
   private int readImpl(long position, ByteBuffer buffer) throws IOException {
