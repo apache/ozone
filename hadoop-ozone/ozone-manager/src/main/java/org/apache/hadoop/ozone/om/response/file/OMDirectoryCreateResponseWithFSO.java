@@ -25,7 +25,6 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
@@ -45,11 +44,10 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
   private long bucketId;
   private OmBucketInfo bucketInfo;
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
   public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull long volumeId, @Nonnull long bucketId,
       @Nonnull OmDirectoryInfo dirInfo,
-      @Nonnull List<OmDirectoryInfo> pDirInfos, @Nonnull Result result,
+      @Nonnull List<OmDirectoryInfo> pDirInfos,
       @Nonnull BucketLayout bucketLayout, @Nonnull OmBucketInfo bucketInfo) {
     super(omResponse, bucketLayout);
     this.dirInfo = dirInfo;
@@ -62,8 +60,7 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
   /**
    * For when the request is not successful or the directory already exists.
    */
-  public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse,
-                                     @Nonnull Result result) {
+  public OMDirectoryCreateResponseWithFSO(@Nonnull OMResponse omResponse) {
     super(omResponse);
   }
 
