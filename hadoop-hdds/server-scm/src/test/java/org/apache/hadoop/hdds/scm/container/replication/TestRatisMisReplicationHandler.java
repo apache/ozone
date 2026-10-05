@@ -177,7 +177,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
   public void testMisReplicationWithTargetsNotReducingIt() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
-    // e.g. placement falls back to the rack that already has all the replicas
+    // The target doesn't help, e.g. because it is on the same rack as all the existing replicas.
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus = mock(ContainerPlacementStatus.class);
     when(mockedContainerPlacementStatus.isPolicySatisfied()).thenReturn(false);

@@ -161,8 +161,9 @@ public abstract class MisReplicationHandler implements
             excludedAndUsedNodes.getExcludedNodes(), currentContainerSize,
             container);
     if (!targetDatanodes.isEmpty()) {
-      // Placement may fall back to a rack that already has a replica. Copying there does not reduce the
-      // mis-replication; the extra replica would just be deleted and copied again.
+      // When no other rack has a usable node, placement can fall back to a rack that already has a replica.
+      // Copying there doesn't help: the container is still mis-replicated, the extra copy gets deleted, and the
+      // next run copies it again, over and over.
       List<DatanodeDetails> dnsAfterCopy = new ArrayList<>(usedDns);
       dnsAfterCopy.addAll(targetDatanodes);
       ContainerPlacementStatus placementAfterCopy =
