@@ -72,6 +72,8 @@ ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port|hostname:por
 | `ozone.directory.deleting.service.interval`    | `60s` | Directory deletion service run interval |
 | `ozone.thread.number.dir.deletion`             | `10` | Number of threads for directory deletion |
 | `ozone.snapshot.filtering.service.interval`    | `60s` | Snapshot SST filtering service run interval |
+| `ozone.scm.nodes.<scmServiceId>`               | - | Comma-separated HA SCM node IDs.|
+| `ozone.scm.address.<scmServiceId>.<scmNodeId>` | - | SCM RPC address in HA mode.|
 
 ### Storage Container Manager (SCM)
 
