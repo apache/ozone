@@ -489,7 +489,8 @@ public abstract class EndpointBase {
     int encodingEnd = charsetEnd < 0 ? -1 : value.indexOf('?', charsetEnd + 1);
     int encodedTextEnd = encodingEnd < 0
         ? -1 : value.indexOf("?=", encodingEnd + 1);
-    if (encodedTextEnd != value.length() - 2) {
+    if (encodedTextEnd != value.length() - 2
+        || value.indexOf('?', encodingEnd + 1) != encodedTextEnd) {
       return value;
     }
 

@@ -313,6 +313,21 @@ public class TestObjectGet {
   }
 
   @Test
+  public void getKeyPreservesInvalidQRfc2047Metadata()
+      throws IOException, OS3Exception {
+    final String keyName = "key-with-invalid-rfc2047-q";
+    final String metaValue = "=?UTF-8?Q?a?b?=";
+    MultivaluedMap<String, String> requestHeaders = new MultivaluedHashMap<>();
+    requestHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "meta1",
+        metaValue);
+    when(headers.getRequestHeaders()).thenReturn(requestHeaders);
+
+    assertSucceeds(() -> put(rest, BUCKET_NAME, keyName, CONTENT));
+
+    assertEquals(metaValue, bucket.getKey(keyName).getMetadata().get("meta1"));
+  }
+
+  @Test
   public void getKeyWithTag() throws IOException, OS3Exception {
     //WHEN
     Response response = get(rest, BUCKET_NAME, KEY_WITH_TAG);
