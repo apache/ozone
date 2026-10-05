@@ -143,6 +143,31 @@ public class TestContainerSet {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
+  public void testRemoveRecoveringContainerFromMemory(ContainerLayoutVersion layout) throws StorageContainerException {
+    ContainerSet containerSet = newContainerSet();
+    long containerId = 100L;
+    KeyValueContainerData data = new KeyValueContainerData(containerId, layout,
+        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    data.setState(ContainerProtos.ContainerDataProto.State.RECOVERING);
+    KeyValueContainer container = new KeyValueContainer(data, new OzoneConfiguration());
+    containerSet.addContainer(container);
+    assertThat(containerSet.getRecoveringContainerMap()).containsKey(containerId);
+
+    assertThat(containerSet.removeContainerOnlyFromMemory(containerId)).isTrue();
+    assertThat(containerSet.getContainer(containerId)).isNull();
+    assertThat(containerSet.getRecoveringContainerMap()).doesNotContainKey(containerId);
+
+    containerSet.addContainer(container);
+    assertThat(containerSet.getRecoveringContainerMap()).containsKey(containerId);
+    containerSet.removeContainerOnlyFromMemory(containerId);
+    data.closeContainer();
+    containerSet.addContainer(container);
+    assertThat(containerSet.getContainer(containerId).getContainerState())
+        .isEqualTo(ContainerProtos.ContainerDataProto.State.CLOSED);
+    assertThat(containerSet.getRecoveringContainerMap()).doesNotContainKey(containerId);
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
   public void testIteratorsAndCount(ContainerLayoutVersion layout)
       throws StorageContainerException {
     setLayoutVersion(layout);
