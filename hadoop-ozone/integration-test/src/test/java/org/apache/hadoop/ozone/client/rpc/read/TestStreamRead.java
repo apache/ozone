@@ -19,27 +19,40 @@ package org.apache.hadoop.ozone.client.rpc.read;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.XceiverClientRatis;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
@@ -51,13 +64,19 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.client.api.DataStreamInput;
+import org.apache.ratis.client.impl.ClientProtoUtils;
+import org.apache.ratis.proto.RaftProtos.DataStreamPacketHeaderProto;
+import org.apache.ratis.protocol.DataStreamReply;
 import org.apache.ratis.util.JavaUtils;
+import org.apache.ratis.util.ReferenceCountedObject;
 import org.apache.ratis.util.SizeInBytes;
 import org.apache.ratis.util.function.CheckedBiConsumer;
 import org.junit.jupiter.api.AfterAll;
@@ -221,6 +240,87 @@ public class TestStreamRead {
           op.accept(bufferSize, expectedMd5);
         }
       }
+    }
+  }
+
+  /**
+   * Reads a block on a Ratis read-only data stream: first from the open container with the Raft group of its pipeline,
+   * and then from the closed container with a read pipeline from SCM. No Raft group has the ID of the read pipeline.
+   */
+  @Test
+  void testRatisStreamReadBlock() throws Exception {
+    final OzoneConfiguration conf = cluster.getConf();
+    final SizeInBytes keySize = SizeInBytes.valueOf("8M");
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      final BucketForTesting testBucket = BucketForTesting.newBuilder(client).build();
+      final String keyName = "ratisStreamReadKey";
+      createKey(testBucket.delegate(), keyName, keySize, SizeInBytes.ONE_MB);
+
+      final OmKeyInfo info = client.getProxy().getKeyInfo(
+          testBucket.delegate().getVolumeName(), testBucket.delegate().getName(), keyName, false);
+      final List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
+      assertEquals(1, locations.size());
+      final BlockID blockId = locations.get(0).getBlockID();
+      final Pipeline pipeline = locations.get(0).getPipeline();
+      final ContainerData containerData = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine().getContainer()
+          .getContainerSet().getContainer(blockId.getContainerID()).getContainerData();
+      final byte[] expected = Files.readAllBytes(
+          ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(containerData, blockId, null).toPath());
+      assertEquals(keySize.getSize(), expected.length);
+
+      assertArrayEquals(expected, ratisStreamRead(pipeline, blockId, expected.length, conf));
+
+      OzoneTestHelper.waitForContainerClose(cluster, blockId.getContainerID());
+      OzoneTestHelper.waitForScmContainerState(cluster, blockId.getContainerID(), LifeCycleState.CLOSED);
+      final Pipeline readPipeline = cluster.getStorageContainerManager().getClientProtocolServer()
+          .getContainerWithPipeline(blockId.getContainerID()).getPipeline();
+      assertNotEquals(pipeline.getId(), readPipeline.getId());
+
+      assertArrayEquals(expected, ratisStreamRead(readPipeline, blockId, expected.length, conf));
+    }
+  }
+
+  /** Reads a block on a Ratis read-only data stream to the closest datanode of the pipeline. */
+  private static byte[] ratisStreamRead(Pipeline pipeline, BlockID blockId, long length, OzoneConfiguration conf)
+      throws Exception {
+    final ContainerCommandRequestProto request = ContainerProtocolCalls.buildReadBlockCommandProto(
+        blockId, 0, length, CHUNK_SIZE, null, pipeline);
+    final ByteBuffer message = ContainerCommandRequestMessage.toMessage(request, null).getContent()
+        .asReadOnlyByteBuffer();
+    final ByteArrayOutputStream data = new ByteArrayOutputStream();
+    final XceiverClientRatis client = XceiverClientRatis.newXceiverClientRatis(pipeline, conf);
+    try {
+      client.connect();
+      try (DataStreamInput in = client.getDataStreamApi().streamReadOnly(message)) {
+        for (;;) {
+          final ReferenceCountedObject<DataStreamReply> ref = in.readAsync().get(1, TimeUnit.MINUTES);
+          try {
+            final DataStreamReply reply = ref.get();
+            if (reply.getType() == DataStreamPacketHeaderProto.Type.STREAM_HEADER) {
+              // The terminal reply
+              assertTrue(reply.isSuccess(), () -> "Failed: " + ClientProtoUtils.getRaftClientReply(reply));
+              return data.toByteArray();
+            }
+
+            // [metadata length][the ReadBlock response without its data][data]
+            final ByteBuffer buffer = reply.nioBuffer();
+            final int metadataLength = buffer.getInt();
+            final ByteBuffer metadata = buffer.slice();
+            metadata.limit(metadataLength);
+            final ContainerCommandResponseProto response = ContainerCommandResponseProto.parseFrom(metadata);
+            assertEquals(Result.SUCCESS, response.getResult(), response::getMessage);
+            assertEquals(data.size(), response.getReadBlock().getOffset());
+            buffer.position(buffer.position() + metadataLength);
+            final byte[] bytes = new byte[buffer.remaining()];
+            buffer.get(bytes);
+            data.write(bytes);
+          } finally {
+            ref.release();
+          }
+        }
+      }
+    } finally {
+      client.close();
     }
   }
 
