@@ -57,6 +57,7 @@ jobs:
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
       integration-suites: ${{ steps.integration-suites.outputs.suites }}
+      kubernetes-suites: ${{ steps.kubernetes-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
@@ -116,6 +117,9 @@ jobs:
       - name: Integration suites
         id: integration-suites
         run: dev-support/ci/integration_suites.sh
+      - name: Kubernetes suites
+        id: kubernetes-suites
+        run: dev-support/ci/kubernetes_suites.sh
       - name: Categorize Basic Checks
         id: categorize-basic-checks
         env:
@@ -340,9 +344,15 @@ jobs:
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: kubernetes
+      script-args: ${{ matrix.suite }}
       sha: ${{ needs.build-info.outputs.sha }}
+      split: ${{ matrix.suite }}
       timeout-minutes: 60
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    strategy:
+      matrix:
+        suite: ${{ fromJson(needs.build-info.outputs.kubernetes-suites) }}
+      fail-fast: false
 
   integration:
     needs:
