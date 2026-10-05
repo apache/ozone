@@ -645,6 +645,45 @@ public class TestStreamBlockInputStream {
     }
   }
 
+  /** A single-byte read returns the byte as 0 to 255: 0xFF must not look like the end of the stream. */
+  @Test
+  public void testReadReturnsUnsignedByte() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    BlockID blockID = new BlockID(1L, 13L);
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = readerRef.get();
+      reader.onNext(buildResponseProto(new byte[]{(byte) 0x80, (byte) 0xFF}, 0));
+      reader.onCompleted();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, 2, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      assertEquals(0x80, sbis.read());
+      assertEquals(0xFF, sbis.read());
+      assertEquals(-1, sbis.read());
+    }
+  }
+
   /**
    * Defensive test for readFromQueue() which NPE'ed when poll() returns null.
    *
