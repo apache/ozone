@@ -682,17 +682,17 @@ public class TestSCMContainerPlacementRackAware {
   @Test
   public void chooseNodeWhenUsedNodeRackHasOnlyDecommissionedNodes() throws SCMException {
     setup(3 * NODE_PER_RACK);
-    // Apart from used node5, rack1 has only decommissioned nodes, which stay in the topology.
+    // rack1 has no usable node left: node5 already has a replica, and nodes 6-9 are decommissioned.
     for (int i = 6; i < 10; i++) {
       dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
     }
-    // Replicas on rack1 (node5, tried first) and rack0 (node0)
+    // The container has replicas on node5 (rack1) and node0 (rack0). rack1 is tried first.
     List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(5), datanodes.get(0)));
 
     List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, new ArrayList<>(), null, 1, 0, 5);
 
     assertEquals(1, datanodeDetails.size());
-    // The new replica goes to rack0, the rack of the other used node
+    // Instead of giving up after rack1, placement tries rack0 and finds a node there.
     assertTrue(cluster.isSameParent(datanodes.get(0), datanodeDetails.get(0)));
     assertNotEquals(datanodes.get(0), datanodeDetails.get(0));
   }
@@ -700,8 +700,8 @@ public class TestSCMContainerPlacementRackAware {
   @Test
   public void fallbackWhenUsedNodeRacksHaveOnlyDecommissionedNodes() throws SCMException {
     setup(3 * NODE_PER_RACK);
-    // Apart from used node0 and node5, rack0 and rack1 have only out-of-service nodes.
-    // node1 and node6 hold replicas being decommissioned, so they are excluded.
+    // The replicas are on node0 (rack0) and node5 (rack1), and neither rack has another usable node:
+    // node1 and node6 are excluded because their replicas are being decommissioned, and the rest are decommissioned.
     dnInfos.get(1).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
     for (int i : new int[] {2, 3, 4, 6, 7, 8, 9}) {
       dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
@@ -712,7 +712,7 @@ public class TestSCMContainerPlacementRackAware {
     List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5);
 
     assertEquals(1, datanodeDetails.size());
-    // The new replica goes to rack2, the only rack with in-service nodes left
+    // After both racks fail, placement falls back to rack2, the only rack with usable nodes.
     assertTrue(cluster.isSameParent(datanodes.get(10), datanodeDetails.get(0)));
   }
 

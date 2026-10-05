@@ -455,8 +455,11 @@ public final class SCMContainerPlacementRackAware
       excludedNodes = usedNodes;
     }
 
-    // Where to look, in order: the rack of each affinity node; without affinity, or as a fallback, any rack but
-    // those of excludedNodes; as a fallback, any rack.
+    // The places to look for a node, in order. Each one gets MAX_RETRY tries:
+    // 1. the rack of each affinity node;
+    // 2. any rack except the racks of excludedNodes (right away if there are no affinity nodes, otherwise only
+    //    as a fallback);
+    // 3. any rack at all, as a fallback.
     List<Step> steps = new ArrayList<>();
     if (affinityNodes != null) {
       for (DatanodeDetails affinityNode : affinityNodes) {
@@ -495,8 +498,8 @@ public final class SCMContainerPlacementRackAware
         }
         retries--;
       }
-      // Out-of-service nodes stay in the topology, so a step can run out of retries without a valid node, e.g. on
-      // the other racks while a whole rack is being decommissioned: try the next step.
+      // Decommissioned and maintenance nodes stay in the topology, so a place can use up all its tries on them,
+      // e.g. the only other rack while a whole rack is being decommissioned. Then move on to the next place.
       outOfRetries = retries == 0;
     }
     if (outOfRetries) {
@@ -509,12 +512,13 @@ public final class SCMContainerPlacementRackAware
     throw new SCMException("No satisfied datanode to meet the excludedNodes and affinityNode constrains.", null);
   }
 
-  /** A place chooseNode looks for a node, with its own MAX_RETRY retries. */
+  /** One place where chooseNode looks for a node. */
   private static final class Step {
-    /** Null to look anywhere, apart from the ancestors of excludedNodes at ancestorGen. */
+    /** Look near this node, or anywhere when null. */
     private final DatanodeDetails affinityNode;
+    /** RACK_LEVEL: stay on affinityNode's rack, or, without one, avoid the racks of excludedNodes. 0: any rack. */
     private final int ancestorGen;
-    /** Whether a node chosen in this step counts as a fallback. */
+    /** Whether a node found here counts as a fallback in the metrics. */
     private final boolean fallback;
 
     Step(DatanodeDetails affinityNode, int ancestorGen, boolean fallback) {
