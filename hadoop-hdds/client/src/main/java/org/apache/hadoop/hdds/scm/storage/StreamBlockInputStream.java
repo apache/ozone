@@ -447,8 +447,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   synchronized void readBlock(int length, boolean preRead) throws IOException {
-    final long required = position + length - requestedLength;
+    final long outstanding = requestedLength - position;  // bytes requested from the datanode but not yet consumed
+    final long required = length - outstanding;           // bytes required to fulfill this call
     final long preReadLength = preRead ? preReadSize : 0;
+    if (required <= 0 && outstanding >= getPreReadRefillThreshold(preReadLength)) {
+      // Safe to skip: already has the required bytes and exceeded the refill threshold
+      return;
+    }
     // Clamp so requestedLength never exceeds blockLength: requesting past the end
     // produces an offset the DataNode cannot serve, causing a read timeout.
     final long readLength = Math.min(required + preReadLength, blockLength - requestedLength);
@@ -535,6 +540,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   public long getPreReadSize() {
     return preReadSize;
+  }
+
+  /** Refill the pre-read window in bulk once it drains below this, instead of after every response. */
+  static long getPreReadRefillThreshold(long preRead) {
+    return preRead / 2;
   }
 
   public int getResponseDataSize() {
