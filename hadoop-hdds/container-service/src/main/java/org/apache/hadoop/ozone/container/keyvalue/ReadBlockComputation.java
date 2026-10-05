@@ -123,16 +123,18 @@ class ReadBlockComputation {
      * - Current offset = 0, responseDataSize = 20
      *
      * If using an INCLUSIVE boundary (end = 20 - 1 = 19):
-     * - endChunk = findChunk(19) -> Chunk 1 (offset = 0)
+     * - endChunk = searchChunk(19) -> Chunk 1 (offset = 0)
      * - lengthExcludingEndChunk = 0 - 0 = 0
      * - Result = ((20 - 0) & -16) + 0 = 16 (Incorrectly truncates 4 bytes)
      *
      * If using an EXCLUSIVE boundary (end = 20):
-     * - endChunk = findChunk(20) -> Chunk 2 (offset = 20)
+     * - endChunk = searchChunk(20) -> Chunk 2 (offset = 20)
      * - lengthExcludingEndChunk = 20 - 0 = 20
      * - Result = ((20 - 20) & -16) + 20 = 20 (Correctly reads the entire Chunk 1)
+     *
+     * Use searchChunk, not findChunk: the read may stop before this end, so the findChunk cursor must not move here.
      */
-    ChunkInfo endChunk = chunks.get(findChunk(offset + responseDataSize));
+    ChunkInfo endChunk = chunks.get(searchChunk(offset + responseDataSize, chunks));
     final int lengthExcludingEndChunk = Math.toIntExact(endChunk.getOffset() - offset);
     // bytesPerChecksum must be a power of 2.
     return ((responseDataSize - lengthExcludingEndChunk) & bitMask) + lengthExcludingEndChunk;
