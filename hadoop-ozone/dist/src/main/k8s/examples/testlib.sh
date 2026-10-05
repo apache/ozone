@@ -105,7 +105,7 @@ reset_k8s_env() {
    print_phase "Deleting existing k8s resources"
    #reset environment
    local -r DEL_TIMEOUT="${RESET_TIMEOUT:-120s}"
-   dump_pv_pvc_state "before delete"
+   # dump_pv_pvc_state "before delete"
    kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found statefulset --all
    kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found daemonset --all
    kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found deployment --all
@@ -113,9 +113,9 @@ reset_k8s_env() {
    kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found configmap --all
    kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found pod --all
    kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found pvc --all
-   dump_pv_pvc_state "after pvc delete"
+   # dump_pv_pvc_state "after pvc delete"
    kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found pv --all
-   dump_pv_pvc_state "after pv delete"
+   # dump_pv_pvc_state "after pv delete"
 }
 
 start_k8s_env() {
