@@ -175,7 +175,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
    */
   @Override
   public boolean flushIfPendingLimitReached() throws RocksDatabaseException, CodecException {
-    if (flushPendingLimit <= 0 || txFlushPending.get() < flushPendingLimit) {
+    if (txFlushPending.get() < flushPendingLimit) {
       return false;
     }
     rwLock.writeLock().lock();
