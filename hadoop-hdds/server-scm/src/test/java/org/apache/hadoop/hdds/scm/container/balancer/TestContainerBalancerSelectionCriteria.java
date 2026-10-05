@@ -32,9 +32,11 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -96,6 +98,65 @@ public class TestContainerBalancerSelectionCriteria {
 
     criteria = new ContainerBalancerSelectionCriteria(balancerConfiguration, nodeManager, replicationManager,
         containerManager, findSourceStrategy, new HashMap<>());
+  }
+
+  /**
+   * Balancing a given storage tier must only consider containers whose replica on
+   * the source actually sits on that tier, otherwise a move would relocate data
+   * across tiers.
+   */
+  @Test
+  public void shouldExcludeContainerOnDifferentStorageType() throws Exception {
+    replicaOnSourceWithStorageType(StorageType.DISK);
+
+    assertFalse(criteria.shouldBeExcluded(containerID, source, 0L,
+        StorageType.DISK));
+    assertTrue(criteria.shouldBeExcluded(containerID, source, 0L,
+        StorageType.SSD));
+  }
+
+  /**
+   * A replica that reports no storage type must stay eligible, so balancing keeps
+   * working against datanodes from before storage type reporting.
+   */
+  @Test
+  public void shouldIncludeContainerWithUnknownStorageType() throws Exception {
+    replicaOnSourceWithStorageType(null);
+
+    assertFalse(criteria.shouldBeExcluded(containerID, source, 0L,
+        StorageType.SSD));
+    assertFalse(criteria.shouldBeExcluded(containerID, source, 0L,
+        StorageType.ARCHIVE));
+  }
+
+  /**
+   * Passing no storage type must behave exactly as before, considering containers
+   * on any tier.
+   */
+  @Test
+  public void shouldIgnoreStorageTypeWhenNotGiven() throws Exception {
+    replicaOnSourceWithStorageType(StorageType.ARCHIVE);
+
+    assertFalse(criteria.shouldBeExcluded(containerID, source, 0L));
+    assertFalse(criteria.shouldBeExcluded(containerID, source, 0L, null));
+  }
+
+  /**
+   * Replaces the container's replica set with a single replica on {@link #source}
+   * reporting the given volume storage type.
+   */
+  private void replicaOnSourceWithStorageType(StorageType storageType)
+      throws Exception {
+    ContainerReplica replica = ReplicationTestUtil.createContainerReplica(
+        containerID, 0, IN_SERVICE, CLOSED, 1L, OzoneConsts.GB, source,
+        source.getID());
+    if (storageType != null) {
+      replica = replica.toBuilder()
+          .setVolumeStorageType(storageType)
+          .build();
+    }
+    when(containerManager.getContainerReplicas(containerID))
+        .thenReturn(new HashSet<>(Collections.singletonList(replica)));
   }
 
   @Test

@@ -90,6 +90,11 @@ public final class ContainerBalancerMetrics {
       " all iterations of Container Balancer.")
   private MutableCounterLong numContainerMovesScheduled;
 
+  @Metric(about = "Number of times Container Balancer stopped scheduling " +
+      "moves in an iteration because it reached the maximum size to move " +
+      "per iteration, while sources and targets were still available.")
+  private MutableCounterLong numIterationLimitsSkipped;
+
   /**
    * Create and register metrics named {@link ContainerBalancerMetrics#NAME}
    * for {@link ContainerBalancer}.
@@ -362,5 +367,13 @@ public final class ContainerBalancerMetrics {
   public void resetNumContainerMovesFailedInLatestIteration() {
     numContainerMovesFailedInLatestIteration.incr(
         -getNumContainerMovesFailedInLatestIteration());
+  }
+
+  public long getNumIterationLimitsSkipped() {
+    return numIterationLimitsSkipped.value();
+  }
+
+  public void incrementNumIterationLimitsSkipped() {
+    numIterationLimitsSkipped.incr();
   }
 }
