@@ -44,6 +44,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
@@ -423,6 +425,25 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
   public List<OMProxyInfo<T>> getOMProxies() {
     return omProxies.getProxies();
+  }
+
+  /**
+   * Determines whether an eligible read request may be sent to an OM follower.
+   *
+   * <p>An explicit consistency hint takes precedence over the configured
+   * default follower-read behavior.</p>
+   */
+  public static boolean shouldUseFollowerRead(OMRequest request,
+      boolean omServiceSupportsFollowerRead,
+      boolean defaultFollowerReadEnabled) {
+    if (!omServiceSupportsFollowerRead || !OmUtils.shouldSendToFollower(request)) {
+      return false;
+    }
+    if (request.hasReadConsistencyHint()) {
+      return ReadConsistency.fromProto(request.getReadConsistencyHint()
+          .getReadConsistency()).allowFollowerRead();
+    }
+    return defaultFollowerReadEnabled;
   }
 
   public OMProxyInfo.OrderedMap<T> getOMProxyMap() {
