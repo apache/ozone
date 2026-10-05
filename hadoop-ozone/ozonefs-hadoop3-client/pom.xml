@@ -49,10 +49,6 @@
           <artifactId>javax.servlet-api</artifactId>
         </exclusion>
         <exclusion>
-          <groupId>org.apache.hadoop.thirdparty</groupId>
-          <artifactId>${hadoop-thirdparty.protobuf.artifact}</artifactId>
-        </exclusion>
-        <exclusion>
           <groupId>org.slf4j</groupId>
           <artifactId>slf4j-api</artifactId>
         </exclusion>
