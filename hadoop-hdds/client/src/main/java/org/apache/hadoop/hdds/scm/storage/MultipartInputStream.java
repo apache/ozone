@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.ratis.util.Preconditions;
 
 /**
  * A stream for accessing multipart streams.
@@ -39,7 +38,6 @@ public class MultipartInputStream extends ExtendedInputStream {
 
   // List of PartInputStream, one for each part of the key
   private final List<? extends PartInputStream> partStreams;
-  private final boolean isStreamBlockInputStream;
 
   // partOffsets[i] stores the index of the first data byte in
   // partStream w.r.t the whole key data.
@@ -66,7 +64,6 @@ public class MultipartInputStream extends ExtendedInputStream {
 
     this.key = keyName;
     this.partStreams = Collections.unmodifiableList(inputStreams);
-    this.isStreamBlockInputStream = !inputStreams.isEmpty() && inputStreams.get(0) instanceof StreamBlockInputStream;
 
     // Calculate and update the partOffsets
     this.partOffsets = new long[inputStreams.size()];
@@ -74,16 +71,9 @@ public class MultipartInputStream extends ExtendedInputStream {
     long streamLength = 0L;
     for (PartInputStream partInputStream : inputStreams) {
       this.partOffsets[i++] = streamLength;
-      if (isStreamBlockInputStream) {
-        Preconditions.assertInstanceOf(partInputStream, StreamBlockInputStream.class);
-      }
       streamLength += partInputStream.getLength();
     }
     this.length = streamLength;
-  }
-
-  public boolean isStreamBlockInputStream() {
-    return isStreamBlockInputStream;
   }
 
   @Override

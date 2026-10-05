@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.client.rpc.read;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedInputStream;
@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
@@ -233,7 +234,7 @@ public class TestStreamRead {
   static void streamRead(SizeInBytes keySize, SizeInBytes bufferSize, String expectedMD5,
       BucketForTesting bucket, String keyName) throws Exception {
     try (KeyInputStream in = bucket.getKeyInputStream(keyName)) {
-      assertTrue(in.isStreamBlockInputStream());
+      in.getPartStreams().forEach(part -> assertInstanceOf(StreamBlockInputStream.class, part));
       runTestReadKey(keySize, bufferSize, expectedMD5, in);
     }
   }
@@ -242,7 +243,7 @@ public class TestStreamRead {
       OzoneClient nonStreamReadClient, String volume, String bucket, String keyName) throws Exception {
     final ClientProtocol proxy = nonStreamReadClient.getProxy();
     try (KeyInputStream in = (KeyInputStream) proxy.getKey(volume, bucket, keyName).getInputStream()) {
-      assertFalse(in.isStreamBlockInputStream());
+      in.getPartStreams().forEach(part -> assertInstanceOf(BlockInputStream.class, part));
       runTestReadKey(keySize, bufferSize, expectedMD5, in);
     }
   }

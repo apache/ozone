@@ -19,9 +19,9 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import static org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper.SOURCE_SIZE;
 import static org.apache.hadoop.hdds.scm.storage.TestChunkInputStream.generateRandomData;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
@@ -34,6 +34,7 @@ import com.google.common.primitives.Bytes;
 import java.io.EOFException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -49,6 +50,8 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.invocation.InvocationOnMock;
 
 /**
@@ -97,7 +100,6 @@ public class TestMultipartInputStream {
     try (MultipartInputStream multipartStream =
         new MultipartInputStream("test-key", Collections.singletonList(part))) {
       multipartStream.initialize();
-      assertTrue(multipartStream.isStreamBlockInputStream());
       int position = 12;
       int expectedBytes = fileLen - position;
       ByteBuffer buffer = ByteBuffer.allocate(expectedBytes * 2);
@@ -122,7 +124,6 @@ public class TestMultipartInputStream {
     parts.add(part1);
     try (MultipartInputStream multipartStream = new MultipartInputStream("test-key", parts)) {
       multipartStream.initialize();
-      assertTrue(multipartStream.isStreamBlockInputStream());
       PositionedReadTestHelper.runConcurrentPositionedReads(keyData,
           multipartStream::readFully);
       verify(part0, never()).seek(anyLong());
@@ -130,8 +131,9 @@ public class TestMultipartInputStream {
     }
   }
 
-  @Test
-  public void testConcurrentPositionedRead() throws Exception {
+  @ParameterizedTest
+  @CsvSource({"false, false", "true, false", "false, true"})
+  public void testConcurrentPositionedRead(boolean streamPart0, boolean streamPart1) throws Exception {
     byte[] part0Data = generateRandomData(PART_SIZE);
     byte[] part1Data = generateRandomData(PART_SIZE);
     byte[] keyData = Bytes.concat(part0Data, part1Data);
@@ -143,18 +145,24 @@ public class TestMultipartInputStream {
     Function<BlockID, BlockLocationInfo> refreshFunction = mock(Function.class);
     Checksum checksum = new Checksum(ChecksumType.NONE, 1024);
 
-    BlockInputStream part0 = createBlockStream(new BlockID(new ContainerBlockID(1, 1)),
+    PartInputStream part0 = streamPart0 ? stubStreamBlockPart(part0Data)
+        : createBlockStream(new BlockID(new ContainerBlockID(1, 1)),
         part0Data, pipeline, refreshFunction, clientConfig, checksum);
-    BlockInputStream part1 = createBlockStream(new BlockID(new ContainerBlockID(1, 2)),
+    PartInputStream part1 = streamPart1 ? stubStreamBlockPart(part1Data)
+        : createBlockStream(new BlockID(new ContainerBlockID(1, 2)),
         part1Data, pipeline, refreshFunction, clientConfig, checksum);
 
-    List<BlockInputStream> parts = new ArrayList<>();
+    List<PartInputStream> parts = new ArrayList<>();
     parts.add(part0);
     parts.add(part1);
     try (MultipartInputStream multipartStream = new MultipartInputStream("test-key", parts)) {
       multipartStream.initialize();
       PositionedReadTestHelper.runConcurrentPositionedReads(keyData,
           multipartStream::readFully);
+      ByteBuffer buffer = ByteBuffer.allocate(4);
+      multipartStream.readFully(PART_SIZE - 2, buffer);
+      assertArrayEquals(Arrays.copyOfRange(keyData, PART_SIZE - 2, PART_SIZE + 2), buffer.array());
+      assertEquals(0, multipartStream.getPos());
     }
   }
 
