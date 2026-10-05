@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.getObjectAttributes;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
@@ -35,24 +36,35 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.S3HeadObjectAttributes;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Verifies bucket-owner-condition verification (source bucket owner lookup) runs under the correct IAM S3 action
- * string for copy-style operations.
+ * Verifies temporary IAM S3 action overrides used by composite operations.
  */
 public class TestS3ActionOverrideForOwnerVerification {
 
@@ -62,6 +74,11 @@ public class TestS3ActionOverrideForOwnerVerification {
   private static final String SOURCE_KEY = "source-key";
   private static final String SOURCE_OWNER = "source-owner";
   private static final String DEST_OWNER = "dest-owner";
+
+  @BeforeAll
+  public static void setUp() {
+    S3GatewayMetrics.create(new OzoneConfiguration());
+  }
 
   @Test
   public void testUploadPartCopyUsesGetObjectActionForSourceBucketOwnerLookup() throws Exception {
@@ -107,6 +124,31 @@ public class TestS3ActionOverrideForOwnerVerification {
     assertThrows(Exception.class, () -> put(endpoint, DEST_BUCKET, DEST_KEY, ""));
 
     assertNull(actionAtSourceBucketOwnerLookup.get());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ETag", "ObjectParts"})
+  public void testGetObjectAttributesRequiresBothIamActions(String attribute) throws Exception {
+    final List<String> actions = new ArrayList<>();
+    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, true);
+
+    final Response response = getObjectAttributes(endpoint, DEST_BUCKET, DEST_KEY, attribute);
+
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    assertEquals(Arrays.asList("GetObject", "GetObjectAttributes"), actions);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ETag", "ObjectParts"})
+  public void testGetObjectAttributesSkipsAdditionalCheckWhenStsDisabled(String attribute) throws Exception {
+    final List<String> actions = new ArrayList<>();
+    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, false);
+
+    final Response response = getObjectAttributes(endpoint, DEST_BUCKET, DEST_KEY, attribute);
+
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    // With STS disabled, only the attributes lookup itself reaches OM; the dependent GetObject check is skipped.
+    assertEquals(Collections.singletonList(null), actions);
   }
 
   private static ObjectEndpoint newEndpoint(AtomicReference<String> actionAtSourceBucketOwnerLookup,
@@ -169,6 +211,59 @@ public class TestS3ActionOverrideForOwnerVerification {
         .setHeaders(headers)
         .setSignatureInfo(signatureInfo)
         .build();
+  }
+
+  private static ObjectEndpoint newGetObjectAttributesEndpoint(List<String> actions, boolean isStsEnabled)
+      throws Exception {
+    final HttpHeaders headers = mock(HttpHeaders.class);
+    final SignatureInfo signatureInfo = mock(SignatureInfo.class);
+    when(signatureInfo.isSignPayload()).thenReturn(true);
+    when(signatureInfo.getStringToSign()).thenReturn("string-to-sign");
+    when(signatureInfo.getSignature()).thenReturn("signature");
+    when(signatureInfo.getAwsAccessId()).thenReturn("access-id");
+
+    final OzoneClient client = mock(OzoneClient.class);
+    final ObjectStore objectStore = mock(ObjectStore.class);
+    final ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    final AtomicReference<S3Auth> s3AuthRef = new AtomicReference<>();
+    doAnswer(invocationOnMock -> {
+      s3AuthRef.set(invocationOnMock.getArgument(0));
+      return null;
+    }).when(clientProtocol).setThreadLocalS3Auth(any(S3Auth.class));
+
+    when(client.getObjectStore()).thenReturn(objectStore);
+    when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getClientProxy()).thenReturn(clientProtocol);
+
+    final OzoneKey key = mock(OzoneKey.class);
+    when(key.isFile()).thenReturn(true);
+    when(key.getModificationTime()).thenReturn(Instant.now());
+    final S3HeadObjectAttributes headAttributes = mock(S3HeadObjectAttributes.class);
+    when(headAttributes.getKey()).thenReturn(key);
+
+    when(clientProtocol.headS3Object(DEST_BUCKET, DEST_KEY)).thenAnswer(invocationOnMock -> {
+      recordS3Action(s3AuthRef, actions);
+      return key;
+    });
+    when(clientProtocol.headS3ObjectAttributes(DEST_BUCKET, DEST_KEY)).thenAnswer(invocationOnMock -> {
+      recordS3Action(s3AuthRef, actions);
+      return headAttributes;
+    });
+
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY, isStsEnabled);
+    return EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setConfig(conf)
+        .setHeaders(headers)
+        .setSignatureInfo(signatureInfo)
+        .build();
+  }
+
+  private static void recordS3Action(AtomicReference<S3Auth> s3AuthRef, List<String> actions) {
+    final S3Auth s3Auth = s3AuthRef.get();
+    assertNotNull(s3Auth, "S3Auth must be initialized before metadata lookup");
+    actions.add(s3Auth.getS3Action());
   }
 }
 

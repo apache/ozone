@@ -343,6 +343,22 @@ public abstract class EndpointBase {
     }
   }
 
+  /**
+   * Performs an additional authorization check for APIs that require more than one IAM action.
+   * The check is skipped when fine-grained STS authorization is disabled.
+   */
+  @SuppressWarnings("SameParameterValue")
+  protected <E extends Exception> void requireS3ActionString(String s3Action, CheckedRunnable<E> authorizationCheck)
+      throws E {
+    if (s3Auth == null || !s3StsEnabled) {
+      return;
+    }
+    runWithS3ActionString(s3Action, () -> {
+      authorizationCheck.run();
+      return null;
+    });
+  }
+
   protected OzoneVolume getVolume() throws IOException {
     return client.getObjectStore().getS3Volume();
   }
@@ -716,6 +732,7 @@ public abstract class EndpointBase {
     }
     target.queryParams = queryParams;
     target.s3Auth = s3Auth;
+    target.s3StsEnabled = s3StsEnabled;
     target.setClient(this.client);
     target.setOzoneConfiguration(this.ozoneConfiguration);
     target.setContext(this.context);

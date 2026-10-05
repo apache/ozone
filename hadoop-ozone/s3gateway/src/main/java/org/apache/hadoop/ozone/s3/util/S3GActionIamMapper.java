@@ -49,6 +49,16 @@ public final class S3GActionIamMapper {
       return "GetBucketAcl";
     case PUT_ACL:
       return "PutBucketAcl";
+    case GET_BUCKET_TAGGING:
+      return "GetBucketTagging";
+    case PUT_BUCKET_TAGGING:
+    case DELETE_BUCKET_TAGGING:
+      return "PutBucketTagging";
+    case GET_BUCKET_LIFECYCLE:
+      return "GetLifecycleConfiguration";
+    case PUT_BUCKET_LIFECYCLE:
+    case DELETE_BUCKET_LIFECYCLE:
+      return "PutLifecycleConfiguration";
     case LIST_MULTIPART_UPLOAD:
       return "ListBucketMultipartUploads";
     case MULTI_DELETE:
@@ -67,6 +77,9 @@ public final class S3GActionIamMapper {
     case GET_KEY:
     case HEAD_KEY:
       return "GetObject";
+    case GET_OBJECT_ATTRIBUTES:
+      // ObjectAttributesHandler separately enforces the dependent GetObject action.
+      return "GetObjectAttributes";
     case ABORT_MULTIPART_UPLOAD:
       return "AbortMultipartUpload";
     case GET_OBJECT_TAGGING:
