@@ -147,7 +147,7 @@ public class TestSCMStateMachine {
 
   private static SCMStateMachine newStateMachine(SCMHADBTransactionBuffer buffer, ScmInvoker<?> invoker) {
     StorageContainerManager scm = mock(StorageContainerManager.class);
-    when(scm.getMetrics()).thenReturn(SCMMetrics.create());
+    when(scm.getMetrics()).thenReturn(mock(SCMMetrics.class));
     SCMContext context = mock(SCMContext.class);
     when(context.isLeader()).thenReturn(true);
     when(scm.getScmContext()).thenReturn(context);
