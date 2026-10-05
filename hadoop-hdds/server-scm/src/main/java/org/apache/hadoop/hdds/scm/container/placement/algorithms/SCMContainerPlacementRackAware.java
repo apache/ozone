@@ -455,8 +455,11 @@ public final class SCMContainerPlacementRackAware
       excludedNodes = usedNodes;
     }
 
-    // Where to look, in order: the rack of each affinity node; without affinity, or as a fallback, any rack but
-    // those of excludedNodes; as a fallback, any rack.
+    // The places to look for a node, in order. Each one gets MAX_RETRY tries:
+    // 1. the rack of each affinity node;
+    // 2. any rack except the racks of excludedNodes (right away if there are no affinity nodes, otherwise only
+    //    as a fallback);
+    // 3. any rack at all, as a fallback.
     List<Step> steps = new ArrayList<>();
     if (affinityNodes != null) {
       for (DatanodeDetails affinityNode : affinityNodes) {
@@ -494,8 +497,8 @@ public final class SCMContainerPlacementRackAware
         }
         retries--;
       }
-      // Out-of-service nodes stay in the topology, so an affinity node's rack can run out of retries without a
-      // valid node: try the next step. On other racks, running out of retries ends the search.
+      // Decommissioned and maintenance nodes stay in the topology, so a rack can use up all its tries on them.
+      // If that happens on an affinity node's rack, move on to the next place. Anywhere else, give up.
       if (retries == 0 && step.affinityNode == null) {
         String errMsg = "No writable datanode with enough space was found. "
             + "metadata size required: " + metadataSizeRequired +
@@ -507,12 +510,13 @@ public final class SCMContainerPlacementRackAware
     throw new SCMException("No satisfied datanode to meet the excludedNodes and affinityNode constrains.", null);
   }
 
-  /** A place chooseNode looks for a node, with its own MAX_RETRY retries. */
+  /** One place where chooseNode looks for a node. */
   private static final class Step {
-    /** Null to look anywhere, apart from the ancestors of excludedNodes at ancestorGen. */
+    /** Look near this node, or anywhere when null. */
     private final DatanodeDetails affinityNode;
+    /** RACK_LEVEL: stay on affinityNode's rack, or, without one, avoid the racks of excludedNodes. 0: any rack. */
     private final int ancestorGen;
-    /** Whether a node chosen in this step counts as a fallback. */
+    /** Whether a node found here counts as a fallback in the metrics. */
     private final boolean fallback;
 
     Step(DatanodeDetails affinityNode, int ancestorGen, boolean fallback) {
