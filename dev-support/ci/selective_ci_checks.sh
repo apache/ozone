@@ -269,6 +269,7 @@ function get_changed_test_classes() {
         "src/test/java/.*/Test.*\.java"
         "src/test/java/org/apache/hadoop/fs/contract"
         "src/test/java/org/apache/hadoop/fs/ozone/contract"
+        "src/test/java/org/apache/hadoop/tools/contract"
     )
     filter_changed_files true
 
@@ -280,7 +281,7 @@ function get_changed_test_classes() {
 
       local f
       for f in ${new_matched_files}; do
-        if echo "$f" | grep -q -e '/fs/contract/' -e '/fs/ozone/contract/'; then
+        if echo "$f" | grep -q -e '/fs/contract/' -e '/fs/ozone/contract/' -e '/tools/contract/'; then
           # run all contract tests
           test_classes="${test_classes},org/apache/hadoop/fs/ozone/contract/Test*"
         else
@@ -317,6 +318,7 @@ function get_count_integration_files() {
         "src/test/java/.*/Test.*\.java"
         "src/test/java/org/apache/hadoop/fs/contract"
         "src/test/java/org/apache/hadoop/fs/ozone/contract"
+        "src/test/java/org/apache/hadoop/tools/contract"
     )
     filter_changed_files true
     COUNT_INTEGRATION_CHANGED_FILES=${match_count}
