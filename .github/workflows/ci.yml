@@ -347,7 +347,7 @@ jobs:
       script-args: ${{ matrix.suite }}
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.suite }}
-      timeout-minutes: 60
+      timeout-minutes: 10
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     strategy:
       matrix:
