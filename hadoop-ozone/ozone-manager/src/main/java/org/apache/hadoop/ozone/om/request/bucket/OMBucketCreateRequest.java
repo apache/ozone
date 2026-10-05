@@ -438,6 +438,24 @@ public class OMBucketCreateRequest extends OMClientRequest {
       processingPhase = RequestProcessingPhase.PRE_PROCESS,
       requestType = Type.CreateBucket
   )
+  public static OMRequest disallowCreateBucketWithStoragePolicy(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)) {
+      BucketInfo bucketInfo = req.getCreateBucketRequest().getBucketInfo();
+      if (bucketInfo.hasStoragePolicy()
+          || bucketInfo.hasAllowFallbackStoragePolicy()) {
+        return stripStoragePolicyFromRequest(req);
+      }
+    }
+    return req;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.CreateBucket
+  )
   public static OMRequest handleCreateBucketWithBucketLayoutDuringPreFinalize(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
@@ -497,6 +515,19 @@ public class OMBucketCreateRequest extends OMClientRequest {
         originalRequest.getCreateBucketRequest();
     BucketInfo newBucketInfo = createBucketRequest.getBucketInfo().toBuilder()
         .setBucketLayout(newLayout.toProto()).build();
+    CreateBucketRequest newCreateRequest = createBucketRequest.toBuilder()
+        .setBucketInfo(newBucketInfo).build();
+    return originalRequest.toBuilder()
+        .setCreateBucketRequest(newCreateRequest).build();
+  }
+
+  private static OMRequest stripStoragePolicyFromRequest(OMRequest originalRequest) {
+    CreateBucketRequest createBucketRequest =
+        originalRequest.getCreateBucketRequest();
+    BucketInfo newBucketInfo = createBucketRequest.getBucketInfo().toBuilder()
+        .clearStoragePolicy()
+        .clearAllowFallbackStoragePolicy()
+        .build();
     CreateBucketRequest newCreateRequest = createBucketRequest.toBuilder()
         .setBucketInfo(newBucketInfo).build();
     return originalRequest.toBuilder()
