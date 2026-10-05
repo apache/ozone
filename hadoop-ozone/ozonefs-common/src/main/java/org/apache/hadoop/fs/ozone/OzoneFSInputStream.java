@@ -28,7 +28,6 @@ import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.FSInputStream;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.Seekable;
-import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
@@ -190,11 +189,7 @@ public class OzoneFSInputStream extends FSInputStream
   }
 
   protected boolean supportsPositionedRead() {
-    if (!(inputStream instanceof ByteBufferPositionedReadable)) {
-      return false;
-    }
-    return !(inputStream instanceof StreamCapabilities)
-        || ((StreamCapabilities) inputStream).hasCapability(StreamCapabilities.PREADBYTEBUFFER);
+    return inputStream instanceof ByteBufferPositionedReadable;
   }
 
   private int readImpl(long position, ByteBuffer buffer) throws IOException {
