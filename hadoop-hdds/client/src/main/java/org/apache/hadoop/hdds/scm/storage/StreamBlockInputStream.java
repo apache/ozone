@@ -23,10 +23,10 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.apache.ratis.util.Preconditions;
@@ -95,7 +96,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final Function<BlockID, BlockLocationInfo> refreshFunction;
   private final RetryPolicy retryPolicy;
   private int retries = 0;
-  private final Set<DatanodeID> failedStreamingDatanodes = new HashSet<>();
+  // Shared by sequential and positioned reads; must be thread-safe for concurrent access.
+  private final Set<DatanodeID> failedStreamingDatanodes = ConcurrentHashMap.newKeySet();
 
   public StreamBlockInputStream(
       BlockID blockID, long length, Pipeline pipeline,
@@ -175,6 +177,96 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       read += toCopy;
     }
     return read > 0 ? read : EOF;
+  }
+
+  /**
+   * Positioned read served by a dedicated one-shot streaming read which never touches the
+   * cursor, the pre-read buffer or the sequential reader.
+   *
+   * @param blockOffset the offset within the block to read from.
+   * @param dst the buffer to read into.
+   * @return the number of bytes copied into {@code dst}, or -1 if no byte could be read.
+   */
+  @Override
+  public int readPositioned(long blockOffset, ByteBuffer dst) throws IOException {
+    if (!dst.hasRemaining()) {
+      return EOF;
+    }
+    if (blockOffset < 0 || blockOffset >= blockLength) {
+      return EOF;
+    }
+    final XceiverClientFactory factory;
+    synchronized (this) {
+      checkOpen();
+      factory = xceiverClientFactory;
+    }
+    final int length = Math.toIntExact(Math.min(dst.remaining(), blockLength - blockOffset));
+    final int startPosition = dst.position();
+    int callRetries = 0;
+    while (true) {
+      final Pipeline pipeline = pipelineRef.get();
+      final XceiverClientGrpc client = acquireGrpcClientForReadData(factory, pipeline);
+      final StreamingReader reader = new StreamingReader(client);
+      try {
+        // On failure initStreamRead releases its own permit, so the reader is closed only after it succeeds.
+        client.initStreamRead(blockID, reader, failedStreamingDatanodes);
+        try {
+          return preadOnce(client, reader, pipeline, blockOffset, length, dst);
+        } finally {
+          closeStream(reader);
+        }
+      } catch (IOException e) {
+        dst.position(startPosition);
+        handlePreadException(e, reader, blockOffset, callRetries++);
+      } finally {
+        factory.releaseClientForReadData(client, false);
+      }
+    }
+  }
+
+  private int preadOnce(XceiverClientGrpc client, StreamingReader reader, Pipeline pipeline,
+      long blockOffset, int length, ByteBuffer dst) throws IOException {
+    final StreamingReadResponse response = reader.getResponse();
+    if (response == null) {
+      throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
+    }
+    client.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
+        blockID, blockOffset, length, responseDataSize, verifyChecksum, tokenRef.get(), pipeline), response);
+
+    int copied = 0;
+    while (copied < length) {
+      final ReadBlockResponseProto proto = reader.poll();
+      if (proto == null) {
+        break;
+      }
+      final ByteBuffer buffer = getByteBuffer(proto, blockOffset + copied);
+      if (buffer == null || !buffer.hasRemaining()) {
+        continue;
+      }
+      buffer.limit(buffer.position() + Math.min(buffer.remaining(), length - copied));
+      copied += buffer.remaining();
+      dst.put(buffer);
+    }
+    return copied > 0 ? copied : EOF;
+  }
+
+  private void handlePreadException(IOException cause, StreamingReader reader, long blockOffset,
+      int callRetries) throws IOException {
+    final IOException root = ConnectionFailureUtils.unwrapCause(cause);
+    if (Status.fromThrowable(cause).getCode() == Status.Code.OUT_OF_RANGE) {
+      final EOFException eof = new EOFException("Failed to read block " + blockID + " at offset "
+          + blockOffset + ": " + cause.getMessage());
+      eof.initCause(cause);
+      throw eof;
+    }
+    final boolean retriable = root instanceof StorageContainerException || isConnectivityIssue(root)
+        || root instanceof TimeoutIOException;
+    if (!retriable || !shouldRetryRead(root, retryPolicy, callRetries)) {
+      throw cause;
+    }
+    recordFailedStreamingDatanode(reader);
+    refreshBlockInfo(root);
+    LOG.warn("Refreshing block data to pread block {} due to {}", blockID, cause.getMessage());
   }
 
   private synchronized boolean dataAvailableToRead(int length, boolean preRead) throws IOException {
@@ -284,7 +376,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     final StreamingReader reader = streamingReader;
     streamingReader = null;
     LOG.debug("{} closeReader for {}", getName(reader), reason);
+    closeStream(reader);
+  }
 
+  private static void closeStream(StreamingReader reader) {
     reader.onCompleted();
 
     final StreamingReadResponse response = reader.getResponse();
@@ -313,31 +408,34 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   protected synchronized void acquireClient() throws IOException {
     checkOpen();
     if (xceiverClient == null) {
-      final Pipeline pipeline = pipelineRef.get();
-      final XceiverClientSpi client;
-      try {
-        client = xceiverClientFactory.acquireClientForReadData(pipeline);
-      } catch (IOException ioe) {
-        LOG.warn("Failed to acquire client for pipeline {}, block {}", pipeline, blockID);
-        throw ioe;
-      }
-
-      if (client == null) {
-        throw new IOException("Failed to acquire client for " + pipeline);
-      }
-      if (!(client instanceof XceiverClientGrpc)) {
-        throw new IOException("Unexpected client class: " + client.getClass().getName() + ", " + pipeline);
-      }
-
-      xceiverClient =  (XceiverClientGrpc) client;
+      xceiverClient = acquireGrpcClientForReadData(xceiverClientFactory, pipelineRef.get());
     }
+  }
+
+  private XceiverClientGrpc acquireGrpcClientForReadData(XceiverClientFactory factory, Pipeline pipeline)
+      throws IOException {
+    final XceiverClientSpi acquired;
+    try {
+      acquired = factory.acquireClientForReadData(pipeline);
+    } catch (IOException ioe) {
+      LOG.warn("Failed to acquire client for pipeline {}, block {}", pipeline, blockID);
+      throw ioe;
+    }
+    if (acquired == null) {
+      throw new IOException("Failed to acquire client for " + pipeline);
+    }
+    if (!(acquired instanceof XceiverClientGrpc)) {
+      factory.releaseClientForReadData(acquired, false);
+      throw new IOException("Unexpected client class: " + acquired.getClass().getName() + ", " + pipeline);
+    }
+    return (XceiverClientGrpc) acquired;
   }
 
   private synchronized void initialize() throws IOException {
     while (streamingReader == null) {
       try {
         acquireClient();
-        final StreamingReader reader = new StreamingReader();
+        final StreamingReader reader = new StreamingReader(xceiverClient);
         LOG.debug("{}: new StreamingReader", getName(reader));
         xceiverClient.initStreamRead(blockID, reader, failedStreamingDatanodes);
         streamingReader = reader;
@@ -348,8 +446,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   synchronized void readBlock(int length, boolean preRead) throws IOException {
-    final long required = position + length - requestedLength;
+    final long outstanding = requestedLength - position;  // bytes requested from the datanode but not yet consumed
+    final long required = length - outstanding;           // bytes required to fulfill this call
     final long preReadLength = preRead ? preReadSize : 0;
+    if (required <= 0 && outstanding >= getPreReadRefillThreshold(preReadLength)) {
+      // Safe to skip: already has the required bytes and exceeded the refill threshold
+      return;
+    }
     // Clamp so requestedLength never exceeds blockLength: requesting past the end
     // produces an offset the DataNode cannot serve, causing a read timeout.
     final long readLength = Math.min(required + preReadLength, blockLength - requestedLength);
@@ -393,10 +496,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private void recordFailedStreamingDatanode() {
-    if (streamingReader == null) {
+    recordFailedStreamingDatanode(streamingReader);
+  }
+
+  private void recordFailedStreamingDatanode(StreamingReader reader) {
+    if (reader == null) {
       return;
     }
-    final StreamingReadResponse response = streamingReader.getResponse();
+    final StreamingReadResponse response = reader.getResponse();
     if (response == null) {
       return;
     }
@@ -425,12 +532,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
   }
 
-  private synchronized void releaseStreamResources() {
-    if (xceiverClient != null) {
-      xceiverClient.completeStreamRead();
-    }
-  }
-
   @Override
   public String toString() {
     return name;
@@ -438,6 +539,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   public long getPreReadSize() {
     return preReadSize;
+  }
+
+  /** Refill the pre-read window in bulk once it drains below this, instead of after every response. */
+  static long getPreReadRefillThreshold(long preRead) {
+    return preRead / 2;
   }
 
   public int getResponseDataSize() {
@@ -479,10 +585,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   /**
-   * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
+   * StreamObserver used for sequential reads and for one-shot positioned reads.
    */
   public class StreamingReader implements StreamingReaderSpi {
     private final String name = StreamBlockInputStream.this.name + "-reader" + READER_ID.getAndIncrement();
+    private final XceiverClientGrpc client;
 
     /** Response queue: poll is blocking while offer is non-blocking. */
     private final BlockingQueue<ReadBlockResponseProto> responseQueue = new LinkedBlockingQueue<>();
@@ -490,6 +597,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     private final CompletableFuture<Void> future = new CompletableFuture<>();
     private final AtomicBoolean semaphoreReleased = new AtomicBoolean(false);
     private final AtomicReference<StreamingReadResponse> response = new AtomicReference<>();
+
+    StreamingReader(XceiverClientGrpc client) {
+      this.client = client;
+    }
 
     void checkError() throws IOException {
       if (future.isCompletedExceptionally()) {
@@ -568,7 +679,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     private void releaseResources() {
       if (semaphoreReleased.compareAndSet(false, true)) {
-        releaseStreamResources();
+        client.completeStreamRead();
       }
     }
 

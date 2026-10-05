@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.Node2PipelineMap;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -104,6 +105,10 @@ public class NodeStateManager implements Runnable, Closeable {
    * Used for publishing node state change events.
    */
   private final EventPublisher eventPublisher;
+  /**
+   * Network topology of the cluster. DEAD nodes are removed from it.
+   */
+  private final NetworkTopology clusterMap;
   /**
    * Maps the event to be triggered when a node state us updated.
    */
@@ -161,16 +166,19 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    * @param conf Configuration
    * @param eventPublisher event publisher
+   * @param clusterMap network topology of the cluster
    * @param layoutManager Layout version manager
    */
   public NodeStateManager(ConfigurationSource conf,
                           EventPublisher eventPublisher,
+                          NetworkTopology clusterMap,
                           LayoutVersionManager layoutManager,
                           SCMContext scmContext) {
     this.layoutVersionManager = layoutManager;
     this.nodeStateMap = new NodeStateMap();
     this.node2PipelineMap = new Node2PipelineMap();
     this.eventPublisher = eventPublisher;
+    this.clusterMap = clusterMap;
     this.state2EventMap = new HashMap<>();
     initialiseState2EventMap();
     Set<NodeState> finalStates = new HashSet<>();
@@ -312,7 +320,7 @@ public class NodeStateManager implements Runnable, Closeable {
       updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
     } catch (NodeNotFoundException ex) {
       throw new IllegalStateException("Inconsistent NodeStateMap! Datanode "
-          + datanodeDetails.getID() + " was added but not found in map: " + nodeStateMap);
+          + datanodeDetails + " was added but not found in map: " + nodeStateMap);
     }
   }
 
@@ -949,12 +957,34 @@ public class NodeStateManager implements Runnable, Closeable {
             getNextState(status.getHealth(), lifeCycleEvent);
         NodeStatus newStatus =
             nodeStateMap.updateNodeHealthState(node.getID(), newHealthState);
+        updateClusterMap(node, status, newStatus);
         fireHealthStateEvent(newStatus.getHealth(), node);
       }
     } catch (InvalidStateTransitionException e) {
       LOG.warn("Invalid state transition of node {}." +
               " Current state: {}, life cycle event: {}",
           node, status.getHealth(), lifeCycleEvent);
+    }
+  }
+
+  /**
+   * Removes the node from the network topology when it becomes DEAD, and adds it back when it recovers.
+   * Doing it here, not in event handlers, keeps the topology in step with the node's health.
+   */
+  private void updateClusterMap(DatanodeInfo node, NodeStatus oldStatus, NodeStatus newStatus) {
+    try {
+      if (newStatus.isDead()) {
+        // Look up by path, as a re-registered node's DatanodeInfo may have no parent.
+        if (clusterMap.getNode(node.getNetworkFullPath()) != null) {
+          clusterMap.remove(node);
+        }
+      } else if (oldStatus.isDead()) {
+        clusterMap.add(node);
+      }
+    } catch (RuntimeException e) {
+      // Don't let this fail the health check.
+      LOG.error("Failed to update network topology for node {} moving from {} to {}", node,
+          oldStatus.getHealth(), newStatus.getHealth(), e);
     }
   }
 

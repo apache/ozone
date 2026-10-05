@@ -1269,6 +1269,24 @@ public class TestKeyValueHandler {
     }
   }
 
+  /**
+   * A chunk boundary inside the response window that is not checksum aligned makes a response shorter than
+   * responseDataSize; the next response must continue from where the short one stopped.
+   */
+  @Test
+  public void testReadBlockResponseShorterThanResponseDataSize() throws Exception {
+    final int unit = (int) BYTES_PER_CHECKSUM;
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, unit);
+      fixture.appendChunk("chunk2", unit, 20);
+      fixture.appendChunk("chunk3", unit + 20, unit);
+      final long blockSize = 2L * unit + 20;
+      ReadBlockResult result = fixture.read(0, blockSize, 2 * unit);
+      assertResponses(result, 0, blockSize);
+      assertEquals(unit + 20, result.getDataResponses().get(0).getReadBlock().getData().size());
+    }
+  }
+
   /** Each byte of the block is the low byte of its position. */
   private static byte[] writtenBytes(long offset, int length) {
     final byte[] bytes = new byte[length];
