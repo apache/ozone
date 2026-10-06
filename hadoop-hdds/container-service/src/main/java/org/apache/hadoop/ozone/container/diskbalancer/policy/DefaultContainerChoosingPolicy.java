@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.diskbalancer.policy;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.computeUtilization;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getUsableVolumesByStorageType;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.newVolumeFixedUsage;
 
 import com.google.common.cache.Cache;
@@ -98,19 +99,23 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
         return null;
       }
 
-      // Balance each storage type independently so a container never crosses types. Iterate
-      // StorageType.values() rather than the grouping keys to keep the order stable across runs.
-      final Map<StorageType, List<VolumeFixedUsage>> usagesByStorageType = volumeUsages.stream()
-          .collect(Collectors.groupingBy(v -> v.getVolume().getStorageType()));
-      for (StorageType storageType : StorageType.values()) {
-        final List<VolumeFixedUsage> sameTypeUsages = usagesByStorageType.get(storageType);
-        if (sameTypeUsages == null || sameTypeUsages.size() < 2) {
-          if (sameTypeUsages != null) {
-            LOG.debug("Skipping storage type {} for disk balancing: only {} usable volume(s)",
-                storageType, sameTypeUsages.size());
-          }
-          continue;
-        }
+      // Balance each storage type independently so a container never crosses types. Try the type
+      // with the largest threshold violation first. StorageType order is only a deterministic
+      // tie-breaker.
+      final Map<StorageType, List<VolumeFixedUsage>> usagesByStorageType =
+          getUsableVolumesByStorageType(volumeUsages);
+      final List<Map.Entry<StorageType, List<VolumeFixedUsage>>> storageTypeGroups =
+          usagesByStorageType.entrySet().stream()
+              .filter(entry -> hasMultipleUsableVolumes(entry.getKey(), entry.getValue()))
+              .sorted(Comparator
+                  .<Map.Entry<StorageType, List<VolumeFixedUsage>>>comparingDouble(
+                      entry -> getThresholdViolation(entry.getValue(), thresholdPercentage))
+                  .reversed()
+                  .thenComparingInt(entry -> entry.getKey().ordinal()))
+              .collect(Collectors.toList());
+      for (Map.Entry<StorageType, List<VolumeFixedUsage>> entry : storageTypeGroups) {
+        final StorageType storageType = entry.getKey();
+        final List<VolumeFixedUsage> sameTypeUsages = entry.getValue();
         final ContainerCandidate candidate = chooseWithinStorageType(ozoneContainer, sameTypeUsages,
             deltaMap, inProgressContainerIDs, thresholdPercentage, movableContainerStates, storageType);
         if (candidate != null) {
@@ -122,6 +127,27 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     } finally {
       lock.unlock();
     }
+  }
+
+  private static boolean hasMultipleUsableVolumes(StorageType storageType,
+      List<VolumeFixedUsage> volumeUsages) {
+    if (volumeUsages.size() >= 2) {
+      return true;
+    }
+    LOG.debug("Skipping storage type {} for disk balancing: only {} usable volume(s)",
+        storageType, volumeUsages.size());
+    return false;
+  }
+
+  private static double getThresholdViolation(List<VolumeFixedUsage> volumeUsages,
+      double thresholdPercentage) {
+    final double idealUsage = getIdealUsage(volumeUsages);
+    final double actualThreshold = thresholdPercentage / 100.0;
+    final double lowerThreshold = idealUsage - actualThreshold;
+    final double upperThreshold = idealUsage + actualThreshold;
+    final double lowestUsage = volumeUsages.get(0).getUtilization();
+    final double highestUsage = volumeUsages.get(volumeUsages.size() - 1).getUtilization();
+    return Math.max(highestUsage - upperThreshold, lowerThreshold - lowestUsage);
   }
 
   /**

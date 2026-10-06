@@ -20,9 +20,11 @@ package org.apache.hadoop.ozone.container.diskbalancer;
 import static org.apache.ratis.util.Preconditions.assertInstanceOf;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -58,6 +60,18 @@ public final class DiskBalancerVolumeCalculation {
     return volumeSet.getVolumesList().stream()
         .map(v -> newVolumeFixedUsage(v, deltas))
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Group positive-capacity volumes by storage type. These are the volumes eligible for disk
+   * balancing calculations.
+   */
+  public static Map<StorageType, List<VolumeFixedUsage>> getUsableVolumesByStorageType(
+      List<VolumeFixedUsage> volumes) {
+    return volumes.stream()
+        .filter(v -> v.getUsage().getCapacity() > 0)
+        .collect(Collectors.groupingBy(v -> v.getVolume().getStorageType(),
+            () -> new EnumMap<>(StorageType.class), Collectors.toList()));
   }
   
   /**

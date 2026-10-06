@@ -460,18 +460,19 @@ public class TestDefaultContainerChoosingPolicy {
   }
 
   /**
-   * With volumes of two StorageTypes, the chosen pair comes from a single type. Here the SSD volumes
-   * have the widest utilization spread, so SSD is balanced first.
+   * When multiple storage types need balancing, the type with the largest threshold violation is
+   * selected even when another eligible type appears earlier in {@link StorageType#values()}.
+   * Source and destination remain within the selected storage type.
    */
   @Test
-  public void testChooseVolumesStaysWithinStorageType() throws IOException {
-    HddsVolume ssdHigh = createVolume("ssd-high", 0.60, VOLUME_CAPACITY, StorageType.SSD);
-    HddsVolume ssdMid = createVolume("ssd-mid", 0.30, VOLUME_CAPACITY, StorageType.SSD);
-    HddsVolume ssdLow = createVolume("ssd-low", 0.20, VOLUME_CAPACITY, StorageType.SSD);
-    HddsVolume diskHigh = createVolume("disk-high", 0.75, VOLUME_CAPACITY, StorageType.DISK);
-    HddsVolume diskLow = createVolume("disk-low", 0.50, VOLUME_CAPACITY, StorageType.DISK);
+  public void testChoosesMostImbalancedStorageTypeWithoutCrossingTypes() throws IOException {
+    HddsVolume ssdHigh = createVolume("ssd-high", 0.75, VOLUME_CAPACITY, StorageType.SSD);
+    HddsVolume ssdLow = createVolume("ssd-low", 0.50, VOLUME_CAPACITY, StorageType.SSD);
+    HddsVolume diskHigh = createVolume("disk-high", 0.60, VOLUME_CAPACITY, StorageType.DISK);
+    HddsVolume diskMid = createVolume("disk-mid", 0.30, VOLUME_CAPACITY, StorageType.DISK);
+    HddsVolume diskLow = createVolume("disk-low", 0.20, VOLUME_CAPACITY, StorageType.DISK);
     volumeSet = createVolumeSetForUsages(
-        Arrays.asList(ssdHigh, ssdMid, ssdLow, diskHigh, diskLow));
+        Arrays.asList(ssdHigh, ssdLow, diskHigh, diskMid, diskLow));
 
     containerSet = newContainerSet();
     createContainer(1L, DEFAULT_CONTAINER_SIZE, ssdHigh, containerSet);
@@ -482,10 +483,10 @@ public class TestDefaultContainerChoosingPolicy {
         volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD, DEFAULT_MOVABLE_STATES);
 
     assertNotNull(result);
-    assertEquals(ssdHigh, result.getSourceVolume());
-    assertEquals(ssdLow, result.getDestVolume());
-    assertEquals(StorageType.SSD, result.getSourceVolume().getStorageType());
-    assertEquals(StorageType.SSD, result.getDestVolume().getStorageType());
+    assertEquals(diskHigh, result.getSourceVolume());
+    assertEquals(diskLow, result.getDestVolume());
+    assertEquals(StorageType.DISK, result.getSourceVolume().getStorageType());
+    assertEquals(StorageType.DISK, result.getDestVolume().getStorageType());
   }
 
   /**

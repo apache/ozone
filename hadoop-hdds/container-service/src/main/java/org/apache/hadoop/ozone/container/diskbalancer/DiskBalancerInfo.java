@@ -21,11 +21,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 
 /**
  * DiskBalancer's information to persist and for report.
- * Report-only fields (idealUsage, volumeInfo) are NOT persisted to YAML.
+ * Report-only fields (idealUsage, volumeInfo, storageTypeInfo) are NOT persisted to YAML.
  */
 public class DiskBalancerInfo {
   private DiskBalancerRunningStatus operationalState;
@@ -44,6 +45,8 @@ public class DiskBalancerInfo {
   private double idealUsage;
   // Report-only: per-volume info. NOT persisted.
   private List<VolumeReportProto> volumeInfo;
+  // Report-only: per-storage-type balancing info. NOT persisted.
+  private List<StorageTypeDiskBalancerInfoProto> storageTypeInfo;
 
   public DiskBalancerInfo(DiskBalancerRunningStatus operationalState, double threshold,
       long bandwidthInMB, int parallelThread, boolean stopAfterDiskEven) {
@@ -248,6 +251,14 @@ public class DiskBalancerInfo {
 
   public void setVolumeInfo(List<VolumeReportProto> volumeInfo) {
     this.volumeInfo = volumeInfo;
+  }
+
+  public List<StorageTypeDiskBalancerInfoProto> getStorageTypeInfo() {
+    return storageTypeInfo != null ? storageTypeInfo : Collections.emptyList();
+  }
+
+  public void setStorageTypeInfo(List<StorageTypeDiskBalancerInfoProto> storageTypeInfo) {
+    this.storageTypeInfo = storageTypeInfo;
   }
 
   @Override
