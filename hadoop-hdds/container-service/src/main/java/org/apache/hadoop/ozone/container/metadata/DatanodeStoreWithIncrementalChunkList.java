@@ -103,7 +103,7 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
    *
    * Chunk 3 starts where chunk 2 ends. It is appended, and the bcsId comes from last_chunk_info.
    *
-   * Container reconciliation in 2.1.0 to 2.2.1 wrote all chunks to block_data but kept the last_chunk_info row:
+   * Container reconciliation in old versions wrote the full chunk list to block_data but kept the last_chunk_info row:
    *
    *   table            value
    *   block_data       BlockData(chunks = [chunk 0, chunk 1, chunk 2, chunk 3])
@@ -122,8 +122,8 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
               blockData.getChunks().get(blockData.getChunks().size() - 1);
       if (lastChunkInBlockData != null) {
         if (lastChunkInBlockData.getOffset() >= lastChunk.getChunks().get(0).getOffset()) {
-          // block_data already has this chunk, so the last_chunk_info row is stale. Container reconciliation in 2.1.0
-          // to 2.2.1 left such a row when it repaired a chunk of the block. Use block_data as it is.
+          // block_data already has this chunk, so the last_chunk_info row is stale. In old versions, container
+          // reconciliation left such a row when it repaired a chunk of the block. Use block_data as it is.
           return;
         }
         Preconditions.checkState(
