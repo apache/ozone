@@ -630,6 +630,10 @@ public final class ScmConfigKeys {
   public static final long
       OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_INTERVAL_DEFAULT = 60 * 1000L;
 
+  public static final String OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT =
+      "ozone.scm.ha.dbtransactionbuffer.flush.pending.limit";
+  public static final long OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT_DEFAULT = 10000L;
+
   public static final String NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY =
       "net.topology.node.switch.mapping.impl";
   public static final String HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL
