@@ -229,8 +229,11 @@ public class KeyValueContainerCheck {
                containerDataFromDisk.getUnprefixedKeyFilter())) {
         // If the container was deleted during the scan, stop trying to process its data.
         while (kvIter.hasNext() && !containerIsDeleted()) {
-          List<ContainerScanError> blockErrors = scanBlock(db, dbFile, kvIter.nextBlock(), throttler, canceler,
-              currentTree);
+          BlockData block = kvIter.nextBlock();
+          // Scan the same chunks that a read returns, including the last chunk of an incremental chunk list.
+          block = db.getStore().getCompleteBlockData(block, block.getBlockID(),
+              containerDataFromDisk.getBlockKey(block.getLocalID()));
+          List<ContainerScanError> blockErrors = scanBlock(db, dbFile, block, throttler, canceler, currentTree);
           errors.addAll(blockErrors);
         }
       }

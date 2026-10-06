@@ -94,6 +94,11 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
       ContainerProtos.ChunkInfo lastChunkInBlockData =
               blockData.getChunks().get(blockData.getChunks().size() - 1);
       if (lastChunkInBlockData != null) {
+        if (lastChunkInBlockData.getOffset() >= lastChunk.getChunks().get(0).getOffset()) {
+          // The block data already has this chunk. Reconciliation in older versions wrote the full chunk list to the
+          // block data table but kept the last chunk info row.
+          return;
+        }
         Preconditions.checkState(
             lastChunkInBlockData.getOffset() + lastChunkInBlockData.getLen()
                 == lastChunk.getChunks().get(0).getOffset(),
