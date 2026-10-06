@@ -122,8 +122,8 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
               blockData.getChunks().get(blockData.getChunks().size() - 1);
       if (lastChunkInBlockData != null) {
         if (lastChunkInBlockData.getOffset() >= lastChunk.getChunks().get(0).getOffset()) {
-          // block_data already has this chunk, so the last_chunk_info row is stale. In old versions, container
-          // reconciliation left such a row when it repaired a chunk of the block. Use block_data as it is.
+          // NOTE: only blocks that container reconciliation in 2.1.0 to 2.2.1 repaired reach this branch. Those
+          // versions wrote the full chunk list to block_data but kept the last_chunk_info row, so the row is stale.
           return;
         }
         Preconditions.checkState(
