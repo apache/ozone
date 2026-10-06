@@ -109,7 +109,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     final String delimiter = queryParams().containsKey(QueryParams.DELIMITER) ?
         queryParams().get(QueryParams.DELIMITER) : null;
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
-    final String marker = queryParams().get(isListObjectVersions() ? QueryParams.KEY_MARKER : QueryParams.MARKER);
+    final String marker = getListMarker();
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
     String prefix = queryParams().get(QueryParams.PREFIX, "");
     String startAfter = queryParams().get(QueryParams.START_AFTER);
@@ -255,9 +255,20 @@ public class BucketEndpoint extends BucketOperationHandler {
     return Response.ok(toListResult(response)).build();
   }
 
-  /** ListObjectVersions lists the same keys as ListObjects (V1), but paginates with key-marker instead of marker. */
   private boolean isListObjectVersions() {
     return queryParams().get(QueryParams.VERSIONS) != null;
+  }
+
+  /** ListObjectVersions lists the same keys as ListObjects (V1), but paginates with key-marker instead of marker. */
+  private String getListMarker() throws OS3Exception {
+    if (!isListObjectVersions()) {
+      return queryParams().get(QueryParams.MARKER);
+    }
+    final String keyMarker = queryParams().get(QueryParams.KEY_MARKER);
+    if (StringUtils.isEmpty(keyMarker) && StringUtils.isNotEmpty(queryParams().get(QueryParams.VERSION_ID_MARKER))) {
+      throw newError(S3ErrorTable.INVALID_ARGUMENT, "A version-id marker cannot be specified without a key marker");
+    }
+    return keyMarker;
   }
 
   private Object toListResult(ListObjectResponse response) {

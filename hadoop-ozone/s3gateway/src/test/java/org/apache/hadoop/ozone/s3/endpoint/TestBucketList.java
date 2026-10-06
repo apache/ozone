@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder.newBucketEndpointBuilder;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -728,6 +729,16 @@ public class TestBucketList {
     assertThat(second.getKeyMarker().getName()).isEqualTo("file+1");
     assertThat(second.getVersionIdMarker()).isEqualTo(NULL_VERSION_ID);
     assertThat(second.getVersions()).extracting(v -> v.getKey().getName()).containsExactly("file2", "file3");
+  }
+
+  @Test
+  public void listObjectVersionsRejectsVersionIdMarkerWithoutKeyMarker() throws IOException {
+    setup("file1");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSION_ID_MARKER, NULL_VERSION_ID);
+
+    assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT, () -> bucketEndpoint.get(BUCKET_NAME));
   }
 
   @Test
