@@ -144,7 +144,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!dataAvailableToRead(1, preRead)) {
       return EOF;
     }
-    final int value = readBuffer.getByteBuffer().get();
+    final int value = Byte.toUnsignedInt(readBuffer.getByteBuffer().get());
     advancePosition(1, preRead);
     return value;
   }
@@ -447,8 +447,13 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   synchronized void readBlock(int length, boolean preRead) throws IOException {
-    final long required = position + length - requestedLength;
+    final long outstanding = requestedLength - position;  // bytes requested from the datanode but not yet consumed
+    final long required = length - outstanding;           // bytes required to fulfill this call
     final long preReadLength = preRead ? preReadSize : 0;
+    if (required <= 0 && outstanding >= getPreReadRefillThreshold(preReadLength)) {
+      // Safe to skip: already has the required bytes and exceeded the refill threshold
+      return;
+    }
     // Clamp so requestedLength never exceeds blockLength: requesting past the end
     // produces an offset the DataNode cannot serve, causing a read timeout.
     final long readLength = Math.min(required + preReadLength, blockLength - requestedLength);
@@ -471,6 +476,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
     xceiverClient.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
         blockID, requestedLength, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
+  }
+
+  /**
+   * A stream killed by a gRPC deadline is a transport failure of the long-lived call, not a data error:
+   * fail over to another datanode the same way as UNAVAILABLE. The classic per-request path is unaffected.
+   */
+  @Override
+  protected boolean isConnectivityIssue(IOException ex) {
+    return super.isConnectivityIssue(ex) || Status.fromThrowable(ex).getCode() == Status.DEADLINE_EXCEEDED.getCode();
   }
 
   private void handleExceptions(IOException cause) throws IOException {
@@ -535,6 +549,11 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   public long getPreReadSize() {
     return preReadSize;
+  }
+
+  /** Refill the pre-read window in bulk once it drains below this, instead of after every response. */
+  static long getPreReadRefillThreshold(long preRead) {
+    return preRead / 2;
   }
 
   public int getResponseDataSize() {

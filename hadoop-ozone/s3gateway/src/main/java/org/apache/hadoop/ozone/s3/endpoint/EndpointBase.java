@@ -60,6 +60,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
@@ -109,6 +110,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
@@ -122,6 +124,7 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
+import org.apache.hadoop.ozone.s3.util.ReadConsistencyContext;
 import org.apache.hadoop.ozone.s3.util.S3GActionIamMapper;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -259,6 +262,7 @@ public abstract class EndpointBase {
     ClientProtocol clientProtocol =
         getClient().getObjectStore().getClientProxy();
     clientProtocol.setThreadLocalS3Auth(s3Auth);
+    setReadConsistencyFromHeader(clientProtocol);
 
     bufferSize = (int) getOzoneConfiguration().getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
@@ -283,6 +287,27 @@ public abstract class EndpointBase {
 
   protected void init() {
     // hook method
+  }
+
+  private void setReadConsistencyFromHeader(ClientProtocol clientProtocol) {
+    ReadConsistencyContext readConsistencyContext =
+        ReadConsistencyContext.fromHeaders(getHeaders());
+    ReadConsistency readConsistency = readConsistencyContext.getReadConsistency();
+    if (OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())) {
+      // S3 credential validation currently requires the OM leader so that
+      // revoked credentials are never accepted by a stale follower.
+      clientProtocol.setThreadLocalReadConsistency(
+          ReadConsistency.LINEARIZABLE_LEADER_ONLY);
+      return;
+    }
+    if (readConsistency == null) {
+      clientProtocol.clearThreadLocalReadConsistency();
+    } else if (readConsistency == ReadConsistency.LOCAL_LEASE) {
+      clientProtocol.setThreadLocalReadConsistency(readConsistency,
+          readConsistencyContext.getLocalLeaseLogLimit(), null);
+    } else {
+      clientProtocol.setThreadLocalReadConsistency(readConsistency);
+    }
   }
 
   /**
@@ -762,6 +787,30 @@ public abstract class EndpointBase {
         throw newError(INVALID_URI, keyPath);
       }
     }
+  }
+
+  /**
+   * Rejects the request with {@code NotImplemented} if it has any of the {@code subresources}.
+   *
+   * @return null if the request has none of the {@code subresources}
+   */
+  Response rejectNotImplemented(S3RequestContext s3RequestContext, Set<String> subresources, String resource) {
+    final boolean requested = subresources.stream().anyMatch(subresource -> queryParams().get(subresource) != null);
+    return rejectNotImplemented(s3RequestContext, requested ? S3GAction.NOT_IMPLEMENTED : null, resource);
+  }
+
+  /**
+   * Rejects the request with {@code NotImplemented} unless {@code action} is null.
+   * The {@code action} is stored in the request context for audit logging.
+   *
+   * @param action the action determined by the handler, null if the handler is not responsible for the request
+   * @return null if {@code action} is null
+   */
+  Response rejectNotImplemented(S3RequestContext s3RequestContext, @Nullable S3GAction action, String resource) {
+    if (s3RequestContext.ignore(action)) {
+      return null;
+    }
+    throw newError(S3ErrorTable.NOT_IMPLEMENTED, resource);
   }
 
   protected ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket) throws OS3Exception {

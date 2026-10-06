@@ -320,7 +320,7 @@ public class NodeStateManager implements Runnable, Closeable {
       updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
     } catch (NodeNotFoundException ex) {
       throw new IllegalStateException("Inconsistent NodeStateMap! Datanode "
-          + datanodeDetails.getID() + " was added but not found in map: " + nodeStateMap);
+          + datanodeDetails + " was added but not found in map: " + nodeStateMap);
     }
   }
 

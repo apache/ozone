@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import java.io.IOException;
 import java.io.InputStream;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 /**
@@ -33,6 +34,16 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 abstract class BucketOperationHandler extends EndpointBase {
 
   /**
+   * Returns the action for the current request if this handler is responsible for its subresource, null otherwise.
+   * A handler that does not support all HTTP methods of its subresource returns
+   * {@link S3GAction#NOT_IMPLEMENTED} for the unsupported ones, which the default implementations of
+   * {@code handlePutRequest}, {@code handleGetRequest} and {@code handleDeleteRequest} reject.
+   */
+  S3GAction getAction() {
+    return null;
+  }
+
+  /**
    * Handle the bucket PUT operation if this handler is responsible for it.
    * The handler inspects the request (query parameters, headers, etc.) to determine
    * if it should handle the request.
@@ -41,11 +52,11 @@ abstract class BucketOperationHandler extends EndpointBase {
    * @param body the request body stream
    * @return Response if this handler handles the request, null otherwise
    * @throws IOException if an I/O error occurs
-   * @throws OS3Exception if an S3-specific error occurs
+   * @throws OS3Exception if an S3-specific error occurs, e.g. NotImplemented for an unsupported subresource operation
    */
   Response handlePutRequest(S3RequestContext context, String bucketName, InputStream body)
       throws IOException, OS3Exception {
-    return null;
+    return rejectNotImplemented(context, getAction(), bucketName);
   }
 
   /**
@@ -57,16 +68,16 @@ abstract class BucketOperationHandler extends EndpointBase {
    * @param bucketName the name of the bucket
    * @return Response if this handler handles the request, null otherwise
    * @throws IOException if an I/O error occurs
-   * @throws OS3Exception if an S3-specific error occurs
+   * @throws OS3Exception if an S3-specific error occurs, e.g. NotImplemented for an unsupported subresource operation
    */
   Response handleGetRequest(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
-    return null;
+    return rejectNotImplemented(context, getAction(), bucketName);
   }
 
   Response handleDeleteRequest(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
-    return null;
+    return rejectNotImplemented(context, getAction(), bucketName);
   }
 
   BucketOperationHandler copyDependenciesFrom(EndpointBase other) {
