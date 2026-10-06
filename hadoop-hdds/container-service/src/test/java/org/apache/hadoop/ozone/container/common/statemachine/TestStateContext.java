@@ -227,6 +227,34 @@ public class TestStateContext {
         StateContext.CONTAINER_REPORTS_PROTO_NAME);
   }
 
+  @Test
+  public void testClearIncrementalContainerReports() throws IOException {
+    StateContext ctx = createSubject();
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    ctx.addEndpoint(scm1);
+    HostAndPort scm2 = new HostAndPort("scm2", 9001);
+    ctx.addEndpoint(scm2);
+
+    // Queue a mix of ICRs and command status reports for both endpoints.
+    batchAddIncrementalReport(ctx,
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 5);
+    batchAddIncrementalReport(ctx,
+        StateContext.COMMAND_STATUS_REPORTS_PROTO_NAME, 2);
+
+    // Re-registration drops only the ICRs queued for scm1.
+    ctx.clearIncrementalContainerReports(scm1);
+
+    // scm1 keeps the command status reports but not the ICRs.
+    Map<String, Integer> expectedReportCount = new HashMap<>();
+    expectedReportCount.put(StateContext.COMMAND_STATUS_REPORTS_PROTO_NAME, 2);
+    checkReportCount(ctx.getAllAvailableReports(scm1), expectedReportCount);
+
+    // scm2 is untouched: it still has both ICRs and command status reports.
+    expectedReportCount.put(
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 5);
+    checkReportCount(ctx.getAllAvailableReports(scm2), expectedReportCount);
+  }
+
   void batchRefreshfullReports(StateContext ctx, String reportName, int count) {
     for (int i = 0; i < count; i++) {
       ctx.refreshFullReport(newMockReport(reportName));

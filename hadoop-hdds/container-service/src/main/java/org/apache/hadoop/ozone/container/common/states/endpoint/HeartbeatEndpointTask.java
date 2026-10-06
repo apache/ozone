@@ -458,6 +458,9 @@ public class HeartbeatEndpointTask
             + " Interrupt HEARTBEAT and transit to GETVERSION state.");
       }
       rpcEndpoint.setState(EndPointStates.GETVERSION);
+      // Re-registration resends a full container report, so the queued ICRs
+      // for this endpoint are redundant.
+      context.clearIncrementalContainerReports(rpcEndpoint.getAddress());
       // trigger immediate GETVERSION
       context.getParent().setNextHB(Time.monotonicNow());
     } else {
