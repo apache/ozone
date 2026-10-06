@@ -110,7 +110,7 @@
     <jdeb.version>1.14</jdeb.version>
     <jersey.version>1.19.4</jersey.version>
     <jersey2.version>2.48</jersey2.version>
-    <jetty.version>12.0.38</jetty.version>
+    <jetty.version>12.1.14</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
     <jline.version>3.30.17</jline.version>
