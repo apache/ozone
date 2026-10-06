@@ -25,6 +25,11 @@ export COMPOSE_DIR
 # shellcheck source=hadoop-ozone/dist/src/main/compose/xcompat/lib.sh
 source "${COMPOSE_DIR}/lib.sh"
 
+# test specific version(s)
+if [[ -n "${OZONE_OLD_VERSIONS}" ]]; then
+  old_versions="${OZONE_OLD_VERSIONS}"
+fi
+
 # old cluster with clients: same version and current version
 for cluster_version in ${old_versions}; do
   export OZONE_VERSION=${cluster_version}
