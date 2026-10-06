@@ -85,6 +85,33 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
     return blockData;
   }
 
+  /**
+   * Appends the last chunk of an incremental chunk list to the chunks from the block data table.
+   * <pre>
+   * A block with an incremental chunk list, by offset:
+   *
+   *   +-----------+-----------+-----------+------------------+
+   *   |  chunk 0  |  chunk 1  |  chunk 2  |  chunk 3 (last)  |
+   *   +-----------+-----------+-----------+------------------+
+   *   |         block_data table          | last_chunk_info  |
+   *
+   * Both tables use the block key: the local ID, with a container prefix in schema V3.
+   *
+   *   table            value
+   *   block_data       BlockData(chunks = [chunk 0, chunk 1, chunk 2])
+   *   last_chunk_info  BlockData(chunks = [chunk 3], bcsId of the last PutBlock)
+   *
+   * Chunk 3 starts where chunk 2 ends. It is appended, and the bcsId comes from last_chunk_info.
+   *
+   * Reconciliation in older versions wrote the full chunk list to block_data but kept the last_chunk_info row:
+   *
+   *   table            value
+   *   block_data       BlockData(chunks = [chunk 0, chunk 1, chunk 2, chunk 3])
+   *   last_chunk_info  BlockData(chunks = [chunk 3])
+   *
+   * block_data already has chunk 3, so the row is ignored.
+   * </pre>
+   */
   private void reconcilePartialChunks(
       BlockData lastChunk, BlockData blockData) {
     LOG.debug("blockData={}, lastChunk={}",
@@ -95,8 +122,6 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
               blockData.getChunks().get(blockData.getChunks().size() - 1);
       if (lastChunkInBlockData != null) {
         if (lastChunkInBlockData.getOffset() >= lastChunk.getChunks().get(0).getOffset()) {
-          // The block data already has this chunk. Reconciliation in older versions wrote the full chunk list to the
-          // block data table but kept the last chunk info row.
           return;
         }
         Preconditions.checkState(

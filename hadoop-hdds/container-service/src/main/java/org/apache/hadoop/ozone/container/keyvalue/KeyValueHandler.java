@@ -1528,9 +1528,6 @@ public class KeyValueHandler extends Handler {
              getBlockIterator(container.getContainerData().getContainerID())) {
       while (blockIterator.hasNext()) {
         BlockData blockData = blockIterator.nextBlock();
-        // Include the last chunk of an incremental chunk list, the same as the scanner and reads do.
-        blockData = dbHandle.getStore().getCompleteBlockData(blockData, blockData.getBlockID(),
-            container.getContainerData().getBlockKey(blockData.getLocalID()));
         merkleTree.addBlock(blockData.getLocalID());
         // Assume all chunks are healthy when building the tree from metadata. Scanner will identify corruption when
         // it runs after.
