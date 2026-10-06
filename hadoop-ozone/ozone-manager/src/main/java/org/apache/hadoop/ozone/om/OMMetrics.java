@@ -222,6 +222,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   private @Metric MutableGaugeLong numVolumes;
   private @Metric MutableGaugeLong numBuckets;
+  private @Metric MutableCounterLong numS3Buckets;
 
   //TODO: This metric is an estimate and it may be inaccurate on restart if the
   // OM process was not shutdown cleanly. Key creations/deletions in the last
@@ -338,6 +339,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incDataCommittedBytes(long bytesWritten) {
     totalDataCommitted.incr(bytesWritten);
+  }
+
+  public void incNumS3Buckets() {
+    numS3Buckets.incr();
+  }
+
+  public void decNumS3Buckets() {
+    numS3Buckets.incr();
   }
 
   public void incNumVolumes() {
