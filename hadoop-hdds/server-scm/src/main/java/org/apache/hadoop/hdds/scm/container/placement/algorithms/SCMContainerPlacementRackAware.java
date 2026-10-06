@@ -440,25 +440,18 @@ public final class SCMContainerPlacementRackAware
       List<DatanodeDetails> affinityNodes, List<DatanodeDetails> usedNodes,
       long metadataSizeRequired,
       long dataSizeRequired) throws SCMException {
+    // Excluded nodes are never picked, in any step. They are skipped one by one, so their racks can still be used.
     List<String> excludedNodesForCapacity = new ArrayList<>();
-
-    // When affinity node is null, in this case new node to be selected
-    // should be in different rack than used nodes rack.
-    // Exclude nodes should be just excluded from topology node selection,
-    // which is filled in excludedNodesForCapacity
-    // Used node rack should not be part of rack selection
-    // which is filled in excludedNodes
-    if (affinityNodes == null && excludedNodes != null) {
+    if (excludedNodes != null) {
       for (DatanodeDetails node : excludedNodes) {
         excludedNodesForCapacity.add(node.getNetworkFullPath());
       }
-      excludedNodes = usedNodes;
     }
 
     // The places to look for a node, in order. Each one gets MAX_RETRY tries:
     // 1. the rack of each affinity node;
-    // 2. any rack except the racks of excludedNodes (right away if there are no affinity nodes, otherwise only
-    //    as a fallback);
+    // 2. any rack that none of usedNodes is on (right away if there are no affinity nodes, otherwise only as a
+    //    fallback);
     // 3. any rack at all, as a fallback.
     List<Step> steps = new ArrayList<>();
     if (affinityNodes != null) {
@@ -478,7 +471,8 @@ public final class SCMContainerPlacementRackAware
       while (retries > 0) {
         metrics.incrDatanodeChooseAttemptCount();
         DatanodeDetails node = (DatanodeDetails) networkTopology.chooseRandom(NetConstants.ROOT,
-            excludedNodesForCapacity, excludedNodes, step.affinityNode, step.ancestorGen);
+            excludedNodesForCapacity, step.affinityNode == null ? usedNodes : null, step.affinityNode,
+            step.ancestorGen);
         if (node == null) {
           LOG.warn("Failed to find the datanode for container. excludedNodes: {}, affinityNode: {}",
               excludedNodes, step.affinityNode);
@@ -514,7 +508,7 @@ public final class SCMContainerPlacementRackAware
   private static final class Step {
     /** Look near this node, or anywhere when null. */
     private final DatanodeDetails affinityNode;
-    /** RACK_LEVEL: stay on affinityNode's rack, or, without one, avoid the racks of excludedNodes. 0: any rack. */
+    /** RACK_LEVEL: stay on affinityNode's rack, or, without one, avoid the racks of usedNodes. 0: any rack. */
     private final int ancestorGen;
     /** Whether a node found here counts as a fallback in the metrics. */
     private final boolean fallback;

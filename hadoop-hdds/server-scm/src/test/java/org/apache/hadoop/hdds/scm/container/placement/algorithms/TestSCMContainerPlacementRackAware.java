@@ -717,6 +717,28 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   @Test
+  public void fallbackDoesNotSkipRackOfExcludedNode() throws SCMException {
+    setup(4 * NODE_PER_RACK);
+    // The replicas are on node0 (rack0), node5 (rack1) and node15 (rack3), and those racks have no other usable
+    // node. node10 on rack2 has a replica that is being decommissioned, so it is excluded.
+    for (int i : new int[] {1, 2, 3, 4, 6, 7, 8, 9, 16, 17, 18, 19}) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    dnInfos.get(10).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    List<DatanodeDetails> usedNodes =
+        new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(5), datanodes.get(15)));
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(Arrays.asList(datanodes.get(10)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // The fallback looks for a rack with no replica on it. That is rack2, and the excluded node there must not
+    // rule out the whole rack.
+    assertTrue(cluster.isSameParent(datanodes.get(10), datanodeDetails.get(0)));
+    assertNotEquals(datanodes.get(10), datanodeDetails.get(0));
+  }
+
+  @Test
   public void chooseSingleNodeRackWithUsedAndExcludeNodes()
       throws SCMException {
     int datanodeCount = 5;
