@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
@@ -32,7 +35,10 @@ public abstract class OzoneManagerHAFollowerReadTests extends AbstractOzoneManag
 
   @BeforeAll
   public static void init() throws Exception {
-    initCluster(true);
+    initCluster(true, conf -> {
+      conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
+      conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    });
   }
 
   protected void listVolumes(boolean checkSuccess)

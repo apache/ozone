@@ -508,7 +508,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     StartDatanodeAdminHandler datanodeStartAdminHandler =
         new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     UnhealthyToHealthyNodeHandler unhealthyToHealthyNodeHandler =
-        new UnhealthyToHealthyNodeHandler(scmNodeManager, serviceManager);
+        new UnhealthyToHealthyNodeHandler(serviceManager);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
 
     ContainerReportHandler containerReportHandler =

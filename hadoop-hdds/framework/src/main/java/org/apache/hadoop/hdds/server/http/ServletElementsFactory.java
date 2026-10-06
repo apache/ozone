@@ -18,8 +18,8 @@
 package org.apache.hadoop.hdds.server.http;
 
 import java.util.Map;
-import org.eclipse.jetty.servlet.FilterHolder;
-import org.eclipse.jetty.servlet.FilterMapping;
+import org.eclipse.jetty.ee8.servlet.FilterHolder;
+import org.eclipse.jetty.ee8.servlet.FilterMapping;
 
 /**
  * Factory class which helps to create different types of servlet elements.

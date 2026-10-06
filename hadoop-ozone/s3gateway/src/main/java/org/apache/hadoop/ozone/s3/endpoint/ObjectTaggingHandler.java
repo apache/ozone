@@ -46,6 +46,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
     }
 
     try {
+      rejectVersionId(keyName);
       S3Tagging tagging;
       try {
         tagging = UNMARSHALLER.get().readFrom(body);
@@ -62,7 +63,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
           S3Tagging.Tag::getValue
       );
 
-      context.getBucket().putObjectTagging(keyName, tags);
+      getClientProtocol().putObjectTagging(context.getVolume().getName(), context.getBucketName(), keyName, tags);
 
       getMetrics().updatePutObjectTaggingSuccessStats(context.getStartNanos());
 
@@ -80,7 +81,8 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
       return null;
     }
     try {
-      context.getBucket().deleteObjectTagging(keyName);
+      rejectVersionId(keyName);
+      getClientProtocol().deleteObjectTagging(context.getVolume().getName(), context.getBucketName(), keyName);
       getMetrics().updateDeleteObjectTaggingSuccessStats(context.getStartNanos());
       return Response.noContent().build();
     } catch (OMException ex) {
@@ -105,7 +107,8 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
       return null;
     }
     try {
-      Map<String, String> tagMap = context.getBucket().getObjectTagging(keyName);
+      Map<String, String> tagMap = getClientProtocol().getObjectTagging(
+          context.getVolume().getName(), context.getBucketName(), keyName);
       getMetrics().updateGetObjectTaggingSuccessStats(context.getStartNanos());
       return Response.ok(S3Tagging.fromMap(tagMap), MediaType.APPLICATION_XML_TYPE).build();
     } catch (Exception e) {
@@ -114,7 +117,15 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
     }
   }
 
-  private S3GAction getAction() {
+  // Tagging a specific version is not implemented; ignoring versionId would modify the tags of the current object.
+  private void rejectVersionId(String keyName) {
+    if (queryParams().get(S3Consts.QueryParams.VERSION_ID) != null) {
+      throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, keyName);
+    }
+  }
+
+  @Override
+  S3GAction getAction() {
     if (queryParams().get(S3Consts.QueryParams.TAGGING) == null) {
       return null;
     }

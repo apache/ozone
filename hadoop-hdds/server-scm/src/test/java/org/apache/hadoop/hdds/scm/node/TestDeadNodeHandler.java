@@ -21,8 +21,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -83,7 +81,6 @@ public class TestDeadNodeHandler {
   private ContainerManager containerManager;
   private PipelineManagerImpl pipelineManager;
   private DeadNodeHandler deadNodeHandler;
-  private UnhealthyToHealthyNodeHandler unhealthyToHealthyNodeHandler;
   private EventPublisher publisher;
   @TempDir
   private File storageDir;
@@ -123,7 +120,6 @@ public class TestDeadNodeHandler {
     deletedBlockLog = mock(DeletedBlockLog.class);
     deadNodeHandler = new DeadNodeHandler(nodeManager,
         mock(PipelineManager.class), containerManager, deletedBlockLog);
-    unhealthyToHealthyNodeHandler = new UnhealthyToHealthyNodeHandler(nodeManager, scm.getSCMServiceManager());
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
     publisher = mock(EventPublisher.class);
   }
@@ -225,16 +221,10 @@ public class TestDeadNodeHandler {
     // First set the node to IN_MAINTENANCE and ensure the container replicas
     // are not removed on the dead event
     datanode1 = nodeManager.getNode(datanode1.getID());
-    assertTrue(
-        nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_MAINTENANCE);
     setNodeHealthState(datanode1, HddsProtos.NodeState.DEAD);
     deadNodeHandler.onMessage(datanode1, publisher);
-    // make sure the node is removed from
-    // ClusterNetworkTopology when it is considered as dead
-    assertFalse(
-        nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
     verify(publisher, times(0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
 
@@ -263,17 +253,11 @@ public class TestDeadNodeHandler {
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_SERVICE);
     // Changing the operational state of a DEAD node fires a DEAD_NODE event on
-    // SCM's event queue. Let SCM's own DeadNodeHandler process it here, so its
-    // asynchronous topology removal does not race with the handlers driven
-    // below (it could otherwise remove the node right after
-    // HealthyReadOnlyNodeHandler re-adds it).
+    // SCM's event queue. Let SCM's own DeadNodeHandler process it here, so it
+    // does not run concurrently with the handler driven below.
     ((EventQueue) scm.getEventQueue()).processAll(60000L);
     setNodeHealthState(datanode1, HddsProtos.NodeState.DEAD);
     deadNodeHandler.onMessage(datanode1, publisher);
-    //datanode1 has been removed from ClusterNetworkTopology, another
-    //deadNodeHandler.onMessage call will not change this
-    assertFalse(
-        nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
     assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getID(), cmd.getType()));
 
     verify(publisher).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
@@ -293,12 +277,39 @@ public class TestDeadNodeHandler {
         .getContainerReplicas(ContainerID.valueOf(container3.getContainerID()));
     assertEquals(1, container3Replicas.size());
     assertEquals(datanode3, container3Replicas.iterator().next().getDatanodeDetails());
+  }
 
-    //datanode will be added back to ClusterNetworkTopology if it resurrects
-    unhealthyToHealthyNodeHandler.onMessage(datanode1, publisher);
-    assertTrue(
-        nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
+  /**
+   * Verifies that DeadNodeHandler skips the event when the node is no longer DEAD, for example because it
+   * heartbeated again and became HEALTHY before the event was handled.
+   */
+  @Test
+  public void testDeadNodeHandlerSkipsNodeThatIsNoLongerDead(
+      @TempDir File tempDir) throws Exception {
+    DatanodeDetails datanode = MockDatanodeDetails.randomDatanodeDetails();
+    String storagePath = tempDir.getPath()
+        .concat("/data-" + datanode.getID());
+    String metaStoragePath = tempDir.getPath()
+        .concat("/metadata-" + datanode.getID());
+    StorageReportProto storageReport = HddsTestUtils.createStorageReport(
+        datanode.getID(), storagePath, 100 * OzoneConsts.TB,
+        10 * OzoneConsts.TB, 90 * OzoneConsts.TB, null);
+    MetadataStorageReportProto metaStorageReport =
+        HddsTestUtils.createMetadataStorageReport(metaStoragePath,
+            100 * OzoneConsts.GB, 10 * OzoneConsts.GB,
+            90 * OzoneConsts.GB, null);
+    nodeManager.register(datanode,
+        HddsTestUtils.createNodeReport(Arrays.asList(storageReport),
+            Arrays.asList(metaStorageReport)), null);
+    datanode = nodeManager.getNode(datanode.getID());
 
+    // The DEAD_NODE event was fired, but the node heartbeated again and became HEALTHY before
+    // DeadNodeHandler processed it. The handler should see the current state and skip the event.
+    setNodeHealthState(datanode, HddsProtos.NodeState.HEALTHY);
+    deadNodeHandler.onMessage(datanode, publisher);
+
+    verify(publisher, times(0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode);
+    verify(deletedBlockLog, times(0)).onDatanodeDead(datanode.getID());
   }
 
   private void setNodeHealthState(DatanodeDetails datanode,

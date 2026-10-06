@@ -171,9 +171,10 @@ enum Type {
   DeleteRevokedSTSTokens = 155;
   GetCallerIdentity = 156;
   SnapshotCount = 157;
-  StartFinalizeUpgrade = 158;
-  QueryUpgradeStatus = 159;
-  CompleteFinalizeUpgrade = 160;
+  GetBucketDeletedBytes = 158;
+  StartFinalizeUpgrade = 159;
+  QueryUpgradeStatus = 160;
+  CompleteFinalizeUpgrade = 161;
 }
 
 enum SafeMode {
@@ -340,9 +341,10 @@ message OMRequest {
   optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 157;
   optional GetCallerIdentityRequest         getCallerIdentityRequest       = 158;
   optional SnapshotCountRequest snapshotCountRequest = 159;
-  optional StartFinalizeUpgradeRequest      startFinalizeUpgradeRequest     = 160;
-  optional QueryUpgradeStatusRequest        queryUpgradeStatusRequest       = 161;
-  optional CompleteFinalizeUpgradeRequest   completeFinalizeUpgradeRequest  = 162;
+  optional GetBucketDeletedBytesRequest     getBucketDeletedBytesRequest   = 160;
+  optional StartFinalizeUpgradeRequest      startFinalizeUpgradeRequest     = 161;
+  optional QueryUpgradeStatusRequest        queryUpgradeStatusRequest       = 162;
+  optional CompleteFinalizeUpgradeRequest   completeFinalizeUpgradeRequest  = 163;
 }
 
 message OMResponse {
@@ -492,9 +494,10 @@ message OMResponse {
   optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 155;
   optional GetCallerIdentityResponse         getCallerIdentityResponse      = 156;
   optional SnapshotCountResponse snapshotCountResponse = 157;
-  optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 158;
-  optional QueryUpgradeStatusResponse        queryUpgradeStatusResponse    = 159;
-  optional CompleteFinalizeUpgradeResponse   completeFinalizeUpgradeResponse = 160;
+  optional GetBucketDeletedBytesResponse     getBucketDeletedBytesResponse  = 158;
+  optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 159;
+  optional QueryUpgradeStatusResponse        queryUpgradeStatusResponse    = 160;
+  optional CompleteFinalizeUpgradeResponse   completeFinalizeUpgradeResponse = 161;
 }
 
 enum Status {
@@ -1425,6 +1428,7 @@ message GetKeyInfoResponse {
   optional KeyInfo keyInfo = 1;
   optional VolumeInfo volumeInfo = 2;
   optional string UserPrincipal = 3;
+  optional BucketLayoutProto bucketLayout = 4;
 }
 
 message RenameKeysRequest {
@@ -1824,6 +1828,19 @@ message ListOpenFilesResponse {
   // result
   repeated uint64 clientID = 4;
   repeated KeyInfo keyInfo = 5;
+}
+
+message GetBucketDeletedBytesRequest {
+  required string bucketPath = 1;
+}
+
+message GetBucketDeletedBytesResponse {
+  required uint64 snapshotTrappedBytes = 1;
+  required uint64 purgeableBytes = 2;
+  optional uint64 snapshotTrappedKeys = 3;
+  optional uint64 purgeableKeys = 4;
+  optional uint64 snapshotTrappedDirs = 5;
+  optional uint64 purgeableDirs = 6;
 }
 
 message ServicePort {

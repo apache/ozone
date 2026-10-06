@@ -20,7 +20,12 @@ package org.apache.hadoop.hdds.scm.node;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -29,6 +34,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
@@ -36,6 +42,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.Event;
@@ -56,6 +64,8 @@ public class TestNodeStateManager {
   private NodeStateManager nsm;
   private ConfigurationSource conf;
   private MockEventPublisher eventPublisher;
+  private SCMContext scmContext;
+  private NetworkTopology clusterMap;
 
   @BeforeEach
   public void setUp() {
@@ -75,11 +85,10 @@ public class TestNodeStateManager {
         return new char[0];
       }
     };
-    // Make NodeStateManager behave as if SCM has completed finalization,
-    // unless a test changes the value of this variable.
-    SCMContext scmContext = SCMContext.emptyContext();
+    scmContext = SCMContext.emptyContext();
     eventPublisher = new MockEventPublisher();
-    nsm = new NodeStateManager(conf, eventPublisher, scmContext);
+    clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
+    nsm = new NodeStateManager(conf, eventPublisher, clusterMap, scmContext);
   }
 
   @Test
@@ -204,6 +213,77 @@ public class TestNodeStateManager {
     assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
     assertEquals(SCMEvents.UNHEALTHY_TO_HEALTHY_NODE, eventPublisher.getLastEvent());
     eventPublisher.clearEvents();
+  }
+
+  @Test
+  public void testDeadNodeIsRemovedFromTopologyUntilItRecovers()
+      throws NodeAlreadyExistsException, NodeNotFoundException {
+    long now = Time.monotonicNow();
+    long staleLimit = HddsServerUtil.getStaleNodeInterval(conf) + 1000;
+    long deadLimit = HddsServerUtil.getDeadNodeInterval(conf) + 1000;
+
+    // Like SCMNodeManager, add the node to the topology before adding it to NodeStateManager.
+    DatanodeDetails dn = generateDatanode();
+    dn.setNetworkName(dn.getUuidString());
+    clusterMap.add(dn);
+    nsm.addNode(dn, defaultVersionProto());
+    DatanodeInfo dni = nsm.getNode(dn);
+    String path = dn.getNetworkFullPath();
+
+    dni.updateLastHeartbeatTime(now - staleLimit);
+    nsm.checkNodesHealth();
+    assertEquals(NodeState.STALE, nsm.getNodeStatus(dn).getHealth());
+    assertNotNull(clusterMap.getNode(path));
+
+    dni.updateLastHeartbeatTime(now - deadLimit);
+    nsm.checkNodesHealth();
+    assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
+    assertNull(clusterMap.getNode(path));
+
+    dni.updateLastHeartbeatTime();
+    nsm.checkNodesHealth();
+    assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
+    assertNotNull(clusterMap.getNode(path));
+  }
+
+  @Test
+  public void testReregisteredNodeIsRemovedFromTopologyWhenDead()
+      throws NodeAlreadyExistsException, NodeNotFoundException {
+    DatanodeDetails dn = generateDatanode();
+    dn.setNetworkName(dn.getUuidString());
+    clusterMap.add(dn);
+    nsm.addNode(dn, defaultVersionProto());
+    String path = dn.getNetworkFullPath();
+
+    // Re-registering with a new version or new ports replaces the DatanodeInfo with a copy that has no parent.
+    DatanodeDetails reregistered = new DatanodeDetails(dn);
+    reregistered.setParent(null);
+    nsm.updateNode(reregistered, defaultVersionProto());
+
+    nsm.getNode(dn).updateLastHeartbeatTime(Time.monotonicNow() - HddsServerUtil.getDeadNodeInterval(conf) - 1000);
+    nsm.checkNodesHealth();
+    nsm.checkNodesHealth();
+
+    assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
+    assertNull(clusterMap.getNode(path));
+  }
+
+  @Test
+  public void testTopologyUpdateFailureDoesNotFailHealthCheck()
+      throws NodeAlreadyExistsException, NodeNotFoundException {
+    NetworkTopology failingClusterMap = mock(NetworkTopology.class);
+    when(failingClusterMap.contains(any())).thenReturn(true);
+    doThrow(new IllegalStateException("injected")).when(failingClusterMap).remove(any());
+    nsm = new NodeStateManager(conf, eventPublisher, failingClusterMap, scmContext);
+
+    DatanodeDetails dn = generateDatanode();
+    nsm.addNode(dn, defaultVersionProto());
+    nsm.getNode(dn).updateLastHeartbeatTime(Time.monotonicNow() - HddsServerUtil.getDeadNodeInterval(conf) - 1000);
+    nsm.checkNodesHealth();
+    nsm.checkNodesHealth();
+
+    assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
+    assertEquals(SCMEvents.DEAD_NODE, eventPublisher.getLastEvent());
   }
 
   @Test
