@@ -42,6 +42,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeStorageTypeUsageInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListStorageTypeUsageInfoRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
@@ -200,6 +203,33 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
       assertEquals(1, usageInfoList.size());
       assertEquals(nodeManager.getContainers(dn).size(), usageInfoList.get(0).getContainerCount());
     }
+  }
+
+  @Test
+  public void testListStorageTypeUsageInfo() throws Exception {
+    NodeManager nodeManager = cluster().getStorageContainerManager().getScmNodeManager();
+    List<? extends DatanodeDetails> dnList = nodeManager.getAllNodes();
+
+    List<DatanodeStorageTypeUsageInfoProto> usageInfoList = storageClient.listStorageTypeUsageInfo(
+        ListStorageTypeUsageInfoRequestProto.newBuilder().build());
+
+    assertThat(usageInfoList).hasSize(dnList.size());
+    for (DatanodeStorageTypeUsageInfoProto info : usageInfoList) {
+      assertThat(info.getStorageTypeUsageInfoList()).isNotEmpty();
+      for (StorageTypeUsageInfoProto storageTypeUsage : info.getStorageTypeUsageInfoList()) {
+        assertThat(storageTypeUsage.getCapacity()).isGreaterThan(0);
+      }
+    }
+
+    // All mini-cluster datanodes are IN_SERVICE/HEALTHY by default, so filtering on that
+    // state must return the same result set, confirming the filter reaches
+    // NodeManager#getNodes(opState, state).
+    List<DatanodeStorageTypeUsageInfoProto> filtered = storageClient.listStorageTypeUsageInfo(
+        ListStorageTypeUsageInfoRequestProto.newBuilder()
+            .setOpState(IN_SERVICE)
+            .setState(HEALTHY)
+            .build());
+    assertThat(filtered).hasSize(usageInfoList.size());
   }
 
   @Test

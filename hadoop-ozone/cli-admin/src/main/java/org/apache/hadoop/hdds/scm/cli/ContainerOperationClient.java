@@ -35,7 +35,9 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContai
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeStorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListStorageTypeUsageInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
@@ -511,5 +513,11 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException {
     return storageContainerLocationClient.suppressContainers(containerIds, suppress);
+  }
+
+  @Override
+  public List<DatanodeStorageTypeUsageInfoProto> listStorageTypeUsageInfo(
+      ListStorageTypeUsageInfoRequestProto requestProto) throws IOException {
+    return storageContainerLocationClient.listStorageTypeUsageInfo(requestProto, ClientVersion.CURRENT_VERSION);
   }
 }

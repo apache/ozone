@@ -50,6 +50,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.client.StorageTypeUtils;
@@ -60,14 +61,19 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeStorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListStorageTypeUsageInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
@@ -86,6 +92,8 @@ import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerStatusInfo
 import org.apache.hadoop.hdds.scm.container.balancer.IllegalContainerBalancerStateException;
 import org.apache.hadoop.hdds.scm.container.balancer.InvalidContainerBalancerConfigurationException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.EligibilityResult;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -1740,6 +1748,56 @@ public class SCMClientProtocolServer implements
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(action, auditMap));
     } catch (IOException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(action, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
+  public List<DatanodeStorageTypeUsageInfoProto> listStorageTypeUsageInfo(
+      ListStorageTypeUsageInfoRequestProto requestProto, int clientVersion) throws IOException {
+    NodeOperationalState opState = requestProto.hasOpState() ? requestProto.getOpState() : null;
+    NodeState state = requestProto.hasState() ? requestProto.getState() : null;
+
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("opState", opState != null ? opState.name() : null);
+    auditMap.put("state", state != null ? state.name() : null);
+
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), true);
+
+      // A null opState or state is a wildcard for that dimension (NodeStateMap#getDatanodeInfos),
+      // so an unfiltered request returns every known node regardless of operational/health state.
+      List<DatanodeInfo> datanodeDetailsList = scm.getScmNodeManager().getNodes(opState, state);
+
+      List<DatanodeStorageTypeUsageInfoProto> usageInfoProtos = new ArrayList<>();
+      for (DatanodeDetails datanodeDetail : datanodeDetailsList) {
+        SCMNodeMetric scmNodeMetric = scm.getScmNodeManager().getNodeStat(datanodeDetail);
+        if (scmNodeMetric == null) {
+          continue;
+        }
+        DatanodeStorageTypeUsageInfoProto.Builder dnUsageInfo = DatanodeStorageTypeUsageInfoProto.newBuilder()
+            .setDatanodeDetails(datanodeDetail.toProto(clientVersion));
+        SCMNodeStat scmNodeStat = scmNodeMetric.get();
+        for (StorageType storageType : StorageType.values()) {
+          long capacity = scmNodeStat.getCapacity(storageType).get();
+          if (capacity > 0) {
+            dnUsageInfo.addStorageTypeUsageInfo(StorageTypeUsageInfoProto.newBuilder()
+                .setStorageType(StorageTypeUtils.getStorageTypeProto(storageType))
+                .setCapacity(capacity)
+                .setUsed(scmNodeStat.getScmUsed(storageType).get())
+                .setRemaining(scmNodeStat.getRemaining(storageType).get())
+                .setCommitted(scmNodeStat.getCommitted(storageType).get())
+                .setFreeSpaceToSpare(scmNodeStat.getFreeSpaceToSpare(storageType).get())
+                .build());
+          }
+        }
+        usageInfoProtos.add(dnUsageInfo.build());
+      }
+
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.LIST_STORAGE_TYPE_USAGE_INFO, auditMap));
+      return usageInfoProtos;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.LIST_STORAGE_TYPE_USAGE_INFO, auditMap, ex));
       throw ex;
     }
   }
