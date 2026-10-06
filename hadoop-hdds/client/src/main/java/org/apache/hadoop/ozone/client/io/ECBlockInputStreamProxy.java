@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -56,7 +56,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
 
   private BlockExtendedInputStream blockReader;
   private boolean reconstructionReader = false;
-  private List<DatanodeDetails> failedLocations = new ArrayList<>();
+  private final CopyOnWriteArrayList<DatanodeDetails> failedLocations;
   private volatile boolean closed = false;
   private OzoneClientConfig config;
 
@@ -102,12 +102,21 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
       BlockLocationInfo> refreshFunction,
       ECBlockInputStreamFactory streamFactory,
       OzoneClientConfig config) {
+    this(repConfig, blockInfo, xceiverClientFactory, refreshFunction, streamFactory, config,
+        new CopyOnWriteArrayList<>());
+  }
+
+  private ECBlockInputStreamProxy(ECReplicationConfig repConfig, BlockLocationInfo blockInfo,
+      XceiverClientFactory xceiverClientFactory, Function<BlockID, BlockLocationInfo> refreshFunction,
+      ECBlockInputStreamFactory streamFactory, OzoneClientConfig config,
+      CopyOnWriteArrayList<DatanodeDetails> failedLocations) {
     this.repConfig = repConfig;
     this.blockInfo = blockInfo;
     this.ecBlockInputStreamFactory = streamFactory;
     this.xceiverClientFactory = xceiverClientFactory;
     this.refreshFunction = refreshFunction;
     this.config = config;
+    this.failedLocations = failedLocations;
 
     setReaderType();
     createBlockReader();
@@ -116,9 +125,10 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
   private synchronized void setReaderType() {
     int expected = expectedDataLocations(repConfig, getLength());
     int available = availableDataLocations(blockInfo.getPipeline(), expected);
-    reconstructionReader = available < expected;
+    reconstructionReader = available < expected || !failedLocations.isEmpty();
     if (reconstructionReader) {
-      LOG.info("Data locations available: {} < expected: {}, using reconstruction read", available, expected);
+      LOG.info("Data locations available: {}, expected: {}, failed: {}, using reconstruction read",
+          available, expected, failedLocations.size());
     }
   }
 
@@ -206,9 +216,9 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
     if (position >= blockInfo.getLength()) {
       return EOF;
     }
-    // Each request owns its cursor, reconstruction buffers and failure recovery.
+    // Each request owns its cursor and reconstruction buffers; failed locations are shared.
     try (ECBlockInputStreamProxy reader = new ECBlockInputStreamProxy(repConfig, blockInfo,
-        xceiverClientFactory, refreshFunction, ecBlockInputStreamFactory, config)) {
+        xceiverClientFactory, refreshFunction, ecBlockInputStreamFactory, config, failedLocations)) {
       reader.seek(position);
       return reader.read(buffer);
     }
@@ -218,7 +228,7 @@ public class ECBlockInputStreamProxy extends BlockExtendedInputStream {
       List<DatanodeDetails> badLocations, long lastPosition)
       throws IOException {
     if (badLocations != null) {
-      failedLocations.addAll(badLocations);
+      failedLocations.addAllAbsent(badLocations);
     }
     blockReader.close();
     reconstructionReader = true;

@@ -191,14 +191,7 @@ public class MultipartInputStream extends ExtendedInputStream {
       int index = binarySearchOffsetIndex(partOffsets, pos);
       PartInputStream part = partStreams.get(index);
       long partPosition = pos - partOffsets[index];
-      final int oldLimit = buffer.limit();
-      final int n;
-      try {
-        buffer.limit(buffer.position() + (int) Math.min(buffer.remaining(), part.getLength() - partPosition));
-        n = part.read(partPosition, buffer);
-      } finally {
-        buffer.limit(oldLimit);
-      }
+      final int n = part.read(partPosition, buffer);
       if (n < 0) {
         break;
       }

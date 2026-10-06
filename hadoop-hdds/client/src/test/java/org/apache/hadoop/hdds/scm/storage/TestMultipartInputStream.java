@@ -156,7 +156,6 @@ public class TestMultipartInputStream {
     parts.add(part0);
     parts.add(part1);
     try (MultipartInputStream multipartStream = new MultipartInputStream("test-key", parts)) {
-      multipartStream.initialize();
       PositionedReadTestHelper.runConcurrentPositionedReads(keyData,
           multipartStream::readFully);
       ByteBuffer buffer = ByteBuffer.allocate(4);

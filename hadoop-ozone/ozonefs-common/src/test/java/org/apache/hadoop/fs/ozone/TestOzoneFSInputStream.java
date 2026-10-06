@@ -35,10 +35,13 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 import java.security.GeneralSecurityException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.IntFunction;
+import javax.crypto.CipherInputStream;
+import javax.crypto.NullCipher;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.crypto.CipherSuite;
@@ -47,6 +50,7 @@ import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.Decryptor;
 import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.PositionedReadable;
 import org.apache.hadoop.fs.Seekable;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
@@ -212,6 +216,53 @@ public class TestOzoneFSInputStream {
       assertEquals(0, client.getPos());
       assertEquals(Byte.toUnsignedInt(source[0]), fs.read());
       assertEquals(Byte.toUnsignedInt(source[0]), client.read());
+    }
+  }
+
+  @Test
+  void gdprDelegateDoesNotSupportPositionedReads() throws Exception {
+    byte[] data = new byte[] {1, 2, 3};
+    try (OzoneInputStream client = new OzoneInputStream(new CipherInputStream(new ByteArrayInputStream(data),
+        new NullCipher()));
+         CapableOzoneFSInputStream fs = new CapableOzoneFSInputStream(client.getInputStream(), null)) {
+      assertFalse(fs.hasCapability(StreamCapabilities.PREADBYTEBUFFER));
+      assertThrows(UnsupportedOperationException.class, () -> fs.read(0, new byte[1], 0, 1));
+      byte[] actual = new byte[data.length];
+      assertEquals(data.length, fs.read(actual));
+      assertArrayEquals(data, actual);
+    }
+  }
+
+  @Test
+  void positionedReadsValidateEmptyRequests() throws Exception {
+    byte[] data = new byte[8];
+    try (OzoneInputStream client = new OzoneInputStream(new NativePositionedInputStream(data));
+         OzoneFSInputStream fs = createTestSubject(client)) {
+      for (ByteBufferPositionedReadable stream : Arrays.asList(client, fs)) {
+        ByteBuffer empty = ByteBuffer.allocate(0);
+        ByteBuffer readOnly = empty.asReadOnlyBuffer();
+        assertThrows(EOFException.class, () -> stream.read(-1, empty));
+        assertThrows(EOFException.class, () -> stream.readFully(-1, empty));
+        assertThrows(ReadOnlyBufferException.class, () -> stream.read(0, readOnly));
+        assertThrows(ReadOnlyBufferException.class, () -> stream.readFully(0, readOnly));
+        assertThrows(NullPointerException.class, () -> stream.read(0, null));
+        assertThrows(NullPointerException.class, () -> stream.readFully(0, null));
+        PositionedReadable arrayStream = (PositionedReadable) stream;
+        assertThrows(EOFException.class, () -> arrayStream.read(-1, data, 0, 0));
+        assertThrows(EOFException.class, () -> arrayStream.readFully(-1, data, 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> arrayStream.read(0, null, 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> arrayStream.readFully(0, null, 0, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> arrayStream.read(0, data, -1, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> arrayStream.readFully(0, data, -1, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> arrayStream.read(0, data, data.length + 1, 0));
+        assertThrows(IndexOutOfBoundsException.class, () -> arrayStream.readFully(0, data, data.length + 1, 0));
+        for (long position : new long[] {0, data.length, data.length + 1}) {
+          assertEquals(0, stream.read(position, empty));
+          stream.readFully(position, empty);
+          assertEquals(0, arrayStream.read(position, data, data.length, 0));
+          arrayStream.readFully(position, data, data.length, 0);
+        }
+      }
     }
   }
 

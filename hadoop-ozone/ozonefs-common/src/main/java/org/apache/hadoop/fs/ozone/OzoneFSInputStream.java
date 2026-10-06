@@ -170,22 +170,19 @@ public class OzoneFSInputStream extends FSInputStream
    */
   @Override
   public int read(long position, ByteBuffer buffer) throws IOException {
-    if (!buffer.hasRemaining()) {
-      return 0;
-    }
     if (position < 0) {
       throw new EOFException("position is negative: " + position);
     }
-    return readImpl(position, buffer);
+    if (buffer.isReadOnly()) {
+      throw new ReadOnlyBufferException();
+    }
+    return buffer.hasRemaining() ? readImpl(position, buffer) : 0;
   }
 
   @Override
   public int read(long position, byte[] array, int offset, int length) throws IOException {
-    if (length == 0) {
-      return 0;
-    }
     validatePositionedReadArgs(position, array, offset, length);
-    return readImpl(position, ByteBuffer.wrap(array, offset, length));
+    return read(position, ByteBuffer.wrap(array, offset, length));
   }
 
   protected InputStream getWrappedInputStream() {
@@ -193,9 +190,6 @@ public class OzoneFSInputStream extends FSInputStream
   }
 
   private int readImpl(long position, ByteBuffer buffer) throws IOException {
-    if (buffer.isReadOnly()) {
-      throw new ReadOnlyBufferException();
-    }
     if (!(inputStream instanceof ByteBufferPositionedReadable)) {
       throw new UnsupportedOperationException("Positioned reads are not supported by "
           + inputStream.getClass().getName());
@@ -215,20 +209,11 @@ public class OzoneFSInputStream extends FSInputStream
    */
   @Override
   public void readFully(long position, ByteBuffer buffer) throws IOException {
-    if (!buffer.hasRemaining()) {
-      return;
-    }
-    if (position < 0) {
-      throw new EOFException("position is negative: " + position);
-    }
     readFullyImpl(position, buffer);
   }
 
   @Override
   public void readFully(long position, byte[] array, int offset, int length) throws IOException {
-    if (length == 0) {
-      return;
-    }
     validatePositionedReadArgs(position, array, offset, length);
     readFullyImpl(position, ByteBuffer.wrap(array, offset, length));
   }
@@ -239,15 +224,15 @@ public class OzoneFSInputStream extends FSInputStream
   }
 
   private void readFullyImpl(long position, ByteBuffer buffer) throws IOException {
-    while (buffer.hasRemaining()) {
+    do {
       final int n = read(position, buffer);
       if (n < 0) {
         throw new EOFException("End of stream at position " + position);
       }
-      if (n == 0) {
+      if (n == 0 && buffer.hasRemaining()) {
         throw new IOException("No progress reading at position " + position);
       }
       position += n;
-    }
+    } while (buffer.hasRemaining());
   }
 }

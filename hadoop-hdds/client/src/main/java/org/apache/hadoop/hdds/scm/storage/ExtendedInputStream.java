@@ -57,22 +57,28 @@ public abstract class ExtendedInputStream extends FSInputStream
 
   @Override
   public void readFully(long position, ByteBuffer buffer) throws IOException {
-    while (buffer.hasRemaining()) {
+    do {
       int n = read(position, buffer);
       if (n < 0) {
         throw new EOFException("End of stream at position " + position);
       }
-      if (n == 0) {
+      if (n == 0 && buffer.hasRemaining()) {
         throw new IOException("No progress reading at position " + position);
       }
       position += n;
-    }
+    } while (buffer.hasRemaining());
   }
 
   @Override
   public int read(long position, byte[] buffer, int offset, int length) throws IOException {
     validatePositionedReadArgs(position, buffer, offset, length);
     return read(position, ByteBuffer.wrap(buffer, offset, length));
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer, int offset, int length) throws IOException {
+    validatePositionedReadArgs(position, buffer, offset, length);
+    readFully(position, ByteBuffer.wrap(buffer, offset, length));
   }
 
   @Override
