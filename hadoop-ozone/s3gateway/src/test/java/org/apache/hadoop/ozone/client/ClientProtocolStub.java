@@ -149,7 +149,7 @@ public class ClientProtocolStub implements ClientProtocol {
     NavigableMap<Integer, Long> partSizes = bucket instanceof OzoneBucketStub
         ? ((OzoneBucketStub) bucket).getCompletedMultipartPartSizes(keyName)
         : Collections.emptyNavigableMap();
-    return new S3HeadObjectAttributes(key, partSizes);
+    return new S3HeadObjectAttributes(key, partSizes, bucket.getBucketLayout());
   }
 
   @Override
