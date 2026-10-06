@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
@@ -223,9 +224,7 @@ public class TestObjectMultiDelete {
   public void multiDeleteWithNullVersionIdDeletesCurrentObject() throws Exception {
     final OzoneClient client = new OzoneClientStub();
     final OzoneBucket bucket = initTestData(client);
-    final BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder()
-        .setClient(client)
-        .build();
+    final BucketEndpoint rest = EndpointBuilder.newBucketEndpointBuilder().setClient(client).build();
 
     final DeleteObject nullVersion = new DeleteObject("key2");
     nullVersion.setVersionId(NULL_VERSION_ID);
@@ -241,6 +240,24 @@ public class TestObjectMultiDelete {
         .extracting(DeletedObject::getKey, DeletedObject::getVersionId)
         .containsExactly(tuple("key1", null), tuple("key2", NULL_VERSION_ID));
     assertThat(bucket.listKeys("")).toIterable().extracting(OzoneKey::getName).containsExactly("key3");
+  }
+
+  @Test
+  public void multiDeleteReturnsVersionIdOfFailedKey() throws Exception {
+    OzoneBucket bucket = mock(OzoneBucket.class);
+    when(bucket.deleteKeys(any(), anyBoolean()))
+        .thenReturn(singletonMap("key1", new ErrorInfo("ACCESS_DENIED", "ACL check failed")));
+    final DeleteObject nullVersion = new DeleteObject("key1");
+    nullVersion.setVersionId(NULL_VERSION_ID);
+    final MultiDeleteRequest mdr = new MultiDeleteRequest();
+    mdr.getObjects().add(nullVersion);
+
+    final MultiDeleteResponse response = newEndpointFor(bucket, new HashMap<>()).multiDelete("b1", "", mdr);
+
+    assertThat(response.getDeletedObjects()).isEmpty();
+    assertThat(response.getErrors())
+        .extracting(MultiDeleteResponse.Error::getKey, MultiDeleteResponse.Error::getVersionId)
+        .containsExactly(tuple("key1", NULL_VERSION_ID));
   }
 
   private MultiDeleteRequest threeKeyRequest() {

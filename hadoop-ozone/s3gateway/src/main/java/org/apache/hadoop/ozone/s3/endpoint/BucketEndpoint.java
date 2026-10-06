@@ -262,8 +262,7 @@ public class BucketEndpoint extends BucketOperationHandler {
 
   private Object toListResult(ListObjectResponse response) {
     return isListObjectVersions()
-        ? ListVersionsResult.of(response, queryParams().get(QueryParams.VERSION_ID_MARKER))
-        : response;
+        ? ListVersionsResult.of(response, queryParams().get(QueryParams.VERSION_ID_MARKER)) : response;
   }
 
   private int validateMaxKeys(int maxKeys) throws OS3Exception {
@@ -403,7 +402,9 @@ public class BucketEndpoint extends BucketOperationHandler {
             }
           } else {
             failedDeletes.add(d.getKey());
-            result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
+            Error deleteError = new Error(d.getKey(), error.getCode(), error.getMessage());
+            deleteError.setVersionId(d.getVersionId());
+            result.addError(deleteError);
           }
         }
         getMetrics().updateDeleteKeySuccessStats(startNanos);

@@ -117,6 +117,9 @@ public class MultiDeleteResponse {
     @XmlElement(name = "Message")
     private String message;
 
+    @XmlElement(name = "VersionId")
+    private String versionId;
+
     public Error() {
     }
 
@@ -148,6 +151,14 @@ public class MultiDeleteResponse {
 
     public void setMessage(String message) {
       this.message = message;
+    }
+
+    public String getVersionId() {
+      return versionId;
+    }
+
+    public void setVersionId(String versionId) {
+      this.versionId = versionId;
     }
   }
 }
