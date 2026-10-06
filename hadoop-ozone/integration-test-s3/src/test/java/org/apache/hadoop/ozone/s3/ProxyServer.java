@@ -28,6 +28,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jetty.ee8.proxy.ProxyServlet;
 import org.eclipse.jetty.ee8.servlet.ServletContextHandler;
 import org.eclipse.jetty.ee8.servlet.ServletHolder;
@@ -209,7 +210,7 @@ public class ProxyServer {
           continue;
         }
         String headerValue = filterServerResponseHeader(clientRequest, serverResponse, headerName, field.getValue());
-        if (headerValue == null || headerValue.trim().isEmpty()) {
+        if (StringUtils.isBlank(headerValue)) {
           continue;
         }
         proxyResponse.addHeader(headerName, headerValue);
