@@ -125,6 +125,15 @@ public class TestObjectTaggingPut {
   }
 
   @Test
+  public void testPutObjectTaggingWithNullVersionId() throws Exception {
+    objectEndpoint.queryParamsForTest().set(S3Consts.QueryParams.VERSION_ID, S3Consts.NULL_VERSION_ID);
+
+    assertSucceeds(() -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, twoTags()));
+    assertThat(clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME).getTags())
+        .containsExactlyEntriesOf(TAGS);
+  }
+
+  @Test
   public void testPutObjectTaggingNoKeyFound() {
     assertErrorResponse(NO_SUCH_KEY, () -> putTagging(objectEndpoint, BUCKET_NAME, "nonexistent", twoTags()));
   }

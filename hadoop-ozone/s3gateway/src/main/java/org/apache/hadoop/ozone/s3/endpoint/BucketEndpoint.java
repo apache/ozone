@@ -109,7 +109,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     final String delimiter = queryParams().containsKey(QueryParams.DELIMITER) ?
         queryParams().get(QueryParams.DELIMITER) : null;
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
-    final String marker = queryParams().get(QueryParams.MARKER);
+    final String marker = queryParams().get(isListObjectVersions() ? QueryParams.KEY_MARKER : QueryParams.MARKER);
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
     String prefix = queryParams().get(QueryParams.PREFIX, "");
     String startAfter = queryParams().get(QueryParams.START_AFTER);
@@ -252,7 +252,18 @@ public class BucketEndpoint extends BucketOperationHandler {
     context.getPerf().appendCount(keyCount);
     context.getPerf().appendOpLatencyNanos(opLatencyNs);
     response.setKeyCount(keyCount);
-    return Response.ok(response).build();
+    return Response.ok(toListResult(response)).build();
+  }
+
+  /** ListObjectVersions lists the same keys as ListObjects (V1), but paginates with key-marker instead of marker. */
+  private boolean isListObjectVersions() {
+    return queryParams().get(QueryParams.VERSIONS) != null;
+  }
+
+  private Object toListResult(ListObjectResponse response) {
+    return isListObjectVersions()
+        ? ListVersionsResult.of(response, queryParams().get(QueryParams.VERSION_ID_MARKER))
+        : response;
   }
 
   private int validateMaxKeys(int maxKeys) throws OS3Exception {
@@ -353,7 +364,8 @@ public class BucketEndpoint extends BucketOperationHandler {
     }
 
     // Deleting a specific version is not implemented; ignoring VersionId would delete the current object instead.
-    if (request.getObjects() != null && request.getObjects().stream().anyMatch(o -> o.getVersionId() != null)) {
+    if (request.getObjects() != null
+        && request.getObjects().stream().anyMatch(o -> isUnsupportedVersionId(o.getVersionId()))) {
       throw newError(S3ErrorTable.NOT_IMPLEMENTED, bucketName);
     }
 
@@ -385,7 +397,9 @@ public class BucketEndpoint extends BucketOperationHandler {
               ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
           if (deleted) {
             if (!request.isQuiet()) {
-              result.addDeleted(new DeletedObject(d.getKey()));
+              DeletedObject deletedObject = new DeletedObject(d.getKey());
+              deletedObject.setVersionId(d.getVersionId());
+              result.addDeleted(deletedObject);
             }
           } else {
             failedDeletes.add(d.getKey());

@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
@@ -787,6 +788,15 @@ public abstract class EndpointBase {
         throw newError(INVALID_URI, keyPath);
       }
     }
+  }
+
+  /**
+   * Versioning is not implemented, so each object only has the null version, i.e. the current object.
+   *
+   * @return true if {@code versionId} refers to any other version
+   */
+  static boolean isUnsupportedVersionId(@Nullable String versionId) {
+    return versionId != null && !NULL_VERSION_ID.equals(versionId);
   }
 
   /**

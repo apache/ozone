@@ -74,6 +74,7 @@ public class MultiDeleteResponse {
     @XmlElement(name = "Key")
     private String key;
 
+    @XmlElement(name = "VersionId")
     private String versionId;
 
     public DeletedObject() {
