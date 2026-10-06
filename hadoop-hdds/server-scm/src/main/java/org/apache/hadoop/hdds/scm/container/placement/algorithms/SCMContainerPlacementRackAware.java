@@ -440,7 +440,6 @@ public final class SCMContainerPlacementRackAware
       List<DatanodeDetails> affinityNodes, List<DatanodeDetails> usedNodes,
       long metadataSizeRequired,
       long dataSizeRequired) throws SCMException {
-    // Excluded nodes are never picked, in any step. They are skipped one by one, so their racks can still be used.
     List<String> excludedNodesForCapacity = new ArrayList<>();
     if (excludedNodes != null) {
       for (DatanodeDetails node : excludedNodes) {
