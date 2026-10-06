@@ -107,6 +107,7 @@ import org.apache.ratis.statemachine.impl.SingleFileSnapshotInfo;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
@@ -750,8 +751,9 @@ public class ContainerStateMachine extends BaseStateMachine {
    *         which is identical on all the peers of the pipeline.
    */
   ByteBuffer streamCommand(ByteBuffer command) throws IOException {
+    // unsafeWrap is okay since the command buffer can be modified after this method has returned.
     final ContainerCommandRequestProto request = ContainerCommandRequestMessage.toProto(
-        ByteString.copyFrom(command), getGroupId());
+        UnsafeByteOperations.unsafeWrap(command), getGroupId());
     if (request.getCmdType() != Type.PutBlock) {
       throw new StorageContainerException("Unexpected stream command " + request.getCmdType()
           + ", expected " + Type.PutBlock, ContainerProtos.Result.MALFORMED_REQUEST);
