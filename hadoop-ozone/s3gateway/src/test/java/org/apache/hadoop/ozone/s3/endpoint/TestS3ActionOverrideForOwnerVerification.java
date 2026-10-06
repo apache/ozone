@@ -34,11 +34,12 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -56,6 +57,7 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeAll;
@@ -128,14 +130,18 @@ public class TestS3ActionOverrideForOwnerVerification {
 
   @ParameterizedTest
   @ValueSource(strings = {"ETag", "ObjectParts"})
-  public void testGetObjectAttributesRequiresBothIamActions(String attribute) throws Exception {
+  public void testGetObjectAttributesSendsSingleOmRequestWithGetObjectAttributesAction(String attribute)
+      throws Exception {
     final List<String> actions = new ArrayList<>();
-    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, true);
+    final ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, true, clientProtocol, false);
 
     final Response response = getObjectAttributes(endpoint, DEST_BUCKET, DEST_KEY, attribute);
 
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    assertEquals(Arrays.asList("GetObject", "GetObjectAttributes"), actions);
+    // OM enforces the dependent GetObject action itself, so S3 Gateway makes exactly one OM request.
+    assertEquals(Collections.singletonList("GetObjectAttributes"), actions);
+    verifySingleMetadataLookup(clientProtocol, attribute);
   }
 
   @ParameterizedTest
@@ -147,8 +153,33 @@ public class TestS3ActionOverrideForOwnerVerification {
     final Response response = getObjectAttributes(endpoint, DEST_BUCKET, DEST_KEY, attribute);
 
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    // With STS disabled, only the attributes lookup itself reaches OM; the dependent GetObject check is skipped.
+    // With STS disabled, no S3 action is sent to OM.
     assertEquals(Collections.singletonList(null), actions);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ETag", "ObjectParts"})
+  public void testGetObjectAttributesPermissionDeniedReturnsAccessDenied(String attribute) throws Exception {
+    final List<String> actions = new ArrayList<>();
+    final ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    final ObjectEndpoint endpoint = newGetObjectAttributesEndpoint(actions, true, clientProtocol, true);
+
+    final OS3Exception ex = assertThrows(
+        OS3Exception.class, () -> getObjectAttributes(endpoint, DEST_BUCKET, DEST_KEY, attribute));
+
+    assertEquals("AccessDenied", ex.getCode());
+    assertEquals(Collections.singletonList("GetObjectAttributes"), actions);
+    verifySingleMetadataLookup(clientProtocol, attribute);
+  }
+
+  private static void verifySingleMetadataLookup(ClientProtocol clientProtocol, String attribute) throws Exception {
+    if ("ObjectParts".equals(attribute)) {
+      verify(clientProtocol).headS3ObjectAttributes(DEST_BUCKET, DEST_KEY);
+      verify(clientProtocol, never()).headS3Object(DEST_BUCKET, DEST_KEY);
+    } else {
+      verify(clientProtocol).headS3Object(DEST_BUCKET, DEST_KEY);
+      verify(clientProtocol, never()).headS3ObjectAttributes(DEST_BUCKET, DEST_KEY);
+    }
   }
 
   private static ObjectEndpoint newEndpoint(AtomicReference<String> actionAtSourceBucketOwnerLookup,
@@ -215,6 +246,11 @@ public class TestS3ActionOverrideForOwnerVerification {
 
   private static ObjectEndpoint newGetObjectAttributesEndpoint(List<String> actions, boolean isStsEnabled)
       throws Exception {
+    return newGetObjectAttributesEndpoint(actions, isStsEnabled, mock(ClientProtocol.class), false);
+  }
+
+  private static ObjectEndpoint newGetObjectAttributesEndpoint(List<String> actions, boolean isStsEnabled,
+      ClientProtocol clientProtocol, boolean denyAccess) throws Exception {
     final HttpHeaders headers = mock(HttpHeaders.class);
     final SignatureInfo signatureInfo = mock(SignatureInfo.class);
     when(signatureInfo.isSignPayload()).thenReturn(true);
@@ -224,7 +260,6 @@ public class TestS3ActionOverrideForOwnerVerification {
 
     final OzoneClient client = mock(OzoneClient.class);
     final ObjectStore objectStore = mock(ObjectStore.class);
-    final ClientProtocol clientProtocol = mock(ClientProtocol.class);
     final AtomicReference<S3Auth> s3AuthRef = new AtomicReference<>();
     doAnswer(invocationOnMock -> {
       s3AuthRef.set(invocationOnMock.getArgument(0));
@@ -243,11 +278,11 @@ public class TestS3ActionOverrideForOwnerVerification {
 
     when(clientProtocol.headS3Object(DEST_BUCKET, DEST_KEY)).thenAnswer(invocationOnMock -> {
       recordS3Action(s3AuthRef, actions);
-      return key;
+      return returnOrDeny(key, denyAccess);
     });
     when(clientProtocol.headS3ObjectAttributes(DEST_BUCKET, DEST_KEY)).thenAnswer(invocationOnMock -> {
       recordS3Action(s3AuthRef, actions);
-      return headAttributes;
+      return returnOrDeny(headAttributes, denyAccess);
     });
 
     final OzoneConfiguration conf = new OzoneConfiguration();
@@ -258,6 +293,13 @@ public class TestS3ActionOverrideForOwnerVerification {
         .setHeaders(headers)
         .setSignatureInfo(signatureInfo)
         .build();
+  }
+
+  private static <T> T returnOrDeny(T result, boolean denyAccess) throws OMException {
+    if (denyAccess) {
+      throw new OMException("Permission denied", ResultCodes.PERMISSION_DENIED);
+    }
+    return result;
   }
 
   private static void recordS3Action(AtomicReference<S3Auth> s3AuthRef, List<String> actions) {

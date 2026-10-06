@@ -78,7 +78,7 @@ public final class S3GActionIamMapper {
     case HEAD_KEY:
       return "GetObject";
     case GET_OBJECT_ATTRIBUTES:
-      // ObjectAttributesHandler separately enforces the dependent GetObject action.
+      // OM also enforces the dependent GetObject action when authorizing this request.
       return "GetObjectAttributes";
     case ABORT_MULTIPART_UPLOAD:
       return "AbortMultipartUpload";
