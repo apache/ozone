@@ -83,6 +83,15 @@ public final class S3Consts {
   public static final String RESERVED_USER_METADATA_KEY_PREFIX = "ozone-s3-internal-";
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
   public static final String STORAGE_CONFIG_HEADER = "storage-config";
+  public static final String READ_CONSISTENCY_HEADER =
+      "x-ozone-read-consistency";
+  public static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
+      "x-ozone-local-lease-log-limit";
+  public static final String READ_CONSISTENCY_FOLLOWER_STALE =
+      "follower-stale";
+  public static final String READ_CONSISTENCY_FOLLOWER_LINEARIZABLE =
+      "follower-linearizable";
+  public static final String READ_CONSISTENCY_LEADER_ONLY = "leader-only";
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";

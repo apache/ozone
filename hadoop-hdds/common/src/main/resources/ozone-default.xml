@@ -4389,7 +4389,16 @@
     <tag>SCM, OZONE</tag>
     <description>Wait duration for flush of buffered transaction.</description>
   </property>
-
+  <property>
+    <name>ozone.scm.ha.dbtransactionbuffer.flush.pending.limit</name>
+    <value>10000</value>
+    <tag>SCM, OZONE</tag>
+    <description>
+      Maximum number of buffered DB operations the SCM HA transaction buffer holds 
+      before applyTransaction flushes them to RocksDB. This bounds memory use while
+      a restarted follower applies a large backlog of committed Ratis log entries.
+    </description>
+  </property>
 
   <property>
     <name>ozone.s3g.kerberos.keytab.file</name>

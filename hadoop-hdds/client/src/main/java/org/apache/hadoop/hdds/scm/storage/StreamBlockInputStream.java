@@ -144,7 +144,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!dataAvailableToRead(1, preRead)) {
       return EOF;
     }
-    final int value = readBuffer.getByteBuffer().get();
+    final int value = Byte.toUnsignedInt(readBuffer.getByteBuffer().get());
     advancePosition(1, preRead);
     return value;
   }
@@ -476,6 +476,15 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
     xceiverClient.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
         blockID, requestedLength, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
+  }
+
+  /**
+   * A stream killed by a gRPC deadline is a transport failure of the long-lived call, not a data error:
+   * fail over to another datanode the same way as UNAVAILABLE. The classic per-request path is unaffected.
+   */
+  @Override
+  protected boolean isConnectivityIssue(IOException ex) {
+    return super.isConnectivityIssue(ex) || Status.fromThrowable(ex).getCode() == Status.DEADLINE_EXCEEDED.getCode();
   }
 
   private void handleExceptions(IOException cause) throws IOException {
