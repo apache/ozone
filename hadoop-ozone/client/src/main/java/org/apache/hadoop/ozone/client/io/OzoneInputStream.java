@@ -32,8 +32,7 @@ import org.apache.hadoop.hdds.scm.storage.ExtendedInputStream;
  * OzoneInputStream is used to read data from Ozone.
  * It uses {@link KeyInputStream} for reading the data.
  */
-public class OzoneInputStream extends ExtendedInputStream implements CanUnbuffer,
-    ByteBufferReadable, Seekable {
+public class OzoneInputStream extends ExtendedInputStream {
 
   private final InputStream inputStream;
 
@@ -99,7 +98,7 @@ public class OzoneInputStream extends ExtendedInputStream implements CanUnbuffer
     if (StreamCapabilities.READBYTEBUFFER.equalsIgnoreCase(capability)) {
       return inputStream instanceof ByteBufferReadable;
     }
-    return inputStream instanceof CanUnbuffer;
+    return StreamCapabilities.UNBUFFER.equalsIgnoreCase(capability) && inputStream instanceof CanUnbuffer;
   }
 
   @Override
