@@ -38,9 +38,6 @@ public enum DatanodeVersion implements ComponentVersion {
 
   SHORT_CIRCUIT_READS(4, "Version with short-circuit read support."),
 
-  RATIS_DATASTREAM_READ_BLOCK_SUPPORT(5, "This version supports ReadBlock on Ratis read-only data streams, "
-      + "also for closed containers without a Raft group."),
-
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 
