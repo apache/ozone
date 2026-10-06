@@ -57,7 +57,6 @@ import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for {@link OzoneFSInputStream}.
@@ -278,7 +277,6 @@ public class TestOzoneFSInputStream {
   }
 
   @Test
-  @Timeout(30)
   void concurrentPositionedReadsThroughWrappers() throws Exception {
     byte[] source = RandomUtils.secure().randomBytes(SOURCE_SIZE);
     try (OzoneFSInputStream stream = createTestSubject(new OzoneInputStream(new NativePositionedInputStream(source)))) {

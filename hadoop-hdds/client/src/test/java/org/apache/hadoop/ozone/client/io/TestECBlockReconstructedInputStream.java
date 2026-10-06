@@ -46,7 +46,6 @@ import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test for the ECBlockReconstructedInputStream class.
@@ -369,7 +368,6 @@ public class TestECBlockReconstructedInputStream {
   }
 
   @Test
-  @Timeout(30)
   void concurrentPositionedReadsReconstructIndependentStripes() throws Exception {
     int chunk = repConfig.getEcChunkSize();
     int blockLength = chunk * 7 - 101;

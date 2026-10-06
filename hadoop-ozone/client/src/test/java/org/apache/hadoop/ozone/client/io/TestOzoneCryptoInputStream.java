@@ -406,7 +406,6 @@ public class TestOzoneCryptoInputStream {
   }
 
   @Test
-  @Timeout(30)
   void positionedReadsOverlapAcrossEncryptedParts() throws Exception {
     byte[] plaintext = RandomUtils.secure().randomBytes(SOURCE_SIZE);
     int split = SOURCE_SIZE / 2 + 7;

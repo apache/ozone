@@ -62,6 +62,7 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
 import org.apache.hadoop.crypto.key.kms.LoadBalancingKMSClientProvider;
@@ -260,6 +261,17 @@ class TestOzoneAtRestEncryption {
     createAndVerifyKeyData(bucket);
     createAndVerifyStreamKeyData(bucket);
     createAndVerifyFileSystemData(bucket);
+
+    String keyName = UUID.randomUUID().toString();
+    byte[] data = generateRandomData(PositionedReadTestHelper.SOURCE_SIZE);
+    DataTestUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, ONE), data);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
+      assertInstanceOf(CryptoInputStream.class, inputStream.getInputStream());
+      inputStream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(data, inputStream::readFully);
+      assertEquals(123, inputStream.getPos());
+      assertEquals(Byte.toUnsignedInt(data[123]), inputStream.read());
+    }
   }
 
   @ParameterizedTest

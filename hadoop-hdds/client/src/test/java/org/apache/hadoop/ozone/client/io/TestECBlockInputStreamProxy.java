@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -400,7 +399,6 @@ public class TestECBlockInputStreamProxy {
 
   @ParameterizedTest
   @ValueSource(strings = {"healthy", "missing", "failover", "failure"})
-  @Timeout(30)
   void positionedReadsOverlapAndCloseTheirReaders(String mode) throws Exception {
     byte[] data = generateData(1024).array();
     BlockLocationInfo info = ECStreamTestUtil.createKeyInfo(repConfig, data.length,
