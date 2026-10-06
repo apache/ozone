@@ -626,8 +626,13 @@ public final class HttpServer2 implements FilterContainer {
       // IP literal (which send no SNI) or to localhost/VIP/alias names absent
       // from the keystore certificate. Jetty 9.4 only ran that check when the
       // client's SNI matched a certificate, so such requests were served with
-      // the default certificate. Disable the check to preserve that behaviour.
-      httpConfig.addCustomizer(new SecureRequestCustomizer(false));
+      // the default certificate. The check is off by default to preserve that
+      // behaviour, and opt-in for deployments whose certificate covers every
+      // name clients use.
+      boolean sniHostCheck = conf.getBoolean(
+          OzoneConfigKeys.OZONE_HTTP_SNI_HOST_CHECK_ENABLED,
+          OzoneConfigKeys.OZONE_HTTP_SNI_HOST_CHECK_ENABLED_DEFAULT);
+      httpConfig.addCustomizer(new SecureRequestCustomizer(sniHostCheck));
       ServerConnector conn = createHttpChannelConnector(server, httpConfig);
 
       SslContextFactory.Server sslContextFactory =
