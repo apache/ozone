@@ -3847,6 +3847,22 @@
     </description>
   </property>
   <property>
+    <name>ozone.http.sni.host.check.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <description>
+      Whether the HTTPS endpoints of Ozone daemons require the request's Host header
+      (or TLS SNI name) to be covered by the certificate the server serves. When this
+      is false, a request whose name the certificate does not cover is still served
+      with that certificate, which is how the HTTPS endpoints behaved before the Jetty
+      12 upgrade. Enabling the check rejects such a request with 400 "Invalid SNI", so
+      it requires the server certificate to carry every name clients connect with as a
+      SubjectAlternativeName - including an iPAddress entry for every address clients
+      reach by IP literal, because such a request sends no SNI at all, and entries for
+      any load balancer, virtual IP or DNS alias in front of the daemon.
+    </description>
+  </property>
+  <property>
     <name>ozone.https.client.need-auth</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
     <value>false</value>
@@ -4389,7 +4405,16 @@
     <tag>SCM, OZONE</tag>
     <description>Wait duration for flush of buffered transaction.</description>
   </property>
-
+  <property>
+    <name>ozone.scm.ha.dbtransactionbuffer.flush.pending.limit</name>
+    <value>10000</value>
+    <tag>SCM, OZONE</tag>
+    <description>
+      Maximum number of buffered DB operations the SCM HA transaction buffer holds 
+      before applyTransaction flushes them to RocksDB. This bounds memory use while
+      a restarted follower applies a large backlog of committed Ratis log entries.
+    </description>
+  </property>
 
   <property>
     <name>ozone.s3g.kerberos.keytab.file</name>
