@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.utils.db.cache.FullTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
@@ -587,6 +588,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void addCacheEntry(CacheKey<KEY> cacheKey,
       CacheValue<VALUE> cacheValue) {
     // This will override the entry if there is already entry for this key.
+    TableCacheUpdateTracker.recordCacheUpdate(getName());
     cache.put(cacheKey, cacheValue);
   }
 

@@ -28,6 +28,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.security.STSSecurityUtil;
 
 /**
  * entry for execution flow for write request.
@@ -73,7 +74,11 @@ public class OMExecutionFlow {
         return OzoneManagerRatisUtils.createErrorResponse(request, ex);
       }
     } else {
-      requestToSubmit = request;
+      try {
+        requestToSubmit = captureReadContext(request);
+      } catch (IOException ex) {
+        return OzoneManagerRatisUtils.createErrorResponse(request, ex);
+      }
     }
 
     // 2. submit request to ratis
@@ -82,5 +87,18 @@ public class OMExecutionFlow {
       omClientRequest.handleRequestFailure(ozoneManager);
     }
     return response;
+  }
+
+  /**
+   * Captures authenticated request context on the RPC thread before submitting a read request to Ratis.
+   */
+  private OMRequest captureReadContext(OMRequest request) throws IOException {
+    OMRequest.Builder requestBuilder = request.toBuilder()
+        .setUserInfo(OMClientRequest.getAuthenticatedUserInfo(request));
+    if (requestBuilder.hasS3Authentication()) {
+      requestBuilder.setS3Authentication(
+          STSSecurityUtil.resolveS3Authentication(requestBuilder.getS3Authentication(), ozoneManager));
+    }
+    return requestBuilder.build();
   }
 }

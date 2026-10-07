@@ -122,6 +122,17 @@ public class OMQuotaRepairRequest extends OMClientRequest {
         // bucket might be deleted when running repair count parallel
         return;
       }
+      if (bucketCountInfo.hasBucketObjectID()
+          && bucketCountInfo.getBucketObjectID() != bucketInfo.getObjectID()) {
+        // The bucket was deleted and recreated under the same name after the
+        // repair scan captured its counts. Applying the stale delta would
+        // corrupt the counters of the unrelated recreated bucket, so drop it.
+        LOG.warn("Skipping quota repair delta for bucket {}/{}: scanned objectID {} does not match "
+                + "current objectID {} (bucket recreated during repair)",
+            bucketCountInfo.getVolName(), bucketCountInfo.getBucketName(),
+            bucketCountInfo.getBucketObjectID(), bucketInfo.getObjectID());
+        return;
+      }
       bucketInfo.incrUsedBytes(bucketCountInfo.getDiffUsedBytes());
       bucketInfo.incrUsedNamespace(bucketCountInfo.getDiffUsedNamespace());
       if (bucketCountInfo.hasDiffSnapshotUsedBytes()) {

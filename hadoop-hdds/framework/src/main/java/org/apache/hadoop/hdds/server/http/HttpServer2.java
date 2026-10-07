@@ -37,6 +37,8 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -60,12 +62,12 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.HddsConfServlet;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -73,7 +75,6 @@ import org.apache.hadoop.hdds.utils.LogLevel;
 import org.apache.hadoop.http.FilterContainer;
 import org.apache.hadoop.http.FilterInitializer;
 import org.apache.hadoop.http.lib.StaticUserWebFilter;
-import org.apache.hadoop.jmx.JMXJsonServlet;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
@@ -86,7 +87,17 @@ import org.apache.hadoop.security.ssl.SSLFactory;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.util.StringUtils;
+import org.eclipse.jetty.ee8.nested.SessionHandler;
+import org.eclipse.jetty.ee8.servlet.DefaultServlet;
+import org.eclipse.jetty.ee8.servlet.FilterHolder;
+import org.eclipse.jetty.ee8.servlet.FilterMapping;
+import org.eclipse.jetty.ee8.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee8.servlet.ServletHandler;
+import org.eclipse.jetty.ee8.servlet.ServletHolder;
+import org.eclipse.jetty.ee8.servlet.ServletMapping;
+import org.eclipse.jetty.ee8.webapp.WebAppContext;
 import org.eclipse.jetty.http.HttpVersion;
+import org.eclipse.jetty.http.UriCompliance;
 import org.eclipse.jetty.server.ConnectionFactory;
 import org.eclipse.jetty.server.Connector;
 import org.eclipse.jetty.server.CustomRequestLog;
@@ -100,21 +111,10 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.Slf4jRequestLogWriter;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
-import org.eclipse.jetty.server.handler.HandlerCollection;
-import org.eclipse.jetty.server.handler.RequestLogHandler;
-import org.eclipse.jetty.server.session.SessionHandler;
-import org.eclipse.jetty.servlet.DefaultServlet;
-import org.eclipse.jetty.servlet.FilterHolder;
-import org.eclipse.jetty.servlet.FilterMapping;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jetty.servlet.ServletMapping;
 import org.eclipse.jetty.util.ArrayUtil;
-import org.eclipse.jetty.util.MultiException;
+import org.eclipse.jetty.util.ExceptionUtil;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
-import org.eclipse.jetty.webapp.WebAppContext;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.servlet.ServletContainer;
 import org.slf4j.Logger;
@@ -172,6 +172,48 @@ public final class HttpServer2 implements FilterContainer {
   private static final int HTTP_IDLE_TIMEOUT_MS_DEFAULT = 60000;
   private static final String HTTP_TEMP_DIR_KEY = "hadoop.http.temp.dir";
 
+  /**
+   * URI compliance mode used when {@code allowAmbiguousUri} is set. S3 object
+   * keys and WebHDFS paths legitimately contain empty path segments ("//"),
+   * percent encodings ("%25"), encoded path separators, and after decoding a
+   * backslash or other suspicious character (DEL and C0 controls), all of which
+   * Jetty 12 rejects with 400 by default. Jetty 9.4 (pre-migration) had no such
+   * check and passed these through, so relax those four violations to keep that
+   * behavior; a decoded backslash or control byte is opaque key/path data in
+   * Ozone (which uses only "/" as a separator), so it does not open path
+   * traversal. Rather than Jetty's broad LEGACY mode -- which would also
+   * re-admit UTF-16 and truncated UTF-8 encodings and userinfo on the
+   * internet-facing S3 Gateway and HttpFS -- relax only those violations the use
+   * case needs. Encoded "." and ".." segments are relaxed separately, for the S3
+   * Gateway only; see {@link #OZONE_S3_URI_COMPLIANCE}. Genuinely illegal
+   * (unencoded) URI characters such as "[" and "]" remain rejected, since
+   * conforming clients percent-encode them.
+   */
+  private static final UriCompliance OZONE_AMBIGUOUS_URI_COMPLIANCE =
+      UriCompliance.DEFAULT.with("OZONE",
+          UriCompliance.Violation.AMBIGUOUS_EMPTY_SEGMENT,
+          UriCompliance.Violation.AMBIGUOUS_PATH_ENCODING,
+          UriCompliance.Violation.AMBIGUOUS_PATH_SEPARATOR,
+          UriCompliance.Violation.SUSPICIOUS_PATH_CHARACTERS);
+
+  /**
+   * URI compliance mode used when {@code allowEncodedDotSegments} is set, which
+   * relaxes {@link #OZONE_AMBIGUOUS_URI_COMPLIANCE} by one further violation.
+   * An S3 object key may contain "." or ".." segments, which clients
+   * percent-encode as "%2e"/"%2e%2e" so that they are not resolved away in
+   * transit. Jetty 9.4 (pre-migration) passed those through; Jetty 12 rejects
+   * them with 400. Jersey resolves the endpoint's key parameter from the raw
+   * request URI rather than from the canonicalized servlet path, so the segments
+   * survive dispatch and the key reaches the S3 endpoint verbatim. Jetty's
+   * single AMBIGUOUS_PATH_SEGMENT violation covers "%2e" and "%2e%2e" alike, so
+   * this mode is scoped to the S3 Gateway, where the key is opaque data; HttpFS
+   * keeps the narrower mode above, since WebHDFS resolves its paths against a
+   * file system hierarchy.
+   */
+  private static final UriCompliance OZONE_S3_URI_COMPLIANCE =
+      OZONE_AMBIGUOUS_URI_COMPLIANCE.with("OZONE_S3",
+          UriCompliance.Violation.AMBIGUOUS_PATH_SEGMENT);
+
   public static final String FILTER_INITIALIZER_PROPERTY
       = "ozone.http.filter.initializers";
 
@@ -190,7 +232,7 @@ public final class HttpServer2 implements FilterContainer {
 
   private final Server webServer;
 
-  private final HandlerCollection handlers;
+  private final Handler.Sequence handlers;
 
   private final List<ServerConnector> listeners = Lists.newArrayList();
 
@@ -255,6 +297,8 @@ public final class HttpServer2 implements FilterContainer {
     private boolean xFrameEnabled;
     private XFrameOption xFrameOption = XFrameOption.SAMEORIGIN;
     private boolean skipDefaultApps;
+    private boolean allowAmbiguousUri;
+    private boolean allowEncodedDotSegments;
 
     public Builder setName(String serverName) {
       this.name = serverName;
@@ -462,6 +506,28 @@ public final class HttpServer2 implements FilterContainer {
       return this;
     }
 
+    /**
+     * Allow ambiguous URIs (e.g. empty path segments from "//") on the
+     * connector. Jetty 9.4 accepted these; Jetty 12 rejects them with 400 by
+     * default. The S3 Gateway needs this because S3 object keys can contain
+     * such sequences.
+     */
+    public Builder allowAmbiguousUri(boolean value) {
+      this.allowAmbiguousUri = value;
+      return this;
+    }
+
+    /**
+     * Allow percent-encoded "." and ".." path segments on the connector, in
+     * addition to {@link #allowAmbiguousUri(boolean)}. Jetty 9.4 accepted
+     * these; Jetty 12 rejects them with 400 by default. The S3 Gateway needs
+     * this because an object key can contain such segments.
+     */
+    public Builder allowEncodedDotSegments(boolean value) {
+      this.allowEncodedDotSegments = value;
+      return this;
+    }
+
     public HttpServer2 build() throws IOException {
       Objects.requireNonNull(name, "name is not set");
       Preconditions.checkState(!endpoints.isEmpty(), "No endpoints specified");
@@ -502,6 +568,11 @@ public final class HttpServer2 implements FilterContainer {
       httpConfig.setRequestHeaderSize(requestHeaderSize);
       httpConfig.setResponseHeaderSize(responseHeaderSize);
       httpConfig.setSendServerVersion(false);
+      if (allowEncodedDotSegments) {
+        httpConfig.setUriCompliance(OZONE_S3_URI_COMPLIANCE);
+      } else if (allowAmbiguousUri) {
+        httpConfig.setUriCompliance(OZONE_AMBIGUOUS_URI_COMPLIANCE);
+      }
 
       int backlogSize = conf.getInt(HTTP_SOCKET_BACKLOG_SIZE_KEY,
           HTTP_SOCKET_BACKLOG_SIZE_DEFAULT);
@@ -549,7 +620,19 @@ public final class HttpServer2 implements FilterContainer {
     private ServerConnector createHttpsChannelConnector(
         Server server, HttpConfiguration httpConfig) {
       httpConfig.setSecureScheme(HTTPS_SCHEME);
-      httpConfig.addCustomizer(new SecureRequestCustomizer());
+      // Jetty 12's SecureRequestCustomizer defaults to sniHostCheck=true, which
+      // rejects every HTTPS request whose Host (or SNI) is not carried by the
+      // served certificate with a 400 "Invalid SNI" -- including requests to an
+      // IP literal (which send no SNI) or to localhost/VIP/alias names absent
+      // from the keystore certificate. Jetty 9.4 only ran that check when the
+      // client's SNI matched a certificate, so such requests were served with
+      // the default certificate. The check is off by default to preserve that
+      // behaviour, and opt-in for deployments whose certificate covers every
+      // name clients use.
+      boolean sniHostCheck = conf.getBoolean(
+          OzoneConfigKeys.OZONE_HTTP_SNI_HOST_CHECK_ENABLED,
+          OzoneConfigKeys.OZONE_HTTP_SNI_HOST_CHECK_ENABLED_DEFAULT);
+      httpConfig.addCustomizer(new SecureRequestCustomizer(sniHostCheck));
       ServerConnector conn = createHttpChannelConnector(server, httpConfig);
 
       SslContextFactory.Server sslContextFactory =
@@ -612,7 +695,7 @@ public final class HttpServer2 implements FilterContainer {
     final String appDir = getWebAppsPath(b.name);
     this.webServer = new Server();
     this.adminsAcl = b.adminsAcl;
-    this.handlers = new HandlerCollection();
+    this.handlers = new Handler.Sequence();
     this.webAppContext = createWebAppContext(b, adminsAcl, appDir);
     this.xFrameOptionIsEnabled = b.xFrameEnabled;
     this.xFrameOption = b.xFrameOption;
@@ -656,9 +739,7 @@ public final class HttpServer2 implements FilterContainer {
     handlers.addHandler(contexts);
 
     RequestLog requestLog = getRequestLog(builder.name);
-    RequestLogHandler requestLogHandler = new RequestLogHandler();
-    requestLogHandler.setRequestLog(requestLog);
-    handlers.addHandler(requestLogHandler);
+    webServer.setRequestLog(requestLog);
 
     handlers.addHandler(webAppContext);
     final String appDir = getWebAppsPath(builder.name);
@@ -795,38 +876,86 @@ public final class HttpServer2 implements FilterContainer {
         CommonConfigurationKeysPublic.HADOOP_HTTP_LOGS_ENABLED,
         CommonConfigurationKeysPublic.HADOOP_HTTP_LOGS_ENABLED_DEFAULT);
     if (logDir != null && logsEnabled) {
-      ServletContextHandler logContext =
-          new ServletContextHandler(parent, "/logs");
-      logContext.setResourceBase(logDir);
-      logContext.addServlet(AdminAuthorizedServlet.class, "/*");
-      if (conf.getBoolean(HADOOP_JETTY_LOGS_SERVE_ALIASES, DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
-        Map<String, String> params = logContext.getInitParams();
-        params.put("org.eclipse.jetty.servlet.Default.aliases", "true");
+      // Jetty 12 refuses to start a context whose base resource does not exist,
+      // so best-effort create the log directory here. This is new behavior:
+      // Jetty 9.4 silently tolerated a missing base resource and did not create
+      // it. If the directory is absent and cannot be created -- permission
+      // denied, a regular file in the way, or a read-only mount -- skip the
+      // "/logs" context gracefully instead of failing daemon startup, mirroring
+      // the "/static" skip-if-absent guard below.
+      Path logPath = Paths.get(logDir);
+      boolean logDirReady = true;
+      // Create only when absent. Files.isDirectory follows symlinks, so a log directory that is a
+      // symlink to a directory is left alone: before JDK 20 (JDK-8294193) createDirectories throws
+      // FileAlreadyExistsException for such a link, which would drop "/logs" on a JDK 17 runtime.
+      if (!Files.isDirectory(logPath)) {
+        try {
+          Files.createDirectories(logPath);
+        } catch (IOException e) {
+          LOG.warn("Log directory {} is not available; /logs will not be served.", logDir, e);
+          logDirReady = false;
+        }
       }
-      logContext.setDisplayName("logs");
+      if (logDirReady && Files.isDirectory(logPath)) {
+        ServletContextHandler logContext =
+            new ServletContextHandler(parent, "/logs");
+        logContext.setBaseResourceAsString(logDir);
+        logContext.addServlet(AdminAuthorizedServlet.class, "/*");
+        if (conf.getBoolean(HADOOP_JETTY_LOGS_SERVE_ALIASES, DEFAULT_HADOOP_JETTY_LOGS_SERVE_ALIASES)) {
+          Map<String, String> params = logContext.getInitParams();
+          params.put("org.eclipse.jetty.servlet.Default.aliases", "true");
+        }
+        logContext.setDisplayName("logs");
+        SessionHandler handler = new SessionHandler();
+        handler.setHttpOnly(true);
+        handler.getSessionCookieConfig().setSecure(true);
+        logContext.setSessionHandler(handler);
+        setContextAttributes(logContext, conf);
+        addNoCacheFilter(logContext);
+        defaultContexts.put(logContext, true);
+      }
+    }
+    // set up the context for "/static/*"
+    // Jetty 12 refuses to start a context whose base resource does not exist.
+    // The shared static assets are unpacked into the module's webapps
+    // directory at package time, so they are present in the packaged jar/dist
+    // but may be absent while unit tests run; serve "/static" only when the
+    // base resource exists (Jetty 9 silently tolerated a missing base).
+    String staticBase = appDir + "/static";
+    if (baseResourceExists(staticBase)) {
+      ServletContextHandler staticContext =
+          new ServletContextHandler(parent, "/static");
+      staticContext.setBaseResourceAsString(staticBase);
+      staticContext.addServlet(DefaultServlet.class, "/*");
+      staticContext.setDisplayName("static");
+      Map<String, String> params = staticContext.getInitParams();
+      params.put("org.eclipse.jetty.servlet.Default.dirAllowed", "false");
+      params.put("org.eclipse.jetty.servlet.Default.gzip", "true");
       SessionHandler handler = new SessionHandler();
       handler.setHttpOnly(true);
       handler.getSessionCookieConfig().setSecure(true);
-      logContext.setSessionHandler(handler);
-      setContextAttributes(logContext, conf);
-      addNoCacheFilter(logContext);
-      defaultContexts.put(logContext, true);
+      staticContext.setSessionHandler(handler);
+      setContextAttributes(staticContext, conf);
+      defaultContexts.put(staticContext, true);
     }
-    // set up the context for "/static/*"
-    ServletContextHandler staticContext =
-        new ServletContextHandler(parent, "/static");
-    staticContext.setResourceBase(appDir + "/static");
-    staticContext.addServlet(DefaultServlet.class, "/*");
-    staticContext.setDisplayName("static");
-    Map<String, String> params = staticContext.getInitParams();
-    params.put("org.eclipse.jetty.servlet.Default.dirAllowed", "false");
-    params.put("org.eclipse.jetty.servlet.Default.gzip", "true");
-    SessionHandler handler = new SessionHandler();
-    handler.setHttpOnly(true);
-    handler.getSessionCookieConfig().setSecure(true);
-    staticContext.setSessionHandler(handler);
-    setContextAttributes(staticContext, conf);
-    defaultContexts.put(staticContext, true);
+  }
+
+  /**
+   * Return whether a context base resource URL points to something that
+   * exists. Non-file resources (e.g. inside a packaged jar) are assumed
+   * present, matching the distribution layout; this only filters out the
+   * file-system case where the shared static assets have not been unpacked.
+   */
+  static boolean baseResourceExists(String resourceUrl) {
+    try {
+      URI uri = URI.create(resourceUrl);
+      if ("file".equals(uri.getScheme())) {
+        return Files.exists(Paths.get(uri));
+      }
+      return true;
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 
   private void setContextAttributes(ServletContextHandler context,
@@ -842,8 +971,8 @@ public final class HttpServer2 implements FilterContainer {
     // set up default servlets
     addServlet("stacks", "/stacks", StackServlet.class);
     addServlet("logLevel", "/logLevel", LogLevel.Servlet.class);
-    addServlet("jmx", "/jmx", JMXJsonServlet.class);
-    addServlet("conf", "/conf", ConfServlet.class);
+    addServlet("jmx", "/jmx", HddsJMXJsonServlet.class);
+    addServlet("conf", "/conf", HddsConfServlet.class);
   }
 
   public void addContext(ServletContextHandler ctxt, boolean isFiltered) {
@@ -1022,8 +1151,8 @@ public final class HttpServer2 implements FilterContainer {
    * @param handler The handler to add
    */
   public void addHandlerAtFront(Handler handler) {
-    Handler[] h = ArrayUtil.prependToArray(
-        handler, this.handlers.getHandlers(), Handler.class);
+    List<Handler> h = new ArrayList<>(this.handlers.getHandlers());
+    h.add(0, handler);
     handlers.setHandlers(h);
   }
 
@@ -1220,13 +1349,9 @@ public final class HttpServer2 implements FilterContainer {
       } catch (IOException ex) {
         LOG.info("HttpServer.start() threw a non Bind IOException", ex);
         throw ex;
-      } catch (MultiException ex) {
-        LOG.info("HttpServer.start() threw a MultiException", ex);
-        throw ex;
       }
       // Make sure there is no handler failures.
-      Handler[] hs = webServer.getHandlers();
-      for (Handler handler : hs) {
+      for (Handler handler : handlers.getHandlers()) {
         if (handler.isFailed()) {
           throw new IOException(
               "Problem in starting http server. Server handlers failed");
@@ -1370,7 +1495,7 @@ public final class HttpServer2 implements FilterContainer {
    * stop the server.
    */
   public void stop() throws Exception {
-    MultiException exception = null;
+    ExceptionUtil.MultiException exception = null;
     for (ServerConnector c : listeners) {
       try {
         c.close();
@@ -1409,10 +1534,10 @@ public final class HttpServer2 implements FilterContainer {
 
   }
 
-  private MultiException addMultiException(MultiException exception,
-      Exception e) {
+  private ExceptionUtil.MultiException addMultiException(
+      ExceptionUtil.MultiException exception, Exception e) {
     if (exception == null) {
-      exception = new MultiException();
+      exception = new ExceptionUtil.MultiException();
     }
     exception.add(e);
     return exception;
@@ -1706,9 +1831,7 @@ public final class HttpServer2 implements FilterContainer {
      */
     private String inferMimeType(ServletRequest request) {
       String path = ((HttpServletRequest) request).getRequestURI();
-      ServletContextHandler.Context sContext =
-          (ServletContextHandler.Context) config.getServletContext();
-      return sContext.getMimeType(path);
+      return config.getServletContext().getMimeType(path);
     }
 
     private void initHttpHeaderMap() {
