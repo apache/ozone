@@ -523,7 +523,7 @@ public final class ContainerProtocolCalls  {
 
     final WriteChunkRequestProto.Builder writeChunkRequest = WriteChunkRequestProto.newBuilder()
         .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicationIndex,
-            StorageTypeUtils.getIDFromProtobuf(storageType)))
+            storageType == null ? null : StorageTypeUtils.getIDFromProtobuf(storageType)))
         .setChunkData(chunk)
         .setData(data);
     if (blockData != null) {
@@ -572,7 +572,7 @@ public final class ContainerProtocolCalls  {
 
     BlockData containerBlockData =
         BlockData.newBuilder().setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(null,
-                StorageTypeUtils.getIDFromProtobuf(storageType)))
+                storageType == null ? null : StorageTypeUtils.getIDFromProtobuf(storageType)))
             .build();
     PutBlockRequestProto.Builder createBlockRequest =
         PutBlockRequestProto.newBuilder()

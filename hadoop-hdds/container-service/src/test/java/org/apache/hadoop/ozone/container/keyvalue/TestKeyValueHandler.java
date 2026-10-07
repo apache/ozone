@@ -1521,7 +1521,7 @@ public class TestKeyValueHandler {
     MutableVolumeSet volumeSet = handlerWithVolume.getVolumeSet();
     ContainerSet containerSet = handlerWithVolume.getContainerSet();
 
-    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID, null);
     containerSet.addContainer(container);
 
     int bytesPerChecksum = 1024;

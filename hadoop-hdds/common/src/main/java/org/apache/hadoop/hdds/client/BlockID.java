@@ -124,9 +124,12 @@ public class BlockID {
     }
     return blockID.build();
   }
+
+  @JsonIgnore
   public DatanodeBlockID.Builder getDatanodeBlockIDProtobufBuilder(Integer replicaIdx) {
     return getDatanodeBlockIDProtobufBuilder(replicaIdx, null);
   }
+
   @JsonIgnore
   public DatanodeBlockID.Builder getDatanodeBlockIDProtobufBuilder(Integer replicaIdx, Integer storageTypeId) {
     final DatanodeBlockID.Builder b = DatanodeBlockID.newBuilder()

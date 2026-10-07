@@ -41,7 +41,6 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -402,7 +401,7 @@ public class TestOmMixedWorkloadUnderDeletionBench {
     OzoneBucket[] buckets = new OzoneBucket[numBuckets];
     FileSystem[] fs = new FileSystem[numBuckets];
     buckets[0] = first;
-    BucketArgs args = BucketArgs.newBuilder().setStorageType(StorageType.DISK)
+    BucketArgs args = BucketArgs.newBuilder()
         .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED).build();
     for (int b = 1; b < numBuckets; b++) {
       String name = first.getName() + "-" + b;

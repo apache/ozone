@@ -1012,7 +1012,7 @@ public class TestHddsDispatcher {
         .build();
 
     ContainerProtos.DatanodeBlockID.Builder blockID =
-        new BlockID(containerId, localId).getDatanodeBlockIDProtobufBuilder();
+        new BlockID(containerId, localId).getDatanodeBlockIDProtobufBuilder(null);
     // TODO: Pass the real storage type from the write path once that BlockID support StorageType
     if (storageType != null) {
       blockID.setStorageTypeID(StorageTypeUtils.getIDFromProtobuf(storageType));

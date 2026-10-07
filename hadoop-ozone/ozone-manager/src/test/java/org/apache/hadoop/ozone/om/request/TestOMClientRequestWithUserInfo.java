@@ -34,6 +34,7 @@ import java.net.InetAddress;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -271,7 +272,7 @@ public class TestOMClientRequestWithUserInfo {
         final BucketInfo.Builder bucketInfo =
             newBucketInfoBuilder(bucketName, volumeName)
                 .setIsVersionEnabled(true)
-                .setStorageType(StorageTypeProto.DISK);
+                .setStorageType(HddsProtos.StorageTypeProto.DISK);
 
         final OMRequest omRequest = newCreateBucketRequest(bucketInfo)
             .setS3Authentication(s3Authentication)
