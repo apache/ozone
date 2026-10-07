@@ -178,7 +178,7 @@ stock install and must be explicitly enabled:
   gRPC traffic when enabled.
 - **TDE/KMS** is optional and protects data at rest only for encrypted buckets;
   it requires a configured KMS, for example via `hadoop.security.key.provider.path`.
-- **HTTP authentication (SPNEGO)** is off by default (`ozone.security.http.kerberos.enabled=false`, and each web server's own type, for example `ozone.om.http.auth.type=simple`). Without it the web endpoints are not authenticated, and the admin check of the OM and SCM DB checkpoint endpoints, which serve the metadata DB, is not applied. *(documented — `ozone-default.xml`.)*
+- **HTTP authentication (SPNEGO)** is off by default (`ozone.security.http.kerberos.enabled=false`, and each web server's own type, for example `ozone.om.http.auth.type=simple`). With these defaults the web endpoints are not authenticated, and the OM and SCM DB checkpoint endpoints, which serve the metadata DB, are served without an admin check. *(documented — `ozone-default.xml`.)*
 
 So a finding that assumes ACLs / block/container tokens / transport encryption /
 TDE / HTTP authentication are active in a default build is `OUT-OF-MODEL: non-default-build` unless the
