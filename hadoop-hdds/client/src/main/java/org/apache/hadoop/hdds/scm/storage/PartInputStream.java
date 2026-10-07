@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
 
@@ -33,4 +34,16 @@ public interface PartInputStream
   }
 
   void close() throws IOException;
+
+  /**
+   * Positioned read within this part starting at {@code partOffset}.
+   *
+   * @return bytes copied into {@code buffer}, {@code -1} if {@code buffer} has no remaining space
+   *         or at EOF
+   * @throws UnsupportedOperationException if this part stream does not support positioned read
+   */
+  default int readPositioned(long partOffset, ByteBuffer buffer) throws IOException {
+    throw new UnsupportedOperationException(
+        "Positioned read is not supported by " + getClass().getName());
+  }
 }
