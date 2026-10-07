@@ -35,6 +35,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.LongSupplier;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
@@ -89,13 +90,19 @@ public class SCMStateMachine extends BaseStateMachine {
   // a follower (see retryStartDNServerUntilReady).
   private static final Duration DN_SERVER_START_RETRY_INTERVAL =
       Duration.ofSeconds(1);
+  private static final Duration DN_SERVER_START_INITIAL_WARNING_DELAY = Duration.ofSeconds(30);
+  private static final Duration DN_SERVER_START_WARNING_INTERVAL = Duration.ofMinutes(5);
   private final Duration dnServerStartRetryInterval;
+  private final LongSupplier monotonicClock;
 
   // Periodically retries the deferred datanode-server start on a follower so an
   // idle cluster (no new transactions, only Ratis heartbeats) still exits safe
   // mode once catch-up becomes observable.
   private ScheduledExecutorService dnServerStartRetryExecutor;
   private ScheduledFuture<?> dnServerStartRetryFuture;
+  private long dnServerStartRetryAttempts;
+  private long dnServerStartRetryStartedAt;
+  private long dnServerStartNextWarningAt;
 
   private DBCheckpoint installingDBCheckpoint = null;
   private List<ManagedSecretKey> installingSecretKeys = null;
@@ -110,17 +117,18 @@ public class SCMStateMachine extends BaseStateMachine {
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
-    this(scm, buffer, DN_SERVER_START_RETRY_INTERVAL);
+    this(scm, buffer, DN_SERVER_START_RETRY_INTERVAL, Time::monotonicNow);
   }
 
   @VisibleForTesting
   SCMStateMachine(final StorageContainerManager scm,
-      SCMHADBTransactionBuffer buffer, Duration retryInterval) {
+      SCMHADBTransactionBuffer buffer, Duration retryInterval, LongSupplier monotonicClock) {
     this.scm = scm;
     this.invokers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
     this.metrics = scm.getMetrics();
     this.dnServerStartRetryInterval = retryInterval;
+    this.monotonicClock = monotonicClock;
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
     if (!latestTrxInfo.isDefault()) {
       updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
@@ -141,10 +149,13 @@ public class SCMStateMachine extends BaseStateMachine {
     isInitialized = true;
   }
 
+  // Used only by SCMRatisServerImpl.initialize() to bootstrap Ratis storage;
+  // there is no SCM instance or background work to start or stop.
   public SCMStateMachine() {
     isInitialized = false;
     this.metrics = null;
     this.dnServerStartRetryInterval = DN_SERVER_START_RETRY_INTERVAL;
+    this.monotonicClock = Time::monotonicNow;
   }
 
   private void addRatisEvent(String message) {
@@ -473,8 +484,12 @@ public class SCMStateMachine extends BaseStateMachine {
    */
   private void retryStartDNServerUntilReady() {
     try {
-      if (!scm.isStopped() && !isStateMachineReady.get()) {
-        tryStartDNServerAndRefreshSafeMode();
+      synchronized (this) {
+        if (!scm.isStopped() && !isStateMachineReady.get()) {
+          dnServerStartRetryAttempts++;
+          tryStartDNServerAndRefreshSafeMode();
+          logPendingDNServerStart();
+        }
       }
     } catch (Exception e) {
       // Do not let a failed readiness check terminate the fallback. The
@@ -488,10 +503,28 @@ public class SCMStateMachine extends BaseStateMachine {
     }
   }
 
+  private void logPendingDNServerStart() {
+    if (scm.isStopped() || isStateMachineReady.get()) {
+      return;
+    }
+    long now = monotonicClock.getAsLong();
+    if (now >= dnServerStartNextWarningAt) {
+      long lastAppliedIndex = scm.getScmHAManager().getRatisServer().getDivision().getInfo().getLastAppliedIndex();
+      LOG.warn("Deferred datanode-server start is still waiting for follower catch-up: " +
+          "attempts={}, elapsed={}ms, lastAppliedIndex={}, leaderCommitIndexOnStart={}",
+          dnServerStartRetryAttempts, now - dnServerStartRetryStartedAt, lastAppliedIndex, leaderCommitIndexOnStart);
+      dnServerStartNextWarningAt = now + DN_SERVER_START_WARNING_INTERVAL.toMillis();
+    }
+  }
+
   private synchronized void scheduleDNServerStartRetry() {
     if (scm.isStopped() || isStateMachineReady.get() ||
         dnServerStartRetryExecutor.isShutdown() || dnServerStartRetryFuture != null) {
       return;
+    }
+    if (dnServerStartRetryAttempts == 0) {
+      dnServerStartRetryStartedAt = monotonicClock.getAsLong();
+      dnServerStartNextWarningAt = dnServerStartRetryStartedAt + DN_SERVER_START_INITIAL_WARNING_DELAY.toMillis();
     }
     dnServerStartRetryFuture = dnServerStartRetryExecutor.schedule(
         this::retryStartDNServerUntilReady,
@@ -499,6 +532,9 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   public void stopDNServerStartRetry() {
+    if (!isInitialized) {
+      return;
+    }
     synchronized (this) {
       dnServerStartRetryExecutor.shutdownNow();
       dnServerStartRetryFuture = null;

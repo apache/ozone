@@ -77,6 +77,8 @@ public class TestSCMStateMachine {
   private final AtomicBoolean commitIndexAvailable = new AtomicBoolean();
   private final AtomicBoolean scmStopped = new AtomicBoolean();
   private final AtomicLong lastAppliedIndex = new AtomicLong(5L);
+  private final AtomicLong leaderCommitIndex = new AtomicLong(5L);
+  private final AtomicLong retryClock = new AtomicLong(1000L);
   private final RaftPeerId followerId = RaftPeerId.valueOf("follower");
   private final RaftPeerId leaderId = RaftPeerId.valueOf("leader");
 
@@ -113,13 +115,13 @@ public class TestSCMStateMachine {
     when(division.getCommitInfos()).thenAnswer(invocation -> commitIndexAvailable.get()
         ? Collections.singletonList(RaftProtos.CommitInfoProto.newBuilder()
             .setServer(RaftProtos.RaftPeerProto.newBuilder().setId(leaderId.toByteString()))
-            .setCommitIndex(5L)
+            .setCommitIndex(leaderCommitIndex.get())
             .build())
         : Collections.emptyList());
     when(buffer.getLatestTrxInfo()).thenReturn(
         TransactionInfo.valueOf(TermIndex.valueOf(0, 0)));
 
-    stateMachine = new SCMStateMachine(scm, buffer, RETRY_INTERVAL);
+    stateMachine = new SCMStateMachine(scm, buffer, RETRY_INTERVAL, retryClock::get);
   }
 
   @AfterEach
@@ -165,6 +167,94 @@ public class TestSCMStateMachine {
     lastAppliedIndex.set(5L);
     verify(datanodeProtocolServer, timeout(2000)).start();
     verify(safeModeManager, timeout(2000)).refreshAndValidate();
+  }
+
+  @Test
+  void testRetryUsesCapturedCommitIndexWhenLeaderAdvances() {
+    commitIndexAvailable.set(true);
+    lastAppliedIndex.set(4L);
+    stateMachine.notifyLeaderChanged(memberId(), leaderId);
+
+    leaderCommitIndex.set(100L);
+    lastAppliedIndex.set(5L);
+
+    verify(datanodeProtocolServer, timeout(2000).times(1)).start();
+    verify(safeModeManager, timeout(2000).times(1)).refreshAndValidate();
+    assertThat(stateMachine.getIsStateMachineReady()).isTrue();
+  }
+
+  @Test
+  void testPendingRetryWarningsAreThrottledAndStopWhenReady() throws Exception {
+    commitIndexAvailable.set(true);
+    lastAppliedIndex.set(4L);
+    LogCapturer logs = LogCapturer.captureLogs(SCMStateMachine.class);
+    try {
+      stateMachine.notifyLeaderChanged(memberId(), leaderId);
+      retryClock.set(30999L);
+      verify(datanodeProtocolServer, after(RETRY_INTERVAL.toMillis() * 2).never()).start();
+      assertThat(logs.getOutput()).doesNotContain("still waiting for follower catch-up");
+
+      retryClock.set(31000L);
+      GenericTestUtils.waitFor(() -> logs.getOutput().contains("elapsed=30000ms"), 10, 2000);
+      assertThat(logs.getOutput()).containsPattern(
+          "attempts=[1-9][0-9]*, elapsed=30000ms, lastAppliedIndex=4, leaderCommitIndexOnStart=5");
+
+      retryClock.set(330999L);
+      verify(datanodeProtocolServer, after(RETRY_INTERVAL.toMillis() * 2).never()).start();
+      assertThat(logs.getOutput()).containsOnlyOnce("still waiting for follower catch-up");
+
+      retryClock.set(331000L);
+      GenericTestUtils.waitFor(() -> logs.getOutput().contains("elapsed=330000ms"), 10, 2000);
+      assertThat(logs.getOutput()).containsOnlyOnce("elapsed=330000ms");
+
+      lastAppliedIndex.set(5L);
+      verify(datanodeProtocolServer, timeout(2000)).start();
+      GenericTestUtils.waitFor(stateMachine::isDNServerStartRetryTerminated, 10, 2000);
+      logs.clearOutput();
+      retryClock.set(1000000L);
+      stateMachine.notifyLeaderChanged(memberId(), leaderId);
+      assertThat(logs.getOutput()).doesNotContain("still waiting for follower catch-up");
+    } finally {
+      logs.stopCapturing();
+    }
+  }
+
+  @Test
+  void testPendingRetryWarningIncludesUnavailableLeaderCommitIndex() throws Exception {
+    LogCapturer logs = LogCapturer.captureLogs(SCMStateMachine.class);
+    try {
+      stateMachine.notifyLeaderChanged(memberId(), leaderId);
+      retryClock.set(31000L);
+
+      GenericTestUtils.waitFor(() -> logs.getOutput().contains("elapsed=30000ms"), 10, 2000);
+      assertThat(logs.getOutput()).contains("lastAppliedIndex=5, leaderCommitIndexOnStart=-1");
+      verify(datanodeProtocolServer, never()).start();
+
+      scmStopped.set(true);
+      stateMachine.stopDNServerStartRetry();
+      logs.clearOutput();
+      retryClock.set(1000000L);
+      assertThat(stateMachine.isDNServerStartRetryTerminated()).isTrue();
+      assertThat(logs.getOutput()).doesNotContain("still waiting for follower catch-up");
+    } finally {
+      logs.stopCapturing();
+    }
+  }
+
+  @Test
+  void testBootstrapStateMachineSkipsSCMCallbacksAndRetryStop() throws Exception {
+    try (SCMStateMachine bootstrap = new SCMStateMachine()) {
+      bootstrap.notifyLeaderChanged(memberId(), leaderId);
+      bootstrap.notifyLeaderChanged(memberId(), followerId);
+      bootstrap.notifyTermIndexUpdated(1, 1);
+      bootstrap.notifyLeaderReady();
+      bootstrap.notifyNotLeader(Collections.emptyList());
+      bootstrap.stopDNServerStartRetry();
+      bootstrap.stopDNServerStartRetry();
+
+      assertThat(bootstrap.getIsStateMachineReady()).isFalse();
+      assertThat(bootstrap.getLatestSnapshot()).isNull();
+    }
   }
 
   @Test
@@ -222,9 +312,9 @@ public class TestSCMStateMachine {
   @Test
   public void testApplyTransactionFlushesAfterRecordingTransactionInfo() throws Exception {
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
-    SCMStateMachine stateMachine = newStateMachine(buffer, succeedingInvoker());
+    SCMStateMachine applyingStateMachine = newStateMachine(buffer, succeedingInvoker());
 
-    CompletableFuture<Message> result = stateMachine.applyTransaction(newTransaction(7));
+    CompletableFuture<Message> result = applyingStateMachine.applyTransaction(newTransaction(7));
 
     assertTrue(result.isDone() && !result.isCompletedExceptionally());
     InOrder order = inOrder(buffer);
@@ -237,10 +327,10 @@ public class TestSCMStateMachine {
   @Test
   public void testFlushCheckedForEveryAppliedTransaction() throws Exception {
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
-    SCMStateMachine stateMachine = newStateMachine(buffer, succeedingInvoker());
+    SCMStateMachine applyingStateMachine = newStateMachine(buffer, succeedingInvoker());
 
     for (int i = 1; i <= 5; i++) {
-      stateMachine.applyTransaction(newTransaction(i));
+      applyingStateMachine.applyTransaction(newTransaction(i));
     }
 
     verify(buffer, times(5)).flushIfPendingLimitReached();
@@ -253,9 +343,9 @@ public class TestSCMStateMachine {
     ScmInvoker<?> invoker = mock(ScmInvoker.class);
     when(invoker.invokeLocal(anyString(), any()))
         .thenThrow(new SCMException("rejected", ResultCodes.FAILED_TO_FIND_CONTAINER));
-    SCMStateMachine stateMachine = newStateMachine(buffer, invoker);
+    SCMStateMachine applyingStateMachine = newStateMachine(buffer, invoker);
 
-    CompletableFuture<Message> result = stateMachine.applyTransaction(newTransaction(3));
+    CompletableFuture<Message> result = applyingStateMachine.applyTransaction(newTransaction(3));
 
     assertTrue(result.isCompletedExceptionally());
     InOrder order = inOrder(buffer);
@@ -270,9 +360,9 @@ public class TestSCMStateMachine {
     try {
       SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
       doThrow(new IllegalStateException("injected flush failure")).when(buffer).flushIfPendingLimitReached();
-      SCMStateMachine stateMachine = newStateMachine(buffer, succeedingInvoker());
+      SCMStateMachine applyingStateMachine = newStateMachine(buffer, succeedingInvoker());
 
-      assertThrows(ExitUtils.ExitException.class, () -> stateMachine.applyTransaction(newTransaction(9)));
+      assertThrows(ExitUtils.ExitException.class, () -> applyingStateMachine.applyTransaction(newTransaction(9)));
 
       verify(buffer).endApplyingTransaction();
     } finally {
