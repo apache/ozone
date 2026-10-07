@@ -86,7 +86,7 @@ public class StorageSize {
         "match. Internal error.");
 
     String valString =
-        sanitizedValue.substring(0, value.length() - suffix.length());
+        sanitizedValue.substring(0, sanitizedValue.length() - suffix.length());
     return new StorageSize(parsedUnit, Double.parseDouble(valString));
 
   }

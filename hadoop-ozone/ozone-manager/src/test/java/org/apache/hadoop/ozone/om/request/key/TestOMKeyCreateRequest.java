@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -49,6 +50,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -72,6 +74,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -1062,6 +1066,69 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
         .setCreateKeyRequest(createKeyRequest).build();
   }
 
+  @Test
+  public void testNamespaceChargeReachesCacheAndDb() throws Exception {
+    OzoneConfiguration configuration = getOzoneConfiguration();
+    configuration.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+    when(ozoneManager.getConfiguration()).thenReturn(configuration);
+    when(ozoneManager.getConfig()).thenReturn(configuration.getObject(OmConfig.class));
+    when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(false, true));
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+
+    // dir1 and dir1/dir2 are the missing parents; the key itself is charged at commit.
+    OMRequest omRequest = createKeyRequest(false, 0, "dir1/dir2/file1");
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+    omKeyCreateRequest = getOMKeyCreateRequest(omKeyCreateRequest.preExecute(ozoneManager));
+
+    OMClientResponse omClientResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    assertEquals(2, omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
+
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      omClientResponse.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    assertEquals(2, omMetadataManager.getBucketTable().getSkipCache(bucketKey).getUsedNamespace());
+  }
+
+  @Test
+  public void testKeyPathLockLeavesBucketCacheEntryAlone() throws Exception {
+    // Key path locking is only chosen for OBJECT_STORE and for LEGACY without filesystem paths.
+    assumeTrue(getBucketLayout() == BucketLayout.LEGACY);
+
+    OzoneConfiguration configuration = getOzoneConfiguration();
+    configuration.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, false);
+    when(ozoneManager.getConfiguration()).thenReturn(configuration);
+    when(ozoneManager.getConfig()).thenReturn(configuration.getObject(OmConfig.class));
+    when(ozoneManager.getEnableFileSystemPaths()).thenReturn(false);
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(true, false));
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo cachedBefore = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey)).getCacheValue();
+
+    OMRequest omRequest = createKeyRequest(false, 0, "dir1/dir2/file1");
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+    omKeyCreateRequest = getOMKeyCreateRequest(omKeyCreateRequest.preExecute(ozoneManager));
+
+    OMClientResponse omClientResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omClientResponse.getOMResponse().getStatus());
+
+    // No parent directories are charged here, and only a bucket read lock is held, so the request
+    // must not replace the cached bucket.
+    assertSame(cachedBefore, omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey)).getCacheValue());
+  }
+
   @ParameterizedTest
   @ValueSource(booleans =  {true, false})
   public void testKeyCreateWithFileSystemPathsEnabled(
@@ -1150,21 +1217,15 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
 
   @Test
   public void testPreExecuteWithInvalidKeyPrefix() throws Exception {
-    Map<String, String> invalidKeyScenarios = new HashMap<String, String>() {
-      {
-        put(OM_SNAPSHOT_INDICATOR + "/" + keyName,
-            "Cannot create key under path reserved for snapshot: "
-                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
-        put(OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
-            "Cannot create key under path reserved for snapshot: "
-                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
-        put(OM_SNAPSHOT_INDICATOR + "/a/b" + keyName,
-            "Cannot create key under path reserved for snapshot: "
-                + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX);
-        put(OM_SNAPSHOT_INDICATOR,
-            "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR);
-      }
-    };
+    Map<String, String> invalidKeyScenarios = ImmutableMap.of(
+        OM_SNAPSHOT_INDICATOR + "/" + keyName,
+        "Cannot create key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+        OM_SNAPSHOT_INDICATOR + "/a/" + keyName,
+        "Cannot create key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+        OM_SNAPSHOT_INDICATOR + "/a/b" + keyName,
+        "Cannot create key under path reserved for snapshot: " + OM_SNAPSHOT_INDICATOR + OM_KEY_PREFIX,
+        OM_SNAPSHOT_INDICATOR,
+        "Cannot create key with reserved name: " + OM_SNAPSHOT_INDICATOR);
 
     for (Map.Entry<String, String> entry : invalidKeyScenarios.entrySet()) {
       String invalidKeyName = entry.getKey();
@@ -1268,7 +1329,7 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     // Retrieve the committed key info
     OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(getOzoneKey());
     List<OzoneAcl> existingAcls = existingKeyInfo.getAcls();
-    assertThat(existingAcls.containsAll(acls));
+    assertThat(existingAcls.containsAll(acls)).isTrue();
 
     // Create a request with a generation which doesn't match the current key
     omRequest = createKeyRequest(false, 0, 100,
@@ -1521,12 +1582,11 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
   }
 
   @Test
-  public void testCreateKeyWithS3DerivedKey() throws Exception {
+  public void testCreateKeyDoesNotDeriveSigningKeyDuringApply() throws Exception {
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(true, true));
     when(ozoneManager.isSecurityEnabled()).thenReturn(true);
-    byte[] expectedDerivedKey = new byte[] {9, 8, 7, 6};
-    when(ozoneManager.getS3DerivedKey(anyString(), anyString())).thenReturn(expectedDerivedKey);
+    when(ozoneManager.getS3DerivedKey(any())).thenThrow(new IOException("Credentials unavailable during apply"));
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName)
@@ -1570,8 +1630,8 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     OzoneManagerProtocolProtos.CreateKeyResponse createKeyResponse =
         response.getOMResponse().getCreateKeyResponse();
     assertNotNull(createKeyResponse);
-    assertTrue(createKeyResponse.hasDerivedKey());
-    assertEquals(com.google.protobuf.ByteString.copyFrom(expectedDerivedKey), createKeyResponse.getDerivedKey());
+    assertThat(createKeyResponse.hasDerivedKey()).isFalse();
+    verify(ozoneManager, never()).getS3DerivedKey(any());
   }
 
   @Test

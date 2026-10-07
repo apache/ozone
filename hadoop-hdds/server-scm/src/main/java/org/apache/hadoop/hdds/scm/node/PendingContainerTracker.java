@@ -392,7 +392,7 @@ public class PendingContainerTracker {
       }
     }
     LOG.debug("Datanode {} has no available container slots. Pending: {}, Allocatable: {}",
-        datanodeInfo.getID(), pendingCount, allocatableCount);
+        datanodeInfo, pendingCount, allocatableCount);
     return false;
   }
 

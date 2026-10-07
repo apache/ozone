@@ -68,6 +68,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -189,6 +190,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, SnapshotInfo> snapshotInfoTable;
   private Table<String, String> snapshotRenamedTable;
   private Table<String, CompactionLogEntry> compactionLogTable;
+
+  private Table<String, Long> s3RevokedStsTokenTable;
 
   private OzoneManager ozoneManager;
 
@@ -538,8 +541,13 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
 
-    lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF, cacheType);
-    lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF, cacheType);
+    // originalAccessKeyId -> revocationTimeMillis
+    // FULL_CACHE keeps revocations in memory as there are not expected to be many
+    s3RevokedStsTokenTable = initializer.get(
+        OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE_DEF, cacheType);
+
+    lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF);
+    lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF);
   }
 
   /**
@@ -1484,7 +1492,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           final String clientIdString
               = dbOpenKeyName.substring(lastPrefix + 1);
 
-          final boolean isHsync = java.util.Optional.of(openKeyInfo)
+          final boolean isHsync = Optional.of(openKeyInfo)
               .map(WithMetadata::getMetadata)
               .map(meta -> meta.get(OzoneConsts.HSYNC_CLIENT_ID))
               .filter(id -> id.equals(clientIdString))
@@ -1509,10 +1517,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .setBucketName(info.getBucketName())
                 .setKeyName(openKeyInfo.getKeyName())
                 .setDataSize(info.getDataSize());
-            java.util.Optional.ofNullable(info.getLatestVersionLocations())
-                .map(OmKeyLocationInfoGroup::createLocationList)
+            Optional.ofNullable(info.getLatestVersionLocations())
+                .map(OmKeyLocationInfoGroup::getLocationLists)
                 .map(Collection::stream)
                 .orElseGet(Stream::empty)
+                .flatMap(List::stream)
                 .map(loc -> loc.getProtobuf(ClientVersion.CURRENT_VERSION))
                 .forEach(keyArgs::addKeyLocations);
 
@@ -1752,6 +1761,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public Table<String, Long> getS3RevokedStsTokenTable() {
+    return s3RevokedStsTokenTable;
+  }
+
+  @Override
   public Table<String, OmLifecycleConfiguration> getLifecycleConfigurationTable() {
     return lifecycleConfigurationTable;
   }
@@ -1765,23 +1779,37 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
    * @return list all LifecycleConfigurations.
    */
   @Override
-  public List<OmLifecycleConfiguration> listLifecycleConfigurations() {
+  public List<OmLifecycleConfiguration> listLifecycleConfigurations() throws IOException {
     List<OmLifecycleConfiguration> result = Lists.newArrayList();
+    Set<String> cachedKeys = new HashSet<>();
 
-    /* lifecycleConfigurationTable is full-cache, so we use cacheIterator. */
+    // lifecycleConfigurationTable uses partial cache, so cacheIterator() only returns
+    // entries that are currently in memory. Process cache entries first to handle
+    // any pending writes or pending deletes that have not yet been flushed to RocksDB.
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmLifecycleConfiguration>>>
         cacheIterator = getLifecycleConfigurationTable().cacheIterator();
-
-    OmLifecycleConfiguration lifecycleConfiguration;
     while (cacheIterator.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmLifecycleConfiguration>> entry =
           cacheIterator.next();
-      lifecycleConfiguration = entry.getValue().getCacheValue();
+      cachedKeys.add(entry.getKey().getCacheKey());
+      OmLifecycleConfiguration lifecycleConfiguration = entry.getValue().getCacheValue();
       if (lifecycleConfiguration == null) {
-        // lifecycleConfiguration null means it's a deleted.
+        // null means it's a pending delete.
         continue;
       }
       result.add(lifecycleConfiguration);
+    }
+
+    // Also iterate RocksDB to pick up entries that have been evicted from (or were
+    // never loaded into) the partial cache.
+    try (TableIterator<String, ? extends KeyValue<String, OmLifecycleConfiguration>>
+             iter = getLifecycleConfigurationTable().iterator()) {
+      while (iter.hasNext()) {
+        KeyValue<String, OmLifecycleConfiguration> kv = iter.next();
+        if (!cachedKeys.contains(kv.getKey())) {
+          result.add(kv.getValue());
+        }
+      }
     }
 
     return result;

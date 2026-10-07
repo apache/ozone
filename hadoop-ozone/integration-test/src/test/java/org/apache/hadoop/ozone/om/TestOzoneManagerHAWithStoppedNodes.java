@@ -239,13 +239,14 @@ public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
     ObjectStore objectStore = getObjectStore();
     final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider
         = OmTestUtil.getFailoverProxyProvider(objectStore);
-    String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     createVolumeTest(true);
+    String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     // On stopping the current OM Proxy, the next connection attempt should
     // failover to a another OM proxy.
     getCluster().stopOzoneManager(firstProxyNodeId);
+    waitForLeaderToBeReady();
 
     // Next request to the proxy provider should result in a failover
     createVolumeTest(true);
@@ -334,6 +335,10 @@ public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
     for (int i = 0; i < 10; i++) {
       createKey(ozoneBucket);
     }
+
+    GenericTestUtils.waitFor(() -> followerOM1.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex() > leaderOMSnaphsotIndex,
+        100, 200000);
 
     final long followerOM1LastAppliedIndexNew =
         followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
