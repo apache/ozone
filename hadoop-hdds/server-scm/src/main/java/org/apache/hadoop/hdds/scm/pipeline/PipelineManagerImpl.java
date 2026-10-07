@@ -695,7 +695,7 @@ public class PipelineManagerImpl implements PipelineManager {
       // Refactored to use getNode instead of getDatanodeInfo
       final DatanodeInfo info = nodeManager.getNode(dn.getID());
       if (info == null) {
-        LOG.warn("DatanodeInfo not found for {}", dn.getID());
+        LOG.warn("DatanodeInfo not found for {}", dn);
         return false;
       }
       datanodeInfos.add(info);

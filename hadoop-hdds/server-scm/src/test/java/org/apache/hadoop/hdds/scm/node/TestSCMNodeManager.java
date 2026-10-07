@@ -379,30 +379,83 @@ public class TestSCMNodeManager {
   /**
    * A datanode that re-registers with the same identity but now exposes the
    * RATIS_DATASTREAM port (e.g. Ratis DataStream was enabled) must have its
-   * stored record refreshed so the new port is visible (HDDS-15799).
+   * stored record refreshed so the new port is visible (HDDS-15799), in the
+   * network topology as well as in the node state (HDDS-16630).
    */
   @Test
   public void testRegisterRefreshesPortsOnPortChange()
       throws IOException, AuthenticationException {
     try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
       final UUID uuid = UUID.randomUUID();
+      final DatanodeID dnId = datanodeWithoutDatastream(uuid).build().getID();
+      final NetworkTopology clusterMap = scm.getClusterMap();
 
       // First registration: streaming disabled, no RATIS_DATASTREAM port.
       registerNode(nodeManager, datanodeWithoutDatastream(uuid).build());
-      DatanodeDetails stored = nodeManager.getNode(
-          datanodeWithoutDatastream(uuid).build().getID());
+      DatanodeDetails stored = nodeManager.getNode(dnId);
       assertFalse(stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+      assertFalse(nodeInTopology(clusterMap, stored)
+          .hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
 
       // Re-registration (same id/ip/host/version) now exposing the port.
       registerNode(nodeManager, datanodeWithoutDatastream(uuid)
           .addPort(DatanodeDetails.newPort(
               DatanodeDetails.Port.Name.RATIS_DATASTREAM, 9855))
           .build());
-      stored = nodeManager.getNode(
-          datanodeWithoutDatastream(uuid).build().getID());
+      stored = nodeManager.getNode(dnId);
       assertTrue(stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM),
           "stored node should be refreshed with the RATIS_DATASTREAM port");
+      assertEquals(1, clusterMap.getNumOfLeafNode(""));
+      assertTrue(clusterMap.contains(stored),
+          "refreshed node should still be in the network topology");
+      assertTrue(nodeInTopology(clusterMap, stored)
+              .hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM),
+          "network topology should hold the refreshed node, not the stale one");
     }
+  }
+
+  /**
+   * A datanode re-registering with a new version must be refreshed in the network topology too,
+   * including when it was previously removed from the topology, as {@link DeadNodeHandler} does
+   * for a dead node (HDDS-16630).
+   */
+  @Test
+  public void testRegisterUpdatesTopologyOnVersionChange()
+      throws IOException, AuthenticationException {
+    try (SCMNodeManager nodeManager = createNodeManager(getConf())) {
+      final UUID uuid = UUID.randomUUID();
+      final DatanodeID dnId = datanodeWithoutDatastream(uuid).build().getID();
+      final NetworkTopology clusterMap = scm.getClusterMap();
+
+      registerNode(nodeManager,
+          datanodeWithoutDatastream(uuid).setVersion("1.0.0").build());
+
+      // Re-registration with a new version, everything else unchanged.
+      registerNode(nodeManager,
+          datanodeWithoutDatastream(uuid).setVersion("2.0.0").build());
+      DatanodeDetails stored = nodeManager.getNode(dnId);
+      assertEquals("2.0.0", stored.getVersion());
+      assertEquals(1, clusterMap.getNumOfLeafNode(""));
+      assertTrue(clusterMap.contains(stored),
+          "refreshed node should still be in the network topology");
+      assertEquals("2.0.0", nodeInTopology(clusterMap, stored).getVersion(),
+          "network topology should hold the refreshed node, not the stale one");
+
+      // A node the DeadNodeHandler dropped from the topology must re-enter it on re-registration.
+      clusterMap.remove(stored);
+      assertEquals(0, clusterMap.getNumOfLeafNode(""));
+      registerNode(nodeManager,
+          datanodeWithoutDatastream(uuid).setVersion("3.0.0").build());
+      stored = nodeManager.getNode(dnId);
+      assertEquals(1, clusterMap.getNumOfLeafNode(""));
+      assertTrue(clusterMap.contains(stored),
+          "node removed from the topology should be added back on re-registration");
+    }
+  }
+
+  private static DatanodeDetails nodeInTopology(NetworkTopology clusterMap,
+      DatanodeDetails node) {
+    return (DatanodeDetails) clusterMap.getNode(node.getNetworkFullPath());
   }
 
   /**
