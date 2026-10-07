@@ -126,7 +126,7 @@ public final class ContainerBalancerAdvisor {
     List<ContainerBalancerRecommendation> recommendations = new ArrayList<>(profiles.size());
     for (ContainerBalancerProfile profile : profiles) {
       recommendations.add(recommendForProfile(
-          conf, request, profile, balancerConfig, thresholdPercent, includeNodes, excludeNodes));
+          conf, request, profile, snapshot, balancerConfig, thresholdPercent));
     }
     return Collections.unmodifiableList(recommendations);
   }
@@ -153,10 +153,9 @@ public final class ContainerBalancerAdvisor {
       OzoneConfiguration conf,
       AdvisorRequest request,
       ContainerBalancerProfile profile,
+      ContainerBalancerClusterSnapshot snapshot,
       ContainerBalancerConfiguration balancerConfig,
-      double thresholdPercent,
-      Set<String> includeNodes,
-      Set<String> excludeNodes) {
+      double thresholdPercent) {
 
     ContainerBalancerRecommendation.Builder builder = ContainerBalancerRecommendation.newBuilder()
         .setProfile(profile)
@@ -169,14 +168,8 @@ public final class ContainerBalancerAdvisor {
       validateMoveTimeouts(conf, moveReplicationTimeoutMillis, moveTimeoutMillis);
       validateBalancingIntervalMillis(balancingIntervalMillis);
 
-      AdvisorRequest estimateRequest = new AdvisorRequest()
-          .setNodes(request.nodes)
-          .setThresholdPercent(thresholdPercent)
-          .setIncludeNodes(includeNodes)
-          .setExcludeNodes(excludeNodes)
-          .setProfile(profile);
-
-      ContainerBalancerEstimation estimation = estimate(conf, estimateRequest).get(0);
+      ContainerBalancerEstimation estimation = estimateForProfile(
+          conf, request, profile, snapshot, balancerConfig, thresholdPercent);
       if (!estimation.succeeded()) {
         throw new IllegalArgumentException(estimation.getFailureMessage());
       }
