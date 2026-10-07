@@ -40,7 +40,7 @@ If you have any questions, please don't hesitate to contact
 Requirements to compile the code:
 
 * Unix System
-* JDK 17 or later; client modules can be built with JDK 8
+* JDK 17 or later
 * Maven 3.6.3 or later
 * Internet connection for first build (to fetch all Maven and Ozone dependencies)
 
