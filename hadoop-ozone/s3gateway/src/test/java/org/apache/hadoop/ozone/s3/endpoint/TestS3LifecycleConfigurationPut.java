@@ -47,11 +47,14 @@ import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import javax.xml.bind.JAXBContext;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -71,7 +74,9 @@ import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -914,6 +919,90 @@ public class TestS3LifecycleConfigurationPut {
     when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner");
     BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, BucketLayout.OBJECT_STORE);
     assertErrorResponse(MALFORMED_XML, () -> endpoint.put("bucket1", null));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("versioningActions")
+  public void testRejectVersioningActions(String action, String status, boolean namespace) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<LifecycleConfiguration" + (namespace ? " xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\"" : "")
+        + "><Rule><ID>versioning</ID><Prefix>prefix/</Prefix><Status>" + status + "</Status>"
+        + "<AbortIncompleteMultipartUpload><DaysAfterInitiation>1</DaysAfterInitiation>"
+        + "</AbortIncompleteMultipartUpload>" + action + "</Rule></LifecycleConfiguration>";
+    assertErrorResponse(NOT_IMPLEMENTED,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  private static Stream<Arguments> versioningActions() {
+    String transition = "<NoncurrentVersionTransition><NoncurrentDays>1</NoncurrentDays>"
+        + "<StorageClass>GLACIER</StorageClass></NoncurrentVersionTransition>";
+    return Stream.of(
+        "<NoncurrentVersionExpiration><NoncurrentDays>1</NoncurrentDays></NoncurrentVersionExpiration>",
+        "<NoncurrentVersionExpiration/>",
+        "<NoncurrentVersionExpiration xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\"/>",
+        "<NoncurrentVersionTransition/>",
+        "<NoncurrentVersionTransition xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\"/>",
+        transition, transition + transition,
+        "<Expiration><Days>30</Days><ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker></Expiration>",
+        "<Expiration><Days>30</Days><ExpiredObjectDeleteMarker>false</ExpiredObjectDeleteMarker></Expiration>",
+        "<Expiration><Days>30</Days><ExpiredObjectDeleteMarker/></Expiration>",
+        "<Expiration><Days>30</Days><ExpiredObjectDeleteMarker "
+            + "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\"/></Expiration>",
+        "<Expiration><ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker></Expiration>")
+        .flatMap(action -> Stream.of("Enabled", "Disabled")
+            .flatMap(status -> Stream.of(true, false).map(namespace -> Arguments.of(action, status, namespace))));
+  }
+
+  @Test
+  public void testRejectedVersioningConfigurationPreservesExistingRules() throws Exception {
+    bucketEndpoint.put("bucket1", onePrefix());
+    String xml = "<LifecycleConfiguration><Rule><ID>replacement</ID><Prefix>replacement/</Prefix>"
+        + "<Status>Enabled</Status>"
+        + "<Expiration><Days>1</Days></Expiration></Rule><Rule><ID>unsupported</ID><Prefix>prefix/</Prefix>"
+        + "<Status>Enabled</Status>"
+        + "<NoncurrentVersionExpiration><NoncurrentDays>1</NoncurrentDays></NoncurrentVersionExpiration>"
+        + "</Rule></LifecycleConfiguration>";
+    assertErrorResponse(NOT_IMPLEMENTED,
+        () -> bucketEndpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    try (Response response = bucketEndpoint.get("bucket1")) {
+      S3LifecycleConfiguration configuration = (S3LifecycleConfiguration) response.getEntity();
+      assertThat(configuration.getRules()).hasSize(1);
+      S3LifecycleConfiguration.Rule rule = configuration.getRules().get(0);
+      assertThat(rule.getId()).isEqualTo("remove logs after 30 days");
+      assertThat(rule.getPrefix()).isEqualTo("prefix/");
+      assertThat(rule.getExpiration().getDays()).isEqualTo(30);
+      StringWriter xmlOutput = new StringWriter();
+      JAXBContext.newInstance(S3LifecycleConfiguration.class).createMarshaller().marshal(configuration, xmlOutput);
+      assertThat(xmlOutput.toString()).doesNotContain("NoncurrentVersion", "ExpiredObjectDeleteMarker");
+    }
+  }
+
+  @Test
+  public void testVersioningNamesInTextRemainSupported() throws Exception {
+    String xml = "<LifecycleConfiguration><Rule><ID>NoncurrentVersionExpiration</ID>"
+        + "<Prefix>NoncurrentVersionTransition/ExpiredObjectDeleteMarker/</Prefix><Status>Enabled</Status>"
+        + "<Expiration><Days>30</Days></Expiration><UnknownElement>ignored</UnknownElement>"
+        + "</Rule></LifecycleConfiguration>";
+    try (Response response = bucketEndpoint.put("bucket1",
+        new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)))) {
+      assertThat(response.getStatus()).isEqualTo(HTTP_OK);
+    }
+  }
+
+  @Test
+  public void testVersioningRuleStillChecksStatusAndOwner() throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<LifecycleConfiguration><Rule><Status>invalid</Status>"
+        + "<NoncurrentVersionExpiration/></Rule></LifecycleConfiguration>";
+    assertErrorResponse(MALFORMED_XML,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("other-owner");
+    assertErrorResponse(ACCESS_DENIED,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
     verify(proxy, never()).setLifecycleConfiguration(any());
   }
 
