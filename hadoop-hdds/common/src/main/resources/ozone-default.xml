@@ -3504,6 +3504,8 @@
     <tag>OM, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
+      kerberos takes effect only when ozone.security.http.kerberos.enabled is true.
+      With simple, requests are not authenticated, so the admin check of the /dbCheckpoint endpoint is not applied.
     </description>
   </property>
   <property>
@@ -3512,6 +3514,8 @@
     <tag>OM, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
+      kerberos takes effect only when ozone.security.http.kerberos.enabled is true.
+      With simple, requests are not authenticated, so the admin check of the /dbCheckpoint endpoint is not applied.
     </description>
   </property>
   <property>
