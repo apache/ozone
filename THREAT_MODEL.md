@@ -176,20 +176,23 @@ stock install and must be explicitly enabled:
   `hdds.secret.key.rotate.check.duration=10m`, and `HmacSHA256`.
 - **gRPC TLS** is off by default (`hdds.grpc.tls.enabled=false`) and protects
   gRPC traffic when enabled.
-- **Service-level authorization (internal RPC-protocol ACLs)** is off by default
-  (`hadoop.security.authorization=false`). When enabled, each internal SCM/OM/DN
-  RPC protocol is gated by a Hadoop service ACL — e.g.
+- **Hadoop RPC service-level authorization** is off by default
+  (`hadoop.security.authorization=false`). When enabled, protocols registered by
+  a service's `PolicyProvider` are gated by service ACLs, such as
   `hdds.security.client.scm.block.protocol.acl`,
-  `hdds.security.client.scm.container.protocol.acl`,
-  `ozone.om.security.client.protocol.acl` — **each defaulting to `*`** (any
-  authenticated principal). The correct value is the set of *service* principals
-  that legitimately call the protocol, and it is **not knowable at build time**
-  (it depends on realm, `_HOST`/hostnames, `auth_to_local`, and the HA member
-  set), so `*` is the only universal default and tightening it is operator config
-  (§10). An internal protocol may serve more than one service: the SCM **block**
-  protocol is OM↔SCM — OM calls `allocateBlock`/`deleteKeyBlocks`/`finalizeUpgrade`
-  while SCM peers call `addSCM`/`getScmInfo` during bootstrap — so its ACL is OM
-  **and** SCM, not OM alone. *(inferred — `SCMPolicyProvider`, `ozone-default.xml`.)*
+  `hdds.security.client.scm.container.protocol.acl`, and
+  `ozone.om.security.client.protocol.acl`, each defaulting to `*`.
+  ACLs match Hadoop short user names and groups after
+  `hadoop.security.auth_to_local` mapping, not full `service/host@REALM`
+  principals or `_HOST` patterns.
+  For the SCM block protocol, OM calls `allocateBlock`/`deleteKeyBlocks`, SCM
+  peers call `addSCM` during bootstrap, and both call `getScmInfo`. If these
+  services map to `om` and `scm`, its ACL can be `om,scm`.
+  `ozone.om.security.client.protocol.acl` must admit ordinary OM clients;
+  `ozone.om.security.admin.protocol.acl` gates OM inter-service/admin RPCs.
+  *(documented — `SCMPolicyProvider`, `OMPolicyProvider`,
+  `SCMBlockProtocolServer`, `HAUtils`, `ozone-default.xml`,
+  Hadoop `AccessControlList`.)*
 - **TDE/KMS** is optional and protects data at rest only for encrypted buckets;
   it requires a configured KMS, for example via `hadoop.security.key.provider.path`.
 
@@ -279,16 +282,14 @@ Per-boundary input trust (grouped by family):
 - **It does not author your authorization policy.** Ozone enforces ACLs/Ranger
   *as configured*; an over-broad Ranger policy or world-readable ACL is an
   operator decision, not an Ozone flaw (§10).
-- **It does not restrict its internal RPC protocols for you.** Service-level
-  authorization (`hadoop.security.authorization` + the per-protocol
-  `hdds.security.client.*.protocol.acl` / `ozone.om.security.client.protocol.acl`
-  ACLs) is what confines an OM↔SCM↔DN service protocol to its intended service
-  principals; these default to `*`, and tightening them is an operator decision
-  just like the object ACL above. An internal RPC that relies solely on this ACL,
-  with no extra in-code per-method admin check (e.g. the SCM block protocol's
-  `deleteKeyBlocks` and `finalizeUpgrade`), is **by design** — the ACL is the
-  gate, and a per-method `checkAdminAccess` is an optional extra, not a
-  requirement (§11a).
+- **Internal RPC service ACLs require operator configuration.** Enable
+  `hadoop.security.authorization` and configure each internal protocol's ACL,
+  such as `hdds.security.client.scm.block.protocol.acl`.
+  These ACLs default to `*`; selecting allowed service accounts is an operator
+  responsibility (§10). The SCM block protocol's `deleteKeyBlocks` relies on
+  protocol-level authorization without a per-method admin check.
+  SCM upgrade finalization uses the client/container-location protocol, where
+  `SCMClientProtocolServer.finalizeScmUpgrade` calls `checkAdminAccess`.
 - **It does not protect its dependencies.** KDC/Ranger/KMS/SCM-CA-key/network
   security are the operator's (§3/§10).
 - **No defence against a Byzantine majority** of a Ratis ring, and **no full
@@ -311,12 +312,13 @@ Per-boundary input trust (grouped by family):
 - **Secure the dependencies:** harden/operate the KDC, author least-privilege
   Ranger/ACL policies, protect the **SCM CA private key**, manage KMS keys,
   network-isolate datanode/Ratis/admin ports.
-- **Restrict internal RPC protocols to service principals:** enable
-  `hadoop.security.authorization` and set each `hdds.security.client.*.protocol.acl`
-  / `ozone.om.security.client.protocol.acl` from its `*` default to the service
-  principals that use it (the SCM block protocol → OM **and** SCM). Leaving them
-  `*` lets any authenticated principal invoke OM↔SCM service RPCs such as block
-  deletion or upgrade finalization.
+- **Configure Hadoop RPC service ACLs:** enable `hadoop.security.authorization`
+  and allow the intended users/groups for each protocol. Restrict internal
+  protocols to their service accounts (SCM block → OM **and** SCM), and preserve
+  legitimate client/admin access to user-facing protocols.
+  `ozone.om.security.client.protocol.acl` must allow ordinary OM clients.
+  Leaving the SCM block ACL at `*` allows any authenticated caller to invoke
+  operations such as `deleteKeyBlocks`.
 - **Protect tokens and secrets:** enable the relevant transport encryption
   (Hadoop RPC privacy, gRPC TLS, and/or HTTPS) so block/delegation tokens and S3
   secrets aren't sniffable; rotate S3 secrets; review token lifetimes for the
@@ -352,16 +354,14 @@ list. *(requested by jojochuang, 2026-06-25.)*
   scoped (§6/§8).
 - **Ranger policy too permissive** — operator policy decision, not Ozone code
   (§9/§10). `OUT-OF-MODEL: trusted-input`.
-- **Internal service RPC protocol relies on a default-`*` service ACL, or drops
-  a per-method admin check in favor of the ACL** — non-finding. The
-  `hdds.security.client.*.protocol.acl` / `ozone.om.security.client.protocol.acl`
-  service ACLs are the operator's gate for confining OM↔SCM↔DN protocols to
-  service principals; their `*` default, and relying on them without a redundant
-  in-code admin check (as `deleteKeyBlocks` and `finalizeUpgrade` do), are
-  operator config and by-design, not Ozone flaws (§9/§10). `OUT-OF-MODEL:
-  trusted-input` — **unless** the *user-facing* entry point that reaches it
-  (OM/S3G/CLI request handler) also lacks its own authorization check, which
-  would be `VALID`.
+- **Internal service RPC relies on a configurable service ACL** — the absence
+  of a per-method admin check is not by itself a finding when every caller
+  admitted by the ACL is intended to perform that operation
+  (e.g. SCM block `deleteKeyBlocks`). A permissive operator-configured ACL is
+  `OUT-OF-MODEL: trusted-input` (§9/§10). This does not exempt bypassing the
+  configured ACL or removing method-level checks from protocols shared by
+  callers with different privileges. User-facing entry points must enforce
+  the applicable authorization checks (§8). *(inferred, Q-svcacl.)*
 - **Findings in `ozone-thirdparty`, `integration-test-*`, `*TestImpl`** —
   `OUT-OF-MODEL: unsupported-component` (§3).
 - **KDC/KMS/Ranger/SCM-CA-key compromise scenarios** — out of layer (§3/§7).
@@ -424,13 +424,10 @@ list. *(requested by jojochuang, 2026-06-25.)*
   Folded into §5a.)* (§8.)
 - **Q-token.** Block/delegation token lifetimes, signing-key rotation, and the
   bearer-token caveat in §9 — confirm. (§8/§9.)
-- **Q-svcacl.** *(inferred — pending maintainer confirmation.)* Confirm that
-  Hadoop service-level authorization (`hadoop.security.authorization` + the
-  `hdds.security.client.*.protocol.acl` / `ozone.om.security.client.protocol.acl`
-  ACLs) is the intended in-cluster gate for internal OM↔SCM↔DN RPC protocols; that
-  its `*` default is operator-tightened like object ACLs; and that internal
-  protocols (e.g. SCM block: `deleteKeyBlocks`, `finalizeUpgrade`) intentionally
-  rely on it without a per-method admin check. (§5a/§9/§10/§11a.)
+- **Q-svcacl.** Confirm the intended security contract for internal RPCs such as
+  SCM block `deleteKeyBlocks`: is a correctly configured service ACL sufficient
+  authorization for these operations, without a per-method admin check?
+  Document the confirmed scope in §9/§11a. (§5a/§9/§10/§11a.)
 - **Q-tde / Q-net / Q-infra.** TDE/KMS production expectations, the
   network-isolation assumptions, and which dependencies (KDC/Ranger/KMS) you want
   explicitly named as operator-owned in §3/§10. (§5/§3/§10.)
