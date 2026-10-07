@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRespon
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -67,6 +68,7 @@ import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -113,6 +115,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPC
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.FinalizeUpgradeProgressResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketDeletedBytesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetBucketTaggingResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetCallerIdentityResponse;
@@ -177,6 +181,7 @@ import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
@@ -265,6 +270,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             request.getListOpenFilesRequest(), request.getVersion());
         responseBuilder.setListOpenFilesResponse(listOpenFilesResponse);
         break;
+      case GetBucketDeletedBytes:
+        GetBucketDeletedBytesResponse getBucketDeletedBytesResponse =
+            getBucketDeletedBytes(request.getGetBucketDeletedBytesRequest());
+        responseBuilder.setGetBucketDeletedBytesResponse(
+            getBucketDeletedBytesResponse);
+        break;
       case ServiceList:
         ServiceListResponse serviceListResponse = getServiceList(
             request.getServiceListRequest());
@@ -350,6 +361,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         OzoneManagerProtocolProtos.ListSnapshotResponse listSnapshotResponse =
             getSnapshots(request.getListSnapshotRequest());
         responseBuilder.setListSnapshotResponse(listSnapshotResponse);
+        break;
+      case SnapshotCount:
+        OzoneManagerProtocolProtos.SnapshotCountResponse snapshotCountResponse =
+            getSnapshotCount(request.getSnapshotCountRequest());
+        responseBuilder.setSnapshotCountResponse(snapshotCountResponse);
         break;
       case SnapshotDiff:
         SnapshotDiffResponse snapshotDiffReport = snapshotDiff(
@@ -453,11 +469,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     injectPause();
     OMClientRequest omClientRequest =
         OzoneManagerRatisUtils.createClientRequest(omRequest, impl);
-    try {
+    try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
       OMClientResponse omClientResponse = captureLatencyNs(
           impl.getPerfMetrics().getValidateAndUpdateCacheLatencyNs(),
           () -> Objects.requireNonNull(omClientRequest.validateAndUpdateCache(getOzoneManager(), context),
               "omClientResponse returned by validateAndUpdateCache cannot be null"));
+      omClientResponse.addCleanupTables(tracker.removeUpdatedTables());
       OMAuditLogger.log(omClientRequest.getAuditBuilder(), context.getTermIndex());
       return omClientResponse;
     } catch (Throwable th) {
@@ -979,6 +996,20 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     }
 
     return resp.build();
+  }
+
+  private GetBucketDeletedBytesResponse getBucketDeletedBytes(
+      GetBucketDeletedBytesRequest request) throws IOException {
+    BucketDeletedBytes bytes = impl.getBucketDeletedBytes(
+        request.getBucketPath());
+    return GetBucketDeletedBytesResponse.newBuilder()
+        .setSnapshotTrappedBytes(bytes.getSnapshotTrappedBytes())
+        .setPurgeableBytes(bytes.getPurgeableBytes())
+        .setSnapshotTrappedKeys(bytes.getSnapshotTrappedKeys())
+        .setPurgeableKeys(bytes.getPurgeableKeys())
+        .setSnapshotTrappedDirs(bytes.getSnapshotTrappedDirs())
+        .setPurgeableDirs(bytes.getPurgeableDirs())
+        .build();
   }
 
   private ServiceListResponse getServiceList(ServiceListRequest request)
@@ -1642,6 +1673,29 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       builder.setLastSnapshot(implResponse.getLastSnapshot());
     }
     return builder.build();
+  }
+
+  @DisallowedUntilLayoutVersion(FILESYSTEM_SNAPSHOT)
+  private OzoneManagerProtocolProtos.SnapshotCountResponse getSnapshotCount(
+      OzoneManagerProtocolProtos.SnapshotCountRequest request) throws IOException {
+    SnapshotCountResponse implResponse = impl.snapshotCount(
+        request.hasBucketFilter() ? request.getBucketFilter() : null);
+    List<OzoneManagerProtocolProtos.SnapshotBucketCount> bucketCountList = implResponse.getBuckets().stream()
+        .map(bucketCount -> OzoneManagerProtocolProtos.SnapshotBucketCount.newBuilder()
+            .setVolumeName(bucketCount.getVolumeName())
+            .setBucketName(bucketCount.getBucketName())
+            .setActive(bucketCount.getActive())
+            .setDeleted(bucketCount.getDeleted())
+            .setTotal(bucketCount.getTotal())
+            .build())
+        .collect(Collectors.toList());
+
+    return OzoneManagerProtocolProtos.SnapshotCountResponse.newBuilder()
+        .setActive(implResponse.getActive())
+        .setDeleted(implResponse.getDeleted())
+        .setTotal(implResponse.getTotal())
+        .addAllBuckets(bucketCountList)
+        .build();
   }
 
   private TransferLeadershipResponseProto transferLeadership(

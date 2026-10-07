@@ -162,6 +162,7 @@ import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
@@ -183,6 +184,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -1149,6 +1151,12 @@ public class RpcClient implements ClientProtocol {
     return ozoneManagerClient.listSnapshot(volumeName, bucketName, snapshotPrefix, prevSnapshot, maxListResult);
   }
 
+  @Override
+  public SnapshotCountResponse snapshotCount(String bucketFilter)
+      throws IOException {
+    return ozoneManagerClient.snapshotCount(bucketFilter);
+  }
+
   /**
    * Assign admin role to an accessId in a tenant.
    * @param accessId access ID.
@@ -1947,7 +1955,9 @@ public class RpcClient implements ClientProtocol {
   @Override
   public S3HeadObjectAttributes headS3ObjectAttributes(String bucketName, String keyName)
       throws IOException {
-    OmKeyInfo keyInfo = getS3KeyInfo(bucketName, keyName, true);
+    KeyInfoWithVolumeContext keyInfoWithS3Context =
+        getS3KeyInfoWithVolumeContext(bucketName, keyName, true);
+    OmKeyInfo keyInfo = keyInfoWithS3Context.getKeyInfo();
     OmKeyLocationInfoGroup locationGroup = keyInfo.getLatestVersionLocations();
     NavigableMap<Integer, Long> partSizes = Collections.emptyNavigableMap();
     if (locationGroup != null && locationGroup.isMultipartKey()) {
@@ -1959,7 +1969,9 @@ public class RpcClient implements ClientProtocol {
         }
       }
     }
-    return new S3HeadObjectAttributes(OzoneKey.fromKeyInfo(keyInfo), partSizes);
+    BucketLayout bucketLayout = keyInfoWithS3Context.getBucketLayout()
+        .orElse(BucketLayout.DEFAULT);
+    return new S3HeadObjectAttributes(OzoneKey.fromKeyInfo(keyInfo), partSizes, bucketLayout);
   }
 
   private OmKeyInfo getS3PartOmKeyInfo(String bucketName, String keyName,
@@ -1985,6 +1997,12 @@ public class RpcClient implements ClientProtocol {
   @Nonnull
   private OmKeyInfo getS3KeyInfo(
       String bucketName, String keyName, boolean isHeadOp) throws IOException {
+    return getS3KeyInfoWithVolumeContext(bucketName, keyName, isHeadOp).getKeyInfo();
+  }
+
+  @Nonnull
+  private KeyInfoWithVolumeContext getS3KeyInfoWithVolumeContext(
+      String bucketName, String keyName, boolean isHeadOp) throws IOException {
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
 
@@ -2002,7 +2020,7 @@ public class RpcClient implements ClientProtocol {
     KeyInfoWithVolumeContext keyInfoWithS3Context =
         ozoneManagerClient.getKeyInfo(keyArgs, true);
     keyInfoWithS3Context.getUserPrincipal().ifPresent(this::updateS3Principal);
-    return keyInfoWithS3Context.getKeyInfo();
+    return keyInfoWithS3Context;
   }
 
   @Nonnull
@@ -2375,6 +2393,8 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneMultipartUploadList listMultipartUploads(String volumeName,
       String bucketName, String prefix, String keyMarker, String uploadIdMarker, int maxUploads) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
 
     OmMultipartUploadList omMultipartUploadList;
     if (omVersion.compareTo(OzoneManagerVersion.S3_LIST_MULTIPART_UPLOADS_PAGINATION) >= 0) {
@@ -2846,6 +2866,11 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public OzoneManagerVersion getOmVersion() {
+    return omVersion;
+  }
+
+  @Override
   public OzoneFsServerDefaults getServerDefaults() throws IOException {
     long now = Time.monotonicNow();
     if ((serverDefaults == null) ||
@@ -2923,13 +2948,35 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void setThreadLocalReadConsistency(ReadConsistency readConsistency) {
+    ozoneManagerClient.setThreadLocalReadConsistency(readConsistency);
+  }
+
+  @Override
+  public void setThreadLocalReadConsistency(ReadConsistency readConsistency,
+      Long localLeaseLogLimit, Long localLeaseTimeMs) {
+    ozoneManagerClient.setThreadLocalReadConsistency(readConsistency,
+        localLeaseLogLimit, localLeaseTimeMs);
+  }
+
+  @Override
   public S3Auth getThreadLocalS3Auth() {
     return ozoneManagerClient.getThreadLocalS3Auth();
   }
 
   @Override
+  public ReadConsistency getThreadLocalReadConsistency() {
+    return ozoneManagerClient.getThreadLocalReadConsistency();
+  }
+
+  @Override
   public void clearThreadLocalS3Auth() {
     ozoneManagerClient.clearThreadLocalS3Auth();
+  }
+
+  @Override
+  public void clearThreadLocalReadConsistency() {
+    ozoneManagerClient.clearThreadLocalReadConsistency();
   }
 
   @Override

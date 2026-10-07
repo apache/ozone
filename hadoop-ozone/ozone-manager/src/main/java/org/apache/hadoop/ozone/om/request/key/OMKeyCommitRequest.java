@@ -195,7 +195,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       bucketLockAcquired = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       // Check for directory exists with same name, if it exists throw error.
       if (LOG.isDebugEnabled()) {
@@ -406,6 +406,9 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           dbOzoneKey, omKeyInfo, trxnLogIndex);
 
       omBucketInfo.incrUsedBytes(correctedSpace);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
       omResponse.setCommitKeyResponse(CommitKeyResponse.newBuilder()
           .setModificationTime(commitKeyArgs.getModificationTime())

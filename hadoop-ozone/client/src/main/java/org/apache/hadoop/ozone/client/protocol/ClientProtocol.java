@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -62,6 +63,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
@@ -75,6 +77,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.KerberosInfo;
@@ -678,8 +681,9 @@ public interface ClientProtocol {
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
    * @param keyNameList List of the Key
-   * @param quiet flag to not throw exception if delete fails
-   * @throws IOException
+   * @param quiet if true, per-key failures are returned in the result map instead of being thrown
+   * @return key name to error for each key that could not be deleted, empty if all keys were deleted
+   * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true
    */
   Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName,
                                     List<String> keyNameList, boolean quiet)
@@ -1064,6 +1068,14 @@ public interface ClientProtocol {
   OzoneFsServerDefaults getServerDefaults() throws IOException;
 
   /**
+   * Returns the negotiated Ozone Manager version for the connected cluster.
+   * In an HA cluster this is the minimum version across all OMs, so callers
+   * can safely gate client behavior on new server-side features.
+   * @return the effective Ozone Manager version.
+   */
+  OzoneManagerVersion getOmVersion();
+
+  /**
    * Get KMS client provider.
    * @return KMS client provider.
    * @throws IOException
@@ -1379,15 +1391,42 @@ public interface ClientProtocol {
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
   /**
+   * Sets the read consistency hint for the current request thread.
+   * @param readConsistency read consistency selected by the client.
+   */
+  void setThreadLocalReadConsistency(ReadConsistency readConsistency);
+
+  /**
+   * Sets the read consistency hint and optional local lease context for the
+   * current request thread.
+   * @param readConsistency read consistency selected by the client.
+   * @param localLeaseLogLimit optional local lease log limit.
+   * @param localLeaseTimeMs optional local lease duration in milliseconds.
+   */
+  void setThreadLocalReadConsistency(ReadConsistency readConsistency,
+      Long localLeaseLogLimit, Long localLeaseTimeMs);
+
+  /**
    * Gets the S3 Authentication information that is attached to the thread.
    * @return S3 Authentication information.
    */
   S3Auth getThreadLocalS3Auth();
 
   /**
+   * Gets the read consistency hint that is attached to the thread.
+   * @return request-local read consistency.
+   */
+  ReadConsistency getThreadLocalReadConsistency();
+
+  /**
    * Clears the S3 Authentication information attached to the thread.
    */
   void clearThreadLocalS3Auth();
+
+  /**
+   * Clears the read consistency hint attached to the thread.
+   */
+  void clearThreadLocalReadConsistency();
 
   default ThreadLocal<S3Auth> getS3CredentialsProvider() {
     return null;
@@ -1488,6 +1527,14 @@ public interface ClientProtocol {
   ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException;
+
+  /**
+   * Bucket-wise snapshot count distribution from snapshotInfo table.
+   * @param bucketFilter optional filter, accepts either bucket or volume/bucket
+   * @return snapshot counts aggregated by bucket
+   * @throws IOException
+   */
+  SnapshotCountResponse snapshotCount(String bucketFilter) throws IOException;
 
   /**
    * Get the differences between two snapshots.

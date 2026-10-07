@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
@@ -66,6 +68,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
@@ -77,6 +80,9 @@ public class ClientProtocolStub implements ClientProtocol {
   private static final String STUB_KERBEROS_ID = "stub_kerberos_id";
   private static final String STUB_SECRET = "stub_secret";
   private final ObjectStoreStub objectStoreStub;
+  private ReadConsistency readConsistency;
+  private Long localLeaseLogLimit;
+  private Long localLeaseTimeMs;
 
   public ClientProtocolStub(ObjectStoreStub objectStoreStub) {
     this.objectStoreStub = objectStoreStub;
@@ -143,7 +149,7 @@ public class ClientProtocolStub implements ClientProtocol {
     NavigableMap<Integer, Long> partSizes = bucket instanceof OzoneBucketStub
         ? ((OzoneBucketStub) bucket).getCompletedMultipartPartSizes(keyName)
         : Collections.emptyNavigableMap();
-    return new S3HeadObjectAttributes(key, partSizes);
+    return new S3HeadObjectAttributes(key, partSizes, bucket.getBucketLayout());
   }
 
   @Override
@@ -618,6 +624,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneManagerVersion getOmVersion() {
+    return OzoneManagerVersion.CURRENT;
+  }
+
+  @Override
   public OzoneFsServerDefaults getServerDefaults() throws IOException {
     return null;
   }
@@ -757,13 +768,49 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void setThreadLocalReadConsistency(
+      ReadConsistency newReadConsistency) {
+    this.readConsistency = newReadConsistency;
+    this.localLeaseLogLimit = null;
+    this.localLeaseTimeMs = null;
+  }
+
+  @Override
+  public void setThreadLocalReadConsistency(ReadConsistency newReadConsistency,
+      Long newLocalLeaseLogLimit, Long newLocalLeaseTimeMs) {
+    this.readConsistency = newReadConsistency;
+    this.localLeaseLogLimit = newLocalLeaseLogLimit;
+    this.localLeaseTimeMs = newLocalLeaseTimeMs;
+  }
+
+  @Override
   public S3Auth getThreadLocalS3Auth() {
     return null;
   }
 
   @Override
+  public ReadConsistency getThreadLocalReadConsistency() {
+    return readConsistency;
+  }
+
+  public Long getThreadLocalLocalLeaseLogLimit() {
+    return localLeaseLogLimit;
+  }
+
+  public Long getThreadLocalLocalLeaseTimeMs() {
+    return localLeaseTimeMs;
+  }
+
+  @Override
   public void clearThreadLocalS3Auth() {
 
+  }
+
+  @Override
+  public void clearThreadLocalReadConsistency() {
+    readConsistency = null;
+    localLeaseLogLimit = null;
+    localLeaseTimeMs = null;
   }
 
   @Override
@@ -828,6 +875,12 @@ public class ClientProtocolStub implements ClientProtocol {
   public ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
+    return null;
+  }
+
+  @Override
+  public SnapshotCountResponse snapshotCount(String bucketFilter)
+      throws IOException {
     return null;
   }
   

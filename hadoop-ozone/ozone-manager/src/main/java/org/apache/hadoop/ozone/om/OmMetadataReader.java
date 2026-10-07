@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -46,6 +47,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
@@ -53,6 +55,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
@@ -198,7 +201,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
               OmMetadataReader.getClientAddress());
       KeyInfoWithVolumeContext.Builder builder = KeyInfoWithVolumeContext
           .newBuilder()
-          .setKeyInfo(keyInfo);
+          .setKeyInfo(keyInfo)
+          .setBucketLayout(Objects.requireNonNullElse(
+              bucket.bucketLayout(), BucketLayout.DEFAULT));
       s3VolumeContext.ifPresent(context -> {
         builder.setVolumeArgs(context.getOmVolumeArgs());
         builder.setUserPrincipal(context.getUserPrincipal());
@@ -307,6 +312,18 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
+      if (bucket.bucketLayout() != null) {
+        try {
+          OzoneFSUtils.validateBucketLayout(bucket.requestedBucket(),
+              bucket.bucketLayout());
+        } catch (IllegalArgumentException e) {
+          // Convert to an OMException so it is returned to the client as a
+          // normal (non-retryable) RPC response instead of escaping the read
+          // handler's IOException catch and triggering a client retry storm.
+          throw new OMException(e.getMessage(),
+              ResultCodes.NOT_SUPPORTED_OPERATION);
+        }
+      }
       if (isAclEnabled) {
         checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
       }

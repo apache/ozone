@@ -676,9 +676,9 @@ public class TestBlockDeletion {
     containerStateManager.updateContainerReplica(replicaOne);
 
     // Check replica updated with wrong keyCount
-    scm.getContainerManager().getContainerReplicas(
+    assertTrue(scm.getContainerManager().getContainerReplicas(
             ContainerID.valueOf(containerInfos.get(0).getContainerID()))
-        .stream().anyMatch(replica -> replica.getKeyCount() == 10);
+        .stream().anyMatch(replica -> replica.getKeyCount() == 10));
 
     // Process delete container in SCM, ensure containers gets deleted,
     // even though keyCount is invalid in one of the replica

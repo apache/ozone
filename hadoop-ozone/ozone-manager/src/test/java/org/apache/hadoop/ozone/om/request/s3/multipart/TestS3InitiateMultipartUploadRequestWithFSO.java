@@ -89,6 +89,11 @@ public class TestS3InitiateMultipartUploadRequestWithFSO
 
     long parentID = verifyDirectoriesInDB(dirs, volumeId, bucketId);
 
+    // The missing parents are charged on a copy, so they only show up here if the request
+    // published it.
+    assertEquals(dirs.size(), omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName)).getUsedNamespace());
+
     String multipartFileKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName,
             modifiedRequest.getInitiateMultiPartUploadRequest().getKeyArgs()
