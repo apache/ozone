@@ -177,6 +177,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
                   .build());
           LOG.error("Received a request name of new key {} already exists",
               toKeyName);
+          continue;
         }
 
         // fromKeyName should exist
