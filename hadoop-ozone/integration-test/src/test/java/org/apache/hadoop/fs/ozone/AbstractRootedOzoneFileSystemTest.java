@@ -1934,6 +1934,15 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
+  void testGetFileChecksumOnNonExistentFile() throws Exception {
+    Path missing = new Path(bucketPath,
+        "checksum-missing-" + RandomStringUtils.secure().nextAlphanumeric(5));
+
+    assertThrows(FileNotFoundException.class,
+        () -> fs.getFileChecksum(missing));
+  }
+
+  @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);

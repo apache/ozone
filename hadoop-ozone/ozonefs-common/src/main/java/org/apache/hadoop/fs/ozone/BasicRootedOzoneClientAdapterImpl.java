@@ -1404,9 +1404,14 @@ public class BasicRootedOzoneClientAdapterImpl
         // semantics). Surface it as IllegalArgumentException, matching the
         // pre-HDDS-15951 client-side layout check.
         throw new IllegalArgumentException(e.getMessage());
-      } else if (e.getResult() == OMException.ResultCodes.NOT_A_FILE) {
-        // LookupFile reports a directory this way; a checksum only exists for a
-        // file, so report it the same way HDFS does.
+      } else if (e.getResult() == OMException.ResultCodes.NOT_A_FILE
+          || e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND
+          || e.getResult() == OMException.ResultCodes.KEY_NOT_FOUND
+          || e.getResult() == OMException.ResultCodes.BUCKET_NOT_FOUND) {
+        // A checksum only exists for an existing file, so report the missing
+        // path the same way HDFS and getFileStatusForKeyOrSnapshot do.
+        // LookupFile reports a directory as NOT_A_FILE and a missing key as
+        // FILE_NOT_FOUND; the LookupKey fallback reports KEY_NOT_FOUND.
         throw new FileNotFoundException(e.getMessage());
       }
       throw e;
