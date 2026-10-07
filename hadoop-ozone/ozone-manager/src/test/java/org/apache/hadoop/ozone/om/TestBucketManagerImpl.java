@@ -687,6 +687,30 @@ class TestBucketManagerImpl extends OzoneTestBase {
   }
 
   @Test
+  void testResolveBucketLinkMissingSourceBucket() throws Exception {
+    String targetVolume = volumeName();
+    String sourceVolume = volumeName();
+    OmBucketInfo danglingLink = OmBucketInfo.newBuilder()
+        .setVolumeName(targetVolume)
+        .setBucketName("dangling-link-bucket")
+        .setSourceVolume(sourceVolume)
+        .setSourceBucket("no-such-bucket")
+        .build();
+    BucketManager bucketManager = mock(BucketManager.class);
+    when(bucketManager.getBucketInfo(targetVolume, "dangling-link-bucket")).thenReturn(danglingLink);
+    when(bucketManager.getBucketInfo(sourceVolume, "no-such-bucket"))
+        .thenThrow(new OMException("Bucket not found", ResultCodes.BUCKET_NOT_FOUND));
+    OzoneManager omSpy = spy(omTestManagers.getOzoneManager());
+    HddsWhiteboxTestUtils.setInternalState(omSpy, "bucketManager", bucketManager);
+    when(omSpy.getAclsEnabled()).thenReturn(false);
+
+    OMException omEx = assertThrows(OMException.class,
+        () -> omSpy.resolveBucketLink(Pair.of(targetVolume, "dangling-link-bucket")));
+    assertEquals(ResultCodes.BUCKET_NOT_FOUND, omEx.getResult());
+    assertThat(omEx.getMessage()).contains("Cannot follow bucket link");
+  }
+
+  @Test
   void testListKeysOnLinkWithMissingSourceVolume() throws Exception {
     String targetVolume = volumeName();
     String missingSourceVolume = volumeName();

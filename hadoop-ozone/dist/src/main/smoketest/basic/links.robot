@@ -93,6 +93,7 @@ Link to non-existent bucket
                         Execute                     ozone sh bucket link ${source}/no-such-bucket ${target}/dangling-link
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/dangling-link
                         Should Contain              ${result}         BUCKET_NOT_FOUND
+                        Should Contain              ${result}         Cannot follow bucket link
 
 Link to non-existent source volume
     ${missing} =        Generate Random String  5  [NUMBERS]
