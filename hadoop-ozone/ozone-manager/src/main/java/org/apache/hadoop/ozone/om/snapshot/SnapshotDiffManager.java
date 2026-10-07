@@ -136,6 +136,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition;
+import org.apache.hadoop.ozone.om.snapshot.diff.DagDiffSequentialReader;
 import org.apache.hadoop.ozone.om.snapshot.diff.FullDiffSequentialReader;
 import org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter;
 import org.apache.hadoop.ozone.om.snapshot.diff.SnapDiffJobStore;
@@ -1656,7 +1657,17 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   }
 
   /**
-   * Optimized full-diff report generation.
+   * Optimized snapshot diff report generation using either full table scans or DAG delta SST scans.
+   *
+   * @param isFullDiff when {@code true}, runs {@link FullDiffSequentialReader} over the to/from
+   *                   snapshot tables; when {@code false}, runs {@link DagDiffSequentialReader}
+   *                   over delta SST files
+   * @param fileDeltaSstFiles to-side file/key delta SST paths for DAG diff; ignored when
+   *                          {@code isFullDiff} is {@code true}
+   * @param dirDeltaSstFiles to-side directory delta SST paths for DAG diff; ignored when
+   *                         {@code isFullDiff} is {@code true}
+   * @param dbTxSequenceNumber {@code fromSnapshot.dbTxSequenceNumber} for DAG diff sequence
+   *                           gating; ignored when {@code isFullDiff} is {@code true}
    */
   @VisibleForTesting
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -1667,24 +1678,40 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final Table<byte[], byte[]> fsDirTable,
       final Table<byte[], byte[]> tsDirTable,
       final byte[] keyPrefix,
+      final boolean isFullDiff,
       final Long updateIdGate,
+      final Long dbTxSequenceNumber,
+      final Collection<Path> fileDeltaSstFiles,
+      final Collection<Path> dirDeltaSstFiles,
       final long bucketObjectId,
       final boolean isFSOBucket,
       final String volumeName,
       final String bucketName,
       final String fromSnapshotName,
       final String toSnapshotName,
-      boolean dependencyOrderingEnabled) throws IOException {
+      final boolean dependencyOrderingEnabled
+      ) throws IOException {
     LOG.info("Starting optimized diff report generation for jobId: {}.", jobId);
     try (SnapDiffJobStore store = SnapDiffJobStore.open(db, codecRegistry, familyOptions, jobId,
         isFSOBucket, snapDiffReportCfh, null,
         maxInMemoryEntriesPerJob)) {
-      FullDiffSequentialReader reader = updateIdGate != null
-          ? new FullDiffSequentialReader(store, updateIdGate)
-          : new FullDiffSequentialReader(store);
-      reader.scanFileTables(fsKeyTable, tsKeyTable, keyPrefix);
-      if (isFSOBucket) {
-        reader.scanDirectoryTables(fsDirTable, tsDirTable, keyPrefix);
+      if (isFullDiff) {
+        FullDiffSequentialReader reader = updateIdGate != null
+            ? new FullDiffSequentialReader(store, updateIdGate)
+            : new FullDiffSequentialReader(store);
+        reader.scanFileTables(fsKeyTable, tsKeyTable, keyPrefix);
+        if (isFSOBucket) {
+          reader.scanDirectoryTables(fsDirTable, tsDirTable, keyPrefix);
+        }
+      } else {
+        Objects.requireNonNull(dbTxSequenceNumber, "dbTxSequenceNumber is required for DAG diff");
+        Collection<Path> fileDeltas = fileDeltaSstFiles != null ? fileDeltaSstFiles : Collections.emptyList();
+        Collection<Path> dirDeltas = dirDeltaSstFiles != null ? dirDeltaSstFiles : Collections.emptyList();
+        DagDiffSequentialReader reader = new DagDiffSequentialReader(store, dbTxSequenceNumber);
+        reader.scanFileTables(fileDeltas, fsKeyTable);
+        if (isFSOBucket) {
+          reader.scanDirectoryTables(keyPrefix, dirDeltas, fsDirTable, tsDirTable);
+        }
       }
       if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
           fromSnapshotName, toSnapshotName)) {
