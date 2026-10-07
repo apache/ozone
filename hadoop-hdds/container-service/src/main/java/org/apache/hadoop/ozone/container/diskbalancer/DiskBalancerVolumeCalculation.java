@@ -73,7 +73,78 @@ public final class DiskBalancerVolumeCalculation {
         .collect(Collectors.groupingBy(v -> v.getVolume().getStorageType(),
             () -> new EnumMap<>(StorageType.class), Collectors.toList()));
   }
-  
+
+  /**
+   * Whether a set of volumes can be balanced against each other. A single volume has no second
+   * volume to move containers to, so there is nothing to balance.
+   */
+  public static boolean isBalanceable(List<VolumeFixedUsage> volumes) {
+    return volumes != null && volumes.size() >= 2;
+  }
+
+  /**
+   * The ideal usage of a set of volumes and the acceptable band around it, computed once from a
+   * single volume snapshot. Volumes outside the band are candidates for balancing.
+   */
+  public static final class ThresholdRange {
+
+    private final double idealUsage;
+    private final double lowerThreshold;
+    private final double upperThreshold;
+
+    private ThresholdRange(double idealUsage, double thresholdPercentage) {
+      final double threshold = thresholdPercentage / 100.0;
+      this.idealUsage = idealUsage;
+      this.lowerThreshold = idealUsage - threshold;
+      this.upperThreshold = idealUsage + threshold;
+    }
+
+    /**
+     * @param volumes volumes that share a storage type, so the ideal usage is a target that
+     *                container moves among them can actually reach
+     * @param thresholdPercentage acceptable deviation from ideal usage, in percent
+     */
+    public static ThresholdRange of(List<VolumeFixedUsage> volumes, double thresholdPercentage) {
+      return new ThresholdRange(
+          DiskBalancerVolumeCalculation.getIdealUsage(volumes), thresholdPercentage);
+    }
+
+    public double getIdealUsage() {
+      return idealUsage;
+    }
+
+    public double getLowerThreshold() {
+      return lowerThreshold;
+    }
+
+    public double getUpperThreshold() {
+      return upperThreshold;
+    }
+
+    /**
+     * How far the most deviant volume lies outside the band. Zero or negative means every volume
+     * is within the band and nothing needs to move.
+     *
+     * @param sortedVolumes volumes sorted ascending by utilization
+     */
+    public double getViolation(List<VolumeFixedUsage> sortedVolumes) {
+      final double lowestUsage = sortedVolumes.get(0).getUtilization();
+      final double highestUsage = sortedVolumes.get(sortedVolumes.size() - 1).getUtilization();
+      return Math.max(highestUsage - upperThreshold, lowerThreshold - lowestUsage);
+    }
+
+    /**
+     * Whether both ends of the utilization range sit inside the band.
+     *
+     * @param sortedVolumes volumes sorted ascending by utilization
+     */
+    public boolean isWithinRange(List<VolumeFixedUsage> sortedVolumes) {
+      final double lowestUsage = sortedVolumes.get(0).getUtilization();
+      final double highestUsage = sortedVolumes.get(sortedVolumes.size() - 1).getUtilization();
+      return highestUsage < upperThreshold && lowestUsage > lowerThreshold;
+    }
+  }
+
   /**
    * Get ideal usage from an immutable list of volumes.
    * 

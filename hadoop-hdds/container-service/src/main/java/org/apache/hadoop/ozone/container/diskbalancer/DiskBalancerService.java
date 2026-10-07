@@ -23,8 +23,8 @@ import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeC
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getUsableVolumesByStorageType;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.isBalanceable;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import java.io.File;
 import java.io.IOException;
@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.ThresholdRange;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
@@ -698,7 +699,6 @@ public class DiskBalancerService extends BackgroundService {
     }
   }
 
-  @VisibleForTesting
   public void cleanupPendingDeletionContainers() {
     // delete all pending deletion containers before stop the service
     boolean ret;
@@ -744,7 +744,6 @@ public class DiskBalancerService extends BackgroundService {
     return info;
   }
 
-  @VisibleForTesting
   static List<StorageTypeDiskBalancerInfoProto> buildStorageTypeInfo(
       List<VolumeFixedUsage> volumeUsages, double thresholdPercentage,
       boolean calculateBytes) {
@@ -757,17 +756,20 @@ public class DiskBalancerService extends BackgroundService {
         continue;
       }
 
-      final boolean balanceable = sameTypeUsages.size() >= 2;
+      final boolean balanceable = isBalanceable(sameTypeUsages);
       final StorageTypeDiskBalancerInfoProto.Builder builder =
           StorageTypeDiskBalancerInfoProto.newBuilder()
               .setStorageType(StorageTypeUtils.getStorageTypeProto(storageType))
               .setUsableVolumeCount(sameTypeUsages.size())
               .setBalanceable(balanceable);
       if (balanceable) {
-        builder.setIdealUsage(getIdealUsage(sameTypeUsages))
+        // One snapshot per storage type, shared by the reported ideal usage and the byte estimate.
+        final ThresholdRange thresholdRange =
+            ThresholdRange.of(sameTypeUsages, thresholdPercentage);
+        builder.setIdealUsage(thresholdRange.getIdealUsage())
             .setCurrentVolumeDensitySum(calculateVolumeDataDensity(sameTypeUsages));
         if (calculateBytes) {
-          builder.setBytesToMove(calculateBytesToMove(sameTypeUsages, thresholdPercentage));
+          builder.setBytesToMove(calculateBytesToMove(sameTypeUsages, thresholdRange));
         }
       }
       result.add(builder.build());
@@ -809,18 +811,19 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   public long calculateBytesToMove(List<VolumeFixedUsage> inputVolumeSet) {
-    return calculateBytesToMove(inputVolumeSet, threshold);
-  }
-
-  private static long calculateBytesToMove(List<VolumeFixedUsage> inputVolumeSet,
-      double thresholdPercentage) {
-    // If there are no available volumes or only one volume, return 0 bytes to move
-    if (inputVolumeSet.isEmpty() || inputVolumeSet.size() < 2) {
+    if (!isBalanceable(inputVolumeSet)) {
       return 0;
     }
+    return calculateBytesToMove(inputVolumeSet, ThresholdRange.of(inputVolumeSet, threshold));
+  }
 
-    // Calculate actual threshold
-    final double actualThreshold = getIdealUsage(inputVolumeSet) + thresholdPercentage / 100.0;
+  /**
+   * @param thresholdRange range already computed for {@code inputVolumeSet}
+   */
+  private static long calculateBytesToMove(List<VolumeFixedUsage> inputVolumeSet,
+      ThresholdRange thresholdRange) {
+    // Volumes above the upper threshold are the sources that need to give up data.
+    final double actualThreshold = thresholdRange.getUpperThreshold();
 
     long totalBytesToMove = 0;
 
@@ -850,7 +853,6 @@ public class DiskBalancerService extends BackgroundService {
     return metrics;
   }
 
-  @VisibleForTesting
   public void setBalancedBytesInLastWindow(long bytes) {
     this.balancedBytesInLastWindow.set(bytes);
   }
@@ -859,17 +861,14 @@ public class DiskBalancerService extends BackgroundService {
     return volumeContainerChoosingPolicy;
   }
 
-  @VisibleForTesting
   public void setVolumeContainerChoosingPolicy(ContainerChoosingPolicy volumeContainerChoosingPolicy) {
     this.volumeContainerChoosingPolicy = volumeContainerChoosingPolicy;
   }
 
-  @VisibleForTesting
   public Set<ContainerID> getInProgressContainers() {
     return inProgressContainers;
   }
 
-  @VisibleForTesting
   public Map<HddsVolume, Long> getDeltaSizes() {
     return deltaSizes;
   }
@@ -922,7 +921,6 @@ public class DiskBalancerService extends BackgroundService {
     }
   }
 
-  @VisibleForTesting
   public static void setInjector(FaultInjector instance) {
     injector = instance;
   }
@@ -938,17 +936,14 @@ public class DiskBalancerService extends BackgroundService {
     }
   }
 
-  @VisibleForTesting
   public void setReplicaDeletionDelay(long durationMills) {
     this.replicaDeletionDelay = durationMills;
   }
 
-  @VisibleForTesting
   public int getPendingDeletionDeadlineCount() {
     return pendingDeletionContainers.size();
   }
 
-  @VisibleForTesting
   public int getPendingDeletionQueueSize() {
     return pendingDeletionContainers.values().stream()
         .mapToInt(Queue::size)

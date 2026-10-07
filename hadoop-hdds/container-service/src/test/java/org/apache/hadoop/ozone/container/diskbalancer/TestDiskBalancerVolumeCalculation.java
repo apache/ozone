@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -54,6 +55,66 @@ class TestDiskBalancerVolumeCalculation {
   void getIdealUsageReturnsZeroForEmptyVolumeList() {
     assertEquals(0.0, DiskBalancerVolumeCalculation.getIdealUsage(
         Collections.emptyList()));
+  }
+
+  @Test
+  void isBalanceableRequiresAtLeastTwoVolumes() throws IOException {
+    assertFalse(DiskBalancerVolumeCalculation.isBalanceable(null));
+    assertFalse(DiskBalancerVolumeCalculation.isBalanceable(Collections.emptyList()));
+    assertFalse(DiskBalancerVolumeCalculation.isBalanceable(
+        Collections.singletonList(usage("solo", 100, 50))));
+    assertTrue(DiskBalancerVolumeCalculation.isBalanceable(
+        Arrays.asList(usage("a", 100, 50), usage("b", 100, 50))));
+  }
+
+  /**
+   * The range is the ideal usage plus or minus the threshold, so a 10% threshold around a 50%
+   * ideal accepts everything between 40% and 60%.
+   */
+  @Test
+  void thresholdRangeBracketsIdealUsage() throws IOException {
+    // 20 of 100 used on one volume, 80 of 100 on the other -> ideal 50%.
+    List<DiskBalancerVolumeCalculation.VolumeFixedUsage> volumes =
+        Arrays.asList(usage("low", 100, 80), usage("high", 100, 20));
+
+    DiskBalancerVolumeCalculation.ThresholdRange range =
+        DiskBalancerVolumeCalculation.ThresholdRange.of(volumes, 10.0);
+
+    // Tolerance covers the small amount of space the volume builder reserves.
+    assertEquals(0.5, range.getIdealUsage(), 0.01);
+    assertEquals(0.4, range.getLowerThreshold(), 0.01);
+    assertEquals(0.6, range.getUpperThreshold(), 0.01);
+  }
+
+  /**
+   * Violation measures how far the worst volume sits outside the band, and is not positive while
+   * every volume is inside it.
+   */
+  @Test
+  void thresholdRangeReportsViolationOutsideBand() throws IOException {
+    // 20% and 80% against a 50% ideal with a 10% threshold -> 20 points past the upper bound.
+    List<DiskBalancerVolumeCalculation.VolumeFixedUsage> spread =
+        Arrays.asList(usage("low", 100, 80), usage("high", 100, 20));
+    DiskBalancerVolumeCalculation.ThresholdRange wideRange =
+        DiskBalancerVolumeCalculation.ThresholdRange.of(spread, 10.0);
+
+    assertEquals(0.2, wideRange.getViolation(spread), 0.01);
+    assertFalse(wideRange.isWithinRange(spread));
+
+    // Both volumes at 50% -> nothing outside the band.
+    List<DiskBalancerVolumeCalculation.VolumeFixedUsage> even =
+        Arrays.asList(usage("a", 100, 50), usage("b", 100, 50));
+    DiskBalancerVolumeCalculation.ThresholdRange evenRange =
+        DiskBalancerVolumeCalculation.ThresholdRange.of(even, 10.0);
+
+    assertThat(evenRange.getViolation(even)).isLessThanOrEqualTo(0.0);
+    assertTrue(evenRange.isWithinRange(even));
+  }
+
+  private DiskBalancerVolumeCalculation.VolumeFixedUsage usage(String name, long capacity,
+      long available) throws IOException {
+    return DiskBalancerVolumeCalculation.newVolumeFixedUsage(
+        createVolume(name, capacity, available), null);
   }
 
   @Test

@@ -891,6 +891,33 @@ public class TestDiskBalancerSubCommands {
     }
   }
 
+  /**
+   * On a datanode with more than one storage type, the JSON report must carry the per-type ideal
+   * usages and not the node-level average, which is not a target any container move can reach.
+   */
+  @Test
+  public void testReportJsonOmitsCrossStorageTypeIdealUsage() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(createMixedStorageTypeReportProto("host-1"));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--json", "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      // Per-type ideal usages are reported.
+      assertThat(output).contains("\"storageTypes\"");
+      assertThat(output).contains("20.00%");
+      assertThat(output).contains("80.00%");
+      // The node-level average across storage types is not.
+      assertThat(output).doesNotContain("50.00%");
+      assertThat(output).doesNotContain("\"thresholdRange\" : \"(40.00%, 60.00%)\"");
+    }
+  }
+
   @Test
   public void testReportDiskBalancerWithInServiceDatanodes() throws Exception {
     DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
@@ -1191,6 +1218,42 @@ public class TestDiskBalancerSubCommands {
         .setCurrentVolumeDensitySum(0.1408700123786014)
         .setIdealUsage(idealUsage)
         .setDiskBalancerConf(createConfigProto(thresholdPercent, 100L, 5, true))
+        .build();
+  }
+
+  /**
+   * A datanode with SSD volumes at 20% and DISK volumes at 80%. Each storage type is balanced
+   * within itself, but the node-level idealUsage averages to 50%, which no move can reach.
+   */
+  private DatanodeDiskBalancerInfoProto createMixedStorageTypeReportProto(String hostname) {
+    DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
+        .setHostName(hostname)
+        .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+
+    return DatanodeDiskBalancerInfoProto.newBuilder()
+        .setNode(nodeProto)
+        .setCurrentVolumeDensitySum(0.0)
+        .setIdealUsage(0.5)
+        .setDiskBalancerConf(createConfigProto(10.0, 100L, 5, true))
+        .addStorageTypeInfo(StorageTypeDiskBalancerInfoProto.newBuilder()
+            .setStorageType(StorageTypeProto.SSD)
+            .setUsableVolumeCount(2)
+            .setBalanceable(true)
+            .setIdealUsage(0.2)
+            .setCurrentVolumeDensitySum(0.0)
+            .build())
+        .addStorageTypeInfo(StorageTypeDiskBalancerInfoProto.newBuilder()
+            .setStorageType(StorageTypeProto.DISK)
+            .setUsableVolumeCount(2)
+            .setBalanceable(true)
+            .setIdealUsage(0.8)
+            .setCurrentVolumeDensitySum(0.0)
+            .build())
         .build();
   }
 

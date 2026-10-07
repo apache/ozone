@@ -273,20 +273,12 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
     result.put("status", "success");
     result.put("volumeDensity", formatPercent(report.getCurrentVolumeDensitySum()));
 
-    if (report.hasIdealUsage() && report.hasDiskBalancerConf()
-        && report.getDiskBalancerConf().hasThreshold()) {
-      double idealUsage = report.getIdealUsage();
-      double threshold = report.getDiskBalancerConf().getThreshold();
-      double lt = Math.max(0.0, idealUsage - threshold / 100.0);
-      double ut = Math.min(1.0, idealUsage + threshold / 100.0);
-      result.put("idealUsage", formatPercent(idealUsage));
-      result.put("threshold %", String.format(Locale.ROOT, PERCENT_FORMAT, threshold));
-      result.put("thresholdRange", String.format("(%s, %s)",
-          formatPercent(lt), formatPercent(ut)));
-    }
-
     Map<StorageTypeProto, StorageTypeDiskBalancerInfoProto> storageTypeInfo =
         getStorageTypeInfo(report);
+    // Report ideal usage per storage type when the datanode sends it. The node-level
+    // idealUsage averages across storage types, which is not a target any move can reach
+    // on a datanode with more than one type, so it is only reported as a fallback for
+    // datanodes that predate the per-storage-type fields.
     if (!storageTypeInfo.isEmpty()) {
       double threshold = report.getDiskBalancerConf().getThreshold();
       List<Map<String, Object>> storageTypes = new ArrayList<>();
@@ -308,6 +300,17 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         storageTypes.add(storageType);
       }
       result.put("storageTypes", storageTypes);
+      result.put("threshold %", String.format(Locale.ROOT, PERCENT_FORMAT, threshold));
+    } else if (report.hasIdealUsage() && report.hasDiskBalancerConf()
+        && report.getDiskBalancerConf().hasThreshold()) {
+      double idealUsage = report.getIdealUsage();
+      double threshold = report.getDiskBalancerConf().getThreshold();
+      double lt = Math.max(0.0, idealUsage - threshold / 100.0);
+      double ut = Math.min(1.0, idealUsage + threshold / 100.0);
+      result.put("idealUsage", formatPercent(idealUsage));
+      result.put("threshold %", String.format(Locale.ROOT, PERCENT_FORMAT, threshold));
+      result.put("thresholdRange", String.format("(%s, %s)",
+          formatPercent(lt), formatPercent(ut)));
     }
 
     if (report.getVolumeInfoCount() > 0) {

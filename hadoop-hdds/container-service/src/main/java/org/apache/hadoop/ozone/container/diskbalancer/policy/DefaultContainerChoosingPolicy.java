@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
 import static java.util.concurrent.TimeUnit.HOURS;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.computeUtilization;
-import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getUsableVolumesByStorageType;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.isBalanceable;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.newVolumeFixedUsage;
 
 import com.google.common.cache.Cache;
@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.ThresholdRange;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
@@ -101,23 +102,19 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
 
       // Balance each storage type independently so a container never crosses types. Try the type
       // with the largest threshold violation first. StorageType order is only a deterministic
-      // tie-breaker.
-      final Map<StorageType, List<VolumeFixedUsage>> usagesByStorageType =
-          getUsableVolumesByStorageType(volumeUsages);
-      final List<Map.Entry<StorageType, List<VolumeFixedUsage>>> storageTypeGroups =
-          usagesByStorageType.entrySet().stream()
-              .filter(entry -> hasMultipleUsableVolumes(entry.getKey(), entry.getValue()))
-              .sorted(Comparator
-                  .<Map.Entry<StorageType, List<VolumeFixedUsage>>>comparingDouble(
-                      entry -> getThresholdViolation(entry.getValue(), thresholdPercentage))
-                  .reversed()
-                  .thenComparingInt(entry -> entry.getKey().ordinal()))
+      // tie-breaker. Each type's threshold range is computed once from the snapshot above and
+      // reused for both the ordering and the balancing attempt.
+      final List<StorageTypeGroup> storageTypeGroups =
+          getUsableVolumesByStorageType(volumeUsages).entrySet().stream()
+              .filter(entry -> isGroupBalanceable(entry.getKey(), entry.getValue()))
+              .map(entry -> new StorageTypeGroup(entry.getKey(), entry.getValue(),
+                  ThresholdRange.of(entry.getValue(), thresholdPercentage)))
+              .sorted(Comparator.comparingDouble(StorageTypeGroup::getViolation).reversed()
+                  .thenComparingInt(group -> group.getStorageType().ordinal()))
               .collect(Collectors.toList());
-      for (Map.Entry<StorageType, List<VolumeFixedUsage>> entry : storageTypeGroups) {
-        final StorageType storageType = entry.getKey();
-        final List<VolumeFixedUsage> sameTypeUsages = entry.getValue();
-        final ContainerCandidate candidate = chooseWithinStorageType(ozoneContainer, sameTypeUsages,
-            deltaMap, inProgressContainerIDs, thresholdPercentage, movableContainerStates, storageType);
+      for (StorageTypeGroup group : storageTypeGroups) {
+        final ContainerCandidate candidate = chooseWithinStorageType(ozoneContainer, group,
+            deltaMap, inProgressContainerIDs, thresholdPercentage, movableContainerStates);
         if (candidate != null) {
           return candidate;
         }
@@ -129,9 +126,9 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     }
   }
 
-  private static boolean hasMultipleUsableVolumes(StorageType storageType,
+  private static boolean isGroupBalanceable(StorageType storageType,
       List<VolumeFixedUsage> volumeUsages) {
-    if (volumeUsages.size() >= 2) {
+    if (isBalanceable(volumeUsages)) {
       return true;
     }
     LOG.debug("Skipping storage type {} for disk balancing: only {} usable volume(s)",
@@ -139,49 +136,70 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
     return false;
   }
 
-  private static double getThresholdViolation(List<VolumeFixedUsage> volumeUsages,
-      double thresholdPercentage) {
-    final double idealUsage = getIdealUsage(volumeUsages);
-    final double actualThreshold = thresholdPercentage / 100.0;
-    final double lowerThreshold = idealUsage - actualThreshold;
-    final double upperThreshold = idealUsage + actualThreshold;
-    final double lowestUsage = volumeUsages.get(0).getUtilization();
-    final double highestUsage = volumeUsages.get(volumeUsages.size() - 1).getUtilization();
-    return Math.max(highestUsage - upperThreshold, lowerThreshold - lowestUsage);
+  /**
+   * Volumes of a single storage type with the threshold range they are measured against. The
+   * range is computed once per balancing cycle so the ordering and the balancing attempt agree.
+   */
+  private static final class StorageTypeGroup {
+
+    private final StorageType storageType;
+    private final List<VolumeFixedUsage> volumeUsages;
+    private final ThresholdRange thresholdRange;
+    private final double violation;
+
+    private StorageTypeGroup(StorageType storageType, List<VolumeFixedUsage> volumeUsages,
+        ThresholdRange thresholdRange) {
+      this.storageType = storageType;
+      this.volumeUsages = volumeUsages;
+      this.thresholdRange = thresholdRange;
+      this.violation = thresholdRange.getViolation(volumeUsages);
+    }
+
+    private StorageType getStorageType() {
+      return storageType;
+    }
+
+    private List<VolumeFixedUsage> getVolumeUsages() {
+      return volumeUsages;
+    }
+
+    private ThresholdRange getThresholdRange() {
+      return thresholdRange;
+    }
+
+    private double getViolation() {
+      return violation;
+    }
   }
 
   /**
-   * Chooses a source volume, destination volume and container among volumes that all share
-   * {@code storageType}.
+   * Chooses a source volume, destination volume and container among volumes that all share one
+   * storage type.
    *
-   * @param volumeUsages usable volumes of a single storage type, sorted ascending by utilization
+   * @param group usable volumes of a single storage type, sorted ascending by utilization, with
+   *              the threshold range already computed for them
    * @return a candidate, or null if this storage type has nothing to move
    */
-  @SuppressWarnings("checkstyle:parameternumber")
   private ContainerCandidate chooseWithinStorageType(OzoneContainer ozoneContainer,
-      List<VolumeFixedUsage> volumeUsages, Map<HddsVolume, Long> deltaMap,
+      StorageTypeGroup group, Map<HddsVolume, Long> deltaMap,
       Set<ContainerID> inProgressContainerIDs, double thresholdPercentage,
-      Set<State> movableContainerStates, StorageType storageType) {
-    // Calculate ideal usage and threshold range (once)
-    final double idealUsage = getIdealUsage(volumeUsages);
-    final double actualThreshold = thresholdPercentage / 100.0;
-    final double lowerThreshold = idealUsage - actualThreshold;
-    final double upperThreshold = idealUsage + actualThreshold;
+      Set<State> movableContainerStates) {
+    final StorageType storageType = group.getStorageType();
+    final List<VolumeFixedUsage> volumeUsages = group.getVolumeUsages();
+    final ThresholdRange thresholdRange = group.getThresholdRange();
+    final double upperThreshold = thresholdRange.getUpperThreshold();
 
     if (LOG.isDebugEnabled()) {
-      logVolumeBalancingState(volumeUsages, idealUsage, thresholdPercentage,
-          lowerThreshold, upperThreshold, deltaMap);
+      logVolumeBalancingState(volumeUsages, thresholdRange.getIdealUsage(), thresholdPercentage,
+          thresholdRange.getLowerThreshold(), upperThreshold, deltaMap);
     }
 
-    // Get highest and lowest utilization volumes
-    final VolumeFixedUsage highestUsage = volumeUsages.get(volumeUsages.size() - 1);
-    final VolumeFixedUsage lowestUsage = volumeUsages.get(0);
-
-    // Only return null if highest is below upper threshold AND lowest is above lower threshold
-    if (highestUsage.getUtilization() < upperThreshold &&
-        lowestUsage.getUtilization() > lowerThreshold) {
+    // Nothing to move while every volume sits inside the threshold range.
+    if (thresholdRange.isWithinRange(volumeUsages)) {
       return null;
     }
+
+    final VolumeFixedUsage highestUsage = volumeUsages.get(volumeUsages.size() - 1);
 
     // Determine source volume: highest utilization volume
     final VolumeFixedUsage srcUsage = highestUsage;
