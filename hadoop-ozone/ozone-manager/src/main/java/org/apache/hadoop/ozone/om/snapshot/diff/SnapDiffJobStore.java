@@ -284,6 +284,10 @@ public final class SnapDiffJobStore implements AutoCloseable {
     return (int) maxInMemoryEntries / 2;
   }
 
+  int ancestorMemoCapacity() {
+    return Math.max(4096, pathResolverLruCapacity() / 2);
+  }
+
   List<byte[]> multiGetFromEdgeValues(List<Long> objectIds) throws IOException {
     if (objectIds.isEmpty()) {
       return Collections.emptyList();
