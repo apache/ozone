@@ -41,7 +41,7 @@ Requirements to compile the code:
 
 * Unix System
 * JDK 17 or later
-* Maven 3.6.3 or later
+* Maven 3.9.6 or later
 * Internet connection for first build (to fetch all Maven and Ozone dependencies)
 
 (Standard development tools such as make, gcc, etc. are required.)
