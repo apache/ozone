@@ -1893,61 +1893,58 @@ public class OzoneBucket extends WithMetadata {
           startKey = "";
           findFirstStartKey = true;
           setAddedKeyPrefix(true);
-        }
-      }
-
-      // Root listings above are ready; other initial listings still need a start key.
-      if (!addedKeyPrefix()) {
-        // 1. Get first element as startKey.
-        List<OzoneKey> firstKeyResult = new ArrayList<>();
-        if (stack.isEmpty()) {
-          // Case: startKey is empty
-          getChildrenKeys(getKeyPrefix(), prevKey, firstKeyResult);
         } else {
-          // Case: startKey is non-empty
-          while (!stack.isEmpty()) {
-            Pair<String, String> keyPrefixPath = stack.pop();
-            getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
-                firstKeyResult);
-            if (!firstKeyResult.isEmpty()) {
-              break;
+          // 1. Get first element as startKey.
+          List<OzoneKey> firstKeyResult = new ArrayList<>();
+          if (stack.isEmpty()) {
+            // Case: startKey is empty
+            getChildrenKeys(getKeyPrefix(), prevKey, firstKeyResult);
+          } else {
+            // Case: startKey is non-empty
+            while (!stack.isEmpty()) {
+              Pair<String, String> keyPrefixPath = stack.pop();
+              getChildrenKeys(keyPrefixPath.getLeft(), keyPrefixPath.getRight(),
+                  firstKeyResult);
+              if (!firstKeyResult.isEmpty()) {
+                break;
+              }
             }
           }
-        }
-        if (!firstKeyResult.isEmpty()) {
-          startKey = firstKeyResult.get(0).getName();
-          findFirstStartKey = true;
-        }
-
-        // A specific case where findFirstStartKey is false does not mean that
-        // the final result is empty because also need to determine whether
-        // keyPrefix is an existing key. Consider the following structure:
-        //     te/
-        //     test1/
-        //     test1/file1
-        //     test1/file2
-        //     test2/
-        // when keyPrefix='te' and prevKey='test1/file2', findFirstStartKey
-        // will be false because 'test1/file2' is the last key in dir
-        // 'test1/'. In the correct result for this case, 'test2/' is expected
-        // in the results and "test1/" should be excluded.
-        //
-        if (!findFirstStartKey) {
-          if (StringUtils.isBlank(prevKey) || !keyPrefixExist()
-              || !StringUtils.startsWith(prevKey, getKeyPrefix())) {
-            return new ArrayList<>();
+          if (!firstKeyResult.isEmpty()) {
+            startKey = firstKeyResult.get(0).getName();
+            findFirstStartKey = true;
           }
+
+          // A specific case where findFirstStartKey is false does not mean that
+          // the final result is empty because also need to determine whether
+          // keyPrefix is an existing key. Consider the following structure:
+          //     te/
+          //     test1/
+          //     test1/file1
+          //     test1/file2
+          //     test2/
+          // when keyPrefix='te' and prevKey='test1/file2', findFirstStartKey
+          // will be false because 'test1/file2' is the last key in dir
+          // 'test1/'. In the correct result for this case, 'test2/' is expected
+          // in the results and "test1/" should be excluded.
+          //
+          if (!findFirstStartKey) {
+            if (StringUtils.isBlank(prevKey) || !keyPrefixExist()
+                || !StringUtils.startsWith(prevKey, getKeyPrefix())) {
+              return new ArrayList<>();
+            }
+          }
+          // A special case where keyPrefix element should present in the
+          // resultList. See the annotation of #addKeyPrefixInfoToResultList
+          if (getKeyPrefix().equals(startKey) && findFirstStartKey
+              && !firstKeyResult.get(0).isFile()) {
+            resultList.add(firstKeyResult.get(0));
+          }
+          // Note that the startKey needs to be an immediate child of the
+          // keyPrefix or black before calling listStatus.
+          startKey = adjustStartKey(startKey);
+          startKey = startKey == null ? "" : startKey;
         }
-        // A special case where keyPrefix element should present in the
-        // resultList. See the annotation of #addKeyPrefixInfoToResultList
-        if (getKeyPrefix().equals(startKey) && findFirstStartKey
-            && !firstKeyResult.get(0).isFile()) {
-          resultList.add(firstKeyResult.get(0));
-        }
-        // Note that the startKey needs to be an immediate child of the
-        // keyPrefix or black before calling listStatus.
-        startKey = adjustStartKey(startKey);
-        startKey = startKey == null ? "" : startKey;
       }
 
       // 2. Get immediate children by listStatus method.
