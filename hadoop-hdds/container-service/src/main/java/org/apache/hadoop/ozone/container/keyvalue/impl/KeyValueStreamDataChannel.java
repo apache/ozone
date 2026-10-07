@@ -35,6 +35,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.util.ReferenceCountedObject;
 import org.apache.ratis.util.function.CheckedConsumer;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -141,30 +142,45 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
    * Note that the PutBlock proto at the end is ignored; see HDDS-12007.
    */
   private void writeBuffers() throws IOException {
-    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
-    final ByteBuf buf = ref.retain();
-    try {
-      setEndIndex(buf);
-      // write the remaining data
-      writeFully(buf.nioBuffer(), super::writeFileChannel);
-    } finally {
-      ref.release();
+    pollAllAndWrite(buffers, super::writeFileChannel, b -> {
+      setEndIndex(b);
+      return null;
+    });
+  }
+
+  /**
+   * Write all the data in {@link #buffers} to the channel.
+   * It must be called before committing a PutBlock in the middle of the stream;
+   * otherwise, the buffered data is not yet in the block file.
+   */
+  public void drainBuffers() throws IOException {
+    assertOpen();
+    if (!buffers.isEmpty()) {
+      pollAllAndWrite(buffers, super::writeFileChannel, b -> null);
     }
   }
 
   static ContainerCommandRequestProto closeBuffers(
       Buffers buffers, WriteMethod writeMethod) throws IOException {
+    return pollAllAndWrite(buffers, writeMethod, KeyValueStreamDataChannel::readPutBlockRequest);
+  }
+
+  /**
+   * Poll all the data from the given buffers and then write it, excluding the bytes removed by beforeWrite.
+   * @return the result of beforeWrite.
+   */
+  private static <T> T pollAllAndWrite(Buffers buffers, WriteMethod writeMethod,
+      CheckedFunction<ByteBuf, T, IOException> beforeWrite) throws IOException {
     final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
     final ByteBuf buf = ref.retain();
-    final ContainerCommandRequestProto putBlockRequestProto;
     try {
-      putBlockRequestProto = readPutBlockRequest(buf);
+      final T result = beforeWrite.apply(buf);
       // write the remaining data
       writeFully(buf.nioBuffer(), writeMethod);
+      return result;
     } finally {
       ref.release();
     }
-    return putBlockRequestProto;
   }
 
   static int readProtoLength(ByteBuf b, int lengthIndex) {

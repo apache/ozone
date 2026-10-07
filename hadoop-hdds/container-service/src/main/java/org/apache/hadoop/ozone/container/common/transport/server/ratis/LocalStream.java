@@ -60,7 +60,9 @@ class LocalStream implements StateMachine.DataStream {
   public CompletableFuture<ByteBuffer> onCommand(ByteBuffer buffer, long streamOffset) {
     return CompletableFuture.supplyAsync(() -> {
       try {
-        // TODO: drain datachannel.buffers
+        if (dataChannel instanceof KeyValueStreamDataChannel) {
+          ((KeyValueStreamDataChannel) dataChannel).drainBuffers();
+        }
         return command.apply(buffer);
       } catch (IOException e) {
         throw new CompletionException(e);
