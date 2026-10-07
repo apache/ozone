@@ -17,10 +17,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot.diff;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -28,38 +24,37 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.IteratorType;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator.MergedKeyValue;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 
 /**
- * The DAG-based diff multi-stage sequential reader that produces the intermediate structures
+ * The DAG-based diff multi-stage sequential read that produces the intermediate structures
  * consumed by the later merge-join and path-resolution stages.
  *
- * <p>{@link org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager} drives two entry points
- * that align with existing object-id-map sub-statuses:
- * <ul>
- *   <li>{@link #scanFileTables} — delta SST scan via
- *       {@link LatestVersionedKWayMergeIterator}, then batched point lookups against
- *       {@code fromSnapshot}'s file/key table.</li>
- *   <li>{@link #scanDirectoryTables} — directory-table delta SST scan (FSO only), then
- *       bucket-scoped full scans of {@code fromSnapshot.directoryTable} and
- *       {@code toSnapshot.directoryTable}.</li>
- * </ul>
+ * <p>Call {@link #scanFileTables} then {@link #scanDirectoryTables} (FSO only) in that order.
+ * Each method runs the to-side delta SST scan first, then the from-side load for the same
+ * table pair. Directory stages full-scan {@code fromSnapshot.directoryTable} before
+ * {@code toSnapshot.directoryTable}.
  *
- * <p>Sequence gating ({@code fromSnapshot.dbTxSequenceNumber}) is supplied at construction time
- * and passed to the K-way merge iterator; this reader consumes only entries the iterator emits.
+ * <p>Scans iterate the raw snapshot tables ({@code Table<byte[], byte[]>} from
+ * {@code DBStore#getTable(String)}) or raw delta SST files so {@link SnapshotDiffValueParser} reads the exact
+ * persisted protobuf bytes and compare signatures match on-disk layout.
+ *
+ * <p>File/key from-side loads are driven by delta table keys batched at {@code writeBatchSize}.
+ * Directory {@code DiffCandidateSet} membership is populated only from directory delta SSTs and
+ * consulted during the from-side directory scan; directory delta tombstones are tracked in a
+ * separate spilled key set with the same in-memory limit.
+ *
+ * <p>Sequence gating ({@code fromSnapshot.dbTxSequenceNumber}) is passed to the K-way merge
+ * iterator; this reader consumes only entries the iterator emits (tombstones and rows with
+ * {@code sequence > fromSnapshot.dbTxSequenceNumber}).
  */
 public class DagDiffSequentialReader {
-
-  private static final int MULTI_GET_BATCH_SIZE = SnapDiffJobStore.DEFAULT_WRITE_BATCH_SIZE;
 
   private final SnapDiffJobStore store;
   private final long exclusiveMinSequenceNumber;
@@ -75,49 +70,104 @@ public class DagDiffSequentialReader {
   }
 
   /**
-   * Scans file/key-table delta SSTs and populates {@code newList}, the file candidate set, and
-   * {@code oldList} from {@code fromFileTable}.
+   * Scans file/key-table delta SSTs with interleaved batched {@code multiGetSkipCache} against
+   * {@code fromSnapshot.file/keyTable}.
    *
-   * <p>No table prefix is required: delta SST user keys are full table keys and the from-side
-   * load is a batched point lookup, not a prefix-scoped table scan.
-   *
-   * @param deltaSstFiles   delta SST paths for {@code fromFileTable}
-   * @param fromFileTable   {@code fromSnapshot}'s file or key table
+   * @param deltaSstFiles delta SST paths for the to-side file/key table
+   * @param fromFileTable raw {@code fromSnapshot}'s file or key table
    */
   public void scanFileTables(Collection<Path> deltaSstFiles,
-      Table<String, ? extends WithParentObjectId> fromFileTable) throws IOException {
-    requireFileTable(fromFileTable.getName());
-    scanDeltaSstFiles(deltaSstFiles, false);
-    loadFromFileTable(fromFileTable);
+      Table<byte[], byte[]> fromFileTable) throws IOException {
+    if (deltaSstFiles.isEmpty()) {
+      return;
+    }
+    try (LatestVersionedKWayMergeIterator iterator =
+        LatestVersionedKWayMergeIterator.overRawSstFilesFromSequence(deltaSstFiles, exclusiveMinSequenceNumber)) {
+      scanFileDeltaEntries(iterator, fromFileTable);
+    }
   }
 
   /**
-   * Scans directory-table delta SSTs and populates directory candidates, {@code newList},
-   * {@code oldList}, and FSO {@code to-edges}/{@code from-edges}.
+   * Scans directory-table delta SSTs, then full scans of {@code fromSnapshot.directoryTable}
+   * and {@code toSnapshot.directoryTable} (FSO only).
    *
-   * @param tablePrefix        bucket-scoped prefix for directory-table full scans
-   * @param deltaSstFiles      delta SST paths for {@code fromDirectoryTable}
-   * @param fromDirectoryTable {@code fromSnapshot.directoryTable}
-   * @param toDirectoryTable   {@code toSnapshot.directoryTable}
+   * @param keyPrefix          optional bucket prefix as stored in RocksDB; {@code null} scans the
+   *                           full table
+   * @param deltaSstFiles      delta SST paths for the to-side directory table
+   * @param fromDirectoryTable raw {@code fromSnapshot.directoryTable}
+   * @param toDirectoryTable   raw {@code toSnapshot.directoryTable}
    */
-  public void scanDirectoryTables(String tablePrefix, Collection<Path> deltaSstFiles,
-      Table<String, OmDirectoryInfo> fromDirectoryTable,
-      Table<String, OmDirectoryInfo> toDirectoryTable) throws IOException {
-    requireDirectoryTable(fromDirectoryTable.getName());
-    requireDirectoryTable(toDirectoryTable.getName());
-    if (!store.isFso()) {
-      throw new IllegalStateException("Directory stage requires an FSO bucket");
+  public void scanDirectoryTables(byte[] keyPrefix, Collection<Path> deltaSstFiles,
+      Table<byte[], byte[]> fromDirectoryTable,
+      Table<byte[], byte[]> toDirectoryTable) throws IOException {
+    if (!deltaSstFiles.isEmpty()) {
+      try (LatestVersionedKWayMergeIterator iterator =
+          LatestVersionedKWayMergeIterator.overRawSstFilesFromSequence(deltaSstFiles, exclusiveMinSequenceNumber)) {
+        scanDirectoryDeltaEntries(iterator);
+      }
     }
-    scanDeltaSstFiles(deltaSstFiles, true);
-    scanFromDirectoryTable(fromDirectoryTable, tablePrefix);
-    scanToDirectoryTable(toDirectoryTable, tablePrefix);
+    scanFromDirectoryTable(fromDirectoryTable, keyPrefix);
+    scanToDirectoryTable(toDirectoryTable, keyPrefix);
   }
 
   @VisibleForTesting
-  void consumeDeltaEntries(ClosableIterator<MergedKeyValue> entries, boolean isDir) throws IOException {
+  void scanFileTablesFromDelta(ClosableIterator<MergedKeyValue> deltaEntries,
+      Table<byte[], byte[]> fromFileTable) throws IOException {
+    scanFileDeltaEntries(deltaEntries, fromFileTable);
+  }
+
+  @VisibleForTesting
+  void scanDirectoryTablesFromDelta(ClosableIterator<MergedKeyValue> deltaEntries, byte[] keyPrefix,
+      Table<byte[], byte[]> fromDirectoryTable,
+      Table<byte[], byte[]> toDirectoryTable) throws IOException {
+    scanDirectoryDeltaEntries(deltaEntries);
+    scanFromDirectoryTable(fromDirectoryTable, keyPrefix);
+    scanToDirectoryTable(toDirectoryTable, keyPrefix);
+  }
+
+  private void scanFileDeltaEntries(ClosableIterator<MergedKeyValue> entries,
+      Table<byte[], byte[]> fromFileTable) throws IOException {
+    int batchSize = store.getWriteBatchSize();
+    List<byte[]> lookupBatch = new ArrayList<>(batchSize);
     try {
       while (entries.hasNext()) {
-        processMergedEntry(entries.next(), isDir);
+        MergedKeyValue entry = entries.next();
+        lookupBatch.add(entry.getUserKey());
+        if (!entry.isTombstone()) {
+          byte[] value = entry.getValue();
+          SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, false);
+          byte[] signature = computeSignature(value, false);
+          store.putNewList(info.getObjectId(),
+              new EntryValue(info.getParentId(), info.getName(), false, signature).toBytes());
+        }
+        if (lookupBatch.size() >= batchSize) {
+          multiGetAndPutOldList(lookupBatch, fromFileTable);
+          lookupBatch.clear();
+        }
+      }
+    } finally {
+      entries.close();
+    }
+    if (!lookupBatch.isEmpty()) {
+      multiGetAndPutOldList(lookupBatch, fromFileTable);
+    }
+    store.flushWrites();
+  }
+
+  private void scanDirectoryDeltaEntries(ClosableIterator<MergedKeyValue> entries) throws IOException {
+    try {
+      while (entries.hasNext()) {
+        MergedKeyValue entry = entries.next();
+        if (entry.isTombstone()) {
+          store.addDirTombstoneKey(entry.getUserKey());
+          continue;
+        }
+        byte[] value = entry.getValue();
+        SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, true);
+        store.addDiffCandidate(info.getObjectId());
+        byte[] signature = computeSignature(value, true);
+        store.putNewList(info.getObjectId(),
+            new EntryValue(info.getParentId(), info.getName(), true, signature).toBytes());
       }
     } finally {
       entries.close();
@@ -125,137 +175,62 @@ public class DagDiffSequentialReader {
     }
   }
 
-  private void scanDeltaSstFiles(Collection<Path> deltaSstFiles, boolean isDir) throws IOException {
-    if (deltaSstFiles.isEmpty()) {
-      return;
-    }
-    try (LatestVersionedKWayMergeIterator iterator =
-        LatestVersionedKWayMergeIterator.overRawSstFilesFromSequence(deltaSstFiles, exclusiveMinSequenceNumber)) {
-      consumeDeltaEntries(iterator, isDir);
-    }
-  }
-
-  private void processMergedEntry(MergedKeyValue entry, boolean isDir) throws IOException {
-    if (isDir) {
-      store.putDirCandidate(entry.getUserKey());
-    } else {
-      store.putFileCandidate(entry.getUserKey());
-    }
-    if (!entry.isTombstone()) {
-      byte[] value = entry.getValue();
-      SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, isDir);
-      store.putNewList(info.getObjectId(),
-          new EntryValue(info.getParentId(), info.getName(), isDir, computeSignature(value, isDir)).toBytes());
-    }
-  }
-
-  private void scanToDirectoryTable(Table<String, OmDirectoryInfo> table, String tablePrefix)
-      throws IOException {
-    try (Table.KeyValueIterator<String, OmDirectoryInfo> iterator = openDirectoryIterator(table, tablePrefix)) {
+  private void scanFromDirectoryTable(Table<byte[], byte[]> table, byte[] keyPrefix) throws IOException {
+    store.flushWrites();
+    try (Table.KeyValueIterator<byte[], byte[]> iterator =
+        table.iterator(keyPrefix, IteratorType.KEY_AND_VALUE)) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, OmDirectoryInfo> kv = iterator.next();
-        byte[] value = toPersistedFormat(kv.getValue());
+        Table.KeyValue<byte[], byte[]> kv = iterator.next();
+        byte[] tableKey = kv.getKey();
+        byte[] value = kv.getValue();
+        SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, true);
+        long objectId = info.getObjectId();
+        store.putFromEdge(info.getParentId(), objectId, nameBytes(info.getName()));
+
+        if (store.isDiffCandidate(objectId) || store.isDirTombstoneKey(tableKey)) {
+          byte[] signature = computeSignature(value, true);
+          store.putOldList(objectId,
+              new EntryValue(info.getParentId(), info.getName(), true, signature).toBytes());
+        }
+      }
+    } catch (RocksDatabaseException | CodecException e) {
+      throw new IOException(e);
+    }
+    store.clearDiffCandidates();
+    store.clearDirTombstoneKeys();
+    store.flushWrites();
+  }
+
+  private void scanToDirectoryTable(Table<byte[], byte[]> table, byte[] keyPrefix) throws IOException {
+    try (Table.KeyValueIterator<byte[], byte[]> iterator =
+        table.iterator(keyPrefix, IteratorType.VALUE_ONLY)) {
+      while (iterator.hasNext()) {
+        byte[] value = iterator.next().getValue();
         SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, true);
         store.putToEdge(info.getParentId(), info.getObjectId(), nameBytes(info.getName()));
       }
+    } catch (RocksDatabaseException | CodecException e) {
+      throw new IOException(e);
     }
     store.flushWrites();
   }
 
-  private void scanFromDirectoryTable(Table<String, OmDirectoryInfo> table, String tablePrefix)
+  private void multiGetAndPutOldList(List<byte[]> keys, Table<byte[], byte[]> fromFileTable)
       throws IOException {
-    store.flushWrites();
-    try (Table.KeyValueIterator<String, OmDirectoryInfo> iterator = openDirectoryIterator(table, tablePrefix)) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<String, OmDirectoryInfo> kv = iterator.next();
-        byte[] value = toPersistedFormat(kv.getValue());
-        SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, true);
-        store.putFromEdge(info.getParentId(), info.getObjectId(), nameBytes(info.getName()));
-        if (store.hasDirCandidate(StringUtils.string2Bytes(kv.getKey()))) {
-          store.putOldList(info.getObjectId(),
-              new EntryValue(info.getParentId(), info.getName(), true, computeSignature(value, true)).toBytes());
-        }
-      }
-    }
-    store.flushWrites();
-    store.discardDirCandidates();
-  }
-
-  private void loadFromFileTable(Table<String, ? extends WithParentObjectId> fromFileTable) throws IOException {
-    store.flushWrites();
-    List<byte[]> batch = new ArrayList<>(MULTI_GET_BATCH_SIZE);
-    try (ClosableIterator<byte[]> iterator = store.iterateFileCandidateKeys()) {
-      while (iterator.hasNext()) {
-        batch.add(iterator.next());
-        if (batch.size() >= MULTI_GET_BATCH_SIZE) {
-          loadFileBatch(batch, fromFileTable);
-          batch.clear();
-        }
-      }
-    }
-    if (!batch.isEmpty()) {
-      loadFileBatch(batch, fromFileTable);
-    }
-    store.flushWrites();
-    store.discardFileCandidates();
-  }
-
-  private void loadFileBatch(List<byte[]> keys, Table<String, ? extends WithParentObjectId> fromFileTable)
-      throws IOException {
-    List<String> tableKeys = new ArrayList<>(keys.size());
-    for (byte[] rawKey : keys) {
-      tableKeys.add(StringUtils.bytes2String(rawKey));
-    }
-    List<? extends WithParentObjectId> entries = tableMultiGetSkipCache(fromFileTable, tableKeys);
-    for (WithParentObjectId entry : entries) {
-      if (entry == null) {
-        continue;
-      }
-      byte[] value = toPersistedFormat(entry);
-      SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, false);
-      store.putOldList(info.getObjectId(),
-          new EntryValue(info.getParentId(), info.getName(), false, computeSignature(value, false)).toBytes());
-    }
-  }
-
-  private static List<? extends WithParentObjectId> tableMultiGetSkipCache(
-      Table<String, ? extends WithParentObjectId> table, List<String> keys) throws IOException {
+    List<byte[]> values;
     try {
-      return table.multiGetSkipCache(keys);
+      values = fromFileTable.multiGetSkipCache(keys);
     } catch (RocksDatabaseException | CodecException e) {
       throw new IOException("Failed to read table keys in batch", e);
     }
-  }
-
-  private static Table.KeyValueIterator<String, OmDirectoryInfo> openDirectoryIterator(
-      Table<String, OmDirectoryInfo> table, String tablePrefix) throws IOException {
-    try {
-      return table.iterator(tablePrefix);
-    } catch (RocksDatabaseException | CodecException e) {
-      throw new IOException("Failed to open directory table iterator", e);
-    }
-  }
-
-  private static byte[] toPersistedFormat(WithParentObjectId entry) throws IOException {
-    try {
-      if (entry instanceof OmDirectoryInfo) {
-        return OmDirectoryInfo.getCodec().toPersistedFormat((OmDirectoryInfo) entry);
+    for (byte[] value : values) {
+      if (value == null) {
+        continue;
       }
-      return OmKeyInfo.getKeyTableCodec().toPersistedFormat((OmKeyInfo) entry);
-    } catch (CodecException e) {
-      throw new IOException("Failed to encode table value", e);
-    }
-  }
-
-  private static void requireFileTable(String tableName) {
-    if (!KEY_TABLE.equals(tableName) && !FILE_TABLE.equals(tableName)) {
-      throw new IllegalArgumentException("Expected file or key table, got: " + tableName);
-    }
-  }
-
-  private static void requireDirectoryTable(String tableName) {
-    if (!DIRECTORY_TABLE.equals(tableName)) {
-      throw new IllegalArgumentException("Expected directory table, got: " + tableName);
+      SnapshotDiffValueParser.ParsedRequiredInfo info = parseRequired(value, false);
+      byte[] signature = computeSignature(value, false);
+      store.putOldList(info.getObjectId(),
+          new EntryValue(info.getParentId(), info.getName(), false, signature).toBytes());
     }
   }
 

@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getReportKeyForIndex;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 
+import com.google.common.primitives.UnsignedBytes;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -30,12 +31,15 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -55,10 +59,10 @@ import org.rocksdb.RocksDBException;
  * Owns the per-job temporary RocksDB column families and batched writes shared
  * between optimized snapshot diff pipeline stages.
  *
- * <p>Diff-candidate {@code objectId}s are held in memory while their count is at
- * most {@code maxInMemoryEntries}; larger sets spill to a temporary column family.
- * Deleted and renamed directory object ids collected during merge join use the same
- * in-memory limit and spill policy.
+ * <p>Diff-candidate {@code objectId}s and DAG directory tombstone table keys are held in
+ * memory while their count is at most {@code maxInMemoryEntries}; larger sets spill to a
+ * temporary column family. Deleted and renamed directory object ids collected during merge
+ * join use the same in-memory limit and spill policy.
  *
  * <p>All RocksDB puts use raw {@code byte[]} keys and values (the JNI boundary). Callers
  * serialize {@link EntryValue} via {@link EntryValue#toBytes()} before writing to
@@ -68,8 +72,8 @@ import org.rocksdb.RocksDBException;
  * stage no longer reads them. Individual key deletes are avoided so short-lived CFs do not
  * accumulate tombstones before drop.
  *
- * <p>This initial version supports the full diff sequential reader ({@link FullDiffSequentialReader}).
- * DAG diff support extends this store in HDDS-15393.
+ * <p>Shared by the full diff sequential reader ({@link FullDiffSequentialReader}) and the
+ * DAG diff sequential reader ({@link DagDiffSequentialReader}).
  */
 public final class SnapDiffJobStore implements AutoCloseable {
 
@@ -79,9 +83,13 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /** Reverse edge value header: parentId (8 BE) + nameLen (4 BE). */
   static final int EDGE_LINK_HEADER_BYTES = Long.BYTES + Integer.BYTES;
 
+  private static final Comparator<byte[]> TOMBSTONE_KEY_COMPARATOR =
+      UnsignedBytes.lexicographicalComparator();
+
   private static final String NEW_LIST_SUFFIX = "-new-list";
   private static final String OLD_LIST_SUFFIX = "-old-list";
   private static final String CAND_IDS_SUFFIX = "-cand-ids";
+  private static final String DIR_TOMBSTONE_KEYS_SUFFIX = "-dir-tombstone-keys";
   private static final String TO_EDGES_SUFFIX = "-to-edges";
   private static final String FROM_EDGES_SUFFIX = "-from-edges";
   private static final String CLASSIFIED_CREATE_SUFFIX = "-cls-create";
@@ -116,6 +124,11 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private Set<Long> diffCandidates;
   private ColumnFamilyHandle diffCandidatesCf;
   private boolean diffCandidatesSpilled;
+
+  private String dirTombstoneKeysCfName;
+  private NavigableSet<byte[]> dirTombstoneKeys;
+  private ColumnFamilyHandle dirTombstoneKeysCf;
+  private boolean dirTombstoneKeysSpilled;
 
   private Set<Long> deletedDirectoryIds;
   private Set<Long> renamedDirectoryIds;
@@ -163,6 +176,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     this.writeOptions = new ManagedWriteOptions();
     this.pendingOps = 0;
     this.diffCandidates = new HashSet<>();
+    this.dirTombstoneKeys = new TreeSet<>(TOMBSTONE_KEY_COMPARATOR);
     this.deletedDirectoryIds = new HashSet<>();
     this.renamedDirectoryIds = new HashSet<>();
   }
@@ -299,6 +313,17 @@ public final class SnapDiffJobStore implements AutoCloseable {
     return multiGet(db, fromEdgesCf, keys);
   }
 
+  List<byte[]> multiGetToEdgeValues(List<Long> objectIds) throws IOException {
+    if (objectIds.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<byte[]> keys = new ArrayList<>(objectIds.size());
+    for (Long objectId : objectIds) {
+      keys.add(objectIdKey(objectId));
+    }
+    return multiGet(db, toEdgesCf, keys);
+  }
+
   public List<Long> multiGetFromParentIds(List<Long> objectIds) throws IOException {
     List<byte[]> values = multiGetFromEdgeValues(objectIds);
     List<Long> parentIds = new ArrayList<>(values.size());
@@ -426,6 +451,39 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /** Returns the current in-memory diff-candidate count (for tests and limit wiring). */
   public int getDiffCandidateCount() {
     return diffCandidates.size();
+  }
+
+  /** Records a directory-table tombstone key from a DAG delta SST scan. */
+  public void addDirTombstoneKey(byte[] tableKey) throws IOException {
+    if (dirTombstoneKeysSpilled) {
+      batchPut(dirTombstoneKeysCf, tableKey, presentMarker);
+      return;
+    }
+    if (dirTombstoneKeys.size() >= maxInMemoryEntries) {
+      spillDirTombstoneKeys();
+    }
+    if (dirTombstoneKeysSpilled) {
+      batchPut(dirTombstoneKeysCf, tableKey, presentMarker);
+    } else {
+      dirTombstoneKeys.add(tableKey);
+    }
+  }
+
+  /** Returns whether {@code tableKey} was recorded as a directory delta tombstone. */
+  public boolean isDirTombstoneKey(byte[] tableKey) throws IOException {
+    if (dirTombstoneKeysSpilled) {
+      return get(dirTombstoneKeysCf, tableKey) != null;
+    }
+    return dirTombstoneKeys.contains(tableKey);
+  }
+
+  /** Clears directory tombstone keys after the from-side directory scan. */
+  public void clearDirTombstoneKeys() throws IOException {
+    dirTombstoneKeys.clear();
+    if (dirTombstoneKeysSpilled) {
+      dropAndClose(dirTombstoneKeysCf);
+      dirTombstoneKeysSpilled = false;
+    }
   }
 
   /** Records a deleted directory {@code objectId} for ancestor filtering. */
@@ -609,6 +667,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     newListCf = createColumnFamily(this.jobId + NEW_LIST_SUFFIX);
     oldListCf = createColumnFamily(this.jobId + OLD_LIST_SUFFIX);
     diffCandCfName = this.jobId + CAND_IDS_SUFFIX;
+    dirTombstoneKeysCfName = this.jobId + DIR_TOMBSTONE_KEYS_SUFFIX;
     deletedDirectoryIdsCfName = this.jobId + DELETED_DIR_IDS_SUFFIX;
     renamedDirectoryIdsCfName = this.jobId + RENAMED_DIR_IDS_SUFFIX;
     classifiedCreateCf = createColumnFamily(this.jobId + CLASSIFIED_CREATE_SUFFIX);
@@ -634,6 +693,21 @@ public final class SnapDiffJobStore implements AutoCloseable {
     diffCandidates.clear();
     flushWrites();
     diffCandidatesSpilled = true;
+  }
+
+  private void spillDirTombstoneKeys() throws IOException {
+    try {
+      dirTombstoneKeysCf = createColumnFamily(dirTombstoneKeysCfName);
+    } catch (RocksDBException e) {
+      throw new IOException("Failed to create directory tombstone key column family "
+          + dirTombstoneKeysCfName, e);
+    }
+    for (byte[] tableKey : dirTombstoneKeys) {
+      batchPut(dirTombstoneKeysCf, tableKey, presentMarker);
+    }
+    dirTombstoneKeys.clear();
+    flushWrites();
+    dirTombstoneKeysSpilled = true;
   }
 
   private void spillDeletedDirectoryIds() throws IOException {

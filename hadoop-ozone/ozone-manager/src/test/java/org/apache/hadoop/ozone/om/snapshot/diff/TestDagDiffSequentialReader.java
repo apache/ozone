@@ -26,11 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,12 +34,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator.MergedKeyValue;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -53,7 +51,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -71,7 +68,6 @@ class TestDagDiffSequentialReader {
   private static final String VOLUME = "vol";
   private static final String BUCKET = "buck";
   private static final long BUCKET_OBJECT_ID = 1L;
-  private static final String TABLE_PREFIX = "";
 
   @TempDir
   private static File tempDir;
@@ -79,6 +75,7 @@ class TestDagDiffSequentialReader {
   private static ManagedDBOptions dbOptions;
   private static ManagedColumnFamilyOptions columnFamilyOptions;
   private static CodecRegistry codecRegistry;
+  private static ColumnFamilyHandle snapDiffReportCfh;
   private static final AtomicInteger JOB_ID = new AtomicInteger(0);
 
   @BeforeAll
@@ -93,6 +90,8 @@ class TestDagDiffSequentialReader {
         new ColumnFamilyDescriptor(StringUtils.string2Bytes(DEFAULT_COLUMN_FAMILY_NAME), columnFamilyOptions));
     List<ColumnFamilyHandle> handles = new ArrayList<>();
     db = ManagedRocksDB.open(dbOptions, dbDir.getAbsolutePath(), descriptors, handles);
+    snapDiffReportCfh = db.get().createColumnFamily(
+        new ColumnFamilyDescriptor(StringUtils.string2Bytes("snap-diff-report"), columnFamilyOptions));
   }
 
   @AfterAll
@@ -105,59 +104,6 @@ class TestDagDiffSequentialReader {
     }
     if (dbOptions != null) {
       dbOptions.close();
-    }
-  }
-
-  @Test
-  void testSequenceGateAndTombstones() throws Exception {
-    long gate = 50L;
-    List<MergedKeyValue> delta = Arrays.asList(
-        merged(userKey("below-gate"), 40L, 0, null),
-        merged(userKey("tombstone"), 60L, 0, null),
-        merged(userKey("create"), 70L, 1, keyBytes("create", 1L, 0L, 100L)));
-
-    try (SnapDiffJobStore store = newStore(false)) {
-      runStage1(store, gate, delta, Collections.emptyList(), mockFileTable(), mockDirectoryTables());
-      assertNull(store.getNewList(99L));
-      assertNotNull(store.getNewList(1L));
-    }
-  }
-
-  @Test
-  void testFileCandidateSetSpillsWhenThresholdExceeded() throws Exception {
-    try (SnapDiffJobStore store = newStore(false, 1L)) {
-      store.putFileCandidate(userKey("first"));
-      assertFalse(store.areFileCandidatesSpilled());
-      store.putFileCandidate(userKey("second"));
-      assertTrue(store.areFileCandidatesSpilled());
-    }
-  }
-
-  @Test
-  void testKeyDiffShapesWithSpilledCandidates() throws Exception {
-    long gate = 50L;
-    byte[] modifyKey = userKey("modify");
-    byte[] oldNameKey = userKey("oldname");
-    byte[] newNameKey = userKey("newname");
-    byte[] deletedKey = userKey("deleted");
-
-    byte[] modifyFrom = keyBytes("modify", 2L, 0L, 100L);
-    byte[] modifyTo = keyBytes("modify", 2L, 0L, 200L);
-    byte[] oldRename = keyBytes("oldname", 3L, 0L, 100L);
-    byte[] newRename = keyBytes("newname", 3L, 0L, 100L);
-    byte[] deletedFrom = keyBytes("deleted", 4L, 0L, 100L);
-
-    List<MergedKeyValue> delta = Arrays.asList(
-        merged(modifyKey, 70L, 1, modifyTo),
-        merged(oldNameKey, 70L, 0, null),
-        merged(newNameKey, 80L, 1, newRename),
-        merged(deletedKey, 70L, 0, null),
-        merged(userKey("create"), 80L, 1, keyBytes("create", 1L, 0L, 100L)));
-
-    try (SnapDiffJobStore store = newStore(false, 0L)) {
-      runStage1(store, gate, delta, Collections.emptyList(),
-          mockFileTable(modifyFrom, oldRename, deletedFrom), mockDirectoryTables());
-      assertNotNull(store.getOldList(4L));
     }
   }
 
@@ -176,15 +122,19 @@ class TestDagDiffSequentialReader {
     byte[] deletedFrom = keyBytes("deleted", 4L, 0L, 100L);
 
     List<MergedKeyValue> delta = Arrays.asList(
-        merged(modifyKey, 70L, 1, modifyTo),
-        merged(oldNameKey, 70L, 0, null),
-        merged(newNameKey, 80L, 1, newRename),
-        merged(deletedKey, 70L, 0, null),
-        merged(userKey("create"), 80L, 1, keyBytes("create", 1L, 0L, 100L)));
+        toMergedKV(modifyKey, 70L, 1, modifyTo),
+        toMergedKV(oldNameKey, 70L, 0, null),
+        toMergedKV(newNameKey, 80L, 1, newRename),
+        toMergedKV(deletedKey, 70L, 0, null),
+        toMergedKV(userKey("create"), 80L, 1, keyBytes("create", 1L, 0L, 100L)));
+
+    DirectoryTables directoryTables = directoryTables(InMemoryTestTable.forRawBytes(DIRECTORY_TABLE),
+        InMemoryTestTable.forRawBytes(DIRECTORY_TABLE));
 
     try (SnapDiffJobStore store = newStore(false)) {
-      runStage1(store, gate, delta, Collections.emptyList(),
-          mockFileTable(modifyFrom, oldRename, deletedFrom), mockDirectoryTables());
+      runReader(store, false, gate, delta, Collections.emptyList(),
+          rawFileTable(modifyKey, modifyFrom, oldNameKey, oldRename, deletedKey, deletedFrom),
+          directoryTables);
 
       assertNotNull(store.getNewList(1L)); // CREATE
       assertNotNull(store.getNewList(2L)); // MODIFY
@@ -195,6 +145,7 @@ class TestDagDiffSequentialReader {
       assertNotNull(store.getOldList(2L));
       assertNotNull(store.getOldList(3L));
       assertNotNull(store.getOldList(4L));
+      assertEquals(0, store.getDiffCandidateCount());
 
       EntryValue newRenameVal = EntryValue.fromBytes(store.getNewList(3L));
       EntryValue oldRenameVal = EntryValue.fromBytes(store.getOldList(3L));
@@ -209,55 +160,114 @@ class TestDagDiffSequentialReader {
   }
 
   @Test
-  void testFsoDirectoryEdgesAndDirCandidates() throws Exception {
+  void testDirectoryDiffShapes() throws Exception {
     long gate = 50L;
-    byte[] dirKey = userKey("dir-a");
-    byte[] dirValue = dirBytes("a", 100L, BUCKET_OBJECT_ID);
+    byte[] createKey = userKey("create");
+    byte[] modifyKey = userKey("modify");
+    byte[] oldNameKey = userKey("oldname");
+    byte[] newNameKey = userKey("newname");
+    byte[] deletedKey = userKey("deleted");
 
-    List<MergedKeyValue> dirDelta = Collections.singletonList(merged(dirKey, 60L, 1, dirValue));
-    DirectoryTables dirTables = mockDirectoryTables(dirKey, dirValue);
+    byte[] createTo = dirBytes("create", 1L, BUCKET_OBJECT_ID);
+    byte[] modifyFrom = dirBytes("modify", 2L, BUCKET_OBJECT_ID, metadata("ver", "from"));
+    byte[] modifyTo = dirBytes("modify", 2L, BUCKET_OBJECT_ID, metadata("ver", "to"));
+    byte[] oldRename = dirBytes("oldname", 3L, BUCKET_OBJECT_ID);
+    byte[] newRename = dirBytes("newname", 3L, BUCKET_OBJECT_ID);
+    byte[] deletedFrom = dirBytes("deleted", 4L, BUCKET_OBJECT_ID);
+
+    List<MergedKeyValue> dirDelta = Arrays.asList(
+        toMergedKV(modifyKey, 70L, 1, modifyTo),
+        toMergedKV(oldNameKey, 70L, 0, null),
+        toMergedKV(newNameKey, 80L, 1, newRename),
+        toMergedKV(deletedKey, 70L, 0, null),
+        toMergedKV(createKey, 80L, 1, createTo));
+
+    DirectoryTables dirTables = directoryTables(
+        rawDirectoryTable(modifyKey, modifyFrom, oldNameKey, oldRename, deletedKey, deletedFrom),
+        rawDirectoryTable(createKey, createTo, modifyKey, modifyTo, newNameKey, newRename));
 
     try (SnapDiffJobStore store = newStore(true)) {
-      runStage1(store, gate, Collections.emptyList(), dirDelta, mockFileTable(), dirTables);
-      assertEquals("a", name(store.getToEdgeName(BUCKET_OBJECT_ID, 100L)));
-      assertEquals("a", name(store.getFromEdgeName(BUCKET_OBJECT_ID, 100L)));
-      assertNotNull(store.getNewList(100L));
-      assertNotNull(store.getOldList(100L));
+      runReader(store, true, gate, Collections.emptyList(), dirDelta, rawFileTable(), dirTables);
+
+      assertNotNull(store.getNewList(1L)); // CREATE
+      assertNotNull(store.getNewList(2L)); // MODIFY
+      assertNotNull(store.getNewList(3L)); // RENAME target
+      assertNull(store.getNewList(4L));    // DELETE tombstone only
+
+      assertNull(store.getOldList(1L));    // CREATE has no from entry
+      assertNotNull(store.getOldList(2L));
+      assertNotNull(store.getOldList(3L));
+      assertNotNull(store.getOldList(4L));
+      assertEquals(0, store.getDiffCandidateCount());
+
+      EntryValue createVal = EntryValue.fromBytes(store.getNewList(1L));
+      assertTrue(createVal.isDir());
+      assertEquals("create", createVal.getName());
+      assertEquals(BUCKET_OBJECT_ID, createVal.getParentId());
+
+      EntryValue newRenameVal = EntryValue.fromBytes(store.getNewList(3L));
+      EntryValue oldRenameVal = EntryValue.fromBytes(store.getOldList(3L));
+      assertTrue(newRenameVal.isDir());
+      assertTrue(oldRenameVal.isDir());
+      assertEquals("newname", newRenameVal.getName());
+      assertEquals("oldname", oldRenameVal.getName());
+      assertArrayEquals(newRenameVal.getSignature(), oldRenameVal.getSignature());
+
+      EntryValue newModify = EntryValue.fromBytes(store.getNewList(2L));
+      EntryValue oldModify = EntryValue.fromBytes(store.getOldList(2L));
+      assertFalse(Arrays.equals(newModify.getSignature(), oldModify.getSignature()));
+
+      assertFromEdge(store, 1L, null, null);
+      assertFromEdge(store, 2L, BUCKET_OBJECT_ID, "modify");
+      assertFromEdge(store, 3L, BUCKET_OBJECT_ID, "oldname");
+      assertFromEdge(store, 4L, BUCKET_OBJECT_ID, "deleted");
+
+      assertToEdge(store, 1L, BUCKET_OBJECT_ID, "create");
+      assertToEdge(store, 2L, BUCKET_OBJECT_ID, "modify");
+      assertToEdge(store, 3L, BUCKET_OBJECT_ID, "newname");
+      assertToEdge(store, 4L, null, null);
+    }
+  }
+
+  private static void assertFromEdge(SnapDiffJobStore store, long objectId, Long parentId, String name)
+      throws IOException {
+    assertEdge(store.multiGetFromEdgeValues(Collections.singletonList(objectId)).get(0), parentId, name);
+  }
+
+  private static void assertToEdge(SnapDiffJobStore store, long objectId, Long parentId, String name)
+      throws IOException {
+    assertEdge(store.multiGetToEdgeValues(Collections.singletonList(objectId)).get(0), parentId, name);
+  }
+
+  private static void assertEdge(byte[] value, Long parentId, String name) {
+    if (parentId == null) {
+      assertNull(value);
+      return;
+    }
+    assertNotNull(value);
+    assertEquals(parentId.longValue(), SnapDiffJobStore.decodeEdgeLinkParentId(value));
+    if (name != null) {
+      assertEquals(name, SnapDiffJobStore.decodeEdgeLinkName(value));
     }
   }
 
   private static SnapDiffJobStore newStore(boolean fso) throws IOException {
-    return newStore(fso, SnapDiffJobStore.DEFAULT_WRITE_BATCH_SIZE,
-        OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT);
-  }
-
-  private static SnapDiffJobStore newStore(boolean fso, long maxInMemoryEntries) throws IOException {
-    return newStore(fso, SnapDiffJobStore.DEFAULT_WRITE_BATCH_SIZE, maxInMemoryEntries);
-  }
-
-  private static SnapDiffJobStore newStore(boolean fso, int writeBatchSize, long maxInMemoryEntries)
-      throws IOException {
     return SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
-        "job" + JOB_ID.incrementAndGet(), fso, SnapDiffJobStore.Mode.DAG, writeBatchSize,
-        maxInMemoryEntries);
+        "job" + JOB_ID.incrementAndGet(), fso, snapDiffReportCfh, null, null);
   }
 
-  private static void runStage1(SnapDiffJobStore store, long gate,
+  private static void runReader(SnapDiffJobStore store, boolean fso, long gate,
       List<MergedKeyValue> fileDelta,
       List<MergedKeyValue> dirDelta,
-      Table<String, OmKeyInfo> fromFileTable,
+      Table<byte[], byte[]> fromFileTable,
       DirectoryTables directoryTables) throws Exception {
     DagDiffSequentialReader reader = new DagDiffSequentialReader(store, gate);
     if (!fileDelta.isEmpty()) {
-      reader.consumeDeltaEntries(mergeIterator(fileDelta, gate), false);
+      reader.scanFileTablesFromDelta(mergeIterator(fileDelta, gate), fromFileTable);
     }
-    reader.buildFileIntermediates(Collections.emptyList(), fromFileTable);
-    if (store.isFso()) {
-      if (!dirDelta.isEmpty()) {
-        reader.consumeDeltaEntries(mergeIterator(dirDelta, gate), true);
-      }
-      reader.buildDirectoryIntermediates(TABLE_PREFIX, Collections.emptyList(), directoryTables.fromTable,
-          directoryTables.toTable);
+    if (fso && !dirDelta.isEmpty()) {
+      reader.scanDirectoryTablesFromDelta(mergeIterator(dirDelta, gate), null,
+          directoryTables.fromTable, directoryTables.toTable);
     }
   }
 
@@ -283,94 +293,28 @@ class TestDagDiffSequentialReader {
     return LatestVersionedKWayMergeIterator.forTest(Collections.singletonList(source), gate);
   }
 
-  @SuppressWarnings("unchecked")
-  private static Table<String, OmKeyInfo> mockFileTable(byte[]... persistedValues) throws Exception {
-    Table<String, OmKeyInfo> table = mock(Table.class);
-    when(table.getName()).thenReturn(KEY_TABLE);
-    java.util.Map<String, OmKeyInfo> entries = new java.util.HashMap<>();
-    for (byte[] persisted : persistedValues) {
-      OmKeyInfo keyInfo = OmKeyInfo.getKeyTableCodec().fromPersistedFormat(persisted);
-      entries.put(keyInfo.getKeyName(), keyInfo);
+  private static Table<byte[], byte[]> rawFileTable(byte[]... keyValuePairs) {
+    InMemoryTestTable<byte[], byte[]> table = InMemoryTestTable.forRawBytes(KEY_TABLE);
+    for (int i = 0; i < keyValuePairs.length; i += 2) {
+      table.put(keyValuePairs[i], keyValuePairs[i + 1]);
     }
-    when(table.get(anyString())).thenAnswer(invocation -> entries.get(invocation.getArgument(0)));
-    when(table.multiGetSkipCache(anyList())).thenAnswer(invocation -> {
-      List<String> keys = invocation.getArgument(0);
-      List<OmKeyInfo> values = new ArrayList<>(keys.size());
-      for (String key : keys) {
-        values.add(entries.get(key));
-      }
-      return values;
-    });
     return table;
   }
 
-  private static DirectoryTables mockDirectoryTables() throws Exception {
-    return mockDirectoryTables(Collections.emptyList(), Collections.emptyList());
-  }
-
-  private static DirectoryTables mockDirectoryTables(byte[] dirKey, byte[] dirValue) throws Exception {
-    byte[][] row = new byte[][] {dirKey, dirValue};
-    return mockDirectoryTables(Collections.singletonList(row), Collections.singletonList(row));
-  }
-
-  @SuppressWarnings("unchecked")
-  private static DirectoryTables mockDirectoryTables(List<byte[][]> fromRows, List<byte[][]> toRows)
-      throws Exception {
-    Table<String, OmDirectoryInfo> fromTable = mock(Table.class);
-    Table<String, OmDirectoryInfo> toTable = mock(Table.class);
-    when(fromTable.getName()).thenReturn(DIRECTORY_TABLE);
-    when(toTable.getName()).thenReturn(DIRECTORY_TABLE);
-    when(fromTable.iterator(eq(TABLE_PREFIX))).thenReturn(directoryIterator(fromRows));
-    when(toTable.iterator(eq(TABLE_PREFIX))).thenReturn(directoryIterator(toRows));
+  private static DirectoryTables directoryTables(Table<byte[], byte[]> fromTable,
+      Table<byte[], byte[]> toTable) {
     return new DirectoryTables(fromTable, toTable);
   }
 
-  private static Table.KeyValueIterator<String, OmDirectoryInfo> directoryIterator(List<byte[][]> rows)
-      throws Exception {
-    List<Table.KeyValue<String, OmDirectoryInfo>> entries = new ArrayList<>();
-    for (byte[][] row : rows) {
-      byte[] key = row[0];
-      byte[] value = row[1];
-      OmDirectoryInfo dirInfo = OmDirectoryInfo.getCodec().fromPersistedFormat(value);
-      entries.add(Table.newKeyValue(StringUtils.bytes2String(key), dirInfo));
+  private static Table<byte[], byte[]> rawDirectoryTable(byte[]... keyValuePairs) {
+    InMemoryTestTable<byte[], byte[]> table = InMemoryTestTable.forRawBytes(DIRECTORY_TABLE);
+    for (int i = 0; i < keyValuePairs.length; i += 2) {
+      table.put(keyValuePairs[i], keyValuePairs[i + 1]);
     }
-    Iterator<Table.KeyValue<String, OmDirectoryInfo>> delegate = entries.iterator();
-    return new Table.KeyValueIterator<String, OmDirectoryInfo>() {
-      @Override
-      public boolean hasNext() {
-        return delegate.hasNext();
-      }
-
-      @Override
-      public Table.KeyValue<String, OmDirectoryInfo> next() {
-        return delegate.next();
-      }
-
-      @Override
-      public void close() {
-        // no-op
-      }
-
-      @Override
-      public void seekToFirst() {
-      }
-
-      @Override
-      public void seekToLast() {
-      }
-
-      @Override
-      public Table.KeyValue<String, OmDirectoryInfo> seek(String s) {
-        return null;
-      }
-
-      @Override
-      public void removeFromDB() {
-      }
-    };
+    return table;
   }
 
-  private static MergedKeyValue merged(byte[] key, long sequence, int type, byte[] value) {
+  private static MergedKeyValue toMergedKV(byte[] key, long sequence, int type, byte[] value) {
     return MergedKeyValue.of(key, sequence, type, value);
   }
 
@@ -393,25 +337,33 @@ class TestDagDiffSequentialReader {
   }
 
   private static byte[] dirBytes(String name, long objectId, long parentId) throws Exception {
-    OmDirectoryInfo dirInfo = OmDirectoryInfo.newBuilder()
+    return dirBytes(name, objectId, parentId, Collections.emptyMap());
+  }
+
+  private static byte[] dirBytes(String name, long objectId, long parentId, Map<String, String> metadata)
+      throws Exception {
+    OmDirectoryInfo.Builder builder = OmDirectoryInfo.newBuilder()
         .setName(name)
         .setObjectID(objectId)
         .setParentObjectID(parentId)
-        .setUpdateID(10L)
-        .build();
-    return OmDirectoryInfo.getCodec().toPersistedFormat(dirInfo);
+        .setUpdateID(10L);
+    if (!metadata.isEmpty()) {
+      builder.addAllMetadata(metadata);
+    }
+    return OmDirectoryInfo.getCodec().toPersistedFormat(builder.build());
   }
 
-  private static String name(byte[] value) {
-    return value == null ? null : new String(value, StandardCharsets.UTF_8);
+  private static Map<String, String> metadata(String key, String value) {
+    Map<String, String> metadata = new LinkedHashMap<>();
+    metadata.put(key, value);
+    return metadata;
   }
 
   private static final class DirectoryTables {
-    private final Table<String, OmDirectoryInfo> fromTable;
-    private final Table<String, OmDirectoryInfo> toTable;
+    private final Table<byte[], byte[]> fromTable;
+    private final Table<byte[], byte[]> toTable;
 
-    private DirectoryTables(Table<String, OmDirectoryInfo> fromTable,
-        Table<String, OmDirectoryInfo> toTable) {
+    private DirectoryTables(Table<byte[], byte[]> fromTable, Table<byte[], byte[]> toTable) {
       this.fromTable = fromTable;
       this.toTable = toTable;
     }
