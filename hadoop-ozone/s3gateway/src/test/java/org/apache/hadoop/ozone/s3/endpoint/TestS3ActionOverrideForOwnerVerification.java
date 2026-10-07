@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.client.S3HeadObjectAttributes;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
@@ -275,6 +276,7 @@ public class TestS3ActionOverrideForOwnerVerification {
     when(key.getModificationTime()).thenReturn(Instant.now());
     final S3HeadObjectAttributes headAttributes = mock(S3HeadObjectAttributes.class);
     when(headAttributes.getKey()).thenReturn(key);
+    when(headAttributes.getBucketLayout()).thenReturn(BucketLayout.OBJECT_STORE);
 
     when(clientProtocol.headS3Object(DEST_BUCKET, DEST_KEY)).thenAnswer(invocationOnMock -> {
       recordS3Action(s3AuthRef, actions);
