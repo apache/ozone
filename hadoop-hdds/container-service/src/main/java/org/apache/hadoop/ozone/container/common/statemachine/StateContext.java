@@ -415,22 +415,6 @@ public class StateContext {
     }
   }
 
-  /**
-   * Drops the queued incremental container reports (ICRs) for a single
-   * endpoint.
-   *
-   * @param endpoint the re-registering endpoint
-   */
-  public void clearIncrementalContainerReports(HostAndPort endpoint) {
-    synchronized (incrementalReportsQueue) {
-      List<Message> reportsForEndpoint = incrementalReportsQueue.get(endpoint);
-      if (reportsForEndpoint != null) {
-        reportsForEndpoint.removeIf(
-            report -> report instanceof IncrementalContainerReportProto);
-      }
-    }
-  }
-
   @VisibleForTesting
   List<Message> getAllAvailableReportsUpToLimit(
       HostAndPort endpoint,
