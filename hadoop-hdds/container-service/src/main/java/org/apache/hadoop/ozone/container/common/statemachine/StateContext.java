@@ -375,14 +375,31 @@ public class StateContext {
    */
   public List<Message> getAllAvailableReports(
       HostAndPort endpoint) {
-    int maxLimit = Integer.MAX_VALUE;
-    // TODO: It is highly unlikely that we will reach maxLimit for the number
-    //       for the number of reports, specially as it does not apply to the
-    //       number of entries in a report. But if maxLimit is hit, should a
-    //       heartbeat be scheduled ASAP? Should full reports not included be
-    //       dropped? Currently this code will keep the full reports not sent
-    //       and include it in the next heartbeat.
+    return getAllAvailableReportsUpToLimit(endpoint, Integer.MAX_VALUE);
+  }
+
+  /**
+   * Returns up to {@code maxLimit} available reports for the endpoint,
+   * removing them from the queue. Any reports beyond the limit stay queued
+   * and are returned by a later call; callers can use {@link
+   * #hasPendingReports(HostAndPort)} to detect that case and schedule a
+   * follow-up heartbeat.
+   *
+   * @return List of reports
+   */
+  public List<Message> getAllAvailableReports(
+      HostAndPort endpoint, int maxLimit) {
     return getAllAvailableReportsUpToLimit(endpoint, maxLimit);
+  }
+
+  /**
+   * Returns true if incremental reports are still queued for the endpoint.
+   */
+  public boolean hasPendingReports(HostAndPort endpoint) {
+    synchronized (incrementalReportsQueue) {
+      List<Message> reportsForEndpoint = incrementalReportsQueue.get(endpoint);
+      return reportsForEndpoint != null && !reportsForEndpoint.isEmpty();
+    }
   }
 
   /**
