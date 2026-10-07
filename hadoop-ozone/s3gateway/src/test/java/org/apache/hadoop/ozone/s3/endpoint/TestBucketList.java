@@ -706,6 +706,26 @@ public class TestBucketList {
     assertNotNull(response.getContents().get(0).getOwner());
   }
 
+  @Test
+  public void delimiterScanKeepsLiteralPrefixes() throws Exception {
+    setup("a::one", "a::two", "b::item", "plain");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, "::");
+    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get(BUCKET_NAME).getEntity();
+    assertEquals(2, response.getCommonPrefixes().size());
+    assertEquals("a::", response.getCommonPrefixes().get(0).getPrefix().getName());
+    assertEquals("b::", response.getCommonPrefixes().get(1).getPrefix().getName());
+    assertEquals(1, response.getContents().size());
+    assertEquals("plain", response.getContents().get(0).getKey().getName());
+
+    setup("aaa", "aab", "baa");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, "aa");
+    response = (ListObjectResponse) bucketEndpoint.get(BUCKET_NAME).getEntity();
+    assertEquals(2, response.getCommonPrefixes().size());
+    assertEquals("aa", response.getCommonPrefixes().get(0).getPrefix().getName());
+    assertEquals("baa", response.getCommonPrefixes().get(1).getPrefix().getName());
+    assertTrue(response.getContents().isEmpty());
+  }
+
   private void createKeys(OzoneClient ozoneClient, String... keys) throws IOException {
     OzoneBucket bucket = ozoneClient.getObjectStore().getS3Bucket(BUCKET_NAME);
     for (String key : keys) {
