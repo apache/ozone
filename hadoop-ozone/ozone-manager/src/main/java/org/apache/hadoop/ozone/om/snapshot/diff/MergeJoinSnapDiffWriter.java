@@ -229,7 +229,7 @@ public final class MergeJoinSnapDiffWriter {
   }
 
   private static Map<Long, Boolean> newAncestorMemo(SnapDiffJobStore store) {
-    final int capacity = (int) Math.min(store.getMaxInMemoryEntries(), Integer.MAX_VALUE);
+    final int capacity = store.ancestorMemoCapacity();
     return new LinkedHashMap<Long, Boolean>(capacity, 0.75f, true) {
       @Override
       protected boolean removeEldestEntry(Map.Entry<Long, Boolean> eldest) {
