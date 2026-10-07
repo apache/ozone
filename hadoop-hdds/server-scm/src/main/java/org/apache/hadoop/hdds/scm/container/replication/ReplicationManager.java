@@ -1580,11 +1580,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
           // and then back to a leader in a short time, there may be old pending
           // Ops in the ContainerReplicaPendingOps table. They are no longer
           // needed as the DN will discard any commands when the term changes.
-          // Therefore we should clear the table so RM starts from a clean
-          // state.
-          containerReplicaPendingOps.clear();
-          // clear() discards pending ops without firing opCompleted, so also
-          // reset the reconstruction tracking that opCompleted maintains.
+          // Reset pending ops and reconstruction tracking atomically under the
+          // tracker lock (see GlobalReconstructionTracker#clear).
           globalReconstructionTracker.clear();
           serviceStatus = ServiceStatus.RUNNING;
         }
@@ -1742,6 +1739,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    *   <li>{@link #reserveAndSend} holds {@link #lock} across reserve, map
    *       registration, and send so {@link #clear()} on leader transition
    *       cannot run mid-send.</li>
+   *   <li>{@link #clear()} clears {@link ContainerReplicaPendingOps} under
+   *       the same lock so pending ADD ops cannot be scheduled after the
+   *       pending-op table is reset.</li>
    *   <li>{@link #onFragmentComplete} runs without {@link #lock}; it uses
    *       {@code ConcurrentHashMap.compute} and tolerates a prior
    *       {@link #clear()}.</li>
@@ -1815,6 +1815,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     void clear() {
       lock.lock();
       try {
+        containerReplicaPendingOps.clear();
         pendingFragmentCountByCommandId.clear();
         inflightCount.set(0);
       } finally {

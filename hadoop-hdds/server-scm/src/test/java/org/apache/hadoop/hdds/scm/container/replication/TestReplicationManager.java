@@ -2175,5 +2175,8 @@ public class TestReplicationManager {
     sender.join(TimeUnit.SECONDS.toMillis(30));
     notifyThread.join(TimeUnit.SECONDS.toMillis(30));
     assertTrue(notifyCompleted.get());
+    assertTrue(containerReplicaPendingOps.getPendingOps(container.containerID())
+        .isEmpty());
+    assertEquals(0, rm.getInflightReconstructionCount());
   }
 }
