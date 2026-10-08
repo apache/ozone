@@ -847,6 +847,11 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   }
 
   @Override
+  public void setVerifyChecksum(boolean verifyChecksum) {
+    ozoneClient.getProxy().setVerifyChecksum(verifyChecksum);
+  }
+
+  @Override
   public boolean isFileClosed(String pathStr) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
     if (StringUtils.isEmpty(pathStr)) {

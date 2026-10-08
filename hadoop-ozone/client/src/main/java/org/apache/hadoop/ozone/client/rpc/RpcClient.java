@@ -3008,6 +3008,11 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void setVerifyChecksum(boolean verifyChecksum) {
+    clientConfig.setChecksumVerify(verifyChecksum);
+  }
+
+  @Override
   public LeaseKeyInfo recoverLease(String volumeName, String bucketName,
                                    String keyName, boolean force)
       throws IOException {
