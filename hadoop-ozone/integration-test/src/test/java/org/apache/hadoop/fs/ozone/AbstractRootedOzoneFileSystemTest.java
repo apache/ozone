@@ -2198,6 +2198,11 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
+  void testSetVerifyChecksum() throws Exception {
+    setVerifyChecksum(cluster, new Path(bucketPath, "testSetVerifyChecksum"));
+  }
+
+  @Test
   public void testSetTimesForLinkedBucketPath() throws Exception {
     // Create a file
     OzoneBucket sourceBucket =

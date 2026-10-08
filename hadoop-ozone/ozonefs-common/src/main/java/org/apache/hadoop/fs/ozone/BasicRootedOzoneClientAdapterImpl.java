@@ -1483,6 +1483,11 @@ public class BasicRootedOzoneClientAdapterImpl
   }
 
   @Override
+  public void setVerifyChecksum(boolean verifyChecksum) {
+    proxy.setVerifyChecksum(verifyChecksum);
+  }
+
+  @Override
   public boolean isFileClosed(String pathStr) throws IOException {
     incrementCounter(Statistic.INVOCATION_IS_FILE_CLOSED, 1);
     OFSPath ofsPath = new OFSPath(pathStr, config);
