@@ -18,15 +18,21 @@
 package org.apache.hadoop.hdds.server.http;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.URI;
 import java.nio.file.Path;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ozone.test.GenericTestUtils.PortAllocator;
+import org.eclipse.jetty.ee8.webapp.WebAppContext;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -137,6 +143,34 @@ class TestBaseHttpServer {
     assertEquals("/1.2.3.4:1234", baseHttpServer
         .getBindAddress("bindhostkey", "addresskey",
             "default", 65).toString());
+
+    // An IPv6 bind host, wildcard or literal, must survive being combined with
+    // the port. Assert on the address rather than toString(), whose bracketing
+    // of IPv6 literals is a JDK detail.
+    conf.set("bindhostkey", "::");
+
+    InetSocketAddress wildcard = baseHttpServer
+        .getBindAddress("bindhostkey", "addresskey", "default", 65);
+    assertEquals(InetAddress.getByName("::"), wildcard.getAddress());
+    assertEquals(1234, wildcard.getPort());
+
+    conf.set("bindhostkey", "2001:db8::1");
+
+    InetSocketAddress literal = baseHttpServer
+        .getBindAddress("bindhostkey", "addresskey", "default", 65);
+    assertEquals(InetAddress.getByName("2001:db8::1"), literal.getAddress());
+    assertEquals(1234, literal.getPort());
+  }
+
+  @Test
+  void endpointUriKeepsHostAndPort() {
+    URI ipv4 = BaseHttpServer.newEndpointUri("http", new InetSocketAddress("192.0.2.1", 9874));
+    assertEquals("192.0.2.1", ipv4.getHost());
+    assertEquals(9874, ipv4.getPort());
+
+    URI ipv6 = BaseHttpServer.newEndpointUri("https", new InetSocketAddress("2001:db8::1", 9875));
+    assertEquals("[2001:db8:0:0:0:0:0:1]", ipv6.getHost());
+    assertEquals(9875, ipv6.getPort());
   }
 
   @ParameterizedTest
@@ -155,6 +189,55 @@ class TestBaseHttpServer {
       if (policy.isHttpsEnabled()) {
         assertEquals(hostname + ":" + subject.getHttpsAddress().getPort(), conf.get(ADDRESS_HTTPS_KEY));
       }
+    } finally {
+      subject.stop();
+    }
+  }
+
+  /**
+   * Each server must use its own temp subdirectory (named after the server)
+   * under the base directory, so multiple WebAppContexts in one process do not
+   * share Jetty scratch space, and the subdirectory is kept persistent so Jetty
+   * does not delete operator data under the metadata directory on stop.
+   */
+  @Test
+  void usesPerServerTempSubdirectory() throws Exception {
+    MutableConfigurationSource conf = newConfig(HttpConfig.Policy.HTTP_ONLY);
+    BaseHttpServer subject = new TestingHttpServer(conf);
+    try {
+      subject.start();
+      Field field = BaseHttpServer.class.getDeclaredField("httpServer");
+      field.setAccessible(true);
+      WebAppContext webAppContext =
+          ((HttpServer2) field.get(subject)).getWebAppContext();
+      assertEquals(new File(tempDir.toFile(), "testing").getCanonicalFile(),
+          webAppContext.getTempDirectory().getCanonicalFile());
+      assertTrue(webAppContext.isPersistTempDirectory());
+    } finally {
+      subject.stop();
+    }
+  }
+
+  /**
+   * An operator-configured {@code hadoop.http.temp.dir} is applied by
+   * {@link HttpServer2} during build and must not be silently replaced by the
+   * per-server {@code <basedir>/<name>} subdirectory, preserving the
+   * pre-Jetty-12 precedence where the explicit setting wins.
+   */
+  @Test
+  void honoursOperatorConfiguredTempDir() throws Exception {
+    MutableConfigurationSource conf = newConfig(HttpConfig.Policy.HTTP_ONLY);
+    File operatorTempDir = new File(tempDir.toFile(), "operator-temp");
+    conf.set("hadoop.http.temp.dir", operatorTempDir.getAbsolutePath());
+    BaseHttpServer subject = new TestingHttpServer(conf);
+    try {
+      subject.start();
+      Field field = BaseHttpServer.class.getDeclaredField("httpServer");
+      field.setAccessible(true);
+      WebAppContext webAppContext =
+          ((HttpServer2) field.get(subject)).getWebAppContext();
+      assertEquals(operatorTempDir.getCanonicalFile(),
+          webAppContext.getTempDirectory().getCanonicalFile());
     } finally {
       subject.stop();
     }

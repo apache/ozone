@@ -140,6 +140,14 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
     return null;
   }
 
+  public long getModificationTime() {
+    final KeyOutputStream keyOutputStream = getKeyOutputStream();
+    if (keyOutputStream != null) {
+      return keyOutputStream.getModificationTime();
+    }
+    throw new IllegalStateException("OutputStream is not a KeyOutputStream: " + outputStream.getClass());
+  }
+
   public OutputStream getOutputStream() {
     return outputStream;
   }
@@ -150,7 +158,7 @@ public class OzoneOutputStream extends ByteArrayStreamOutput
   }
 
   public void setPreCommits(List<CheckedRunnable<IOException>> preCommits) {
-    KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
+    final KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
     if (keyCommitOutput != null) {
       keyCommitOutput.setPreCommits(preCommits);
       return;

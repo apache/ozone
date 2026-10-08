@@ -109,12 +109,10 @@ public class OzoneLocal extends GenericCli {
 
   @Override
   public void setConfigurationPath(String configPath) {
-    // LocalOzoneCluster.userConfiguredSource() tells a --conf file from a shipped classpath
-    // default by exact source-name comparison, and Configuration records a classpath resource by
-    // its bare name, so a scheme-less path is absolutized before GenericCli records it. A value
-    // carrying a scheme (file:, hdfs:) already cannot collide with a bare resource name and
-    // java.nio would misparse it into a CWD-relative literal path, so it passes through; the
-    // fs.Path parse also keeps rejecting an empty value at option parse time.
+    // Configuration records a classpath resource by its bare name and LocalOzoneCluster#userConfiguredSource
+    // compares names exactly, so a scheme-less path is absolutized: ./ozone-default.xml must stay a user
+    // choice. A scheme (file:, hdfs:) cannot collide and java.nio would mangle it into a literal path, so
+    // it passes through. fs.Path does the scheme check because it also rejects an empty value at parse.
     if (new org.apache.hadoop.fs.Path(configPath).toUri().getScheme() == null) {
       configPath = Paths.get(configPath).toAbsolutePath().normalize().toString();
     }
@@ -248,7 +246,7 @@ public class OzoneLocal extends GenericCli {
       return null;
     }
 
-    /** Marks startup failures so the root command can print the cause before any useful hints. */
+    /** Wraps startup failures so {@link OzoneLocal#printError} can print the cause and then the hint. */
     private void start(LocalOzoneRuntime runtime) throws Exception {
       try {
         runtime.start();
@@ -360,9 +358,7 @@ public class OzoneLocal extends GenericCli {
         try {
           return LocalOzoneClusterConfig.FormatMode.fromString(value);
         } catch (IllegalArgumentException ex) {
-          // The value can come from OZONE_LOCAL_FORMAT, so name it: the user may not realize the
-          // environment supplied it. picocli's conversion-error line names the option but not the
-          // value, so the message has to carry it.
+          // picocli's wrapper names the option but not the value, which may come from OZONE_LOCAL_FORMAT.
           throw new CommandLine.TypeConversionException("Invalid format mode '" + value
               + "'. Expected one of: if-needed, always, never.");
         }
@@ -383,8 +379,6 @@ public class OzoneLocal extends GenericCli {
       }
 
       private static Duration parseHadoopStyleDuration(String value) {
-        // Rejected instead of silently interpreting the value a thousand times smaller than the
-        // user meant; the rationale lives on LocalOzoneCluster#lacksTimeUnit.
         if (LocalOzoneCluster.lacksTimeUnit(value)) {
           throw new CommandLine.TypeConversionException("Missing time unit in '" + value
               + "'. " + durationMessage());

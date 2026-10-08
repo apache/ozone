@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -259,6 +260,8 @@ public class Checksum {
   /**
    * The default implementation of computeChecksum(ChunkBuffer) that does not use cache, even if cache is initialized.
    * This is a stop-gap solution before the protocol change.
+   * The input must be prepared for reading as described by
+   * {@link #computeChecksum(ChunkBuffer, boolean)}.
    * @param data ChunkBuffer
    * @return ChecksumData
    * @throws OzoneChecksumException
@@ -269,6 +272,10 @@ public class Checksum {
   }
 
   /**
+   * The input must be prepared for reading. For each buffer returned by
+   * {@link ChunkBuffer#asByteBufferList()}, the bytes in
+   * {@code [position(), limit())} must be the logical checksum data.
+   *
    * This method does not advance the positions of {@code data}'s underlying
    * buffers. Both the no-cache and cache paths slice via
    * {@link ByteBuffer#duplicate()}.
@@ -305,6 +312,7 @@ public class Checksum {
     final int checksumCount = dataLength == 0 ? 0 : 1 + (dataLength - 1) / bytesPerChecksum;
     final List<ByteString> result = new ArrayList<>(checksumCount);
     int windowRemaining = bytesPerChecksum;
+    long processed = 0;
     algo.reset();
 
     for (ByteBuffer src : data.asByteBufferList()) {
@@ -314,6 +322,7 @@ public class Checksum {
         final int n = Math.min(srcLim - srcPos, windowRemaining);
         algo.update(BufferUtils.slice(src, srcPos, n));
         srcPos += n;
+        processed += n;
         windowRemaining -= n;
         if (windowRemaining == 0) {
           result.add(algo.finish());
@@ -321,6 +330,10 @@ public class Checksum {
           windowRemaining = bytesPerChecksum;
         }
       }
+    }
+    if (processed != dataLength) {
+      throw new IllegalStateException("ChunkBuffer remaining byte count is " + dataLength
+          + ", but its underlying buffers expose " + processed + " bytes");
     }
     if (windowRemaining < bytesPerChecksum) {
       // Unaligned trailing window.
@@ -421,6 +434,59 @@ public class Checksum {
     final ChecksumData computed = checksum.computeChecksum(
         ChunkBuffer.wrap(bufferList));
     checksumData.verifyChecksumDataMatches(startIndex, computed);
+  }
+
+  public static void validateChecksums(ByteBuffer data, long blockOffset, int startIndex,
+      final List<ChunkInfo> chunks) throws OzoneChecksumException {
+
+    if (!data.hasRemaining()) {
+      return;
+    }
+    int dataOffset = data.position();
+    int remaining = data.remaining();
+    long offset = blockOffset;
+    while (remaining > 0) {
+      if (startIndex >= chunks.size()) {
+        throw new OzoneChecksumException("Missing chunk metadata at offset " + offset);
+      }
+      ChunkInfo chunk = chunks.get(startIndex++);
+      long chunkOffset = chunk.getOffset();
+      long length = chunk.getLen();
+      if (offset < chunkOffset || offset - chunkOffset >= length
+          || (offset != blockOffset && offset != chunkOffset)) {
+        throw new OzoneChecksumException("Invalid chunk coverage at offset " + offset);
+      }
+      long relativeOffset = offset - chunkOffset;
+      int size = (int) Math.min(remaining, length - relativeOffset);
+      if (chunk.getChecksumData().getType() != ChecksumType.NONE) {
+        int bytesPerChecksum = chunk.getChecksumData().getBytesPerChecksum();
+        if (bytesPerChecksum <= 0 || relativeOffset % bytesPerChecksum != 0
+            || (relativeOffset + size != length && (relativeOffset + size) % bytesPerChecksum != 0)) {
+          throw new OzoneChecksumException("Invalid checksum boundary at offset " + offset);
+        }
+        verifySingleChunk(data, dataOffset, size, chunk, (int) (relativeOffset / bytesPerChecksum));
+      }
+      dataOffset += size;
+      offset += size;
+      remaining -= size;
+    }
+  }
+
+  private static void verifySingleChunk(ByteBuffer data, int dataOffset, int dataLimit,
+      ContainerProtos.ChunkInfo chunkInfo, int checksumIndex) throws OzoneChecksumException {
+
+    ContainerProtos.ChecksumData protoChecksum = chunkInfo.getChecksumData();
+    final ByteBuffer buffer = data.duplicate();
+    buffer.position(dataOffset);
+    buffer.limit(dataOffset + dataLimit);
+
+    final ChecksumData checksum = new ChecksumData(
+        protoChecksum.getType(),
+        protoChecksum.getBytesPerChecksum(),
+        protoChecksum.getChecksumsList()
+    );
+
+    Checksum.verifyChecksum(buffer, checksum, checksumIndex);
   }
 
   /**

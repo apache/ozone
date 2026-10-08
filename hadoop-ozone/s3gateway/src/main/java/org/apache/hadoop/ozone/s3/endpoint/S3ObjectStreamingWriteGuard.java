@@ -49,6 +49,11 @@ final class S3ObjectStreamingWriteGuard extends S3ObjectWriteGuard {
   }
 
   @Override
+  public ByteBuffer getDerivedKey() {
+    return outputStream.getDerivedKey();
+  }
+
+  @Override
   public void close() throws IOException {
     outputStream.close();
   }

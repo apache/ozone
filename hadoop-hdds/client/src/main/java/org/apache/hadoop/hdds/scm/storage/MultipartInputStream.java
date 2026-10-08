@@ -40,6 +40,7 @@ public class MultipartInputStream extends ExtendedInputStream {
   // List of PartInputStream, one for each part of the key
   private final List<? extends PartInputStream> partStreams;
   private final boolean isStreamBlockInputStream;
+  private final boolean statelessPositionedReadSupported;
 
   // partOffsets[i] stores the index of the first data byte in
   // partStream w.r.t the whole key data.
@@ -70,15 +71,19 @@ public class MultipartInputStream extends ExtendedInputStream {
 
     // Calculate and update the partOffsets
     this.partOffsets = new long[inputStreams.size()];
+    boolean statelessSupported = !inputStreams.isEmpty();
     int i = 0;
     long streamLength = 0L;
     for (PartInputStream partInputStream : inputStreams) {
       this.partOffsets[i++] = streamLength;
       if (isStreamBlockInputStream) {
         Preconditions.assertInstanceOf(partInputStream, StreamBlockInputStream.class);
+      } else if (statelessSupported && !(partInputStream instanceof BlockInputStream)) {
+        statelessSupported = false;
       }
       streamLength += partInputStream.getLength();
     }
+    this.statelessPositionedReadSupported = statelessSupported;
     this.length = streamLength;
   }
 
@@ -191,32 +196,56 @@ public class MultipartInputStream extends ExtendedInputStream {
 
   @Override
   public boolean readFully(long position, ByteBuffer buffer) throws IOException {
-    if (!isStreamBlockInputStream) {
+    if (!statelessPositionedReadSupported) {
       return false;
     }
+    return readFullyStateless(position, buffer);
+  }
 
-    final long oldPos = getPos();
-    seek(position);
-    try {
-      int remainingBeforeRead = buffer.remaining();
-      if (remainingBeforeRead == 0) {
-        return true;
-      }
-      read(new ByteBufferReader(buffer) {
-        @Override
-        int readImpl(InputStream inputStream) throws IOException {
-          return Preconditions.assertInstanceOf(inputStream, StreamBlockInputStream.class)
-              .readFully(getBuffer(), false);
+  /**
+   * Shared stateless positioned-read loop across parts using {@link PartInputStream#readPositioned}.
+   */
+  private boolean readFullyStateless(long position, ByteBuffer buffer) throws IOException {
+    if (!buffer.hasRemaining()) {
+      return true;
+    }
+
+    long pos = position;
+    int bytesRead = 0;
+    while (buffer.hasRemaining()) {
+      if (pos < 0 || pos >= length) {
+        if (bytesRead > 0) {
+          return true;
         }
-      });
-      if (remainingBeforeRead - buffer.remaining() == 0) {
-        throw new EOFException("EOF encountered at pos: " + position +
+        throw new EOFException("EOF encountered at pos: " + pos +
             " for key: " + key);
       }
-    } finally {
-      seek(oldPos);
+      int idx = binarySearchOffsetIndex(partOffsets, pos);
+      long partPos = pos - partOffsets[idx];
+      int n = partStreams.get(idx).readPositioned(partPos, buffer);
+      if (n <= 0) {
+        if (bytesRead > 0) {
+          return true;
+        }
+        throw new EOFException("EOF encountered at pos: " + pos +
+            " for key: " + key);
+      }
+      bytesRead += n;
+      pos += n;
     }
     return true;
+  }
+
+  static int binarySearchOffsetIndex(long[] offsets, long pos) {
+    final int idx = Arrays.binarySearch(offsets, pos);
+    if (idx >= 0) {
+      // exact match: pos falls exactly on the start of chunk/part idx
+      return idx;
+    }
+    // binarySearch returns n = -insertionPoint - 1;
+    // insertionPoint is -n - 1
+    // the containing index is insertionPoint - 1.
+    return -idx - 2;
   }
 
   public synchronized void initialize() throws IOException {

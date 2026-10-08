@@ -36,7 +36,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilter;
-import org.eclipse.jetty.servlet.FilterHolder;
+import org.eclipse.jetty.ee8.servlet.FilterHolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

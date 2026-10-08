@@ -64,15 +64,15 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest request = super.preExecute(ozoneManager);
+    final OMRequest omRequest = super.preExecute(ozoneManager);
 
     long modificationTime = Time.now();
-    SetVolumePropertyRequest.Builder setPropertyRequestBuilder = getOmRequest()
+    SetVolumePropertyRequest.Builder setPropertyRequestBuilder = omRequest
         .getSetVolumePropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
     SetVolumePropertyRequest setVolumePropertyRequest =
-        getOmRequest().getSetVolumePropertyRequest();
+        omRequest.getSetVolumePropertyRequest();
     String volume = setVolumePropertyRequest.getVolumeName();
 
     // ACL check during preExecute
@@ -89,12 +89,12 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
             String.valueOf(setVolumePropertyRequest.getQuotaInBytes()));
         markForAudit(ozoneManager.getAuditLogger(),
             buildAuditMessage(OMAction.SET_QUOTA, auditMap, ex,
-                request.getUserInfo()));
+                omRequest.getUserInfo()));
         throw ex;
       }
     }
 
-    return request.toBuilder()
+    return omRequest.toBuilder()
         .setSetVolumePropertyRequest(setPropertyRequestBuilder)
         .build();
   }

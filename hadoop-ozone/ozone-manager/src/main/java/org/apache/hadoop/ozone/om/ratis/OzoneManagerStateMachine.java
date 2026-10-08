@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
 
@@ -625,14 +624,19 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
 
       long startTime = Time.monotonicNow();
-      final TransactionInfo transactionInfo = TransactionInfo.valueOf(snapshot);
+      // The double buffer may have committed transactions past the index computed above, since it
+      // advances lastAppliedTermIndex only after its batch commit returns. Persisting through it
+      // keeps the stored index from moving backwards over that data, and yields whichever value is
+      // actually stored so the in-memory copy Ratis reads cannot disagree with the DB.
+      final TransactionInfo transactionInfo =
+          ozoneManagerDoubleBuffer.persistIfNewer(TransactionInfo.valueOf(snapshot));
       ozoneManager.setTransactionInfo(transactionInfo);
-      ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, transactionInfo);
       ozoneManager.getMetadataManager().getStore().flushDB();
       LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
           "notified = {}, current snapshot index = {}, took {} ms",
-              getId(), applied, lastSkippedIndex, notified, snapshot, Time.monotonicNow() - startTime);
-      return snapshot.getIndex();
+              getId(), applied, lastSkippedIndex, notified, transactionInfo.getTermIndex(),
+              Time.monotonicNow() - startTime);
+      return transactionInfo.getTermIndex().getIndex();
     }
   }
 
@@ -693,18 +697,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @VisibleForTesting
   OMResponse runCommand(OMRequest request, TermIndex termIndex) {
-    try {
+    try (OMThreadContext.Scope ignored =
+             OMThreadContext.forWrite(request, ozoneManager).applyToCurrentThread()) {
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
-      OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
-      OMResponse omResponse = omClientResponse.getOMResponse();
-      if (omLockDetails != null) {
-        return omResponse.toBuilder()
-            .setOmLockDetails(omLockDetails.toProtobufBuilder()).build();
-      } else {
-        return omResponse;
-      }
+      OMLockDetails lockDetails = omClientResponse.getOmLockDetails();
+      OMResponse response = omClientResponse.getOMResponse();
+      return lockDetails == null ? response
+          : response.toBuilder().setOmLockDetails(lockDetails.toProtobufBuilder()).build();
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e, termIndex);
@@ -755,9 +756,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @param request OMRequest
    * @return response from OM
    */
-  private Message queryCommand(OMRequest request) {
-    OMResponse response = handler.handleReadRequest(request);
-    return OMRatisHelper.convertResponseToMessage(response);
+  private Message queryCommand(OMRequest request) throws IOException {
+    try (OMThreadContext.Scope context =
+             OMThreadContext.forRead(request, ozoneManager).applyToCurrentThread()) {
+      OMResponse response = handler.handleReadRequest(request);
+      return OMRatisHelper.convertResponseToMessage(context.addLockDetails(response));
+    }
   }
 
   private static <T> CompletableFuture<T> completeExceptionally(Exception e) {
