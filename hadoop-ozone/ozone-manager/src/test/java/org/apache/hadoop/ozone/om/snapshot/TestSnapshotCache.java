@@ -176,10 +176,12 @@ class TestSnapshotCache {
     final UUID dbKey = UUID.randomUUID();
     when(cacheLoader.load(eq(dbKey)))
         .thenThrow(new OMException("Snapshot is no longer active", OMException.ResultCodes.FILE_NOT_FOUND));
-    OMException ex = assertThrows(OMException.class, () -> snapshotCache.get(dbKey));
-    assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
-    assertEquals(0, snapshotCache.size());
-    assertEquals(0, omMetrics.getNumSnapshotCacheSize());
+    for (int i = 0; i < 3; i++) {
+      OMException ex = assertThrows(OMException.class, () -> snapshotCache.get(dbKey));
+      assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
+      assertEquals(0, snapshotCache.size());
+      assertEquals(0, omMetrics.getNumSnapshotCacheSize());
+    }
   }
 
   @ParameterizedTest
