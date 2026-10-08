@@ -232,6 +232,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               commitKeyArgs.getMetadataList()))
           .setDataSize(commitKeyArgs.getDataSize())
           .setUpdateID(trxnLogIndex)
+          .setSeqNumMin(resolveSeqNumMin(ozoneManager, keyToDelete, omKeyInfo, trxnLogIndex))
           .build();
 
       List<OmKeyLocationInfo> uncommitted =

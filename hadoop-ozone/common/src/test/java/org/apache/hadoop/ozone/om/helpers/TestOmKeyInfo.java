@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -114,6 +115,53 @@ public class TestOmKeyInfo {
         (ECReplicationConfig) recovered.getReplicationConfig();
     assertEquals(3, config.getData());
     assertEquals(2, config.getParity());
+  }
+
+  @Test
+  public void visibilityIntervalProtobufConversion() throws IOException {
+    OmKeyInfo key = createOmKeyInfo(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE)).toBuilder()
+        .setSeqNumMin(42L)
+        .setSeqNumMax(99L)
+        .build();
+
+    OmKeyInfo recovered = OmKeyInfo.getFromProtobuf(key.getProtobuf(ClientVersion.CURRENT_VERSION));
+    assertEquals(42L, recovered.getSeqNumMin());
+    assertEquals(99L, recovered.getSeqNumMax());
+
+    // Key table entries use isOpenKey=false; the interval must survive that codec.
+    OmKeyInfo fromKeyTableCodec = OmKeyInfo.getFromProtobuf(
+        key.getProtobuf(true, ClientVersion.CURRENT_VERSION, false));
+    assertEquals(42L, fromKeyTableCodec.getSeqNumMin());
+    assertEquals(99L, fromKeyTableCodec.getSeqNumMax());
+
+    assertEquals(42L, key.copyObject().getSeqNumMin());
+    assertEquals(99L, key.copyObject().getSeqNumMax());
+  }
+
+  @Test
+  public void visibilityIntervalAbsentByDefault() throws IOException {
+    OmKeyInfo key = createOmKeyInfo(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    assertNull(key.getSeqNumMin());
+    assertNull(key.getSeqNumMax());
+
+    OmKeyInfo recovered = OmKeyInfo.getFromProtobuf(key.getProtobuf(ClientVersion.CURRENT_VERSION));
+    assertNull(recovered.getSeqNumMin());
+    assertNull(recovered.getSeqNumMax());
+  }
+
+  /** seqNumMin alone must round-trip as such: prepareKeyForDelete keys off its presence. */
+  @Test
+  public void visibilityIntervalPartiallyPopulated() throws IOException {
+    OmKeyInfo key = createOmKeyInfo(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE)).toBuilder()
+        .setSeqNumMin(0L)
+        .build();
+
+    OmKeyInfo recovered = OmKeyInfo.getFromProtobuf(key.getProtobuf(ClientVersion.CURRENT_VERSION));
+    assertEquals(0L, recovered.getSeqNumMin());
+    assertNull(recovered.getSeqNumMax());
   }
 
   private OmKeyInfo createOmKeyInfo(ReplicationConfig replicationConfig) {
