@@ -377,6 +377,36 @@ public class TestS3GetSecretRequest {
   }
 
   @Test
+  public void testSecretRequestsWithoutRpcUser() throws IOException {
+    // Create the secret first so that the set request passes its existence check.
+    processSuccessSecretRequest(USER_ALICE, 1, true);
+    when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+    Server.getCurCall().remove();
+
+    assertPreExecuteDenied(new S3GetSecretRequest(s3GetSecretRequest(USER_ALICE)));
+    assertPreExecuteDenied(new OMSetSecretRequest(OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.SetS3Secret)
+        .setSetS3SecretRequest(OzoneManagerProtocolProtos.SetS3SecretRequest.newBuilder()
+            .setAccessId(USER_ALICE)
+            .setSecretKey("secretKey12345")
+            .build())
+        .build()));
+    assertPreExecuteDenied(new S3RevokeSecretRequest(OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.RevokeS3Secret)
+        .setRevokeS3SecretRequest(OzoneManagerProtocolProtos.RevokeS3SecretRequest.newBuilder()
+            .setKerberosID(USER_ALICE)
+            .build())
+        .build()));
+  }
+
+  private void assertPreExecuteDenied(OMClientRequest request) {
+    OMException e = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+    assertEquals(ResultCodes.PERMISSION_DENIED, e.getResult());
+  }
+
+  @Test
   public void testGetSecretOfAnotherUserAsS3Admin() throws IOException {
     // This effectively makes alice an S3 admin.
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);

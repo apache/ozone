@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -164,6 +165,78 @@ public class TestOMMetadataReader {
     assertTrue(omMetadataReader.checkAcls(obj, contextWithoutS3ActionBuilder, true));
 
     verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, "GetObject");
+  }
+
+  @Test
+  public void testCheckAclsAlsoChecksGetObjectForGetObjectAttributes() throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("GetObjectAttributes")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+    final OzoneObj obj = createTestOzoneObj();
+
+    assertTrue(omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), true));
+
+    final ArgumentCaptor<RequestContext> captor = ArgumentCaptor.forClass(RequestContext.class);
+    verify(accessAuthorizer, times(2)).checkAccess(eq(obj), captor.capture());
+    assertEquals("GetObjectAttributes", captor.getAllValues().get(0).getS3Action());
+    assertEquals("GetObject", captor.getAllValues().get(1).getS3Action());
+  }
+
+  @Test
+  public void testCheckAclsDeniedWhenDependentGetObjectActionDenied() throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("GetObjectAttributes")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OzoneObj obj = createTestOzoneObj();
+    when(accessAuthorizer.checkAccess(eq(obj), any(RequestContext.class))).thenAnswer(
+        invocation -> !"GetObject".equals(invocation.<RequestContext>getArgument(1).getS3Action()));
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+
+    final OMException ex = assertThrows(
+        OMException.class, () -> omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), true));
+
+    assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
+    verify(accessAuthorizer, times(2)).checkAccess(eq(obj), any(RequestContext.class));
+  }
+
+  @Test
+  public void testCheckAclsSkipsDependentActionWhenGetObjectAttributesDenied() throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("GetObjectAttributes")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OzoneObj obj = createTestOzoneObj();
+    when(accessAuthorizer.checkAccess(eq(obj), any(RequestContext.class))).thenReturn(false);
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+
+    assertFalse(omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), false));
+
+    verify(accessAuthorizer).checkAccess(eq(obj), any(RequestContext.class));
+  }
+
+  @Test
+  public void testCheckAclsDoesNotCheckDependentActionWhenStsFeatureDisabled() throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("GetObjectAttributes")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, mock(KeyManager.class), false);
+    final OzoneObj obj = createTestOzoneObj();
+
+    assertTrue(omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), true));
+
+    verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, null);
   }
 
   @Test

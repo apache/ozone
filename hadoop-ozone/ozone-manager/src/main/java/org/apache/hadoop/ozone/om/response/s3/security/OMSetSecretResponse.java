@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.s3.security;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
-
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -26,7 +24,6 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -36,7 +33,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Response for SetSecret request.
  */
-@CleanupTableInfo(cleanupTables = {S3_SECRET_TABLE})
 public class OMSetSecretResponse extends OMClientResponse {
 
   private static final Logger LOG =

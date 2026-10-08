@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -156,8 +157,10 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
           // case-3) If src == destin then check source and destin of same type
           // (a) If dst is a file then return true.
           // (b) Otherwise throws exception.
-          // TODO: Discuss do we need to throw exception for file as well.
           if (toKeyFileStatus.isFile()) {
+            // Nothing to rename, so reply with a response that changes no table.
+            omClientResponse = new DummyOMClientResponse(
+                omResponse.setRenameKeyResponse(RenameKeyResponse.newBuilder()).build());
             result = Result.SUCCESS;
           } else {
             throw new OMException("Key already exists " + toKeyName,

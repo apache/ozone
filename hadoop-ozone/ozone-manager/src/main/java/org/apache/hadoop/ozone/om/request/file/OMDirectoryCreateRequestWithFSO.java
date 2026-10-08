@@ -164,18 +164,18 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
         result = OMDirectoryCreateRequest.Result.SUCCESS;
         omClientResponse =
             new OMDirectoryCreateResponseWithFSO(omResponse.build(),
-                volumeId, bucketId, dirInfo, missingParentInfos, result,
+                volumeId, bucketId, dirInfo, missingParentInfos,
                 getBucketLayout(), omBucketInfo.copyObject());
       } else {
         result = Result.DIRECTORY_ALREADY_EXISTS;
         omResponse.setStatus(Status.DIRECTORY_ALREADY_EXISTS);
         omClientResponse =
-            new OMDirectoryCreateResponseWithFSO(omResponse.build(), result);
+            new OMDirectoryCreateResponseWithFSO(omResponse.build());
       }
     } catch (IOException | InvalidPathException ex) {
       exception = ex;
       omClientResponse = new OMDirectoryCreateResponseWithFSO(
-          createErrorOMResponse(omResponse, exception), result);
+          createErrorOMResponse(omResponse, exception));
     } finally {
       if (acquiredLock) {
         mergeOmLockDetails(omMetadataManager.getLock()
