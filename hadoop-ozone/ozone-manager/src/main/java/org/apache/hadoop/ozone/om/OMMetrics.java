@@ -142,7 +142,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numVolumeListFails;
   private @Metric MutableCounterLong numKeyCommitFails;
   private @Metric MutableCounterLong numBlockAllocationFails;
-  private @Metric MutableCounterLong numGetServiceListFails;
   private @Metric MutableCounterLong numInitiateMultipartUploadFails;
   private @Metric MutableCounterLong numCommitMultipartUploadParts;
   private @Metric MutableCounterLong numCommitMultipartUploadPartFails;
@@ -559,10 +558,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numSnapshotDeleted.incr();
   }
 
-  public void decNumSnapshotDeleted() {
-    numSnapshotDeleted.incr(-1);
-  }
-
   public int getNumSnapshotCacheSize() {
     return numSnapshotCacheSize.value();
   }
@@ -877,10 +872,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumVolumeListFails() {
     numVolumeListFails.incr();
-  }
-
-  public void incNumGetServiceListFails() {
-    numGetServiceListFails.incr();
   }
 
   public void incNumOpenKeyDeleteRequests() {
@@ -1256,11 +1247,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   @VisibleForTesting
   public long getNumBlockAllocateFails() {
     return numBlockAllocationFails.value();
-  }
-
-  @VisibleForTesting
-  public long getNumGetServiceListFails() {
-    return numGetServiceListFails.value();
   }
 
   @VisibleForTesting
