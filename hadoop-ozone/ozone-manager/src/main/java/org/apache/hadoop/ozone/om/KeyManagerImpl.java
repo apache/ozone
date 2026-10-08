@@ -770,7 +770,7 @@ public class KeyManagerImpl implements KeyManager {
           for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
             ContainerWithPipeline cp = containerWithPipelineMap.get(
                 omKeyLocationInfo.getContainerID());
-            if (cp != null && !pipelineMatchesLocation(cp.getPipeline(), omKeyLocationInfo)) {
+            if (cp != null && cp.getPipeline() != null) {
               omKeyLocationInfo.setPipeline(cp.getPipeline());
             }
           }
@@ -2563,43 +2563,12 @@ public class KeyManagerImpl implements KeyManager {
         for (OmKeyLocationInfo omKeyLocationInfo : omKeyLocationInfoList) {
           Pipeline pipeline = containerLocations.get(
               omKeyLocationInfo.getContainerID());
-          if (pipeline != null && !pipelineMatchesLocation(pipeline, omKeyLocationInfo)) {
+          if (pipeline != null) {
             omKeyLocationInfo.setPipeline(pipeline);
           }
         }
       }
     }
-  }
-
-  /**
-   * Returns true when {@code candidate} carries the same pipeline information
-   * as the pipeline currently stored in {@code info}, including the
-   * currentVersion of every member datanode.
-   *
-   * {@link Pipeline#equals} only compares node UUIDs, so it cannot detect
-   * a version-only upgrade where topology is unchanged but the datanodes now
-   * advertise a higher wire-protocol version.  Without this check, OM would
-   * keep serving stale DN currentVersion values to clients even after SCM
-   * returns an updated pipeline.
-   */
-  private static boolean pipelineMatchesLocation(Pipeline candidate, OmKeyLocationInfo info) {
-    Pipeline current = info.getPipeline();
-    if (current == null) {
-      return candidate == null;
-    }
-    if (!candidate.equals(current)) {
-      return false;
-    }
-    // Pipeline.equals only checks node IDs; also verify currentVersion on each member.
-    for (DatanodeDetails node : candidate.getNodes()) {
-      DatanodeDetails match = current.getNodes().stream()
-          .filter(n -> n.getID().equals(node.getID()))
-          .findFirst().orElse(null);
-      if (match == null || !node.compareNodeVersions(match)) {
-        return false;
-      }
-    }
-    return true;
   }
 
   @Nonnull
