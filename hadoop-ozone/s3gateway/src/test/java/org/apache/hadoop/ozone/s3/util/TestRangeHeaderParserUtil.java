@@ -61,6 +61,13 @@ public class TestRangeHeaderParserUtil {
     assertTrue(rangeHeader.isReadFull());
     assertFalse(rangeHeader.isInValidRange());
 
+    // inverted range, start is still inside the object
+    rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=8-3", 10);
+    assertEquals(0, rangeHeader.getStartOffset());
+    assertEquals(9, rangeHeader.getEndOffset());
+    assertTrue(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
+
     // bytes spec is wrong
     rangeHeader = RangeHeaderParserUtil.parseRangeHeader("mb=11-8", 10);
     assertEquals(0, rangeHeader.getStartOffset());

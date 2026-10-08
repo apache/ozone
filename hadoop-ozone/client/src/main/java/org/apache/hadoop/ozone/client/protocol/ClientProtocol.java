@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -40,6 +41,7 @@ import org.apache.hadoop.ozone.client.OzoneMultipartUploadList;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.S3HeadObjectAttributes;
 import org.apache.hadoop.ozone.client.TenantArgs;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
@@ -47,6 +49,8 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
@@ -60,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
@@ -73,6 +78,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.KerberosInfo;
@@ -171,6 +177,18 @@ public interface ClientProtocol {
    * @throws IOException
    */
   OzoneKey headS3Object(String bucketName, String keyName, int partNumber)
+      throws IOException;
+
+  /**
+   * Returns S3 head metadata and completed multipart part sizes from a single
+   * {@code GetKeyInfo} OM call.
+   *
+   * @param bucketName Name of the Bucket
+   * @param keyName Key name
+   * @return head key metadata and sorted part-number to size map (empty when not MPU)
+   * @throws IOException
+   */
+  S3HeadObjectAttributes headS3ObjectAttributes(String bucketName, String keyName)
       throws IOException;
 
   /**
@@ -674,8 +692,9 @@ public interface ClientProtocol {
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket
    * @param keyNameList List of the Key
-   * @param quiet flag to not throw exception if delete fails
-   * @throws IOException
+   * @param quiet if true, per-key failures are returned in the result map instead of being thrown
+   * @return key name to error for each key that could not be deleted, empty if all keys were deleted
+   * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true
    */
   Map<String, ErrorInfo> deleteKeys(String volumeName, String bucketName,
                                     List<String> keyNameList, boolean quiet)
@@ -1060,6 +1079,14 @@ public interface ClientProtocol {
   OzoneFsServerDefaults getServerDefaults() throws IOException;
 
   /**
+   * Returns the negotiated Ozone Manager version for the connected cluster.
+   * In an HA cluster this is the minimum version across all OMs, so callers
+   * can safely gate client behavior on new server-side features.
+   * @return the effective Ozone Manager version.
+   */
+  OzoneManagerVersion getOmVersion();
+
+  /**
    * Get KMS client provider.
    * @return KMS client provider.
    * @throws IOException
@@ -1239,6 +1266,16 @@ public interface ClientProtocol {
   /**
    * Lightweight listStatus API.
    *
+   * @param options Encapsulates volume, bucket, key, recursive, startKey,
+   *                numEntries, allowPartialPrefixes, and optional listPrefix.
+   * @return list of file status
+   */
+  List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
+      throws IOException;
+
+  /**
+   * Lightweight listStatus API (convenience overload without listPrefix).
+   *
    * @param volumeName Volume name
    * @param bucketName Bucket name
    * @param keyName    Absolute path of the entry to be listed
@@ -1251,9 +1288,12 @@ public interface ClientProtocol {
    *                             this is needed in context of ListKeys
    * @return list of file status
    */
-  List<OzoneFileStatusLight> listStatusLight(String volumeName,
+  default List<OzoneFileStatusLight> listStatusLight(String volumeName,
       String bucketName, String keyName, boolean recursive, String startKey,
-      long numEntries, boolean allowPartialPrefixes) throws IOException;
+      long numEntries, boolean allowPartialPrefixes) throws IOException {
+    return listStatusLight(ListStatusLightOptions.of(volumeName, bucketName,
+        keyName, recursive, startKey, numEntries, allowPartialPrefixes));
+  }
 
   /**
    * Add acl for Ozone object. Return true if acl is added successfully else
@@ -1362,15 +1402,42 @@ public interface ClientProtocol {
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
   /**
+   * Sets the read consistency hint for the current request thread.
+   * @param readConsistency read consistency selected by the client.
+   */
+  void setThreadLocalReadConsistency(ReadConsistency readConsistency);
+
+  /**
+   * Sets the read consistency hint and optional local lease context for the
+   * current request thread.
+   * @param readConsistency read consistency selected by the client.
+   * @param localLeaseLogLimit optional local lease log limit.
+   * @param localLeaseTimeMs optional local lease duration in milliseconds.
+   */
+  void setThreadLocalReadConsistency(ReadConsistency readConsistency,
+      Long localLeaseLogLimit, Long localLeaseTimeMs);
+
+  /**
    * Gets the S3 Authentication information that is attached to the thread.
    * @return S3 Authentication information.
    */
   S3Auth getThreadLocalS3Auth();
 
   /**
+   * Gets the read consistency hint that is attached to the thread.
+   * @return request-local read consistency.
+   */
+  ReadConsistency getThreadLocalReadConsistency();
+
+  /**
    * Clears the S3 Authentication information attached to the thread.
    */
   void clearThreadLocalS3Auth();
+
+  /**
+   * Clears the read consistency hint attached to the thread.
+   */
+  void clearThreadLocalReadConsistency();
 
   default ThreadLocal<S3Auth> getS3CredentialsProvider() {
     return null;
@@ -1471,6 +1538,14 @@ public interface ClientProtocol {
   ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException;
+
+  /**
+   * Bucket-wise snapshot count distribution from snapshotInfo table.
+   * @param bucketFilter optional filter, accepts either bucket or volume/bucket
+   * @return snapshot counts aggregated by bucket
+   * @throws IOException
+   */
+  SnapshotCountResponse snapshotCount(String bucketFilter) throws IOException;
 
   /**
    * Get the differences between two snapshots.
@@ -1629,6 +1704,34 @@ public interface ClientProtocol {
    */
   void deleteObjectTagging(String volumeName, String bucketName, String keyName)
       throws IOException;
+
+  /**
+   * Process the AssumeRole operation.
+   *
+   * @param roleArn                 The ARN of the role to assume
+   * @param roleSessionName         The session name (should be unique) for this operation
+   * @param durationSeconds         The duration in seconds for the token validity
+   * @param awsIamSessionPolicy     The AWS IAM JSON session policy
+   * @param requestId               The requestId from the STS endpoint
+   * @return AssumeRoleResponseInfo The AssumeRole response information containing temporary credentials
+   * @throws IOException            if an error occurs during the AssumeRole operation
+   */
+  AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy, String requestId) throws IOException;
+
+  /**
+   * Returns the caller identity for the current S3-authenticated request.
+   * @return CallerIdentityInfo containing account, arn, and userId
+   * @throws IOException if an error occurs during the GetCallerIdentity operation
+   */
+  CallerIdentityInfo getCallerIdentity() throws IOException;
+
+  /**
+   * Revokes STS tokens for the given original access key ID.
+   * @param originalAccessKeyId     The original long-lived access key ID whose STS tokens to revoke
+   * @throws IOException            if an error occurs while revoking the STS token
+   */
+  void revokeSTSToken(String originalAccessKeyId) throws IOException;
 
   /**
    * Gets the lifecycle configuration information.

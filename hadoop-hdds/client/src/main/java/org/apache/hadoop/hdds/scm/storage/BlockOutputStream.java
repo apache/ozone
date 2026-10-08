@@ -188,18 +188,11 @@ public class BlockOutputStream extends OutputStream {
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
-    ContainerProtos.DatanodeBlockID.Builder blkIDBuilder =
-        ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(blockID.getContainerID())
-            .setLocalID(blockID.getLocalID())
-            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
-    if (replicationIndex > 0) {
-      blkIDBuilder.setReplicaIndex(replicationIndex);
-    }
-    // TODO: Replica to the method parameter
-    blkIDBuilder.setStorageTypeID(StorageTypeUtils.getID(StorageType.DISK));
-    this.containerBlockData = BlockData.newBuilder().setBlockID(
-        blkIDBuilder.build()).addMetadata(keyValue);
+
+    this.containerBlockData = BlockData.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicationIndex,
+            StorageTypeUtils.getID(StorageType.DISK)))
+        .addMetadata(keyValue);
     this.pipeline = pipeline;
     // tell DataNode I will send incremental chunk list
     this.supportIncrementalChunkList = canEnableIncrementalChunkList();
