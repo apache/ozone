@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.rocksdb.ByteBufferGetStatus;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
@@ -238,34 +239,16 @@ public final class RocksDatabase implements Closeable {
     return isClosed.get();
   }
 
-  /**
-   * Represents a checkpoint of the db.
-   *
-   * @see ManagedCheckpoint
-   */
-  final class RocksCheckpoint implements Closeable {
-    private final ManagedCheckpoint checkpoint;
-
-    private RocksCheckpoint() {
-      this.checkpoint = ManagedCheckpoint.create(db);
-    }
-
-    public void createCheckpoint(Path path) throws RocksDatabaseException {
-      try (UncheckedAutoCloseable ignored = acquire()) {
-        checkpoint.get().createCheckpoint(path.toString());
-      } catch (RocksDBException e) {
-        closeOnError(e);
-        throw toRocksDatabaseException(this, "createCheckpoint " + path, e);
-      }
-    }
-
-    public long getLatestSequenceNumber() throws RocksDatabaseException {
-      return RocksDatabase.this.getLatestSequenceNumber();
-    }
-
-    @Override
-    public void close() throws RocksDatabaseException {
-      checkpoint.close();
+  /** @return the latest sequence number after the checkpoint is created. */
+  long createCheckpoint(Path path) throws RocksDatabaseException {
+    final String checkpointPath = path.toString();
+    try (UncheckedAutoCloseable ignored = acquire();
+        ManagedCheckpoint checkpoint = ManagedCheckpoint.create(db)) {
+      checkpoint.get().createCheckpoint(checkpointPath);
+      return db.get().getLatestSequenceNumber();
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      throw toRocksDatabaseException(this, "createCheckpoint " + checkpointPath, e);
     }
   }
 
@@ -596,10 +579,6 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  RocksCheckpoint createCheckpoint() {
-    return new RocksCheckpoint();
-  }
-
   /**
    * - When the key definitely does not exist in the database,
    *   this method returns null.
@@ -681,6 +660,21 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
+  List<byte[]> multiGet(ColumnFamily family, List<byte[]> keys)
+      throws RocksDatabaseException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      return db.get().multiGetAsList(DEFAULT_READ_OPTION,
+          Collections.nCopies(keys.size(), family.getHandle()), keys);
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      final String message = "multiGet " + keys.size() + " keys from " + family;
+      throw toRocksDatabaseException(this, message, e);
+    }
+  }
+
   /**
    * Get the value mapped to the given key.
    *
@@ -706,6 +700,32 @@ public final class RocksDatabase implements Closeable {
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "get " + bytes2String(key) + " from " + family;
+      throw toRocksDatabaseException(this, message, e);
+    }
+  }
+
+  List<ByteBufferGetStatus> multiGet(ColumnFamily family, List<ByteBuffer> keys, List<ByteBuffer> values)
+      throws RocksDatabaseException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      final List<ByteBufferGetStatus> statuses = db.get().multiGetByteBuffers(DEFAULT_READ_OPTION,
+          Collections.nCopies(keys.size(), family.getHandle()), keys, values);
+      if (LOG.isTraceEnabled()) {
+        for (ByteBufferGetStatus status: statuses) {
+          if (status.value != null) {
+            LOG.trace("multiGet: requiredSize={}, remaining={}",
+                status.requiredSize, status.value.asReadOnlyBuffer().remaining());
+          } else {
+            LOG.trace("multiGet: status={}", status.status);
+          }
+        }
+      }
+      return statuses;
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      final String message = "multiGet " + keys.size() + " keys from " + family;
       throw toRocksDatabaseException(this, message, e);
     }
   }

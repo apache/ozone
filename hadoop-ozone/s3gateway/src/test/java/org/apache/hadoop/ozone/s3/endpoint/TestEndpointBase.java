@@ -17,24 +17,43 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.LOCAL_LEASE_LOG_LIMIT_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.READ_CONSISTENCY_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.ClientProtocolStub;
+import org.apache.hadoop.ozone.client.ObjectStoreStub;
+import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests the s3 EndpointBase class methods.
@@ -113,6 +132,73 @@ public class TestEndpointBase {
     assertEquals(value, customMetadata.get(key));
   }
 
+  @Test
+  public void testAccessDeniedResultCodes() {
+    final EndpointBase endpointBase = new EndpointBase() {
+      @Override
+      public void init() { }
+    };
+
+    assertTrue(endpointBase.isAccessDenied(new OMException(ResultCodes.PERMISSION_DENIED)));
+    assertTrue(endpointBase.isAccessDenied(new OMException(ResultCodes.INVALID_TOKEN)));
+    assertTrue(endpointBase.isAccessDenied(new OMException(ResultCodes.REVOKED_TOKEN)));
+    assertFalse(endpointBase.isAccessDenied(new OMException(ResultCodes.INTERNAL_ERROR)));
+    assertFalse(endpointBase.isAccessDenied(new OMException(ResultCodes.BUCKET_NOT_FOUND)));
+  }
+
+  @Test
+  public void testExpiredTokenResultCode() {
+    final EndpointBase endpointBase = new EndpointBase() {
+      @Override
+      public void init() { }
+    };
+
+    assertTrue(endpointBase.isExpiredToken(new OMException(ResultCodes.TOKEN_EXPIRED)));
+    assertFalse(endpointBase.isExpiredToken(new OMException(ResultCodes.INVALID_TOKEN)));
+  }
+
+  @Test
+  public void testListS3BucketsHandlesRuntimeExceptionWrappingOMException() throws Exception {
+    final EndpointBase endpointBase = new EndpointBase() {
+      @Override
+      public void init() { }
+
+      @Override
+      protected OzoneVolume getVolume() {
+        final OzoneVolume volume = mock(OzoneVolume.class);
+        when(volume.listBuckets(anyString())).thenThrow(
+            new RuntimeException(new OMException("Permission Denied", ResultCodes.PERMISSION_DENIED)));
+        return volume;
+      }
+    };
+
+    final OS3Exception e = assertThrows(
+        OS3Exception.class, () -> endpointBase.listS3Buckets(
+            "prefix", volume -> { }), "listS3Buckets should fail.");
+
+    // Ensure we get the correct code
+    assertEquals("AccessDenied", e.getCode());
+  }
+
+  @Test
+  public void testListS3BucketsHandlesRuntimeExceptionWrappingOMExceptionVolumeNotFound() throws Exception {
+    final EndpointBase endpointBase = new EndpointBase() {
+      @Override
+      public void init() { }
+
+      @Override
+      protected OzoneVolume getVolume() {
+        final OzoneVolume volume = mock(OzoneVolume.class);
+        when(volume.listBuckets(anyString())).thenThrow(
+            new RuntimeException(new OMException("Volume Not Found", ResultCodes.VOLUME_NOT_FOUND)));
+        return volume;
+      }
+    };
+
+    // Ensure we get an empty iterator
+    assertFalse(endpointBase.listS3Buckets("prefix", volume -> { }).hasNext());
+  }
+
   @ParameterizedTest
   @MethodSource("reservedInternalMetadataKeyPrefixCases")
   public void testRejectReservedInternalMetadataKeyPrefix(String metadataKey) {
@@ -128,10 +214,188 @@ public class TestEndpointBase {
     assertThat(e.getErrorMessage()).contains(RESERVED_USER_METADATA_KEY_PREFIX);
   }
 
+  @Test
+  public void testReadConsistencyHeaderLocalLease() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
+        .thenReturn("follower-stale");
+
+    RootEndpoint endpoint = newRootEndpoint(headers);
+
+    ClientProtocol clientProtocol =
+        endpoint.getClient().getObjectStore().getClientProxy();
+    assertEquals(ReadConsistency.LOCAL_LEASE,
+        clientProtocol.getThreadLocalReadConsistency());
+  }
+
+  @Test
+  public void testReadConsistencyHeaderLocalLeaseContext() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
+        .thenReturn("follower-stale");
+    when(headers.getHeaderString(LOCAL_LEASE_LOG_LIMIT_HEADER))
+        .thenReturn("10");
+
+    RootEndpoint endpoint = newRootEndpoint(headers);
+
+    ClientProtocolStub clientProtocol = (ClientProtocolStub) endpoint
+        .getClient().getObjectStore().getClientProxy();
+    assertEquals(ReadConsistency.LOCAL_LEASE,
+        clientProtocol.getThreadLocalReadConsistency());
+    assertEquals(10L, clientProtocol.getThreadLocalLocalLeaseLogLimit());
+    assertThat(clientProtocol.getThreadLocalLocalLeaseTimeMs()).isNull();
+  }
+
+  @Test
+  public void testReadConsistencyHeaderLocalLeaseContextAllowsMinusOne() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
+        .thenReturn("follower-stale");
+    when(headers.getHeaderString(LOCAL_LEASE_LOG_LIMIT_HEADER))
+        .thenReturn("-1");
+
+    RootEndpoint endpoint = newRootEndpoint(headers);
+
+    ClientProtocolStub clientProtocol = (ClientProtocolStub) endpoint
+        .getClient().getObjectStore().getClientProxy();
+    assertEquals(-1L, clientProtocol.getThreadLocalLocalLeaseLogLimit());
+    assertThat(clientProtocol.getThreadLocalLocalLeaseTimeMs()).isNull();
+  }
+
+  @Test
+  public void testReadConsistencyHeaderLinearizableFollower() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
+        .thenReturn("follower-linearizable");
+
+    RootEndpoint endpoint = newRootEndpoint(headers);
+
+    ClientProtocol clientProtocol =
+        endpoint.getClient().getObjectStore().getClientProxy();
+    assertEquals(ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER,
+        clientProtocol.getThreadLocalReadConsistency());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"follower-stale", "follower-linearizable"})
+  public void testReadConsistencyHeaderUsesLeaderInSecureMode(
+      String readConsistency) {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
+        .thenReturn(readConsistency);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+
+    RootEndpoint endpoint = newRootEndpoint(headers, conf);
+
+    ClientProtocol clientProtocol =
+        endpoint.getClient().getObjectStore().getClientProxy();
+    assertEquals(ReadConsistency.LINEARIZABLE_LEADER_ONLY,
+        clientProtocol.getThreadLocalReadConsistency());
+  }
+
+  @Test
+  public void testReadConsistencyHeaderUnsetUsesLeaderInSecureMode() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
+
+    RootEndpoint endpoint = newRootEndpoint(null, conf);
+
+    ClientProtocol clientProtocol =
+        endpoint.getClient().getObjectStore().getClientProxy();
+    assertEquals(ReadConsistency.LINEARIZABLE_LEADER_ONLY,
+        clientProtocol.getThreadLocalReadConsistency());
+  }
+
+  @Test
+  public void testReadConsistencyHeaderLeaderOnly() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
+        .thenReturn("leader-only");
+
+    RootEndpoint endpoint = newRootEndpoint(headers);
+
+    ClientProtocol clientProtocol =
+        endpoint.getClient().getObjectStore().getClientProxy();
+    assertEquals(ReadConsistency.LINEARIZABLE_LEADER_ONLY,
+        clientProtocol.getThreadLocalReadConsistency());
+  }
+
+  @Test
+  public void testReadConsistencyHeaderUnsetByDefault() {
+    RootEndpoint endpoint = newRootEndpoint(null);
+
+    ClientProtocol clientProtocol =
+        endpoint.getClient().getObjectStore().getClientProxy();
+    assertThat(clientProtocol.getThreadLocalReadConsistency()).isNull();
+  }
+
+  @Test
+  public void testInvalidReadConsistencyHeader() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
+        .thenReturn("eventual");
+
+    OS3Exception e = assertThrows(OS3Exception.class,
+        () -> EndpointBuilder.newRootEndpointBuilder()
+            .setHeaders(headers)
+            .build());
+    assertThat(e.getCode()).isEqualTo("InvalidArgument");
+  }
+
+  @Test
+  public void testInvalidLocalLeaseContextWithoutLocalLease() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
+        .thenReturn("follower-linearizable");
+    when(headers.getHeaderString(LOCAL_LEASE_LOG_LIMIT_HEADER))
+        .thenReturn("10");
+
+    OS3Exception e = assertThrows(OS3Exception.class,
+        () -> EndpointBuilder.newRootEndpointBuilder()
+            .setHeaders(headers)
+            .build());
+    assertThat(e.getCode()).isEqualTo("InvalidArgument");
+  }
+
+  @Test
+  public void testInvalidLocalLeaseContextValue() {
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(READ_CONSISTENCY_HEADER))
+        .thenReturn("follower-stale");
+    when(headers.getHeaderString(LOCAL_LEASE_LOG_LIMIT_HEADER))
+        .thenReturn("abc");
+
+    OS3Exception e = assertThrows(OS3Exception.class,
+        () -> EndpointBuilder.newRootEndpointBuilder()
+            .setHeaders(headers)
+            .build());
+    assertThat(e.getCode()).isEqualTo("InvalidArgument");
+  }
+
   private static Stream<String> reservedInternalMetadataKeyPrefixCases() {
     return Stream.of(
         RESERVED_USER_METADATA_KEY_PREFIX + "cache-control",
         RESERVED_USER_METADATA_KEY_PREFIX.toUpperCase(Locale.ROOT) + "cache-control");
+  }
+
+  private static RootEndpoint newRootEndpoint(HttpHeaders headers) {
+    return newRootEndpoint(headers, new OzoneConfiguration());
+  }
+
+  private static RootEndpoint newRootEndpoint(HttpHeaders headers,
+      OzoneConfiguration conf) {
+    ClientProtocol clientProtocol = new ClientProtocolStub(null);
+    ObjectStoreStub objectStore =
+        new ObjectStoreStub(conf, clientProtocol);
+    EndpointBuilder<RootEndpoint> builder = EndpointBuilder
+        .newRootEndpointBuilder()
+        .setClient(new OzoneClientStub(objectStore))
+        .setConfig(conf);
+    if (headers != null) {
+      builder.setHeaders(headers);
+    }
+    return builder.build();
   }
 
 }

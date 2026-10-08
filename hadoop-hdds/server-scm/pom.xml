@@ -64,10 +64,6 @@
       <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-collections4</artifactId>
     </dependency>
@@ -162,8 +158,12 @@
       <artifactId>bcpkix-jdk18on</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-webapp</artifactId>
+      <groupId>org.eclipse.jetty.ee8</groupId>
+      <artifactId>jetty-ee8-webapp</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.toolchain</groupId>
+      <artifactId>jetty-servlet-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -323,16 +323,18 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.xolstice.maven.plugins</groupId>
+        <groupId>io.github.ascopes</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
         <configuration>
-          <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+          <protoc kind="binary-maven">
+            <version>${protobuf.version}</version>
+          </protoc>
         </configuration>
         <executions>
           <execution>
             <id>compile-test-protobuf</id>
             <goals>
-              <goal>test-compile</goal>
+              <goal>generate-test</goal>
             </goals>
             <phase>generate-test-sources</phase>
           </execution>

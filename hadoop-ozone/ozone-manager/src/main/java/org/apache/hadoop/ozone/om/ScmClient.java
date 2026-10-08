@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATIO
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE_DEFAULT;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.apache.hadoop.ozone.util.CacheMetrics;
 
 /**
@@ -55,6 +57,8 @@ public class ScmClient {
 
   private final ScmBlockLocationProtocol blockClient;
   private final StorageContainerLocationProtocol containerClient;
+  private final SCMFailoverProxyProviderBase<?> blockProxyProvider;
+  private final SCMFailoverProxyProviderBase<?> containerProxyProvider;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
   private final CacheMetrics datanodeDetailsCacheMetrics;
@@ -62,8 +66,18 @@ public class ScmClient {
   ScmClient(ScmBlockLocationProtocol blockClient,
             StorageContainerLocationProtocol containerClient,
             OzoneConfiguration configuration) {
+    this(blockClient, containerClient, null, null, configuration);
+  }
+
+  ScmClient(ScmBlockLocationProtocol blockClient,
+            StorageContainerLocationProtocol containerClient,
+            SCMFailoverProxyProviderBase<?> blockProxyProvider,
+            SCMFailoverProxyProviderBase<?> containerProxyProvider,
+            OzoneConfiguration configuration) {
     this.containerClient = containerClient;
     this.blockClient = blockClient;
+    this.blockProxyProvider = blockProxyProvider;
+    this.containerProxyProvider = containerProxyProvider;
     Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache =
         createDatanodeDetailsCache(configuration);
     this.containerLocationCache =
@@ -144,12 +158,49 @@ public class ScmClient {
     return builder.build();
   }
 
+  /**
+   * Reloads block/container SCM proxies on reconfiguration without an OM restart.
+   * No-op if providers are unavailable (e.g., test mocks).
+   */
+  public void reloadScmNodes() {
+    if (blockProxyProvider != null) {
+      blockProxyProvider.changeConfig();
+    }
+    if (containerProxyProvider != null) {
+      containerProxyProvider.changeConfig();
+    }
+  }
+
+  @VisibleForTesting
+  public SCMFailoverProxyProviderBase<?> getBlockProxyProvider() {
+    return blockProxyProvider;
+  }
+
+  @VisibleForTesting
+  public SCMFailoverProxyProviderBase<?> getContainerProxyProvider() {
+    return containerProxyProvider;
+  }
+
   public ScmBlockLocationProtocol getBlockClient() {
     return this.blockClient;
   }
 
   public StorageContainerLocationProtocol getContainerClient() {
     return this.containerClient;
+  }
+
+  /** Don't keep empty pipelines or insufficient EC pipelines in the cache. */
+  static boolean shouldInvalidate(Pipeline pipeline) {
+    if (pipeline.isEmpty()) {
+      return true;
+    }
+
+    final ReplicationConfig repConfig = pipeline.getReplicationConfig();
+    if (!(repConfig instanceof ECReplicationConfig)) {
+      return false;
+    }
+    final int d = ((ECReplicationConfig) repConfig).getData();
+    return !pipeline.containsAllReplicaIndexes(1, d + 1); // 1 <= i <= d are the data strips
   }
 
   public Map<Long, Pipeline> getContainerLocations(Iterable<Long> containerIds,
@@ -160,29 +211,13 @@ public class ScmClient {
     }
     try {
       Map<Long, Pipeline> result = containerLocationCache.getAll(containerIds);
-      // Don't keep empty pipelines or insufficient EC pipelines in the cache.
-      List<Long> uncachePipelines = result.entrySet().stream()
-          .filter(e -> {
-            Pipeline pipeline = e.getValue();
-            // filter empty pipelines
-            if (pipeline.isEmpty()) {
-              return true;
-            }
-            // filter insufficient EC pipelines which missing any data index
-            ReplicationConfig repConfig = pipeline.getReplicationConfig();
-            if (repConfig instanceof ECReplicationConfig) {
-              int d = ((ECReplicationConfig) repConfig).getData();
-              for (int i = 1; i <= d; i++) {
-                if (!pipeline.getReplicaIndexes().containsValue(i)) {
-                  return true;
-                }
-              }
-            }
-            return false;
-          })
-          .map(Map.Entry::getKey)
-          .collect(Collectors.toList());
-      containerLocationCache.invalidateAll(uncachePipelines);
+
+      for (Map.Entry<Long, Pipeline> entry : result.entrySet()) {
+        if (shouldInvalidate(entry.getValue())) {
+          containerLocationCache.invalidate(entry.getKey());
+        }
+      }
+
       return result;
     } catch (ExecutionException e) {
       return handleCacheExecutionException(e);

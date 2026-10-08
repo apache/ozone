@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
-import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
@@ -65,12 +64,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
 import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
-import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
-import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -91,7 +87,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    CreateKeyRequest createKeyRequest = super.preExecute(ozoneManager)
+    final CreateKeyRequest createKeyRequest = super.preExecute(ozoneManager)
         .getCreateKeyRequest();
     Objects.requireNonNull(createKeyRequest, "createKeyRequest == null");
 
@@ -247,7 +243,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(keyArgs, dbKeyInfo);
 
       OmBucketInfo bucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
+          getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       // If FILE_EXISTS we just override like how we used to do for Key Create.
       if (LOG.isDebugEnabled()) {
@@ -322,8 +318,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       checkBucketQuotaInBytes(omMetadataManager, bucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(bucketInfo, numMissingParents + 1L);
-      CreateKeyResponse.Builder builder =
-          getResponseBuilderWithDerivedKey(getOmRequest(), ozoneManager, createKeyRequest);
+      CreateKeyResponse.Builder builder = CreateKeyResponse.newBuilder();
       perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       bucketInfo.incrUsedNamespace(numMissingParents);
 
@@ -333,6 +328,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, bucketInfo.getBucketLayout(),
             null, missingParentInfos, trxnLogIndex);
+
+        // Parent directory creation holds the bucket write lock; key path locking leaves
+        // numMissingParents at 0.
+        omMetadataManager.getBucketTable().addCacheEntry(
+            omMetadataManager.getBucketKey(volumeName, bucketName), bucketInfo, trxnLogIndex);
       }
 
       // Add to cache entry can be done outside of lock for this openKey.
@@ -464,28 +464,5 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       }
     }
     return req;
-  }
-
-  protected CreateKeyResponse.Builder getResponseBuilderWithDerivedKey(
-      OMRequest omRequest, OzoneManager ozoneManager,
-      CreateKeyRequest createKeyRequest) throws IOException {
-    CreateKeyResponse.Builder builder = CreateKeyResponse.newBuilder();
-    if (omRequest.hasS3Authentication() && ozoneManager.isSecurityEnabled()
-        && createKeyRequest.hasDerivedKeyPiggyBacking()
-        && createKeyRequest.getDerivedKeyPiggyBacking()
-    ) {
-      OzoneTokenIdentifier s3Token = S3SecurityUtil.constructS3Token(omRequest);
-      if (!s3Token.getTokenType().equals(OMTokenProto.Type.S3AUTHINFO)) {
-        // Piggyback was requested but this token type cannot produce a derived key.
-        // S3 Gateway should only set this flag for S3AUTHINFO tokens.
-        LOG.warn("Derived key piggyback requested but token type is {}, " +
-                "not S3AUTHINFO. Derived key will not be returned.",
-            s3Token.getTokenType());
-        return builder;
-      }
-      byte[] derivedKey = ozoneManager.getS3DerivedKey(s3Token.getAwsAccessId(), s3Token.getStrToSign());
-      builder.setDerivedKey(ByteString.copyFrom(derivedKey));
-    }
-    return builder;
   }
 }
