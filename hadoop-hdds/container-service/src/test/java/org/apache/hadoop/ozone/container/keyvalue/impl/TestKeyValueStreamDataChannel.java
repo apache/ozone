@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.container.keyvalue.impl;
 import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.PUT_BLOCK_REQUEST_LENGTH_MAX;
 import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.executePutBlockClose;
 import static org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput.getProtoLength;
-import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.closeBuffers;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.writeBuffers;
+import static org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel.writeFully;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -347,6 +347,21 @@ public class TestKeyValueStreamDataChannel {
       }
       return CompletableFuture.completedFuture(
           new Reply(true, 0, putBlockRequest));
+    }
+
+    static ContainerCommandRequestProto closeBuffers(
+        Buffers buffers, WriteMethod writeMethod) throws IOException {
+      final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+      final ByteBuf buf = ref.retain();
+      final ContainerCommandRequestProto putBlockRequest;
+      try {
+        putBlockRequest = KeyValueStreamDataChannel.readPutBlockRequest(buf);
+        // write the remaining data
+        writeFully(buf.nioBuffer(), writeMethod);
+      } finally {
+        ref.release();
+      }
+      return putBlockRequest;
     }
 
     @Override

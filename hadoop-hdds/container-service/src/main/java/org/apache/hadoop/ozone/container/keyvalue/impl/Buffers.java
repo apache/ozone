@@ -106,10 +106,6 @@ class Buffers {
     });
   }
 
-  boolean isEmpty() {
-    return deque.isEmpty();
-  }
-
   void cleanUpAll() {
     while (!deque.isEmpty()) {
       poll().release();
