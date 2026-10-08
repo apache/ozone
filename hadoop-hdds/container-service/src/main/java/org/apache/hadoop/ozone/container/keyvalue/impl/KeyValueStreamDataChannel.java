@@ -159,9 +159,13 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
    */
   public void drainBuffers() throws IOException {
     assertOpen();
+    if (buffers.isEmpty()) {
+      return;
+    }
     final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+    final ByteBuf buf = ref.retain();
     try {
-      writeFully(ref.retain().nioBuffer(), super::writeFileChannel);
+      writeFully(buf.nioBuffer(), super::writeFileChannel);
     } finally {
       ref.release();
     }
