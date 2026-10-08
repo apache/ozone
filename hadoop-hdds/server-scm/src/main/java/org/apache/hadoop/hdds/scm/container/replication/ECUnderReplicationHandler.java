@@ -450,6 +450,16 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     return commandsSent;
   }
 
+  private static boolean hasSufficientSourcesForDecommissionReconstruction(
+      Map<Integer, Pair<ContainerReplica, NodeStatus>> sources,
+      Set<Integer> decomIndexes,
+      int requiredDataSources) {
+    long nonDecommissionSourceCount = sources.keySet().stream()
+        .filter(index -> !decomIndexes.contains(index))
+        .count();
+    return nonDecommissionSourceCount >= requiredDataSources;
+  }
+
   private List<DatanodeDetails> getTargetDatanodes(
       ContainerInfo container, int requiredNodes,
       List<DatanodeDetails> usedNodes,
@@ -479,17 +489,44 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     }
 
     if (replicationManager.getConfig().isEcDecommissionReconstructionEnabled()) {
+      ECReplicationConfig repConfig =
+          (ECReplicationConfig) container.getReplicationConfig();
       for (Integer index : decomIndexes) {
         Pair<ContainerReplica, NodeStatus> source = sources.get(index);
-        if (source != null && replicationManager.isNodeHighlyLoaded(
+        if (source == null || !replicationManager.isNodeHighlyLoaded(
             source.getLeft().getDatanodeDetails())) {
-          LOG.info("Source node {} is highly loaded, switching to " +
-                  "reconstruction for decommissioning container {}",
-              source.getLeft().getDatanodeDetails(), container.containerID());
-          return processReconstruction(replicaCount,
+          continue;
+        }
+        if (!hasSufficientSourcesForDecommissionReconstruction(
+            sources, decomIndexes, repConfig.getData())) {
+          LOG.debug("Insufficient non-decommission sources to reconstruct "
+                  + "decommission indexes for container {}, using 1-1 "
+                  + "replication.",
+              container.containerID());
+          break;
+        }
+        if (replicationManager.isReconstructionLimitReached()) {
+          LOG.debug("Global reconstruction limit reached for container {}, "
+              + "using 1-1 replication for decommission recovery.",
+              container.containerID());
+          break;
+        }
+        LOG.info("Source node {} is highly loaded, switching to "
+                + "reconstruction for decommissioning container {}",
+            source.getLeft().getDatanodeDetails(), container.containerID());
+        try {
+          int commandsSent = processReconstruction(replicaCount,
               new ArrayList<>(decomIndexes), sources, availableSourceNodes,
               excludedNodes, usedNodes);
+          if (commandsSent > 0) {
+            return commandsSent;
+          }
+        } catch (CommandTargetOverloadedException e) {
+          LOG.debug("Reconstruction throttled for decommissioning container "
+                  + "{}, using 1-1 replication.",
+              container.containerID(), e);
         }
+        break;
       }
     }
 
