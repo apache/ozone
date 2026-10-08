@@ -366,9 +366,6 @@ abstract class ContainerStateMachineTests {
         .setCmdType(ContainerProtos.Type.ReadBlock)
         .setResult(ContainerProtos.Result.SUCCESS)
         .setReadBlock(ContainerProtos.ReadBlockResponseProto.newBuilder()
-            .setChecksumData(ContainerProtos.ChecksumData.newBuilder()
-                .setType(ContainerProtos.ChecksumType.NONE)
-                .setBytesPerChecksum(1024))
             .setOffset(offset)
             .setData(data))
         .build();

@@ -76,6 +76,34 @@ class TestInterSCMGrpcClient {
   }
 
   /**
+   * gRPC rejects a non-positive keepalive time at build time, so a zero value
+   * fails construction only if the configured keepalive time is applied.
+   */
+  @Test
+  void testClientAppliesConfiguredKeepAliveTime() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIME, "0ms");
+
+    assertThrows(IllegalArgumentException.class, () ->
+        new InterSCMGrpcClient(
+            "localhost", PortAllocator.getFreePort(), conf, null));
+  }
+
+  /**
+   * gRPC rejects a non-positive keepalive timeout at build time, so a zero
+   * value fails construction only if the configured timeout is applied.
+   */
+  @Test
+  void testClientAppliesConfiguredKeepAliveTimeout() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIMEOUT, "0ms");
+
+    assertThrows(IllegalArgumentException.class, () ->
+        new InterSCMGrpcClient(
+            "localhost", PortAllocator.getFreePort(), conf, null));
+  }
+
+  /**
    * Keeps the download stream pending, so that the client side deadline is
    * the only way the call can end.
    */

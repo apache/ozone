@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
@@ -65,8 +66,12 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.BucketForTesting;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -162,6 +167,63 @@ public class TestStreamRead {
   void testReadKey256k() throws Exception {
     final SizeInBytes bytesPerChecksum = SizeInBytes.valueOf("256k");
     runTestReadKey(KEY_SIZE, bytesPerChecksum);
+  }
+
+  @Test
+  void testUnevenFlushedChunks() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration(cluster.getConf());
+    OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
+    config.setStreamReadBlock(true);
+    config.setChecksumVerify(true);
+    config.setBytesPerChecksum(16 * 1024);
+    config.setStreamReadResponseDataSize(32 * 1024);
+    config.setStreamBufferFlushDelay(false);
+    conf.setFromObject(config);
+    byte[] expected = new byte[8193 + 32771 + 65543];
+    new java.util.Random(16258).nextBytes(expected);
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+      BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
+      String key = "uneven-flushed-chunks";
+      try (OutputStream out = bucket.delegate().createKey(key, expected.length,
+          RatisReplicationConfig.getInstance(ONE), Collections.emptyMap())) {
+        int offset = 0;
+        for (int length : new int[] {8193, 32771, 65543}) {
+          out.write(expected, offset, length);
+          out.flush();
+          offset += length;
+        }
+      }
+      OmKeyInfo info = client.getProxy().getKeyInfo(bucket.delegate().getVolumeName(),
+          bucket.delegate().getName(), key, false);
+      List<OmKeyLocationInfo> locations = info.getLatestVersionLocations().createLocationList();
+      assertEquals(1, locations.size());
+      BlockID blockID = locations.get(0).getBlockID();
+      KeyValueContainerData container = (KeyValueContainerData) cluster.getHddsDatanodes().get(0)
+          .getDatanodeStateMachine().getContainer().getContainerSet()
+          .getContainer(blockID.getContainerID()).getContainerData();
+      List<ChunkInfo> chunks;
+      try (DBHandle db = BlockUtils.getDB(container, conf)) {
+        BlockData block = db.getStore().getBlockByID(blockID, container.getBlockKey(blockID.getLocalID()));
+        chunks = block.getChunks();
+      }
+      assertTrue(chunks.size() >= 3, "flush must persist separate chunks");
+      assertTrue(chunks.stream().map(ChunkInfo::getLen).distinct().count() > 1, "stored chunks must be nonuniform");
+      long shiftedOffset = chunks.get(1).getOffset();
+      assertTrue(shiftedOffset % config.getBytesPerChecksum() != 0, "second chunk must shift the checksum grid");
+      try (KeyInputStream in = bucket.getKeyInputStream(key)) {
+        assertTrue(in.isStreamBlockInputStream());
+        byte[] actual = new byte[expected.length];
+        org.apache.hadoop.io.IOUtils.readFully(in, actual, 0, actual.length);
+        assertArrayEquals(expected, actual);
+        for (long position : new long[] {shiftedOffset + 1, shiftedOffset + 16385, expected.length - 17, 0}) {
+          in.seek(position);
+          int length = Math.min(20000, expected.length - (int) position);
+          byte[] range = new byte[length];
+          org.apache.hadoop.io.IOUtils.readFully(in, range, 0, range.length);
+          assertArrayEquals(Arrays.copyOfRange(expected, (int) position, (int) position + length), range);
+        }
+      }
+    }
   }
 
   void runTestReadKey(SizeInBytes keySize, SizeInBytes bytesPerChecksum) throws Exception {
@@ -284,7 +346,7 @@ public class TestStreamRead {
   private static byte[] ratisStreamRead(Pipeline pipeline, BlockID blockId, long length, OzoneConfiguration conf)
       throws Exception {
     final ContainerCommandRequestProto request = ContainerProtocolCalls.buildReadBlockCommandProto(
-        blockId, 0, length, CHUNK_SIZE, null, pipeline);
+        blockId, 0, length, CHUNK_SIZE, true, null, pipeline);
     final ByteBuffer message = ContainerCommandRequestMessage.toMessage(request, null).getContent()
         .asReadOnlyByteBuffer();
     final ByteArrayOutputStream data = new ByteArrayOutputStream();

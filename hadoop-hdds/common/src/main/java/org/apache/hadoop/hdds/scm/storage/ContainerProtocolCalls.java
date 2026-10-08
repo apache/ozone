@@ -950,7 +950,7 @@ public final class ContainerProtocolCalls  {
   }
 
   public static ContainerCommandRequestProto buildReadBlockCommandProto(
-      BlockID blockID, long offset, long length, int responseDataSize,
+      BlockID blockID, long offset, long length, int responseDataSize, boolean includeChecksums,
       Token<? extends TokenIdentifier> token, Pipeline pipeline)
       throws IOException {
     final DatanodeDetails datanode = pipeline.getClosestNode();
@@ -959,6 +959,7 @@ public final class ContainerProtocolCalls  {
         .setOffset(offset)
         .setLength(length)
         .setResponseDataSize(responseDataSize)
+        .setIncludeChecksums(includeChecksums)
         .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicaIndex));
     final ContainerCommandRequestProto.Builder builder =
         ContainerCommandRequestProto.newBuilder().setCmdType(Type.ReadBlock)
