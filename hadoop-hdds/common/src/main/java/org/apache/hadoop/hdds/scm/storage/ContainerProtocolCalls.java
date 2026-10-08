@@ -25,10 +25,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -143,13 +141,20 @@ public final class ContainerProtocolCalls  {
     return response.getListBlock();
   }
 
-  static <T> T tryEachDatanode(Pipeline pipeline,
+  /**
+   * Applies {@code op} to each datanode in order until it succeeds.
+   * {@code op} must only contact the given datanode, otherwise each attempt
+   * would fail over to the whole pipeline again.
+   */
+  static <T> T tryEachDatanode(List<DatanodeDetails> datanodes,
       CheckedFunction<DatanodeDetails, T, IOException> op,
       Function<DatanodeDetails, String> toErrorMessage)
       throws IOException {
-    final Set<DatanodeDetails> excluded = new HashSet<>();
-    for (; ;) {
-      final DatanodeDetails d = pipeline.getClosestNode(excluded);
+    if (datanodes.isEmpty()) {
+      throw new IOException("No datanode to try");
+    }
+    for (int i = 0; ; i++) {
+      final DatanodeDetails d = datanodes.get(i);
 
       try {
         return op.apply(d);
@@ -165,8 +170,7 @@ public final class ContainerProtocolCalls  {
           }
         }
         span.addEvent("failed to connect to DN " + d);
-        excluded.add(d);
-        if (excluded.size() < pipeline.size()) {
+        if (i < datanodes.size() - 1) {
           LOG.warn(toErrorMessage.apply(d)
               + "; will try another datanode.", e);
         } else {
@@ -197,7 +201,8 @@ public final class ContainerProtocolCalls  {
       builder.setEncodedToken(token.encodeToUrlString());
     }
 
-    return tryEachDatanode(xceiverClient.getPipeline(),
+    return tryEachDatanode(
+        xceiverClient.getDatanodesInOrder(blockID.getDatanodeBlockIDProtobuf(), Type.GetBlock),
         d -> getBlock(xceiverClient, validators, builder, blockID, d, pipeline),
         d -> toErrorMessage(blockID, d));
   }
@@ -256,7 +261,7 @@ public final class ContainerProtocolCalls  {
         .setDatanodeUuid(datanode.getUuidString())
         .setGetBlock(readBlockRequest).build();
     ContainerCommandResponseProto response =
-        xceiverClient.sendCommand(request, validators);
+        xceiverClient.sendCommand(request, validators, datanode);
     return response.getGetBlock();
   }
 
@@ -431,7 +436,8 @@ public final class ContainerProtocolCalls  {
       span.setAttribute("offset", chunk.getOffset())
           .setAttribute("length", chunk.getLen())
           .setAttribute("block", blockID.toString());
-      return tryEachDatanode(xceiverClient.getPipeline(),
+      return tryEachDatanode(
+          xceiverClient.getDatanodesInOrder(blockID, Type.ReadChunk),
           d -> readChunk(xceiverClient, chunk, blockID,
               validators, builder, d),
           d -> toErrorMessage(chunk, blockID, d));
@@ -450,7 +456,7 @@ public final class ContainerProtocolCalls  {
       requestBuilder = requestBuilder.setTraceID(traceId);
     }
     ContainerCommandResponseProto reply =
-        xceiverClient.sendCommand(requestBuilder.build(), validators);
+        xceiverClient.sendCommand(requestBuilder.build(), validators, d);
     final ReadChunkResponseProto response = reply.getReadChunk();
     final long readLen = getLen(response);
     if (readLen != chunk.getLen()) {
