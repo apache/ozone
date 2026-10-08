@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.local;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.HttpURLConnection;
@@ -48,7 +49,7 @@ class TestLocalOzoneRecon {
       cluster.start();
 
       assertTrue(cluster.getReconPort() > 0);
-      assertHttpEndpointResponds(cluster.getReconEndpoint());
+      assertHttpEndpointResponds(cluster.getReconEndpoint() + "/api/v1/clusterState");
     }
   }
 
@@ -57,8 +58,8 @@ class TestLocalOzoneRecon {
     try {
       connection.setConnectTimeout(1_000);
       connection.setReadTimeout(1_000);
-      // Any HTTP response proves Recon is serving requests.
-      assertTrue(connection.getResponseCode() > 0, endpoint);
+      // Query the API to verify that Recon resources can be injected in the shared JVM.
+      assertEquals(200, connection.getResponseCode(), endpoint);
     } finally {
       connection.disconnect();
     }
