@@ -672,10 +672,12 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
     if (combineMode == null) {
       return null;
     }
+    // The bucket layout is validated once in the constructor, so LookupKey is
+    // enough here; there is no InfoBucket RPC to save on this path.
     return OzoneClientUtils.getFileChecksumWithCombineMode(
-        volume, bucket, keyName,
+        volume.getName(), bucket.getName(), keyName,
         length, combineMode,
-        ozoneClient.getObjectStore().getClientProxy());
+        ozoneClient.getObjectStore().getClientProxy(), false);
   }
 
   @Override

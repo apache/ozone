@@ -1218,6 +1218,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   @VisibleForTesting
+  public long getNumLookupFile() {
+    return numLookupFile.value();
+  }
+
+  @VisibleForTesting
   public long getNumKeyLookupFails() {
     return numKeyLookupFails.value();
   }
