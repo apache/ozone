@@ -133,9 +133,9 @@ class TestSnapDiffPathResolver {
         assertEquals("dir/left", resolver.resolvePaths(Collections.singletonList(21L)).get(0));
         assertEquals(2, dbLookupKeyCount.get());
 
-        // Only lookup right from DB since dir is already in cache.
+        // Resolve right; prefetch still loads its edge and the shared parent edge.
         assertEquals("dir/right", resolver.resolvePaths(Collections.singletonList(22L)).get(0));
-        assertEquals(3, dbLookupKeyCount.get());
+        assertEquals(4, dbLookupKeyCount.get());
       }
       assertTrue(resolver.isPathCached(20L));
       assertTrue(resolver.isPathCached(21L));
@@ -160,6 +160,23 @@ class TestSnapDiffPathResolver {
 
       SnapDiffPathResolver resolver = store.newFromPathResolver(BUCKET_OBJECT_ID);
       assertNull(resolver.resolvePaths(Collections.singletonList(31L)).get(0));
+    }
+  }
+
+  @Test
+  void testBatchResolveSurvivesLruEvictionWithinBatch() throws Exception {
+    try (SnapDiffJobStore store = newStoreWithPathCacheCapacity(2L)) {
+      putFromEdge(store, BUCKET_OBJECT_ID, 10L, "dir");
+      putFromEdge(store, 10L, 11L, "a");
+      putFromEdge(store, 10L, 12L, "b");
+      store.flushWrites();
+
+      SnapDiffPathResolver resolver = store.newFromPathResolver(BUCKET_OBJECT_ID);
+      assertEquals("dir/a", resolver.resolvePaths(Collections.singletonList(11L)).get(0));
+
+      List<String> paths = resolver.resolvePaths(Arrays.asList(12L, 11L));
+      assertEquals("dir/b", paths.get(0));
+      assertEquals("dir/a", paths.get(1));
     }
   }
 
@@ -192,7 +209,13 @@ class TestSnapDiffPathResolver {
   }
 
   private static SnapDiffJobStore newStore() throws IOException {
+    return newStoreWithPathCacheCapacity(null);
+  }
+
+  private static SnapDiffJobStore newStoreWithPathCacheCapacity(Long maxInMemoryEntries)
+      throws IOException {
     return SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
-        "path-resolver-" + JOB_ID.incrementAndGet(), true, snapDiffReportCfh, null, null);
+        "path-resolver-" + JOB_ID.incrementAndGet(), true, snapDiffReportCfh, null,
+        maxInMemoryEntries);
   }
 }

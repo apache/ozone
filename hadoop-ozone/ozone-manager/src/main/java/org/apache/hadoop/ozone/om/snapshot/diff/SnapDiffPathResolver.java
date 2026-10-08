@@ -66,10 +66,29 @@ final class SnapDiffPathResolver {
     if (objectIds.isEmpty()) {
       return Collections.emptyList();
     }
-    Map<Long, byte[]> prefetchedEdges = prefetchEdgeChains(objectIds);
+    Map<Long, String> pathsCachedAtBatchStart = new HashMap<>();
+    List<Long> objectIdsToResolve = new ArrayList<>();
+    for (Long objectId : objectIds) {
+      if (objectId == bucketObjectId) {
+        continue;
+      }
+      String cachedPath = pathCache.get(objectId);
+      if (cachedPath != null) {
+        pathsCachedAtBatchStart.put(objectId, cachedPath);
+      } else {
+        objectIdsToResolve.add(objectId);
+      }
+    }
+    Map<Long, byte[]> prefetchedEdges = prefetchEdgeChains(objectIdsToResolve);
     List<String> paths = new ArrayList<>(objectIds.size());
     for (Long objectId : objectIds) {
-      paths.add(resolvePath(objectId, prefetchedEdges));
+      if (objectId == bucketObjectId) {
+        paths.add("");
+      } else {
+        String cachedAtStart = pathsCachedAtBatchStart.get(objectId);
+        paths.add(cachedAtStart != null ? cachedAtStart
+            : resolvePath(objectId, prefetchedEdges));
+      }
     }
     return paths;
   }
@@ -117,7 +136,7 @@ final class SnapDiffPathResolver {
     Map<Long, byte[]> prefetchedEdges = new HashMap<>();
     List<Long> lookupIds = new ArrayList<>();
     for (Long objectId : objectIds) {
-      if (objectId != bucketObjectId && !pathCache.containsKey(objectId)) {
+      if (objectId != bucketObjectId) {
         lookupIds.add(objectId);
       }
     }
@@ -143,8 +162,7 @@ final class SnapDiffPathResolver {
         byte[] value = prefetchedEdges.get(lookupId);
         if (value != null) {
           long parent = SnapDiffJobStore.decodeEdgeLinkParentId(value);
-          if (parent != bucketObjectId && !pathCache.containsKey(parent)
-              && !prefetchedEdges.containsKey(parent)) {
+          if (parent != bucketObjectId && !prefetchedEdges.containsKey(parent)) {
             nextFetch.add(parent);
           }
         }
