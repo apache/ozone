@@ -74,7 +74,8 @@ Goals:
 Non-goals:
 
 - Reopening old blocks or closed containers, filling the previous partial block, or changing existing prefix bytes.
-- `truncate`, `concat`, random writes, concurrent appender merging, or automatic small-block compaction.
+- `truncate`, `concat`, random writes, concurrent appender merging, or automatic small-block compaction. The choices that
+  keep these possible later are listed under [compatibility with future file editing](#compatibility-with-future-file-editing).
 - Native object or S3 append in OBJECT_STORE buckets.
 - EC `hflush`/`hsync`, or reconstruction of an arbitrary uncommitted EC suffix after writer failure.
 - A throughput guarantee for repeated small append/close cycles. Such cycles remain correct but may be expensive.
@@ -165,7 +166,9 @@ metadata alone grant renewable append ownership. Complete the [writer-state audi
 Extend `OmKeyInfo`/`KeyInfo` with optional, server-owned append fields. Keep them separate from user-supplied key metadata.
 Use the field names below as the initial schema proposal; assign protobuf numbers against the implementation branch.
 Reuse the existing location lists and identity fields. The open record stores only allocations from this append session;
-the committed record remains the authoritative source of the immutable prefix.
+the committed record remains the authoritative source of the immutable prefix. Prefix immutability is an invariant of the
+append session type, enforced by the guards below; it is not a property of the committed-file format, which stays an
+ordered list of block references with per-entry logical offset and length.
 
 | Record | Fields and meaning |
 | --- | --- |
@@ -334,7 +337,7 @@ of lease freshness; matching owner/open rows alone do not authorize data changes
 | Admit append | Existing file, feature finalized/enabled, permissions valid, no append reservation or active ordinary writer. Add the owner and `ACTIVE` open record, initialize prefix boundaries and lease times, and add the session-index entry. Keep published data and namespace usage unchanged. |
 | Allocate suffix block | Matching owner and `ACTIVE` open record. Add only a new session allocation to the open record. Allocation prepared through SCM must be revalidated during OM application; an allocation losing this race goes through unused-allocation cleanup. |
 | Renew | Matching file/session identity, committed owner, and `ACTIVE` open record. Advance `lastRenewedAt` monotonically without changing published bytes, file data mtime, or prefix boundaries. Skip the ancestor walk; renewal cannot prevent unreachable-session cleanup. A fenced, removed, or terminal session cannot renew. |
-| Hsync | Matching owner and `ACTIVE` phase, supported stream, durable suffix, valid allocated locations, unchanged prefix, and no regression of published bytes. Update committed length/locations and quota delta while retaining ownership and the open record. Preserve concurrent attribute and renewal updates. |
+| Hsync | Matching owner and `ACTIVE` phase, supported stream, durable suffix, valid allocated locations, unchanged prefix, and no regression of this session's published state (its published length). Update committed length/locations and quota delta while retaining ownership and the open record. Preserve concurrent attribute and renewal updates. |
 | Close | Same ownership and data checks as publication. Publish final contents, account for the delta once, clear the owner, remove the open record and index entry, and enqueue only unused private allocations for cleanup. |
 | Start recovery | Matching reservation and current recovery eligibility, including renewals already applied. Change `ACTIVE` to `RECOVERING` before datanode recovery begins. Keep the reservation; reject original-writer allocation, renewal, sync, and close. Repeated recovery joins the existing phase. |
 | Complete recovery | Same fenced session still owns the same file and remains `RECOVERING`. Validate the recovered suffix and preserve the published lower bound, then publish, clear ownership, and remove the open record/index entry. EC preserves committed data and discards only its unpublished suffix. |
@@ -351,6 +354,9 @@ publication into a different session.
 
 `AllocateBlock`, sync, close, and recovery use the ownership guards above. Publication assembles the prefix from the
 committed record and validates the submitted suffix against this session's allocations and published lower bound.
+Each publication replaces the committed block list as a unit, and readers derive the file length from that list. The
+growth-only checks belong to the append session guards; OM storage, codecs, and readers must not assume a block list only
+ever grows or that it changes only at its tail.
 
 For supported append hsync operations, make the data durable at datanodes and publish the corresponding total length and
 block locations in OM before returning success, including when the current block has not changed. Retain ownership.
@@ -526,7 +532,9 @@ hsync or close, preserve the current missing-committed-file behavior; append doe
 
 Add an `AppendFile` operation to the OM protocol and route both filesystem implementations through it, using the RPC fields
 below. The admission response also preserves file attributes. Extend messages with optional fields where possible and
-assign wire numbers during implementation.
+assign wire numbers during implementation. Append references whole blocks from byte zero, but do not encode that
+assumption: readers must honor each `KeyLocation` entry's recorded `length`, and a future optional in-block start offset
+must fit alongside the existing `offset` and `length` fields without changing how existing entries are interpreted.
 
 ### Session RPCs and retries
 
@@ -706,7 +714,9 @@ Process each `OmKeyInfo` version inside a `RepeatedOmKeyInfo` independently, but
 all of its versions are exhausted. For a candidate version, let `D` be its remaining physical block identities, `R` the
 members of `D` referenced by a retained file view or live session, and `E = D - R` the eligible set. Identify blocks by
 container/local ID, not location-list length, BCSID, pathname, or file object ID alone. Treat an EC block group as one
-reclamation unit. Any referenced byte retains the whole block/group.
+reclamation unit. Any referenced byte retains the whole block/group. This classification depends only on block identity,
+never on an entry's position in the list or on prefix equality between versions; keep it that way so lists that later
+diverge in the middle need no separate reclamation path.
 
 For example, snapshot S1 contains `[A]`, S2 contains `[A, B]`, and the deleted live file contains `[A, B, C]`:
 
@@ -958,6 +968,22 @@ Append must pass the filesystem contract, failure/recovery, snapshot/GC, compati
 combination. Implementation-backed formal verification and trace validation are required alongside those tests; record
 assumptions, explored bounds, and results before activation.
 
+## Compatibility with future file editing
+
+File editing (`truncate`, `concat`, and byte-range writes) is not part of this proposal. [HDDS-3714](https://issues.apache.org/jira/browse/HDDS-3714) remains the tracker for truncate. The choices below are made so that this design does not block it; they add no work to append.
+
+What carries over unchanged: exclusive session ownership, renewal, fencing, and recovery; the session index and rename-following handles; snapshot capture of the applied block-list version; and partial reclamation by block identity. Each of these treats a file as an ordered list of block references and is indifferent to where in the list a change occurs.
+
+Choices in this design that keep editing possible:
+
+- Published state is a block-list version. Readers derive length from the list, and monotonic-length checks are append-session guards rather than storage or reader assumptions ([writing and publication](#writing-and-publication)).
+- Prefix immutability is an invariant of the append session type, not of the committed-file format ([metadata representation](#metadata-representation)). An editing session would describe its pending change as a range plus new allocations; for append that range is always at EOF.
+- `KeyLocation` entries keep per-entry logical `offset` and `length`, readers honor the recorded `length`, and an optional in-block start offset can be added later without reinterpreting existing entries ([client and protocol changes](#client-and-protocol-changes)).
+- Reclamation classifies by block identity and retains a partially referenced block whole ([partial reclamation](#partial-reclamation-algorithm)). A list that diverges in the middle needs no new GC path.
+- Append never writes into an existing block, so a block whose logical `length` is later shortened is never refilled, and the truncate-then-append race from the earlier proposal cannot arise.
+
+What editing would still need, so that it is not mistaken for a free follow-up: an in-block start offset field for entries that begin inside a block, the corresponding seek in `KeyInputStream`, range checksums for `getFileChecksum`, a compaction mechanism because every in-place edit adds a block, and an API, since Hadoop exposes `truncate` and `concat` but no random-write operation. Truncate itself is a metadata-only block-list cut under the same ownership and snapshot rules and is the natural first extension.
+
 ## Alternatives
 
 - Reopen the previous partial block: reduces small-block growth but adds container-state, finalization, fencing, and snapshot
@@ -1188,7 +1214,7 @@ closure does not establish either community acceptance of the design or technica
 | Reuse the final block in an open container; [immutability objection](https://github.com/apache/ozone/pull/1515#discussion_r513026161) | Rejected; see [Alternatives](#alternatives). |
 | [Last-appender-wins](https://github.com/apache/ozone/pull/1515#discussion_r513025813) | Rejected; see [Alternatives](#alternatives). |
 | [Reuse open-key metadata instead of appendTable](https://github.com/apache/ozone/pull/1515#discussion_r527517567) | Adopted in [OM ownership and metadata](#om-ownership-and-metadata). The author's reply did not update the old document/diagram and is not evidence of an implemented change. |
-| Delayed truncate of the last block can race with a later append. | Preserve the compatibility constraint: append never writes to old blocks, including a block pending truncation. Truncate remains out of scope; any future implementation must serialize its metadata changes with append and account for snapshots before reclaiming blocks. Do not add the old toBeTruncated flag just for append. |
+| Delayed truncate of the last block can race with a later append. | Preserve the compatibility constraint: append never writes to old blocks, including a block pending truncation. Truncate remains out of scope; any future implementation must serialize its metadata changes with append and account for snapshots before reclaiming blocks. Do not add the old toBeTruncated flag just for append. See [compatibility with future file editing](#compatibility-with-future-file-editing). |
 | hflush was excluded and native AppendKey was proposed alongside AppendFile. | This OEP specifies sync behavior per stream and the filesystem API only. Neither a separate hflush feature nor native object append is required for EC close-time append. |
 
 The old client/OM/SCM/datanode division remains useful: OM controls metadata, SCM allocates blocks, and the client writes
