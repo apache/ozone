@@ -1643,6 +1643,14 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Set whether this client verifies checksums when reading. Overrides ozone.client.verify.checksum for this client
+   * only. Takes effect for input streams opened afterwards, streams that are already open may or may not pick it up.
+   * @param verifyChecksum false to skip checksum verification, e.g. when the application verifies its own checksums.
+   */
+  default void setVerifyChecksum(boolean verifyChecksum) {
+  }
+
+  /**
    * Start the lease recovery of a file.
    *
    * @param volumeName - The volume name.

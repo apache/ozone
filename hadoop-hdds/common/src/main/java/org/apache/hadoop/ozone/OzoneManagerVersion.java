@@ -67,7 +67,12 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "buckets server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check"),
 
-  S3_MULTIPART_UPLOAD_ABORT_CONTEXT(15,
+  LOOKUP_FILE_REJECTS_OBS(15,
+      "OzoneManager version that rejects lookupFile on OBJECT_STORE buckets "
+          + "server-side, so file system clients no longer need the "
+          + "client-side InfoBucket layout check for getFileChecksum"),
+
+  S3_MULTIPART_UPLOAD_ABORT_CONTEXT(16,
       "OzoneManager version that resolves S3 volume context for multipart upload abort"),
 
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
