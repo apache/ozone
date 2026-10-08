@@ -165,6 +165,37 @@ public class TestOzoneBucket {
             Stream.of(Arguments.of(shape, size, null), Arguments.of(shape, size, ""))));
   }
 
+  @Test
+  void shallowRootListingWithMarkerKeepsSeed() throws IOException {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    when(proxy.listStatusLight(any())).thenAnswer(invocation -> {
+      ListStatusLightOptions options = invocation.getArgument(0);
+      List<OzoneFileStatusLight> statuses = new ArrayList<>(Arrays.asList(
+          keyStatus("a-file", false), keyStatus("b-file", false)));
+      statuses.removeIf(status -> status.getTrimmedName().compareTo(options.getStartKey()) < 0);
+      return statuses;
+    });
+
+    Iterator<? extends OzoneKey> keys = fsoBucket(proxy).listKeys("", "a-file", true);
+
+    ArgumentCaptor<ListStatusLightOptions> options = ArgumentCaptor.forClass(ListStatusLightOptions.class);
+    verify(proxy, times(2)).listStatusLight(options.capture());
+    for (ListStatusLightOptions call : options.getAllValues()) {
+      assertEquals("vol", call.getVolumeName());
+      assertEquals("bucket", call.getBucketName());
+      assertEquals("", call.getKeyName());
+      assertEquals("", call.getListPrefix());
+      assertEquals(3, call.getNumEntries());
+      assertFalse(call.isRecursive());
+    }
+    assertEquals("a-file", options.getAllValues().get(0).getStartKey());
+    assertTrue(options.getAllValues().get(0).isAllowPartialPrefixes());
+    assertEquals("b-file", options.getAllValues().get(1).getStartKey());
+    assertFalse(options.getAllValues().get(1).isAllowPartialPrefixes());
+    verifyNoMoreInteractions(proxy);
+    assertEquals("b-file", keys.next().getName());
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"dir/", "/"})
   void shallowListingWithPrefixKeepsSeed(String prefix) throws IOException {
