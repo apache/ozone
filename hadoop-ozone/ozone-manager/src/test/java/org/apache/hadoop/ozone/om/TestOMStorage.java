@@ -39,7 +39,7 @@ import java.util.Properties;
 import java.util.UUID;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -282,7 +282,7 @@ public class TestOMStorage {
       OzoneConfiguration conf, String nodeId) throws IOException {
     OMStorage storage = new OMStorage(conf);
     storage.setClusterId("clusterId");
-    storage.setLayoutVersion(OMLayoutVersionManager.maxLayoutVersion());
+    storage.setApparentVersion(OzoneManagerVersion.SOFTWARE_VERSION.serialize());
     storage.setOmId(OM_ID_STR);
     if (nodeId != null) {
       storage.setOmNodeId(nodeId);

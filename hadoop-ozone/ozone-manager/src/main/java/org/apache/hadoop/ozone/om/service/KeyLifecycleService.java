@@ -1246,7 +1246,7 @@ public class KeyLifecycleService extends BackgroundService {
       OMRequest omRequest = OMRequest.newBuilder()
           .setCmdType(OzoneManagerProtocolProtos.Type.AbortExpiredMultiPartUploads)
           .setMultipartUploadsExpiredAbortRequest(abortRequest)
-          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT.serialize())
           .setClientId(clientId.toString())
           .build();
 
@@ -1393,7 +1393,7 @@ public class KeyLifecycleService extends BackgroundService {
 
         OMRequest omRequest = OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.SaveLifecycleScanState)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(clientId.toString())
             .setSaveLifecycleScanStateRequest(saveRequest)
             .build();
@@ -1460,7 +1460,7 @@ public class KeyLifecycleService extends BackgroundService {
           if (deleteKeysRequest.getSerializedSize() < ratisByteLimit) {
             OMRequest omRequestRaw = OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
-                .setVersion(ClientVersion.CURRENT_VERSION)
+                .setVersion(ClientVersion.CURRENT.serialize())
                 .setClientId(clientId.toString())
                 .setDeleteKeysRequest(deleteKeysRequest)
                 .build();
@@ -1588,7 +1588,7 @@ public class KeyLifecycleService extends BackgroundService {
         // send request out
         OMRequest omRequest = OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(clientId.toString())
             .setRenameKeyRequest(renameKeyRequest)
             .build();
@@ -1652,7 +1652,7 @@ public class KeyLifecycleService extends BackgroundService {
           OMRequest omRequest = OMRequest.newBuilder().setCreateDirectoryRequest(
                   CreateDirectoryRequest.newBuilder().setKeyArgs(keyArgs))
               .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
-              .setVersion(ClientVersion.CURRENT_VERSION)
+              .setVersion(ClientVersion.CURRENT.serialize())
               .setClientId(clientId.toString())
               .build();
           try {

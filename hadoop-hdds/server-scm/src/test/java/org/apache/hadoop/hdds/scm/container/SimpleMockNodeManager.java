@@ -30,7 +30,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -68,7 +69,8 @@ public class SimpleMockNodeManager implements NodeManager {
   public void register(DatanodeDetails dd, NodeStatus status) {
     dd.setPersistedOpState(status.getOperationalState());
     dd.setPersistedOpStateExpiryEpochSec(status.getOpStateExpiryEpochSeconds());
-    nodeMap.put(dd.getID(), new DatanodeInfo(dd, status, null, HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
+    nodeMap.put(dd.getID(), new DatanodeInfo(dd, status, UpgradeUtils.defaultVersionProto(),
+        HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT));
   }
 
   public void setNodeStatus(DatanodeDetails dd, NodeStatus status) {
@@ -305,8 +307,8 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public void processLayoutVersionReport(DatanodeDetails datanodeDetails,
-                                         LayoutVersionProto layoutReport) {
+  public void processVersionReport(DatanodeDetails datanodeDetails,
+                                   DatanodeVersionProto versionReport) {
   }
 
   /**
@@ -434,7 +436,7 @@ public class SimpleMockNodeManager implements NodeManager {
   public RegisteredCommand register(DatanodeDetails datanodeDetails,
                                     NodeReportProto nodeReport,
                                     PipelineReportsProto pipelineReport,
-                                    LayoutVersionProto layoutreport) {
+                                    DatanodeVersionProto versionReport) {
     return null;
   }
 
