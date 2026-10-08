@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -165,7 +166,11 @@ public abstract class OMClientRequest implements RequestAuditor {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, long transactionLogIndex) {
     ExecutionContext context = ExecutionContext.of(transactionLogIndex,
         TransactionInfo.getTermIndex(transactionLogIndex));
-    return validateAndUpdateCache(ozoneManager, context);
+    try (TableCacheUpdateTracker tracker = TableCacheUpdateTracker.track()) {
+      OMClientResponse response = validateAndUpdateCache(ozoneManager, context);
+      response.addCleanupTables(tracker.removeUpdatedTables());
+      return response;
+    }
   }
 
   @VisibleForTesting
@@ -178,6 +183,22 @@ public abstract class OMClientRequest implements RequestAuditor {
    * @return User Info.
    */
   public OzoneManagerProtocolProtos.UserInfo getUserInfo() throws IOException {
+    return getUserInfo(omRequest, true);
+  }
+
+  /**
+   * Get authenticated user information for a read request submitted to Ratis.
+   * Client-supplied user information is not trusted on this path.
+   * @param omRequest OM request
+   * @return User Info.
+   */
+  public static OzoneManagerProtocolProtos.UserInfo getAuthenticatedUserInfo(
+      OMRequest omRequest) throws IOException {
+    return getUserInfo(omRequest, false);
+  }
+
+  private static OzoneManagerProtocolProtos.UserInfo getUserInfo(
+      OMRequest omRequest, boolean allowClientUserInfo) throws IOException {
     UserGroupInformation user = ProtobufRpcEngine.Server.getRemoteUser();
     InetAddress remoteAddress = ProtobufRpcEngine.Server.getRemoteIp();
     OzoneManagerProtocolProtos.UserInfo.Builder userInfo =
@@ -219,7 +240,8 @@ public abstract class OMClientRequest implements RequestAuditor {
     // client-supplied user name when no identity was established above:
     // it is unauthenticated data and must never override the identity
     // derived from S3 authentication or from the RPC user.
-    if (user == null && !userInfo.hasUserName() && omRequest.hasUserInfo()) {
+    if (allowClientUserInfo && user == null && !userInfo.hasUserName() &&
+        omRequest.hasUserInfo()) {
       userInfo.setUserName(omRequest.getUserInfo().getUserName());
     }
 

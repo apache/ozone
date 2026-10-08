@@ -43,8 +43,8 @@ env:
   TEST_JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml and populate-cache.yml, please keep in sync
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
-  # Maven 3.9 downloads dependencies via maven-resolver-transport-http, which reads aether.* and ignores maven.wagon.*
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Daether.connector.http.retryHandler.count=10
+  # Maven 3.9 downloads dependencies via maven-resolver-transport-http, which reads aether.* and ignores both maven.wagon.* and JDK-level http.*
+  MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 
 permissions: { }
@@ -56,7 +56,9 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
+      test-classes: ${{ steps.selective-checks.outputs.test-classes }}
       integration-suites: ${{ steps.integration-suites.outputs.suites }}
+      kubernetes-suites: ${{ steps.kubernetes-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
@@ -116,6 +118,9 @@ jobs:
       - name: Integration suites
         id: integration-suites
         run: dev-support/ci/integration_suites.sh
+      - name: Kubernetes suites
+        id: kubernetes-suites
+        run: dev-support/ci/kubernetes_suites.sh
       - name: Categorize Basic Checks
         id: categorize-basic-checks
         env:
@@ -174,7 +179,7 @@ jobs:
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
       matrix:
-        java: [ 17, 25 ]
+        java: [ 25 ]
         include:
           - os: ubuntu-24.04
           - java: 21
@@ -187,7 +192,7 @@ jobs:
       ratis-args: ${{ inputs.ratis_args }}
       runner: ${{ matrix.os }}
       script: compile
-      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings -Dmaven.compiler.release=${{ matrix.java }}"
+      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings -Dozone.java.version.server=${{ matrix.java }}"
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.java }}
       timeout-minutes: 45
@@ -340,9 +345,15 @@ jobs:
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: kubernetes
+      script-args: ${{ matrix.suite }}
       sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 60
+      split: ${{ matrix.suite }}
+      timeout-minutes: 10
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    strategy:
+      matrix:
+        suite: ${{ fromJson(needs.build-info.outputs.kubernetes-suites) }}
+      fail-fast: false
 
   integration:
     needs:
@@ -357,6 +368,7 @@ jobs:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: ${{ matrix.profile == 'filesystem' }}
       pre-script: sudo hostname localhost
       ratis-args: ${{ inputs.ratis_args }}
       script: integration
@@ -369,6 +381,31 @@ jobs:
       matrix:
         profile: ${{ fromJson(needs.build-info.outputs.integration-suites) }}
       fail-fast: false
+
+  # same as integration, but runs specific tests instead of profiles
+  specific-tests:
+    name: integration
+    needs:
+      - build-info
+      - build
+      - basic
+      - dependency
+      - license
+    if: |
+      needs.build-info.outputs.test-classes != '' &&
+      needs.build-info.outputs.needs-integration-tests != 'true'
+    uses: $/.github/workflows/check.yml
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      pre-script: sudo hostname localhost
+      ratis-args: ${{ inputs.ratis_args }}
+      script: integration
+      script-args: -Drocks_tools_native -DskipShade -Dtest=${{ needs.build-info.outputs.test-classes }}
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 90
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
 
   coverage:
     runs-on: ubuntu-24.04

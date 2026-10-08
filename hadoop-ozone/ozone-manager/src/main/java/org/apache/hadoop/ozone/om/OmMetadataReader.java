@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -46,6 +47,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
@@ -199,7 +201,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
               OmMetadataReader.getClientAddress());
       KeyInfoWithVolumeContext.Builder builder = KeyInfoWithVolumeContext
           .newBuilder()
-          .setKeyInfo(keyInfo);
+          .setKeyInfo(keyInfo)
+          .setBucketLayout(Objects.requireNonNullElse(
+              bucket.bucketLayout(), BucketLayout.DEFAULT));
       s3VolumeContext.ifPresent(context -> {
         builder.setVolumeArgs(context.getOmVolumeArgs());
         builder.setUserPrincipal(context.getUserPrincipal());

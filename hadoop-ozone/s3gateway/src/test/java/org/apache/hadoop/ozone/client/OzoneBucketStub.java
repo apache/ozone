@@ -316,7 +316,7 @@ public final class OzoneBucketStub extends OzoneBucket {
                 mtime,
                 mtime,
                 new ArrayList<>(), rConfig, objectMetadata, null,
-                null, false,
+                () -> readKey(key), false,
                 UserGroupInformation.getCurrentUser().getShortUserName(),
                 tags
             ));
