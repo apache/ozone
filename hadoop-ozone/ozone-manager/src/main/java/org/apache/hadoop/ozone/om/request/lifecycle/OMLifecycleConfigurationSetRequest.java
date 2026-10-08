@@ -241,9 +241,8 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
                 " day(s), which is not less than the cluster MPU expire threshold (" +
                 OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + "=" + expireThresholdConfig +
                 "). The MultipartUploadCleanupService will clean up the upload before the " +
-                "lifecycle rule fires, making the rule ineffective. " +
-                "Set daysAfterInitiation to a value less than " + expireThresholdConfig +
-                ", or increase " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + ".",
+                "lifecycle rule fires, making the rule ineffective. Make sure daysAfterInitiation " +
+                "time duration is shorter than " + OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD + ".",
                 OMException.ResultCodes.INVALID_REQUEST);
           }
         }
