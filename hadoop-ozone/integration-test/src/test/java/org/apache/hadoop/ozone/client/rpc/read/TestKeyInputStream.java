@@ -343,6 +343,11 @@ class TestKeyInputStream extends InputStreamTests {
 
     KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName);
 
+    // Wait until all replicas have applied the block, otherwise a ReadChunk to a lagging follower fails with
+    // UNKNOWN_BCSID and the retry on another datanode is counted again.
+    long containerID = keyInputStream.getPartStreams().get(0).getBlockID().getContainerID();
+    OzoneTestHelper.waitForContainerClose(getCluster(), containerID);
+
     // skip 150
     long skipped = keyInputStream.skip(70);
     assertEquals(70, skipped);
