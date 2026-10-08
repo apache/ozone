@@ -31,6 +31,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OzonePrefixPathImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -401,5 +402,102 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
     // We expect snapshotUsedNamespace to not go negative
     assertTrue(bucketInfoAfterPurge.getSnapshotUsedNamespace() >= 0,
         "SnapshotUsedNamespace went negative (" + bucketInfoAfterPurge.getSnapshotUsedNamespace() + ") due to bug.");
+  }
+
+  /**
+   * HDDS-16289 moved the emptiness check out of the bucket write lock, so assert that a non-recursive
+   * delete of a non-empty directory still fails with DIRECTORY_NOT_EMPTY and, because the check now
+   * precedes the lock, mutates nothing: the directory stays in the table and the bucket's used
+   * namespace is unchanged.
+   */
+  @Test
+  public void testDeleteNonEmptyDirectoryNonRecursiveFails() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    String parentDir = "parent";
+    OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, parentDir, omMetadataManager);
+    OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, parentDir + "/childDir", omMetadataManager);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    long usedNamespaceBefore = omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace();
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    String dirKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, bucketId, parentDir);
+    assertNotNull(omMetadataManager.getDirectoryTable().get(dirKey));
+
+    OMRequest deleteRequest = doPreExecute(createDeleteKeyRequest(parentDir, false));
+    OMClientResponse response = getOmKeyDeleteRequest(deleteRequest)
+        .validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_EMPTY, response.getOMResponse().getStatus());
+    assertNotNull(omMetadataManager.getDirectoryTable().get(dirKey));
+    assertEquals(usedNamespaceBefore, omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
+  }
+
+  /**
+   * The recursive counterpart of {@link #testDeleteNonEmptyDirectoryNonRecursiveFails()}: with
+   * recursive set, the emptiness check is skipped and the delete applies.
+   */
+  @Test
+  public void testDeleteNonEmptyDirectoryRecursiveSucceeds() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    String parentDir = "parent";
+    OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, parentDir, omMetadataManager);
+    OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, parentDir + "/childDir", omMetadataManager);
+
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    String dirKey = omMetadataManager.getOzonePathKey(volumeId, bucketId, bucketId, parentDir);
+    assertNotNull(omMetadataManager.getDirectoryTable().get(dirKey));
+
+    OMRequest deleteRequest = doPreExecute(createDeleteKeyRequest(parentDir, true));
+    OMClientResponse response = getOmKeyDeleteRequest(deleteRequest)
+        .validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getDirectoryTable().get(dirKey));
+  }
+
+  /**
+   * HDDS-16289 split the hsync open-key handling across the two phases: the open key is read and
+   * rewritten before the bucket write lock, and only its cache entry is published under the lock.
+   * Assert the published entry still carries the deleted-hsync marker.
+   */
+  @Test
+  public void testDeleteHsyncKeyMarksOpenKeyDeleted() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    long parentId = OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, PARENT_DIR, omMetadataManager);
+    final long clientId = 100L;
+
+    OmKeyInfo openKeyInfo =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(parentId + 1L)
+            .setParentObjectID(parentId)
+            .setUpdateID(100L)
+            .build();
+    openKeyInfo.setKeyName(FILE_NAME);
+    String dbOpenKey = OMRequestTestUtils.addFileToKeyTable(true, false, FILE_NAME, openKeyInfo,
+        clientId, 50L, omMetadataManager);
+
+    OmKeyInfo committedKeyInfo =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, FILE_KEY, RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(parentId + 1L)
+            .setParentObjectID(parentId)
+            .setUpdateID(100L)
+            .addMetadata(OzoneConsts.HSYNC_CLIENT_ID, String.valueOf(clientId))
+            .build();
+    committedKeyInfo.setKeyName(FILE_NAME);
+    OMRequestTestUtils.addFileToKeyTable(false, false, FILE_NAME, committedKeyInfo, -1, 50L, omMetadataManager);
+
+    OMRequest deleteRequest = doPreExecute(createDeleteKeyRequest(FILE_KEY, false));
+    OMClientResponse response = getOmKeyDeleteRequest(deleteRequest)
+        .validateAndUpdateCache(ozoneManager, 101L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    OmKeyInfo cachedOpenKey = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
+    assertNotNull(cachedOpenKey);
+    assertEquals("true", cachedOpenKey.getMetadata().get(OzoneConsts.DELETED_HSYNC_KEY));
   }
 }

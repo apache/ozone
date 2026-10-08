@@ -63,9 +63,19 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
             ScmConfigKeys.OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL,
             ScmConfigKeys.OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL_DEFAULT,
             TimeUnit.MILLISECONDS);
+    final long keepAliveTime = conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIME,
+            ScmConfigKeys.OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIME_DEFAULT,
+            TimeUnit.MILLISECONDS);
+    final long keepAliveTimeout = conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIMEOUT,
+            ScmConfigKeys.OZONE_SCM_HA_GRPC_CLIENT_KEEPALIVE_TIMEOUT_DEFAULT,
+            TimeUnit.MILLISECONDS);
     NettyChannelBuilder channelBuilder =
         NettyChannelBuilder.forAddress(host, port).usePlaintext()
             .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+            .keepAliveTime(keepAliveTime, TimeUnit.MILLISECONDS)
+            .keepAliveTimeout(keepAliveTimeout, TimeUnit.MILLISECONDS)
             .proxyDetector(uri -> null);
     SecurityConfig securityConfig = new SecurityConfig(conf);
     if (securityConfig.isSecurityEnabled()

@@ -234,7 +234,7 @@ class TestOMUpgradeFinalization {
 
         // Every OM is pre-finalized for ZDU. The version returned to clients should reflect the last software
         // version before ZDU to remain compatible with the old version framework.
-        assertAllOmServiceInfoVersions(cluster, OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS);
+        assertAllOmServiceInfoVersions(cluster, OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS);
 
         omClient.finalizeUpgrade();
         OMUpgradeTestUtils.waitForFinalization(omClient);

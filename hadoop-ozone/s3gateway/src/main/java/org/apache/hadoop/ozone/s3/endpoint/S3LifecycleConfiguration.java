@@ -83,6 +83,11 @@ public class S3LifecycleConfiguration {
     @XmlElement(name = "Filter")
     private Filter filter;
 
+    // Ozone does not support lifecycle Transition actions. This is bound only so a Transition
+    // element is detected and rejected instead of being silently dropped by JAXB.
+    @XmlElement(name = "Transition")
+    private List<Transition> transitions;
+
     public String getId() {
       return id;
     }
@@ -129,6 +134,14 @@ public class S3LifecycleConfiguration {
 
     public void setFilter(Filter filter) {
       this.filter = filter;
+    }
+
+    public List<Transition> getTransitions() {
+      return transitions;
+    }
+
+    public void setTransitions(List<Transition> transitions) {
+      this.transitions = transitions;
     }
   }
 
@@ -178,6 +191,48 @@ public class S3LifecycleConfiguration {
 
     public void setDaysAfterInitiation(Integer daysAfterInitiation) {
       this.daysAfterInitiation = daysAfterInitiation == null ? null : daysAfterInitiation.toString();
+    }
+  }
+
+  /**
+   * Transition entity for lifecycle rule. Ozone does not support lifecycle transition actions
+   * for any storage class; this is modeled only so a Transition element in the request is
+   * detected and rejected during conversion instead of being silently ignored.
+   */
+  @XmlAccessorType(XmlAccessType.FIELD)
+  @XmlRootElement(name = "Transition")
+  public static class Transition {
+    @XmlElement(name = "Days")
+    private String days;
+
+    @XmlElement(name = "Date")
+    private String date;
+
+    @XmlElement(name = "StorageClass")
+    private String storageClass;
+
+    public Integer getDays() {
+      return parseDays(days);
+    }
+
+    public void setDays(Integer days) {
+      this.days = days == null ? null : days.toString();
+    }
+
+    public String getDate() {
+      return date;
+    }
+
+    public void setDate(String date) {
+      this.date = date;
+    }
+
+    public String getStorageClass() {
+      return storageClass;
+    }
+
+    public void setStorageClass(String storageClass) {
+      this.storageClass = storageClass;
     }
   }
 
@@ -342,6 +397,14 @@ public class S3LifecycleConfiguration {
     }
     if (!STATUS_ENABLED.equals(status) && !STATUS_DISABLED.equals(status)) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML);
+    }
+    if (rule.getTransitions() != null && !rule.getTransitions().isEmpty()) {
+      String storageClass = rule.getTransitions().get(0).getStorageClass();
+      String message = StringUtils.isNotEmpty(storageClass)
+          ? "Invalid lifecycle configuration: storage class '" + storageClass
+              + "' is not supported for lifecycle transitions"
+          : "Invalid lifecycle configuration: Transition actions are not supported";
+      throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, rule.getId()).withMessage(message);
     }
 
     OmLCRule.Builder builder = new OmLCRule.Builder()
