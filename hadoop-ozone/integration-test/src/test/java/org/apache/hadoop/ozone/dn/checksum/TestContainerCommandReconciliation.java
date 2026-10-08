@@ -109,10 +109,10 @@ import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
-import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -461,7 +461,7 @@ public class TestContainerCommandReconciliation {
     // 2. Corrupt every block in one replica.
     for (BlockData blockData : blockDatas) {
       long blockID = blockData.getLocalID();
-      TestContainerCorruptions.CORRUPT_BLOCK.applyTo(container, blockID);
+      ContainerTestCorruptions.CORRUPT_BLOCK.applyTo(container, blockID);
     }
 
     datanodeStateMachine.getContainer().getContainerSet().scanContainerWithoutGap(containerID, TEST_SCAN);

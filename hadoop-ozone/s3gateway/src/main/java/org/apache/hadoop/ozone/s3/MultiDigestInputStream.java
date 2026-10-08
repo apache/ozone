@@ -177,6 +177,14 @@ public class MultiDigestInputStream extends FilterInputStream {
   }
 
   /**
+   * @return the underlying stream this digest stream wraps. Lets a caller reach a wrapped
+   *         {@link SignedChunksInputStream} to attach a chunk validator once the signing key is known.
+   */
+  public InputStream getWrappedStream() {
+    return in;
+  }
+
+  /**
    * Resets all message digests by calling {@link MessageDigest#reset()} on each
    * registered digest.
    */

@@ -24,11 +24,10 @@ import static org.apache.hadoop.hdds.scm.events.SCMEvents.CLOSE_CONTAINER;
 import static org.apache.hadoop.ozone.container.ozoneimpl.TestOzoneContainer.runTestOzoneContainerViaDataNode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.List;
 import java.util.Optional;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,7 +38,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -91,16 +89,22 @@ public class TestReconAsPassiveScm {
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
 
-    LambdaTestUtils.await(60000, 5000,
-        () -> (reconPipelineManager.getPipelines().size() >= 4));
-
-    // Verify if Recon has all the pipelines from SCM.
-    scmPipelineManager.getPipelines().forEach(p -> {
-      try {
-        assertNotNull(reconPipelineManager.getPipeline(p.getId()));
-      } catch (PipelineNotFoundException e) {
-        fail();
+    // SCM and Recon update their pipeline state asynchronously. Validate the
+    // complete SCM snapshot inside the retry loop so a pipeline created after
+    // Recon reaches the expected count does not cause a one-shot failure.
+    LambdaTestUtils.await(60000, 5000, () -> {
+      List<Pipeline> scmPipelines = scmPipelineManager.getPipelines();
+      if (scmPipelines.size() < 4) {
+        return false;
       }
+      for (Pipeline pipeline : scmPipelines) {
+        Pipeline reconPipeline =
+            reconPipelineManager.getPipeline(pipeline.getId());
+        if (reconPipeline == null) {
+          return false;
+        }
+      }
+      return true;
     });
 
     // Verify we can never create a pipeline in Recon.

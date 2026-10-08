@@ -439,7 +439,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       int leafCount = child.getNumOfLeaves();
       // skip nodes covered by excluded scopes
       for (Map.Entry<String, Integer> entry: excludedNodeCount.entrySet()) {
-        if (entry.getKey().startsWith(child.getNetworkFullPath())) {
+        if (child.isAncestor(entry.getKey())) {
           leafCount -= entry.getValue();
         }
       }
@@ -481,8 +481,6 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
         }
       }
     }
-    innerNode.build();
-
     HddsProtos.NetworkNode networkNode =
         HddsProtos.NetworkNode.newBuilder()
             .setInnerNode(innerNode).build();
