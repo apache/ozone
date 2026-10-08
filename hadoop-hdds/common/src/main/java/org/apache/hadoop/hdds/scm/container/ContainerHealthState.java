@@ -107,6 +107,13 @@ public enum ContainerHealthState {
       "Containers in OPEN state without any healthy Pipeline",
       "OpenContainersWithoutPipeline"),
 
+  /**
+   * Replicas with the same BCSID have different data checksums.
+   */
+  DATA_CHECKSUM_MISMATCH((short) 10,
+      "Containers with replicas reporting the same BCSID but different data checksums",
+      "DataChecksumMismatchContainers"),
+
   // ========== Actual Combinations Found in Code (100+) ==========
 
   /**

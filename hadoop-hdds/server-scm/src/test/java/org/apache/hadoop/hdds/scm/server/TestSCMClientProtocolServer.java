@@ -18,6 +18,9 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,16 +39,22 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerReplicasResponseProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
@@ -156,6 +165,47 @@ public class TestSCMClientProtocolServer {
             mockStorageContainerManager(), mock(ReconfigurationHandler.class));
     try {
       assertEquals(10, scmServer.getContainerCount(CLOSED));
+    } finally {
+      scmServer.stop();
+    }
+  }
+
+  @Test
+  public void testContainerReplicaResponseIncludesDataChecksumMismatch()
+      throws Exception {
+    ContainerInfo container = new ContainerInfo.Builder()
+        .setContainerID(1)
+        .setState(CLOSED)
+        .setSequenceId(10)
+        .setOwner("scm")
+        .setPipelineID(PipelineID.randomId())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.THREE))
+        .build();
+    ContainerID containerID = container.containerID();
+    Set<ContainerReplica> replicas = new HashSet<>();
+    long[] checksums = {100, 200, 100};
+    for (int i = 0; i < checksums.length; i++) {
+      replicas.add(createContainerReplica(containerID, i + 1, IN_SERVICE,
+          ContainerReplicaProto.State.CLOSED, 10L).toBuilder()
+          .setChecksums(ContainerChecksums.of(checksums[i]))
+          .build());
+    }
+
+    StorageContainerManager mockScm =
+        mockStorageContainerManager(List.of(container));
+    when(mockScm.getContainerManager().getContainer(containerID))
+        .thenReturn(container);
+    when(mockScm.getContainerManager().getContainerReplicas(containerID))
+        .thenReturn(replicas);
+    SCMClientProtocolServer scmServer =
+        new SCMClientProtocolServer(new OzoneConfiguration(), mockScm,
+            mock(ReconfigurationHandler.class));
+    try {
+      GetContainerReplicasResponseProto response =
+          scmServer.getContainerReplicasResponse(containerID.getId(),
+              CURRENT_VERSION);
+      assertTrue(response.getDataChecksumMismatch());
     } finally {
       scmServer.stop();
     }
