@@ -1,0 +1,288 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.admin.upgrade;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
+import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import picocli.CommandLine;
+
+/**
+ * Unit tests for {@link StatusSubCommand}.
+ */
+public class TestStatusSubCommand {
+
+  private static final String DEFAULT_ENCODING = StandardCharsets.UTF_8.name();
+  private static final ObjectMapper JSON = new ObjectMapper();
+
+  private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
+  private final PrintStream originalOut = System.out;
+  private final PrintStream originalErr = System.err;
+  private OzoneManagerProtocol omClient;
+  private StatusSubCommand cmd;
+  private boolean verbose;
+
+  @BeforeEach
+  public void setup() throws IOException {
+    omClient = mock(OzoneManagerProtocol.class);
+    when(omClient.getServiceInfo()).thenReturn(serviceInfoWithVersion(OzoneManagerVersion.ZDU));
+
+    verbose = false;
+    cmd = new StatusSubCommand() {
+      @Override
+      protected OzoneManagerProtocol getClient() throws Exception {
+        return omClient;
+      }
+
+      @Override
+      protected boolean isVerbose() {
+        return verbose;
+      }
+    };
+    System.setOut(new PrintStream(outContent, false, DEFAULT_ENCODING));
+    System.setErr(new PrintStream(errContent, false, DEFAULT_ENCODING));
+  }
+
+  @AfterEach
+  public void tearDown() {
+    System.setOut(originalOut);
+    System.setErr(originalErr);
+  }
+
+  @Test
+  public void testStatusCommandPrintsFinalized() throws Exception {
+    // Every component has finished finalizing and all datanodes are finalized.
+    HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
+        .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+        .setNumDatanodesFinalized(3)
+        .setNumDatanodesTotal(3)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+        .build();
+
+    OzoneManagerProtocolProtos.QueryUpgradeStatusResponse response =
+        OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
+            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+            .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+            .setHddsStatus(hddsStatus)
+            .build();
+
+    when(omClient.queryUpgradeStatus()).thenReturn(response);
+    new CommandLine(cmd).parseArgs();
+    cmd.call();
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertTrue(output.contains("Upgrade finalization status"));
+    assertTrue(output.contains("Cluster: FINALIZED"));
+    assertTrue(output.contains("OM: FINALIZED"));
+    assertTrue(output.contains("SCM: FINALIZED"));
+    assertTrue(output.contains("Datanodes finalized: 3/3"));
+    // Without --verbose internal server versions are not shown.
+    assertFalse(output.toLowerCase().contains("version"));
+    verify(omClient).queryUpgradeStatus();
+  }
+
+  @Test
+  public void testStatusCommandPrintsInProgress() throws Exception {
+    // SCM is finalized and datanodes are partway through, but OM has not finalized yet.
+    HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
+        .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+        .setNumDatanodesFinalized(1)
+        .setNumDatanodesTotal(3)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
+        .build();
+
+    OzoneManagerProtocolProtos.QueryUpgradeStatusResponse response =
+        OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
+            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
+            .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.IN_PROGRESS)
+            .setHddsStatus(hddsStatus)
+            .build();
+
+    when(omClient.queryUpgradeStatus()).thenReturn(response);
+    new CommandLine(cmd).parseArgs();
+    cmd.call();
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertTrue(output.contains("Upgrade finalization status"));
+    assertTrue(output.contains("Cluster: IN_PROGRESS"));
+    assertTrue(output.contains("OM: IN_PROGRESS"));
+    assertTrue(output.contains("SCM: FINALIZED"));
+    assertTrue(output.contains("Datanodes finalized: 1/3"));
+    verify(omClient).queryUpgradeStatus();
+  }
+
+  @Test
+  public void testStatusCommandPrintsUnfinalized() throws Exception {
+    // Nothing has been finalized yet.
+    HddsProtos.UpgradeStatus hddsStatus = HddsProtos.UpgradeStatus.newBuilder()
+        .setScmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+        .setNumDatanodesFinalized(0)
+        .setNumDatanodesTotal(3)
+        .setHddsFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+        .build();
+
+    OzoneManagerProtocolProtos.QueryUpgradeStatusResponse response =
+        OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
+            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+            .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.UNFINALIZED)
+            .setHddsStatus(hddsStatus)
+            .build();
+
+    when(omClient.queryUpgradeStatus()).thenReturn(response);
+    new CommandLine(cmd).parseArgs();
+    cmd.call();
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertTrue(output.contains("Upgrade finalization status"));
+    assertTrue(output.contains("Cluster: UNFINALIZED"));
+    assertTrue(output.contains("OM: UNFINALIZED"));
+    assertTrue(output.contains("SCM: UNFINALIZED"));
+    assertTrue(output.contains("Datanodes finalized: 0/3"));
+    verify(omClient).queryUpgradeStatus();
+  }
+
+  @Test
+  public void testStatusCommandPropagatesException() throws Exception {
+    when(omClient.queryUpgradeStatus()).thenThrow(new IOException("OM unavailable"));
+    new CommandLine(cmd).parseArgs();
+    assertThrows(IOException.class, () -> cmd.call());
+  }
+
+  @Test
+  public void testNonZduServerPrintsErrorAndReturnsNonZero() throws Exception {
+    when(omClient.getServiceInfo()).thenReturn(serviceInfoWithVersion(OzoneManagerVersion.DEFAULT_VERSION));
+
+    new CommandLine(cmd).parseArgs();
+    assertEquals(1, cmd.call());
+
+    String errOutput = errContent.toString(DEFAULT_ENCODING);
+    assertTrue(errOutput.contains("OM does not support zero downtime upgrade"));
+    verify(omClient, never()).queryUpgradeStatus();
+  }
+
+  @Test
+  public void testJsonOutput() throws Exception {
+    int omVersion = OzoneManagerVersion.ZDU.serialize();
+    int hddsVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
+    OzoneManagerProtocolProtos.QueryUpgradeStatusResponse response =
+        OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
+            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+            .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+            .setOmApparentVersion(omVersion)
+            .setHddsStatus(HddsProtos.UpgradeStatus.newBuilder()
+                .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+                .setNumDatanodesFinalized(2)
+                .setNumDatanodesTotal(3)
+                .setScmApparentVersion(hddsVersion)
+                .setMinDatanodeApparentVersion(hddsVersion)
+                .setMaxDatanodeApparentVersion(hddsVersion)
+                .build())
+            .build();
+    when(omClient.queryUpgradeStatus()).thenReturn(response);
+
+    // JSON output includes every field, including the apparent versions.
+    new CommandLine(cmd).parseArgs("--json");
+    assertEquals(0, cmd.call());
+    String jsonOutput = outContent.toString(DEFAULT_ENCODING);
+
+    JsonNode root = JSON.readTree(jsonOutput);
+    assertEquals("FINALIZED", root.path("clusterFinalizationStatus").asText());
+    assertEquals("FINALIZED", root.path("omFinalizationStatus").asText());
+    assertEquals("FINALIZED", root.path("scmFinalizationStatus").asText());
+    assertEquals(2, root.path("datanodesFinalized").asInt());
+    assertEquals(3, root.path("datanodesTotal").asInt());
+    assertEquals(OzoneManagerVersion.ZDU.toString(), root.path("omApparentVersion").asText());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.toString(), root.path("scmApparentVersion").asText());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.toString(), root.path("minDatanodeApparentVersion").asText());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.toString(), root.path("maxDatanodeApparentVersion").asText());
+
+    // The --verbose flag only affects the human-readable output; JSON output is identical.
+    outContent.reset();
+    verbose = true;
+    new CommandLine(cmd).parseArgs("--json");
+    assertEquals(0, cmd.call());
+    assertEquals(jsonOutput, outContent.toString(DEFAULT_ENCODING));
+  }
+
+  @Test
+  public void testVerboseTextOutputIncludesVersions() throws Exception {
+    verbose = true;
+    int omVersion = OzoneManagerVersion.ZDU.serialize();
+    int hddsVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
+    OzoneManagerProtocolProtos.QueryUpgradeStatusResponse response =
+        OzoneManagerProtocolProtos.QueryUpgradeStatusResponse.newBuilder()
+            .setOmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+            .setClusterFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+            .setOmApparentVersion(omVersion)
+            .setHddsStatus(HddsProtos.UpgradeStatus.newBuilder()
+                .setScmFinalizationStatus(HddsProtos.FinalizationStatus.FINALIZED)
+                .setNumDatanodesFinalized(3)
+                .setNumDatanodesTotal(3)
+                .setScmApparentVersion(hddsVersion)
+                .setMinDatanodeApparentVersion(hddsVersion)
+                .setMaxDatanodeApparentVersion(hddsVersion)
+                .build())
+            .build();
+    when(omClient.queryUpgradeStatus()).thenReturn(response);
+
+    new CommandLine(cmd).parseArgs();
+    assertEquals(0, cmd.call());
+
+    String output = outContent.toString(DEFAULT_ENCODING);
+    assertTrue(output.contains("OM:"));
+    assertTrue(output.contains("SCM:"));
+    // Each apparent version label should be followed by the version number set on the response.
+    assertTrue(output.contains("OM Apparent Version:     " + OzoneManagerVersion.ZDU));
+    assertTrue(output.contains("SCM Apparent Version:    " + HDDSVersion.SOFTWARE_VERSION));
+    assertTrue(output.contains("Min Datanode Apparent Version: " + HDDSVersion.SOFTWARE_VERSION));
+    assertTrue(output.contains("Max Datanode Apparent Version: " + HDDSVersion.SOFTWARE_VERSION));
+  }
+
+  private ServiceInfoEx serviceInfoWithVersion(OzoneManagerVersion version) {
+    ServiceInfo serviceInfo = new ServiceInfo.Builder()
+        .setNodeType(HddsProtos.NodeType.OM)
+        .setHostname("localhost")
+        .setOmVersion(version)
+        .build();
+    return new ServiceInfoEx(Collections.singletonList(serviceInfo), "", Collections.emptyList());
+  }
+}
