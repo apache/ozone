@@ -68,7 +68,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -165,7 +165,7 @@ public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
   private AtomicLong totalHeartbeats = new AtomicLong(0);
   private AtomicLong totalFCRs = new AtomicLong(0);
   private AtomicLong totalICRs = new AtomicLong(0);
-  private StorageContainerLocationProtocol scmContainerClient;
+  private StorageContainerLocationInternalInterface scmContainerClient;
 
   @Override
   public Void call() throws Exception {

@@ -51,7 +51,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplicaInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
@@ -70,7 +70,7 @@ public class ContainerOperationClient implements ScmClient {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerOperationClient.class);
-  private final StorageContainerLocationProtocol
+  private final StorageContainerLocationInternalInterface
       storageContainerLocationClient;
   private final SecretKeyProtocolScm secretKeyClient;
   private final boolean containerTokenEnabled;
@@ -119,12 +119,12 @@ public class ContainerOperationClient implements ScmClient {
     return manager;
   }
 
-  public static StorageContainerLocationProtocol newContainerRpcClient(
+  public static StorageContainerLocationInternalInterface newContainerRpcClient(
       ConfigurationSource configSource) {
     return HAUtils.getScmContainerClient(configSource);
   }
 
-  public static StorageContainerLocationProtocol newContainerRpcClientForNode(
+  public static StorageContainerLocationInternalInterface newContainerRpcClientForNode(
       ConfigurationSource configSource, ScmNodeTarget targetScmNode) {
     return HAUtils.getScmContainerClientForNode(configSource, targetScmNode);
   }

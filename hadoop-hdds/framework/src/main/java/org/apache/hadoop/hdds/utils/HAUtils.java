@@ -50,7 +50,7 @@ import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
@@ -149,7 +149,7 @@ public final class HAUtils {
             conf);
   }
 
-  public static StorageContainerLocationProtocol getScmContainerClient(
+  public static StorageContainerLocationInternalInterface getScmContainerClient(
       ConfigurationSource conf) {
     return getScmContainerClient(conf,
         new SCMContainerLocationFailoverProxyProvider(conf, null));
@@ -159,37 +159,37 @@ public final class HAUtils {
    * Creates an SCM container client using the provided proxy provider.
    * Retains the provider reference to support dynamic SCM node updates.
    */
-  public static StorageContainerLocationProtocol getScmContainerClient(
+  public static StorageContainerLocationInternalInterface getScmContainerClient(
       ConfigurationSource conf,
       SCMContainerLocationFailoverProxyProvider proxyProvider) {
-    StorageContainerLocationProtocol scmContainerClient =
+    StorageContainerLocationInternalInterface scmContainerClient =
         TracingUtil.createProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider), StorageContainerLocationProtocol.class, conf);
+                proxyProvider), StorageContainerLocationInternalInterface.class, conf);
     return scmContainerClient;
   }
 
   @VisibleForTesting
-  public static StorageContainerLocationProtocol getScmContainerClient(
+  public static StorageContainerLocationInternalInterface getScmContainerClient(
       ConfigurationSource conf, UserGroupInformation userGroupInformation) {
     SCMContainerLocationFailoverProxyProvider proxyProvider =
         new SCMContainerLocationFailoverProxyProvider(conf,
             userGroupInformation);
-    StorageContainerLocationProtocol scmContainerClient =
+    StorageContainerLocationInternalInterface scmContainerClient =
         TracingUtil.createProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider), StorageContainerLocationProtocol.class, conf);
+                proxyProvider), StorageContainerLocationInternalInterface.class, conf);
     return scmContainerClient;
   }
 
-  public static StorageContainerLocationProtocol getScmContainerClientForNode(
+  public static StorageContainerLocationInternalInterface getScmContainerClientForNode(
       ConfigurationSource conf, ScmNodeTarget targetScmNode) {
     SCMContainerLocationFailoverProxyProvider proxyProvider =
         new SCMContainerLocationFailoverProxyProvider(conf, null);
-    StorageContainerLocationProtocol scmContainerClient =
+    StorageContainerLocationInternalInterface scmContainerClient =
         TracingUtil.createProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider, targetScmNode), StorageContainerLocationProtocol.class, conf);
+                proxyProvider, targetScmNode), StorageContainerLocationInternalInterface.class, conf);
     return scmContainerClient;
   }
 

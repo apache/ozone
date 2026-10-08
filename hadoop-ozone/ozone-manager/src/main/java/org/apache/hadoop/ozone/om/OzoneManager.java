@@ -205,7 +205,7 @@ import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -686,7 +686,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Retain SCM proxy providers so OM can dynamically reload nodes/addresses without restarting.
     final SCMContainerLocationFailoverProxyProvider scmContainerProxyProvider =
         new SCMContainerLocationFailoverProxyProvider(configuration, null);
-    final StorageContainerLocationProtocol scmContainerClient =
+    final StorageContainerLocationInternalInterface scmContainerClient =
         HAUtils.getScmContainerClient(configuration, scmContainerProxyProvider);
     // verifies that the SCM info in the OM Version file is correct.
     final SCMBlockLocationFailoverProxyProvider scmBlockProxyProvider =
