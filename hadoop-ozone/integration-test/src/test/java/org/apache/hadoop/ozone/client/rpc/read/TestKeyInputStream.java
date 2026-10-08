@@ -239,6 +239,15 @@ class TestKeyInputStream extends InputStreamTests {
     }
   }
 
+  /**
+   * Wait until all replicas have applied the key's block, otherwise a ReadChunk to a lagging follower fails with
+   * UNKNOWN_BCSID and the retry on another datanode is counted again in {@link XceiverClientMetrics}.
+   */
+  private void waitForAllReplicas(KeyInputStream keyInputStream) throws Exception {
+    long containerID = keyInputStream.getPartStreams().get(0).getBlockID().getContainerID();
+    OzoneTestHelper.waitForContainerClose(getCluster(), containerID);
+  }
+
   public void testSeek(BucketForTesting bucket) throws Exception {
     XceiverClientManager.resetXceiverClientMetrics();
     XceiverClientMetrics metrics = XceiverClientManager
@@ -257,6 +266,7 @@ class TestKeyInputStream extends InputStreamTests {
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
 
     KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName);
+    waitForAllReplicas(keyInputStream);
 
     // Seek to position 150
     keyInputStream.seek(150);
@@ -342,11 +352,7 @@ class TestKeyInputStream extends InputStreamTests {
         metrics.getContainerOpCountMetrics(ContainerProtos.Type.WriteChunk));
 
     KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName);
-
-    // Wait until all replicas have applied the block, otherwise a ReadChunk to a lagging follower fails with
-    // UNKNOWN_BCSID and the retry on another datanode is counted again.
-    long containerID = keyInputStream.getPartStreams().get(0).getBlockID().getContainerID();
-    OzoneTestHelper.waitForContainerClose(getCluster(), containerID);
+    waitForAllReplicas(keyInputStream);
 
     // skip 150
     long skipped = keyInputStream.skip(70);
