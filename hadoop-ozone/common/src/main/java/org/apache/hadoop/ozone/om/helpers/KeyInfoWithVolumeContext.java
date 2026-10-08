@@ -37,12 +37,22 @@ public class KeyInfoWithVolumeContext {
 
   private final OmKeyInfo keyInfo;
 
+  private final Optional<BucketLayout> bucketLayout;
+
   public KeyInfoWithVolumeContext(OmVolumeArgs volumeArgs,
                                   String userPrincipal,
                                   OmKeyInfo keyInfo) {
+    this(volumeArgs, userPrincipal, keyInfo, null);
+  }
+
+  public KeyInfoWithVolumeContext(OmVolumeArgs volumeArgs,
+                                  String userPrincipal,
+                                  OmKeyInfo keyInfo,
+                                  BucketLayout bucketLayout) {
     this.volumeArgs = Optional.ofNullable(volumeArgs);
     this.userPrincipal = Optional.ofNullable(userPrincipal);
     this.keyInfo = keyInfo;
+    this.bucketLayout = Optional.ofNullable(bucketLayout);
   }
 
   public static KeyInfoWithVolumeContext fromProtobuf(
@@ -52,6 +62,8 @@ public class KeyInfoWithVolumeContext {
             OmVolumeArgs.getFromProtobuf(proto.getVolumeInfo()) : null)
         .setUserPrincipal(proto.getUserPrincipal())
         .setKeyInfo(OmKeyInfo.getFromProtobuf(proto.getKeyInfo()))
+        .setBucketLayout(proto.hasBucketLayout()
+            ? BucketLayout.fromProto(proto.getBucketLayout()) : null)
         .build();
   }
 
@@ -60,6 +72,7 @@ public class KeyInfoWithVolumeContext {
     volumeArgs.ifPresent(v -> builder.setVolumeInfo(v.getProtobuf()));
     userPrincipal.ifPresent(builder::setUserPrincipal);
     builder.setKeyInfo(keyInfo.getProtobuf(clientVersion));
+    bucketLayout.ifPresent(layout -> builder.setBucketLayout(layout.toProto()));
     return builder.build();
   }
 
@@ -75,6 +88,10 @@ public class KeyInfoWithVolumeContext {
     return userPrincipal;
   }
 
+  public Optional<BucketLayout> getBucketLayout() {
+    return bucketLayout;
+  }
+
   public static Builder newBuilder() {
     return new Builder();
   }
@@ -86,6 +103,7 @@ public class KeyInfoWithVolumeContext {
     private OmVolumeArgs volumeArgs;
     private String userPrincipal;
     private OmKeyInfo keyInfo;
+    private BucketLayout bucketLayout;
 
     public Builder setVolumeArgs(OmVolumeArgs volumeArgs) {
       this.volumeArgs = volumeArgs;
@@ -102,8 +120,13 @@ public class KeyInfoWithVolumeContext {
       return this;
     }
 
+    public Builder setBucketLayout(BucketLayout layout) {
+      this.bucketLayout = layout;
+      return this;
+    }
+
     public KeyInfoWithVolumeContext build() {
-      return new KeyInfoWithVolumeContext(volumeArgs, userPrincipal, keyInfo);
+      return new KeyInfoWithVolumeContext(volumeArgs, userPrincipal, keyInfo, bucketLayout);
     }
   }
 }

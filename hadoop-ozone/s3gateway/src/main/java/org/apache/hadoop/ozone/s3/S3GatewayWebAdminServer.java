@@ -50,9 +50,9 @@ import org.apache.hadoop.ozone.conf.S3GatewayHealthCheckConfig;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
-import org.eclipse.jetty.servlet.FilterHolder;
-import org.eclipse.jetty.servlet.FilterMapping;
-import org.eclipse.jetty.servlet.ServletHandler;
+import org.eclipse.jetty.ee8.servlet.FilterHolder;
+import org.eclipse.jetty.ee8.servlet.FilterMapping;
+import org.eclipse.jetty.ee8.servlet.ServletHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,6 +71,9 @@ class S3GatewayWebAdminServer extends BaseHttpServer {
 
   S3GatewayWebAdminServer(MutableConfigurationSource conf, String name) throws IOException {
     super(conf, name);
+    if (isEnabled()) {
+      WeldCdiIntegration.enable(getWebAppContext());
+    }
     addServlet("icon", "/favicon.ico", IconServlet.class);
     S3GatewayHealthCheckConfig healthConfig =
         conf.getObject(S3GatewayHealthCheckConfig.class);

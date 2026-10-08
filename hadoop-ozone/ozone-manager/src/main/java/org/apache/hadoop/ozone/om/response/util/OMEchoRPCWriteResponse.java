@@ -20,14 +20,12 @@ package org.apache.hadoop.ozone.om.response.util;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for EchoRPC request (write).
  */
-@CleanupTableInfo
 public class OMEchoRPCWriteResponse extends OMClientResponse {
 
   public OMEchoRPCWriteResponse(OMResponse omResponse) {

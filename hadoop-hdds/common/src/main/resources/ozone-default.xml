@@ -3825,12 +3825,12 @@
     <value/>
     <tag>OZONE, OM, SCM, MANAGEMENT</tag>
     <description>
-      The base dir for HTTP Jetty server to extract contents. If this property
-      is not configured, by default, Jetty will create a directory inside the
-      directory named by the ${ozone.metadata.dirs}/webserver. While in production environment,
-      it's strongly suggested instructing Jetty to use a different parent directory by
-      setting this property to the name of the desired parent directory. The value of the
-      property will be used to set Jetty context attribute 'org.eclipse.jetty.webapp.basetempdir'.
+      The base dir for the HTTP Jetty server. If this property is not configured,
+      by default the directory named by ${ozone.metadata.dirs}/webserver is used.
+      While in a production environment, it's strongly suggested to point this at a
+      different parent directory by setting this property. Under this directory Ozone
+      creates and reuses a per-server subdirectory (named after the server) as Jetty's
+      persistent temp directory; it is kept across restarts rather than deleted on stop.
       The directory named by this property must exist and be writeable.
     </description>
   </property>
@@ -3844,6 +3844,22 @@
       - HTTP_ONLY : Service is provided only on http
       - HTTPS_ONLY : Service is provided only on https
       - HTTP_AND_HTTPS : Service is provided both on http and https
+    </description>
+  </property>
+  <property>
+    <name>ozone.http.sni.host.check.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <description>
+      Whether the HTTPS endpoints of Ozone daemons require the request's Host header
+      (or TLS SNI name) to be covered by the certificate the server serves. When this
+      is false, a request whose name the certificate does not cover is still served
+      with that certificate, which is how the HTTPS endpoints behaved before the Jetty
+      12 upgrade. Enabling the check rejects such a request with 400 "Invalid SNI", so
+      it requires the server certificate to carry every name clients connect with as a
+      SubjectAlternativeName - including an iPAddress entry for every address clients
+      reach by IP literal, because such a request sends no SNI at all, and entries for
+      any load balancer, virtual IP or DNS alias in front of the daemon.
     </description>
   </property>
   <property>
@@ -4369,6 +4385,55 @@
     <description>Deadline for SCM DB checkpoint interval.</description>
   </property>
   <property>
+    <name>ozone.scm.ha.grpc.client.keepalive.time</name>
+    <value>5m</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Interval after which an Inter-SCM gRPC client (a follower SCM
+      or Recon downloading a DB checkpoint) sends an HTTP/2 keepalive ping to
+      the leader SCM when the connection is otherwise quiet, to keep long
+      checkpoint downloads alive across proxies and load balancers.
+      Must be >= ozone.scm.ha.grpc.server.permit.keepalive.time to prevent
+      server disconnections.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.client.keepalive.timeout</name>
+    <value>30s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Time an Inter-SCM gRPC client waits for a keepalive ping ack
+      before considering the connection dead and closing it.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.server.max.connection.idle</name>
+    <value>15m</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Maximum time the Inter-SCM gRPC server keeps a connection with
+      no active RPC before closing it with a GOAWAY. Does not affect an
+      in-progress checkpoint download, which holds an active stream.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.server.keepalive.time</name>
+    <value>5m</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Interval after which the Inter-SCM gRPC server sends an HTTP/2
+      keepalive ping to a client when the connection is otherwise quiet.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.server.keepalive.timeout</name>
+    <value>30s</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Time the Inter-SCM gRPC server waits for a keepalive ping ack
+      before considering the connection dead and closing it.</description>
+  </property>
+  <property>
+    <name>ozone.scm.ha.grpc.server.permit.keepalive.time</name>
+    <value>5m</value>
+    <tag>SCM, OZONE, HA, RATIS</tag>
+    <description>Minimum interval the Inter-SCM gRPC server permits between
+      keepalive pings from a client. Clients pinging more frequently are
+      disconnected. Should be no larger than
+      ozone.scm.ha.grpc.client.keepalive.time so client pings are accepted.</description>
+  </property>
+  <property>
     <name>ozone.scm.close.container.wait.duration</name>
     <value>150s</value>
     <tag>SCM, OZONE, RECON</tag>
@@ -4389,7 +4454,16 @@
     <tag>SCM, OZONE</tag>
     <description>Wait duration for flush of buffered transaction.</description>
   </property>
-
+  <property>
+    <name>ozone.scm.ha.dbtransactionbuffer.flush.pending.limit</name>
+    <value>10000</value>
+    <tag>SCM, OZONE</tag>
+    <description>
+      Maximum number of buffered DB operations the SCM HA transaction buffer holds 
+      before applyTransaction flushes them to RocksDB. This bounds memory use while
+      a restarted follower applies a large backlog of committed Ratis log entries.
+    </description>
+  </property>
 
   <property>
     <name>ozone.s3g.kerberos.keytab.file</name>

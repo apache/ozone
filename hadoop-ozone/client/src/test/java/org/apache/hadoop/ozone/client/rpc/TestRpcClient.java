@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
@@ -39,6 +41,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.slf4j.event.Level;
 
@@ -246,6 +249,20 @@ public class TestRpcClient {
           .doesNotContain("This metrics class is not used.");
     } finally {
       logs.stopCapturing();
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"invalid/volume, bucket1, INVALID_VOLUME_NAME", "volume1, invalid/bucket, INVALID_BUCKET_NAME"})
+  public void testListMultipartUploadsValidatesNames(String volume, String bucket, ResultCodes expected)
+      throws Exception {
+    RpcClient client = createRpcClient();
+    try {
+      OMException error = assertThrows(OMException.class,
+          () -> client.listMultipartUploads(volume, bucket, null, null, null, 10));
+      assertThat(error.getResult()).isEqualTo(expected);
+    } finally {
+      client.close();
     }
   }
 
