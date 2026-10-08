@@ -64,13 +64,14 @@ public class TestOMMetricsSetters {
     metrics.decNumSnapshotActive();
     metrics.setNumSnapshotDeleted(1);
     metrics.setNumSnapshotDeleted(4);
+    metrics.setNumSnapshotDeleted(2);
     metrics.incNumTenants();
     metrics.incNumTenants();
     metrics.decNumTenants();
 
     MetricsRecordBuilder rb = getMetrics("OMMetrics");
     assertGauge("NumSnapshotActive", 2L, rb);
-    assertGauge("NumSnapshotDeleted", 4L, rb);
+    assertGauge("NumSnapshotDeleted", 2L, rb);
     assertGauge("NumTenants", 1L, rb);
   }
 }
