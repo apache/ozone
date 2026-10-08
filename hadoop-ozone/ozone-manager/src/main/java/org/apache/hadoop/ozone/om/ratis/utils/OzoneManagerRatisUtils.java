@@ -333,6 +333,13 @@ public final class OzoneManagerRatisUtils {
       break;
     case AbortMultiPartUpload:
       keyArgs = omRequest.getAbortMultiPartUploadRequest().getKeyArgs();
+      if (omRequest.getAbortMultiPartUploadRequest().getAssumeS3Context()) {
+        // Resolve before choosing the bucket layout and write the resolved volume to Ratis.
+        keyArgs = keyArgs.toBuilder().setVolumeName(
+            ozoneManager.getS3VolumeContext().getOmVolumeArgs().getVolume()).build();
+        omRequest = omRequest.toBuilder().setAbortMultiPartUploadRequest(
+            omRequest.getAbortMultiPartUploadRequest().toBuilder().setKeyArgs(keyArgs).clearAssumeS3Context()).build();
+      }
       volumeName = keyArgs.getVolumeName();
       bucketName = keyArgs.getBucketName();
       break;

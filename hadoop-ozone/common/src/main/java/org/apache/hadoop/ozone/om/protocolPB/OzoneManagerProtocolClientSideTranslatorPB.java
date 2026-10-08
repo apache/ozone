@@ -1924,6 +1924,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException {
+    abortMultipartUpload(omKeyArgs, false);
+  }
+
+  @Override
+  public void abortMultipartUpload(OmKeyArgs omKeyArgs, boolean assumeS3Context) throws IOException {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(omKeyArgs.getVolumeName())
         .setBucketName(omKeyArgs.getBucketName())
@@ -1931,7 +1936,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setMultipartUploadID(omKeyArgs.getMultipartUploadID());
 
     MultipartUploadAbortRequest.Builder multipartUploadAbortRequest =
-        MultipartUploadAbortRequest.newBuilder();
+        MultipartUploadAbortRequest.newBuilder().setAssumeS3Context(assumeS3Context);
     multipartUploadAbortRequest.setKeyArgs(keyArgs);
 
     OMRequest omRequest = createOMRequest(

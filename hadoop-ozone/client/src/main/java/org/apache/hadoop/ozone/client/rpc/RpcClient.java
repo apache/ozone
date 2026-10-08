@@ -2343,6 +2343,23 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.S3_MULTIPART_UPLOAD_ABORT_CONTEXT) < 0) {
+      abortMultipartUpload(getS3VolumeContext().getOmVolumeArgs().getVolume(), bucketName, keyName, uploadID);
+      return;
+    }
+    verifyBucketName(bucketName);
+    HddsClientUtils.checkNotNull(keyName, uploadID);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setMultipartUploadID(uploadID)
+        .build();
+    ozoneManagerClient.abortMultipartUpload(keyArgs, true);
+  }
+
+  @Override
   public void abortMultipartUpload(String volumeName,
        String bucketName, String keyName, String uploadID) throws IOException {
     verifyVolumeName(volumeName);

@@ -884,6 +884,9 @@ public interface ClientProtocol {
   void abortMultipartUpload(String volumeName,
       String bucketName, String keyName, String uploadID) throws IOException;
 
+  /** Abort a multipart upload in S3 volume context. */
+  void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException;
+
   /**
    * Returns list of parts of a multipart upload key.
    * @param volumeName

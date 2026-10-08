@@ -22,10 +22,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -34,15 +41,20 @@ import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.event.Level;
 
 /**
@@ -261,6 +273,35 @@ public class TestRpcClient {
       OMException error = assertThrows(OMException.class,
           () -> client.listMultipartUploads(volume, bucket, null, null, null, 10));
       assertThat(error.getResult()).isEqualTo(expected);
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"GET_FILE_STATUS_REJECTS_OBS", "S3_MULTIPART_UPLOAD_ABORT_CONTEXT"})
+  void testAbortS3MultipartUpload(OzoneManagerVersion version) throws Exception {
+    RpcClient client = spy(createRpcClient());
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "omVersion", version, true);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
+          .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(client).getS3VolumeContext();
+      boolean assumeContext = version == OzoneManagerVersion.S3_MULTIPART_UPLOAD_ABORT_CONTEXT;
+
+      client.abortS3MultipartUpload("bucket", "key", "upload-id");
+
+      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+      if (assumeContext) {
+        verify(om).abortMultipartUpload(args.capture(), eq(true));
+      } else {
+        verify(om).abortMultipartUpload(args.capture());
+      }
+      verify(client, times(assumeContext ? 0 : 1)).getS3VolumeContext();
+      assertEquals(assumeContext ? "s3v" : "tenant-volume", args.getValue().getVolumeName());
+      assertEquals("upload-id", args.getValue().getMultipartUploadID());
     } finally {
       client.close();
     }
