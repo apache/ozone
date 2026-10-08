@@ -19,11 +19,14 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.NoSuchElementException;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.junit.jupiter.api.Test;
@@ -36,36 +39,51 @@ class TestBlockReadCursor {
             .setType(ContainerProtos.ChecksumType.CRC32).setBytesPerChecksum(interval)).build();
   }
 
+  private static void assertNextRange(BlockReadCursor cursor, long offset, int length, List<ChunkInfo> chunks) {
+    assertTrue(cursor.hasNext());
+    BlockReadCursor.ReadRange range = cursor.next();
+    assertEquals(offset, range.offset());
+    assertEquals(length, range.length());
+    assertEquals(chunks, range.chunks());
+  }
+
   @Test
   void testShiftedRangesAndLookahead() throws Exception {
     List<ChunkInfo> chunks = Arrays.asList(chunk(0, 3, 4), chunk(3, 9, 4), chunk(12, 7, 3));
     BlockReadCursor cursor = new BlockReadCursor(4, 14, 6, chunks);
-    assertEquals(3, cursor.offset());
-    assertEquals(4, cursor.nextReadLength());
-    assertEquals(4, cursor.nextReadLength());
-    assertEquals(chunks.subList(1, 2), cursor.chunksForRead(4));
-    cursor.advance(4);
-    assertEquals(7, cursor.offset());
-    assertEquals(5, cursor.nextReadLength());
-    cursor.advance(5);
-    assertEquals(12, cursor.offset());
-    assertEquals(6, cursor.nextReadLength());
-    cursor.advance(6);
-    assertFalse(cursor.hasRemaining());
-    assertEquals(15, cursor.bytesRead());
+    assertTrue(cursor.hasNext());
+    assertNextRange(cursor, 3, 4, chunks.subList(1, 2));
+    assertNextRange(cursor, 7, 5, chunks.subList(1, 2));
+    assertNextRange(cursor, 12, 6, chunks.subList(2, 3));
+    assertFalse(cursor.hasNext());
   }
 
   @Test
   void testSpanningChunksAndShortFinalChecksum() throws Exception {
     List<ChunkInfo> chunks = Arrays.asList(chunk(0, 3, 4), chunk(3, 9, 4));
     BlockReadCursor cursor = new BlockReadCursor(0, Long.MAX_VALUE, 8, chunks);
-    assertEquals(7, cursor.nextReadLength());
-    assertEquals(chunks, cursor.chunksForRead(7));
-    cursor.advance(7);
-    assertEquals(5, cursor.nextReadLength());
-    cursor.advance(5);
-    assertFalse(cursor.hasRemaining());
-    assertEquals(12, cursor.bytesRead());
+    assertNextRange(cursor, 0, 7, chunks);
+    assertNextRange(cursor, 7, 5, chunks.subList(1, 2));
+    assertFalse(cursor.hasNext());
+  }
+
+  @Test
+  void testIteratesWholeRangeOnce() throws Exception {
+    List<ChunkInfo> chunks = Arrays.asList(chunk(0, 3, 4), chunk(3, 9, 4), chunk(12, 7, 3));
+    BlockReadCursor cursor = new BlockReadCursor(0, Long.MAX_VALUE, 5, chunks);
+    List<Integer> lengths = new ArrayList<>();
+    long offset = 0;
+    while (cursor.hasNext()) {
+      BlockReadCursor.ReadRange range = cursor.next();
+      assertEquals(offset, range.offset());
+      lengths.add(range.length());
+      offset += range.length();
+    }
+    assertEquals(Arrays.asList(3, 4, 5, 3, 4), lengths);
+    assertFalse(cursor.hasNext());
+    assertThrows(NoSuchElementException.class, cursor::next);
+    assertFalse(cursor.hasNext());
+    assertThrows(NoSuchElementException.class, new BlockReadCursor(3, 0, 1, chunks)::next);
   }
 
   @Test
@@ -75,12 +93,8 @@ class TestBlockReadCursor {
         {12, 15, 2}, {15, 18, 2}, {18, 19, 2}}) {
       for (int requestedOffset : new int[] {range[0], range[1] - 1}) {
         BlockReadCursor cursor = new BlockReadCursor(requestedOffset, 1, 8, chunks);
-        int length = range[1] - range[0];
-        assertEquals(range[0], cursor.offset());
-        assertEquals(length, cursor.nextReadLength());
-        assertEquals(Collections.singletonList(chunks.get(range[2])), cursor.chunksForRead(length));
-        cursor.advance(length);
-        assertFalse(cursor.hasRemaining());
+        assertNextRange(cursor, range[0], range[1] - range[0], Collections.singletonList(chunks.get(range[2])));
+        assertFalse(cursor.hasNext());
       }
     }
   }
@@ -90,29 +104,27 @@ class TestBlockReadCursor {
     List<ChunkInfo> chunks = Arrays.asList(chunk(0, 3, 4), chunk(3, 9, 4));
     BlockReadCursor cursor = new BlockReadCursor(3, 9, 1, chunks);
     for (int expected : new int[] {4, 4, 1}) {
-      assertTrue(cursor.hasRemaining());
-      assertEquals(expected, cursor.nextReadLength());
-      cursor.advance(expected);
+      assertTrue(cursor.hasNext());
+      assertEquals(expected, cursor.next().length());
     }
-    assertFalse(cursor.hasRemaining());
-    assertFalse(new BlockReadCursor(3, 0, 1, chunks).hasRemaining());
+    assertFalse(cursor.hasNext());
+    assertFalse(new BlockReadCursor(3, 0, 1, chunks).hasNext());
     BlockReadCursor shortChunk = new BlockReadCursor(0, 3, 1,
         Collections.singletonList(chunk(0, 3, Integer.MAX_VALUE)));
     assertEquals(3, shortChunk.responseDataSize());
-    assertEquals(3, shortChunk.nextReadLength());
+    assertEquals(3, shortChunk.next().length());
   }
 
   @Test
   void testRangeNearLongLimit() throws Exception {
     List<ChunkInfo> chunks = Arrays.asList(chunk(0, Long.MAX_VALUE - 9, 4), chunk(Long.MAX_VALUE - 9, 9, 4));
     BlockReadCursor cursor = new BlockReadCursor(Long.MAX_VALUE - 8, Long.MAX_VALUE, 4, chunks);
-    assertEquals(Long.MAX_VALUE - 9, cursor.offset());
+    long offset = Long.MAX_VALUE - 9;
     for (int length : new int[] {4, 4, 1}) {
-      assertEquals(length, cursor.nextReadLength());
-      cursor.advance(length);
+      assertNextRange(cursor, offset, length, chunks.subList(1, 2));
+      offset += length;
     }
-    assertEquals(Long.MAX_VALUE, cursor.offset());
-    assertFalse(cursor.hasRemaining());
+    assertFalse(cursor.hasNext());
   }
 
 }

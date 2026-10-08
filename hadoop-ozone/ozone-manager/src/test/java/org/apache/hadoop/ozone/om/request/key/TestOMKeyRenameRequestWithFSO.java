@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -97,6 +98,34 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
         omKeyRenameRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(OzoneManagerProtocolProtos.Status.RENAME_OPEN_FILE,
         response.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testRenameFileToItself() throws Exception {
+    String dbFromKey = OMRequestTestUtils.addFileToKeyTable(false, false, fromKeyInfo.getFileName(), fromKeyInfo,
+        clientID, txnLogId, omMetadataManager);
+    OMRequest omRequest = doPreExecute(createRenameKeyRequest(volumeName, bucketName, fromKeyName, fromKeyName));
+
+    OMClientResponse response = getOMKeyRenameRequest(omRequest).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    // The response must be safe to flush and must leave the file as it was.
+    try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batchOperation);
+      omMetadataManager.getStore().commitBatchOperation(batchOperation);
+    }
+    assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(dbFromKey).getUpdateID())
+        .isEqualTo(fromKeyInfo.getUpdateID());
+  }
+
+  @Test
+  public void testRenameDirectoryToItself() throws Exception {
+    String dirName = fromKeyParentInfo.getKeyName();
+    OMRequest omRequest = doPreExecute(createRenameKeyRequest(volumeName, bucketName, dirName, dirName));
+
+    OMClientResponse response = getOMKeyRenameRequest(omRequest).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS, response.getOMResponse().getStatus());
   }
 
   @Override

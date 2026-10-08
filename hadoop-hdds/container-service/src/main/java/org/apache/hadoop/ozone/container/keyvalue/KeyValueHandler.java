@@ -2348,23 +2348,23 @@ public class KeyValueHandler extends Handler {
     final BlockReadCursor cursor = new BlockReadCursor(readBlock.getOffset(), readBlock.getLength(),
         responseDataSize, blockData.getChunks());
     final ByteBuffer buffer = ByteBuffer.allocate(cursor.responseDataSize());
-    blockFile.position(cursor.offset());
-    while (cursor.hasRemaining()) {
-      buffer.clear().limit(cursor.nextReadLength());
+    long bytesRead = 0;
+    while (cursor.hasNext()) {
+      final BlockReadCursor.ReadRange range = cursor.next();
+      blockFile.position(range.offset());
+      buffer.clear().limit(range.length());
       blockFile.read(buffer);
       if (buffer.hasRemaining()) {
-        throw new EOFException("Unexpected end of block " + blockID + " at " + cursor.offset());
+        throw new EOFException("Unexpected end of block " + blockID + " at " + range.offset());
       }
+      bytesRead += range.length();
       buffer.flip();
-      final int readLength = buffer.remaining();
-      final List<ContainerProtos.ChunkInfo> chunks = cursor.chunksForRead(readLength);
       if (validateChunkChecksumData) {
-        Checksum.validateChecksums(buffer, cursor.offset(), 0, chunks);
+        Checksum.validateChecksums(buffer, range.offset(), 0, range.chunks());
       }
-      streamObserver.onNext(getReadBlockResponse(request, chunks, buffer, cursor.offset()));
-      cursor.advance(readLength);
+      streamObserver.onNext(getReadBlockResponse(request, range.chunks(), buffer, range.offset()));
     }
-    return cursor.bytesRead();
+    return bytesRead;
   }
 
   /**

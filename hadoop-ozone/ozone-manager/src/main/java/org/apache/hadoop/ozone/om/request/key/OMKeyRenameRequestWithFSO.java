@@ -43,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -111,6 +112,10 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         omClientResponse = renameKey(prepared, fromKeyName,
             keyArgs.getModificationTime(), ozoneManager, omResponse,
             trxnLogIndex);
+      } else {
+        // Nothing to rename, so reply with a response that changes no table.
+        omClientResponse = new DummyOMClientResponse(
+            omResponse.setRenameKeyResponse(RenameKeyResponse.newBuilder()).build());
       }
 
       result = Result.SUCCESS;

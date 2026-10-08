@@ -58,9 +58,13 @@ class LocalStream implements StateMachine.DataStream {
 
   @Override
   public CompletableFuture<ByteBuffer> onCommand(ByteBuffer buffer, long streamOffset) {
+    if (!(dataChannel instanceof KeyValueStreamDataChannel)) {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "Unexpected DataChannel " + dataChannel.getClass()));
+    }
     return CompletableFuture.supplyAsync(() -> {
       try {
-        // TODO: drain datachannel.buffers
+        ((KeyValueStreamDataChannel) dataChannel).drainBuffers();
         return command.apply(buffer);
       } catch (IOException e) {
         throw new CompletionException(e);
