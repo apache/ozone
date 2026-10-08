@@ -227,6 +227,27 @@ public class TestStateContext {
         StateContext.CONTAINER_REPORTS_PROTO_NAME);
   }
 
+  @Test
+  public void testGetAllAvailableReportsRespectsLimit() throws IOException {
+    StateContext ctx = createSubject();
+    HostAndPort scm1 = new HostAndPort("scm1", 9001);
+    ctx.addEndpoint(scm1);
+
+    // Queue 10 ICRs; no full report is refreshed, so only ICRs are returned.
+    batchAddIncrementalReport(ctx,
+        StateContext.INCREMENTAL_CONTAINER_REPORT_PROTO_NAME, 10);
+
+    // A limited collection returns at most the limit and leaves the rest.
+    assertEquals(4, ctx.getAllAvailableReports(scm1, 4).size());
+    assertTrue(ctx.hasPendingReports(scm1));
+    assertEquals(4, ctx.getAllAvailableReports(scm1, 4).size());
+    assertTrue(ctx.hasPendingReports(scm1));
+    // Last chunk drains the queue.
+    assertEquals(2, ctx.getAllAvailableReports(scm1, 4).size());
+    assertFalse(ctx.hasPendingReports(scm1));
+    assertEquals(0, ctx.getAllAvailableReports(scm1, 4).size());
+  }
+
   void batchRefreshfullReports(StateContext ctx, String reportName, int count) {
     for (int i = 0; i < count; i++) {
       ctx.refreshFullReport(newMockReport(reportName));

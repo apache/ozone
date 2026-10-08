@@ -1842,6 +1842,15 @@
     </description>
   </property>
   <property>
+    <name>hdds.container.report.max.limit</name>
+    <value>10000</value>
+    <tag>DATANODE</tag>
+    <description>
+      Maximum number of reports a datanode includes in a single heartbeat to
+      an SCM endpoint.
+    </description>
+  </property>
+  <property>
     <name>hdds.db.profile</name>
     <value>DISK</value>
     <tag>OZONE, OM, PERFORMANCE</tag>
