@@ -1522,7 +1522,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .map(Collection::stream)
                 .orElseGet(Stream::empty)
                 .flatMap(List::stream)
-                .map(loc -> loc.getProtobuf(ClientVersion.CURRENT_VERSION))
+                .map(loc -> loc.getProtobuf(ClientVersion.CURRENT))
                 .forEach(keyArgs::addKeyLocations);
 
             OzoneManagerProtocolClientSideTranslatorPB.setReplicationConfig(

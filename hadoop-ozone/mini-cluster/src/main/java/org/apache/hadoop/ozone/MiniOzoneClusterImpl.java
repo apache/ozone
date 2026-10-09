@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.server.http.BaseHttpServer.SERVER_DIR;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
@@ -41,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -79,7 +79,7 @@ import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -815,8 +815,8 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           .build();
       datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
 
-      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(dnConf,
-          datanodeDetails.getUuidString(), maxLayoutVersion());
+      DatanodeStorage layoutStorage = new DatanodeStorage(dnConf,
+          datanodeDetails.getUuidString(), HDDSVersion.SOFTWARE_VERSION.serialize());
       if (layoutStorage.getState() != StorageState.INITIALIZED) {
         layoutStorage.initialize();
       }
