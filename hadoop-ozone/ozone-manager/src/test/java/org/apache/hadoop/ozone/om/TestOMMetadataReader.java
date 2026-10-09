@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.REA
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,6 +53,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
@@ -164,6 +166,78 @@ public class TestOMMetadataReader {
     assertTrue(omMetadataReader.checkAcls(obj, contextWithoutS3ActionBuilder, true));
 
     verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, "GetObject");
+  }
+
+  @Test
+  public void testCheckAclsAlsoChecksGetObjectForGetObjectAttributes() throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("GetObjectAttributes")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+    final OzoneObj obj = createTestOzoneObj();
+
+    assertTrue(omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), true));
+
+    final ArgumentCaptor<RequestContext> captor = ArgumentCaptor.forClass(RequestContext.class);
+    verify(accessAuthorizer, times(2)).checkAccess(eq(obj), captor.capture());
+    assertEquals("GetObjectAttributes", captor.getAllValues().get(0).getS3Action());
+    assertEquals("GetObject", captor.getAllValues().get(1).getS3Action());
+  }
+
+  @Test
+  public void testCheckAclsDeniedWhenDependentGetObjectActionDenied() throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("GetObjectAttributes")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OzoneObj obj = createTestOzoneObj();
+    when(accessAuthorizer.checkAccess(eq(obj), any(RequestContext.class))).thenAnswer(
+        invocation -> !"GetObject".equals(invocation.<RequestContext>getArgument(1).getS3Action()));
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+
+    final OMException ex = assertThrows(
+        OMException.class, () -> omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), true));
+
+    assertEquals(ResultCodes.PERMISSION_DENIED, ex.getResult());
+    verify(accessAuthorizer, times(2)).checkAccess(eq(obj), any(RequestContext.class));
+  }
+
+  @Test
+  public void testCheckAclsSkipsDependentActionWhenGetObjectAttributesDenied() throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("GetObjectAttributes")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OzoneObj obj = createTestOzoneObj();
+    when(accessAuthorizer.checkAccess(eq(obj), any(RequestContext.class))).thenReturn(false);
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer);
+
+    assertFalse(omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), false));
+
+    verify(accessAuthorizer).checkAccess(eq(obj), any(RequestContext.class));
+  }
+
+  @Test
+  public void testCheckAclsDoesNotCheckDependentActionWhenStsFeatureDisabled() throws Exception {
+    OzoneManager.setS3Auth(S3Authentication.newBuilder()
+        .setAccessId(ACCESS_KEY_ID)
+        .setS3Action("GetObjectAttributes")
+        .build());
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, mock(KeyManager.class), false);
+    final OzoneObj obj = createTestOzoneObj();
+
+    assertTrue(omMetadataReader.checkAcls(obj, createTestRequestContextBuilder(), true));
+
+    verifyS3ActionPassedToAuthorizer(accessAuthorizer, obj, null);
   }
 
   @Test
@@ -766,5 +840,64 @@ public class TestOMMetadataReader {
     OzoneFileStatus status = reader.getFileStatus(keyArgs);
     assertEquals(expectedStatus, status);
     verify(keyManager).getFileStatus(any(OmKeyArgs.class), anyString());
+  }
+
+  @Test
+  public void lookupFileRejectsObjectStoreLayout() throws Exception {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    KeyManager keyManager = mock(KeyManager.class);
+    when(ozoneManager.getAclsEnabled()).thenReturn(false);
+    when(ozoneManager.getBucketManager()).thenReturn(mock(BucketManager.class));
+    when(ozoneManager.getVolumeManager()).thenReturn(mock(VolumeManager.class));
+    when(ozoneManager.getPerfMetrics()).thenReturn(mock(OMPerformanceMetrics.class));
+    when(ozoneManager.resolveBucketLink(any(OmKeyArgs.class)))
+        .thenReturn(new ResolvedBucket("vol", "obs-bucket", "vol", "obs-bucket",
+            "owner", BucketLayout.OBJECT_STORE));
+
+    OmMetadataReader reader = new OmMetadataReader(keyManager,
+        mock(PrefixManager.class), ozoneManager, mock(org.slf4j.Logger.class),
+        mock(AuditLogger.class), mock(OmMetadataReaderMetrics.class), null);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("vol")
+        .setBucketName("obs-bucket")
+        .setKeyName("key1")
+        .build();
+
+    OMException exception = assertThrows(OMException.class,
+        () -> reader.lookupFile(keyArgs));
+    assertEquals(ResultCodes.NOT_SUPPORTED_OPERATION, exception.getResult());
+    assertTrue(exception.getMessage().contains("obs-bucket"));
+    assertTrue(exception.getMessage().contains("OBJECT_STORE"));
+    verify(keyManager, never()).lookupFile(any(), anyString());
+  }
+
+  @Test
+  public void lookupFileAllowsLegacyLayout() throws Exception {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    KeyManager keyManager = mock(KeyManager.class);
+    when(ozoneManager.getAclsEnabled()).thenReturn(false);
+    when(ozoneManager.getBucketManager()).thenReturn(mock(BucketManager.class));
+    when(ozoneManager.getVolumeManager()).thenReturn(mock(VolumeManager.class));
+    when(ozoneManager.getPerfMetrics()).thenReturn(mock(OMPerformanceMetrics.class));
+    when(ozoneManager.resolveBucketLink(any(OmKeyArgs.class)))
+        .thenReturn(new ResolvedBucket("vol", "legacy-bucket", "vol",
+            "legacy-bucket", "owner", BucketLayout.LEGACY));
+    OmKeyInfo expectedKeyInfo = mock(OmKeyInfo.class);
+    when(keyManager.lookupFile(any(OmKeyArgs.class), anyString()))
+        .thenReturn(expectedKeyInfo);
+
+    OmMetadataReader reader = new OmMetadataReader(keyManager,
+        mock(PrefixManager.class), ozoneManager, mock(org.slf4j.Logger.class),
+        mock(AuditLogger.class), mock(OmMetadataReaderMetrics.class), null);
+
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("vol")
+        .setBucketName("legacy-bucket")
+        .setKeyName("key1")
+        .build();
+
+    assertEquals(expectedKeyInfo, reader.lookupFile(keyArgs));
+    verify(keyManager).lookupFile(any(OmKeyArgs.class), anyString());
   }
 }

@@ -79,7 +79,7 @@ public abstract class TestBucketLayoutWithOlderClient implements NonHATests.Test
         OzoneManagerProtocolProtos.OMRequest
             .newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
-            .setVersion(ClientVersion.DEFAULT_VERSION.toProtoValue())
+            .setVersion(ClientVersion.DEFAULT_VERSION.serialize())
             .setClientId(UUID.randomUUID().toString())
             .setCreateBucketRequest(
                 OzoneManagerProtocolProtos.CreateBucketRequest.newBuilder()

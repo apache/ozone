@@ -37,6 +37,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
+import software.amazon.awssdk.services.s3.model.StorageClass;
 
 /**
  * Integration tests for the S3 Gateway of the {@code ozone local} runtime.
@@ -47,16 +48,18 @@ class TestLocalOzoneS3 {
   private Path tempDir;
 
   /**
-   * The gateway serves signed S3 requests on a loopback-only listener, and accepts any
-   * credentials because the local runtime leaves security off. Regression guard rather than a
-   * fix: non-secure OM has always skipped signature validation, so these assertions do not go red
-   * against a runtime that also stores a secret in OM.
+   * Security is off, so the S3 Gateway accepts credentials it has never seen. The object carries an explicit STANDARD
+   * storage class, which succeeds on the single default datanode only because ozone local sets
+   * {@code ozone.s3g.standard.storage-class.use-client-default}; otherwise S3StorageType maps it to RATIS/THREE.
    */
   @Test
   void s3GatewayServesRequests() throws Exception {
     LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(tempDir.resolve("local-ozone-s3")).build();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // Match the test module's 128 MB containers; production blocks default to 256 MB.
+    ClientConfigForTesting.newBuilder(StorageUnit.MB).applyTo(conf);
 
-    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, conf)) {
       cluster.start();
 
       assertTrue(cluster.getS3gPort() > 0);
@@ -65,34 +68,36 @@ class TestLocalOzoneS3 {
 
       assertBucketRoundTrip(cluster.getS3Endpoint(), "local-smoke",
           LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY, LocalOzoneClusterConfig.LOCAL_S3_SECRET_KEY);
-      // Credentials the runtime never saw work the same, for the reason given on this test.
       String unknown = UUID.randomUUID().toString().replace("-", "");
       assertBucketRoundTrip(cluster.getS3Endpoint(), "local-smoke-" + unknown, unknown, unknown);
+
+      try (S3Client s3 = s3Client(cluster.getS3Endpoint(),
+          LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY, LocalOzoneClusterConfig.LOCAL_S3_SECRET_KEY)) {
+        s3.putObject(request -> request.bucket("local-smoke").key("object").storageClass(StorageClass.STANDARD),
+            RequestBody.fromString("payload"));
+        assertEquals("payload",
+            s3.getObjectAsBytes(request -> request.bucket("local-smoke").key("object")).asUtf8String());
+      }
     }
   }
 
-  /**
-   * The SDK sends a SigV4-signed request, which is what AuthorizationFilter requires of every
-   * caller; whether that signature verifies is decided separately, in OM.
-   */
-  private static void assertBucketRoundTrip(String endpoint, String bucket,
-      String accessKey, String secretKey) {
-    AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
-    try (S3Client s3 = S3Client.builder()
-        .endpointOverride(URI.create(endpoint))
-        .region(Region.of(LocalOzoneClusterConfig.LOCAL_S3_REGION))
-        .credentialsProvider(StaticCredentialsProvider.create(credentials))
-        .forcePathStyle(true)
-        .build()) {
+  private static void assertBucketRoundTrip(String endpoint, String bucket, String accessKey, String secretKey) {
+    try (S3Client s3 = s3Client(endpoint, accessKey, secretKey)) {
       s3.createBucket(request -> request.bucket(bucket));
       assertTrue(s3.listBuckets().buckets().stream().anyMatch(b -> bucket.equals(b.name())));
     }
   }
 
-  /**
-   * Covers the object data path that {@link #s3GatewayServesRequests()} does not: put and get,
-   * not just create and list.
-   */
+  private static S3Client s3Client(String endpoint, String accessKey, String secretKey) {
+    return S3Client.builder()
+        .endpointOverride(URI.create(endpoint))
+        .region(Region.of(LocalOzoneClusterConfig.LOCAL_S3_REGION))
+        .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
+        .forcePathStyle(true)
+        .build();
+  }
+
+  /** Exercises create, list, put and get with explicit SDK credentials. */
   @Test
   void awsSdkCanCreateListPutAndGetAgainstLocalRuntime() throws Exception {
     LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
