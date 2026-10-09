@@ -178,7 +178,7 @@ public class TestOMDirectoriesPurgeApplyPerf extends OMKeyRequestTests {
           .setUpdateID(0)
           .build();
       OmKeyInfo subDirKey = getOmKeyInfo(volumeName, bucket, subdir, "dir1/" + subdir.getName());
-      path.addMarkDeletedSubDirs(subDirKey.getProtobuf(ClientVersion.CURRENT_VERSION));
+      path.addMarkDeletedSubDirs(subDirKey.getProtobuf(ClientVersion.CURRENT));
 
       OmKeyInfo subFile = OMRequestTestUtils.createOmKeyInfo(volumeName, bucket, "dir1/file" + i,
               RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
@@ -187,7 +187,7 @@ public class TestOMDirectoriesPurgeApplyPerf extends OMKeyRequestTests {
           .setUpdateID(100L)
           .build();
       subFile.setKeyLocationVersions(buildLocationVersions());
-      path.addDeletedSubFiles(subFile.getProtobuf(true, ClientVersion.CURRENT_VERSION));
+      path.addDeletedSubFiles(subFile.getProtobuf(true, ClientVersion.CURRENT));
     }
 
     OzoneManagerProtocolProtos.PurgeDirectoriesRequest.Builder purgeDir =

@@ -181,6 +181,8 @@ public class SCMStateMachine extends BaseStateMachine {
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
       updateLastAppliedTermIndex(appliedTermIndex);
 
+      transactionBuffer.flushIfPendingLimitReached();
+
       // A restarted follower may catch up by applying data-carrying entries
       // here rather than through notifyTermIndexUpdated, so check for catch-up
       // in both places. No-op once the datanode protocol server has started.
@@ -496,7 +498,6 @@ public class SCMStateMachine extends BaseStateMachine {
     // leader ready  in SCMContext.
     scm.getScmContext().setLeaderReady();
     scm.getSCMServiceManager().notifyStatusChanged();
-    scm.getFinalizationManager().onLeaderReady();
     addRatisEvent("SCM " + scm.getScmId() +
         " is ready to serve requests as the leader");
   }

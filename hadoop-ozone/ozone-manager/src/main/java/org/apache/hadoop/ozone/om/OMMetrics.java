@@ -29,6 +29,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.om.snapshot.OMSnapshotDirectoryMetrics;
 import org.apache.hadoop.util.Time;
 
@@ -88,6 +89,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numListSnapshotDiffJobs;
 
   private @Metric MutableGaugeInt numSnapshotCacheSize;
+  @Metric("Set to 1 if OM is monitoring ongoing upgrade finalization, 0 otherwise")
+  private MutableGaugeInt finalizationInProgress;
   private @Metric MutableCounterLong numGetFileStatus;
   private @Metric MutableCounterLong numCreateDirectory;
   private @Metric MutableCounterLong numCreateFile;
@@ -219,14 +222,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   // Metrics for total number of volumes, buckets and keys
 
-  private @Metric MutableCounterLong numVolumes;
-  private @Metric MutableCounterLong numBuckets;
+  private @Metric MutableGaugeLong numVolumes;
+  private @Metric MutableGaugeLong numBuckets;
   private @Metric MutableCounterLong numS3Buckets;
 
   //TODO: This metric is an estimate and it may be inaccurate on restart if the
   // OM process was not shutdown cleanly. Key creations/deletions in the last
   // few minutes before restart may not be included in this count.
-  private @Metric MutableCounterLong numKeys;
+  private @Metric MutableGaugeLong numKeys;
 
   private @Metric MutableCounterLong numBucketS3Creates;
   private @Metric MutableCounterLong numBucketS3CreateFails;
@@ -256,8 +259,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numTrashAtomicDirDeletes;
 
   //FSO Metrics
-  private @Metric MutableCounterLong numDirs;
-  private @Metric MutableCounterLong numFiles;
+  private @Metric MutableGaugeLong numDirs;
+  private @Metric MutableGaugeLong numFiles;
 
   //EC Metrics
   private @Metric MutableCounterLong ecKeyCreateTotal;
@@ -353,7 +356,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void decNumVolumes() {
-    numVolumes.incr(-1);
+    numVolumes.decr();
   }
 
   public void incNumBuckets() {
@@ -361,7 +364,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void decNumBuckets() {
-    numBuckets.incr(-1);
+    numBuckets.decr();
   }
 
   public void incNumKeys() {
@@ -373,36 +376,31 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void decNumKeys() {
-    numKeys.incr(-1);
+    numKeys.decr();
   }
 
   public void setNumVolumes(long val) {
-    long oldVal = this.numVolumes.value();
-    this.numVolumes.incr(val - oldVal);
+    this.numVolumes.set(val);
   }
 
   public void setNumBuckets(long val) {
-    long oldVal = this.numBuckets.value();
-    this.numBuckets.incr(val - oldVal);
+    this.numBuckets.set(val);
   }
 
   public void setNumKeys(long val) {
-    long oldVal = this.numKeys.value();
-    this.numKeys.incr(val - oldVal);
+    this.numKeys.set(val);
   }
 
   public void setNumDirs(long val) {
-    long oldVal = this.numDirs.value();
-    this.numDirs.incr(val - oldVal);
+    this.numDirs.set(val);
   }
 
   public void setNumFiles(long val) {
-    long oldVal = this.numDirs.value();
-    this.numDirs.incr(val - oldVal);
+    this.numFiles.set(val);
   }
 
   public void decNumKeys(long val) {
-    this.numKeys.incr(-val);
+    this.numKeys.decr(val);
   }
 
   public long getNumVolumes() {
@@ -627,6 +625,14 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void decNumSnapshotCacheSize() {
     numSnapshotCacheSize.decr();
+  }
+
+  public void setFinalizationInProgress(boolean inProgress) {
+    finalizationInProgress.set(inProgress ? 1 : 0);
+  }
+
+  public int getFinalizationInProgress() {
+    return finalizationInProgress.value();
   }
 
   public void incNumCompleteMultipartUploadFails() {
@@ -1219,6 +1225,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   @VisibleForTesting
   public long getNumKeyLookups() {
     return numKeyLookup.value();
+  }
+
+  @VisibleForTesting
+  public long getNumLookupFile() {
+    return numLookupFile.value();
   }
 
   @VisibleForTesting
