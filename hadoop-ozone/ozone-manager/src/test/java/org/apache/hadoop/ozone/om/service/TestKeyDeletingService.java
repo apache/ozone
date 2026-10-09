@@ -1368,6 +1368,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       // wait for AOS deleted keys to be reclaimed and
       // snap2 to be deep cleaned.
       directoryDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       keyDeletingService.runPeriodicalTaskNow();
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 10, 100, 10000);
       // Verify last run AOS deletion metrics.
@@ -1402,6 +1403,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // wait for snap2 to be deep cleaned.
       directoryDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       keyDeletingService.runPeriodicalTaskNow();
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 20, 100, 10000);
 
