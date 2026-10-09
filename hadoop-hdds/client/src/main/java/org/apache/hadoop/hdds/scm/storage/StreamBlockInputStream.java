@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -144,7 +143,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!dataAvailableToRead(1, preRead)) {
       return EOF;
     }
-    final int value = readBuffer.getByteBuffer().get();
+    final int value = Byte.toUnsignedInt(readBuffer.getByteBuffer().get());
     advancePosition(1, preRead);
     return value;
   }
@@ -232,7 +231,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
     client.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
-        blockID, blockOffset, length, responseDataSize, tokenRef.get(), pipeline), response);
+        blockID, blockOffset, length, responseDataSize, verifyChecksum, tokenRef.get(), pipeline), response);
 
     int copied = 0;
     while (copied < length) {
@@ -475,7 +474,16 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
     xceiverClient.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
-        blockID, requestedLength, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
+        blockID, requestedLength, length, responseDataSize, verifyChecksum, tokenRef.get(), pipelineRef.get()), r);
+  }
+
+  /**
+   * A stream killed by a gRPC deadline is a transport failure of the long-lived call, not a data error:
+   * fail over to another datanode the same way as UNAVAILABLE. The classic per-request path is unaffected.
+   */
+  @Override
+  protected boolean isConnectivityIssue(IOException ex) {
+    return super.isConnectivityIssue(ex) || Status.fromThrowable(ex).getCode() == Status.DEADLINE_EXCEEDED.getCode();
   }
 
   private void handleExceptions(IOException cause) throws IOException {
@@ -696,8 +704,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       try {
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
         if (verifyChecksum) {
-          ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
-          Checksum.verifyChecksum(data, checksumData, 0);
+          Checksum.validateChecksums(data, readBlock.getOffset(), 0, readBlock.getChunkInfoListList());
         }
         offerToQueue(readBlock);
       } catch (Exception e) {
@@ -709,7 +716,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         LOG.warn("Failed to process block {} response at offset={}, size={}: {}, {}",
             getBlockID().getContainerBlockID(),
             offset, data.size(), StringUtils.bytes2Hex(data.asReadOnlyByteBuffer(), 10),
-            readBlock.getChecksumData(), e);
+            readBlock.getChunkInfoListList(), e);
         if (r != null) {
           r.getRequestObserver().onError(e);
         }
@@ -783,10 +790,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     private void offerToQueue(ReadBlockResponseProto item) {
       if (LOG.isTraceEnabled()) {
-        final ContainerProtos.ChecksumData checksumData = item.getChecksumData();
-        LOG.trace("{}: enqueue response offset {}, length {}, numChecksums {}, bytesPerChecksum={}",
-            name, item.getOffset(), item.getData().size(),
-            checksumData.getChecksumsList().size(), checksumData.getBytesPerChecksum());
+        LOG.trace("{}: enqueue response offset {}, length {}, chunks {}",
+            name, item.getOffset(), item.getData().size(), item.getChunkInfoListCount());
       }
       final boolean offered = responseQueue.offer(item);
       Preconditions.assertTrue(offered, () -> "Failed to offer " + item);

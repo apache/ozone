@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 
 import jakarta.annotation.Nullable;
 import java.io.Closeable;
@@ -27,11 +27,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -43,11 +45,12 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventHandler;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.StorageContainerNodeProtocol;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A node manager supports a simple interface for managing a datanode.
@@ -74,6 +77,8 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 public interface NodeManager extends StorageContainerNodeProtocol,
     EventHandler<CommandForDatanode>, NodeManagerMXBean, Closeable {
 
+  Logger LOG = LoggerFactory.getLogger(NodeManager.class);
+
   /**
    * Register API without a layout version info object passed in. Useful for
    * tests.
@@ -87,7 +92,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto) {
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
-        defaultLayoutVersionProto());
+        defaultVersionProto());
   }
 
   /**
@@ -140,6 +145,78 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /** @return the number of datanodes. */
   default int getAllNodeCount() {
     return getAllNodes().size();
+  }
+
+  /**
+   * @return DatanodeFinalizationCounts, finalized and total healthy node counts, and whether all
+   * healthy datanodes run SCM's software version
+   */
+  default DatanodeFinalizationCounts getDatanodeFinalizationCounts() {
+    int finalizedNodes = 0;
+    int totalHealthyNodes = 0;
+    boolean allSoftwareVersionsMatchScm = true;
+    int minApparentVersion = Integer.MAX_VALUE;
+    int maxApparentVersion = 0;
+
+    for (DatanodeInfo dn : getAllNodes()) {
+      try {
+        // Only count HEALTHY nodes. STALE/DEAD nodes are intentionally excluded
+        // for the following reasons:
+        //  - When a node goes STALE, its write pipelines are closed, so it
+        //    cannot be involved in writes regardless of finalization state.
+        //  - The ZDU write path is designed to handle datanodes at different
+        //    layout versions, so an unfinalized STALE node does not block
+        //    correctness if it later returns to HEALTHY.
+        //  - If it recovers to HEALTHY, it will receive a finalize command on
+        //    its next heartbeat and finalize quickly. If it is in bad shape,
+        //    it will likely go DEAD and can be ignored.
+        if (!getNodeStatus(dn).isHealthy()) {
+          continue;
+        }
+        totalHealthyNodes++;
+
+        ComponentVersion dnApparentVersion = dn.getLastKnownApparentVersion();
+        ComponentVersion dnSoftwareVersion = dn.getLastKnownSoftwareVersion();
+
+        int dnApparentVersionInt = dnApparentVersion.serialize();
+        minApparentVersion = Math.min(minApparentVersion, dnApparentVersionInt);
+        maxApparentVersion = Math.max(maxApparentVersion, dnApparentVersionInt);
+
+        if (!dnApparentVersion.equals(dnSoftwareVersion)) {
+          // Datanode has not yet finalized
+          LOG.debug("Datanode {} has not yet finalized: apparent version={}, software version={}",
+              dn.getHostName(), dnApparentVersion, dnSoftwareVersion);
+        } else {
+          finalizedNodes++;
+        }
+
+        // Track whether every healthy datanode is running the same software version as SCM. A
+        // datanode on a lower (or unknown) software version must not be present when SCM finalizes.
+        if (!HDDSVersion.SOFTWARE_VERSION.equals(dnSoftwareVersion)) {
+          allSoftwareVersionsMatchScm = false;
+          // This is expected during a rolling upgrade. Do not flood the logs with one message for every datanode.
+          LOG.debug("Datanode {} software version {} does not match SCM software version {}.",
+              dn.getHostName(), dnSoftwareVersion, HDDSVersion.SOFTWARE_VERSION);
+        }
+      } catch (NodeNotFoundException e) {
+        // Node was removed while we were iterating. This is OK, skip it.
+        LOG.debug("Node {} not found while waiting for finalization, " +
+            "skipping.", dn);
+      }
+    }
+
+    if (minApparentVersion == Integer.MAX_VALUE) {
+      // No healthy datanode with version info was found
+      minApparentVersion = 0;
+    }
+
+    return DatanodeFinalizationCounts.newBuilder()
+        .setNumFinalizedDatanodes(finalizedNodes)
+        .setTotalHealthyDatanodes(totalHealthyNodes)
+        .setMinApparentVersion(minApparentVersion)
+        .setMaxApparentVersion(maxApparentVersion)
+        .setAllSoftwareVersionsMatchScm(allSoftwareVersionsMatchScm)
+        .build();
   }
 
   /**
@@ -324,13 +401,12 @@ public interface NodeManager extends StorageContainerNodeProtocol,
                          NodeReportProto nodeReport);
 
   /**
-   * Process Node LayoutVersion report.
+   * Process Node version report.
    *
    * @param datanodeDetails
-   * @param layoutReport
+   * @param versionReport
    */
-  void processLayoutVersionReport(DatanodeDetails datanodeDetails,
-                         LayoutVersionProto layoutReport);
+  void processVersionReport(DatanodeDetails datanodeDetails, DatanodeVersionProto versionReport);
 
   /**
    * Get the number of commands of the given type queued on the datanode at the
@@ -430,12 +506,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
     return null;
   }
 
-  default HDDSLayoutVersionManager getLayoutVersionManager() {
-    return null;
-  }
-
-  default void forceNodesToHealthyReadOnly() { }
-
   /**
    * This API allows removal of only DECOMMISSIONED, IN_MAINTENANCE and DEAD nodes
    * from NodeManager data structures and cleanup memory.
@@ -448,8 +518,96 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   int openContainerLimit(List<DatanodeDetails> datanodes);
 
-  /**
-   * SCM-side tracker for container allocations not yet reported by datanodes.
-   */
   PendingContainerTracker getPendingContainerTracker();
+
+  /**
+   * Class to store the number finalized and healthy datanodes.
+   */
+  final class DatanodeFinalizationCounts {
+    private final int numFinalizedDatanodes;
+    private final int totalHealthyDatanodes;
+    private final int minApparentVersion;
+    private final int maxApparentVersion;
+    private final boolean allSoftwareVersionsMatchScm;
+
+    private DatanodeFinalizationCounts(Builder b) {
+      this.numFinalizedDatanodes = b.numFinalizedDatanodes;
+      this.totalHealthyDatanodes = b.totalHealthyDatanodes;
+      this.minApparentVersion = b.minApparentVersion;
+      this.maxApparentVersion = b.maxApparentVersion;
+      this.allSoftwareVersionsMatchScm = b.allSoftwareVersionsMatchScm;
+    }
+
+    public static Builder newBuilder() {
+      return new Builder();
+    }
+
+    public int getNumFinalizedDatanodes() {
+      return numFinalizedDatanodes;
+    }
+
+    public int getTotalHealthyDatanodes() {
+      return totalHealthyDatanodes;
+    }
+
+    public boolean allNodesFinalized() {
+      return numFinalizedDatanodes == totalHealthyDatanodes;
+    }
+
+    public int getMinApparentVersion() {
+      return minApparentVersion;
+    }
+
+    public int getMaxApparentVersion() {
+      return maxApparentVersion;
+    }
+
+    /**
+     * @return true if every healthy datanode reports the same software version as SCM
+     * ({@link HDDSVersion#SOFTWARE_VERSION}), vacuously true when there are no healthy datanodes
+     */
+    public boolean allSoftwareVersionsMatchScmVersion() {
+      return allSoftwareVersionsMatchScm;
+    }
+
+    /**
+     * Builder for {@link DatanodeFinalizationCounts}.
+     */
+    public static final class Builder {
+      private int numFinalizedDatanodes;
+      private int totalHealthyDatanodes;
+      private int minApparentVersion;
+      private int maxApparentVersion;
+      private boolean allSoftwareVersionsMatchScm;
+
+      public Builder setNumFinalizedDatanodes(int value) {
+        this.numFinalizedDatanodes = value;
+        return this;
+      }
+
+      public Builder setTotalHealthyDatanodes(int value) {
+        this.totalHealthyDatanodes = value;
+        return this;
+      }
+
+      public Builder setMinApparentVersion(int value) {
+        this.minApparentVersion = value;
+        return this;
+      }
+
+      public Builder setMaxApparentVersion(int value) {
+        this.maxApparentVersion = value;
+        return this;
+      }
+
+      public Builder setAllSoftwareVersionsMatchScm(boolean value) {
+        this.allSoftwareVersionsMatchScm = value;
+        return this;
+      }
+
+      public DatanodeFinalizationCounts build() {
+        return new DatanodeFinalizationCounts(this);
+      }
+    }
+  }
 }

@@ -17,19 +17,27 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.util.JavaUtils;
+import org.apache.ratis.util.function.CheckedFunction;
 
 class LocalStream implements StateMachine.DataStream {
   private final StateMachine.DataChannel dataChannel;
   private final Executor executor;
+  /** Handler for the commands sent in the middle of the stream. */
+  private final CheckedFunction<ByteBuffer, ByteBuffer, IOException> command;
 
-  LocalStream(StateMachine.DataChannel dataChannel, Executor executor) {
+  LocalStream(StateMachine.DataChannel dataChannel, Executor executor,
+      CheckedFunction<ByteBuffer, ByteBuffer, IOException> command) {
     this.dataChannel = dataChannel;
     this.executor = executor;
+    this.command = command;
   }
 
   @Override
@@ -46,6 +54,22 @@ class LocalStream implements StateMachine.DataStream {
     return CompletableFuture
         .supplyAsync(((KeyValueStreamDataChannel) dataChannel)::cleanUp,
             executor);
+  }
+
+  @Override
+  public CompletableFuture<ByteBuffer> onCommand(ByteBuffer buffer, long streamOffset) {
+    if (!(dataChannel instanceof KeyValueStreamDataChannel)) {
+      return JavaUtils.completeExceptionally(new IllegalStateException(
+          "Unexpected DataChannel " + dataChannel.getClass()));
+    }
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        ((KeyValueStreamDataChannel) dataChannel).drainBuffers();
+        return command.apply(buffer);
+      } catch (IOException e) {
+        throw new CompletionException(e);
+      }
+    }, executor);
   }
 
   @Override

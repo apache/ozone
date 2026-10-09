@@ -36,13 +36,15 @@ Downgrade to a lower version is allowed from the pre-finalized state. This invol
     org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature
 Class to add  a new layout feature being brought in. Layout version is typically 1 + last layout feature in that catalog. 
 
-## LayoutVersionManager
-    org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager
-    org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager
-Every component carries an instance of this interface, which provides APIs to get runtime layout version, and if a feature is allowed based on that or not.
+## Version management (OM vs HDDS)
 
-The LayoutVersionManager interface carries an API that can be used to check if a feature is allowed in the current layout version.
-     org.apache.hadoop.ozone.upgrade.LayoutVersionManager#isAllowed(org.apache.hadoop.ozone.upgrade.LayoutFeature)
+**Ozone Manager** uses [`org.apache.hadoop.ozone.om.upgrade.OMVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/upgrade/OMVersionManager.java) ([`org.apache.hadoop.ozone.upgrade.ComponentVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/framework/src/main/java/org/apache/hadoop/ozone/upgrade/ComponentVersionManager.java)), with upgrade actions discovered via [`org.apache.hadoop.ozone.om.upgrade.OMUpgradeActionProvider`](https://github.com/apache/ozone/blob/master/hadoop-ozone/ozone-manager/src/main/java/org/apache/hadoop/ozone/om/upgrade/OMUpgradeActionProvider.java). It exposes apparent/software `ComponentVersion` and `isAllowed(ComponentVersion)` for gating.
+
+**SCM** uses [`org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/server/upgrade/ScmVersionManager.java) ([`org.apache.hadoop.ozone.upgrade.ComponentVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/framework/src/main/java/org/apache/hadoop/ozone/upgrade/ComponentVersionManager.java)), with upgrade actions via [`org.apache.hadoop.hdds.upgrade.ScmUpgradeActionProvider`](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/upgrade/ScmUpgradeActionProvider.java). Cluster-wide SCM finalization uses [`org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/server/upgrade/FinalizationManager.java).
+
+**DataNode** uses [`org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/upgrade/DatanodeVersionManager.java) with upgrade actions via [`org.apache.hadoop.ozone.container.upgrade.DatanodeUpgradeActionProvider`](https://github.com/apache/ozone/blob/master/hadoop-hdds/container-service/src/main/java/org/apache/hadoop/ozone/container/upgrade/DatanodeUpgradeActionProvider.java). Both SCM and DataNode expose apparent/software `ComponentVersion` and `isAllowed(ComponentVersion)` for gating (including legacy [`HDDSLayoutFeature`](https://github.com/apache/ozone/blob/master/hadoop-hdds/framework/src/main/java/org/apache/hadoop/hdds/upgrade/HDDSLayoutFeature.java) checks where still used).
+
+**Recon** uses [`org.apache.hadoop.ozone.recon.upgrade.ReconVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-ozone/recon/src/main/java/org/apache/hadoop/ozone/recon/upgrade/ReconVersionManager.java) for Derby SQL schema versioning, with versions defined in [`ReconVersion`](https://github.com/apache/ozone/blob/master/hadoop-ozone/recon/src/main/java/org/apache/hadoop/ozone/recon/upgrade/ReconVersion.java) and upgrade actions via [`ReconUpgradeActionProvider`](https://github.com/apache/ozone/blob/master/hadoop-ozone/recon/src/main/java/org/apache/hadoop/ozone/recon/upgrade/ReconUpgradeActionProvider.java). Apparent version is stored in `RECON_SCHEMA_VERSION`. Recon also runs [`ScmVersionManager`](https://github.com/apache/ozone/blob/master/hadoop-hdds/server-scm/src/main/java/org/apache/hadoop/hdds/scm/server/upgrade/ScmVersionManager.java) for SCM-lite metadata and finalizes both tracks on startup.
 
 ## @DisallowedUntilLayoutVersion Annotation
 Method level annotation used to "disallow" an API if current layout version does not include the associated layout feature. Currently it is added only to the OM module, but can easily be moved down to a common module based on need on the HDDS layer.
@@ -50,7 +52,7 @@ Method level annotation used to "disallow" an API if current layout version does
 ## @BelongsToLayoutVersion Annotation
 Annotation to mark an OM request class that it belongs to a specific Layout Version. Until that version is available post finalize, this request will not be supported. A newer version of an existing OM request can be created (by inheritance or a fully new class) and marked with a newer layout version. Until finalizing this layout version, the older request class is used. Post finalizing, the newer version of the request class is used.
 
-## Upgrade Action (UpgradeActionOm & UpgradeActionHdds)
+## Upgrade Action (UpgradeActionOm, UpgradeActionScm, UpgradeActionDatanode & UpgradeActionRecon)
 Annotation to specify upgrade action run during finalization. Each layout feature can optionally define a single upgrade action that will be executed when the feature is finalized. This action should be idempotent and execute quickly. The action must complete for the feature to finish
 finalizing, so if there is an error executing the action it will be retried. This partial failure should not leave the component inoperable.
 

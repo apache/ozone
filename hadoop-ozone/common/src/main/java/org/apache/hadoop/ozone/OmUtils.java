@@ -276,6 +276,11 @@ public final class OmUtils {
       return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    // Prepare and CancelPrepare are now no-ops, but still produce responses for compatability.
+    // They are marked as read-only since they don't modify state anymore.
+    case Prepare:
+    case CancelPrepare:
+    case QueryUpgradeStatus:
     case GetLifecycleConfiguration:
     case GetLifecycleServiceStatus:
       return true;
@@ -313,8 +318,8 @@ public final class OmUtils {
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
     case FinalizeUpgrade:
-    case Prepare:
-    case CancelPrepare:
+    case StartFinalizeUpgrade:
+    case CompleteFinalizeUpgrade:
     case DeleteOpenKeys:
     case SetS3Secret:
     case RevokeS3Secret:
@@ -444,6 +449,8 @@ public final class OmUtils {
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
     case FinalizeUpgrade:
+    case StartFinalizeUpgrade:
+    case CompleteFinalizeUpgrade:
     case Prepare:
     case CancelPrepare:
     case DeleteOpenKeys:
@@ -496,6 +503,7 @@ public final class OmUtils {
     case SetLifecycleServiceStatus:
     case SaveLifecycleScanState:
     case UnknownCommand:
+    case QueryUpgradeStatus:
       return false;
     case EchoRPC:
       return omRequest.getEchoRPCRequest().getReadOnly();
