@@ -936,7 +936,8 @@ public class ContainerStateMachine extends BaseStateMachine {
           bytesWritten.addAndGet(writeReadBlockReply(stream, response));
         } catch (IOException e) {
           error.set(e);
-          // Stop reading the block. The handler passes a cancelled stream on, so the container is not scanned.
+          // Stop reading the block, as the onNext of a cancelled gRPC call does by throwing CANCELLED.
+          // The handler passes the status on, so the container is not scanned.
           throw Status.CANCELLED.withDescription("Failed to write a ReadBlock reply").withCause(e).asRuntimeException();
         }
       }
