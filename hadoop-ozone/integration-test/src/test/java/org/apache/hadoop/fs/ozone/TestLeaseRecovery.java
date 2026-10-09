@@ -20,6 +20,8 @@ package org.apache.hadoop.fs.ozone;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
@@ -52,11 +54,13 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.storage.BlockDataStreamOutput;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.DataTestUtil;
@@ -65,6 +69,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
+import org.apache.hadoop.ozone.client.io.SelectorOutputStream;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -222,6 +228,38 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
     // open it again, make sure the data is correct
     verifyData(data, dataSize * 2, file, fs);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testRecoveryAfterStreamWriterFailure(boolean putBlockWithoutRaft) throws Exception {
+    // Smaller than the block size and PUT_BLOCK_REQUEST_LENGTH_MAX,
+    // so the datanodes still keep all the data in memory when hsync commits the PutBlock.
+    final int dataSize = 100 << 10;
+    final byte[] data = getData(dataSize);
+
+    final OzoneConfiguration streamConf = new OzoneConfiguration(conf);
+    streamConf.setBoolean(OZONE_FS_DATASTREAM_ENABLED, true);
+    streamConf.set(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, "0B");
+    final OzoneClientConfig clientConfig = streamConf.getObject(OzoneClientConfig.class);
+    clientConfig.setDatastreamPutBlockWithoutRaftEnabled(putBlockWithoutRaft);
+    streamConf.setFromObject(clientConfig);
+
+    try (FileSystem streamFs = FileSystem.get(streamConf)) {
+      final FSDataOutputStream stream = streamFs.create(file, true);
+      stream.write(data);
+      stream.hsync();
+
+      // The writer fails: it drops its connection to the datanodes and never closes the stream.
+      final OutputStream underlying = ((SelectorOutputStream<?>) stream.getWrappedStream()).getUnderlying();
+      final KeyDataStreamOutput out = assertInstanceOf(KeyDataStreamOutput.class,
+          assertInstanceOf(OzoneFSDataStreamOutput.class, underlying).getByteBufferStreamOutput());
+      assertInstanceOf(BlockDataStreamOutput.class, out.getStreamEntries().get(0).getByteBufStreamOutput())
+          .cleanup(true);
+    }
+
+    assertTrue(fs.recoverLease(file));
+    verifyData(data, dataSize, file, fs);
   }
 
   @Test
