@@ -716,6 +716,7 @@ public abstract class EndpointBase {
     }
     target.queryParams = queryParams;
     target.s3Auth = s3Auth;
+    target.s3StsEnabled = s3StsEnabled;
     target.setClient(this.client);
     target.setOzoneConfiguration(this.ozoneConfiguration);
     target.setContext(this.context);

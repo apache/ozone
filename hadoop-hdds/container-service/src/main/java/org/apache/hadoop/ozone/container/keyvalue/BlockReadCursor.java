@@ -19,19 +19,21 @@ package org.apache.hadoop.ozone.container.keyvalue;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 
-/** Tracks chunk-relative checksum boundaries for a streaming block read. */
-class BlockReadCursor {
+/** Splits a streaming block read into ranges aligned to chunk-relative checksum boundaries. */
+class BlockReadCursor implements Iterator<BlockReadCursor.ReadRange> {
   private static final int STREAMING_BYTES_PER_CHUNK = 1024 * 64;
 
   private final List<ChunkInfo> chunks;
   // [c1 offset, c2 offset, ..., cn offset, cn offset + cn len]
   private final long[] chunkOffsets;
+  private final int[] intervals;
   private final int responseDataSize;
-  private final long start;
   private final long end;
   private long offset;
   private int chunkIndex;
@@ -39,27 +41,28 @@ class BlockReadCursor {
   BlockReadCursor(long requestedOffset, long length, int responseSize, List<ChunkInfo> chunks) throws IOException {
     this.chunks = chunks;
     chunkOffsets = new long[chunks.size() + 1];
+    intervals = new int[chunks.size()];
     int bufferSize = responseSize;
     for (int i = 0; i < chunks.size(); i++) {
       ChunkInfo chunk = chunks.get(i);
       chunkOffsets[i] = chunk.getOffset();
+      intervals[i] = interval(chunk);
       // One checksum interval (or the short chunk containing it) must always fit in the buffer.
-      bufferSize = Math.max(bufferSize, (int) Math.min(chunk.getLen(), interval(chunk)));
+      bufferSize = Math.max(bufferSize, (int) Math.min(chunk.getLen(), intervals[i]));
     }
     ChunkInfo lastChunk = chunks.get(chunks.size() - 1);
     long blockEnd = lastChunk.getOffset() + lastChunk.getLen();
     chunkOffsets[chunks.size()] = blockEnd;
     this.responseDataSize = bufferSize;
     chunkIndex = findChunk(requestedOffset);
-    start = length == 0 ? requestedOffset : alignDown(requestedOffset, chunkIndex);
-    offset = start;
+    offset = length == 0 ? requestedOffset : alignDown(requestedOffset, chunkIndex);
     if (length == 0) {
-      end = start;
+      end = offset;
     } else {
       long requestedEnd = requestedOffset + Math.min(length, blockEnd - requestedOffset);
       int last = findChunk(requestedEnd - 1);
       long floor = alignDown(requestedEnd - 1, last);
-      end = floor + Math.min(interval(chunks.get(last)), chunkOffsets[last + 1] - floor);
+      end = floor + Math.min(intervals[last], chunkOffsets[last + 1] - floor);
     }
   }
 
@@ -75,8 +78,8 @@ class BlockReadCursor {
     return size;
   }
 
-  private long alignDown(long position, int index) throws IOException {
-    return position - (position - chunkOffsets[index]) % interval(chunks.get(index));
+  private long alignDown(long position, int index) {
+    return position - (position - chunkOffsets[index]) % intervals[index];
   }
 
   private int findChunk(long position) {
@@ -88,11 +91,8 @@ class BlockReadCursor {
     return insertionPoint - 1;
   }
 
-  long offset() {
-    return offset;
-  }
-
-  boolean hasRemaining() {
+  @Override
+  public boolean hasNext() {
     return offset < end;
   }
 
@@ -100,26 +100,47 @@ class BlockReadCursor {
     return responseDataSize;
   }
 
-  int nextReadLength() throws IOException {
+  /** Hands out the next range and advances past it, whether or not the caller reads it. */
+  @Override
+  public ReadRange next() {
+    if (!hasNext()) {
+      throw new NoSuchElementException("No range left at offset " + offset + " of " + end);
+    }
     long limit = offset + Math.min(responseDataSize, end - offset);
     if (limit < end) {
       limit = alignDown(limit, findChunk(limit));
     }
-    return Math.toIntExact(limit - offset);
-  }
-
-  List<ChunkInfo> chunksForRead(int length) {
-    return chunks.subList(chunkIndex, findChunk(offset + length - 1) + 1);
-  }
-
-  void advance(int bytesRead) {
-    offset += bytesRead;
-    if (hasRemaining()) {
+    ReadRange range = new ReadRange(offset, Math.toIntExact(limit - offset),
+        chunks.subList(chunkIndex, findChunk(limit - 1) + 1));
+    offset = limit;
+    if (hasNext()) {
       chunkIndex = findChunk(offset);
     }
+    return range;
   }
 
-  long bytesRead() {
-    return offset - start;
+  /** A range of the block sent in one response, with the chunks it overlaps. */
+  static final class ReadRange {
+    private final long offset;
+    private final int length;
+    private final List<ChunkInfo> chunks;
+
+    private ReadRange(long offset, int length, List<ChunkInfo> chunks) {
+      this.offset = offset;
+      this.length = length;
+      this.chunks = chunks;
+    }
+
+    long offset() {
+      return offset;
+    }
+
+    int length() {
+      return length;
+    }
+
+    List<ChunkInfo> chunks() {
+      return chunks;
+    }
   }
 }

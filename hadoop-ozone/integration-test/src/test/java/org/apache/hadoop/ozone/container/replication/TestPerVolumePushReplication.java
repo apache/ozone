@@ -40,6 +40,7 @@ import static org.apache.hadoop.hdds.scm.node.NodeTestUtil.waitForDnToReachOpSta
 import static org.apache.hadoop.hdds.scm.pipeline.MockPipeline.createPipeline;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.createContainer;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.waitForContainerClose;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getReplicateContainerCommand;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
@@ -158,7 +159,7 @@ class TestPerVolumePushReplication {
     ThreadPoolExecutor volumePool = volumePoolOf(sourceDn, containerVolume);
     long completedBefore = volumePool.getCompletedTaskCount();
 
-    ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(containerId, target);
+    ReplicateContainerCommand cmd = getReplicateContainerCommand(containerId, target);
     queuePushAndWaitForContainer(cluster, cmd, source, target, containerId);
     GenericTestUtils.waitFor(() -> volumePool.getCompletedTaskCount() > completedBefore, 100, 30000);
 
@@ -215,13 +216,13 @@ class TestPerVolumePushReplication {
       // The healthy volume keeps its own pool and keeps serving pushes from it.
       ThreadPoolExecutor healthyPool = volumePoolOf(sourceDn, vol1);
       long completedBefore = healthyPool.getCompletedTaskCount();
-      ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(containerOnVol1, target);
+      ReplicateContainerCommand cmd = getReplicateContainerCommand(containerOnVol1, target);
       queuePushAndWaitForContainer(cluster, cmd, source, target, containerOnVol1);
       GenericTestUtils.waitFor(() -> healthyPool.getCompletedTaskCount() > completedBefore, 100, 30000);
       assertThat(volSet.getFailedVolumesList()).hasSize(1);
 
       // Task routes via global pool fallback (HDDS-15327); replication fails on bad volume.
-      ReplicateContainerCommand failedVolCmd = ReplicateContainerCommand.toTarget(containerOnVol0, target);
+      ReplicateContainerCommand failedVolCmd = getReplicateContainerCommand(containerOnVol0, target);
       ReplicationSupervisor supervisor = sourceDn.getDatanodeStateMachine().getSupervisor();
       // Scope the counter to push replication: the cluster-wide counter also moves for unrelated
       // SCM-driven work on this datanode and would satisfy the wait on its own.

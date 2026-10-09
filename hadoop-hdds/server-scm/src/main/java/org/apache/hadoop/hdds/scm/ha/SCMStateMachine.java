@@ -622,7 +622,6 @@ public class SCMStateMachine extends BaseStateMachine {
     // leader ready  in SCMContext.
     scm.getScmContext().setLeaderReady();
     scm.getSCMServiceManager().notifyStatusChanged();
-    scm.getFinalizationManager().onLeaderReady();
     addRatisEvent("SCM " + scm.getScmId() +
         " is ready to serve requests as the leader");
   }

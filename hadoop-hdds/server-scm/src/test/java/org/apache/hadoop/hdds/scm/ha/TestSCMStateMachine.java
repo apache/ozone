@@ -50,10 +50,13 @@ import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.util.concurrent.ExecutorHelper;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.proto.RaftProtos.LogEntryProto;
+import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
@@ -309,12 +312,35 @@ public class TestSCMStateMachine {
     return RaftGroupMemberId.valueOf(followerId, RaftGroupId.randomId());
   }
 
+  /**
+   * A finalization step that throws an UpgradeException (an IOException, not an SCMException) must
+   * crash SCM rather than be returned to the Ratis client. UpgradeException skips the inner
+   * catch (SCMException) and hits the outer catch (Exception) -> ExitUtils.terminate.
+   */
+  @Test
+  public void testUpgradeExceptionDuringApplyTerminates() throws Exception {
+    ExitUtils.disableSystemExit();
+    try {
+      SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+      ScmInvoker<?> invoker = mock(ScmInvoker.class);
+      when(invoker.invokeLocal(any(), any())).thenThrow(
+          new UpgradeException(UpgradeException.ResultCodes.FINALIZE_UPGRADE_ACTION_FAILED));
+      SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.FINALIZE, invoker);
+
+      // terminate throws ExitException when system exit is disabled
+      assertThrows(ExitUtils.ExitException.class,
+          () -> applyingStateMachine.applyTransaction(newTransaction(RequestType.FINALIZE, 1)));
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
   @Test
   public void testApplyTransactionFlushesAfterRecordingTransactionInfo() throws Exception {
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
-    SCMStateMachine applyingStateMachine = newStateMachine(buffer, succeedingInvoker());
+    SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, succeedingInvoker());
 
-    CompletableFuture<Message> result = applyingStateMachine.applyTransaction(newTransaction(7));
+    CompletableFuture<Message> result = applyingStateMachine.applyTransaction(newTransaction(RequestType.PIPELINE, 7));
 
     assertTrue(result.isDone() && !result.isCompletedExceptionally());
     InOrder order = inOrder(buffer);
@@ -327,10 +353,10 @@ public class TestSCMStateMachine {
   @Test
   public void testFlushCheckedForEveryAppliedTransaction() throws Exception {
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
-    SCMStateMachine applyingStateMachine = newStateMachine(buffer, succeedingInvoker());
+    SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, succeedingInvoker());
 
     for (int i = 1; i <= 5; i++) {
-      applyingStateMachine.applyTransaction(newTransaction(i));
+      applyingStateMachine.applyTransaction(newTransaction(RequestType.PIPELINE, i));
     }
 
     verify(buffer, times(5)).flushIfPendingLimitReached();
@@ -343,9 +369,9 @@ public class TestSCMStateMachine {
     ScmInvoker<?> invoker = mock(ScmInvoker.class);
     when(invoker.invokeLocal(anyString(), any()))
         .thenThrow(new SCMException("rejected", ResultCodes.FAILED_TO_FIND_CONTAINER));
-    SCMStateMachine applyingStateMachine = newStateMachine(buffer, invoker);
+    SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, invoker);
 
-    CompletableFuture<Message> result = applyingStateMachine.applyTransaction(newTransaction(3));
+    CompletableFuture<Message> result = applyingStateMachine.applyTransaction(newTransaction(RequestType.PIPELINE, 3));
 
     assertTrue(result.isCompletedExceptionally());
     InOrder order = inOrder(buffer);
@@ -360,9 +386,10 @@ public class TestSCMStateMachine {
     try {
       SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
       doThrow(new IllegalStateException("injected flush failure")).when(buffer).flushIfPendingLimitReached();
-      SCMStateMachine applyingStateMachine = newStateMachine(buffer, succeedingInvoker());
+      SCMStateMachine applyingStateMachine = newStateMachine(buffer, RequestType.PIPELINE, succeedingInvoker());
 
-      assertThrows(ExitUtils.ExitException.class, () -> applyingStateMachine.applyTransaction(newTransaction(9)));
+      assertThrows(ExitUtils.ExitException.class,
+          () -> applyingStateMachine.applyTransaction(newTransaction(RequestType.PIPELINE, 9)));
 
       verify(buffer).endApplyingTransaction();
     } finally {
@@ -370,12 +397,14 @@ public class TestSCMStateMachine {
     }
   }
 
-  private static TransactionContext newTransaction(long index) throws Exception {
-    SCMRatisRequest request = SCMRatisRequest.of(RequestType.PIPELINE, "op", new Class<?>[0]);
-    RaftProtos.StateMachineLogEntryProto smLogEntry = RaftProtos.StateMachineLogEntryProto.newBuilder()
+  private static TransactionContext newTransaction(RequestType type, long index) throws Exception {
+    // The operation name is only used by ScmInvoker#invokeLocal to pick a method to call. The invokers
+    // here are mocked and stubbed for any operation, so any non-empty name works.
+    SCMRatisRequest request = SCMRatisRequest.of(type, "op", new Class<?>[0]);
+    StateMachineLogEntryProto smLogEntry = StateMachineLogEntryProto.newBuilder()
         .setLogData(request.encode().getContent())
         .build();
-    RaftProtos.LogEntryProto logEntry = RaftProtos.LogEntryProto.newBuilder()
+    LogEntryProto logEntry = LogEntryProto.newBuilder()
         .setTerm(1)
         .setIndex(index)
         .setStateMachineLogEntry(smLogEntry)
@@ -386,7 +415,8 @@ public class TestSCMStateMachine {
     return trx;
   }
 
-  private static SCMStateMachine newStateMachine(SCMHADBTransactionBuffer buffer, ScmInvoker<?> invoker) {
+  private static SCMStateMachine newStateMachine(SCMHADBTransactionBuffer buffer, RequestType type,
+      ScmInvoker<?> invoker) {
     StorageContainerManager scm = mock(StorageContainerManager.class);
     when(scm.getMetrics()).thenReturn(mock(SCMMetrics.class));
     SCMContext context = mock(SCMContext.class);
@@ -396,7 +426,7 @@ public class TestSCMStateMachine {
     when(scm.getScmSafeModeManager()).thenReturn(mock(SCMSafeModeManager.class));
     when(buffer.getLatestTrxInfo()).thenReturn(TransactionInfo.valueOf(TermIndex.valueOf(0, 0)));
     SCMStateMachine stateMachine = new SCMStateMachine(scm, buffer);
-    stateMachine.registerInvoker(RequestType.PIPELINE, invoker);
+    stateMachine.registerInvoker(type, invoker);
     return stateMachine;
   }
 
