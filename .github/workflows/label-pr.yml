@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
     steps:
       - name: "Checkout project" # required for `gh` CLI
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
           sparse-checkout: |
@@ -66,7 +66,7 @@ jobs:
     runs-on: ubuntu-slim
     steps:
       - name: "Checkout project" # provides .github/labeler.yml for the labeler action
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
           sparse-checkout: |
@@ -82,7 +82,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
       - name: "Apply component labels"
-        uses: actions/labeler@bf12e9b00b37c5c0ca2b87b79b2daf7891dbda13 # v7.0.0
+        uses: actions/labeler@v7
         with:
           pr-number: ${{ steps.prs.outputs.numbers }}
           # add only: path rules cannot express why a label was applied manually,
