@@ -113,7 +113,7 @@ public class TestSCMContainerPlacementRackAware {
       cluster.add(datanodeDetails);
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto(),
+          UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
@@ -458,7 +458,7 @@ public class TestSCMContainerPlacementRackAware {
           hostname + i, null);
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto(),
+          UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
@@ -881,11 +881,9 @@ public class TestSCMContainerPlacementRackAware {
 
   @Test
   public void testSourceDatanodeIsNotChosenAsTarget() {
-    setup(2);
+    setup(1);
     List<DatanodeDetails> usedNodes = new ArrayList<>();
     usedNodes.add(datanodes.get(0));
-    dnInfos.get(1).setNodeStatus(NodeStatus.inServiceHealthyReadOnly());
-
     assertThrows(SCMException.class,
             () -> policy.chooseDatanodes(usedNodes, null, null, 1, 0, 0),
             "No target datanode, this call should fail");

@@ -26,11 +26,9 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -71,7 +69,6 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
   }
 
   @Override
-  @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
     DeleteKeyRequest deleteKeyRequest = getOmRequest().getDeleteKeyRequest();
@@ -82,15 +79,10 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();
-    String keyName = keyArgs.getKeyName();
-    boolean recursive = keyArgs.getRecursive();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumKeyDeletes();
     OMPerformanceMetrics perfMetrics = ozoneManager.getPerfMetrics();
-
-    AuditLogger auditLogger = ozoneManager.getAuditLogger();
-    OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -99,102 +91,21 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     boolean acquiredLock = false;
     OMClientResponse omClientResponse = null;
     Result result = null;
-    OmBucketInfo omBucketInfo = null;
     long startNanos = Time.monotonicNowNanos();
     try {
+      PreparedKeyDelete prepared =
+          prepareKeyDelete(ozoneManager, keyArgs, auditMap, trxnLogIndex);
+
+      // Phase 2 (bucket write lock): re-check that the key still exists, then apply the cache
+      // mutations and publish the quota copy. The lock is held only for this mutation tail, so
+      // bucket read-lock holders still observe each transaction atomically (all mutations or none),
+      // but are no longer blocked for the Phase 1 path walk and emptiness scan.
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
 
-      // Validate bucket and volume exists or not.
-      validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-
-      OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
-          omMetadataManager, volumeName, bucketName, keyName, 0,
-          ozoneManager.getDefaultReplicationConfig());
-
-      if (keyStatus == null) {
-        throw new OMException("Key not found. Key:" + keyName, KEY_NOT_FOUND);
-      }
-
-      OmKeyInfo omKeyInfo = keyStatus.getKeyInfo();
-      validateIfMatchETag(keyArgs, omKeyInfo);
-      // New key format for the fileTable & dirTable.
-      // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
-      // keyName field stores only the leaf node name, which is 'file1'.
-      String fileName = OzoneFSUtils.getFileName(keyName);
-      omKeyInfo.setKeyName(fileName);
-
-      // Set the UpdateID to current transactionLogIndex
-      omKeyInfo = omKeyInfo.toBuilder()
-          .setUpdateID(trxnLogIndex)
-          .build();
-
-      final long volumeId = omMetadataManager.getVolumeId(volumeName);
-      final long bucketId = omMetadataManager.getBucketId(volumeName,
-              bucketName);
-      String ozonePathKey = omMetadataManager.getOzonePathKey(volumeId,
-              bucketId, omKeyInfo.getParentObjectID(),
-              omKeyInfo.getFileName());
-      OmKeyInfo deletedOpenKeyInfo = null;
-
-      if (keyStatus.isDirectory()) {
-        // Check if there are any sub path exists under the user requested path
-        if (!recursive &&
-            OMFileRequest.hasChildren(omKeyInfo, omMetadataManager)) {
-          throw new OMException("Directory is not empty. Key:" + keyName,
-                  DIRECTORY_NOT_EMPTY);
-        }
-
-        // Update dir cache.
-        omMetadataManager.getDirectoryTable().addCacheEntry(
-                new CacheKey<>(ozonePathKey),
-                CacheValue.get(trxnLogIndex));
-      } else {
-        // Update table cache.
-        omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
-                new CacheKey<>(ozonePathKey),
-                CacheValue.get(trxnLogIndex));
-      }
-
-      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
-
-      long quotaReleased = sumBlockLengths(omKeyInfo);
-      // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
-      boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(omKeyInfo);
-      omBucketInfo.decrUsedBytes(quotaReleased, isKeyNonEmpty);
-      omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty || keyStatus.isDirectory());
-
-      // If omKeyInfo has hsync metadata, delete its corresponding open key as well
-      String dbOpenKey = null;
-      String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
-      if (hsyncClientId != null) {
-        Table<String, OmKeyInfo> openKeyTable = omMetadataManager.getOpenKeyTable(getBucketLayout());
-        long parentId = omKeyInfo.getParentObjectID();
-        dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId, parentId, fileName, hsyncClientId);
-        OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
-        if (openKeyInfo != null) {
-          openKeyInfo = openKeyInfo.withMetadataMutations(
-              metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
-          openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
-          deletedOpenKeyInfo = openKeyInfo;
-        } else {
-          LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
-        }
-      }
-
-      if (keyStatus.isFile()) {
-        auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(omKeyInfo.getDataSize()));
-        auditMap.put(OzoneConsts.REPLICATION_CONFIG, omKeyInfo.getReplicationConfig().toString());
-      }
-
-      omMetadataManager.getBucketTable().addCacheEntry(
-          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
-
-      omClientResponse = new OMKeyDeleteResponseWithFSO(omResponse
-          .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
-          keyName, omKeyInfo,
-          omBucketInfo.copyObject(), keyStatus.isDirectory(), volumeId, deletedOpenKeyInfo);
+      omClientResponse = applyKeyDelete(omMetadataManager, keyArgs, prepared,
+          trxnLogIndex, omResponse);
 
       result = Result.SUCCESS;
       long endNanosDeleteKeySuccessLatencyNs = Time.monotonicNowNanos();
@@ -216,10 +127,213 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       }
     }
 
-    // Performing audit logging outside of the lock.
-    markForAudit(auditLogger, buildAuditMessage(OMAction.DELETE_KEY, auditMap,
-        exception, userInfo));
+    auditAndLogResult(ozoneManager, deleteKeyRequest, auditMap, exception, result);
 
+    return omClientResponse;
+  }
+
+  /**
+   * Phase 1 (no bucket lock): resolves the key, checks directory emptiness and prepares the quota
+   * delta and the hsync open-key copy. All of this reads committed state only. The OM apply path is
+   * single-threaded (OzoneManagerStateMachine uses a single-thread executor), so no other transaction
+   * can change what these reads observe before Phase 2 mutates; the double-buffer flush/cleanup
+   * threads only materialize already-committed epochs and never alter a key's visible value.
+   * <p>
+   * Keeping these reads out of the bucket write lock is the point of HDDS-16289: it stops the lone
+   * apply thread from gating readers of a hot bucket (getBucketInfo/getFileStatus/lookupKey). Delete
+   * has two costly reads here, not one: getOMKeyInfoIfExists walks the path segment by segment, and
+   * hasChildren scans the whole dirTable and fileTable cache before seeking RocksDB, so on a
+   * non-recursive directory delete it dominates the hold. This rests on the serial-apply invariant, and
+   * delete needs it more than the other FSO writers: hasChildren is a range predicate over the subtree,
+   * so no re-check on a single key can restore it. If OM ever applies transactions in parallel per
+   * bucket/key, the re-check in {@link #applyKeyDelete} is not enough - delete then has to hold a lock
+   * covering the directory's subtree (PREFIX_LOCK), or re-run hasChildren under the lock and give back
+   * most of what this change won.
+   * <p>
+   * Also fills in the data-size and replication audit parameters for a file delete, which are read
+   * off the resolved key.
+   */
+  private PreparedKeyDelete prepareKeyDelete(OzoneManager ozoneManager,
+      OzoneManagerProtocolProtos.KeyArgs keyArgs, Map<String, String> auditMap, long trxnLogIndex)
+      throws IOException {
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String keyName = keyArgs.getKeyName();
+
+    // Validate bucket and volume exists or not.
+    validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
+
+    OzoneFileStatus keyStatus = OMFileRequest.getOMKeyInfoIfExists(
+        omMetadataManager, volumeName, bucketName, keyName, 0,
+        ozoneManager.getDefaultReplicationConfig());
+
+    if (keyStatus == null) {
+      throw new OMException("Key not found. Key:" + keyName, KEY_NOT_FOUND);
+    }
+
+    OmKeyInfo omKeyInfo = keyStatus.getKeyInfo();
+    validateIfMatchETag(keyArgs, omKeyInfo);
+    // New key format for the fileTable & dirTable.
+    // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
+    // keyName field stores only the leaf node name, which is 'file1'.
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    omKeyInfo.setKeyName(fileName);
+
+    // Set the UpdateID to current transactionLogIndex
+    omKeyInfo = omKeyInfo.toBuilder()
+        .setUpdateID(trxnLogIndex)
+        .build();
+
+    final long volumeId = omMetadataManager.getVolumeId(volumeName);
+    final long bucketId = omMetadataManager.getBucketId(volumeName,
+            bucketName);
+    String ozonePathKey = omMetadataManager.getOzonePathKey(volumeId,
+            bucketId, omKeyInfo.getParentObjectID(),
+            omKeyInfo.getFileName());
+
+    if (keyStatus.isDirectory() && !keyArgs.getRecursive()
+        && OMFileRequest.hasChildren(omKeyInfo, omMetadataManager)) {
+      // Check if there are any sub path exists under the user requested path
+      throw new OMException("Directory is not empty. Key:" + keyName,
+              DIRECTORY_NOT_EMPTY);
+    }
+
+    // If omKeyInfo has hsync metadata, delete its corresponding open key as well. Only the cache
+    // entry is published under the lock in Phase 2; reading and rewriting the copy is done here.
+    OmKeyInfo deletedOpenKeyInfo = null;
+    String dbOpenKey = null;
+    String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
+    if (hsyncClientId != null) {
+      long parentId = omKeyInfo.getParentObjectID();
+      dbOpenKey = omMetadataManager.getOpenFileName(volumeId, bucketId, parentId, fileName, hsyncClientId);
+      OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(dbOpenKey);
+      if (openKeyInfo != null) {
+        deletedOpenKeyInfo = openKeyInfo.withMetadataMutations(
+            metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
+      } else {
+        LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
+      }
+    }
+
+    if (keyStatus.isFile()) {
+      auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(omKeyInfo.getDataSize()));
+      auditMap.put(OzoneConsts.REPLICATION_CONFIG, omKeyInfo.getReplicationConfig().toString());
+    }
+
+    return new PreparedKeyDelete(keyStatus.isDirectory(), omKeyInfo, volumeId, ozonePathKey,
+        sumBlockLengths(omKeyInfo), dbOpenKey, deletedOpenKeyInfo);
+  }
+
+  /**
+   * Phase 2 (under the bucket write lock): re-checks the key resolved in Phase 1, then tombstones it
+   * in the directory or file table, marks any hsync open key deleted, applies the bucket quota
+   * release and publishes the bucket copy.
+   */
+  private OMClientResponse applyKeyDelete(OMMetadataManager omMetadataManager,
+      OzoneManagerProtocolProtos.KeyArgs keyArgs, PreparedKeyDelete prepared, long trxnLogIndex,
+      OMResponse.Builder omResponse) throws IOException {
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String keyName = keyArgs.getKeyName();
+
+    // Cheap O(1) re-check of the key resolved in Phase 1. Under serial apply this always holds, so it
+    // is unreachable; it is kept because it is a point lookup and it fails the way the Phase 1
+    // existence check does. It does not make Phase 1 safe under concurrent apply and cannot: a
+    // concurrent create can add a child after Phase 1's hasChildren scan and this delete would orphan
+    // it. See the note on prepareKeyDelete.
+    final boolean keyStillExists = prepared.isDirectory
+        ? omMetadataManager.getDirectoryTable().isExist(prepared.ozonePathKey)
+        : omMetadataManager.getKeyTable(getBucketLayout()).isExist(prepared.ozonePathKey);
+    if (!keyStillExists) {
+      throw new OMException("Key not found. Key:" + keyName, KEY_NOT_FOUND);
+    }
+
+    if (prepared.isDirectory) {
+      // Update dir cache.
+      omMetadataManager.getDirectoryTable().addCacheEntry(
+              new CacheKey<>(prepared.ozonePathKey),
+              CacheValue.get(trxnLogIndex));
+    } else {
+      // Update table cache.
+      omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
+              new CacheKey<>(prepared.ozonePathKey),
+              CacheValue.get(trxnLogIndex));
+    }
+
+    OmBucketInfo omBucketInfo =
+        getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
+
+    // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
+    boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(prepared.omKeyInfo);
+    omBucketInfo.decrUsedBytes(prepared.quotaReleased, isKeyNonEmpty);
+    omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty || prepared.isDirectory);
+
+    if (prepared.deletedOpenKeyInfo != null) {
+      omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
+          prepared.dbOpenKey, prepared.deletedOpenKeyInfo, trxnLogIndex);
+    }
+
+    omMetadataManager.getBucketTable().addCacheEntry(
+        omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
+    return new OMKeyDeleteResponseWithFSO(omResponse
+        .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
+        keyName, prepared.omKeyInfo,
+        omBucketInfo.copyObject(), prepared.isDirectory, prepared.volumeId,
+        prepared.deletedOpenKeyInfo);
+  }
+
+  /**
+   * Phase 1 output of {@link #prepareKeyDelete}, consumed by {@link #applyKeyDelete} under the bucket
+   * write lock: the resolved key and its path key, the bytes to release and the hsync open key to
+   * mark deleted.
+   */
+  private static final class PreparedKeyDelete {
+    private final boolean isDirectory;
+    private final OmKeyInfo omKeyInfo;
+    private final long volumeId;
+    private final String ozonePathKey;
+    private final long quotaReleased;
+    private final String dbOpenKey;
+    private final OmKeyInfo deletedOpenKeyInfo;
+
+    PreparedKeyDelete(boolean isDirectory, OmKeyInfo omKeyInfo, long volumeId, String ozonePathKey,
+        long quotaReleased, String dbOpenKey, OmKeyInfo deletedOpenKeyInfo) {
+      this.isDirectory = isDirectory;
+      this.omKeyInfo = omKeyInfo;
+      this.volumeId = volumeId;
+      this.ozonePathKey = ozonePathKey;
+      this.quotaReleased = quotaReleased;
+      this.dbOpenKey = dbOpenKey;
+      this.deletedOpenKeyInfo = deletedOpenKeyInfo;
+    }
+  }
+
+  @Override
+  protected OzoneManagerProtocolProtos.KeyArgs resolveBucketAndCheckAcls(
+      OzoneManager ozoneManager,
+      OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs)
+      throws IOException {
+    return captureLatencyNs(
+        ozoneManager.getPerfMetrics().getDeleteKeyResolveBucketAndAclCheckLatencyNs(),
+        () -> resolveBucketAndCheckKeyAclsWithFSO(newKeyArgs.build(),
+            ozoneManager, IAccessAuthorizer.ACLType.DELETE));
+  }
+
+  /**
+   * Emits the audit log and the result log outside the bucket lock.
+   */
+  private void auditAndLogResult(OzoneManager ozoneManager, DeleteKeyRequest deleteKeyRequest,
+      Map<String, String> auditMap, Exception exception, Result result) {
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(OMAction.DELETE_KEY, auditMap,
+        exception, getOmRequest().getUserInfo()));
+
+    OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
+    String volumeName = keyArgs.getVolumeName();
+    String bucketName = keyArgs.getBucketName();
+    String keyName = keyArgs.getKeyName();
+    OMMetrics omMetrics = ozoneManager.getMetrics();
 
     switch (result) {
     case SUCCESS:
@@ -236,18 +350,5 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
       LOG.error("Unrecognized Result for OMKeyDeleteRequest: {}",
           deleteKeyRequest);
     }
-
-    return omClientResponse;
-  }
-
-  @Override
-  protected OzoneManagerProtocolProtos.KeyArgs resolveBucketAndCheckAcls(
-      OzoneManager ozoneManager,
-      OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs)
-      throws IOException {
-    return captureLatencyNs(
-        ozoneManager.getPerfMetrics().getDeleteKeyResolveBucketAndAclCheckLatencyNs(),
-        () -> resolveBucketAndCheckKeyAclsWithFSO(newKeyArgs.build(),
-            ozoneManager, IAccessAuthorizer.ACLType.DELETE));
   }
 }
