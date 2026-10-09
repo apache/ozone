@@ -169,13 +169,13 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numCancelSnapshotDiffFails;
   private @Metric MutableCounterLong numListSnapshotDiffJobFails;
 
-  private @Metric MutableCounterLong numSnapshotActive;
-  private @Metric MutableCounterLong numSnapshotDeleted;
+  private @Metric MutableGaugeLong numSnapshotActive;
+  private @Metric MutableGaugeLong numSnapshotDeleted;
 
   // Number of tenant operations attempted
   private @Metric MutableCounterLong numTenantOps;
   // Metrics for a total number of tenants
-  private @Metric MutableCounterLong numTenants;
+  private @Metric MutableGaugeLong numTenants;
   // Metrics for tenant create operation
   private @Metric MutableCounterLong numTenantCreates;
   private @Metric MutableCounterLong numTenantCreateFails;
@@ -590,8 +590,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void setNumSnapshotActive(long num) {
-    long currVal = numSnapshotActive.value();
-    numSnapshotActive.incr(num - currVal);
+    numSnapshotActive.set(num);
   }
 
   public void incNumSnapshotActive() {
@@ -599,12 +598,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void decNumSnapshotActive() {
-    numSnapshotActive.incr(-1);
+    numSnapshotActive.decr();
   }
 
   public void setNumSnapshotDeleted(long num) {
-    long currVal = numSnapshotDeleted.value();
-    numSnapshotDeleted.incr(num - currVal);
+    numSnapshotDeleted.set(num);
   }
 
   public void incNumSnapshotDeleted() {
@@ -667,7 +665,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   public void decNumTenants() {
-    numTenants.incr(-1);
+    numTenants.decr();
   }
 
   public void incNumTenantCreates() {

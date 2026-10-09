@@ -160,7 +160,6 @@ public class Gateway extends GenericCli implements Callable<Void> {
     }
   }
 
-  @VisibleForTesting
   public InetSocketAddress getHttpAddress() {
     return this.httpServer.getHttpAddress();
   }
