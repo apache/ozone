@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.local;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,6 +35,9 @@ import java.util.List;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.upgrade.ComponentVersionManagerMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.io.TempDir;
@@ -64,6 +69,16 @@ class TestLocalOzoneRecon {
 
       assertEquals(reconEnabled, syncThreadRunning());
       if (reconEnabled) {
+        String metricsName = ComponentVersionManagerMetrics.METRICS_SOURCE_NAME;
+        MetricsSource scm = DefaultMetricsSystem.instance().getSource(metricsName + ".SCM");
+        MetricsSource om = DefaultMetricsSystem.instance().getSource(metricsName + ".OM");
+        MetricsSource recon = DefaultMetricsSystem.instance().getSource(metricsName + ".ReconSCM");
+        assertNotNull(scm);
+        assertNotNull(om);
+        assertNotNull(recon);
+        assertNotSame(scm, om);
+        assertNotSame(scm, recon);
+
         assertEquals(200, responseCode(cluster.getReconEndpoint() + "/api/v1/clusterState"));
         endpoints.add(cluster.getReconEndpoint());
       }
