@@ -488,7 +488,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     conf.setIfUnset(OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT,
         "1s");
     // All services share this JVM.
-    setLocalOverride(conf, HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED, true);
+    conf.setBoolean(HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED, true);
 
     SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
     scmClientConfig.setMaxRetryTimeout(SCM_CLIENT_MAX_RETRY_TIMEOUT_MILLIS);
