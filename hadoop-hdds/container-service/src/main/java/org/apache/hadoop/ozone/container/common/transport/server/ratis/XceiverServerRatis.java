@@ -526,9 +526,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       CertificateClient caClient, StateContext context) throws IOException {
     Parameters parameters = createTlsParameters(
         new SecurityConfig(ozoneConf), caClient);
-    if (parameters == null) {
-      parameters = new Parameters();
-    }
     RaftServerConfigKeys.DataStream.setServerApiResolver(parameters,
         new ClosedContainerReadResolver(dispatcher, containerController, datanodeDetails));
 
@@ -554,7 +551,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       return RatisHelper.setServerTlsConf(serverConfig, clientConfig);
     }
 
-    return null;
+    return new Parameters();
   }
 
   @Override
