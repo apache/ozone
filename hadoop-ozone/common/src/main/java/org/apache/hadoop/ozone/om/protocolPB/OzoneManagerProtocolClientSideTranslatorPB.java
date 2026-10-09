@@ -815,6 +815,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
     }
 
+    // Send the key's storage policy so OM allocates on the same tier as the key's earlier
+    // blocks. Absent when the key inherited its policy, which OM then resolves from the bucket.
+    if (args.getStoragePolicy() != null) {
+      keyArgs.setStoragePolicy(OzoneStoragePolicy.toProto(args.getStoragePolicy()));
+    }
+
     req.setKeyArgs(keyArgs);
     req.setClientID(clientId);
     req.setExcludeList(excludeList.getProtoBuf());

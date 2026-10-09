@@ -543,9 +543,6 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       if (dbOpenKeyInfo.getTags() != null) {
         builder.setTags(dbOpenKeyInfo.getTags());
       }
-      if (dbOpenKeyInfo.getStoragePolicy() != null) {
-        builder.setStoragePolicy(dbOpenKeyInfo.getStoragePolicy());
-      }
     }
     return builder.setUpdateID(trxnLogIndex).build();
   }

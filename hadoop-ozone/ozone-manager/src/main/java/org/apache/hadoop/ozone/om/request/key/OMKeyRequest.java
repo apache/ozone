@@ -1074,6 +1074,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (keyArgs.hasExpectedDataGeneration()) {
         builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
       }
+      // The new blocks were allocated with the policy in keyArgs, so record that policy instead
+      // of the one copied from the overwritten key.
+      if (keyArgs.hasStoragePolicy()) {
+        builder.setStoragePolicy(OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()));
+      }
 
       return builder.build();
     }

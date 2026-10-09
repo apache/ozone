@@ -103,6 +103,10 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
         .setBucketName(info.getBucketName()).setKeyName(info.getKeyName())
         .setReplicationConfig(b.getReplicationConfig())
         .setDataSize(info.getDataSize())
+        // Carry the key's storage policy into later allocateBlock calls, so blocks allocated
+        // after the pre-allocated ones run out land on the same tier. Null when the key did not
+        // ask for a policy, which leaves OM to resolve it from the bucket as it did on create.
+        .setStoragePolicy(info.getStoragePolicy())
         .setIsMultipartKey(b.isMultipartKey())
         .setMultipartUploadID(b.getMultipartUploadID())
         .setMultipartUploadPartNumber(b.getMultipartNumber());

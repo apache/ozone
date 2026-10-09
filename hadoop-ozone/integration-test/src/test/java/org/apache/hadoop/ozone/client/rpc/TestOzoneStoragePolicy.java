@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.client.rpc;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -239,6 +240,97 @@ public class TestOzoneStoragePolicy {
     assertEquals(OzoneStoragePolicy.COLD, keyInfo.getStoragePolicy());
     assertTrue(keyInfo.getLatestVersionLocations()
         .getBlocksLatestVersionOnly().isEmpty());
+  }
+
+  /**
+   * Blocks allocated after the pre-allocated ones run out must stay on the key's tier.
+   *
+   * <p>Creating the key with size 0 pre-allocates nothing, so every block comes from a separate
+   * allocateBlock call. The key asks for COLD while its bucket is WARM, so if the policy is not
+   * carried into those calls, OM falls back to the bucket and the later blocks land on DISK
+   * instead of ARCHIVE.
+   */
+  @Test
+  public void testStoragePolicyHonouredOnSubsequentBlockAllocation()
+      throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    OzoneBucket bucket =
+        createBucket(OzoneStoragePolicy.WARM, BucketLayout.OBJECT_STORE);
+    String keyName = UUID.randomUUID().toString();
+
+    // Size 0 means OM pre-allocates no blocks, so the first write already needs an
+    // allocateBlock round trip. Write enough to span more than one block.
+    byte[] data = new byte[(int) (2 * ozoneManager.getScmBlockSize() + 1024)];
+    Arrays.fill(data, (byte) 'p');
+    try (OzoneOutputStream out = bucket.createKey(keyName, 0, RATIS_THREE,
+        Collections.emptyMap(), Collections.emptyMap(),
+        OzoneStoragePolicy.COLD)) {
+      out.write(data);
+    }
+
+    OmKeyInfo keyInfo = lookupKey(bucket, keyName);
+    assertEquals(OzoneStoragePolicy.COLD, keyInfo.getStoragePolicy());
+
+    List<OmKeyLocationInfo> blocks =
+        keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
+    assertThat(blocks.size())
+        .withFailMessage("Expected more than one block so a later allocation is exercised, "
+            + "but the key has %d", blocks.size())
+        .isGreaterThan(1);
+
+    // Every block, not just the first, must sit on the tier the key asked for.
+    assertAllBlocksOnTier(keyInfo, OzoneStoragePolicy.COLD.getCreationTier());
+  }
+
+  /**
+   * Overwriting a key with a different storage policy must update the recorded policy, not just
+   * the tier of the new blocks.
+   *
+   * <p>The overwrite takes the existing-key branch of {@code prepareFileInfo}, which starts from
+   * a copy of the old key. If that branch does not apply the new policy, the blocks land on the new
+   * tier while {@code getStoragePolicy()} keeps reporting the old one.
+   */
+  @Test
+  public void testOverwriteWithDifferentStoragePolicyUpdatesKey()
+      throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    OzoneBucket bucket = createBucket(null, BucketLayout.OBJECT_STORE);
+    String keyName = UUID.randomUUID().toString();
+
+    writeKey(bucket, keyName, OzoneStoragePolicy.HOT);
+    OmKeyInfo original = lookupKey(bucket, keyName);
+    assertEquals(OzoneStoragePolicy.HOT, original.getStoragePolicy());
+    assertAllBlocksOnTier(original, OzoneStoragePolicy.HOT.getCreationTier());
+
+    // Overwrite the same key name with a different policy.
+    writeKey(bucket, keyName, OzoneStoragePolicy.COLD);
+    OmKeyInfo overwritten = lookupKey(bucket, keyName);
+
+    // The recorded policy and the tier the data actually sits on must agree.
+    assertEquals(OzoneStoragePolicy.COLD, overwritten.getStoragePolicy());
+    assertAllBlocksOnTier(overwritten, OzoneStoragePolicy.COLD.getCreationTier());
+  }
+
+  /**
+   * Checks every block of a key landed on a container of the expected tier. The
+   * {@code assertDatanodeContainerAndBlock} helper only inspects the first block, which cannot
+   * catch a tier that changes partway through a key.
+   */
+  private void assertAllBlocksOnTier(OmKeyInfo keyInfo, StorageTier expectedTier)
+      throws IOException {
+    StorageType expectedStorageType = expectedTier.getUniformStorageType();
+    List<OmKeyLocationInfo> blocks =
+        keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly();
+    for (int i = 0; i < blocks.size(); i++) {
+      OmKeyLocationInfo block = blocks.get(i);
+      ContainerInfo containerInfo = containerManager.getContainer(
+          ContainerID.valueOf(block.getContainerID()));
+      assertEquals(expectedStorageType,
+          containerInfo.getStorageTier().getUniformStorageType(),
+          "block " + i + " of " + blocks.size() + " landed on the wrong tier");
+    }
   }
 
   private OzoneBucket createBucket(OzoneStoragePolicy storagePolicy,
