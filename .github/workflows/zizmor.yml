@@ -23,9 +23,11 @@ on:
       - '**'
     paths:
       - '.github/workflows/**'
+      - '.github/zizmor.yml'
   pull_request:
     paths:
       - '.github/workflows/**'
+      - '.github/zizmor.yml'
 
 permissions: { }
 
