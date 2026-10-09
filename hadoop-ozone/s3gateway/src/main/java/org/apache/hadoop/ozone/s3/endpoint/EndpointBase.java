@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
@@ -65,6 +66,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -90,8 +94,8 @@ import javax.ws.rs.core.Response;
 import net.jcip.annotations.Immutable;
 import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.EncoderException;
-import org.apache.commons.codec.net.BCodec;
 import org.apache.commons.codec.net.QCodec;
+import org.apache.commons.codec.net.QuotedPrintableCodec;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -143,7 +147,6 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class EndpointBase {
 
-  private static final BCodec RFC_2047_B_CODEC = new BCodec(UTF_8);
   private static final QCodec RFC_2047_Q_CODEC = createRfc2047QCodec();
 
   protected static final String ETAG_CUSTOM =
@@ -490,24 +493,41 @@ public abstract class EndpointBase {
     int encodedTextEnd = encodingEnd < 0
         ? -1 : value.indexOf("?=", encodingEnd + 1);
     if (encodedTextEnd != value.length() - 2
+        || encodedTextEnd <= encodingEnd + 1
         || value.indexOf('?', encodingEnd + 1) != encodedTextEnd) {
+      return value;
+    }
+
+    String encodedText = value.substring(encodingEnd + 1, encodedTextEnd);
+    if (encodedText.chars().anyMatch(character -> character < '!'
+        || character > '~')) {
       return value;
     }
 
     String encoding = value.substring(charsetEnd + 1, encodingEnd);
     try {
+      byte[] decodedBytes;
       if (encoding.equalsIgnoreCase("Q")) {
-        return RFC_2047_Q_CODEC.decode(value);
+        decodedBytes = QuotedPrintableCodec.decodeQuotedPrintable(
+            encodedText.replace('_', ' ').getBytes(US_ASCII));
+      } else if (encoding.equalsIgnoreCase("B")) {
+        if (encodedText.length() % 4 != 0) {
+          return value;
+        }
+        decodedBytes = Base64.getDecoder().decode(encodedText);
+      } else {
+        return value;
       }
-      if (encoding.equalsIgnoreCase("B")) {
-        Base64.getDecoder().decode(
-            value.substring(encodingEnd + 1, encodedTextEnd));
-        return RFC_2047_B_CODEC.decode(value);
-      }
-    } catch (DecoderException | IllegalArgumentException ex) {
+
+      Charset charset = Charset.forName(value.substring(2, charsetEnd));
+      return charset.newDecoder()
+          .onMalformedInput(CodingErrorAction.REPORT)
+          .onUnmappableCharacter(CodingErrorAction.REPORT)
+          .decode(ByteBuffer.wrap(decodedBytes)).toString();
+    } catch (DecoderException | CharacterCodingException
+        | IllegalArgumentException ex) {
       return value;
     }
-    return value;
   }
 
   private static String encodeRfc2047MetadataValue(String value) {
