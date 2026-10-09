@@ -101,7 +101,7 @@ public final class SafeModeRuleFactory {
     if (pipelineManager != null) {
       if (shouldEnableRatisThreePipelineRules()) {
         safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue,
-            pipelineManager, safeModeManager, config, scmContext, nodeManager));
+            pipelineManager, safeModeManager, config, nodeManager));
         safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
             safeModeManager, config));
       } else {
@@ -112,7 +112,6 @@ public final class SafeModeRuleFactory {
             ScmConfigKeys.OZONE_SCM_PIPELINE_CREATE_RATIS_THREE);
       }
     }
-
   }
 
   /**

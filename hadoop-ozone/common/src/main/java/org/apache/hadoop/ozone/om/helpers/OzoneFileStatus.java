@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 import java.io.IOException;
 import java.util.Objects;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto.Builder;
 
@@ -92,7 +93,7 @@ public class OzoneFileStatus {
     return !isDirectory();
   }
 
-  public OzoneFileStatusProto getProtobuf(int clientVersion) {
+  public OzoneFileStatusProto getProtobuf(ClientVersion clientVersion) {
     Builder builder = OzoneFileStatusProto.newBuilder()
         .setBlockSize(blockSize)
         .setIsDirectory(isDirectory);

@@ -114,7 +114,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
             n.getDatanodeDetails(), config.getExcludeNodes(), config.getIncludeNodes()))
         .collect(Collectors.toList());
     List<DatanodeUsageInfoProto> protos = eligible.stream()
-        .map(n -> n.toProto(ClientVersion.DEFAULT_VERSION.toProtoValue()))
+        .map(n -> n.toProto(ClientVersion.DEFAULT_VERSION))
         .collect(Collectors.toList());
 
     ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(

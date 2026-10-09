@@ -49,8 +49,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientReply;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -323,11 +321,6 @@ public class FileChecksumBenchmark {
     when(mockRpcClient.getOzoneManagerClient()).thenReturn(mockOm);
     when(mockRpcClient.getXceiverClientManager()).thenReturn(xceiverFactory);
 
-    OzoneVolume mockVolume = mock(OzoneVolume.class);
-    when(mockVolume.getName()).thenReturn("vol");
-    OzoneBucket mockBucket = mock(OzoneBucket.class);
-    when(mockBucket.getName()).thenReturn("bucket");
-
     OzoneClientConfig.ChecksumCombineMode combineMode =
         OzoneClientConfig.ChecksumCombineMode.COMPOSITE_CRC;
 
@@ -344,7 +337,7 @@ public class FileChecksumBenchmark {
                 .setLatestVersionLocation(true)
                 .build());
         new ECFileChecksumHelper(
-            mockVolume, mockBucket, keyName, FILE_SIZE, combineMode,
+            "vol", "bucket", keyName, FILE_SIZE, combineMode,
             mockRpcClient, keyInfo)
             .compute();
       } catch (IOException e) {
