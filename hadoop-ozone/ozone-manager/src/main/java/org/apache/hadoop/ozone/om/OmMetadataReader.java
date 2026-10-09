@@ -29,8 +29,10 @@ import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -46,6 +48,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
@@ -81,6 +84,13 @@ import org.slf4j.Logger;
  * from a rocksDb instance, for both the OM and OM snapshots.
  */
 public class OmMetadataReader implements IOmMetadataReader, Auditor {
+  /**
+   * S3 actions that additionally require other S3 actions to be authorized within the same request.
+   * AWS requires both s3:GetObject and s3:GetObjectAttributes for GetObjectAttributes.
+   */
+  private static final Map<String, List<String>> DEPENDENT_S3_ACTIONS =
+      Collections.singletonMap("GetObjectAttributes", Collections.singletonList("GetObject"));
+
   private final KeyManager keyManager;
   private final PrefixManager prefixManager;
   private final VolumeManager volumeManager;
@@ -199,7 +209,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
               OmMetadataReader.getClientAddress());
       KeyInfoWithVolumeContext.Builder builder = KeyInfoWithVolumeContext
           .newBuilder()
-          .setKeyInfo(keyInfo);
+          .setKeyInfo(keyInfo)
+          .setBucketLayout(Objects.requireNonNullElse(
+              bucket.bucketLayout(), BucketLayout.DEFAULT));
       s3VolumeContext.ifPresent(context -> {
         builder.setVolumeArgs(context.getOmVolumeArgs());
         builder.setUserPrincipal(context.getUserPrincipal());
@@ -349,6 +361,18 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
+      if (bucket.bucketLayout() != null) {
+        try {
+          OzoneFSUtils.validateBucketLayout(bucket.requestedBucket(),
+              bucket.bucketLayout());
+        } catch (IllegalArgumentException e) {
+          // Convert to an OMException so it is returned to the client as a
+          // normal (non-retryable) RPC response instead of escaping the read
+          // handler's IOException catch and triggering a client retry storm.
+          throw new OMException(e.getMessage(),
+              ResultCodes.NOT_SUPPORTED_OPERATION);
+        }
+      }
       if (isAclEnabled) {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
             bucket, args.getKeyName());
@@ -713,7 +737,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     final RequestContext context = contextBuilder.build();
 
     if (!captureLatencyNs(perfMetrics::setCheckAccessLatencyNs,
-        () -> accessAuthorizer.checkAccess(obj, context))) {
+        () -> checkAccessIncludingDependentS3Actions(obj, context))) {
       if (throwIfPermissionDenied) {
         String volumeName = obj.getVolumeName() != null ?
                 "Volume:" + obj.getVolumeName() + " " : "";
@@ -748,6 +772,30 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     } else {
       return true;
     }
+  }
+
+  /**
+   * Checks access for the S3 action in the context and then for each S3 action it depends on (see
+   * {@link #DEPENDENT_S3_ACTIONS}), so a single request does not need a separate RPC per action.
+   * Each {@link IAccessAuthorizer#checkAccess} call carries exactly one S3 action.
+   *
+   * @return true only if access is granted for the S3 action and all of its dependent S3 actions.
+   */
+  private boolean checkAccessIncludingDependentS3Actions(OzoneObj obj, RequestContext context)
+      throws OMException {
+    if (!accessAuthorizer.checkAccess(obj, context)) {
+      return false;
+    }
+    final String s3Action = context.getS3Action();
+    if (s3Action == null) {
+      return true;
+    }
+    for (String dependentAction : DEPENDENT_S3_ACTIONS.getOrDefault(s3Action, Collections.emptyList())) {
+      if (!accessAuthorizer.checkAccess(obj, context.toBuilder().setS3Action(dependentAction).build())) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

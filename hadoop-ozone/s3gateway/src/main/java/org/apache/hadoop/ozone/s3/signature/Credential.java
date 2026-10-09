@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_CREDENTIAL_DATE;
+
 /**
  * Credential in the AWS authorization header.
  * Ref: https://docs.aws.amazon.com/AmazonS3/latest/API/
@@ -104,5 +106,23 @@ public class Credential {
     return String.format("%s/%s/%s/%s", getDate(),
         getAwsRegion(), getAwsService(),
         getAwsRequest());
+  }
+
+  /**
+   * Validates that credential scope date matches the date portion of
+   * {@code X-Amz-Date}. AWS SigV4 requires zero tolerance between these values.
+   */
+  static void validateScopeDateMatchesAmzDate(String credentialDate,
+      String amzDate, String resource) throws MalformedResourceException {
+    if (amzDate == null || amzDate.isEmpty()) {
+      throw new MalformedResourceException("Missing X-Amz-Date.", resource);
+    }
+    if (amzDate.length() < 8) {
+      throw new MalformedResourceException(
+          "Invalid X-Amz-Date format: " + amzDate, resource);
+    }
+    if (!credentialDate.equals(amzDate.substring(0, 8))) {
+      throw new MalformedResourceException(MALFORMED_CREDENTIAL_DATE, resource);
+    }
   }
 }

@@ -438,6 +438,16 @@ public class TestOmUtils {
   }
 
   @Test
+  public void testGetBucketDeletedBytesIsClassifiedAsReadOnlyAndFollowerEligible() {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.GetBucketDeletedBytes)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+    assertTrue(OmUtils.isReadOnly(request));
+    assertTrue(OmUtils.shouldSendToFollower(request));
+  }
+
+  @Test
   void testOmAddressesBracketIPv6Literals() {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::1]:9999");

@@ -243,7 +243,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
           .setCmdType(Type.DeleteRevokedSTSTokens)
           .setDeleteRevokedSTSTokensRequest(request)
           .setClientId(clientId.toString())
-          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT.serialize())
           .build();
 
       try {
