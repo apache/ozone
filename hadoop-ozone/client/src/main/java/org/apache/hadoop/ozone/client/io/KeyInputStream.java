@@ -105,7 +105,6 @@ public class KeyInputStream extends MultipartInputStream {
     return partStreams;
   }
 
-  @VisibleForTesting
   static BlockLocationInfo getBlockLocationInfo(OmKeyInfo newKeyInfo,
       BlockID blockID) {
     if (newKeyInfo == null) {
