@@ -254,13 +254,20 @@ for that fix.
 The initial delivery does not require a metadata layout or Protobuf schema change. Existing IPv4 and DNS configuration
 remains valid, and default bind addresses remain unchanged.
 
-Ozone supports non-rolling software upgrades. An existing cluster must first use that procedure to install an
-IPv6-capable release while retaining its IPv4 configuration. This requires a maintenance window; this proposal does not
-guarantee a zero-downtime software upgrade or address-family migration.
+An existing cluster must first install an IPv6-capable release while retaining its IPv4 configuration, using the upgrade
+procedure supported for its starting and target releases. Zero downtime upgrade (ZDU) can be used when both releases
+support it and that upgrade path is qualified. A starting release without ZDU support still requires a non-rolling
+upgrade; introducing ZDU in the target release alone is not sufficient.
 
-After the upgrade, operators can migrate from IPv4 through dual-stack to IPv6-only. IPv4 endpoints must remain usable
-until IPv6 listeners, advertised endpoints, security services, and clients have been validated. IPv4 can be removed only
-after all Ozone services, command-line clients, and relevant filesystem clients can use IPv6.
+After the software upgrade and any required finalization, operators can migrate from IPv4 through dual-stack to
+IPv6-only. In an HA deployment, apply listener configuration changes through rolling restarts, keeping SCM and OM
+quorums and enough datanodes available for reads and writes. Bring each restarted service back to a healthy state before
+continuing. IPv4 endpoints must remain usable until IPv6 listeners, advertised endpoints, security services, and clients
+have been validated. IPv4 can be removed only after all Ozone services, command-line clients, and relevant filesystem
+clients can use IPv6.
+
+A migration without a cluster-wide outage must be qualified with active reads and writes across rolling restarts and HA
+peer-address updates. ZDU for the software upgrade alone does not qualify the address-family migration.
 
 A datanode retains its persisted UUID when its IP address or hostname changes. When it re-registers, SCM updates the
 existing datanode. SCM then finalizes and closes open containers on stale pipelines, removes those pipelines, and
@@ -400,11 +407,14 @@ Required coverage includes:
   checks, certificate renewal, and authenticated HTTP endpoints pass without an IPv4 fallback.
 - **HA and failure handling:** SCM and OM leader changes, suggested-leader handling, client failover, Ratis role
   reporting, and Recon access preserve valid IPv6 endpoints.
-- **Existing-cluster migration:** Starting from an IPv4 configuration, complete the supported non-rolling upgrade and
-  migrate through dual-stack to IPv6-only. Preserve SCM and OM group IDs, peer IDs, Ratis storage, and committed state.
-  Test stable DNS and address updates that keep the same peer IDs for IPv4 literal peers. Migrate datanodes in bounded
-  batches and validate UUID retention, container closure, pipeline replacement, active writes, retries, data integrity,
-  and rollback to IPv4 before the final cutover.
+- **Existing-cluster migration:** Starting from an IPv4 configuration, install the IPv6-capable release through the
+  supported upgrade procedure. Cover non-rolling upgrades from releases without ZDU and rolling upgrades between
+  eligible releases. After any required finalization, migrate through dual-stack to IPv6-only using rolling restarts in
+  HA deployments. Preserve SCM and OM quorums, group IDs, peer IDs, Ratis storage, and committed state. Test stable DNS
+  and address updates that keep the same peer IDs for IPv4 literal peers. Migrate datanodes in bounded batches and
+  validate UUID retention, container closure, pipeline replacement, active reads and writes, retries, data integrity,
+  and rollback to IPv4 before the final cutover. Any claim of migration without downtime requires continuous client
+  workload coverage throughout the procedure.
 - **Erasure coding:** An EC bucket completes write, read, degraded read, and reconstruction with IPv6-reachable
   datanodes and the expected topology placement.
 
@@ -480,6 +490,7 @@ documentation work will verify the combined behavior rather than infer support f
 - [HDDS-15763: Ozone IPv6 support](https://issues.apache.org/jira/browse/HDDS-15763)
 - [HDDS-9894: IPv6 address checks for certificate requests](https://issues.apache.org/jira/browse/HDDS-9894)
 - [Ozone non-rolling upgrades and downgrades]({{< ref "feature/Nonrolling-Upgrade.md" >}})
+- [HDDS-14496: Zero downtime upgrade](https://issues.apache.org/jira/browse/HDDS-14496)
 - [HADOOP-11890: Hadoop IPv6 support umbrella](https://issues.apache.org/jira/browse/HADOOP-11890)
 - [HADOOP-3619: IPv6 reverse DNS failure](https://issues.apache.org/jira/browse/HADOOP-3619)
 - [HADOOP-12491: IPv6-unsafe Hadoop Common parsing](https://issues.apache.org/jira/browse/HADOOP-12491)
