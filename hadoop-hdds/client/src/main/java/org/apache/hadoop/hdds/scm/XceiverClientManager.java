@@ -29,10 +29,15 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
@@ -47,6 +52,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.util.CacheMetrics;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.util.ConcurrentUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +76,7 @@ public class XceiverClientManager extends XceiverClientCreator {
   private final CacheMetrics cacheMetrics;
   private static XceiverClientMetrics metrics;
   private final ConcurrentHashMap<String, DatanodeDetails> localDNCache;
+  private final ExecutorService closeExecutor;
 
   /**
    * Creates a new XceiverClientManager for non secured ozone cluster.
@@ -90,6 +97,10 @@ public class XceiverClientManager extends XceiverClientCreator {
     Objects.requireNonNull(conf, "conf == null");
     long staleThresholdMs = clientConf.getStaleThreshold(MILLISECONDS);
 
+    // at most one thread, which exits when idle
+    this.closeExecutor = new ThreadPoolExecutor(0, 1, 60, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(Math.max(1, clientConf.getMaxSize())),
+        new ThreadFactoryBuilder().setDaemon(true).setNameFormat("XceiverClientManager-close-%d").build());
     this.clientCache = CacheBuilder.newBuilder()
         .recordStats()
         .expireAfterAccess(staleThresholdMs, MILLISECONDS)
@@ -103,7 +114,9 @@ public class XceiverClientManager extends XceiverClientCreator {
               synchronized (clientCache) {
                 // Mark the entry as evicted
                 XceiverClientSpi info = removalNotification.getValue();
-                info.setEvicted();
+                if (info.setEvicted()) {
+                  closeAsync(info);
+                }
               }
             }
           }).build();
@@ -170,7 +183,9 @@ public class XceiverClientManager extends XceiverClientCreator {
       boolean topologyAware) {
     Objects.requireNonNull(client, "client == null");
     synchronized (clientCache) {
-      client.decrementReference();
+      if (client.decrementReference()) {
+        closeAsync(client);
+      }
       if (invalidateClient) {
         Pipeline pipeline = client.getPipeline();
         String key = getPipelineCacheKey(pipeline, topologyAware, client instanceof XceiverClientShortCircuit);
@@ -179,6 +194,25 @@ public class XceiverClientManager extends XceiverClientCreator {
           clientCache.invalidate(key);
         }
       }
+    }
+  }
+
+  /**
+   * Closes the client on a background thread. Closing can wait several seconds for channel termination,
+   * so it should not run on the caller thread, which holds the clientCache lock.
+   */
+  private void closeAsync(XceiverClientSpi client) {
+    try {
+      closeExecutor.execute(() -> {
+        try {
+          client.close();
+        } catch (RuntimeException e) {
+          LOG.warn("Failed to close client for pipeline {}", client.getPipeline(), e);
+        }
+      });
+    } catch (RejectedExecutionException e) {
+      // too many clients are waiting to be closed, or this manager is already closed
+      client.close();
     }
   }
 
@@ -278,6 +312,7 @@ public class XceiverClientManager extends XceiverClientCreator {
     //closing is done through RemovalListener
     clientCache.invalidateAll();
     clientCache.cleanUp();
+    ConcurrentUtils.shutdownAndWait(closeExecutor);
     if (LOG.isDebugEnabled()) {
       LOG.debug("XceiverClient cache stats: {}", clientCache.stats());
     }
