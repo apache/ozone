@@ -50,6 +50,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
@@ -511,6 +512,17 @@ public class TestDatanodeStateMachine {
     /** Port out of range **/
     confList.add(Maps.immutableEntry(
         ScmConfigKeys.OZONE_SCM_NAMES, "scm:123456"));
+    /** Unbracketed IPv6 literal **/
+    confList.add(Maps.immutableEntry(
+        ScmConfigKeys.OZONE_SCM_NAMES, "::1"));
+    /** Wildcard **/
+    confList.add(Maps.immutableEntry(
+        ScmConfigKeys.OZONE_SCM_NAMES, "0.0.0.0"));
+
+    // Invalid ozone.recon.address
+    /** Wildcard **/
+    confList.add(Maps.immutableEntry(
+        ReconConfigKeys.OZONE_RECON_ADDRESS_KEY, "0.0.0.0:9891"));
 
     confList.forEach((entry) -> {
       OzoneConfiguration perTestConf = new OzoneConfiguration(conf);
