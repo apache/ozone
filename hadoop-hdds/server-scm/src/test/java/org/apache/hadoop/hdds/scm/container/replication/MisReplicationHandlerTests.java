@@ -125,8 +125,12 @@ public abstract class MisReplicationHandlerTests {
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
     ContainerPlacementStatus mockedContainerPlacementStatus = mock(ContainerPlacementStatus.class);
     when(mockedContainerPlacementStatus.isPolicySatisfied()).thenReturn(false);
-    when(placementPolicy.validateContainerPlacement(anyList(),
-        anyInt())).thenReturn(mockedContainerPlacementStatus);
+    // With the new targets added, the placement is fine.
+    ContainerPlacementStatus placementAfterCopy = mock(ContainerPlacementStatus.class);
+    when(placementAfterCopy.isPolicySatisfied()).thenReturn(true);
+    when(placementPolicy.validateContainerPlacement(anyList(), anyInt())).thenAnswer(invocation ->
+        invocation.<List<DatanodeDetails>>getArgument(0).size() > invocation.<Integer>getArgument(1)
+            ? placementAfterCopy : mockedContainerPlacementStatus);
     return placementPolicy;
   }
 

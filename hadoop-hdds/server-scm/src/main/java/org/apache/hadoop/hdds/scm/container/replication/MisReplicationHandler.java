@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -133,8 +134,9 @@ public abstract class MisReplicationHandler implements
     List<DatanodeDetails> usedDns = replicas.stream()
             .map(ContainerReplica::getDatanodeDetails)
             .collect(Collectors.toList());
-    if (containerPlacement.validateContainerPlacement(usedDns,
-            usedDns.size()).isPolicySatisfied()) {
+    ContainerPlacementStatus placementStatus =
+        containerPlacement.validateContainerPlacement(usedDns, usedDns.size());
+    if (placementStatus.isPolicySatisfied()) {
       LOG.info("Container {} is currently not misreplicated",
               container.getContainerID());
       return 0;
@@ -158,6 +160,21 @@ public abstract class MisReplicationHandler implements
             excludedAndUsedNodes.getUsedNodes(),
             excludedAndUsedNodes.getExcludedNodes(), currentContainerSize,
             container);
+    if (!targetDatanodes.isEmpty()) {
+      // When no other rack has a usable node, placement can fall back to a rack that already has a replica.
+      // Copying there doesn't help: the container is still mis-replicated, the extra copy gets deleted, and the
+      // next run copies it again, over and over.
+      List<DatanodeDetails> dnsAfterCopy = new ArrayList<>(usedDns);
+      dnsAfterCopy.addAll(targetDatanodes);
+      ContainerPlacementStatus placementAfterCopy =
+          containerPlacement.validateContainerPlacement(dnsAfterCopy, usedDns.size());
+      if (!placementAfterCopy.isPolicySatisfied()
+          && placementAfterCopy.misReplicationCount() >= placementStatus.misReplicationCount()) {
+        LOG.info("Not copying container {} to {}, as that would not reduce its mis-replication.",
+            container.getContainerID(), targetDatanodes);
+        return 0;
+      }
+    }
     List<DatanodeDetails> availableSources = sources.stream()
         .map(ContainerReplica::getDatanodeDetails)
         .collect(Collectors.toList());

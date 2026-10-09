@@ -24,14 +24,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -442,9 +440,7 @@ public final class SCMContainerPlacementRackAware
       List<DatanodeDetails> affinityNodes, List<DatanodeDetails> usedNodes,
       long metadataSizeRequired,
       long dataSizeRequired) throws SCMException {
-    int ancestorGen = RACK_LEVEL;
-    int maxRetry = MAX_RETRY;
-    List<String> excludedNodesForCapacity = null;
+    List<String> excludedNodesForCapacity = new ArrayList<>();
 
     // When affinity node is null, in this case new node to be selected
     // should be in different rack than used nodes rack.
@@ -453,84 +449,82 @@ public final class SCMContainerPlacementRackAware
     // Used node rack should not be part of rack selection
     // which is filled in excludedNodes
     if (affinityNodes == null && excludedNodes != null) {
-      excludedNodesForCapacity = excludedNodes.stream()
-          .map(DatanodeDetails::getNetworkFullPath)
-          .collect(Collectors.toList());
+      for (DatanodeDetails node : excludedNodes) {
+        excludedNodesForCapacity.add(node.getNetworkFullPath());
+      }
       excludedNodes = usedNodes;
     }
 
-    boolean isFallbacked = false;
-    while (true) {
-      metrics.incrDatanodeChooseAttemptCount();
-      DatanodeDetails node = null;
-      if (affinityNodes != null) {
-        for (Node affinityNode : affinityNodes) {
-          node = (DatanodeDetails)networkTopology.chooseRandom(
-              NetConstants.ROOT, excludedNodesForCapacity, excludedNodes,
-              affinityNode, ancestorGen);
-          if (node != null) {
-            break;
-          }
-        }
-      } else {
-        node = (DatanodeDetails)networkTopology.chooseRandom(NetConstants.ROOT,
-            excludedNodesForCapacity, excludedNodes, null, ancestorGen);
+    // The places to look for a node, in order. Each one gets MAX_RETRY tries:
+    // 1. the rack of each affinity node;
+    // 2. any rack except the racks of excludedNodes (right away if there are no affinity nodes, otherwise only
+    //    as a fallback);
+    // 3. any rack at all, as a fallback.
+    List<Step> steps = new ArrayList<>();
+    if (affinityNodes != null) {
+      for (DatanodeDetails affinityNode : affinityNodes) {
+        steps.add(new Step(affinityNode, RACK_LEVEL, false));
       }
+    }
+    if (affinityNodes == null || fallback) {
+      steps.add(new Step(null, RACK_LEVEL, affinityNodes != null));
+    }
+    if (fallback) {
+      steps.add(new Step(null, 0, true));
+    }
 
-      if (node == null) {
-        // cannot find the node which meets all constrains
-        LOG.warn("Failed to find the datanode for container. excludedNodes:" +
-            (excludedNodes == null ? "" : excludedNodes.toString()) +
-            ", affinityNode:" +
-            (affinityNodes == null ? "" : affinityNodes.stream()
-                .map(Object::toString).collect(Collectors.joining(", "))));
-        if (fallback) {
-          isFallbacked = true;
-          // fallback, don't consider the affinity node
-          if (affinityNodes != null) {
-            affinityNodes = null;
-            continue;
-          }
-          // fallback, don't consider cross rack
-          if (ancestorGen == RACK_LEVEL) {
-            ancestorGen--;
-            continue;
-          }
-        }
-        // there is no constrains to reduce or fallback is true
-        throw new SCMException("No satisfied datanode to meet the" +
-            " excludedNodes and affinityNode constrains.", null);
-      }
-
-      if (usedNodes != null && usedNodes.contains(node)) {
-        if (excludedNodesForCapacity == null) {
-          excludedNodesForCapacity = new ArrayList<>();
+    boolean outOfRetries = false;
+    for (Step step : steps) {
+      int retries = MAX_RETRY;
+      while (retries > 0) {
+        metrics.incrDatanodeChooseAttemptCount();
+        DatanodeDetails node = (DatanodeDetails) networkTopology.chooseRandom(NetConstants.ROOT,
+            excludedNodesForCapacity, excludedNodes, step.affinityNode, step.ancestorGen);
+        if (node == null) {
+          LOG.warn("Failed to find the datanode for container. excludedNodes: {}, affinityNode: {}",
+              excludedNodes, step.affinityNode);
+          break;
         }
         excludedNodesForCapacity.add(node.getNetworkFullPath());
-        continue;
-      }
-
-      if (isValidNode(node, metadataSizeRequired, dataSizeRequired)) {
-        metrics.incrDatanodeChooseSuccessCount();
-        if (isFallbacked) {
-          metrics.incrDatanodeChooseFallbackCount();
+        if (usedNodes != null && usedNodes.contains(node)) {
+          continue;
         }
-        return node;
+        if (isValidNode(node, metadataSizeRequired, dataSizeRequired)) {
+          metrics.incrDatanodeChooseSuccessCount();
+          if (step.fallback) {
+            metrics.incrDatanodeChooseFallbackCount();
+          }
+          return node;
+        }
+        retries--;
       }
+      // Decommissioned and maintenance nodes stay in the topology, so a place can use up all its tries on them,
+      // e.g. the only other rack while a whole rack is being decommissioned. Then move on to the next place.
+      outOfRetries = retries == 0;
+    }
+    if (outOfRetries) {
+      String errMsg = "No writable datanode with enough space was found. "
+          + "metadata size required: " + metadataSizeRequired +
+          " data size required: " + dataSizeRequired;
+      LOG.info(errMsg);
+      throw new SCMException(errMsg, null);
+    }
+    throw new SCMException("No satisfied datanode to meet the excludedNodes and affinityNode constrains.", null);
+  }
 
-      maxRetry--;
-      if (maxRetry == 0) {
-        // avoid the infinite loop
-        String errMsg = "No satisfied datanode to meet the space constrains. "
-            + "metadata size required: " + metadataSizeRequired +
-            " data size required: " + dataSizeRequired;
-        LOG.info(errMsg);
-        throw new SCMException(errMsg, null);
-      }
-      if (excludedNodesForCapacity == null) {
-        excludedNodesForCapacity = new ArrayList<>();
-      }
-      excludedNodesForCapacity.add(node.getNetworkFullPath());
+  /** One place where chooseNode looks for a node. */
+  private static final class Step {
+    /** Look near this node, or anywhere when null. */
+    private final DatanodeDetails affinityNode;
+    /** RACK_LEVEL: stay on affinityNode's rack, or, without one, avoid the racks of excludedNodes. 0: any rack. */
+    private final int ancestorGen;
+    /** Whether a node found here counts as a fallback in the metrics. */
+    private final boolean fallback;
+
+    Step(DatanodeDetails affinityNode, int ancestorGen, boolean fallback) {
+      this.affinityNode = affinityNode;
+      this.ancestorGen = ancestorGen;
+      this.fallback = fallback;
     }
   }
 

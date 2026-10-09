@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
@@ -676,6 +677,67 @@ public class TestSCMContainerPlacementRackAware {
     assertTrue(cluster.isSameParent(
         datanodes.get(0), datanodeDetails.get(0)) ||
         cluster.isSameParent(datanodes.get(5), datanodeDetails.get(0)));
+  }
+
+  @Test
+  public void chooseNodeWhenUsedNodeRackHasOnlyDecommissionedNodes() throws SCMException {
+    setup(3 * NODE_PER_RACK);
+    // rack1 has no usable node left: node5 already has a replica, and nodes 6-9 are decommissioned.
+    for (int i = 6; i < 10; i++) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    // The container has replicas on node5 (rack1) and node0 (rack0). rack1 is tried first.
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(5), datanodes.get(0)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, new ArrayList<>(), null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // Instead of giving up after rack1, placement tries rack0 and finds a node there.
+    assertTrue(cluster.isSameParent(datanodes.get(0), datanodeDetails.get(0)));
+    assertNotEquals(datanodes.get(0), datanodeDetails.get(0));
+  }
+
+  @Test
+  public void fallbackWhenUsedNodeRacksHaveOnlyDecommissionedNodes() throws SCMException {
+    setup(3 * NODE_PER_RACK);
+    // The replicas are on node0 (rack0) and node5 (rack1), and neither rack has another usable node:
+    // node1 and node6 are excluded because their replicas are being decommissioned, and the rest are decommissioned.
+    dnInfos.get(1).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    for (int i : new int[] {2, 3, 4, 6, 7, 8, 9}) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(5)));
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(Arrays.asList(datanodes.get(1), datanodes.get(6)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // After both racks fail, placement falls back to rack2, the only rack with usable nodes.
+    assertTrue(cluster.isSameParent(datanodes.get(10), datanodeDetails.get(0)));
+  }
+
+  @Test
+  public void fallbackToSameRackWhenOtherRackHasOnlyDecommissionedNodes() throws SCMException {
+    setup(2 * NODE_PER_RACK);
+    // All of rack1 is being decommissioned. node5 has a replica that is being decommissioned, so it is excluded,
+    // and nodes 6-9 are already decommissioned.
+    dnInfos.get(5).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    for (int i = 6; i < 10; i++) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    // The other two replicas are on rack0.
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(1)));
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(Arrays.asList(datanodes.get(5)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // rack1 has no usable node, so the new replica has to go to rack0 as well.
+    assertTrue(cluster.isSameParent(datanodes.get(0), datanodeDetails.get(0)));
+    assertThat(usedNodes).doesNotContain(datanodeDetails.get(0));
+    assertEquals(1, metrics.getDatanodeChooseFallbackCount());
+    // Without fallback, there is nowhere to put it.
+    assertThrows(SCMException.class, () -> policyNoFallback.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5));
   }
 
   @Test
