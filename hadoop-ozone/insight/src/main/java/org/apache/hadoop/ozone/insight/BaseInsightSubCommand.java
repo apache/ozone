@@ -80,7 +80,7 @@ public class BaseInsightSubCommand {
     String protocol = policy.isHttpsEnabled() ? HTTPS_SCHEME : HTTP_SCHEME;
     
     if (component.getHostname() != null) {
-      return protocol + "://" + component.getHostname() + ":" + component.getPort();
+      return protocol + "://" + HddsUtils.getHostPortString(component.getHostname(), component.getPort());
     }
     
     String address = getComponentAddress(conf, component.getName(), policy);
