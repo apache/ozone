@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.local;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.HttpURLConnection;
@@ -25,6 +27,9 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.time.Duration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.upgrade.ComponentVersionManagerMetrics;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -47,6 +52,16 @@ class TestLocalOzoneRecon {
 
     try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
       cluster.start();
+
+      String metricsName = ComponentVersionManagerMetrics.METRICS_SOURCE_NAME;
+      MetricsSource scm = DefaultMetricsSystem.instance().getSource(metricsName + ".SCM");
+      MetricsSource om = DefaultMetricsSystem.instance().getSource(metricsName + ".OM");
+      MetricsSource recon = DefaultMetricsSystem.instance().getSource(metricsName + ".ReconSCM");
+      assertNotNull(scm);
+      assertNotNull(om);
+      assertNotNull(recon);
+      assertNotSame(scm, om);
+      assertNotSame(scm, recon);
 
       assertTrue(cluster.getReconPort() > 0);
       assertHttpEndpointResponds(cluster.getReconEndpoint() + "/api/v1/clusterState");
