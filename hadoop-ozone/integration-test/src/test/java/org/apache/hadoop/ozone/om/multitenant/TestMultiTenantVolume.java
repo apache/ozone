@@ -18,13 +18,9 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -41,15 +37,15 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.OMStorage;
+import org.apache.hadoop.ozone.om.OMUpgradeTestUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -76,7 +72,8 @@ public class TestMultiTenantVolume {
     conf.setBoolean(
         OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     conf.setBoolean(OZONE_OM_MULTITENANCY_ENABLED, true);
-    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, OMLayoutFeature.INITIAL_VERSION.serialize());
+    conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes();
     cluster = builder.build();
@@ -146,27 +143,8 @@ public class TestMultiTenantVolume {
     // Trigger OM upgrade finalization. Ref: FinalizeUpgradeSubCommand#call
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
-    final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
-    UpgradeFinalization.StatusAndMessages finalizationResponse =
-        omClient.finalizeUpgrade(upgradeClientID);
-
-    // The status should transition as soon as the client call above returns
-    assertTrue(isStarting(finalizationResponse.status()));
-
-    // Wait for the finalization to be marked as done.
-    // 10s timeout should be plenty.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        final UpgradeFinalization.StatusAndMessages progress =
-            omClient.queryUpgradeFinalizationProgress(
-                upgradeClientID, false, false);
-        return isDone(progress.status());
-      } catch (IOException e) {
-        fail("Unexpected exception while waiting for "
-            + "the OM upgrade to finalize: " + e.getMessage());
-      }
-      return false;
-    }, 500, 10000);
+    omClient.finalizeUpgrade();
+    OMUpgradeTestUtils.waitForFinalization(omClient);
   }
 
   @Test

@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
-
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,13 +24,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.node.PendingContainerTracker.TwoWindowBucket;
+import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +59,8 @@ public class DatanodeInfo extends DatanodeDetails {
 
   private List<StorageReportProto> storageReports;
   private List<MetadataStorageReportProto> metadataStorageReports;
-  private LayoutVersionProto lastKnownLayoutVersion;
+  private ComponentVersion lastKnownSoftwareVersion;
+  private ComponentVersion lastKnownApparentVersion;
   private final Map<SCMCommandProto.Type, Integer> commandCounts;
 
   private NodeStatus nodeStatus;
@@ -67,16 +69,17 @@ public class DatanodeInfo extends DatanodeDetails {
    * Constructs DatanodeInfo from DatanodeDetails.
    *
    * @param datanodeDetails Details about the datanode
-   * @param layoutInfo Details about the LayoutVersionProto
+   * @param versionInfo Details about the DatanodeVersionProto
    */
   public DatanodeInfo(DatanodeDetails datanodeDetails, NodeStatus nodeStatus,
-       LayoutVersionProto layoutInfo, long containerRollIntervalMs) {
+       DatanodeVersionProto versionInfo, long containerRollIntervalMs) {
     super(datanodeDetails);
     this.lock = new ReentrantReadWriteLock();
     this.lastHeartbeatTime = Time.monotonicNow();
-    lastKnownLayoutVersion = toLayoutVersionProto(
-        layoutInfo != null ? layoutInfo.getMetadataLayoutVersion() : 0,
-        layoutInfo != null ? layoutInfo.getSoftwareLayoutVersion() : 0);
+    this.lastKnownSoftwareVersion =
+        HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(versionInfo.getSoftwareVersion());
+    this.lastKnownApparentVersion =
+        HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(versionInfo.getApparentVersion());
     this.storageReports = Collections.emptyList();
     this.nodeStatus = nodeStatus;
     this.metadataStorageReports = Collections.emptyList();
@@ -108,17 +111,30 @@ public class DatanodeInfo extends DatanodeDetails {
   }
 
   /**
-   * Updates the last LayoutVersion.
+   * Updates the last known apparent and software versions for this datanode.
    */
-  public void updateLastKnownLayoutVersion(LayoutVersionProto version) {
+  public void updateLastKnownVersions(DatanodeVersionProto version) {
     if (version == null) {
       return;
     }
     try {
       lock.writeLock().lock();
-      lastKnownLayoutVersion = toLayoutVersionProto(
-          version.getMetadataLayoutVersion(),
-          version.getSoftwareLayoutVersion());
+      lastKnownSoftwareVersion =
+          HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(version.getSoftwareVersion());
+      lastKnownApparentVersion =
+          HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(version.getApparentVersion());
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  /**
+   * Updates the current version reported by this datanode on its heartbeat in a thread-safe manner.
+   */
+  public void updateCurrentVersion(HDDSVersion version) {
+    try {
+      lock.writeLock().lock();
+      setCurrentVersion(version);
     } finally {
       lock.writeLock().unlock();
     }
@@ -138,15 +154,19 @@ public class DatanodeInfo extends DatanodeDetails {
     }
   }
 
-  /**
-   * Returns the last known Layout Version .
-   *
-   * @return last  Layout Version.
-   */
-  public LayoutVersionProto getLastKnownLayoutVersion() {
+  public ComponentVersion getLastKnownSoftwareVersion() {
     try {
       lock.readLock().lock();
-      return lastKnownLayoutVersion;
+      return lastKnownSoftwareVersion;
+    } finally {
+      lock.readLock().unlock();
+    }
+  }
+
+  public ComponentVersion getLastKnownApparentVersion() {
+    try {
+      lock.readLock().lock();
+      return lastKnownApparentVersion;
     } finally {
       lock.readLock().unlock();
     }

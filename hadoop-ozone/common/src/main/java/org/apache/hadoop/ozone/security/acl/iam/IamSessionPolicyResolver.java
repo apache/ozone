@@ -1140,6 +1140,14 @@ public final class IamSessionPolicyResolver {
         EnumSet.of(READ, LIST), EnumSet.noneOf(ACLType.class)),
     PUT_BUCKET_ACL("s3:PutBucketAcl", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, READ_ACL, WRITE_ACL),
         EnumSet.noneOf(ACLType.class)),
+    GET_BUCKET_TAGGING("s3:GetBucketTagging", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.noneOf(ACLType.class)),
+    PUT_BUCKET_TAGGING("s3:PutBucketTagging", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, WRITE),
+        EnumSet.noneOf(ACLType.class)),
+    GET_BUCKET_LIFECYCLE("s3:GetLifecycleConfiguration", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.noneOf(ACLType.class)),
+    PUT_BUCKET_LIFECYCLE("s3:PutLifecycleConfiguration", ActionKind.BUCKET, EnumSet.of(READ), EnumSet.of(READ, WRITE),
+        EnumSet.noneOf(ACLType.class)),
 
     // Object-scope
     ABORT_MULTIPART_UPLOAD("s3:AbortMultipartUpload", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
@@ -1151,6 +1159,8 @@ public final class IamSessionPolicyResolver {
         EnumSet.of(WRITE)),
     // Used for HeadObject, CopyObject (for source bucket), GetObject (without versionId parameter) APIs
     GET_OBJECT("s3:GetObject", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
+    GET_OBJECT_ATTRIBUTES("s3:GetObjectAttributes", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),
+        EnumSet.of(READ)),
     GET_OBJECT_TAGGING("s3:GetObjectTagging", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ), EnumSet.of(READ)),
     // Used for ListParts API
     LIST_MULTIPART_UPLOAD_PARTS("s3:ListMultipartUploadParts", ActionKind.OBJECT, EnumSet.of(READ), EnumSet.of(READ),

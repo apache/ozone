@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.hdds.protocol;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS;
 import static org.apache.hadoop.ozone.ClientVersion.VERSION_HANDLES_UNKNOWN_DN_PORTS;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -38,7 +35,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -48,7 +46,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsP
 import org.apache.hadoop.hdds.scm.net.NetConstants;
 import org.apache.hadoop.hdds.scm.net.NetUtils;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
-import org.apache.hadoop.hdds.upgrade.BelongsToHDDSLayoutVersion;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
@@ -92,8 +89,12 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
   private String revision;
   private volatile HddsProtos.NodeOperationalState persistedOpState;
   private volatile long persistedOpStateExpiryEpochSec;
-  private int initialVersion;
-  private int currentVersion;
+  private HDDSVersion initialVersion;
+  private volatile HDDSVersion currentVersion;
+  // The raw serialized currentVersion as it arrived off the wire. Kept separate from
+  // currentVersion so that a reader which deserializes an unknown newer version to
+  // UNKNOWN_VERSION still forwards the original value to datanodes instead of -1.
+  private volatile int serializedCurrentVersion;
 
   private DatanodeDetails(Builder b) {
     super(b.hostName, b.networkLocation, NetConstants.NODE_COST_DEFAULT);
@@ -110,6 +111,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     persistedOpStateExpiryEpochSec = b.persistedOpStateExpiryEpochSec;
     initialVersion = b.initialVersion;
     currentVersion = b.currentVersion;
+    serializedCurrentVersion = b.serializedCurrentVersion;
     if (b.networkName != null) {
       setNetworkName(b.networkName);
     }
@@ -138,6 +140,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
         datanodeDetails.getPersistedOpStateExpiryEpochSec();
     this.initialVersion = datanodeDetails.getInitialVersion();
     this.currentVersion = datanodeDetails.getCurrentVersion();
+    this.serializedCurrentVersion = datanodeDetails.getSerializedCurrentVersion();
   }
 
   public static Codec<DatanodeDetails> getCodec() {
@@ -480,9 +483,6 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     }
     if (datanodeDetailsProto.hasCurrentVersion()) {
       builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
-    } else {
-      // fallback to version 1 if not present
-      builder.setCurrentVersion(DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue());
     }
     return builder;
   }
@@ -530,27 +530,39 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    */
   @JsonIgnore
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
-    return toProto(ClientVersion.CURRENT_VERSION);
+    return toProto(ClientVersion.CURRENT);
   }
 
-  public HddsProtos.DatanodeDetailsProto toProto(int clientVersion) {
+  public HddsProtos.DatanodeDetailsProto toProto(ClientVersion clientVersion) {
     return toProtoBuilder(clientVersion, Collections.emptySet()).build();
   }
 
-  public HddsProtos.DatanodeDetailsProto toProto(int clientVersion, Set<Port.Name> filterPorts) {
+  public HddsProtos.DatanodeDetailsProto toProto(ClientVersion clientVersion, Set<Port.Name> filterPorts) {
     return toProtoBuilder(clientVersion, filterPorts).build();
+  }
+
+  public HddsProtos.DatanodeDetailsProto toProto(ClientVersion clientVersion, Set<Port.Name> filterPorts,
+      ComponentVersion versionOverride) {
+    return toProtoBuilder(clientVersion, filterPorts, versionOverride).build();
+  }
+
+  public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
+      ClientVersion clientVersion, Set<Port.Name> filterPorts) {
+    return toProtoBuilder(clientVersion, filterPorts, null);
   }
 
   /**
    * Converts the current DatanodeDetails instance into a proto {@link HddsProtos.DatanodeDetailsProto.Builder} object.
    *
-   * @param clientVersion - The client version.
-   * @param filterPorts   - A set of {@link Port.Name} specifying ports to include.
-   *                        If empty, all available ports will be included.
+   * @param clientVersion          - The client version.
+   * @param filterPorts            - A set of {@link Port.Name} specifying ports to include.
+   *                                 If empty, all available ports will be included.
+   * @param versionOverride        - When non-null, its serialized value is set as the proto's currentVersion instead
+   *                                 of this node's own version. Used to advertise a pipeline-wide write version.
    * @return A {@link HddsProtos.DatanodeDetailsProto.Builder} Object.
    */
   public HddsProtos.DatanodeDetailsProto.Builder toProtoBuilder(
-      int clientVersion, Set<Port.Name> filterPorts) {
+      ClientVersion clientVersion, Set<Port.Name> filterPorts, ComponentVersion versionOverride) {
 
     final HddsProtos.DatanodeIDProto idProto = id.toProto();
     final HddsProtos.DatanodeDetailsProto.Builder builder =
@@ -585,8 +597,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     builder.setPersistedOpStateExpiry(persistedOpStateExpiryEpochSec);
 
     final boolean handlesUnknownPorts =
-        ClientVersion.fromProtoValue(clientVersion)
-        .compareTo(VERSION_HANDLES_UNKNOWN_DN_PORTS) >= 0;
+        VERSION_HANDLES_UNKNOWN_DN_PORTS.isSupportedBy(clientVersion);
     final int requestedPortCount = filterPorts.size();
     final boolean maySkip = requestedPortCount > 0;
     for (Port port : ports.values()) {
@@ -608,7 +619,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       }
     }
 
-    builder.setCurrentVersion(currentVersion);
+    builder.setCurrentVersion(versionOverride != null ? versionOverride.serialize() : serializedCurrentVersion);
 
     return builder;
   }
@@ -640,23 +651,34 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    * Note: Datanode initial version is not passed to the client due to no use case. See HDDS-9884
    * @return the version this datanode was initially created with
    */
-  public int getInitialVersion() {
+  public HDDSVersion getInitialVersion() {
     return initialVersion;
   }
 
-  public void setInitialVersion(int initialVersion) {
+  public void setInitialVersion(HDDSVersion initialVersion) {
     this.initialVersion = initialVersion;
   }
 
   /**
-   * @return the version this datanode was last started with
+   * @return the version this datanode should report to clients
    */
-  public int getCurrentVersion() {
+  public HDDSVersion getCurrentVersion() {
     return currentVersion;
   }
 
-  public void setCurrentVersion(int currentVersion) {
+  /**
+   * @return the raw serialized currentVersion as it arrived off the wire. Unlike
+   *     {@link #getCurrentVersion()} this preserves the original value even when it cannot be
+   *     deserialized by this component. Use this when forwarding the version to another
+   *     component, e.g. the write pipeline version sent to datanodes.
+   */
+  public int getSerializedCurrentVersion() {
+    return serializedCurrentVersion;
+  }
+
+  public void setCurrentVersion(HDDSVersion currentVersion) {
     this.currentVersion = currentVersion;
+    this.serializedCurrentVersion = currentVersion.serialize();
   }
 
   @Override
@@ -739,8 +761,9 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     private String revision;
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
-    private int initialVersion;
-    private int currentVersion = DatanodeVersion.CURRENT_VERSION;
+    private HDDSVersion initialVersion = HDDSVersion.DEFAULT_VERSION;
+    private HDDSVersion currentVersion = HDDSVersion.DEFAULT_VERSION;
+    private int serializedCurrentVersion = HDDSVersion.DEFAULT_VERSION.serialize();
 
     /**
      * Default private constructor. To create Builder instance use
@@ -957,13 +980,25 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       return this;
     }
 
-    public Builder setInitialVersion(int v) {
+    public Builder setInitialVersion(HDDSVersion v) {
       this.initialVersion = v;
       return this;
     }
 
-    public Builder setCurrentVersion(int v) {
+    public Builder setCurrentVersion(HDDSVersion v) {
       this.currentVersion = v;
+      this.serializedCurrentVersion = v.serialize();
+      return this;
+    }
+
+    /**
+     * Sets the currentVersion from its raw serialized value, preserving the original even if it
+     * cannot be deserialized (in which case {@link #getCurrentVersion()} is
+     * {@link HDDSVersion#UNKNOWN_VERSION} while {@link #getSerializedCurrentVersion()} keeps it).
+     */
+    public Builder setCurrentVersion(int serialized) {
+      this.serializedCurrentVersion = serialized;
+      this.currentVersion = HDDSVersion.deserialize(serialized);
       return this;
     }
 
@@ -1035,13 +1070,9 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
      */
     public enum Name {
       STANDALONE, RATIS, REST, REPLICATION, RATIS_ADMIN, RATIS_SERVER,
-      @BelongsToHDDSLayoutVersion(RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS)
       RATIS_DATASTREAM,
-      @BelongsToHDDSLayoutVersion(WEBUI_PORTS_IN_DATANODEDETAILS)
       HTTP,
-      @BelongsToHDDSLayoutVersion(WEBUI_PORTS_IN_DATANODEDETAILS)
       HTTPS,
-      @BelongsToHDDSLayoutVersion(HADOOP_PRC_PORTS_IN_DATANODEDETAILS)
       CLIENT_RPC;
 
       public static final Set<Name> ALL_PORTS = ImmutableSet.copyOf(
@@ -1195,7 +1226,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
 
   @Override
   public HddsProtos.NetworkNode toProtobuf(
-      int clientVersion) {
+      ClientVersion clientVersion) {
     return HddsProtos.NetworkNode.newBuilder()
         .setDatanodeDetails(toProtoBuilder(clientVersion, Collections.emptySet()).build())
         .build();

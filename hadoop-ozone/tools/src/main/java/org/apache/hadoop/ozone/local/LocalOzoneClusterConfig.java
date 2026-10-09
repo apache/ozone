@@ -57,10 +57,6 @@ public final class LocalOzoneClusterConfig {
   static final int DEFAULT_DATANODES =
       Integer.parseInt(DEFAULT_DATANODES_VALUE);
   static final String DEFAULT_HOST = "127.0.0.1";
-  // Loopback, not the wildcard address: the local runtime leaves security off, and
-  // S3SecurityUtil#validateS3Credential only checks a signature when it is on, so listening on
-  // every interface would serve a writable S3 endpoint to anyone who can reach the port.
-  static final String DEFAULT_BIND_HOST = "127.0.0.1";
   static final String WILDCARD_HOST = "0.0.0.0";
   static final int DEFAULT_PORT = Integer.parseInt(DEFAULT_PORT_VALUE);
   static final boolean DEFAULT_S3G_ENABLED =
@@ -71,10 +67,7 @@ public final class LocalOzoneClusterConfig {
       Boolean.parseBoolean(DEFAULT_EPHEMERAL_VALUE);
   static final Duration DEFAULT_STARTUP_TIMEOUT =
       Duration.parse(DEFAULT_STARTUP_TIMEOUT_VALUE);
-  // Printed for client setup, not enforced: with security off any credentials are accepted. The
-  // access key id still names the caller, so OMClientRequest records it as the request user and
-  // RpcClient stores it as the owner of buckets created through the gateway. Keeping one fixed
-  // value keeps that ownership stable across restarts.
+  // Printed for S3 clients; not checked while security is off.
   static final String LOCAL_S3_ACCESS_KEY = "admin";
   static final String LOCAL_S3_SECRET_KEY = "admin123";
   static final String LOCAL_S3_REGION = "us-east-1";
@@ -100,7 +93,8 @@ public final class LocalOzoneClusterConfig {
     formatMode = Objects.requireNonNull(builder.formatMode, "formatMode");
     datanodes = builder.datanodes;
     host = Objects.requireNonNull(builder.host, "host");
-    bindHost = Objects.requireNonNull(builder.bindHost, "bindHost");
+    // Defaults to host rather than WILDCARD_HOST: the local runtime runs without security by default.
+    bindHost = builder.bindHost != null ? builder.bindHost : host;
     scmPort = builder.scmPort;
     omPort = builder.omPort;
     s3gPort = builder.s3gPort;
@@ -240,7 +234,7 @@ public final class LocalOzoneClusterConfig {
     private FormatMode formatMode = DEFAULT_FORMAT_MODE;
     private int datanodes = DEFAULT_DATANODES;
     private String host = DEFAULT_HOST;
-    private String bindHost = DEFAULT_BIND_HOST;
+    private String bindHost;
     private int scmPort = DEFAULT_PORT;
     private int omPort = DEFAULT_PORT;
     private int s3gPort = DEFAULT_PORT;

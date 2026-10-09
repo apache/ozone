@@ -123,8 +123,6 @@ class TestOzoneLocal {
     assertTrue(text.contains("AWS_REGION=" + LocalOzoneClusterConfig.LOCAL_S3_REGION), text);
     assertTrue(text.contains("AWS_ENDPOINT_URL_S3=http://localhost:9878"), text);
     assertTrue(text.contains("aws configure set default.s3.addressing_style path"), text);
-    // The printed pair is an example, not a credential the gateway enforces. Saying so is what
-    // keeps a reader from treating the local endpoint as access-controlled.
     assertTrue(text.contains("accepts any credentials"), text);
     assertTrue(text.contains("Press Ctrl+C to stop."), text);
   }
@@ -169,8 +167,7 @@ class TestOzoneLocal {
     StubRuntime runtime = new StubRuntime("localhost", 9860, 9862, "");
     TestableRunCommand command = new TestableRunCommand(runtime);
     CommandLine commandLine = new CommandLine(command);
-    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8),
-        true));
+    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8), true));
 
     int exitCode = commandLine.execute("--no-s3g");
 
@@ -304,8 +301,8 @@ class TestOzoneLocal {
         LocalOzoneClusterConfig.DEFAULT_DATANODES_VALUE);
     assertEnvDefault("host", OzoneLocal.ENV_HOST,
         LocalOzoneClusterConfig.DEFAULT_HOST);
-    assertEnvDefault("bindHost", OzoneLocal.ENV_BIND_HOST,
-        LocalOzoneClusterConfig.DEFAULT_BIND_HOST);
+    assertEquals("${env:" + OzoneLocal.ENV_BIND_HOST + "}",
+        OzoneLocal.RunCommand.class.getDeclaredField("bindHost").getAnnotation(Option.class).defaultValue());
     assertEnvDefault("scmPort", OzoneLocal.ENV_SCM_PORT,
         LocalOzoneClusterConfig.DEFAULT_PORT_VALUE);
     assertEnvDefault("omPort", OzoneLocal.ENV_OM_PORT,
@@ -343,6 +340,11 @@ class TestOzoneLocal {
     assertFalse(config.isReconEnabled());
     assertFalse(config.isEphemeral());
     assertEquals(Duration.ofMinutes(2), config.getStartupTimeout());
+  }
+
+  @Test
+  void resolveConfigBindsToHostWithoutBindHost() {
+    assertEquals("cli-host", resolve("--host", "cli-host").getBindHost());
   }
 
   @Test
@@ -631,8 +633,6 @@ class TestOzoneLocal {
         return LocalOzoneClusterConfig.DEFAULT_DATANODES_VALUE;
       } else if ("--host".equals(option)) {
         return LocalOzoneClusterConfig.DEFAULT_HOST;
-      } else if ("--bind-host".equals(option)) {
-        return LocalOzoneClusterConfig.DEFAULT_BIND_HOST;
       } else if ("--scm-port".equals(option)
           || "--om-port".equals(option)
           || "--s3g-port".equals(option)) {
