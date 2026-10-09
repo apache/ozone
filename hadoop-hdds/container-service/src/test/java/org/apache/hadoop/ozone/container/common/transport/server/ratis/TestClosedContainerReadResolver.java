@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,8 +30,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroupId;
@@ -46,7 +49,7 @@ class TestClosedContainerReadResolver {
   private static final long CONTAINER_ID = 1L;
 
   private ContainerController containerController;
-  private Container<?> container;
+  private KeyValueContainerData containerData;
   private ClosedContainerReadResolver resolver;
   private String datanodeUuid;
 
@@ -56,22 +59,26 @@ class TestClosedContainerReadResolver {
     final DatanodeDetails datanode = mock(DatanodeDetails.class);
     when(datanode.getUuidString()).thenReturn(datanodeUuid);
     containerController = mock(ContainerController.class);
-    container = mock(Container.class);
+    containerData = new KeyValueContainerData(CONTAINER_ID, ContainerLayoutVersion.FILE_PER_BLOCK, 1L << 30,
+        UUID.randomUUID().toString(), datanodeUuid);
+    final Container<?> container = mock(Container.class);
+    doReturn(containerData).when(container).getContainerData();
     when(containerController.getContainer(CONTAINER_ID)).thenReturn(container);
     resolver = new ClosedContainerReadResolver(mock(ContainerDispatcher.class), containerController, datanode);
   }
 
-  @Test
-  void resolvesReadBlockForClosedContainer() throws IOException {
-    when(container.getContainerState()).thenReturn(State.CLOSED);
+  @ParameterizedTest
+  @EnumSource(mode = EnumSource.Mode.EXCLUDE, names = {"OPEN", "CLOSING"})
+  void resolvesReadBlockForContainerThatIsNotOpen(State state) throws IOException {
+    containerData.setState(state);
 
     assertNotNull(resolver.resolve(newRequest(Type.ReadBlock, datanodeUuid)));
   }
 
   @ParameterizedTest
-  @EnumSource(mode = EnumSource.Mode.EXCLUDE, names = "CLOSED")
-  void declinesReadBlockForContainerInOtherState(State state) throws IOException {
-    when(container.getContainerState()).thenReturn(state);
+  @EnumSource(names = {"OPEN", "CLOSING"})
+  void declinesReadBlockForOpenContainer(State state) throws IOException {
+    containerData.setState(state);
 
     assertNull(resolver.resolve(newRequest(Type.ReadBlock, datanodeUuid)));
   }
@@ -85,14 +92,14 @@ class TestClosedContainerReadResolver {
 
   @Test
   void declinesOtherCommandForClosedContainer() throws IOException {
-    when(container.getContainerState()).thenReturn(State.CLOSED);
+    containerData.setState(State.CLOSED);
 
     assertNull(resolver.resolve(newRequest(Type.GetBlock, datanodeUuid)));
   }
 
   @Test
   void declinesRequestForAnotherDatanode() throws IOException {
-    when(container.getContainerState()).thenReturn(State.CLOSED);
+    containerData.setState(State.CLOSED);
 
     assertNull(resolver.resolve(newRequest(Type.ReadBlock, UUID.randomUUID().toString())));
   }

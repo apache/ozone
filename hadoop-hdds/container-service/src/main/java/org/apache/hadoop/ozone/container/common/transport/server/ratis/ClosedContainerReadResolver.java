@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
-
 import java.io.IOException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -31,9 +29,9 @@ import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.server.api.DataStreamApi;
 
 /**
- * Serves ReadBlock on a Ratis read-only data stream for a closed container, without a Raft group.
- * SCM gives the read pipeline of a closed container a random ID, and no Raft group has this ID.
- * A closed container does not change, so this datanode can serve the read from its replica.
+ * Serves ReadBlock on a Ratis read-only data stream, without a Raft group, for a container that is not open or closing.
+ * SCM gives the read pipeline of such a container a random ID, and no Raft group has this ID.
+ * The container no longer changes through Raft, so this datanode can serve the read from its replica.
  */
 final class ClosedContainerReadResolver implements DataStreamApi.Resolver {
   private final ContainerDispatcher dispatcher;
@@ -48,8 +46,8 @@ final class ClosedContainerReadResolver implements DataStreamApi.Resolver {
   }
 
   /**
-   * @return the API to serve a ReadBlock of a closed container on this datanode. Otherwise, null: Ratis then serves
-   *     the request with its Raft group.
+   * @return the API to serve a ReadBlock of a container on this datanode that is not open or closing. Otherwise, null:
+   *     Ratis then serves the request with its Raft group.
    */
   @Override
   public DataStreamApi resolve(RaftClientRequest request) throws IOException {
@@ -61,7 +59,8 @@ final class ClosedContainerReadResolver implements DataStreamApi.Resolver {
     }
 
     final Container<?> container = containerController.getContainer(requestProto.getContainerID());
-    if (container == null || container.getContainerState() != CLOSED) {
+    // Like SCM, which keeps the pipeline with the Raft group for a container that is open or closing
+    if (container == null || container.getContainerData().isOpen() || container.getContainerData().isClosing()) {
       return null;
     }
     return (message, stream) -> ContainerStateMachine.streamReadBlock(dispatcher, requestProto, stream);
