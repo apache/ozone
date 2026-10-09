@@ -363,6 +363,7 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -635,7 +636,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
 
-    versionManager = new OMVersionManager(omStorage, this);
+    versionManager = new OMVersionManager(omStorage, this,
+        MetricUtil.metricsSourceComponent(configuration, "OM"));
 
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");

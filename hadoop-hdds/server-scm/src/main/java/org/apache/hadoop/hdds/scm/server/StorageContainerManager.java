@@ -709,7 +709,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       leaseManager = new LeaseManager<>(threadNamePrefix, timeDuration);
     }
 
-    versionManager = new ScmVersionManager(scmStorageConfig, this);
+    versionManager = new ScmVersionManager(scmStorageConfig, this,
+        MetricUtil.metricsSourceComponent(conf, "SCM"));
     finalizationManager = new FinalizationManagerImpl.Builder()
         .setHAManager(scmHAManager)
         .setFinalizationStore(scmMetadataStore.getMetaTable())

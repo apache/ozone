@@ -162,7 +162,7 @@ public class DatanodeStateMachine implements Closeable {
     storage = new DatanodeStorage(conf,
         datanodeDetails.getUuidString());
 
-    versionManager = new DatanodeVersionManager(storage, this);
+    versionManager = new DatanodeVersionManager(storage, this, metricsSourceComponent);
     VersionedDatanodeFeatures.initialize(versionManager);
 
     String threadNamePrefix = datanodeDetails.threadNamePrefix();
