@@ -91,7 +91,7 @@ public class TestKeyValueStreamDataChannel {
               .setContainerID(222).setLocalID(333).build()).build()))
       .setDatanodeUuid("datanodeId")
       .setContainerID(111L)
-      .setVersion(ClientVersion.CURRENT.toProtoValue())
+      .setVersion(ClientVersion.CURRENT.serialize())
       .build();
   static final int PUT_BLOCK_PROTO_SIZE = PUT_BLOCK_PROTO.toByteString().size();
 
@@ -129,6 +129,40 @@ public class TestKeyValueStreamDataChannel {
     }
     assertEquals(data.length, tempFile.length());
     assertArrayEquals(data, Files.readAllBytes(tempFile.toPath()));
+  }
+
+  @Test
+  public void testDrainBuffers() throws Exception {
+    File tempFile = File.createTempFile("test-kv-drain", ".tmp");
+    tempFile.deleteOnExit();
+    AtomicReference<ContainerCommandRequestProto> processed = new AtomicReference<>();
+    KeyValueStreamDataChannel channel = newChannel(tempFile, true, processed);
+    final byte[] data1 = RandomUtils.secure().randomBytes(50);
+    final byte[] data2 = RandomUtils.secure().randomBytes(30);
+    final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
+        PUT_BLOCK_PROTO, null).getContent().asReadOnlyByteBuffer();
+    final ByteBuffer protoLengthBuf = getProtoLength(putBlockBuf, PUT_BLOCK_REQUEST_LENGTH_MAX);
+
+    assertEquals(0, tempFile.length());
+    write(channel, data1);
+    // data1 is smaller than PUT_BLOCK_REQUEST_LENGTH_MAX, so it is still buffered
+    assertEquals(0, tempFile.length());
+    channel.drainBuffers();
+    assertEquals(data1.length, tempFile.length());
+    // draining empty buffers is a no-op
+    channel.drainBuffers();
+    assertEquals(data1.length, tempFile.length());
+
+    write(channel, data2);
+    write(channel, putBlockBuf.duplicate());
+    write(channel, protoLengthBuf.duplicate());
+    channel.close();
+
+    assertEquals(PUT_BLOCK_PROTO, processed.get());
+    final byte[] expected = new byte[data1.length + data2.length];
+    System.arraycopy(data1, 0, expected, 0, data1.length);
+    System.arraycopy(data2, 0, expected, data1.length, data2.length);
+    assertArrayEquals(expected, Files.readAllBytes(tempFile.toPath()));
   }
 
   @Test

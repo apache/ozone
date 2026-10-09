@@ -62,7 +62,7 @@ public class TestSCMContainerPlacementRandom {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto(),
+          UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
@@ -173,7 +173,7 @@ public class TestSCMContainerPlacementRandom {
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           MockDatanodeDetails.randomDatanodeDetails(),
           NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto(),
+          UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(

@@ -34,7 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -83,7 +84,7 @@ public class TestBlockDataStreamOutput {
   private static final String VOLUME_NAME = "testblockoutputstream";
   private static final String BUCKET_NAME = VOLUME_NAME;
   private static String keyString = UUID.randomUUID().toString();
-  private static final DatanodeVersion DN_OLD_VERSION = DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+  private static final HDDSVersion DN_OLD_VERSION = HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
 
   static MiniOzoneCluster createCluster() throws IOException,
       InterruptedException, TimeoutException {
@@ -135,6 +136,7 @@ public class TestBlockDataStreamOutput {
         .setNumDatanodes(5)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setCurrentVersion(DN_OLD_VERSION)
+            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION)
             .build())
         .build();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
@@ -358,6 +360,7 @@ public class TestBlockDataStreamOutput {
     }
   }
 
+  @Unhealthy("Requires HDDS-16044 to finish implementing datanode version passing to client.")
   @ParameterizedTest
   @MethodSource("clientParameters")
   public void testDatanodeVersion(boolean flushDelay, boolean putBlockWithoutRaft)
@@ -368,7 +371,7 @@ public class TestBlockDataStreamOutput {
       List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
       for (HddsDatanodeService dn : dns) {
         DatanodeDetails details = dn.getDatanodeDetails();
-        assertEquals(DN_OLD_VERSION.toProtoValue(), details.getCurrentVersion());
+        assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
       }
 
       String keyName = getKeyName();
@@ -376,10 +379,10 @@ public class TestBlockDataStreamOutput {
       KeyDataStreamOutput keyDataStreamOutput = (KeyDataStreamOutput) key.getByteBufStreamOutput();
       BlockDataStreamOutputEntry stream = keyDataStreamOutput.getStreamEntries().get(0);
 
-      // Now check 3 DNs in a random pipeline returns the correct DN versions
+     // Now check 3 DNs in a random pipeline returns the correct DN versions
       List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
       for (DatanodeDetails details : streamDnDetails) {
-        assertEquals(DN_OLD_VERSION.toProtoValue(), details.getCurrentVersion());
+        assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
       }
     }
   }

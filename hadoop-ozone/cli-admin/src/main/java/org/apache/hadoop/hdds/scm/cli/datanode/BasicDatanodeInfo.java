@@ -120,7 +120,7 @@ public final class BasicDatanodeInfo {
 
   @JsonProperty(index = 30)
   public int getCurrentVersion() {
-    return dn.getCurrentVersion();
+    return dn.getCurrentVersion().serialize();
   }
 
   @JsonProperty(index = 35)
