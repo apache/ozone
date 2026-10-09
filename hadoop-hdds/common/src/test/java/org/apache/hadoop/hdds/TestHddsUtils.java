@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HO
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.HddsUtils.processForLogging;
 import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddress;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddressConfig;
 import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedHost;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY;
@@ -435,5 +436,23 @@ public class TestHddsUtils {
   @ValueSource(strings = {"scm1.example.com", "192.0.2.1", "[2001:db8::1]:9860", "127.0.0.1:9860"})
   void validateAdvertisedAddressAcceptsReachableAddress(String value) {
     assertDoesNotThrow(() -> validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, value));
+  }
+
+  @Test
+  void validateAdvertisedAddressConfigSkipsUnsetProperty() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    assertDoesNotThrow(() -> validateAdvertisedAddressConfig(conf, OZONE_SCM_CLIENT_ADDRESS_KEY));
+  }
+
+  @Test
+  void validateAdvertisedAddressConfigChecksEveryListEntry() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_NAMES, "scm1.example.com,0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> validateAdvertisedAddressConfig(conf, OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_NAMES));
+
+    assertThat(e.getMessage()).contains(OZONE_SCM_NAMES).contains("0.0.0.0");
   }
 }
