@@ -2102,6 +2102,17 @@
   </property>
 
   <property>
+    <name>ozone.s3g.standard.storage-class.use-client-default</name>
+    <value>false</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      When true, a request with x-amz-storage-class STANDARD uses ozone.replication and
+      ozone.replication.type, if ozone.replication is set, instead of RATIS/THREE.
+      The ozone local runtime sets it to true.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.secret.http.enabled</name>
     <value>false</value>
     <tag>OZONE, S3GATEWAY</tag>
@@ -5359,7 +5370,12 @@
     <tag>OZONE, RATIS, OM</tag>
     <description>The maximum number of events that can be pending in OM Ratis.</description>
   </property>
-
+  <property>
+    <name>ozone.om.upgrade.finalization.check.interval</name>
+    <value>1m</value>
+    <tag>OM</tag>
+    <description>If OM is unfinalized, how frequently it should poll SCM to trigger finalization</description>
+  </property>
   <property>
     <name>ozone.lifecycle.service.enabled</name>
     <value>false</value>

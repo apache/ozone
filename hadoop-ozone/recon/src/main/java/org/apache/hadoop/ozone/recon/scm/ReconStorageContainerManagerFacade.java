@@ -99,10 +99,9 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReport;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
-import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -123,6 +122,8 @@ import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.ContainerSizeCountTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
@@ -149,7 +150,8 @@ public class ReconStorageContainerManagerFacade
   // This will hold the recon related information like health status and errors in initialization of modules if any,
   // which can later be used for alerts integration or displaying some meaningful info to user on Recon UI.
   private final ReconContext reconContext;
-  private final SCMStorageConfig scmStorageConfig;
+  private final ReconStorageConfig scmStorageConfig;
+  private final ScmVersionManager scmVersionManager;
   private final SCMNodeDetails reconNodeDetails;
   private final SCMHAManager scmhaManager;
   private final SequenceIdGenerator sequenceIdGen;
@@ -338,6 +340,7 @@ public class ReconStorageContainerManagerFacade
                                             ReconUtils reconUtils,
                                             ReconSafeModeManager safeModeManager,
                                             ReconContext reconContext,
+                                            ReconStorageConfig reconStorageConfig,
                                             DataSource dataSource,
                                             ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
                                             ContainerHealthSchemaManager containerHealthSchemaManager)
@@ -369,12 +372,14 @@ public class ReconStorageContainerManagerFacade
     conf.setLong(HDDS_SCM_CLIENT_FAILOVER_MAX_RETRY,
         scmClientFailOverMaxRetryCount);
 
-    this.scmStorageConfig = new ReconStorageConfig(conf, reconUtils);
+    this.scmStorageConfig = reconStorageConfig;
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     this.dbStore = DBStoreBuilder.createDBStore(ozoneConfiguration, ReconSCMDBDefinition.get());
 
-    HDDSLayoutVersionManager scmLayoutVersionManager =
-        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    // Use a version manager with no upgrade actions. The version will only be used to track Datanode versions,
+    // not run SCM specific reformatting on upgrade.
+    this.scmVersionManager = new ScmVersionManager(scmStorageConfig, this, HashMap::new,
+        MetricUtil.metricsSourceComponent(conf, "ReconSCM"));
     this.scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMDBTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(
@@ -383,7 +388,7 @@ public class ReconStorageContainerManagerFacade
     this.nodeManager =
         new ReconNodeManager(conf, scmStorageConfig, eventQueue, clusterMap,
             ReconSCMDBDefinition.NODES.getTable(dbStore),
-            scmLayoutVersionManager, reconContext);
+            scmVersionManager, reconContext);
     SCMContainerPlacementMetrics placementMetrics = SCMContainerPlacementMetrics.create();
     PlacementPolicy containerPlacementPolicy = ContainerPlacementPolicyFactory.getPolicy(conf, nodeManager,
         clusterMap, true, placementMetrics);
@@ -1097,5 +1102,9 @@ public class ReconStorageContainerManagerFacade
 
   public DataSource getDataSource() {
     return dataSource;
+  }
+
+  public void finalizeScmVersionUpgrade() throws UpgradeException {
+    scmVersionManager.finalizeUpgrade();
   }
 }

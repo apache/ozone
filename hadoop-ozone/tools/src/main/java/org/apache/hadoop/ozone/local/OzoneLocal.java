@@ -74,8 +74,7 @@ public class OzoneLocal extends GenericCli {
       + "}";
   private static final String DEFAULT_HOST_VALUE = "${env:" + ENV_HOST
       + ":-" + LocalOzoneClusterConfig.DEFAULT_HOST + "}";
-  private static final String DEFAULT_BIND_HOST_VALUE = "${env:"
-      + ENV_BIND_HOST + ":-" + LocalOzoneClusterConfig.DEFAULT_BIND_HOST + "}";
+  private static final String DEFAULT_BIND_HOST_VALUE = "${env:" + ENV_BIND_HOST + "}";
   private static final String DEFAULT_SCM_PORT_VALUE = "${env:"
       + ENV_SCM_PORT + ":-" + LocalOzoneClusterConfig.DEFAULT_PORT_VALUE
       + "}";
@@ -185,7 +184,7 @@ public class OzoneLocal extends GenericCli {
 
     @Option(names = "--bind-host",
         defaultValue = DEFAULT_BIND_HOST_VALUE,
-        description = "Bind host for HTTP and RPC listeners (use 0.0.0.0 to listen on all interfaces)")
+        description = "Bind host for HTTP and RPC listeners (default: --host)")
     private String bindHost;
 
     @Option(names = "--scm-port",
@@ -272,8 +271,7 @@ public class OzoneLocal extends GenericCli {
         writer.println("AWS_REGION=" + LocalOzoneClusterConfig.LOCAL_S3_REGION);
         writer.println("AWS_ENDPOINT_URL_S3=" + runtime.getS3Endpoint());
         writer.println("Use path-style addressing (AWS CLI: aws configure set default.s3.addressing_style path).");
-        writer.println("Local Ozone runs without security, so the S3 Gateway accepts any credentials;");
-        writer.println("the access key id is the identity buckets are created under.");
+        writer.println("With security off (the default), the S3 Gateway accepts any credentials.");
       }
       if (config.isReconEnabled()) {
         writer.println("Recon endpoint: " + runtime.getReconEndpoint());

@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
@@ -51,7 +50,7 @@ import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.report.ReportManager;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CloseContainerCommandHandler;
@@ -60,7 +59,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Comm
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.CreatePipelineCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteContainerCommandHandler;
-import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeNewLayoutVersionCommandHandler;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.FinalizeVersionCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconcileContainerCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.ReconstructECContainersCommandHandler;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.RefreshVolumeUsageCommandHandler;
@@ -78,11 +77,9 @@ import org.apache.hadoop.ozone.container.replication.PushReplicator;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationSupervisorMetrics;
-import org.apache.hadoop.ozone.container.upgrade.DataNodeUpgradeFinalizer;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
 import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.ExitUtils;
@@ -114,9 +111,8 @@ public class DatanodeStateMachine implements Closeable {
 
   private final HddsDatanodeStopService hddsDatanodeStopService;
 
-  private final HDDSLayoutVersionManager layoutVersionManager;
-  private final DatanodeLayoutStorage layoutStorage;
-  private final DataNodeUpgradeFinalizer upgradeFinalizer;
+  private final DatanodeVersionManager versionManager;
+  private final DatanodeStorage storage;
 
   /**
    * Used to synchronize to the OzoneContainer object created in the
@@ -163,13 +159,11 @@ public class DatanodeStateMachine implements Closeable {
 
     Clock clock = Clock.system(ZoneId.systemDefault());
     // Expected to be initialized already.
-    layoutStorage = new DatanodeLayoutStorage(conf,
+    storage = new DatanodeStorage(conf,
         datanodeDetails.getUuidString());
 
-    layoutVersionManager = new HDDSLayoutVersionManager(
-        layoutStorage.getLayoutVersion(), metricsSourceComponent);
-    upgradeFinalizer = new DataNodeUpgradeFinalizer(layoutVersionManager);
-    VersionedDatanodeFeatures.initialize(layoutVersionManager);
+    versionManager = new DatanodeVersionManager(storage, this, metricsSourceComponent);
+    VersionedDatanodeFeatures.initialize(versionManager);
 
     String threadNamePrefix = datanodeDetails.threadNamePrefix();
     executorService = Executors.newFixedThreadPool(
@@ -270,7 +264,7 @@ public class DatanodeStateMachine implements Closeable {
             closePipelineCommandExecutorService))
         .addHandler(new CreatePipelineCommandHandler(conf,
             createPipelineCommandExecutorService))
-        .addHandler(new FinalizeNewLayoutVersionCommandHandler())
+        .addHandler(new FinalizeVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
         .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient));
 
@@ -461,8 +455,8 @@ public class DatanodeStateMachine implements Closeable {
     if (cmdProcessThread != null) {
       cmdProcessThread.interrupt();
     }
-    if (layoutVersionManager != null) {
-      layoutVersionManager.close();
+    if (versionManager != null) {
+      versionManager.close();
     }
     context.setState(DatanodeStates.getLastState());
     replicationSupervisorMetrics.unRegister();
@@ -754,29 +748,13 @@ public class DatanodeStateMachine implements Closeable {
     return supervisor;
   }
 
-  @VisibleForTesting
-  public HDDSLayoutVersionManager getLayoutVersionManager() {
-    return layoutVersionManager;
+  public DatanodeVersionManager getVersionManager() {
+    return versionManager;
   }
 
   @VisibleForTesting
-  public DatanodeLayoutStorage getLayoutStorage() {
-    return layoutStorage;
-  }
-
-  public StatusAndMessages finalizeUpgrade()
-      throws IOException {
-    return upgradeFinalizer.finalize(datanodeDetails.getUuidString(), this);
-  }
-
-  public StatusAndMessages queryUpgradeStatus()
-      throws IOException {
-    return upgradeFinalizer.reportStatus(datanodeDetails.getUuidString(),
-        true);
-  }
-
-  public UpgradeFinalizer<DatanodeStateMachine> getUpgradeFinalizer() {
-    return upgradeFinalizer;
+  public DatanodeStorage getStorage() {
+    return storage;
   }
 
   public ConfigurationSource getConf() {

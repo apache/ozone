@@ -726,6 +726,11 @@ public class BasicOzoneFileSystem extends FileSystem {
   }
 
   @Override
+  public void setVerifyChecksum(boolean verifyChecksum) {
+    adapter.setVerifyChecksum(verifyChecksum);
+  }
+
+  @Override
   public void setWorkingDirectory(Path newDir) {
     workingDir = newDir;
   }

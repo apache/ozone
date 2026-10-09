@@ -17,47 +17,34 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
+import static org.apache.hadoop.hdds.upgrade.HddsUpgradeTestUtils.waitForScmToFinalize;
+import static org.apache.hadoop.hdds.upgrade.HddsUpgradeTestUtils.waitForScmsToFinalize;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.stream.Stream;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationStateManagerImpl;
-import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
+import org.apache.hadoop.hdds.utils.HAUtils;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
-import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
-import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor.UpgradeTestInjectionPoints;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
-import org.apache.hadoop.ozone.upgrade.UpgradeTestUtils;
+import org.apache.hadoop.ozone.container.common.states.endpoint.RegisterEndpointTask;
+import org.apache.hadoop.ozone.upgrade.RatisBasedVersionManager;
+import org.apache.hadoop.util.ExitUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,28 +53,22 @@ import org.slf4j.LoggerFactory;
  * HA.
  */
 public class TestScmHAFinalization {
-  private static final String CLIENT_ID = UUID.randomUUID().toString();
   private static final Logger LOG =
       LoggerFactory.getLogger(TestScmHAFinalization.class);
-  private static final String METHOD_SOURCE =
-      "org.apache.hadoop.hdds.upgrade" +
-          ".TestScmHAFinalization#injectionPointsToTest";
 
   private StorageContainerLocationProtocol scmClient;
+  private ScmBlockLocationProtocol scmBlockClient;
   private MiniOzoneHAClusterImpl cluster;
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;
-  private Future<?> finalizationFuture;
 
-  public void init(OzoneConfiguration conf,
-      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor,
-      int numInactiveSCMs) throws Exception {
+  public void init(OzoneConfiguration conf, int numInactiveSCMs) throws Exception {
 
     SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setUpgradeFinalizationExecutor(executor);
 
-    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
+    conf.setInt(SCMStorageConfig.TESTING_INIT_APPARENT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.serialize());
     conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT, "5s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT, "1s");
 
     MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf);
     clusterBuilder.setNumOfStorageContainerManagers(NUM_SCMS)
@@ -97,26 +78,13 @@ public class TestScmHAFinalization {
         .setSCMConfigurator(configurator)
         .setNumDatanodes(NUM_DATANODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+            .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION)
             .build());
     this.cluster = clusterBuilder.build();
 
     scmClient = cluster.getStorageContainerLocationClient();
+    scmBlockClient = HAUtils.getScmBlockClient(cluster.getConf());
     cluster.waitForClusterToBeReady();
-
-    // Launch finalization from the client. In the current implementation,
-    // this call will block until finalization completes. If the test
-    // involves restarts or leader changes the client may be disconnected,
-    // but finalization should still proceed.
-    finalizationFuture = Executors.newSingleThreadExecutor().submit(
-        () -> {
-          try {
-            scmClient.finalizeScmUpgrade(CLIENT_ID);
-          } catch (IOException ex) {
-            LOG.info("finalization client failed. This may be expected if the" +
-                " test injected failures.", ex);
-          }
-        });
   }
 
   @AfterEach
@@ -126,118 +94,54 @@ public class TestScmHAFinalization {
     }
   }
 
-  /**
-   * Argument supplier for parameterized tests.
-   */
-  public static Stream<Arguments> injectionPointsToTest() {
-    // Do not test from BEFORE_PRE_FINALIZE_UPGRADE injection point.
-    // Finalization will not have started so there will be no persisted state
-    // to resume from.
-    return Stream.of(
-        Arguments.of(UpgradeTestInjectionPoints.AFTER_PRE_FINALIZE_UPGRADE),
-        Arguments.of(UpgradeTestInjectionPoints.AFTER_COMPLETE_FINALIZATION),
-        Arguments.of(UpgradeTestInjectionPoints.AFTER_POST_FINALIZE_UPGRADE)
-    );
-  }
+  @Test
+  public void testFinalizedDatanodesShutDownWithPrefinalizedScm() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(SCMStorageConfig.TESTING_INIT_APPARENT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.serialize());
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT, "5s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT, "1s");
 
-  @ParameterizedTest
-  @MethodSource(METHOD_SOURCE)
-  public void testFinalizationWithLeaderChange(
-      UpgradeTestInjectionPoints haltingPoint) throws Exception {
+    MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf);
+    clusterBuilder.setNumOfStorageContainerManagers(NUM_SCMS)
+        .setNumOfActiveSCMs(NUM_SCMS)
+        .setSCMServiceId("scmservice")
+        .setNumOfOzoneManagers(1)
+        .setNumDatanodes(NUM_DATANODES)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION)
+            .build());
 
-    CountDownLatch pauseLatch = new CountDownLatch(1);
-    CountDownLatch unpauseLatch = new CountDownLatch(1);
-    init(new OzoneConfiguration(),
-        UpgradeTestUtils.newPausingFinalizationExecutor(haltingPoint,
-            pauseLatch, unpauseLatch, LOG), 0);
-    pauseLatch.await();
+    // Prevent terminateDatanode() from calling System.exit(1) and killing the test JVM.
+    ExitUtil.disableSystemExit();
+    LogCapturer logCapture = LogCapturer.captureLogs(RegisterEndpointTask.class);
+    // This starts the mini ozone cluster.
+    cluster = clusterBuilder.build();
 
-    // Stop the leader, forcing a leader change in the middle of finalization.
-    // This will cause the initial client call for finalization
-    // to be interrupted.
-    StorageContainerManager oldLeaderScm = cluster.getActiveSCM();
-    LOG.info("Stopping current SCM leader {} to initiate a leader change.",
-        oldLeaderScm.getSCMNodeId());
-    cluster.shutdownStorageContainerManager(oldLeaderScm);
+    // isStopped cannot be set to true unless a datanode was started first.
+    // Each datanode should be rejected since its apparent version exceeds the pre-finalized SCM's.
+    GenericTestUtils.waitFor(
+        () -> cluster.getHddsDatanodes().stream().allMatch(HddsDatanodeService::isStopped),
+        500, 30_000);
 
-    // Wait for the remaining two SCMs to elect a new leader.
-    cluster.waitForClusterToBeReady();
-
-    // While finalization is paused, check its state on the remaining SCMs.
-    checkMidFinalizationConditions(haltingPoint,
-        cluster.getStorageContainerManagersList());
-
-    // Restart actually creates a new SCM.
-    // Since this SCM will be a follower, the implementation of its upgrade
-    // finalization executor does not matter for this test.
-    cluster.restartStorageContainerManager(oldLeaderScm, true);
-
-    // Make sure the original SCM leader is not the leader anymore.
-    StorageContainerManager newLeaderScm  = cluster.getActiveSCM();
-    assertNotEquals(newLeaderScm.getSCMNodeId(),
-        oldLeaderScm.getSCMNodeId());
-
-    // Resume finalization from the new leader.
-    unpauseLatch.countDown();
-
-    // Client should complete exceptionally since the original SCM it
-    // requested to was restarted.
-    finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
-    // Make sure old leader has caught up and all SCMs have finalized.
-    waitForScmsToFinalize(cluster.getStorageContainerManagersList());
-
-    HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
-    HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), 0, CLOSED);
-  }
-
-  @ParameterizedTest
-  @MethodSource(METHOD_SOURCE)
-  @Flaky("HDDS-8714")
-  public void testFinalizationWithRestart(
-      UpgradeTestInjectionPoints haltingPoint) throws Exception {
-    CountDownLatch terminateLatch = new CountDownLatch(1);
-    init(new OzoneConfiguration(),
-        UpgradeTestUtils.newTerminatingFinalizationExecutor(haltingPoint,
-            terminateLatch, LOG),
-        0);
-    terminateLatch.await();
-
-    // Once upgrade finalization is stopped at the halting point, restart all
-    // SCMs.
-    LOG.info("Restarting all SCMs during upgrade finalization.");
-    // Restarting an SCM from mini ozone actually replaces the SCM with a new
-    // instance. We will use the normal upgrade finalization executor for
-    // these new instances, since the last one aborted at the halting point.
-    cluster.getSCMConfigurator()
-        .setUpgradeFinalizationExecutor(
-            new DefaultUpgradeFinalizationExecutor<>());
-    List<StorageContainerManager> originalSCMs =
-        cluster.getStorageContainerManagers();
-
-    for (StorageContainerManager scm: originalSCMs) {
-      cluster.restartStorageContainerManager(scm, false);
+    assertThat(logCapture.getOutput()).contains("SCM rejected this datanode's registration");
+    for (StorageContainerManager scm : cluster.getStorageContainerManagersList()) {
+      assertThat(scm.getScmNodeManager().getAllNodes()).isEmpty();
     }
+  }
 
-    checkMidFinalizationConditions(haltingPoint,
-        cluster.getStorageContainerManagersList());
-
-    // After all SCMs were restarted, finalization should resume
-    // automatically once a leader is elected.
-    cluster.waitForClusterToBeReady();
-
-    finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
-    // Once the leader tells the client finalization is complete, wait for all
-    // followers to catch up so we can check their state.
+  @Test
+  public void testFinalization() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    init(conf, 0);
+    scmBlockClient.finalizeUpgrade();
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmBlockClient);
+    // Ensure all SCMs finalize, indicating the message has been propagated across them all
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
     HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
+        cluster.getStorageContainerManagersList(), 0);
     HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), 0, CLOSED);
+        cluster.getHddsDatanodes(), 0);
   }
 
   @Test
@@ -250,9 +154,9 @@ public class TestScmHAFinalization {
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD,
         5);
 
-    init(conf, new DefaultUpgradeFinalizationExecutor<>(), numInactiveSCMs);
+    init(conf, numInactiveSCMs);
 
-    LogCapturer logCapture = LogCapturer.captureLogs(FinalizationStateManagerImpl.class);
+    LogCapturer logCapture = LogCapturer.captureLogs(RatisBasedVersionManager.class);
 
     StorageContainerManager inactiveScm = cluster.getInactiveSCM().next();
     LOG.info("Inactive SCM node ID: {}", inactiveScm.getSCMNodeId());
@@ -267,15 +171,16 @@ public class TestScmHAFinalization {
     }
 
     // Wait for finalization from the client perspective.
-    finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    // Force finalize skips the peer version checks that require all peers to be active.
+    scmBlockClient.forceFinalizeUpgrade();
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmBlockClient);
     // Wait for two running SCMs to finish finalization.
     waitForScmsToFinalize(activeScms);
 
     HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
-        activeScms, 0, NUM_DATANODES);
+        activeScms, 0);
     HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), 0, CLOSED);
+        cluster.getHddsDatanodes(), 0);
 
     // Move SCM log index farther ahead to make sure a snapshot install
     // happens on the restarted SCM.
@@ -288,90 +193,16 @@ public class TestScmHAFinalization {
     }
 
     cluster.startInactiveSCM(inactiveScm.getSCMNodeId());
-    waitForScmToFinalize(inactiveScm);
+    LOG.info("Waiting for restarted SCM to finalize");
+    // When the leader sends a snapshot to the follower, it should have flushed all entries to the DB, including the
+    // apparent versin. This means the follower should see it in the DB it receives immediately to trigger finalization.
+    waitForScmToFinalize(inactiveScm, true);
 
     HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
-        inactiveScm, 0, NUM_DATANODES);
+        inactiveScm, 0);
 
     // Use log to verify a snapshot was installed.
-    assertThat(logCapture.getOutput()).contains("New SCM snapshot " +
-        "received with metadata layout version");
-  }
-
-  private void waitForScmsToFinalize(Collection<StorageContainerManager> scms)
-      throws Exception {
-    for (StorageContainerManager scm: scms) {
-      waitForScmToFinalize(scm);
-    }
-  }
-
-  private void waitForScmToFinalize(StorageContainerManager scm)
-      throws Exception {
-    GenericTestUtils.waitFor(() -> !scm.isInSafeMode(), 500, 5000);
-    GenericTestUtils.waitFor(() -> {
-      FinalizationCheckpoint checkpoint =
-          scm.getScmContext().getFinalizationCheckpoint();
-      LOG.info("Waiting for SCM {} (leader? {}) to finalize. Current " +
-          "finalization checkpoint is {}",
-          scm.getSCMNodeId(), scm.checkLeader(), checkpoint);
-      return checkpoint.hasCrossed(
-          FinalizationCheckpoint.FINALIZATION_COMPLETE);
-    }, 2_000, 60_000);
-  }
-
-  private void checkMidFinalizationConditions(
-      UpgradeTestInjectionPoints haltingPoint,
-      List<StorageContainerManager> scms) {
-
-    // Ratis only makes sure that the Leader has processed the finalization,
-    // the followers might have this in the Raft Log and not yet processed it.
-    switch (haltingPoint) {
-    case BEFORE_PRE_FINALIZE_UPGRADE:
-      // At least one node (leader) should be in the FINALIZATION_REQUIRED stage.
-      assertTrue(scms.stream().anyMatch(scm ->
-          scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_REQUIRED));
-      // Pipeline creation should not be frozen at this point, even on leader.
-      assertTrue(scms.stream().noneMatch(scm ->
-          scm.getPipelineManager().isPipelineCreationFrozen()));
-      break;
-    case AFTER_PRE_FINALIZE_UPGRADE:
-      // At least one node (leader) should be in the FINALIZATION_STARTED stage.
-      assertTrue(scms.stream().anyMatch(scm ->
-          scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_STARTED));
-      // Pipeline creation should be frozen on nodes where the finalization checkpoint is FINALIZATION_STARTED,
-      // this should include the leader SCM.
-      assertTrue(scms.stream()
-          .filter(scm ->
-              scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_STARTED)
-          .allMatch(scm ->
-              scm.getPipelineManager().isPipelineCreationFrozen()));
-      break;
-    case AFTER_COMPLETE_FINALIZATION:
-      // At least one node (leader) should be in the MLV_EQUALS_SLV stage.
-      assertTrue(scms.stream().anyMatch(scm ->
-          scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.MLV_EQUALS_SLV));
-      // Pipeline creation should not be frozen on nodes where the finalization checkpoint is MLV_EQUALS_SLV,
-      // this should include the leader SCM.
-      assertTrue(scms.stream()
-          .filter(scm ->
-              scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.MLV_EQUALS_SLV)
-          .noneMatch(scm ->
-              scm.getPipelineManager().isPipelineCreationFrozen()));
-      break;
-    case AFTER_POST_FINALIZE_UPGRADE:
-      // At least one node (leader) should be in the FINALIZATION_COMPLETE stage.
-      assertTrue(scms.stream().anyMatch(scm ->
-          scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_COMPLETE));
-      // Pipeline creation should not be frozen on nodes where the finalization checkpoint is FINALIZATION_COMPLETE,
-      // this should include the leader SCM.
-      assertTrue(scms.stream()
-          .filter(scm ->
-              scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_COMPLETE)
-          .noneMatch(scm ->
-              scm.getPipelineManager().isPipelineCreationFrozen()));
-      break;
-    default:
-      fail("Unknown halting point in test: " + haltingPoint);
-    }
+    assertThat(logCapture.getOutput()).contains("New snapshot received with higher apparent version " +
+        HDDSVersion.SOFTWARE_VERSION + ". Attempting to finalize to that version.");
   }
 }

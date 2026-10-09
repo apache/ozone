@@ -61,6 +61,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATAS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_BASEDIR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_POLICY_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_POLICY_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
@@ -89,6 +91,7 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_BIN
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ENABLED_KEY;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTPS_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY;
@@ -132,6 +135,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -145,6 +149,7 @@ import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.ozone.recon.ReconSqlDbConfig;
 import org.apache.hadoop.ozone.s3.Gateway;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -306,7 +311,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     configureLocalDefaults(conf);
 
     PersistedPortState persistedPorts = loadPersistedPortState();
-    PortAllocator portAllocator = new PortAllocator();
+    PortAllocator portAllocator = new PortAllocator(persistedPorts.ports());
     int scmPort = configureScm(conf, persistedPorts, portAllocator);
     int omPort = configureOm(conf, persistedPorts, portAllocator);
     int s3gPort = configureS3Gateway(conf, persistedPorts, portAllocator);
@@ -317,8 +322,8 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     prepareStorageLayout();
     createServiceDirectories();
     persistedPorts.store();
-    preparedConfiguration = new PreparedConfiguration(conf, scmPort, omPort,
-        s3gPort, reconPort, datanodeConfigurations);
+    preparedConfiguration = new PreparedConfiguration(conf, scmPort, omPort, s3gPort, reconPort,
+        datanodeConfigurations);
     return preparedConfiguration;
   }
 
@@ -354,14 +359,10 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   @Override
   public String getS3Endpoint() {
     int port = getS3gPort();
-    return port > 0 ? "http://" + getDisplayHost() + ":" + port : "";
+    return port > 0 ? "http://" + address(getDisplayHost(), port) : "";
   }
 
-  /**
-   * Returns the address the S3 Gateway HTTP listener is bound to, or null when there is none to
-   * report: {@code BaseHttpServer} assigns an address only for a server it enables. Keyed off the
-   * field rather than {@code isS3gEnabled()}, which says what was asked for, not what is running.
-   */
+  /** Returns the bound S3 Gateway HTTP address, or null when the S3 Gateway is not running. */
   InetSocketAddress getS3gBoundAddress() {
     return s3Gateway != null ? s3Gateway.getHttpAddress() : null;
   }
@@ -464,7 +465,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
 
   private void configureLocalDefaults(OzoneConfiguration conf) throws IOException {
     conf.set(OZONE_METADATA_DIRS, metadataDir().toString());
-    // SCM, OM, and the S3 Gateway share one configuration and JVM, so the Jetty base dir is a
+    // SCM and OM share one configuration and JVM, so the Jetty base dir is a
     // single service-neutral location; Jetty keeps per-context temp dirs.
     conf.setIfUnset(OZONE_HTTP_BASEDIR, metadataDir() + SERVER_DIR);
     setLocalOverrideReplication(conf, OZONE_REPLICATION, ReplicationFactor.ONE);
@@ -708,37 +709,33 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
         omMetadataDir.toString());
   }
 
-  private int configureS3Gateway(OzoneConfiguration conf,
-      PersistedPortState persistedPorts, PortAllocator portAllocator)
-      throws IOException {
+  private int configureS3Gateway(OzoneConfiguration conf, PersistedPortState persistedPorts,
+      PortAllocator portAllocator) throws IOException {
     if (!config.isS3gEnabled()) {
       return -1;
     }
-    // The runtime advertises an http:// endpoint and reads the bound port back off this
-    // listener, so a configuration that switches it off leaves nothing to report.
+    // getS3Endpoint() advertises the HTTP listener, which a policy without HTTP leaves unbound.
+    HttpConfig.Policy httpPolicy =
+        HttpConfig.Policy.fromString(conf.get(OZONE_HTTP_POLICY_KEY, OZONE_HTTP_POLICY_DEFAULT));
+    if (httpPolicy != null && !httpPolicy.isHttpEnabled()) {
+      rejectUserConfigured(conf, OZONE_HTTP_POLICY_KEY, "HTTP_ONLY or HTTP_AND_HTTPS");
+    }
+    // getS3gPort() reads the port back off this listener.
     setLocalOverride(conf, OZONE_S3G_HTTP_ENABLED_KEY, true);
+    // S3StorageType maps an explicit STANDARD to RATIS/THREE regardless of the local STAND_ALONE/ONE replication.
+    setLocalOverride(conf, OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY, true);
 
-    int s3gHttpPort = reservePort(portAllocator, persistedPorts,
-        S3G_HTTP_PORT_KEY, config.getS3gPort());
-    int s3gWebHttpPort = reservePort(portAllocator, persistedPorts,
-        S3G_WEBADMIN_HTTP_PORT_KEY, 0);
-    // Port 0, not a reservation: the local runtime runs the default HTTP-only policy, so these
-    // connectors never bind, and a port reserved for a listener that never claims it is a window
-    // for another process rather than a stable endpoint.
-    int s3gHttpsPort = 0;
-    int s3gWebHttpsPort = 0;
+    int s3gHttpPort = reservePort(portAllocator, persistedPorts, S3G_HTTP_PORT_KEY, config.getS3gPort());
+    int s3gWebHttpPort = reservePort(portAllocator, persistedPorts, S3G_WEBADMIN_HTTP_PORT_KEY, 0);
 
-    conf.set(OZONE_S3G_HTTP_ADDRESS_KEY,
-        address(config.getHost(), s3gHttpPort));
+    // HTTPS addresses stay on port 0: the printed endpoint is HTTP, so HTTPS needs no stable port.
+    conf.set(OZONE_S3G_HTTP_ADDRESS_KEY, address(config.getHost(), s3gHttpPort));
     conf.set(OZONE_S3G_HTTP_BIND_HOST_KEY, config.getBindHost());
-    conf.set(OZONE_S3G_HTTPS_ADDRESS_KEY,
-        address(config.getHost(), s3gHttpsPort));
+    conf.set(OZONE_S3G_HTTPS_ADDRESS_KEY, address(config.getHost(), 0));
     conf.set(OZONE_S3G_HTTPS_BIND_HOST_KEY, config.getBindHost());
-    conf.set(OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY,
-        address(config.getHost(), s3gWebHttpPort));
+    conf.set(OZONE_S3G_WEBADMIN_HTTP_ADDRESS_KEY, address(config.getHost(), s3gWebHttpPort));
     conf.set(OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY, config.getBindHost());
-    conf.set(OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY,
-        address(config.getHost(), s3gWebHttpsPort));
+    conf.set(OZONE_S3G_WEBADMIN_HTTPS_ADDRESS_KEY, address(config.getHost(), 0));
     conf.set(OZONE_S3G_WEBADMIN_HTTPS_BIND_HOST_KEY, config.getBindHost());
     return s3gHttpPort;
   }
@@ -939,19 +936,15 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   }
 
   private void startS3Gateway(OzoneConfiguration conf) throws Exception {
-    // Gateway reads its configuration from the static holder, and the reset is what lets a second
-    // in-JVM start win: setConfiguration() keeps the first value. Same pair as S3GatewayService.
+    // Gateway reads the static holder; setConfiguration() keeps the first value.
     OzoneConfigurationHolder.resetConfiguration();
     OzoneConfigurationHolder.setConfiguration(new OzoneConfiguration(conf));
-    Gateway gateway = new Gateway();
-    // Start through call(), not execute(): GenericCli's execution-exception handler reduces the
-    // startup failure cause to a bare exit code and can even System.exit the JVM on an
-    // AccessControlException. parseArgs() primes the picocli state that Gateway.start() reads.
-    gateway.getCmd().parseArgs();
-    // call() returns only after Jetty has bound the gateway's ports and serves requests, so no
-    // readiness poll follows.
-    executeWithinStartupTimeout("S3 Gateway", gateway::call, gateway::stop, config.getStartupTimeout());
-    s3Gateway = gateway;
+    // Assigned first so start()'s stopServices() rollback stops a failed call().
+    s3Gateway = new Gateway();
+    // call(), not execute(): GenericCli#printError drops the cause and can exit the JVM.
+    // parseArgs() sets the parse result Gateway#start reads.
+    s3Gateway.getCmd().parseArgs();
+    s3Gateway.call();
   }
 
   /**
@@ -1339,6 +1332,17 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
    */
   static final class PortAllocator {
     private final Set<Integer> reserved = new HashSet<>();
+    private final Set<Integer> persisted;
+    private final CheckedSupplier<Integer, IOException> freePorts;
+
+    PortAllocator(Set<Integer> persisted) {
+      this(persisted, PortAllocator::nextFreePort);
+    }
+
+    PortAllocator(Set<Integer> persisted, CheckedSupplier<Integer, IOException> freePorts) {
+      this.persisted = persisted;
+      this.freePorts = freePorts;
+    }
 
     int reserve(int preferredPort) throws IOException {
       if (preferredPort > 0) {
@@ -1346,8 +1350,9 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       }
 
       while (true) {
-        int candidate = nextFreePort();
-        if (reserved.add(candidate)) {
+        int candidate = freePorts.get();
+        // A persisted port is free while the cluster is down, but its key may reserve it later in this run.
+        if (!persisted.contains(candidate) && reserved.add(candidate)) {
           return candidate;
         }
       }
@@ -1422,6 +1427,14 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       } catch (NumberFormatException ex) {
         throw invalidPortValue(key, value);
       }
+    }
+
+    Set<Integer> ports() throws IOException {
+      Set<Integer> ports = new HashSet<>();
+      for (String key : properties.stringPropertyNames()) {
+        ports.add(get(key));
+      }
+      return ports;
     }
 
     void requireKeys(String[] keys) throws IOException {
