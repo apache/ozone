@@ -337,7 +337,7 @@ Per-boundary input trust (grouped by family):
   ideally, encrypt them on disk. *(maintainer — jojochuang, 2026-06-25.)*
 - **Isolate the KMS** in a separate, firewalled network segment. *(maintainer —
   jojochuang, 2026-06-25.)*
-- **Bound client load:** set namespace and space quotas, enable the RPC `FairCallQueue` on the OM (for S3 traffic it needs the Ozone identity provider), and put rate limiting in front of an internet-facing S3 Gateway. Ozone does not promise to withstand load by volume (§9).
+- **Bound client load:** set namespace and space quotas, enable the RPC `FairCallQueue` on the OM (for S3 traffic it needs the Ozone identity provider, and it applies only when S3 Gateway reaches the OM over Hadoop RPC, the default `ozone.om.transport.class`, not over gRPC), and put rate limiting in front of an internet-facing S3 Gateway. Ozone does not promise to withstand load by volume (§9).
 - **Client side:** treat data read from Ozone per your own trust needs; protect
   delegation tokens your app caches.
 
