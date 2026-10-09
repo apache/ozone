@@ -43,13 +43,13 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
@@ -57,7 +57,7 @@ import org.junit.jupiter.api.Test;
  * Test class for delete Lifecycle configuration request.
  */
 public class TestOMLifecycleConfigurationDeleteRequest extends
-    TestOMLifecycleConfigurationRequest {
+    OMLifecycleConfigurationRequestTestBase {
   @Test
   public void testPreExecute() throws Exception {
     OMRequest omRequest = createDeleteLifecycleConfigurationRequest(
@@ -170,9 +170,7 @@ public class TestOMLifecycleConfigurationDeleteRequest extends
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
-    when(versionManager.isAllowed(OMLayoutFeature.S3_LIFECYCLE_SUPPORT)).thenReturn(false);
-
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager();
     ValidationContext ctx = of(versionManager, omMetadataManager);
     OMRequest request = createDeleteLifecycleConfigurationRequest(volumeName, bucketName);
 
@@ -286,9 +284,7 @@ public class TestOMLifecycleConfigurationDeleteRequest extends
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
 
-    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
-    when(versionManager.isAllowed(OMLayoutFeature.S3_LIFECYCLE_SUPPORT)).thenReturn(true);
-
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
     ValidationContext ctx = of(versionManager, omMetadataManager);
     OMRequest request = createDeleteLifecycleConfigurationRequest(volumeName, bucketName);
 

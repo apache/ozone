@@ -74,6 +74,19 @@ public final class OmKeyInfo extends WithParentObjectId
   // name of key client specified
   private String keyName;
   private long dataSize;
+  /**
+   * Block locations of the key, one group per key version. When bucket versioning is enabled, an overwrite adds a
+   * group and keeps the earlier groups. Otherwise, it discards the existing groups and leaves the key with a single
+   * group.
+   * <p>
+   * For a committed key with multiple groups, {@code dataSize} contains only the size of the latest version. To account
+   * for all retained versions, callers must walk every group and use
+   * {@link OmKeyLocationInfoGroup#getBlocksLatestVersionOnly()} to count the blocks created by that group. Metadata
+   * written before HDDS-5472 may include blocks from earlier versions in later groups.
+   * <p>
+   * Object versioning (HDDS-15728) keeps each object version in a separate {@code OmKeyInfo} instead of adding groups
+   * here.
+   */
   private List<OmKeyLocationInfoGroup> keyLocationVersions;
   private final long creationTime;
   private long modificationTime;
@@ -143,7 +156,7 @@ public final class OmKeyInfo extends WithParentObjectId
     return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.getDefaultInstance()),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(true, ClientVersion.CURRENT_VERSION, isOpenKey),
+        k -> k.getProtobuf(true, ClientVersion.CURRENT, isOpenKey),
         OmKeyInfo.class);
   }
 
@@ -726,7 +739,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * For network transmit.
    * @return KeyInfo
    */
-  public KeyInfo getProtobuf(int clientVersion) {
+  public KeyInfo getProtobuf(ClientVersion clientVersion) {
     return getProtobuf(false, clientVersion);
   }
 
@@ -736,7 +749,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * @param latestVersion
    * @return key info.
    */
-  public KeyInfo getNetworkProtobuf(int clientVersion, boolean latestVersion) {
+  public KeyInfo getNetworkProtobuf(ClientVersion clientVersion, boolean latestVersion) {
     return getProtobuf(false, null, clientVersion, latestVersion);
   }
 
@@ -748,7 +761,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * @param latestVersion
    * @return key info with the user given full key name
    */
-  public KeyInfo getNetworkProtobuf(String fullKeyName, int clientVersion,
+  public KeyInfo getNetworkProtobuf(String fullKeyName, ClientVersion clientVersion,
       boolean latestVersion) {
     return getProtobuf(false, fullKeyName, clientVersion, latestVersion);
   }
@@ -758,7 +771,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * @param ignorePipeline true for persist to DB, false for network transmit.
    * @return KeyInfo
    */
-  public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion) {
+  public KeyInfo getProtobuf(boolean ignorePipeline, ClientVersion clientVersion) {
     return getProtobuf(ignorePipeline, null, clientVersion, false, true);
   }
 
@@ -770,7 +783,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * @param isOpenKey true for openKeyTable, false for keyTable
    * @return KeyInfo
    */
-  public KeyInfo getProtobuf(boolean ignorePipeline, int clientVersion,
+  public KeyInfo getProtobuf(boolean ignorePipeline, ClientVersion clientVersion,
                              boolean isOpenKey) {
     return getProtobuf(ignorePipeline, null, clientVersion, false, isOpenKey);
   }
@@ -783,7 +796,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * @return key info object
    */
   private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName,
-                              int clientVersion, boolean latestVersionBlocks) {
+                              ClientVersion clientVersion, boolean latestVersionBlocks) {
     return getProtobuf(ignorePipeline, fullKeyName, clientVersion, latestVersionBlocks, true);
   }
 
@@ -798,7 +811,7 @@ public final class OmKeyInfo extends WithParentObjectId
    * @return key info object
    */
   private KeyInfo getProtobuf(boolean ignorePipeline, String fullKeyName,
-                              int clientVersion, boolean latestVersionBlocks,
+                              ClientVersion clientVersion, boolean latestVersionBlocks,
                               boolean isOpenKey) {
     long latestVersion = keyLocationVersions.isEmpty() ? -1 :
         keyLocationVersions.get(keyLocationVersions.size() - 1).getVersion();

@@ -26,11 +26,11 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getReplicateContainerCommand;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status.DONE;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.PER_VOLUME_ENABLED_KEY;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.PER_VOLUME_STREAMS_LIMIT_KEY;
-import static org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand.toTarget;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -819,8 +819,7 @@ public class TestReplicationSupervisor {
   }
 
   private ReplicateContainerCommand createCommand(long containerId) {
-    ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(containerId, datanode);
+    ReplicateContainerCommand cmd = getReplicateContainerCommand(containerId, datanode);
     cmd.setTerm(CURRENT_TERM);
     return cmd;
   }
@@ -1068,7 +1067,7 @@ public class TestReplicationSupervisor {
       List<DatanodeDetails> datanodes, ReplicationSupervisor rs) {
     for (int i = 0; i < 10; i++) {
       DatanodeDetails target = datanodes.get(i % datanodes.size());
-      rs.addTask(new ReplicationTask(toTarget(i, target), noopReplicator));
+      rs.addTask(new ReplicationTask(getReplicateContainerCommand(i, target), noopReplicator));
     }
   }
 
@@ -1514,8 +1513,8 @@ public class TestReplicationSupervisor {
   }
 
   private ReplicationTask createPushTask(long containerId) {
-    ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(
-        containerId, MockDatanodeDetails.randomDatanodeDetails());
+    ReplicateContainerCommand cmd =
+        getReplicateContainerCommand(containerId, MockDatanodeDetails.randomDatanodeDetails());
     cmd.setTerm(CURRENT_TERM);
     return new ReplicationTask(cmd, replicatorRef.get());
   }

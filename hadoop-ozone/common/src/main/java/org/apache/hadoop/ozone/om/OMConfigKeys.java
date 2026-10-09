@@ -313,12 +313,6 @@ public final class OMConfigKeys {
   public static final TimeDuration
       OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT
       = TimeDuration.valueOf(3000, TimeUnit.MILLISECONDS);
-  public static final String
-      OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY
-      = "ozone.om.ratis.server.retry.cache.timeout";
-  public static final TimeDuration
-      OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT
-      = TimeDuration.valueOf(600000, TimeUnit.MILLISECONDS);
   public static final String OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY
       = "ozone.om.ratis.minimum.timeout";
   public static final TimeDuration OZONE_OM_RATIS_MINIMUM_TIMEOUT_DEFAULT
@@ -828,6 +822,10 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
       "ozone.om.ratis.events.max.limit";
   public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
+
+  public static final String OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL =
+      "ozone.om.upgrade.finalization.check.interval";
+  public static final String OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL_DEFAULT = "1m";
 
   /**
    * Never constructed.

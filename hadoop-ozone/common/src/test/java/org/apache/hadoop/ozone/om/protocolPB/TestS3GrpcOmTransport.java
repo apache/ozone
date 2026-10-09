@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.protocolPB;
 
-import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
+import static org.apache.hadoop.ozone.ClientVersion.CURRENT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
@@ -166,7 +167,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -186,7 +187,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -211,7 +212,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -258,7 +259,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -301,7 +302,7 @@ public class TestS3GrpcOmTransport {
 
     OMRequest request = OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .build();
 
@@ -332,7 +333,7 @@ public class TestS3GrpcOmTransport {
 
     client.submitRequest(OMRequest.newBuilder()
         .setCmdType(Type.CreateVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .build());
 
@@ -360,11 +361,129 @@ public class TestS3GrpcOmTransport {
 
     client.submitRequest(OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
             .setReadConsistency(ReadConsistencyProto.LOCAL_LEASE)
             .build())
+        .build());
+
+    assertEquals(1, followerRequestCount.get());
+    assertEquals(ReadConsistencyProto.LOCAL_LEASE,
+        followerRequest.get().getReadConsistencyHint().getReadConsistency());
+  }
+
+  @Test
+  public void testLeaderOnlyReadOverridesDefaultFollowerRead() throws Exception {
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    configureHaOmService("om0", "om1");
+
+    AtomicInteger leaderRequestCount = new AtomicInteger();
+    AtomicInteger followerRequestCount = new AtomicInteger();
+    AtomicReference<OMRequest> leaderRequest = new AtomicReference<>();
+
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient("om0", createNodeChannel("om0",
+        leaderRequestCount, leaderRequest));
+    client.startClient("om1", createNodeChannel("om1",
+        followerRequestCount, new AtomicReference<>()));
+    client.changeLeaderProxyForTest("om0");
+    client.changeFollowerReadInitialProxy("om1");
+
+    client.submitRequest(OMRequest.newBuilder()
+        .setCmdType(Type.ListVolume)
+        .setVersion(CURRENT.serialize())
+        .setClientId("test")
+        .setS3Authentication(S3Authentication.newBuilder()
+            .setAccessId("access-id")
+            .setSignature("signature")
+            .setStringToSign("string-to-sign"))
+        .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
+            .setReadConsistency(ReadConsistencyProto.LINEARIZABLE_LEADER_ONLY))
+        .build());
+
+    assertEquals(1, leaderRequestCount.get());
+    assertEquals(0, followerRequestCount.get());
+    assertEquals(ReadConsistencyProto.LINEARIZABLE_LEADER_ONLY,
+        leaderRequest.get().getReadConsistencyHint().getReadConsistency());
+
+    client.submitRequest(OMRequest.newBuilder()
+        .setCmdType(Type.ListVolume)
+        .setVersion(CURRENT.serialize())
+        .setClientId("test")
+        .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
+            .setReadConsistency(ReadConsistencyProto.LINEARIZABLE_ALLOW_FOLLOWER))
+        .build());
+
+    assertEquals(1, followerRequestCount.get());
+  }
+
+  @Test
+  public void testLocalLeaseReadAvoidsKnownLeader() throws Exception {
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    configureHaOmService("om0", "om1");
+
+    AtomicInteger leaderRequestCount = new AtomicInteger();
+    AtomicInteger followerRequestCount = new AtomicInteger();
+
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient("om0", createNodeChannel("om0",
+        leaderRequestCount, new AtomicReference<>()));
+    client.startClient("om1", createNodeChannel("om1",
+        followerRequestCount, new AtomicReference<>()));
+    client.changeLeaderProxyForTest("om0");
+    client.changeFollowerReadInitialProxy("om0");
+
+    client.submitRequest(OMRequest.newBuilder()
+        .setCmdType(Type.ListVolume)
+        .setVersion(CURRENT.serialize())
+        .setClientId("test")
+        .setS3Authentication(S3Authentication.newBuilder()
+            .setAccessId("access-id")
+            .setSignature("signature")
+            .setStringToSign("string-to-sign")
+            .setSessionToken("session-token"))
+        .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
+            .setReadConsistency(ReadConsistencyProto.LOCAL_LEASE))
+        .build());
+
+    assertEquals(0, leaderRequestCount.get());
+    assertEquals(1, followerRequestCount.get());
+  }
+
+  @Test
+  public void testExplicitFollowerReadWhenDisabledByDefault() throws Exception {
+    conf.setBoolean(OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, false);
+    configureHaOmService("om0", "om1");
+
+    AtomicInteger leaderRequestCount = new AtomicInteger();
+    AtomicInteger followerRequestCount = new AtomicInteger();
+    AtomicReference<OMRequest> leaderRequest = new AtomicReference<>();
+    AtomicReference<OMRequest> followerRequest = new AtomicReference<>();
+
+    client = new GrpcOmTransport(conf, ugi, omServiceId);
+    client.startClient("om0", createNodeChannel("om0",
+        leaderRequestCount, leaderRequest));
+    client.startClient("om1", createNodeChannel("om1",
+        followerRequestCount, followerRequest));
+    client.changeLeaderProxyForTest("om0");
+    client.changeFollowerReadInitialProxy("om1");
+
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.ListVolume)
+        .setVersion(CURRENT.serialize())
+        .setClientId("test")
+        .build();
+    client.submitRequest(request);
+
+    assertEquals(1, leaderRequestCount.get());
+    assertEquals(0, followerRequestCount.get());
+    assertEquals(ReadConsistencyProto.DEFAULT,
+        leaderRequest.get().getReadConsistencyHint().getReadConsistency());
+
+    client.submitRequest(request.toBuilder()
+        .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
+            .setReadConsistency(ReadConsistencyProto.LOCAL_LEASE))
         .build());
 
     assertEquals(1, followerRequestCount.get());
@@ -390,7 +509,7 @@ public class TestS3GrpcOmTransport {
 
     client.submitRequest(OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .build());
 
@@ -495,7 +614,7 @@ public class TestS3GrpcOmTransport {
     ServiceListRequest req = ServiceListRequest.newBuilder().build();
     return OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();

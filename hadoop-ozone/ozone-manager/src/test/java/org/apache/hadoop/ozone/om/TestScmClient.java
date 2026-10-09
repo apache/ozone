@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Arrays.asList;
 import static org.apache.hadoop.hdds.client.ReplicationConfig.fromTypeAndFactor;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -239,6 +241,32 @@ public class TestScmClient {
     assertSame(updated, refreshedNode);
     assertEquals("updated-ip", refreshedNode.getIpAddress());
     assertSame(updated, datanodeDetailsCache.getIfPresent(original.getID()));
+  }
+
+  @Test
+  public void testReloadScmNodesDelegatesToAllProviders() {
+    SCMFailoverProxyProviderBase<?> blockProvider =
+        mock(SCMFailoverProxyProviderBase.class);
+    SCMFailoverProxyProviderBase<?> containerProvider =
+        mock(SCMFailoverProxyProviderBase.class);
+    SCMFailoverProxyProviderBase<?> keyDeletionBlockProvider =
+        mock(SCMFailoverProxyProviderBase.class);
+    ScmClient client = new ScmClient(mock(ScmBlockLocationProtocol.class),
+        mock(StorageContainerLocationProtocol.class), blockProvider,
+        containerProvider, new OzoneConfiguration(),
+        mock(ScmBlockLocationProtocol.class), keyDeletionBlockProvider);
+
+    client.reloadScmNodes();
+
+    verify(blockProvider, times(1)).changeConfig();
+    verify(containerProvider, times(1)).changeConfig();
+    verify(keyDeletionBlockProvider, times(1)).changeConfig();
+  }
+
+  @Test
+  public void testReloadScmNodesIsNoOpWithoutProviders() {
+    // Ignore reload when providers are null (e.g., in unit tests).
+    assertDoesNotThrow(scmClient::reloadScmNodes);
   }
 
   ContainerWithPipeline createPipeline(long containerId,

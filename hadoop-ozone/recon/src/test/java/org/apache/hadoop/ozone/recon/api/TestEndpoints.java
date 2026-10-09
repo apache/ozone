@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -66,6 +66,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -81,7 +82,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -96,10 +97,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -428,7 +429,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         NodeReportProto.newBuilder()
             .addStorageReport(storageReportProto3)
             .addStorageReport(storageReportProto4).build();
-    LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
+    DatanodeVersionProto versionInfo = defaultVersionProto();
 
     DatanodeDetailsProto datanodeDetailsProto3 =
         DatanodeDetailsProto.newBuilder()
@@ -467,17 +468,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
-              containerReportsProto, pipelineReportsProto, layoutInfo);
+              containerReportsProto, pipelineReportsProto, versionInfo);
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
               PipelineReportsProto.newBuilder().build(),
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto3, nodeReportProto3,
               ContainerReportsProto.newBuilder().build(),
               PipelineReportsProto.newBuilder().build(),
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     });
@@ -655,8 +656,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       fail(String.format("Datanode %s not registered",
           hostname));
     }
-    assertEquals(HDDSLayoutVersionManager.maxLayoutVersion(),
-        datanodeMetadata.getLayoutVersion());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), datanodeMetadata.getApparentVersion());
   }
 
   @Test
@@ -915,6 +915,15 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertEquals(2L, rocksCount3.longValue(), "Expected RocksDB bin 1024 to have count 2 for vol2/bucket1");
 
     // --- Now test the query endpoints of the utilization service ---
+    verifyFileCountQueries();
+  }
+
+  /**
+   * Verify the filtering behaviour of the fileCount endpoint against the
+   * bins written by {@link #testGetFileCounts()}: vol1/bucket1:1024,
+   * vol1/bucket1:131072 and vol2/bucket1:1024, each with count 2.
+   */
+  private void verifyFileCountQueries() {
     Response response = utilizationEndpoint.getFileCounts(null, null, 0);
     List<FileCountBySize> resultSet =
         (List<FileCountBySize>) response.getEntity();
@@ -952,6 +961,32 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
 
+    // Test for "fileSize" query param on its own.
+    response = utilizationEndpoint.getFileCounts(null, null, 131072);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(1, resultSet.size());
+    assertTrue(resultSet.stream().allMatch(o -> o.getVolume().equals("vol1") &&
+        o.getBucket().equals("bucket1") && o.getFileSize() == 131072L));
+
+    // Test for "volume" + "fileSize" query params, without bucket.
+    response = utilizationEndpoint.getFileCounts("vol1", null, 131072);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(1, resultSet.size());
+    assertTrue(resultSet.stream().allMatch(o -> o.getVolume().equals("vol1") &&
+        o.getFileSize() == 131072L));
+
+    // Test for "bucket" + "fileSize" query params, without volume.
+    response = utilizationEndpoint.getFileCounts(null, "bucket1", 1024);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(2, resultSet.size());
+    assertTrue(resultSet.stream().allMatch(o -> o.getBucket().equals("bucket1") &&
+        o.getFileSize() == 1024L));
+
+    // Test for a fileSize that is not a bin upper bound, without volume and bucket.
+    response = utilizationEndpoint.getFileCounts(null, null, 1310725);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(0, resultSet.size());
+
     // Test for "volume" + "bucket" + "fileSize" query params.
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 131072);
     resultSet = (List<FileCountBySize>) response.getEntity();
@@ -960,7 +995,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertTrue(o.getVolume().equals("vol1") && o.getBucket().equals("bucket1") &&
         o.getFileSize() == 131072);
 
-    // Test for non-existent fileSize.
+    // Test for a fileSize that is not a bin boundary. It is mapped to bin 131072.
+    response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 100000);
+    resultSet = (List<FileCountBySize>) response.getEntity();
+    assertEquals(1, resultSet.size());
+    o = resultSet.get(0);
+    assertEquals("vol1", o.getVolume());
+    assertEquals("bucket1", o.getBucket());
+    assertEquals(131072L, o.getFileSize());
+    assertEquals(2L, o.getCount());
+
+    // Test for a fileSize that is mapped to an empty bin.
     response = utilizationEndpoint.getFileCounts("vol1", "bucket1", 1310725);
     resultSet = (List<FileCountBySize>) response.getEntity();
     assertEquals(0, resultSet.size());
@@ -1278,7 +1323,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setContainerReport(containerReportsProto)
             .setDatanodeDetails(extendedDatanodeDetailsProto
                 .getDatanodeDetails())
-            .setDataNodeLayoutVersion(defaultLayoutVersionProto())
+            .setDatanodeVersion(defaultVersionProto())
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);
@@ -1360,7 +1405,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testSuccessWhenDecommissionStatus() throws IOException {
-    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(ClientVersion.class))).thenReturn(
         nodes); // 2 nodes decommissioning
     when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
     when(mockScmClient.getMetrics(any())).thenReturn(metrics.get(1));
@@ -1386,7 +1431,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testSuccessWhenDecommissionStatusWithUUID() throws IOException {
-    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(ClientVersion.class))).thenReturn(
         getNodeDetailsForUuid("654c4b89-04ef-4015-8a3b-50d0fb0e1684")); // 1 nodes decommissioning
     when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
     Response datanodesDecommissionInfo =

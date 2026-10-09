@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATIO
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE_DEFAULT;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -46,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.apache.hadoop.ozone.util.CacheMetrics;
 
 /**
@@ -55,6 +57,9 @@ public class ScmClient {
   private final ScmBlockLocationProtocol blockClient;
   private final ScmBlockLocationProtocol blockClientForKeyDeletion;
   private final StorageContainerLocationProtocol containerClient;
+  private final SCMFailoverProxyProviderBase<?> blockProxyProvider;
+  private final SCMFailoverProxyProviderBase<?> containerProxyProvider;
+  private final SCMFailoverProxyProviderBase<?> keyDeletionBlockProxyProvider;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
   private final CacheMetrics datanodeDetailsCacheMetrics;
@@ -69,9 +74,32 @@ public class ScmClient {
             StorageContainerLocationProtocol containerClient,
             OzoneConfiguration configuration,
             ScmBlockLocationProtocol blockClientForKeyDeletion) {
+    this(blockClient, containerClient, null, null, configuration,
+        blockClientForKeyDeletion, null);
+  }
+
+  ScmClient(ScmBlockLocationProtocol blockClient,
+            StorageContainerLocationProtocol containerClient,
+            SCMFailoverProxyProviderBase<?> blockProxyProvider,
+            SCMFailoverProxyProviderBase<?> containerProxyProvider,
+            OzoneConfiguration configuration) {
+    this(blockClient, containerClient, blockProxyProvider,
+        containerProxyProvider, configuration, blockClient, null);
+  }
+
+  ScmClient(ScmBlockLocationProtocol blockClient,
+            StorageContainerLocationProtocol containerClient,
+            SCMFailoverProxyProviderBase<?> blockProxyProvider,
+            SCMFailoverProxyProviderBase<?> containerProxyProvider,
+            OzoneConfiguration configuration,
+            ScmBlockLocationProtocol blockClientForKeyDeletion,
+            SCMFailoverProxyProviderBase<?> keyDeletionBlockProxyProvider) {
     this.containerClient = containerClient;
     this.blockClient = blockClient;
     this.blockClientForKeyDeletion = blockClientForKeyDeletion;
+    this.blockProxyProvider = blockProxyProvider;
+    this.containerProxyProvider = containerProxyProvider;
+    this.keyDeletionBlockProxyProvider = keyDeletionBlockProxyProvider;
     Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache =
         createDatanodeDetailsCache(configuration);
     this.containerLocationCache =
@@ -150,6 +178,32 @@ public class ScmClient {
     }
     builder.setNodes(nodes);
     return builder.build();
+  }
+
+  /**
+   * Reloads block/container SCM proxies on reconfiguration without an OM restart.
+   * No-op if providers are unavailable (e.g., test mocks).
+   */
+  public void reloadScmNodes() {
+    if (blockProxyProvider != null) {
+      blockProxyProvider.changeConfig();
+    }
+    if (containerProxyProvider != null) {
+      containerProxyProvider.changeConfig();
+    }
+    if (keyDeletionBlockProxyProvider != null) {
+      keyDeletionBlockProxyProvider.changeConfig();
+    }
+  }
+
+  @VisibleForTesting
+  public SCMFailoverProxyProviderBase<?> getBlockProxyProvider() {
+    return blockProxyProvider;
+  }
+
+  @VisibleForTesting
+  public SCMFailoverProxyProviderBase<?> getContainerProxyProvider() {
+    return containerProxyProvider;
   }
 
   public ScmBlockLocationProtocol getBlockClient() {

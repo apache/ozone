@@ -151,8 +151,8 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         OZONE_OM_ADDRESS_KEY);
 
-    return host.orElse(OZONE_OM_BIND_HOST_DEFAULT) + ":" +
-        getOmRpcPort(conf);
+    return getHostPortString(host.orElse(OZONE_OM_BIND_HOST_DEFAULT),
+        getOmRpcPort(conf));
   }
 
   /**
@@ -167,8 +167,9 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf, confKey);
 
     if (host.isPresent()) {
-      return host.get() + ":" + getPortNumberFromConfigKeys(conf, confKey)
-              .orElse(OZONE_OM_PORT_DEFAULT);
+      return getHostPortString(host.get(),
+          getPortNumberFromConfigKeys(conf, confKey)
+              .orElse(OZONE_OM_PORT_DEFAULT));
     } else {
       // The specified confKey is not set
       return null;
@@ -263,9 +264,15 @@ public final class OmUtils {
     case GetSnapshotInfo:
     case GetObjectTagging:
     case GetBucketTagging:
+    case GetBucketDeletedBytes:
       return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    // Prepare and CancelPrepare are now no-ops, but still produce responses for compatability.
+    // They are marked as read-only since they don't modify state anymore.
+    case Prepare:
+    case CancelPrepare:
+    case QueryUpgradeStatus:
     case GetLifecycleConfiguration:
     case GetLifecycleServiceStatus:
       return true;
@@ -303,8 +310,8 @@ public final class OmUtils {
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
     case FinalizeUpgrade:
-    case Prepare:
-    case CancelPrepare:
+    case StartFinalizeUpgrade:
+    case CompleteFinalizeUpgrade:
     case DeleteOpenKeys:
     case SetS3Secret:
     case RevokeS3Secret:
@@ -397,6 +404,7 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetLifecycleConfiguration:
     case GetLifecycleServiceStatus:
+    case GetBucketDeletedBytes:
       return true;
     case GetBucketTagging:
       return true;
@@ -433,6 +441,8 @@ public final class OmUtils {
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
     case FinalizeUpgrade:
+    case StartFinalizeUpgrade:
+    case CompleteFinalizeUpgrade:
     case Prepare:
     case CancelPrepare:
     case DeleteOpenKeys:
@@ -485,6 +495,7 @@ public final class OmUtils {
     case SetLifecycleServiceStatus:
     case SaveLifecycleScanState:
     case UnknownCommand:
+    case QueryUpgradeStatus:
       return false;
     case EchoRPC:
       return omRequest.getEchoRPCRequest().getReadOnly();
@@ -626,7 +637,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" + addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT));
   }
 
   /**
@@ -652,8 +664,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" +
-        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT));
   }
 
   public static File createOMDir(String dirPath) {

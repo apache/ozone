@@ -132,15 +132,25 @@ public final class HAUtils {
    */
   public static ScmBlockLocationProtocol getScmBlockClient(
       OzoneConfiguration conf) {
-    return getScmBlockClient(conf, null);
+    return getScmBlockClient(conf,
+        new SCMBlockLocationFailoverProxyProvider(conf));
   }
 
   public static ScmBlockLocationProtocol getScmBlockClient(
       OzoneConfiguration conf, SocketFactory socketFactory) {
+    return getScmBlockClient(conf,
+        new SCMBlockLocationFailoverProxyProvider(conf, socketFactory));
+  }
+
+  /**
+   * Creates an SCM block client using the provided proxy provider.
+   * Retains the provider reference to support dynamic SCM node updates.
+   */
+  public static ScmBlockLocationProtocol getScmBlockClient(
+      OzoneConfiguration conf,
+      SCMBlockLocationFailoverProxyProvider proxyProvider) {
     ScmBlockLocationProtocolClientSideTranslatorPB scmBlockLocationClient =
-        new ScmBlockLocationProtocolClientSideTranslatorPB(
-            new SCMBlockLocationFailoverProxyProvider(conf, socketFactory),
-            conf);
+        new ScmBlockLocationProtocolClientSideTranslatorPB(proxyProvider, conf);
     return TracingUtil
         .createProxy(scmBlockLocationClient, ScmBlockLocationProtocol.class,
             conf);
@@ -148,7 +158,22 @@ public final class HAUtils {
 
   public static StorageContainerLocationProtocol getScmContainerClient(
       ConfigurationSource conf) {
-    return getScmContainerClient(conf, null, null);
+    return getScmContainerClient(conf,
+        new SCMContainerLocationFailoverProxyProvider(conf, null));
+  }
+
+  /**
+   * Creates an SCM container client using the provided proxy provider.
+   * Retains the provider reference to support dynamic SCM node updates.
+   */
+  public static StorageContainerLocationProtocol getScmContainerClient(
+      ConfigurationSource conf,
+      SCMContainerLocationFailoverProxyProvider proxyProvider) {
+    StorageContainerLocationProtocol scmContainerClient =
+        TracingUtil.createProxy(
+            new StorageContainerLocationProtocolClientSideTranslatorPB(
+                proxyProvider), StorageContainerLocationProtocol.class, conf);
+    return scmContainerClient;
   }
 
   @VisibleForTesting
@@ -160,20 +185,20 @@ public final class HAUtils {
   public static StorageContainerLocationProtocol getScmContainerClient(
       ConfigurationSource conf, UserGroupInformation userGroupInformation,
       SocketFactory socketFactory) {
-    SCMContainerLocationFailoverProxyProvider proxyProvider =
+    return getScmContainerClient(conf,
         new SCMContainerLocationFailoverProxyProvider(conf,
-            userGroupInformation, socketFactory);
-    StorageContainerLocationProtocol scmContainerClient =
-        TracingUtil.createProxy(
-            new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider), StorageContainerLocationProtocol.class, conf);
-    return scmContainerClient;
+            userGroupInformation, socketFactory));
   }
 
   public static StorageContainerLocationProtocol getScmContainerClientForNode(
       ConfigurationSource conf, ScmNodeTarget targetScmNode) {
+    return getScmContainerClientForNode(conf, targetScmNode, null);
+  }
+
+  public static StorageContainerLocationProtocol getScmContainerClientForNode(
+      ConfigurationSource conf, ScmNodeTarget targetScmNode, UserGroupInformation ugi) {
     SCMContainerLocationFailoverProxyProvider proxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(conf, null);
+        new SCMContainerLocationFailoverProxyProvider(conf, ugi);
     StorageContainerLocationProtocol scmContainerClient =
         TracingUtil.createProxy(
             new StorageContainerLocationProtocolClientSideTranslatorPB(
