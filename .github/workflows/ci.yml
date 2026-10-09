@@ -348,7 +348,7 @@ jobs:
       script: acceptance
       script-args: compat-old ${{ matrix.version }}
       sha: ${{ needs.build-info.outputs.sha }}
-      split: ${{ matrix.version }}-compat
+      split: compat-old-${{ matrix.version }}
       timeout-minutes: 30
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     strategy:

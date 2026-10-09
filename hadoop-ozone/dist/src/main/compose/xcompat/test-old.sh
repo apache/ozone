@@ -26,7 +26,7 @@ export COMPOSE_DIR
 source "${COMPOSE_DIR}/lib.sh"
 
 # test specific version(s)
-if [[ -n "${OZONE_OLD_VERSIONS}" ]]; then
+if [[ -n "${OZONE_OLD_VERSIONS:-}" ]]; then
   old_versions="${OZONE_OLD_VERSIONS}"
 fi
 
