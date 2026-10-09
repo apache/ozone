@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
@@ -49,7 +51,7 @@ class TestDataNodeMetricsCollectionTask {
 
   private final DatanodeInfo nodeDetails = new DatanodeInfo(
       MockDatanodeDetails.randomDatanodeDetails(),
-      NodeStatus.inServiceHealthy(), null, 5 * 60 * 1000);
+      NodeStatus.inServiceHealthy(), defaultVersionProto(), 5 * 60 * 1000);
 
   private DatanodePendingDeletionMetrics collect(List<Map<String, Object>> beans) throws Exception {
     MetricsServiceProvider provider = mock(MetricsServiceProvider.class);
