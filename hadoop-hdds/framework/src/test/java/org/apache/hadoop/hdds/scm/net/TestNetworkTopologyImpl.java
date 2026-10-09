@@ -63,6 +63,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -936,6 +937,30 @@ class TestNetworkTopologyImpl {
       reset(mockedShuffleOperation);
       length--;
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testSortByDistanceCostGroupByRack(boolean sortGroupByRack) {
+    NodeSchemaManager manager = NodeSchemaManager.getInstance();
+    manager.init(new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA}, true);
+    NetworkTopology newCluster = new NetworkTopologyImpl(manager, mockedShuffleOperation, sortGroupByRack);
+    Node client = createDatanode("0.0.0.0", "/r1");
+    Node dn1 = createDatanode("1.1.1.1", "/r2");
+    Node dn2 = createDatanode("2.2.2.2", "/r2");
+    Node dn3 = createDatanode("3.3.3.3", "/r3");
+    for (Node node : Arrays.asList(client, dn1, dn2, dn3)) {
+      newCluster.add(node);
+    }
+    List<Node> nodeList = Arrays.asList(dn1, dn3, dn2);
+
+    boolean sameRackSplit = false;
+    for (int i = 0; i < 100; i++) {
+      List<Node> ret = newCluster.sortByDistanceCost(client, nodeList, nodeList.size());
+      assertThat(ret).containsExactlyInAnyOrderElementsOf(nodeList);
+      sameRackSplit |= Math.abs(ret.indexOf(dn1) - ret.indexOf(dn2)) != 1;
+    }
+    assertEquals(!sortGroupByRack, sameRackSplit);
   }
 
   @Test

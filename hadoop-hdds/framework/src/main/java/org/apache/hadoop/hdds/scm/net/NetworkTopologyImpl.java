@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.net;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ANCESTOR_GENERATION_DEFAULT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.SCOPE_REVERSE_STR;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -27,8 +29,10 @@ import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.TreeMap;
@@ -61,6 +65,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
   private final NodeSchemaManager schemaManager;
   /** The algorithm to randomize nodes with equal distances. */
   private final Consumer<List<? extends Node>> shuffleOperation;
+  /** Whether sortByDistanceCost keeps nodes in the same rack next to each other. */
+  private final boolean sortGroupByRack;
   /** Lock to coordinate cluster tree access. */
   private final ReadWriteLock netlock = new ReentrantReadWriteLock(true);
 
@@ -68,6 +74,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
     schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(conf);
     shuffleOperation = Collections::shuffle;
+    sortGroupByRack = conf.getBoolean(OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_KEY,
+        OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_DEFAULT);
     maxLevel = schemaManager.getMaxLevel();
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
@@ -75,11 +83,12 @@ public class NetworkTopologyImpl implements NetworkTopology {
         schemaManager.getCost(NetConstants.ROOT_LEVEL));
   }
 
-  public NetworkTopologyImpl(String schemaFile, InnerNode clusterTree) {
+  public NetworkTopologyImpl(String schemaFile, InnerNode clusterTree, boolean sortGroupByRack) {
     schemaManager = NodeSchemaManager.getInstance();
     schemaManager.init(schemaFile);
     maxLevel = schemaManager.getMaxLevel();
     shuffleOperation = Collections::shuffle;
+    this.sortGroupByRack = sortGroupByRack;
     factory = InnerNodeImpl.FACTORY;
     this.clusterTree = clusterTree;
   }
@@ -87,8 +96,15 @@ public class NetworkTopologyImpl implements NetworkTopology {
   @VisibleForTesting
   public NetworkTopologyImpl(NodeSchemaManager manager,
                              Consumer<List<? extends Node>> shuffleOperation) {
+    this(manager, shuffleOperation, OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_DEFAULT);
+  }
+
+  @VisibleForTesting
+  public NetworkTopologyImpl(NodeSchemaManager manager, Consumer<List<? extends Node>> shuffleOperation,
+      boolean sortGroupByRack) {
     schemaManager = manager;
     this.shuffleOperation = shuffleOperation;
+    this.sortGroupByRack = sortGroupByRack;
     maxLevel = schemaManager.getMaxLevel();
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
@@ -771,6 +787,9 @@ public class NetworkTopologyImpl implements NetworkTopology {
    *
    * As an additional twist, we also randomize the nodes at each network
    * distance. This helps with load balancing when there is data skew.
+   * If {@code ozone.network.topology.sort.group.by.rack} is enabled, nodes at the same distance
+   * in the same rack are kept next to each other, so that a pipeline through the sorted nodes
+   * does not cross racks more often than needed.
    *
    * @param reader    Node where need the data
    * @param nodes     Available replicas with the requested data
@@ -811,7 +830,15 @@ public class NetworkTopologyImpl implements NetworkTopology {
     for (List<N> list : tree.values()) {
       if (list != null) {
         shuffleOperation.accept(list);
-        ret.addAll(list);
+        if (!sortGroupByRack) {
+          ret.addAll(list);
+          continue;
+        }
+        Map<String, List<N>> racks = new LinkedHashMap<>();
+        for (N node : list) {
+          racks.computeIfAbsent(node.getNetworkLocation(), k -> new ArrayList<>()).add(node);
+        }
+        racks.values().forEach(ret::addAll);
       }
     }
 
