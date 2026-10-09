@@ -2318,9 +2318,6 @@ public class KeyValueHandler extends Handler {
           "Failed to readBlock " + request.getReadBlock(), ioe, IO_EXCEPTION);
       responseProto = ContainerUtils.logAndReturnError(LOG, sce, request);
     } catch (StatusRuntimeException e) {
-      // The response stream failed, for example with CANCELLED because the client went away. This is not a container
-      // problem, so pass it on instead of returning an error response, which would make the dispatcher scan the
-      // container.
       throw e;
     } catch (Exception e) {
       final StorageContainerException sce = new StorageContainerException(

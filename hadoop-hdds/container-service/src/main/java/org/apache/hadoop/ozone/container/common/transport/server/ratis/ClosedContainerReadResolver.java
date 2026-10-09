@@ -59,8 +59,6 @@ final class ClosedContainerReadResolver implements DataStreamApi.Resolver {
     }
 
     final Container<?> container = containerController.getContainer(requestProto.getContainerID());
-    // The states for which SCM's ContainerInfo#isOpen is true, so SCM keeps the pipeline with the Raft group.
-    // On the datanode, ContainerData#isOpen covers only OPEN.
     if (container == null || container.getContainerData().isOpen() || container.getContainerData().isClosing()) {
       return null;
     }
