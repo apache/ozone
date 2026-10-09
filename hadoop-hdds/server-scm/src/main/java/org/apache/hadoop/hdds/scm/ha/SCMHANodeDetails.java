@@ -215,6 +215,7 @@ public class SCMHANodeDetails {
               "%s. SCM RPC Address should be set for all nodes in a SCM " +
               "service.", rpcAddrKey);
         }
+        HddsUtils.validateAdvertisedHost(rpcAddrKey, rpcAddrStr);
         isSCMddressSet = true;
 
         String ratisPortKey = ConfUtils.addKeySuffixes(OZONE_SCM_RATIS_PORT_KEY,
