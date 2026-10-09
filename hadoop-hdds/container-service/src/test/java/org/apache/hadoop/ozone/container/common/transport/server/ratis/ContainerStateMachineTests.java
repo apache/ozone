@@ -36,7 +36,6 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.util.ArrayList;
@@ -319,9 +318,11 @@ abstract class ContainerStateMachineTests {
   @Test
   public void testTransferToReadBlockWriteFailure() throws Exception {
     setUpMockReadBlock(observer -> {
-      // The failed write stops the read. Then the dispatcher sends the error response of the read.
-      assertThrows(UncheckedIOException.class, () -> observer.onNext(readBlockResponse(0, ByteString.EMPTY)));
-      observer.onNext(errorResponse());
+      final StatusRuntimeException e = assertThrows(StatusRuntimeException.class,
+          () -> observer.onNext(readBlockResponse(0, ByteString.EMPTY)));
+      // KeyValueHandler passes a CANCELLED status on, so the dispatcher does not scan the container.
+      assertEquals(Status.Code.CANCELLED, e.getStatus().getCode());
+      throw e;
     });
     final IOException failure = new IOException("Connection closed");
     final WritableByteChannel stream = mock(WritableByteChannel.class);
@@ -331,7 +332,6 @@ abstract class ContainerStateMachineTests {
         () -> stateMachine.transferTo(newRequest(ContainerProtos.Type.ReadBlock), stream));
 
     assertSame(failure, e.getCause());
-    // The error response is not written to the failed stream.
     verify(stream, times(1)).write(any());
     verify(stream, never()).close();
   }

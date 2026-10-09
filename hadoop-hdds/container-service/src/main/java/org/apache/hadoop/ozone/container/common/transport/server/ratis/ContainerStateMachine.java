@@ -28,7 +28,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
@@ -114,6 +113,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JavaUtils;
@@ -928,16 +929,12 @@ public class ContainerStateMachine extends BaseStateMachine {
     final StreamObserver<ContainerCommandResponseProto> observer = new StreamObserver<ContainerCommandResponseProto>() {
       @Override
       public void onNext(ContainerCommandResponseProto response) {
-        if (error.get() != null) {
-          // The read already failed. Drop the error response that the dispatcher sends after a failed write.
-          return;
-        }
         try {
           bytesWritten.addAndGet(writeReadBlockReply(stream, response));
         } catch (IOException e) {
           error.set(e);
-          // Throw to stop reading the block
-          throw new UncheckedIOException(e);
+          // Stop reading the block. The handler passes a cancelled stream on, so the container is not scanned.
+          throw Status.CANCELLED.withDescription("Failed to write a ReadBlock reply").withCause(e).asRuntimeException();
         }
       }
 
@@ -953,8 +950,8 @@ public class ContainerStateMachine extends BaseStateMachine {
 
     try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
       dispatcher.streamDataReadOnly(request, observer, blockFile, null);
-    } catch (UncheckedIOException e) {
-      error.compareAndSet(null, e.getCause());
+    } catch (StatusRuntimeException e) {
+      error.compareAndSet(null, e);
     }
     if (error.get() != null) {
       throw new IOException("Failed to read block " + BlockID.getFromProtobuf(request.getReadBlock().getBlockID()),

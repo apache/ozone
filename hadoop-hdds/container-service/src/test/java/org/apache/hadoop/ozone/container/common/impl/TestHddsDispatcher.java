@@ -28,9 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -43,8 +45,10 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -68,6 +72,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunk
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
@@ -96,12 +101,18 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFacto
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -640,6 +651,73 @@ public class TestHddsDispatcher {
   }
 
   /**
+   * A ReadBlock whose stream is cancelled, for example because the client went away, is not a container problem, so
+   * the datanode must not scan the container. Any other failure while reading still makes it scan.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testReadBlockScansContainerOnlyIfTheStreamIsNotCancelled(boolean cancelled) throws Exception {
+    String testDirPath = testDir.getPath();
+    try {
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+      DatanodeDetails dd = randomDatanodeDetails();
+      ContainerSet containerSet = newContainerSet();
+      OnDemandContainerScanner scanner = mock(OnDemandContainerScanner.class);
+      containerSet.registerOnDemandScanner(scanner);
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, UUID.randomUUID(), conf, null, containerSet);
+      ContainerCommandRequestProto writeChunkRequest = getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+      assertEquals(ContainerProtos.Result.SUCCESS, hddsDispatcher.dispatch(writeChunkRequest, null).getResult());
+      assertEquals(ContainerProtos.Result.SUCCESS,
+          hddsDispatcher.dispatch(ContainerTestHelper.getPutBlockRequest(writeChunkRequest), null).getResult());
+      ContainerCommandRequestProto readBlockRequest = ContainerCommandRequestProto.newBuilder()
+          .setCmdType(ContainerProtos.Type.ReadBlock)
+          .setContainerID(writeChunkRequest.getContainerID())
+          .setDatanodeUuid(dd.getUuidString())
+          .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+              .setBlockID(writeChunkRequest.getWriteChunk().getBlockID())
+              .setOffset(0)
+              .setLength(writeChunkRequest.getWriteChunk().getChunkData().getLen()))
+          .build();
+
+      // The stream fails on the data response, and takes the error response that the dispatcher may send after it.
+      RuntimeException failure = cancelled ? Status.CANCELLED.asRuntimeException() : new IllegalStateException();
+      List<ContainerCommandResponseProto> errorResponses = new ArrayList<>();
+      StreamObserver<ContainerCommandResponseProto> stream = new StreamObserver<ContainerCommandResponseProto>() {
+        @Override
+        public void onNext(ContainerCommandResponseProto response) {
+          if (response.hasReadBlock()) {
+            throw failure;
+          }
+          errorResponses.add(response);
+        }
+
+        @Override
+        public void onError(Throwable t) {
+        }
+
+        @Override
+        public void onCompleted() {
+        }
+      };
+      try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
+        if (cancelled) {
+          assertSame(failure, assertThrows(StatusRuntimeException.class,
+              () -> hddsDispatcher.streamDataReadOnly(readBlockRequest, stream, blockFile, null)));
+        } else {
+          hddsDispatcher.streamDataReadOnly(readBlockRequest, stream, blockFile, null);
+        }
+      }
+
+      verify(scanner, times(cancelled ? 0 : 1)).scanContainer(any(), anyString());
+      assertEquals(cancelled ? 0 : 1, errorResponses.size());
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  /**
    * Creates HddsDispatcher instance with given infos.
    * @param dd datanode detail info.
    * @param scmId UUID of scm id.
@@ -654,7 +732,11 @@ public class TestHddsDispatcher {
 
   static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId,
       OzoneConfiguration conf, TokenVerifier tokenVerifier) throws IOException {
-    ContainerSet containerSet = newContainerSet();
+    return createDispatcher(dd, scmId, conf, tokenVerifier, newContainerSet());
+  }
+
+  static HddsDispatcher createDispatcher(DatanodeDetails dd, UUID scmId, OzoneConfiguration conf,
+      TokenVerifier tokenVerifier, ContainerSet containerSet) throws IOException {
     MutableVolumeSet volumeSet = new MutableVolumeSet(dd.getUuidString(), conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
     volumeSet.getVolumesList().stream().forEach(v -> {
