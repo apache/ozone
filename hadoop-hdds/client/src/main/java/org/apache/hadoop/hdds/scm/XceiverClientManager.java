@@ -203,16 +203,18 @@ public class XceiverClientManager extends XceiverClientCreator {
    */
   private void closeAsync(XceiverClientSpi client) {
     try {
-      closeExecutor.execute(() -> {
-        try {
-          client.close();
-        } catch (RuntimeException e) {
-          LOG.warn("Failed to close client for pipeline {}", client.getPipeline(), e);
-        }
-      });
+      closeExecutor.execute(() -> closeAndLog(client));
     } catch (RejectedExecutionException e) {
       // too many clients are waiting to be closed, or this manager is already closed
+      closeAndLog(client);
+    }
+  }
+
+  private static void closeAndLog(XceiverClientSpi client) {
+    try {
       client.close();
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to close client for pipeline {}", client.getPipeline(), e);
     }
   }
 
