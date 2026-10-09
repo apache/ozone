@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -46,6 +47,10 @@ import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.upgrade.RatisBasedVersionManager;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
@@ -191,6 +196,18 @@ class TestOMUpgradeFinalization {
         assertNull(om.getMetadataManager().getMetaTable().get(FINALIZATION_IN_PROGRESS_KEY));
         assertEquals(HddsProtos.FinalizationStatus.UNFINALIZED,
             omClient.queryUpgradeStatus().getOmFinalizationStatus());
+
+        OMRequest request = OMRequest.newBuilder()
+            .setCmdType(Type.CompleteFinalizeUpgrade)
+            .setVersion(ClientVersion.CURRENT.serialize())
+            .setClientId(UUID.randomUUID().toString())
+            .build();
+        OMResponse response = OmTestUtil.getFailoverProxyProvider(client.getObjectStore()).getProxy().proxy
+            .submitRequest(null, request);
+        assertThat(response.getSuccess()).isFalse();
+        assertEquals(Status.INVALID_REQUEST, response.getStatus());
+        assertEquals(INITIAL_VERSION, om.getVersionManager().getApparentVersion());
+        assertNull(om.getMetadataManager().getMetaTable().get(FINALIZATION_IN_PROGRESS_KEY));
 
         // With the in-progress marker present but the OM not yet finalized, OM reports IN_PROGRESS.
         om.getMetadataManager().getMetaTable().put(FINALIZATION_IN_PROGRESS_KEY, "ignored");
