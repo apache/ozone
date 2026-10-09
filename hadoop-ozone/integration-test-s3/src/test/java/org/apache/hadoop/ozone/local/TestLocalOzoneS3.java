@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -100,10 +99,7 @@ class TestLocalOzoneS3 {
   /** Exercises create, list, put and get with explicit SDK credentials. */
   @Test
   void awsSdkCanCreateListPutAndGetAgainstLocalRuntime() throws Exception {
-    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
-            tempDir.resolve("local-ozone-s3-sdk"))
-        .setStartupTimeout(Duration.ofMinutes(3))
-        .build();
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(tempDir.resolve("local-ozone-s3-sdk")).build();
 
     String bucketName = "local-" + UUID.randomUUID().toString().replace("-", "");
     String keyName = "key-" + UUID.randomUUID().toString().replace("-", "");
@@ -115,21 +111,14 @@ class TestLocalOzoneS3 {
     try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, conf)) {
       cluster.start();
 
-      try (S3Client client = S3Client.builder()
-          .region(Region.of(LocalOzoneClusterConfig.LOCAL_S3_REGION))
-          .endpointOverride(URI.create(cluster.getS3Endpoint()))
-          .credentialsProvider(StaticCredentialsProvider.create(
-              AwsBasicCredentials.create("localuser", "localsecret")))
-          .forcePathStyle(true)
-          .build()) {
+      try (S3Client client = s3Client(cluster.getS3Endpoint(),
+          LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY, LocalOzoneClusterConfig.LOCAL_S3_SECRET_KEY)) {
         client.createBucket(builder -> builder.bucket(bucketName));
 
         ListBucketsResponse buckets = client.listBuckets();
-        assertTrue(buckets.buckets().stream()
-            .anyMatch(bucket -> bucketName.equals(bucket.name())));
+        assertTrue(buckets.buckets().stream().anyMatch(bucket -> bucketName.equals(bucket.name())));
 
-        client.putObject(builder -> builder.bucket(bucketName).key(keyName),
-            RequestBody.fromString(payload));
+        client.putObject(builder -> builder.bucket(bucketName).key(keyName), RequestBody.fromString(payload));
 
         ResponseBytes<GetObjectResponse> response = client.getObjectAsBytes(
             builder -> builder.bucket(bucketName).key(keyName));

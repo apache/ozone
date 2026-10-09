@@ -14,8 +14,7 @@
 # limitations under the License.
 
 *** Settings ***
-Documentation       The packaged ozone local distribution serves path-style SigV4 S3 on 9878,
-...                 accepting the credentials its startup summary prints.
+Documentation       S3 gateway test with aws cli against ozone local
 Library             OperatingSystem
 Library             String
 Resource            ../commonlib.robot
@@ -24,9 +23,9 @@ Test Timeout        5 minutes
 Suite Setup         Setup local ozone S3 smoke
 
 *** Variables ***
+# Needs ozone local run --s3g-port 9878; the S3 Gateway port is ephemeral by default.
 ${ENDPOINT_URL}       http://127.0.0.1:9878
-# LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY and LOCAL_S3_SECRET_KEY, as printed by the
-# ozone local startup summary.
+# LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY, LOCAL_S3_SECRET_KEY and LOCAL_S3_REGION.
 ${S3_ACCESS_KEY}      admin
 ${S3_SECRET_KEY}      admin123
 ${S3_REGION}          us-east-1
