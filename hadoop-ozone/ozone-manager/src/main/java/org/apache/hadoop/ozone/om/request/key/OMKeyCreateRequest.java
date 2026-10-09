@@ -32,7 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
@@ -147,6 +149,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  As for a client for the first time this can be executed on any OM,
       //  till leader is identified.
 
+      final StoragePolicy storagePolicy = getStoragePolicy(bucketInfo, keyArgs);
+      final boolean allowFallbackStoragePolicy = getAllowFallbackStoragePolicy(bucketInfo);
+
       final List<OmKeyLocationInfo> omKeyLocationInfoList;
       final long effectiveDataSize;
       // Skip block allocation if dataSize <= 0. We also consider unspecified dataSize as
@@ -158,12 +163,14 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         effectiveDataSize = keyArgs.getDataSize();
         omKeyLocationInfoList = captureLatencyNs(perfMetrics.getCreateKeyAllocateBlockLatencyNs(),
             () -> allocateBlock(repConfig, new ExcludeList(), effectiveDataSize,
-                keyArgs.getSortDatanodes(), userInfo, ozoneManager));
+                keyArgs.getSortDatanodes(), userInfo, ozoneManager,
+                storagePolicy, allowFallbackStoragePolicy));
       }
 
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
-              .setDataSize(effectiveDataSize);
+              .setDataSize(effectiveDataSize)
+              .setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy));
 
       newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
           .map(info -> info.getProtobuf(false,

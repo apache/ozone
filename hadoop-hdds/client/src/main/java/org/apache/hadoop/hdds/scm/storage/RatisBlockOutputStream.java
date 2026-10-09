@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -78,10 +79,12 @@ public class RatisBlockOutputStream extends BlockOutputStream
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
-      Supplier<ExecutorService> blockOutputStreamResourceProvider
+      Supplier<ExecutorService> blockOutputStreamResourceProvider,
+      StorageType storageType
   ) throws IOException {
     super(blockID, blockSize, xceiverClientManager, pipeline,
-        bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider);
+        bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider,
+        storageType);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
 

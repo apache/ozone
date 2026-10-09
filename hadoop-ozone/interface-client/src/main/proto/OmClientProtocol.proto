@@ -1143,6 +1143,11 @@ message KeyArgs {
     // the given ETag for the operation to succeed. This is used for
     // S3 conditional writes with the If-Match header.
     optional string expectedETag = 24;
+
+    // storagePolicy, when set, overrides the bucket's storage policy for this
+    // key. When unset, OM falls back to the bucket policy, then to the cluster
+    // default, so older clients keep their current behaviour.
+    optional hadoop.hdds.StoragePolicyProto storagePolicy = 25;
 }
 
 message KeyLocation {
@@ -1238,6 +1243,10 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+
+    // Storage policy this key was created with. Absent for keys written before
+    // storage policy support, which are read back using the bucket policy.
+    optional hadoop.hdds.StoragePolicyProto storagePolicy = 23;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing

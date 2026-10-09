@@ -30,7 +30,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.StorageTier;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -101,6 +103,10 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
         .setBucketName(info.getBucketName()).setKeyName(info.getKeyName())
         .setReplicationConfig(b.getReplicationConfig())
         .setDataSize(info.getDataSize())
+        // Carry the key's storage policy into later allocateBlock calls, so blocks allocated
+        // after the pre-allocated ones run out land on the same tier. Null when the key did not
+        // ask for a policy, which leaves OM to resolve it from the bucket as it did on create.
+        .setStoragePolicy(info.getStoragePolicy())
         .setIsMultipartKey(b.isMultipartKey())
         .setMultipartUploadID(b.getMultipartUploadID())
         .setMultipartUploadPartNumber(b.getMultipartNumber());
@@ -168,7 +174,21 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setStreamBufferArgs(streamBufferArgs)
             .setExecutorServiceSupplier(executorServiceSupplier)
             .setForRetry(forRetry)
+            .setStorageType(getStorageType(subKeyInfo))
             .build();
+  }
+
+  /**
+   * Resolves the storage type the block should land on from the storage tier SCM
+   * assigned to it. Returns null when the tier is absent or spans more than one
+   * storage type, which leaves the datanode free to pick any volume.
+   */
+  private static StorageType getStorageType(OmKeyLocationInfo subKeyInfo) {
+    StorageTier storageTier = subKeyInfo.getStorageTier();
+    if (storageTier == null || !storageTier.isUniform()) {
+      return null;
+    }
+    return storageTier.getUniformStorageType();
   }
 
   private synchronized void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo, boolean forRetry) {

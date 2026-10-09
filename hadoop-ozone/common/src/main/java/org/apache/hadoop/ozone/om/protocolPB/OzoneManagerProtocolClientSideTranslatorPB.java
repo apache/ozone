@@ -45,6 +45,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
@@ -763,6 +764,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (args.getExpectedETag() != null) {
       keyArgs.setExpectedETag(args.getExpectedETag());
     }
+    if (args.getStoragePolicy() != null) {
+      keyArgs.setStoragePolicy(OzoneStoragePolicy.toProto(args.getStoragePolicy()));
+    }
 
     req.setKeyArgs(keyArgs.build());
     req.setDerivedKeyPiggyBacking(args.isDerivedKeyPiggyBacking());
@@ -809,6 +813,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             ReplicationConfig.getLegacyFactor(args.getReplicationConfig()));
       }
       keyArgs.setType(args.getReplicationConfig().getReplicationType());
+    }
+
+    // Send the key's storage policy so OM allocates on the same tier as the key's earlier
+    // blocks. Absent when the key inherited its policy, which OM then resolves from the bucket.
+    if (args.getStoragePolicy() != null) {
+      keyArgs.setStoragePolicy(OzoneStoragePolicy.toProto(args.getStoragePolicy()));
     }
 
     req.setKeyArgs(keyArgs);
