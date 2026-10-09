@@ -1467,6 +1467,11 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   }
 
   @Test
+  void testSetVerifyChecksum() throws Exception {
+    setVerifyChecksum(cluster, new Path(ROOT, "testSetVerifyChecksum"));
+  }
+
+  @Test
   public void testLoopInLinkBuckets() throws Exception {
     String linksVolume = UUID.randomUUID().toString();
 

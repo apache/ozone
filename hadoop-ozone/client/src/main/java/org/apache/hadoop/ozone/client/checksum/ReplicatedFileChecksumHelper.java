@@ -26,8 +26,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -38,11 +36,11 @@ import org.apache.hadoop.security.token.Token;
  */
 public class ReplicatedFileChecksumHelper extends BaseFileChecksumHelper {
 
-  public ReplicatedFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
+  public ReplicatedFileChecksumHelper(String volumeName, String bucketName,
       String keyName, long length,
       OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
       ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
-    super(volume, bucket, keyName, length, checksumCombineMode, rpcClient,
+    super(volumeName, bucketName, keyName, length, checksumCombineMode, rpcClient,
         keyInfo);
   }
 

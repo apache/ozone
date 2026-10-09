@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
+import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
@@ -76,6 +77,7 @@ import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for StreamBlockInputStream custom configuration behavior.
@@ -484,6 +486,52 @@ public class TestStreamBlockInputStream {
     }
   }
 
+  /**
+   * A stream killed with DEADLINE_EXCEEDED (e.g. by a deadline on the long-lived call) must be treated
+   * like any other connectivity failure: fail over to a fresh stream instead of surfacing the error.
+   */
+  @Test
+  public void testDeadlineExceededFailsOverToFreshStream() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    clientConfig.setReadRetryInterval(0);
+    BlockID blockID = new BlockID(1L, 13L);
+    byte[] data = {1, 2, 3, 4};
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver = mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+    when(streamingReadResponse.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
+
+    AtomicInteger initCount = new AtomicInteger();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      if (initCount.incrementAndGet() == 1) {
+        // First stream is killed by the transport.
+        reader.onError(Status.DEADLINE_EXCEEDED.asRuntimeException());
+      } else {
+        reader.onNext(ContainerCommandResponseProto.newBuilder()
+            .setCmdType(Type.ReadBlock)
+            .setResult(ContainerProtos.Result.SUCCESS)
+            .setReadBlock(buildReadBlockResponse(data))
+            .build());
+      }
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class))).thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, data.length, pipeline, null, xceiverClientFactory, NO_REFRESH, clientConfig)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      assertEquals(data.length, sbis.read(buf), "read should succeed after failing over to a fresh stream");
+      assertArrayEquals(data, buf.array());
+    }
+    assertEquals(2, initCount.get(), "a fresh stream should have been initialized for the retry");
+  }
+
   private OzoneClientConfig newStreamReadConfig() {
     OzoneClientConfig clientConfig = new OzoneClientConfig();
     clientConfig.setChecksumVerify(false);
@@ -596,6 +644,45 @@ public class TestStreamBlockInputStream {
       assertEquals(4, bytesRead);
       assertArrayEquals(new byte[]{4, 5, 6, 7}, out,
           "should return bytes starting from seek position, skipping the checksum-aligned preamble");
+    }
+  }
+
+  /** A single-byte read returns the byte as 0 to 255: 0xFF must not look like the end of the stream. */
+  @Test
+  public void testReadReturnsUnsignedByte() throws Exception {
+    OzoneClientConfig clientConfig = newStreamReadConfig();
+    BlockID blockID = new BlockID(1L, 13L);
+    Pipeline pipeline = mockStandalonePipeline();
+    ClientCallStreamObserver<ContainerCommandRequestProto> requestObserver =
+        mock(ClientCallStreamObserver.class);
+    StreamingReadResponse streamingReadResponse = mock(StreamingReadResponse.class);
+    when(streamingReadResponse.getRequestObserver()).thenReturn(requestObserver);
+
+    AtomicReference<StreamingReaderSpi> readerRef = new AtomicReference<>();
+    XceiverClientGrpc xceiverClient = mock(XceiverClientGrpc.class);
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      reader.setStreamingReadResponse(streamingReadResponse);
+      readerRef.set(reader);
+      return null;
+    }).when(xceiverClient).initStreamRead(any(BlockID.class), any(), any());
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = readerRef.get();
+      reader.onNext(buildResponseProto(new byte[]{(byte) 0x80, (byte) 0xFF}, 0));
+      reader.onCompleted();
+      return null;
+    }).when(xceiverClient).streamRead(any(), any());
+
+    XceiverClientFactory xceiverClientFactory = mock(XceiverClientFactory.class);
+    when(xceiverClientFactory.acquireClientForReadData(any(Pipeline.class)))
+        .thenReturn(xceiverClient);
+
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockID, 2, pipeline, null, xceiverClientFactory,
+        NO_REFRESH, clientConfig)) {
+      assertEquals(0x80, sbis.read());
+      assertEquals(0xFF, sbis.read());
+      assertEquals(-1, sbis.read());
     }
   }
 
@@ -1138,10 +1225,12 @@ public class TestStreamBlockInputStream {
     return ReadBlockResponseProto.newBuilder()
         .setOffset(0)
         .setData(ByteString.copyFrom(data))
-        .setChecksumData(ChecksumData.newBuilder()
-            .setType(ContainerProtos.ChecksumType.NONE)
-            .setBytesPerChecksum(data.length)
-            .build())
+        .addChunkInfoList(ContainerProtos.ChunkInfo.newBuilder()
+            .setChunkName("chunk").setOffset(0).setLen(data.length)
+            .setChecksumData(ChecksumData.newBuilder()
+                .setType(ContainerProtos.ChecksumType.NONE)
+                .setBytesPerChecksum(data.length)
+                .build()))
         .build();
   }
 
@@ -1152,10 +1241,12 @@ public class TestStreamBlockInputStream {
         .setReadBlock(ReadBlockResponseProto.newBuilder()
             .setOffset(offset)
             .setData(ByteString.copyFrom(data))
-            .setChecksumData(ChecksumData.newBuilder()
-                .setType(ContainerProtos.ChecksumType.NONE)
-                .setBytesPerChecksum(data.length)
-                .build())
+            .addChunkInfoList(ContainerProtos.ChunkInfo.newBuilder()
+                .setChunkName("chunk").setOffset(offset).setLen(data.length)
+                .setChecksumData(ChecksumData.newBuilder()
+                    .setType(ContainerProtos.ChecksumType.NONE)
+                    .setBytesPerChecksum(data.length)
+                    .build()))
             .build())
         .build();
   }
@@ -1167,12 +1258,96 @@ public class TestStreamBlockInputStream {
         .setReadBlock(ReadBlockResponseProto.newBuilder()
             .setOffset(offset)
             .setData(ByteString.copyFrom(data))
-            .setChecksumData(ChecksumData.newBuilder()
-                .setType(ContainerProtos.ChecksumType.CRC32)
-                .setBytesPerChecksum(data.length)
-                .addChecksums(ByteString.copyFrom(new byte[4]))
-                .build())
+            .addChunkInfoList(ContainerProtos.ChunkInfo.newBuilder()
+                .setChunkName("chunk").setOffset(offset).setLen(data.length)
+                .setChecksumData(ChecksumData.newBuilder()
+                    .setType(ContainerProtos.ChecksumType.CRC32)
+                    .setBytesPerChecksum(data.length)
+                    .addChecksums(ByteString.copyFrom(new byte[4]))
+                    .build()))
             .build())
         .build();
+  }
+
+  private static ContainerProtos.ChunkInfo checksummedChunk(byte[] data, int offset, int length) throws Exception {
+    return ContainerProtos.ChunkInfo.newBuilder().setChunkName("chunk-" + offset).setOffset(offset).setLen(length)
+        .setChecksumData(new Checksum(ContainerProtos.ChecksumType.CRC32, 4)
+            .computeChecksum(ByteBuffer.wrap(data, offset, length)).getProtoBufMessage()).build();
+  }
+
+  private static ContainerCommandResponseProto response(byte[] data, long offset,
+      List<ContainerProtos.ChunkInfo> chunks) {
+    return ContainerCommandResponseProto.newBuilder().setCmdType(Type.ReadBlock)
+        .setResult(ContainerProtos.Result.SUCCESS).setReadBlock(ReadBlockResponseProto.newBuilder()
+            .setOffset(offset).setData(ByteString.copyFrom(data)).addAllChunkInfoList(chunks)).build();
+  }
+
+  @Test
+  void testChunkChecksumsAndSeekPrefix() throws Exception {
+    byte[] data = new byte[] {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    List<ContainerProtos.ChunkInfo> chunks = Arrays.asList(
+        checksummedChunk(data, 0, 3), checksummedChunk(data, 3, 9));
+    for (int seek : new int[] {0, 4, 8, 11}) {
+      int offset = seek == 0 ? 0 : 3 + (seek - 3) / 4 * 4;
+      ContainerCommandResponseProto response = response(Arrays.copyOfRange(data, offset, data.length), offset,
+          offset == 0 ? chunks : chunks.subList(1, 2));
+      assertStreamResponse(response, data, seek, true, false);
+    }
+  }
+
+  @Test
+  void testMissingMetadataAndVerificationDisabled() throws Exception {
+    byte[] data = new byte[] {0, 1, 2, 3};
+    ContainerCommandResponseProto missing = response(data, 0, Collections.emptyList());
+    assertStreamResponse(missing, data, 0, true, true);
+    assertStreamResponse(missing, data, 0, false, false);
+    assertStreamResponse(buildResponseProto(data, 0), data, 0, true, false);
+    byte[] corruptData = data.clone();
+    corruptData[0]++;
+    ContainerCommandResponseProto corrupt = response(corruptData, 0,
+        Collections.singletonList(checksummedChunk(data, 0, data.length)));
+    assertStreamResponse(corrupt, data, 0, true, true);
+    assertStreamResponse(corrupt, corruptData, 0, false, false);
+  }
+
+  private void assertStreamResponse(ContainerCommandResponseProto response, byte[] expected, int seek,
+      boolean verifyChecksum, boolean fails) throws Exception {
+    assertStreamResponse(response, expected, seek, verifyChecksum, fails, false);
+    assertStreamResponse(response, expected, seek, verifyChecksum, fails, true);
+  }
+
+  private void assertStreamResponse(ContainerCommandResponseProto response, byte[] expected, int seek,
+      boolean verifyChecksum, boolean fails, boolean positioned) throws Exception {
+    OzoneClientConfig config = newStreamReadConfig();
+    config.setChecksumVerify(verifyChecksum);
+    config.setMaxReadRetryCount(0);
+    ClientCallStreamObserver<ContainerCommandRequestProto> observer = mock(ClientCallStreamObserver.class);
+    XceiverClientGrpc client = mockCapturingStreamingReadClient(observer, reader -> reader.onNext(response));
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any(Pipeline.class))).thenReturn(client);
+    try (StreamBlockInputStream stream = new StreamBlockInputStream(new BlockID(1, 16258), expected.length,
+        mockStandalonePipeline(), null, factory, NO_REFRESH, config)) {
+      stream.seek(seek);
+      byte[] actual = new byte[expected.length - seek];
+      if (fails) {
+        IOException error = assertThrows(IOException.class, () -> {
+          if (positioned) {
+            stream.readPositioned(seek, ByteBuffer.wrap(actual));
+          } else {
+            stream.read(actual);
+          }
+        });
+        assertThat(hasCause(error, OzoneChecksumException.class)).isTrue();
+        assertArrayEquals(new byte[actual.length], actual);
+      } else {
+        assertEquals(actual.length, positioned
+            ? stream.readPositioned(seek, ByteBuffer.wrap(actual)) : stream.read(actual));
+        assertArrayEquals(Arrays.copyOfRange(expected, seek, expected.length), actual);
+      }
+    }
+    ArgumentCaptor<ContainerCommandRequestProto> request = ArgumentCaptor.forClass(ContainerCommandRequestProto.class);
+    verify(client).streamRead(request.capture(), any());
+    assertEquals(verifyChecksum, request.getValue().getReadBlock().getIncludeChecksums());
+    verify(client, times(1)).completeStreamRead();
   }
 }
