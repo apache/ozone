@@ -625,7 +625,7 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public OzoneManagerVersion getOmVersion() {
-    return OzoneManagerVersion.CURRENT;
+    return OzoneManagerVersion.SOFTWARE_VERSION;
   }
 
   @Override

@@ -35,6 +35,16 @@ export const DatanodeOpStateList = [
 ] as const;
 export type DatanodeOpState = typeof DatanodeOpStateList[number];
 
+export type DatanodeDiskInfo = {
+  storageUuid: string;
+  storageLocation: string;
+  capacity: number;
+  used: number;
+  remaining: number;
+  committed: number;
+  openContainerCount: number | null;
+}
+
 export type DatanodeResponse = {
   hostname: string;
   state: DatanodeState;
@@ -51,6 +61,7 @@ export type DatanodeResponse = {
   revision: string;
   buildDate: string;
   networkLocation: string;
+  disks?: DatanodeDiskInfo[];
 }
 
 export type DatanodesResponse = {
@@ -78,6 +89,7 @@ export type Datanode = {
   revision: string;
   buildDate: string;
   networkLocation: string;
+  disks?: DatanodeDiskInfo[];
 }
 
 export type DatanodeDetails = {

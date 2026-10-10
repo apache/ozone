@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -460,7 +461,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
 
   @Override
   public HddsProtos.NetworkNode toProtobuf(
-      int clientVersion) {
+      ClientVersion clientVersion) {
 
     HddsProtos.InnerNode.Builder innerNode =
         HddsProtos.InnerNode.newBuilder()

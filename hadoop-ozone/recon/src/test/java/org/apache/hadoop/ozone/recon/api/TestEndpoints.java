@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -66,6 +66,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -81,7 +82,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
@@ -96,10 +97,10 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -115,6 +116,7 @@ import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
 import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.BucketsResponse;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeDiskInfo;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
@@ -381,6 +383,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setFsCapacity(40000)
             .setFsAvailable(15000)
             .setStorageUuid(UUID.randomUUID().toString())
+            .setOpenContainerCount(3)
             .setFailed(false).build();
     StorageReportProto storageReportProto2 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
@@ -428,7 +431,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         NodeReportProto.newBuilder()
             .addStorageReport(storageReportProto3)
             .addStorageReport(storageReportProto4).build();
-    LayoutVersionProto layoutInfo = defaultLayoutVersionProto();
+    DatanodeVersionProto versionInfo = defaultVersionProto();
 
     DatanodeDetailsProto datanodeDetailsProto3 =
         DatanodeDetailsProto.newBuilder()
@@ -467,17 +470,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     assertDoesNotThrow(() -> {
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto, nodeReportProto,
-              containerReportsProto, pipelineReportsProto, layoutInfo);
+              containerReportsProto, pipelineReportsProto, versionInfo);
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto2, nodeReportProto2,
               ContainerReportsProto.newBuilder().build(),
               PipelineReportsProto.newBuilder().build(),
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       reconScm.getDatanodeProtocolServer()
           .register(extendedDatanodeDetailsProto3, nodeReportProto3,
               ContainerReportsProto.newBuilder().build(),
               PipelineReportsProto.newBuilder().build(),
-              defaultLayoutVersionProto());
+              defaultVersionProto());
       // Process all events in the event queue
       reconScm.getEventQueue().processAll(1000);
     });
@@ -616,6 +619,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       assertEquals(pipeline.getLeaderNode().getHostName(),
           datanodeMetadata.getPipelines().get(0).getLeaderNode());
       assertEquals(1, datanodeMetadata.getLeaderCount());
+      assertEquals(2, datanodeMetadata.getDisks().size());
+      DatanodeDiskInfo disk1 = datanodeMetadata.getDisks().stream()
+          .filter(d -> "/disk1".equals(d.getStorageLocation()))
+          .findFirst().orElse(null);
+      assertNotNull(disk1);
+      assertEquals(3L, disk1.getOpenContainerCount());
+      DatanodeDiskInfo disk2 = datanodeMetadata.getDisks().stream()
+          .filter(d -> "/disk2".equals(d.getStorageLocation()))
+          .findFirst().orElse(null);
+      assertNotNull(disk2);
+      assertNull(disk2.getOpenContainerCount());
       break;
     case HOST2:
       assertEquals(130000,
@@ -655,8 +669,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       fail(String.format("Datanode %s not registered",
           hostname));
     }
-    assertEquals(HDDSLayoutVersionManager.maxLayoutVersion(),
-        datanodeMetadata.getLayoutVersion());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), datanodeMetadata.getApparentVersion());
   }
 
   @Test
@@ -1323,7 +1336,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setContainerReport(containerReportsProto)
             .setDatanodeDetails(extendedDatanodeDetailsProto
                 .getDatanodeDetails())
-            .setDataNodeLayoutVersion(defaultLayoutVersionProto())
+            .setDatanodeVersion(defaultVersionProto())
             .build();
     reconScm.getDatanodeProtocolServer().sendHeartbeat(heartbeatRequestProto);
     LambdaTestUtils.await(30000, 1000, check);
@@ -1405,7 +1418,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testSuccessWhenDecommissionStatus() throws IOException {
-    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(ClientVersion.class))).thenReturn(
         nodes); // 2 nodes decommissioning
     when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
     when(mockScmClient.getMetrics(any())).thenReturn(metrics.get(1));
@@ -1431,7 +1444,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
 
   @Test
   public void testSuccessWhenDecommissionStatusWithUUID() throws IOException {
-    when(mockScmClient.queryNode(any(), any(), any(), any(), any(Integer.class))).thenReturn(
+    when(mockScmClient.queryNode(any(), any(), any(), any(), any(ClientVersion.class))).thenReturn(
         getNodeDetailsForUuid("654c4b89-04ef-4015-8a3b-50d0fb0e1684")); // 1 nodes decommissioning
     when(mockScmClient.getContainersOnDecomNode(any())).thenReturn(containerOnDecom);
     Response datanodesDecommissionInfo =
