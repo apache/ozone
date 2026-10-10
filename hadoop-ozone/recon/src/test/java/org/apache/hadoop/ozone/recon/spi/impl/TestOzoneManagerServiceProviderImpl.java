@@ -38,8 +38,10 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,6 +55,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.SequenceNumberNotFoundException;
@@ -355,13 +358,18 @@ public class TestOzoneManagerServiceProviderImpl {
     // OM Service Provider's Metadata Manager.
     OMMetadataManager omMetadataManager =
         initializeNewOmMetadataManager(dirOmMetadata);
+    ReconOMMetadataManager reconOMMetadataManager =
+        getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata);
+    DBStore omDbStore = spy(reconOMMetadataManager.getStore());
+    ReconOMMetadataManager spiedReconOMMetadataManager = spy(reconOMMetadataManager);
+    doReturn(omDbStore).when(spiedReconOMMetadataManager).getStore();
 
     OzoneConfiguration withLimitConfiguration =
         new OzoneConfiguration(configuration);
     withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LIMIT, 10);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(configuration,
-            getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
+            spiedReconOMMetadataManager,
             getMockTaskController(), new ReconUtils(), getMockOzoneManagerClient(dbUpdatesWrapper),
             reconContext, getMockTaskStatusUpdaterManager());
 
@@ -373,6 +381,7 @@ public class TestOzoneManagerServiceProviderImpl {
     assertEquals(4.0,
         metrics.getAverageNumUpdatesInDeltaRequest(), 0.0);
     assertEquals(1, metrics.getNumNonZeroDeltaRequests());
+    verify(omDbStore, times(dbUpdatesWrapper.getData().size())).commitBatchOperation(any());
 
     // In this method, we have to assert the "GET" path and the "APPLY" path.
 
