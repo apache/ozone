@@ -36,10 +36,13 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTOR
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -118,6 +121,11 @@ public abstract class BaseHttpServer implements AutoCloseable {
         // Ozone config prefix must be set to avoid AuthenticationFilter
         // fall back to default one form hadoop.http.authentication.
         builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
+        // Without an explicit host, HttpServer2 expands _HOST in the SPNEGO
+        // principal to the host of its first endpoint, which is the bind
+        // address: a wildcard or interface-specific bind host does not name
+        // this node and matches no keytab entry.
+        builder.hostName(getSpnegoHost());
         if (httpAuthType.equals("kerberos")) {
           builder.setSecurityEnabled(true);
           builder.setUsernameConfKey(getSpnegoPrincipal());
@@ -327,6 +335,28 @@ public abstract class BaseHttpServer implements AutoCloseable {
 
     return NetUtils.createSocketAddr(
         getHostPortString(hostName, addressPort.orElse(bindPortdefault)));
+  }
+
+  /**
+   * Returns the host that replaces {@code _HOST} in this server's SPNEGO
+   * principal: the host of the advertised HTTP or HTTPS address unless it is
+   * a wildcard, otherwise the canonical name of the local host.
+   */
+  protected String getSpnegoHost() throws UnknownHostException {
+    for (String addressKey : new String[] {getHttpAddressKey(), getHttpsAddressKey()}) {
+      Optional<String> host = getHostNameFromConfigKeys(conf, addressKey);
+      if (host.isPresent() && !isWildcardHost(host.get())) {
+        return host.get();
+      }
+    }
+    return InetAddress.getLocalHost().getCanonicalHostName();
+  }
+
+  private static boolean isWildcardHost(String host) {
+    // Judged on the text first: InetAddresses.forString rejects a scoped
+    // literal unless this host owns the named interface.
+    return host.indexOf('%') < 0 && InetAddresses.isInetAddress(host)
+        && InetAddresses.forString(host).isAnyLocalAddress();
   }
 
   /**

@@ -126,7 +126,7 @@ class S3GatewayWebAdminServer extends BaseHttpServer {
             conf.get(OZONE_S3G_WEB_AUTHENTICATION_KERBEROS_PRINCIPAL);
         if (!Strings.isNullOrEmpty(principalInConf)) {
           params.put("kerberos.principal", SecurityUtil.getServerPrincipal(
-              principalInConf, conf.get(OZONE_S3G_WEBADMIN_HTTP_BIND_HOST_KEY)));
+              principalInConf, getSpnegoHost()));
         }
         String httpKeytab = conf.get(OZONE_S3G_KEYTAB_FILE);
         if (!Strings.isNullOrEmpty(httpKeytab)) {

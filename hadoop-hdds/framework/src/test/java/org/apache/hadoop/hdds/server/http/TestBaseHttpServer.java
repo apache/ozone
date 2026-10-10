@@ -27,18 +27,24 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.file.Path;
-import org.apache.commons.lang3.NotImplementedException;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHandler;
 import org.apache.ozone.test.GenericTestUtils.PortAllocator;
+import org.eclipse.jetty.ee8.servlet.FilterHolder;
 import org.eclipse.jetty.ee8.webapp.WebAppContext;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test Common ozone/hdds web methods.
@@ -54,6 +60,10 @@ class TestBaseHttpServer {
   private static final int BIND_PORT_HTTP_DEFAULT = PortAllocator.getFreePort();
   private static final int BIND_PORT_HTTPS_DEFAULT = PortAllocator.getFreePort();
   private static final String ENABLED_KEY = "enabled";
+  private static final String HTTP_AUTH_TYPE_KEY = "http.auth.type";
+  private static final String HTTP_AUTH_CONFIG_PREFIX = "http.auth.";
+  private static final String KEYTAB_KEY = "http.kerberos.keytab";
+  private static final String SPNEGO_PRINCIPAL_KEY = "http.kerberos.principal";
 
   private String hostname;
 
@@ -206,10 +216,7 @@ class TestBaseHttpServer {
     BaseHttpServer subject = new TestingHttpServer(conf);
     try {
       subject.start();
-      Field field = BaseHttpServer.class.getDeclaredField("httpServer");
-      field.setAccessible(true);
-      WebAppContext webAppContext =
-          ((HttpServer2) field.get(subject)).getWebAppContext();
+      WebAppContext webAppContext = httpServer2Of(subject).getWebAppContext();
       assertEquals(new File(tempDir.toFile(), "testing").getCanonicalFile(),
           webAppContext.getTempDirectory().getCanonicalFile());
       assertTrue(webAppContext.isPersistTempDirectory());
@@ -232,15 +239,85 @@ class TestBaseHttpServer {
     BaseHttpServer subject = new TestingHttpServer(conf);
     try {
       subject.start();
-      Field field = BaseHttpServer.class.getDeclaredField("httpServer");
-      field.setAccessible(true);
-      WebAppContext webAppContext =
-          ((HttpServer2) field.get(subject)).getWebAppContext();
+      WebAppContext webAppContext = httpServer2Of(subject).getWebAppContext();
       assertEquals(operatorTempDir.getCanonicalFile(),
           webAppContext.getTempDirectory().getCanonicalFile());
     } finally {
       subject.stop();
     }
+  }
+
+  static Stream<Arguments> advertisedAddressesNamingNoHost() {
+    return Stream.of(
+        Arguments.of(null, null),
+        Arguments.of("0.0.0.0:9874", "0.0.0.0:9875"),
+        Arguments.of("[::]:9874", "[::]:9875"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("advertisedAddressesNamingNoHost")
+  void spnegoHostFallsBackToLocalHostWithoutAdvertisedHost(
+      String httpAddress, String httpsAddress) throws Exception {
+    BaseHttpServer subject = newDisabledServer(httpAddress, httpsAddress);
+
+    assertEquals(InetAddress.getLocalHost().getCanonicalHostName(),
+        subject.getSpnegoHost());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "om1.example.com:9874, , om1.example.com",
+      "0.0.0.0:9874, om1.example.com:9875, om1.example.com",
+      "[2001:db8::1]:9874, , 2001:db8::1",
+  })
+  void spnegoHostIsAdvertisedHost(String httpAddress, String httpsAddress,
+      String expectedHost) throws Exception {
+    BaseHttpServer subject = newDisabledServer(httpAddress, httpsAddress);
+
+    assertEquals(expectedHost, subject.getSpnegoHost());
+  }
+
+  /**
+   * The bind host is what {@link HttpServer2} expands {@code _HOST} to when
+   * it is not told otherwise; none of these name the host the keytab was
+   * issued for.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"0.0.0.0", "::", "127.0.0.1"})
+  void spnegoPrincipalNamesAdvertisedHostNotBindHost(String bindHost)
+      throws Exception {
+    MutableConfigurationSource conf = newConfig(HttpConfig.Policy.HTTP_ONLY);
+    conf.set(BIND_HOST_HTTP_KEY, bindHost);
+    conf.set(ADDRESS_HTTP_KEY, "om1.example.com:" + BIND_PORT_HTTP_DEFAULT);
+    conf.set(HTTP_AUTH_TYPE_KEY, "kerberos");
+    conf.set(SPNEGO_PRINCIPAL_KEY, "HTTP/_HOST@EXAMPLE.COM");
+
+    try (BaseHttpServer subject = new SecureTestingHttpServer(conf)) {
+      FilterHolder spnegoFilter = httpServer2Of(subject).getWebAppContext()
+          .getServletHandler().getFilter(HttpServer2.SPNEGO_FILTER);
+      assertEquals("HTTP/om1.example.com@EXAMPLE.COM",
+          spnegoFilter.getInitParameter(KerberosAuthenticationHandler.PRINCIPAL));
+    }
+  }
+
+  private BaseHttpServer newDisabledServer(String httpAddress,
+      String httpsAddress) throws IOException {
+    MutableConfigurationSource conf = newConfig(HttpConfig.Policy.HTTP_ONLY);
+    conf.setBoolean(ENABLED_KEY, false);
+    if (httpAddress != null) {
+      conf.set(ADDRESS_HTTP_KEY, httpAddress);
+    }
+    if (httpsAddress != null) {
+      conf.set(ADDRESS_HTTPS_KEY, httpsAddress);
+    }
+    return new TestingHttpServer(conf);
+  }
+
+  private static HttpServer2 httpServer2Of(BaseHttpServer server)
+      throws ReflectiveOperationException {
+    Field field = BaseHttpServer.class.getDeclaredField("httpServer");
+    field.setAccessible(true);
+    return (HttpServer2) field.get(server);
   }
 
   private MutableConfigurationSource newConfig(HttpConfig.Policy policy) {
@@ -293,12 +370,12 @@ class TestBaseHttpServer {
 
     @Override
     protected String getKeytabFile() {
-      throw new NotImplementedException();
+      return KEYTAB_KEY;
     }
 
     @Override
     protected String getSpnegoPrincipal() {
-      throw new NotImplementedException();
+      return SPNEGO_PRINCIPAL_KEY;
     }
 
     @Override
@@ -308,12 +385,25 @@ class TestBaseHttpServer {
 
     @Override
     protected String getHttpAuthType() {
-      throw new NotImplementedException();
+      return HTTP_AUTH_TYPE_KEY;
     }
 
     @Override
     protected String getHttpAuthConfigPrefix() {
-      throw new NotImplementedException();
+      return HTTP_AUTH_CONFIG_PREFIX;
+    }
+  }
+
+  /** Reports HTTP security as enabled without a Kerberos login. */
+  private static final class SecureTestingHttpServer extends TestingHttpServer {
+
+    SecureTestingHttpServer(MutableConfigurationSource conf) throws IOException {
+      super(conf);
+    }
+
+    @Override
+    public boolean isSecurityEnabled() {
+      return true;
     }
   }
 
