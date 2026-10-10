@@ -50,6 +50,11 @@ export const pipelineLocators = {
   pipelineTableRow: (uuid: string) => `pipelinetable-${uuid}`
 }
 
+export const containerLocators = {
+  containerRowRegex: /containerstable-/,
+  containerTableRow: (containerId: number) => `containerstable-${containerId}`,
+}
+
 export const autoReloadPanelLocators = {
   'autoreloadPanel': 'autoreload-panel',
   'refreshButton': 'autoreload-panel-refresh',
