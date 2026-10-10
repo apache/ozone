@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -163,6 +164,30 @@ public class TestKeyValueStreamDataChannel {
     System.arraycopy(data1, 0, expected, 0, data1.length);
     System.arraycopy(data2, 0, expected, data1.length, data2.length);
     assertArrayEquals(expected, Files.readAllBytes(tempFile.toPath()));
+  }
+
+  @Test
+  public void testPollAllEmpty() {
+    final Buffers buffers = new Buffers(PUT_BLOCK_REQUEST_LENGTH_MAX);
+    assertTrue(buffers.isEmpty());
+
+    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+    final ByteBuf buf = ref.retain();
+    try {
+      assertSame(Unpooled.EMPTY_BUFFER, buf);
+      assertFalse(buf.isReadable());
+    } finally {
+      ref.release();
+    }
+
+    assertTrue(buffers.isEmpty());
+    final ReferenceCountedObject<ByteBuf> again = buffers.pollAll();
+    final ByteBuf bufAgain = again.retain();
+    try {
+      assertSame(Unpooled.EMPTY_BUFFER, bufAgain);
+    } finally {
+      again.release();
+    }
   }
 
   @Test

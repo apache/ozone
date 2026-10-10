@@ -90,7 +90,9 @@ class Buffers {
   }
 
   ReferenceCountedObject<ByteBuf> pollAll() {
-    Preconditions.checkState(!deque.isEmpty(), "The deque is empty");
+    if (deque.isEmpty()) {
+      return ReferenceCountedObject.wrap(Unpooled.EMPTY_BUFFER);
+    }
     final ByteBuffer[] array = new ByteBuffer[deque.size()];
     final List<ReferenceCountedObject<ByteBuffer>> refs = new ArrayList<>(deque.size());
     for (int i = 0; i < array.length; i++) {
