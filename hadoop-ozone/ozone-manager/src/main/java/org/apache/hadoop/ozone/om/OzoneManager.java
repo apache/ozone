@@ -167,6 +167,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.management.ObjectName;
+import javax.net.SocketFactory;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
@@ -429,6 +430,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private ScmTopologyClient scmTopologyClient;
   private final Text omRpcAddressTxt;
   private OzoneConfiguration configuration;
+  private final OzoneConfiguration scmLocationClientConfiguration;
   private OmConfig config;
   private RPC.Server omRpcServer;
   private GrpcOzoneManagerServer omS3gGrpcServer;
@@ -681,19 +683,33 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Honor property 'hadoop.security.token.service.use_ip'
     omRpcAddressTxt = new Text(SecurityUtil.buildTokenService(omNodeRpcAddr));
 
+    scmLocationClientConfiguration =
+        OMScmLocationClientConfig.createScmClientConfiguration(configuration);
+    SocketFactory scmLocationSocketFactory =
+        OMScmLocationClientConfig.createSocketFactory(configuration);
     // Retain SCM proxy providers so OM can dynamically reload nodes/addresses without restarting.
     final SCMContainerLocationFailoverProxyProvider scmContainerProxyProvider =
-        new SCMContainerLocationFailoverProxyProvider(configuration, null);
+        new SCMContainerLocationFailoverProxyProvider(
+            scmLocationClientConfiguration, null, scmLocationSocketFactory);
     final StorageContainerLocationProtocol scmContainerClient =
-        HAUtils.getScmContainerClient(configuration, scmContainerProxyProvider);
+        HAUtils.getScmContainerClient(scmLocationClientConfiguration,
+            scmContainerProxyProvider);
     // verifies that the SCM info in the OM Version file is correct.
     final SCMBlockLocationFailoverProxyProvider scmBlockProxyProvider =
-        new SCMBlockLocationFailoverProxyProvider(configuration);
+        new SCMBlockLocationFailoverProxyProvider(
+            scmLocationClientConfiguration, scmLocationSocketFactory);
     final ScmBlockLocationProtocol scmBlockClient =
-        HAUtils.getScmBlockClient(configuration, scmBlockProxyProvider);
+        HAUtils.getScmBlockClient(scmLocationClientConfiguration,
+            scmBlockProxyProvider);
+    final SCMBlockLocationFailoverProxyProvider keyDeletionScmBlockProxyProvider =
+        new SCMBlockLocationFailoverProxyProvider(configuration);
+    final ScmBlockLocationProtocol keyDeletionScmBlockClient =
+        HAUtils.getScmBlockClient(configuration,
+            keyDeletionScmBlockProxyProvider);
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,
-        scmBlockProxyProvider, scmContainerProxyProvider, configuration);
+        scmBlockProxyProvider, scmContainerProxyProvider, configuration,
+        keyDeletionScmBlockClient, keyDeletionScmBlockProxyProvider);
     this.ozoneLockProvider = new OzoneLockProvider(getKeyPathLockEnabled(),
         getEnableFileSystemPaths());
 
@@ -6113,7 +6129,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     String scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY,
         HddsUtils.getScmServiceId(configuration));
     String previous = configuration.get(scmNodesKey);
+    String previousLocationClientValue =
+        scmLocationClientConfiguration.get(scmNodesKey);
     configuration.set(scmNodesKey, value);
+    scmLocationClientConfiguration.set(scmNodesKey, value);
     try {
       scmClient.reloadScmNodes();
       LOG.info("Reloaded SCM proxy configuration for {} : {}", scmNodesKey, value);
@@ -6123,6 +6142,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         configuration.unset(scmNodesKey);
       } else {
         configuration.set(scmNodesKey, previous);
+      }
+      if (previousLocationClientValue == null) {
+        scmLocationClientConfiguration.unset(scmNodesKey);
+      } else {
+        scmLocationClientConfiguration.set(scmNodesKey,
+            previousLocationClientValue);
       }
       throw e;
     }
@@ -6146,6 +6171,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean scmProxyKeyChanged = changedProperties.keySet().stream()
         .anyMatch(key -> key.equals(scmNodesKey) || key.startsWith(scmAddressPrefix));
     if (scmProxyKeyChanged) {
+      changedProperties.keySet().stream()
+          .filter(key -> key.equals(scmNodesKey) || key.startsWith(scmAddressPrefix))
+          .forEach(key -> {
+            String value = newConf.get(key);
+            if (value == null) {
+              scmLocationClientConfiguration.unset(key);
+            } else {
+              scmLocationClientConfiguration.set(key, value);
+            }
+          });
       try {
         scmClient.reloadScmNodes();
         LOG.info("Reloaded SCM failover proxies after reconfiguration of {} / {}*",
