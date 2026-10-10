@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
@@ -53,8 +54,11 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -72,6 +76,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils;
 import org.apache.hadoop.hdds.utils.Cache;
 import org.apache.hadoop.hdds.utils.ResourceCache;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
@@ -109,6 +114,9 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.FileUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
@@ -124,6 +132,7 @@ import org.slf4j.LoggerFactory;
  * <p>
  * The container requests can be divided into readonly request, WriteChunk request and other write requests.
  * - Read only requests (see {@link HddsUtils#isReadOnly}) are handled by {@link #query(Message)}.
+ * - ReadBlock requests on a Ratis read-only data stream are handled by {@link #transferTo}.
  * - WriteChunk request contains user data
  * - Other write request does not contain user data.
  * <p>
@@ -890,6 +899,97 @@ public class ContainerStateMachine extends BaseStateMachine {
       metrics.incNumQueryStateMachineFails();
       return completeExceptionally(e);
     }
+  }
+
+  /** Serves a Ratis read-only data stream. Only ReadBlock is supported, see {@link #streamReadBlock}. */
+  @Override
+  public long transferTo(Message request, WritableByteChannel stream) throws IOException {
+    try {
+      metrics.incNumQueryStateMachineOps();
+      final ContainerCommandRequestProto requestProto = message2ContainerCommandRequestProto(request);
+      if (requestProto.getCmdType() != Type.ReadBlock) {
+        throw new IOException("Unsupported command for a read-only data stream: " + requestProto.getCmdType());
+      }
+      return streamReadBlock(dispatcher, requestProto, stream);
+    } catch (IOException e) {
+      metrics.incNumQueryStateMachineFails();
+      throw e;
+    }
+  }
+
+  /**
+   * Reads a block and writes each ReadBlock response to the stream as one reply:
+   * {@code [int: metadata length][metadata: the response without its data][data]}.
+   * Then closes the stream, which sends the terminal reply.
+   * If the read fails, this method throws without closing the stream. Ratis sends the failure as the terminal reply.
+   *
+   * @return the number of bytes written to the stream
+   */
+  static long streamReadBlock(ContainerDispatcher dispatcher, ContainerCommandRequestProto request,
+      WritableByteChannel stream) throws IOException {
+    final AtomicLong bytesWritten = new AtomicLong();
+    final AtomicReference<Throwable> error = new AtomicReference<>();
+    final StreamObserver<ContainerCommandResponseProto> observer = new StreamObserver<ContainerCommandResponseProto>() {
+      @Override
+      public void onNext(ContainerCommandResponseProto response) {
+        try {
+          bytesWritten.addAndGet(writeReadBlockReply(stream, response));
+        } catch (IOException e) {
+          error.set(e);
+          throw Status.CANCELLED.withDescription("Failed to write a ReadBlock reply").withCause(e).asRuntimeException();
+        }
+      }
+
+      @Override
+      public void onError(Throwable t) {
+        error.compareAndSet(null, t);
+      }
+
+      @Override
+      public void onCompleted() {
+      }
+    };
+
+    try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
+      dispatcher.streamDataReadOnly(request, observer, blockFile, null);
+    } catch (StatusRuntimeException e) {
+      error.compareAndSet(null, e);
+    }
+    if (error.get() != null) {
+      throw new IOException("Failed to read block " + BlockID.getFromProtobuf(request.getReadBlock().getBlockID()),
+          error.get());
+    }
+    stream.close();
+    return bytesWritten.get();
+  }
+
+  private static int writeReadBlockReply(WritableByteChannel stream, ContainerCommandResponseProto response)
+      throws IOException {
+    final ByteString data;
+    final ContainerCommandResponseProto metadata;
+    if (response.hasReadBlock()) {
+      data = response.getReadBlock().getData();
+      metadata = response.toBuilder()
+          .setReadBlock(response.getReadBlock().toBuilder().setData(ByteString.EMPTY))
+          .build();
+    } else {
+      data = ByteString.EMPTY;
+      metadata = response;
+    }
+    final ByteString metadataBytes = metadata.toByteString();
+    final ByteBuffer reply = ByteBuffer.allocate(Integer.BYTES + metadataBytes.size() + data.size());
+    reply.putInt(metadataBytes.size());
+    metadataBytes.copyTo(reply);
+    data.copyTo(reply);
+    reply.flip();
+
+    // The client parses each reply on its own, so the reply must be sent in one write.
+    final int length = reply.remaining();
+    final int written = stream.write(reply);
+    if (written != length) {
+      throw new IOException("Failed to write a ReadBlock reply: only " + written + " of " + length + " bytes written");
+    }
+    return length;
   }
 
   private ByteString readStateMachineData(

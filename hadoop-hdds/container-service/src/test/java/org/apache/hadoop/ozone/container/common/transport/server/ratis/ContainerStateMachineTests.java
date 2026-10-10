@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_CONTAINER_RATIS_STATEMACHINE_WRITE_WAIT_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -38,6 +40,9 @@ import static org.mockito.Mockito.when;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.WritableByteChannel;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -46,6 +51,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -68,6 +74,9 @@ import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -256,6 +265,148 @@ abstract class ContainerStateMachineTests {
     assertInstanceOf(StorageContainerException.class, catcher.getReceived().getCause());
     StorageContainerException sce = (StorageContainerException) catcher.getReceived().getCause();
     assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
+  }
+
+  @Test
+  public void testTransferToReadBlock() throws Exception {
+    final ByteString first = ByteString.copyFromUtf8("first data");
+    final List<ContainerProtos.ContainerCommandResponseProto> responses = Arrays.asList(
+        readBlockResponse(0, first), readBlockResponse(first.size(), ByteString.copyFromUtf8("second data")));
+    setUpMockReadBlock(observer -> responses.forEach(observer::onNext));
+    final List<ByteBuffer> replies = new ArrayList<>();
+    final WritableByteChannel stream = newReadStream(replies);
+
+    final long written = stateMachine.transferTo(newRequest(ContainerProtos.Type.ReadBlock), stream);
+
+    // Each response is one reply: [metadata length][the response without its data][data]
+    assertEquals(responses.size(), replies.size());
+    long replyBytes = 0;
+    for (int i = 0; i < responses.size(); i++) {
+      final ContainerProtos.ContainerCommandResponseProto response = responses.get(i);
+      final ByteBuffer reply = replies.get(i);
+      replyBytes += reply.remaining();
+      assertEquals(readBlockResponse(response.getReadBlock().getOffset(), ByteString.EMPTY), parseMetadata(reply));
+      assertEquals(response.getReadBlock().getData(), ByteString.copyFrom(reply));
+    }
+    assertEquals(replyBytes, written);
+    verify(stream).close();
+  }
+
+  @Test
+  public void testTransferToReadBlockErrorResponse() throws Exception {
+    final ContainerProtos.ContainerCommandResponseProto error = errorResponse();
+    setUpMockReadBlock(observer -> observer.onNext(error));
+    final List<ByteBuffer> replies = new ArrayList<>();
+    final WritableByteChannel stream = newReadStream(replies);
+
+    stateMachine.transferTo(newRequest(ContainerProtos.Type.ReadBlock), stream);
+
+    assertEquals(1, replies.size());
+    assertEquals(error, parseMetadata(replies.get(0)));
+    assertFalse(replies.get(0).hasRemaining());
+    verify(stream).close();
+  }
+
+  /** The stream stays open, so Ratis sends the failure as the terminal reply. */
+  @Test
+  public void testTransferToReadBlockReadFailure() throws Exception {
+    final StatusRuntimeException failure = Status.OUT_OF_RANGE.asRuntimeException();
+    setUpMockReadBlock(observer -> observer.onError(failure));
+    final WritableByteChannel stream = mock(WritableByteChannel.class);
+
+    final IOException e = assertThrows(IOException.class,
+        () -> stateMachine.transferTo(newRequest(ContainerProtos.Type.ReadBlock), stream));
+
+    assertSame(failure, e.getCause());
+    verify(stream, never()).write(any());
+    verify(stream, never()).close();
+  }
+
+  @Test
+  public void testTransferToReadBlockWriteFailure() throws Exception {
+    setUpMockReadBlock(observer -> {
+      final StatusRuntimeException e = assertThrows(StatusRuntimeException.class,
+          () -> observer.onNext(readBlockResponse(0, ByteString.EMPTY)));
+      // KeyValueHandler passes a CANCELLED status on, so the dispatcher does not scan the container.
+      assertEquals(Status.Code.CANCELLED, e.getStatus().getCode());
+      throw e;
+    });
+    final IOException failure = new IOException("Connection closed");
+    final WritableByteChannel stream = mock(WritableByteChannel.class);
+    when(stream.write(any())).thenThrow(failure);
+
+    final IOException e = assertThrows(IOException.class,
+        () -> stateMachine.transferTo(newRequest(ContainerProtos.Type.ReadBlock), stream));
+
+    assertSame(failure, e.getCause());
+    verify(stream, times(1)).write(any());
+    verify(stream, never()).close();
+  }
+
+  @Test
+  public void testTransferToUnsupportedCommand() throws Exception {
+    final WritableByteChannel stream = mock(WritableByteChannel.class);
+
+    assertThrows(IOException.class, () -> stateMachine.transferTo(newRequest(ContainerProtos.Type.GetBlock), stream));
+
+    verify(dispatcher, never()).streamDataReadOnly(any(), any(), any(), any());
+    verify(stream, never()).write(any());
+  }
+
+  private void setUpMockReadBlock(Consumer<StreamObserver<ContainerProtos.ContainerCommandResponseProto>> readBlock) {
+    doAnswer(invocation -> {
+      readBlock.accept(invocation.getArgument(1));
+      return null;
+    }).when(dispatcher).streamDataReadOnly(any(), any(), any(), any());
+  }
+
+  private static Message newRequest(ContainerProtos.Type type) {
+    return ContainerCommandRequestMessage.toMessage(ContainerProtos.ContainerCommandRequestProto.newBuilder()
+        .setCmdType(type)
+        .setContainerID(1)
+        .setDatanodeUuid(UUID.randomUUID().toString())
+        .build(), null);
+  }
+
+  private static ContainerProtos.ContainerCommandResponseProto readBlockResponse(long offset, ByteString data) {
+    return ContainerProtos.ContainerCommandResponseProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.ReadBlock)
+        .setResult(ContainerProtos.Result.SUCCESS)
+        .setReadBlock(ContainerProtos.ReadBlockResponseProto.newBuilder()
+            .setOffset(offset)
+            .setData(data))
+        .build();
+  }
+
+  private static ContainerProtos.ContainerCommandResponseProto errorResponse() {
+    return ContainerProtos.ContainerCommandResponseProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.ReadBlock)
+        .setResult(ContainerProtos.Result.CONTAINER_NOT_FOUND)
+        .setMessage("Container not found")
+        .build();
+  }
+
+  /** @return a mock Ratis read-only stream, which sends each buffer as one reply and does not move its position. */
+  private static WritableByteChannel newReadStream(List<ByteBuffer> replies) throws IOException {
+    final WritableByteChannel stream = mock(WritableByteChannel.class);
+    when(stream.write(any())).thenAnswer(invocation -> {
+      final ByteBuffer buffer = invocation.getArgument(0);
+      final ByteBuffer reply = ByteBuffer.allocate(buffer.remaining());
+      reply.put(buffer.duplicate());
+      reply.flip();
+      replies.add(reply);
+      return reply.remaining();
+    });
+    return stream;
+  }
+
+  /** Parses the metadata of a reply, and moves the reply to its data. */
+  private static ContainerProtos.ContainerCommandResponseProto parseMetadata(ByteBuffer reply) throws IOException {
+    final int length = reply.getInt();
+    final ByteBuffer metadata = reply.slice();
+    metadata.limit(length);
+    reply.position(reply.position() + length);
+    return ContainerProtos.ContainerCommandResponseProto.parseFrom(metadata);
   }
 
   @Test
