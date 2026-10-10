@@ -117,7 +117,7 @@ class TestChunkInputStream extends InputStreamTests {
     assertEquals(useShortCircuitRead, localChunkInputStreamLog.getOutput()
         .contains("LocalChunkInputStream is created"));
     assertEquals(useShortCircuitRead, shortCircuitClientLog.getOutput()
-        .contains("XceiverClientShortCircuit is created"));
+        .contains("Created: XceiverClientShortCircuit"));
     assertEquals(useShortCircuitRead, blockInputStreamLog.getOutput()
         .contains("Get the FileInputStream of block"));
     assertEquals(!useShortCircuitRead, grpcClientLog.getOutput()
