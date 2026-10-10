@@ -18,3 +18,4 @@ rules:
     config:
       policies:
         actions/*: ref-pin
+        apache/*: ref-pin
