@@ -18,10 +18,14 @@
 package org.apache.hadoop.hdds.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.Arrays;
 import java.util.Collections;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -85,5 +89,56 @@ class TestNettyMetrics {
   @Test
   void maxDirectMemoryIsPositive() {
     assertThat(NettyMetrics.maxDirectMemory()).isGreaterThan(0L);
+  }
+
+  @Test
+  void defaultCreateKeepsStandaloneSourceName() {
+    NettyMetrics metrics = NettyMetrics.create();
+    try {
+      assertNotNull(DefaultMetricsSystem.instance()
+          .getSource(NettyMetrics.SOURCE_NAME));
+    } finally {
+      metrics.unregister();
+    }
+    assertNull(DefaultMetricsSystem.instance()
+        .getSource(NettyMetrics.SOURCE_NAME));
+  }
+
+  @Test
+  void createUsesDistinctSourceNamesPerComponent() {
+    NettyMetrics scmMetrics = null;
+    NettyMetrics omMetrics = null;
+    NettyMetrics datanodeMetrics = null;
+    try {
+      scmMetrics = assertDoesNotThrow(() -> NettyMetrics.create("SCM"));
+      omMetrics = assertDoesNotThrow(() -> NettyMetrics.create("OM"));
+      datanodeMetrics = assertDoesNotThrow(
+          () -> NettyMetrics.create("Datanode-1"));
+    } finally {
+      if (datanodeMetrics != null) {
+        datanodeMetrics.unregister();
+      }
+      if (omMetrics != null) {
+        omMetrics.unregister();
+      }
+      if (scmMetrics != null) {
+        scmMetrics.unregister();
+      }
+    }
+  }
+
+  @Test
+  void unregisterReleasesSourceNameForReuse() {
+    NettyMetrics metrics = NettyMetrics.create("SCM");
+    metrics.unregister();
+
+    NettyMetrics recreated = null;
+    try {
+      recreated = assertDoesNotThrow(() -> NettyMetrics.create("SCM"));
+    } finally {
+      if (recreated != null) {
+        recreated.unregister();
+      }
+    }
   }
 }

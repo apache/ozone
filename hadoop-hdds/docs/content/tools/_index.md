@@ -44,7 +44,7 @@ Client commands:
    * **sh** -  Primary command line interface for ozone to manage volumes/buckets/keys.
    * **fs** - Runs a command on ozone file system (similar to `hdfs dfs`)
    * **local** - Runs a single-node local Ozone cluster (SCM, OM, datanodes,
-   and optional S3 Gateway) in one process for development.
+   and optional S3 Gateway and Recon) in one process for development.
    * **version** - Prints the version of Ozone and HDDS.
 
 

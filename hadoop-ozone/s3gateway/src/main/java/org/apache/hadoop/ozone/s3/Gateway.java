@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayVersionMetrics;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -68,6 +69,12 @@ public class Gateway extends GenericCli implements Callable<Void> {
   private S3GatewayMetrics metrics;
   private S3GatewayVersionMetrics versionMetrics;
   private NettyMetrics nettyMetrics;
+  /**
+   * Withdrawn by {@link #stop()}: a hook left behind keeps a stopped gateway reachable for the
+   * life of the JVM and would still run {@link S3GatewayMetrics#unRegister()}, a static global
+   * shared with whichever gateway is current when several start in turn in one JVM.
+   */
+  private Runnable shutdownHook;
 
   private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
 
@@ -97,16 +104,18 @@ public class Gateway extends GenericCli implements Callable<Void> {
     stsServer = new S3STSHttpServer(OzoneConfigurationHolder.configuration(), "s3g-sts");
     metrics = S3GatewayMetrics.create(OzoneConfigurationHolder.configuration());
     versionMetrics = S3GatewayVersionMetrics.create();
-    nettyMetrics = NettyMetrics.create();
+    nettyMetrics = NettyMetrics.create(
+        MetricUtil.metricsSourceComponent(OzoneConfigurationHolder.configuration(), "S3Gateway"));
     start();
 
-    ShutdownHookManager.get().addShutdownHook(() -> {
+    shutdownHook = () -> {
       try {
         stop();
       } catch (Exception e) {
         LOG.error("Error during stop S3Gateway", e);
       }
-    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
+    };
+    ShutdownHookManager.get().addShutdownHook(shutdownHook, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 
@@ -126,6 +135,15 @@ public class Gateway extends GenericCli implements Callable<Void> {
 
   public void stop() throws Exception {
     LOG.info("Stopping Ozone S3 gateway");
+    if (shutdownHook != null) {
+      // Withdrawn before the stop runs, so the hook firing during JVM shutdown does not repeat
+      // a stop that already happened. Skipped while the hook itself is running, since
+      // ShutdownHookManager rejects removal once shutdown is in progress.
+      if (!ShutdownHookManager.get().isShutdownInProgress()) {
+        ShutdownHookManager.get().removeShutdownHook(shutdownHook);
+      }
+      shutdownHook = null;
+    }
     IOUtils.closeQuietly(httpServer, contentServer, stsServer);
     jvmPauseMonitor.stop();
     S3GatewayMetrics.unRegister();

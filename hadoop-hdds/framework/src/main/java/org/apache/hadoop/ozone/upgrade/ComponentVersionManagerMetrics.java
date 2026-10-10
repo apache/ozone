@@ -25,6 +25,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics for {@link ComponentVersionManager}.
@@ -43,26 +44,33 @@ public final class ComponentVersionManagerMetrics implements MetricsSource {
       "Current apparent version in serialized int form.");
 
   private final ComponentVersionManager versionManager;
+  private final String sourceName;
 
-  private ComponentVersionManagerMetrics(ComponentVersionManager versionManager) {
+  private ComponentVersionManagerMetrics(ComponentVersionManager versionManager, String sourceName) {
     this.versionManager = versionManager;
+    this.sourceName = sourceName;
   }
 
   public static ComponentVersionManagerMetrics create(ComponentVersionManager versionManager) {
+    return create(versionManager, null);
+  }
+
+  public static ComponentVersionManagerMetrics create(ComponentVersionManager versionManager, String component) {
+    String sourceName = MetricUtil.qualifySourceName(METRICS_SOURCE_NAME, component);
     ComponentVersionManagerMetrics metrics = (ComponentVersionManagerMetrics) DefaultMetricsSystem.instance()
-            .getSource(METRICS_SOURCE_NAME);
+            .getSource(sourceName);
     if (metrics == null) {
       return DefaultMetricsSystem.instance().register(
-          METRICS_SOURCE_NAME,
+          sourceName,
           "Metrics for component version management.",
-          new ComponentVersionManagerMetrics(versionManager));
+          new ComponentVersionManagerMetrics(versionManager, sourceName));
     }
     return metrics;
   }
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    MetricsRecordBuilder builder = collector.addRecord(METRICS_SOURCE_NAME);
+    MetricsRecordBuilder builder = collector.addRecord(sourceName);
     builder
         .addGauge(SOFTWARE_VERSION,
             versionManager.getSoftwareVersion().serialize())
@@ -71,6 +79,6 @@ public final class ComponentVersionManagerMetrics implements MetricsSource {
   }
 
   public void unRegister() {
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+    DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 }

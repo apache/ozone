@@ -65,13 +65,21 @@ public class ContainerChecksumTreeManager {
    * Creates one instance that should be used to coordinate all container checksum info within a datanode.
    */
   public ContainerChecksumTreeManager(ConfigurationSource conf) {
+    this(conf, null);
+  }
+
+  /**
+   * Same as {@link #ContainerChecksumTreeManager(ConfigurationSource)}, but registers the metrics source under a
+   * name qualified by {@code metricsSourceComponent} so multiple datanodes can share one JVM.
+   */
+  public ContainerChecksumTreeManager(ConfigurationSource conf, String metricsSourceComponent) {
     fileLocks = Striped.custom(conf.getObject(DatanodeConfiguration.class).getContainerChecksumLockStripes(),
         () -> new ReentrantLock(true));
-    metrics = ContainerMerkleTreeMetrics.create();
+    metrics = ContainerMerkleTreeMetrics.create(metricsSourceComponent);
   }
 
   public void stop() {
-    ContainerMerkleTreeMetrics.unregister();
+    metrics.unRegister();
   }
 
   /**

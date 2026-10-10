@@ -36,6 +36,10 @@ Most environments allow scaling the number of datanodes.
 
 Key ports (web UI, RPC) are usually published on the docker host.  Datanode ports are published on random local ports, since there can be multiple instances of the same service.
 
+The [`ozone-local/`](./ozone-local/) example is the single-container option. It
+runs the packaged `ozone local run` command and configures the cluster only with
+CLI flags and `OZONE_LOCAL_*` environment variables in Compose.
+
 ### Starting the Cluster
 
 ```
