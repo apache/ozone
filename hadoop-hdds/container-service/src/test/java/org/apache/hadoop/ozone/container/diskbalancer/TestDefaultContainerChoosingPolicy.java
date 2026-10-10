@@ -490,6 +490,40 @@ public class TestDefaultContainerChoosingPolicy {
   }
 
   /**
+   * When the most imbalanced storage type has no container that can move, the next storage type is
+   * balanced instead of giving up for the cycle. Here DISK has the larger threshold violation and
+   * is tried first, but its only container is OPEN and so not movable. SSD is chosen next.
+   */
+  @Test
+  public void testFallsBackToNextStorageTypeWhenTopTypeHasNoMovableContainer()
+      throws IOException {
+    // DISK is the most imbalanced type, so it sorts first.
+    HddsVolume diskHigh = createVolume("disk-high", 0.75, VOLUME_CAPACITY, StorageType.DISK);
+    HddsVolume diskLow = createVolume("disk-low", 0.20, VOLUME_CAPACITY, StorageType.DISK);
+    // SSD is imbalanced too, but less so, so it sorts second.
+    HddsVolume ssdHigh = createVolume("ssd-high", 0.60, VOLUME_CAPACITY, StorageType.SSD);
+    HddsVolume ssdLow = createVolume("ssd-low", 0.30, VOLUME_CAPACITY, StorageType.SSD);
+    volumeSet = createVolumeSetForUsages(Arrays.asList(diskHigh, diskLow, ssdHigh, ssdLow));
+
+    containerSet = newContainerSet();
+    // The only DISK container is OPEN, which is not a movable state by default.
+    createContainer(1L, DEFAULT_CONTAINER_SIZE, diskHigh, containerSet,
+        ContainerDataProto.State.OPEN);
+    createContainer(2L, DEFAULT_CONTAINER_SIZE, ssdHigh, containerSet);
+    mockContainerSet(containerSet);
+
+    ContainerCandidate result = policy.chooseVolumesAndContainer(ozoneContainer,
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD, DEFAULT_MOVABLE_STATES);
+
+    assertNotNull(result, "DISK had nothing movable, so SSD should have been balanced instead");
+    assertEquals(2L, result.getContainerData().getContainerID());
+    assertEquals(ssdHigh, result.getSourceVolume());
+    assertEquals(ssdLow, result.getDestVolume());
+    assertEquals(StorageType.SSD, result.getSourceVolume().getStorageType());
+    assertEquals(StorageType.SSD, result.getDestVolume().getStorageType());
+  }
+
+  /**
    * A StorageType with a single volume has no same-type peer, so it is skipped instead of being
    * paired with a volume of another type. Here the lone SSD volume is left alone and the DISK pair
    * is balanced.
