@@ -412,6 +412,51 @@ public class TestDeletedBlockLog {
     assertEquals(0, blocks.size());
   }
 
+  @Test
+  public void testCommitTransactionsDefersPurgeForReplicaAddedDuringCommit()
+      throws Exception {
+    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
+    addTransactions(generateData(1), true);
+    mockContainerHealthResult(true);
+    List<DeletedBlocksTransaction> blocks =
+        getTransactions(BLOCKS_PER_TXN * THREE);
+    assertEquals(THREE, blocks.size());
+    // All THREE entries above are the same logical transaction, one per replica DN;
+    // commit it one DN at a time to control exactly how many times
+    // containerManager.getContainerReplicas() is invoked per commit call.
+    List<DeletedBlocksTransaction> singleTxn =
+        Collections.singletonList(blocks.get(0));
+
+    final ContainerID cid = ContainerID.valueOf(blocks.get(0).getContainerID());
+    final Set<ContainerReplica> originalReplicas = new HashSet<>(replicas.get(cid));
+
+    // Simulate ReplicationManager landing a new, never-acked replica of the container
+    // in the window between the ack-set check and the durable purge: the first three
+    // getContainerReplicas() calls (the in-loop decision for each of the three commits
+    // below) see the original replica set, while every call after that (the pre-purge
+    // recheck) sees a fourth replica that never received or acknowledged the deletion.
+    ContainerReplica newReplica = ContainerReplica.newBuilder()
+        .setContainerID(cid)
+        .setContainerState(ContainerReplicaProto.State.CLOSED)
+        .setDatanodeDetails(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build())
+        .build();
+    Set<ContainerReplica> grownReplicas = new HashSet<>(originalReplicas);
+    grownReplicas.add(newReplica);
+    when(containerManager.getContainerReplicas(cid)).thenReturn(
+        originalReplicas, originalReplicas, originalReplicas, grownReplicas);
+
+    commitTransactions(singleTxn, dnList.get(0));
+    commitTransactions(singleTxn, dnList.get(1));
+    commitTransactions(singleTxn, dnList.get(2));
+
+    // The transaction must remain outstanding: the new replica never received or
+    // acknowledged the delete, so purging now would leak its blocks forever.
+    assertEquals(1, deletedBlockLog.getNumOfValidTransactions(),
+        "transaction was purged although a never-acked replica exists");
+    assertEquals(1, deletedBlockLog.getTransactionToDNsCommitMapSize(),
+        "commit tracking was dropped although the transaction was not purged");
+  }
+
   private void recordScmCommandToStatusManager(
       DatanodeID dnId, DeleteBlocksCommand command) {
     Set<Long> dnTxSet = command.blocksTobeDeleted()

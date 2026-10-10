@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
@@ -563,6 +564,9 @@ public class SCMDeletedBlockTransactionStatusManager {
   public void commitTransactions(List<DeleteBlockTransactionResult> transactionResults, DatanodeID dnId) {
 
     ArrayList<Long> txIDsToBeDeleted = new ArrayList<>();
+    // Container backing each candidate txID, so its replica set can be re-validated
+    // against the latest state right before the durable removal below.
+    Map<Long, ContainerID> purgeCandidateContainers = new HashMap<>();
     for (DeleteBlockTransactionResult transactionResult :
         transactionResults) {
       if (isTransactionFailed(transactionResult)) {
@@ -602,11 +606,11 @@ public class SCMDeletedBlockTransactionStatusManager {
               .map(DatanodeDetails::getID)
               .collect(Collectors.toList());
           if (dnsWithCommittedTxn.containsAll(containerDns)) {
-            transactionToDNsCommitMap.remove(txID);
-            transactionToRetryCountMap.remove(txID);
-            if (LOG.isDebugEnabled()) {
-              LOG.debug("Purging txId: {} from block deletion log", txID);
-            }
+            // Defer clearing transactionToDNsCommitMap/transactionToRetryCountMap until
+            // the replica set is re-validated below, right before the durable removal,
+            // so a transaction that turns out unsafe to purge stays tracked and can
+            // still be resent.
+            purgeCandidateContainers.put(txID, containerId);
             txIDsToBeDeleted.add(txID);
           }
         }
@@ -619,12 +623,59 @@ public class SCMDeletedBlockTransactionStatusManager {
             transactionResult.getTxID(), e);
       }
     }
+    // Re-check replica membership immediately before the durable removal. A container
+    // copy (ReplicationManager) can add a new replica after the ack-set check above but
+    // before this point; purging then would leave that replica's blocks undeleted with
+    // no way to resend the transaction. Transactions that fail this recheck stay tracked.
+    txIDsToBeDeleted.removeIf(txID -> !isSafeToPurge(txID, purgeCandidateContainers.get(txID)));
+    for (Long txID : txIDsToBeDeleted) {
+      transactionToDNsCommitMap.remove(txID);
+      transactionToRetryCountMap.remove(txID);
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Purging txId: {} from block deletion log", txID);
+      }
+    }
     try {
       removeTransactions(txIDsToBeDeleted);
       metrics.incrBlockDeletionTransactionCompleted(txIDsToBeDeleted.size());
     } catch (IOException e) {
       LOG.warn("Could not commit delete block transactions: "
           + txIDsToBeDeleted, e);
+    }
+  }
+
+  /**
+   * Re-checks, right before the durable purge, that every current replica of the
+   * container is still covered by the set of datanodes that committed the deletion.
+   * Guards against a replica added after the ack-set snapshot taken earlier in
+   * {@link #commitTransactions}: purging while such a replica exists would leak its
+   * blocks with no way to resend the delete, since SCM does not reconcile a replica's
+   * reported delete-transaction progress against the container.
+   */
+  private boolean isSafeToPurge(long txID, ContainerID containerId) {
+    if (containerId == null) {
+      return false;
+    }
+    final Set<DatanodeID> committedDns = transactionToDNsCommitMap.get(txID);
+    if (committedDns == null) {
+      return false;
+    }
+    try {
+      final List<DatanodeID> currentDns = containerManager.getContainerReplicas(containerId).stream()
+          .map(ContainerReplica::getDatanodeDetails)
+          .map(DatanodeDetails::getID)
+          .collect(Collectors.toList());
+      if (committedDns.containsAll(currentDns)) {
+        return true;
+      }
+      LOG.info("Deferring purge of txId: {} for container {}: replica set changed since the "
+          + "ack snapshot (current: {}, committed: {}); keeping it for resend.",
+          txID, containerId, currentDns, committedDns);
+      return false;
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Could not re-validate replicas for txId: {} container {} before purge; deferring.",
+          txID, containerId, e);
+      return false;
     }
   }
 
