@@ -186,6 +186,12 @@ public class TestMultiTenantVolume {
     ObjectStore store2 = getStoreForAccessID(UUID.randomUUID().toString());
     assertS3BucketNotFound(store2, BUCKET_NAME);
 
+    String keyName = "key";
+    String uploadID = bucket.initiateMultipartUpload(keyName).getUploadID();
+    store.getClientProxy().abortS3MultipartUpload(BUCKET_NAME, keyName, uploadID);
+    OMException exception = assertThrows(OMException.class, () -> bucket.abortMultipartUpload(keyName, uploadID));
+    assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, exception.getResult());
+
     // Delete bucket.
     store.deleteS3Bucket(BUCKET_NAME);
     assertS3BucketNotFound(store, BUCKET_NAME);

@@ -49,9 +49,19 @@ import org.junit.jupiter.params.provider.EnumSource;
  */
 public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
 
+  @Test
+  public void testPreExecute() throws IOException {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    doPreExecuteAbortMPU(volumeName, bucketName, keyName,
+        UUID.randomUUID().toString());
+  }
+
   @ParameterizedTest
   @EnumSource(value = BucketLayout.class, names = {"OBJECT_STORE", "FILE_SYSTEM_OPTIMIZED"})
-  public void testPreExecute(BucketLayout layout) throws Exception {
+  public void testAssumeS3Context(BucketLayout layout) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
