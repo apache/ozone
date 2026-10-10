@@ -73,11 +73,11 @@ enum Type {
 
   ServiceList = 51;
   DBUpdates = 53;
-  FinalizeUpgrade = 54;
+  FinalizeUpgrade = 54; // [deprecated = true]
   FinalizeUpgradeProgress = 55;
-  Prepare = 56;
-  PrepareStatus = 57;
-  CancelPrepare = 58;
+  Prepare = 56; // Deprecated
+  PrepareStatus = 57; // Deprecated
+  CancelPrepare = 58; // Deprecated
 
   GetDelegationToken = 61;
   RenewDelegationToken = 62;
@@ -171,6 +171,10 @@ enum Type {
   DeleteRevokedSTSTokens = 155;
   GetCallerIdentity = 156;
   SnapshotCount = 157;
+  GetBucketDeletedBytes = 158;
+  StartFinalizeUpgrade = 159;
+  QueryUpgradeStatus = 160;
+  CompleteFinalizeUpgrade = 161;
 }
 
 enum SafeMode {
@@ -229,11 +233,11 @@ message OMRequest {
 
   optional ServiceListRequest               serviceListRequest             = 51;
   optional DBUpdatesRequest                  dbUpdatesRequest              = 53;
-  optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54;
-  optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55;
-  optional PrepareRequest                   prepareRequest                 = 56;
-  optional PrepareStatusRequest             prepareStatusRequest           = 57;
-  optional CancelPrepareRequest             cancelPrepareRequest           = 58;
+  optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54 [deprecated = true];
+  optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55 [deprecated = true];
+  optional PrepareRequest                   prepareRequest                 = 56 [deprecated = true];
+  optional PrepareStatusRequest             prepareStatusRequest           = 57 [deprecated = true];
+  optional CancelPrepareRequest             cancelPrepareRequest           = 58 [deprecated = true];
 
   optional hadoop.common.GetDelegationTokenRequestProto getDelegationTokenRequest = 61;
   optional hadoop.common.RenewDelegationTokenRequestProto renewDelegationTokenRequest= 62;
@@ -337,6 +341,10 @@ message OMRequest {
   optional UpdateAssumeRoleRequest          updateAssumeRoleRequest        = 157;
   optional GetCallerIdentityRequest         getCallerIdentityRequest       = 158;
   optional SnapshotCountRequest snapshotCountRequest = 159;
+  optional GetBucketDeletedBytesRequest     getBucketDeletedBytesRequest   = 160;
+  optional StartFinalizeUpgradeRequest      startFinalizeUpgradeRequest     = 161;
+  optional QueryUpgradeStatusRequest        queryUpgradeStatusRequest       = 162;
+  optional CompleteFinalizeUpgradeRequest   completeFinalizeUpgradeRequest  = 163;
 }
 
 message OMResponse {
@@ -386,11 +394,11 @@ message OMResponse {
 
   optional ServiceListResponse               ServiceListResponse           = 51;
   optional DBUpdatesResponse                 dbUpdatesResponse             = 52;
-  optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54;
-  optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55;
-  optional PrepareResponse                 prepareResponse                 = 56;
-  optional PrepareStatusResponse           prepareStatusResponse           = 57;
-  optional CancelPrepareResponse           cancelPrepareResponse           = 58;
+  optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54 [deprecated = true];
+  optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55 [deprecated = true];
+  optional PrepareResponse                 prepareResponse                 = 56 [deprecated = true];
+  optional PrepareStatusResponse           prepareStatusResponse           = 57 [deprecated = true];
+  optional CancelPrepareResponse           cancelPrepareResponse           = 58 [deprecated = true];
 
   optional GetDelegationTokenResponseProto getDelegationTokenResponse = 61;
   optional RenewDelegationTokenResponseProto renewDelegationTokenResponse = 62;
@@ -471,11 +479,10 @@ message OMResponse {
   optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
   optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse    = 143;
-
+  // TODO: Empty ack after OM applies tag set to OmBucketInfo.
   optional PutBucketTaggingResponse          putBucketTaggingResponse      = 144;
   optional GetBucketTaggingResponse          getBucketTaggingResponse      = 145;
   optional DeleteBucketTaggingResponse       deleteBucketTaggingResponse    = 146;
-
   optional SetLifecycleConfigurationResponse setLifecycleConfigurationResponse = 147;
   optional GetLifecycleConfigurationResponse   getLifecycleConfigurationResponse   = 148;
   optional DeleteLifecycleConfigurationResponse deleteLifecycleConfigurationResponse = 149;
@@ -487,6 +494,10 @@ message OMResponse {
   optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 155;
   optional GetCallerIdentityResponse         getCallerIdentityResponse      = 156;
   optional SnapshotCountResponse snapshotCountResponse = 157;
+  optional GetBucketDeletedBytesResponse     getBucketDeletedBytesResponse  = 158;
+  optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 159;
+  optional QueryUpgradeStatusResponse        queryUpgradeStatusResponse    = 160;
+  optional CompleteFinalizeUpgradeResponse   completeFinalizeUpgradeResponse = 161;
 }
 
 enum Status {
@@ -575,12 +586,13 @@ enum Status {
 
     DIRECTORY_NOT_EMPTY = 68;
 
-    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69;
-    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 70;
-    UPDATE_LAYOUT_VERSION_FAILED = 71;
-    LAYOUT_FEATURE_FINALIZATION_FAILED = 72;
-    PREPARE_FAILED = 73;
-    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74;
+    PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED = 69; // [deprecated = true]
+    REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 70; // [deprecated = true]
+    UPDATE_LAYOUT_VERSION_FAILED = 71; // [deprecated = true]
+    LAYOUT_FEATURE_FINALIZATION_FAILED = 72; // [deprecated = true]
+    PREPARE_FAILED = 73; // [deprecated = true]
+    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74; // [deprecated = true]
+
     NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION = 75;
 
     TENANT_NOT_FOUND = 76;
@@ -1416,6 +1428,7 @@ message GetKeyInfoResponse {
   optional KeyInfo keyInfo = 1;
   optional VolumeInfo volumeInfo = 2;
   optional string UserPrincipal = 3;
+  optional BucketLayoutProto bucketLayout = 4;
 }
 
 message RenameKeysRequest {
@@ -1697,40 +1710,84 @@ message RangerBGSyncResponse {
 }
 
 message FinalizeUpgradeRequest {
+  // Ignored by OM; retained for wire compatibility.
   required string upgradeClientId = 1;
 }
 
 message FinalizeUpgradeResponse {
-    required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+  required hadoop.hdds.UpgradeFinalizationStatus status = 1;
 }
 
+message StartFinalizeUpgradeRequest {
+    optional bool force = 1 [default = false];
+}
+
+message StartFinalizeUpgradeResponse {
+}
+
+// Internal request submitted by OMUpgradeFinalizeService to complete OM finalization
+// once SCM reports FINALIZED.
+message CompleteFinalizeUpgradeRequest {
+}
+
+message CompleteFinalizeUpgradeResponse {
+}
+
+message QueryUpgradeStatusRequest {
+}
+
+message QueryUpgradeStatusResponse {
+    // Aggregate status of OM, SCM and all healthy datanodes
+    optional hadoop.hdds.FinalizationStatus clusterFinalizationStatus = 1;
+    optional hadoop.hdds.UpgradeStatus hddsStatus = 2;
+    optional hadoop.hdds.FinalizationStatus omFinalizationStatus = 3;
+    optional uint32 omApparentVersion = 4;
+}
+
+// deprecated, use QueryUpgradeStatusRequest/Response instead. Retained for wire compatibility.
 message FinalizeUpgradeProgressRequest {
+    // Ignored by OM; retained for wire compatibility.
     required string upgradeClientId = 1;
-    optional bool takeover = 2;
-    optional bool readonly = 3;
+    optional bool takeover = 2 [deprecated = true];
+    optional bool readonly = 3 [deprecated = true];
 }
 
 message FinalizeUpgradeProgressResponse {
     required hadoop.hdds.UpgradeFinalizationStatus status = 1;
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed.
+ */
 message PrepareRequest {
-    required PrepareRequestArgs args = 1;
+    required PrepareRequestArgs args = 1 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
+ */
 message PrepareRequestArgs {
-    optional uint64 txnApplyWaitTimeoutSeconds = 1 [default = 300];
-    optional uint64 txnApplyCheckIntervalSeconds = 2 [default = 5];
+    optional uint64 txnApplyWaitTimeoutSeconds = 1 [default = 300, deprecated = true];
+    optional uint64 txnApplyCheckIntervalSeconds = 2 [default = 5, deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
+ */
 message PrepareResponse {
-    required uint64 txnID = 1;
+    required uint64 txnID = 1 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
+ */
 message PrepareStatusRequest {
-    required uint64 txnID = 1;
+    required uint64 txnID = 1 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and server status will always be PREPARE_COMPLETED.
+ */
 message PrepareStatusResponse {
     enum PrepareStatus {
         NOT_PREPARED = 1;
@@ -1738,13 +1795,19 @@ message PrepareStatusResponse {
         PREPARE_COMPLETED = 3;
     }
     required PrepareStatus status = 1;
-    optional uint64 currentTxnIndex = 2;
+    optional uint64 currentTxnIndex = 2 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
+ */
 message CancelPrepareRequest {
 
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
+ */
 message CancelPrepareResponse {
 
 }
@@ -1765,6 +1828,19 @@ message ListOpenFilesResponse {
   // result
   repeated uint64 clientID = 4;
   repeated KeyInfo keyInfo = 5;
+}
+
+message GetBucketDeletedBytesRequest {
+  required string bucketPath = 1;
+}
+
+message GetBucketDeletedBytesResponse {
+  required uint64 snapshotTrappedBytes = 1;
+  required uint64 purgeableBytes = 2;
+  optional uint64 snapshotTrappedKeys = 3;
+  optional uint64 purgeableKeys = 4;
+  optional uint64 snapshotTrappedDirs = 5;
+  optional uint64 purgeableDirs = 6;
 }
 
 message ServicePort {
@@ -2435,6 +2511,9 @@ message S3Authentication {
     // S3 action without the s3: prefix for this request (e.g. GetObject), set by S3 Gateway for use
     // in finer-grained STS permissions.
     optional string s3Action = 10;
+    // Resolved so GetCallerIdentity can return the assumed-role identity from the session token.
+    optional string resolvedStsAssumedRoleId = 11;
+    optional string resolvedStsAssumedRoleUserArn = 12;
 }
 
 message RecoverLeaseRequest {
@@ -2479,6 +2558,10 @@ message BucketQuotaCount {
     required bool supportOldQuota = 5 [default=false];
     optional int64 diffSnapshotUsedBytes = 6;
     optional int64 diffSnapshotUsedNamespace = 7;
+    // objectID of the bucket the delta was computed against, so the apply can
+    // reject a stale delta if the bucket was deleted and recreated under the
+    // same name during the repair window. Optional for backward compatibility.
+    optional uint64 bucketObjectID = 8;
 }
 
 message QuotaRepairResponse {

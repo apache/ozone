@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -27,13 +24,11 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for RenameKey request.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE, SNAPSHOT_RENAMED_TABLE})
 public class OMKeyRenameResponse extends OmKeyResponse {
 
   private String fromKeyName;

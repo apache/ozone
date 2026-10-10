@@ -25,7 +25,8 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class MockSpaceUsageSource {
 
   public static SpaceUsageSource unlimited() {
-    return fixed(Long.MAX_VALUE, Long.MAX_VALUE);
+    // Not Long.MAX_VALUE: SCM sums capacity across volumes and datanodes, which would overflow.
+    return fixed(Long.MAX_VALUE / 1024, Long.MAX_VALUE / 1024);
   }
 
   public static SpaceUsageSource fixed(long capacity, long available) {

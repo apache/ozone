@@ -175,6 +175,7 @@ public class S3ClientFactory {
     builder.region(region)
         .endpointOverride(new URI(endpoint))
         .credentialsProvider(StaticCredentialsProvider.create(credentials))
+        .disableS3ExpressSessionAuth(true)
         .forcePathStyle(enablePathStyle);
   }
 }

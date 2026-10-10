@@ -50,6 +50,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
@@ -58,6 +59,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -73,6 +75,7 @@ import org.apache.hadoop.ozone.container.replication.ReplicationServer.Replicati
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -240,6 +243,50 @@ public class TestDatanodeStateMachine {
     }
   }
 
+  @Test
+  @Timeout(60)
+  void testStalledInitializationTimeoutTerminatesDatanode() throws Exception {
+    ExitUtils.disableSystemExit();
+    ExitUtils.clear();
+    conf.setFromObject(conf.getObject(ReplicationConfig.class).setPort(0));
+    // Enable the startup watchdog with a short timeout.
+    conf.setTimeDuration(DatanodeConfiguration.CONTAINER_INIT_TIMEOUT_KEY, 2, TimeUnit.SECONDS);
+    DatanodeDetails datanodeDetails = getNewDatanodeDetails();
+    ContainerTestUtils.initializeDatanodeLayout(conf, datanodeDetails);
+    CountDownLatch initializing = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    DatanodeStateMachine stateMachine = new DatanodeStateMachine(null, datanodeDetails, conf, null, null,
+        mock(HddsDatanodeStopService.class), new ReconfigurationHandler("DN", conf, op -> { }));
+    try {
+      OzoneContainer container = stateMachine.getContainer();
+      XceiverServerSpi writeChannel = spy(container.getWriteChannel());
+      Field writeChannelField = OzoneContainer.class.getDeclaredField("writeChannel");
+      writeChannelField.setAccessible(true);
+      writeChannelField.set(container, writeChannel);
+      // Stall Ratis startup: never returns and never throws, simulating a hang
+      // (for example a group recovery blocked on a failing volume).
+      doAnswer(invocation -> {
+        initializing.countDown();
+        assertThat(release.await(30, TimeUnit.SECONDS)).isTrue();
+        return null;
+      }).when(writeChannel).start();
+
+      stateMachine.startDaemon();
+      assertThat(initializing.await(10, TimeUnit.SECONDS)).isTrue();
+
+      // The watchdog must enter JVM shutdown even though writeChannel.start()
+      // never returns and never throws. Going straight to ExitUtils (System.exit)
+      // avoids the synchronous stop() path, which could itself block on the disk.
+      GenericTestUtils.waitFor(ExitUtils::isTerminated, 100, 20000);
+      assertThat(ExitUtils.getFirstExitException().getStatus()).isEqualTo(1);
+      assertThat(ExitUtils.getFirstExitException().getMessage()).contains("did not complete within");
+    } finally {
+      release.countDown();
+      stateMachine.stopDaemon();
+      ExitUtils.clear();
+    }
+  }
+
   /**
    * This test explores the state machine by invoking each call in sequence just
    * like as if the state machine would call it. Because this is a test we are
@@ -320,9 +367,9 @@ public class TestDatanodeStateMachine {
       task = stateMachine.getContext().getTask();
       assertEquals(RunningDatanodeState.class, task.getClass());
 
-      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+      DatanodeStorage layoutStorage = new DatanodeStorage(conf,
           UUID.randomUUID().toString(),
-          HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+          HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize());
       layoutStorage.initialize();
 
       // This execute will invoke getVersion calls against all SCM endpoints
@@ -465,6 +512,17 @@ public class TestDatanodeStateMachine {
     /** Port out of range **/
     confList.add(Maps.immutableEntry(
         ScmConfigKeys.OZONE_SCM_NAMES, "scm:123456"));
+    /** Unbracketed IPv6 literal **/
+    confList.add(Maps.immutableEntry(
+        ScmConfigKeys.OZONE_SCM_NAMES, "::1"));
+    /** Wildcard **/
+    confList.add(Maps.immutableEntry(
+        ScmConfigKeys.OZONE_SCM_NAMES, "0.0.0.0"));
+
+    // Invalid ozone.recon.address
+    /** Wildcard **/
+    confList.add(Maps.immutableEntry(
+        ReconConfigKeys.OZONE_RECON_ADDRESS_KEY, "0.0.0.0:9891"));
 
     confList.forEach((entry) -> {
       OzoneConfiguration perTestConf = new OzoneConfiguration(conf);

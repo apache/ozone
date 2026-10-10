@@ -94,6 +94,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String CONTAINER_CLIENT_CACHE_SIZE = "hdds.datanode.container.client.cache.size";
   public static final String CONTAINER_CLIENT_CACHE_STALE_THRESHOLD =
       "hdds.datanode.container.client.cache.stale.threshold";
+  public static final String CONTAINER_INIT_TIMEOUT_KEY = "hdds.datanode.container.init.timeout";
 
   static final boolean CHUNK_DATA_VALIDATION_CHECK_DEFAULT = false;
 
@@ -151,6 +152,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String BLOCK_DELETE_COMMAND_WORKER_INTERVAL =
       "hdds.datanode.block.delete.command.worker.interval";
   public static final Duration BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT = Duration.ofSeconds(2);
+  public static final String STREAM_READ_FILE_IDLE_TIMEOUT_KEY = "hdds.datanode.stream.read.file.idle.timeout";
+  public static final Duration STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT = Duration.ofMinutes(1);
 
   /**
    * Number of threads per volume that Datanode will use for chunk read.
@@ -162,6 +165,16 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       description = "Number of threads per volume that Datanode will use for reading replicated chunks."
   )
   private int numReadThreadPerVolume = 10;
+
+  @Config(key = STREAM_READ_FILE_IDLE_TIMEOUT_KEY,
+      type = ConfigType.TIME,
+      defaultValue = "1m",
+      tags = {DATANODE},
+      description = "How long a streaming ReadBlock stream may stay idle before the datanode closes the block file "
+          + "held open for it. The stream itself stays open and the file is reopened by the next request, so this "
+          + "only bounds the file descriptors pinned by idle streams."
+  )
+  private Duration streamReadFileIdleTimeout = STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT;
 
   /**
    * SO_BACKLOG value for the gRPC server socket.
@@ -470,6 +483,22 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           + " postfix (ns,ms,s,m,h,d)."
   )
   private Duration diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
+
+  @Config(key = "hdds.datanode.container.init.timeout",
+      defaultValue = "0s",
+      type = ConfigType.TIME,
+      tags = { DATANODE },
+      description = "Maximum time allowed for datanode container services to"
+          + " initialize at startup. Initialization builds the container set"
+          + " and starts the Ratis write channel, which recovers all Raft"
+          + " groups from disk. If it does not complete within this time,"
+          + " startup is failed so the datanode shuts down cleanly instead of"
+          + " hanging indefinitely (for example when Ratis group recovery"
+          + " stalls on a failing volume). A value of 0 (the default) disables"
+          + " the watchdog and preserves the previous behavior of waiting"
+          + " indefinitely. Unit could be defined with postfix (ns,ms,s,m,h,d)."
+  )
+  private Duration containerInitTimeout = Duration.ZERO;
 
   @Config(key = "hdds.datanode.disk.check.sliding.window.timeout",
       defaultValue = "70m",
@@ -838,6 +867,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
           BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT;
     }
 
+    if (streamReadFileIdleTimeout.isNegative() || streamReadFileIdleTimeout.isZero()) {
+      LOG.warn(STREAM_READ_FILE_IDLE_TIMEOUT_KEY + " must be greater than zero and was set to {}. Defaulting to {}",
+          streamReadFileIdleTimeout, STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT);
+      streamReadFileIdleTimeout = STREAM_READ_FILE_IDLE_TIMEOUT_DEFAULT;
+    }
+
     if (rocksdbLogMaxFileSize < 0) {
       LOG.warn(ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_KEY +
               " must be no less than zero and was set to {}. Defaulting to {}",
@@ -1093,6 +1128,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     diskCheckTimeout = duration;
   }
 
+  public Duration getContainerInitTimeout() {
+    return containerInitTimeout;
+  }
+
+  public void setContainerInitTimeout(Duration duration) {
+    containerInitTimeout = duration;
+  }
+
   public void setDiskCheckEnabled(boolean diskCheckEnabled) {
     isDiskCheckEnabled = diskCheckEnabled;
   }
@@ -1184,6 +1227,10 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public int getNumReadThreadPerVolume() {
     return numReadThreadPerVolume;
+  }
+
+  public Duration getStreamReadFileIdleTimeout() {
+    return streamReadFileIdleTimeout;
   }
 
   public void setNumReadThreadPerVolume(int threads) {

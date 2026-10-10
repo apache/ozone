@@ -24,13 +24,12 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import java.lang.annotation.Annotation;
 import java.util.Map;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -42,9 +41,11 @@ class TestVersionExtractor {
   @EnumSource(OMLayoutFeature.class)
   void testLayoutVersionExtractor(OMLayoutFeature layoutVersionValue) throws OMException {
     ValidationContext context = mock(ValidationContext.class);
-    LayoutVersionManager layoutVersionManager = new OMLayoutVersionManager(layoutVersionValue.version());
-    when(context.versionManager()).thenReturn(layoutVersionManager);
-    Versioned version = VersionExtractor.LAYOUT_VERSION_EXTRACTOR.extractVersion(null, context);
+    OMVersionManager omVm = mock(OMVersionManager.class);
+    when(omVm.getApparentVersion()).thenReturn(layoutVersionValue);
+    when(context.versionManager()).thenReturn(omVm);
+    ComponentVersion version =
+        VersionExtractor.LAYOUT_VERSION_EXTRACTOR.extractVersion(null, context);
     assertEquals(layoutVersionValue, version);
   }
 
@@ -52,8 +53,9 @@ class TestVersionExtractor {
   @EnumSource(ClientVersion.class)
   void testClientVersionExtractor(ClientVersion expectedClientVersion) {
     OMRequest request = mock(OMRequest.class);
-    when(request.getVersion()).thenReturn(expectedClientVersion.version());
-    Versioned version = VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
+    when(request.getVersion()).thenReturn(expectedClientVersion.serialize());
+    ComponentVersion version =
+        VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
     assertEquals(expectedClientVersion, version);
   }
 
@@ -61,8 +63,9 @@ class TestVersionExtractor {
   @ValueSource(ints = {1, 2, 5, 10, 1000, 10000})
   void testClientVersionExtractorForFutureValues(int futureVersion) {
     OMRequest request = mock(OMRequest.class);
-    when(request.getVersion()).thenReturn(ClientVersion.CURRENT_VERSION + futureVersion);
-    Versioned version = VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
+    when(request.getVersion()).thenReturn(ClientVersion.CURRENT.serialize() + futureVersion);
+    ComponentVersion version =
+        VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
     assertEquals(ClientVersion.FUTURE_VERSION, version);
   }
 
