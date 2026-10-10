@@ -277,8 +277,12 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    assertDoesNotThrow(
-        () -> ozoneManager.lookupFile(snapshotKeyArgs));
+    if (bucketLayout == BucketLayout.OBJECT_STORE) {
+      assertLookupFileNotSupported(snapshotKeyArgs);
+    } else {
+      assertDoesNotThrow(
+          () -> ozoneManager.lookupFile(snapshotKeyArgs));
+    }
   }
 
   @ParameterizedTest
@@ -292,6 +296,16 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
+
+    if (bucketLayout == BucketLayout.OBJECT_STORE) {
+      // HDDS-15951: the layout check runs before the ACL check, so the
+      // rejection wins over PERMISSION_DENIED on both the snapshot and the
+      // active file system.
+      assertLookupFileNotSupported(snapshotKeyArgs);
+      assertLookupFileNotSupported(keyArgs);
+      return;
+    }
+
     final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
 
@@ -300,6 +314,18 @@ public class TestOzoneManagerSnapshotAcl {
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
     assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
+  }
+
+  /**
+   * HDDS-15951 moved the OBJECT_STORE layout check for LookupFile from the file
+   * system client into OM, so OBS buckets - which have no file system semantics
+   * - are now rejected server-side, snapshots included.
+   */
+  private static void assertLookupFileNotSupported(OmKeyArgs keyArgs) {
+    final OMException ex = assertThrows(OMException.class,
+        () -> ozoneManager.lookupFile(keyArgs));
+    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION,
+        ex.getResult());
   }
 
   @ParameterizedTest

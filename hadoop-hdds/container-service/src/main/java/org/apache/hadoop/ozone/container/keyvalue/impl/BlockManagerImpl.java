@@ -340,9 +340,8 @@ public class BlockManagerImpl implements BlockManager {
           .initBatchOperation()) {
         db.getStore().getFinalizeBlocksTable().putWithBatch(batch,
             kvContainer.getContainerData().getBlockKey(localID), localID);
-        db.getStore().getBatchHandler().commitBatchOperation(batch);
-
         mergeLastChunkForBlockFinalization(blockId, db, kvContainer, batch, localID);
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
       }
     }
   }

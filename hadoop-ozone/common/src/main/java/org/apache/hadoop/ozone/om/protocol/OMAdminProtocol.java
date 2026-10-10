@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.protocol;
 
 import java.io.Closeable;
 import java.io.IOException;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.KerberosInfo;
@@ -57,4 +58,11 @@ public interface OMAdminProtocol extends Closeable {
    *         or if the task was triggered successfully (when noWait is true)
    */
   boolean triggerSnapshotDefrag(boolean noWait) throws IOException;
+
+  /**
+   * Returns the software version of this OM peer without contacting SCM.
+   * Intended for use by the OM leader to verify that all Ratis group members
+   * are running the same software version before accepting a finalize command.
+   */
+  OzoneManagerVersion getPeerUpgradeStatus() throws IOException;
 }

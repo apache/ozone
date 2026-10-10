@@ -471,6 +471,34 @@ public class TestBlockManagerImpl {
   }
 
   @ContainerTestVersionInfo.ContainerTest
+  public void testFinalizeBlockMergesLastChunk(ContainerTestVersionInfo versionInfo) throws Exception {
+    initTest(versionInfo);
+    Assumptions.assumeFalse(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));
+    // simulates writing a full chunk + 1024 bytes, hsync, write another 1024 bytes, hsync, then finalize
+    long containerID = 1;
+    long blockNo = 2;
+    long chunkLimit = 4 * 1024 * 1024;
+    blockData1 = createBlockDataWithOneFullChunk(containerID, blockNo, 2, chunkLimit, 1024, 1);
+    blockManager.putBlock(keyValueContainer, blockData1, false);
+    BlockData blockData2 = createBlockData(containerID, blockNo, 2, chunkLimit, 2048, 2);
+    blockManager.putBlock(keyValueContainer, blockData2, false);
+
+    blockManager.finalizeBlock(keyValueContainer, new BlockID(containerID, blockNo));
+
+    // the last chunk should be moved from the last chunk info table to the block data table
+    KeyValueContainerData containerData = keyValueContainer.getContainerData();
+    String blockKey = containerData.getBlockKey(blockNo);
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      assertEquals(blockNo, db.getStore().getFinalizeBlocksTable().get(blockKey));
+      assertNull(db.getStore().getLastChunkInfoTable().get(blockKey));
+      BlockData persisted = db.getStore().getBlockDataTable().get(blockKey);
+      assertEquals(chunkLimit + 2048, persisted.getSize());
+      assertEquals(2, persisted.getChunks().size());
+      assertEquals(2, persisted.getBlockCommitSequenceId());
+    }
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutBlockForClosedContainerWithLastChunkInfo(ContainerTestVersionInfo versionInfo) throws Exception {
     initTest(versionInfo);
     Assumptions.assumeFalse(isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V1));

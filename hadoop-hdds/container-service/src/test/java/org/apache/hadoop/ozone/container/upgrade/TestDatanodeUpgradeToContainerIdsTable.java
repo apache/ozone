@@ -85,7 +85,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.HBASE_SUPPORT.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
 
@@ -104,8 +104,8 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     // close container to allow upgrade.
     UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
 
-    dsm.finalizeUpgrade();
-    assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
+    dsm.getVersionManager().finalizeUpgrade();
+    assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
     assertEquals(WitnessedContainerDBDefinition.CONTAINER_CREATE_INFO_TABLE_DEF.getName(),
         metadataStore.getContainerCreateInfoTable().getName());
     ContainerCreateInfo containerCreateInfo = metadataStore.getContainerCreateInfoTable().get(
@@ -122,7 +122,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
-        HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
+        HDDSLayoutFeature.HBASE_SUPPORT.serialize());
     ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     final Pipeline pipeline = MockPipeline.createPipeline(Collections.singletonList(dsm.getDatanodeDetails()));
 
@@ -162,8 +162,8 @@ public class TestDatanodeUpgradeToContainerIdsTable {
     }
 
     // trigger another upgrade which will update metainfo for upgrade
-    dsm.finalizeUpgrade();
-    assertTrue(dsm.getLayoutVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
+    dsm.getVersionManager().finalizeUpgrade();
+    assertTrue(dsm.getVersionManager().isAllowed(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE));
     assertEquals(WitnessedContainerDBDefinition.CONTAINER_CREATE_INFO_TABLE_DEF.getName(),
         metadataStore.getContainerCreateInfoTable().getName());
     ContainerCreateInfo containerCreateInfo

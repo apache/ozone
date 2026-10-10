@@ -48,26 +48,22 @@ public class TestOzoneClientUtils {
 
   @Test()
   public void testNegativeLength() throws IOException {
-    OzoneVolume volume = mock(OzoneVolume.class);
-    OzoneBucket bucket = mock(OzoneBucket.class);
     String keyName = "dummy";
     ClientProtocol clientProtocol = mock(ClientProtocol.class);
     assertThrows(IllegalArgumentException.class, () ->
-        OzoneClientUtils.getFileChecksumWithCombineMode(volume, bucket, keyName,
+        OzoneClientUtils.getFileChecksumWithCombineMode("vol", "bucket", keyName,
         -1, OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC,
-        clientProtocol));
+        clientProtocol, false));
   }
 
   @Test
   public void testEmptyKeyName() throws IOException {
-    OzoneVolume volume = mock(OzoneVolume.class);
-    OzoneBucket bucket = mock(OzoneBucket.class);
     String keyName = "";
     ClientProtocol clientProtocol = mock(ClientProtocol.class);
     FileChecksum checksum =
-        OzoneClientUtils.getFileChecksumWithCombineMode(volume, bucket, keyName,
+        OzoneClientUtils.getFileChecksumWithCombineMode("vol", "bucket", keyName,
             1, OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC,
-            clientProtocol);
+            clientProtocol, false);
 
     assertNull(checksum);
   }
