@@ -716,10 +716,13 @@ public class TestBucketList {
     assertEquals("b::", response.getCommonPrefixes().get(1).getPrefix().getName());
     assertEquals(1, response.getContents().size());
     assertEquals("plain", response.getContents().get(0).getKey().getName());
+  }
 
+  @Test
+  public void delimiterScanKeepsOverlappingPrefixes() throws Exception {
     setup("aaa", "aab", "baa");
     bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, "aa");
-    response = (ListObjectResponse) bucketEndpoint.get(BUCKET_NAME).getEntity();
+    ListObjectResponse response = (ListObjectResponse) bucketEndpoint.get(BUCKET_NAME).getEntity();
     assertEquals(2, response.getCommonPrefixes().size());
     assertEquals("aa", response.getCommonPrefixes().get(0).getPrefix().getName());
     assertEquals("baa", response.getCommonPrefixes().get(1).getPrefix().getName());
