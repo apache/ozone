@@ -88,13 +88,6 @@ public class S3LifecycleConfiguration {
     @XmlElement(name = "Transition")
     private List<Transition> transitions;
 
-    // Bound only to detect unsupported versioning actions before conversion to OM rules.
-    @XmlElement(name = "NoncurrentVersionExpiration")
-    private UnsupportedElement noncurrentVersionExpiration;
-
-    @XmlElement(name = "NoncurrentVersionTransition")
-    private List<UnsupportedElement> noncurrentVersionTransitions;
-
     public String getId() {
       return id;
     }
@@ -150,21 +143,6 @@ public class S3LifecycleConfiguration {
     public void setTransitions(List<Transition> transitions) {
       this.transitions = transitions;
     }
-
-    public UnsupportedElement getNoncurrentVersionExpiration() {
-      return noncurrentVersionExpiration;
-    }
-
-    public List<UnsupportedElement> getNoncurrentVersionTransitions() {
-      return noncurrentVersionTransitions;
-    }
-  }
-
-  /**
-   * Presence marker for lifecycle elements whose contents are not supported.
-   */
-  @XmlAccessorType(XmlAccessType.FIELD)
-  public static class UnsupportedElement {
   }
 
   /**
@@ -180,13 +158,6 @@ public class S3LifecycleConfiguration {
 
     @XmlElement(name = "Date")
     private String date;
-
-    @XmlElement(name = "ExpiredObjectDeleteMarker")
-    private String expiredObjectDeleteMarker;
-
-    public String getExpiredObjectDeleteMarker() {
-      return expiredObjectDeleteMarker;
-    }
 
     public Integer getDays() {
       return parseDays(days);
@@ -434,13 +405,6 @@ public class S3LifecycleConfiguration {
               + "' is not supported for lifecycle transitions"
           : "Invalid lifecycle configuration: Transition actions are not supported";
       throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, rule.getId()).withMessage(message);
-    }
-
-    if (rule.getNoncurrentVersionExpiration() != null
-        || (rule.getNoncurrentVersionTransitions() != null && !rule.getNoncurrentVersionTransitions().isEmpty())
-        || (rule.getExpiration() != null && rule.getExpiration().getExpiredObjectDeleteMarker() != null)) {
-      throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, rule.getId())
-          .withMessage("Invalid lifecycle configuration: versioning-related actions are not supported");
     }
 
     OmLCRule.Builder builder = new OmLCRule.Builder()

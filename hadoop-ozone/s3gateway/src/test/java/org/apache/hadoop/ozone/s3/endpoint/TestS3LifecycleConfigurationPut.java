@@ -931,7 +931,7 @@ public class TestS3LifecycleConfigurationPut {
         + "><Rule><ID>versioning</ID><Prefix>prefix/</Prefix><Status>" + status + "</Status>"
         + "<AbortIncompleteMultipartUpload><DaysAfterInitiation>1</DaysAfterInitiation>"
         + "</AbortIncompleteMultipartUpload>" + action + "</Rule></LifecycleConfiguration>";
-    assertErrorResponse(NOT_IMPLEMENTED,
+    assertErrorResponse(MALFORMED_XML,
         () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
     verify(proxy, never()).setLifecycleConfiguration(any());
   }
@@ -965,7 +965,7 @@ public class TestS3LifecycleConfigurationPut {
         + "<Status>Enabled</Status>"
         + "<NoncurrentVersionExpiration><NoncurrentDays>1</NoncurrentDays></NoncurrentVersionExpiration>"
         + "</Rule></LifecycleConfiguration>";
-    assertErrorResponse(NOT_IMPLEMENTED,
+    assertErrorResponse(MALFORMED_XML,
         () -> bucketEndpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
     try (Response response = bucketEndpoint.get("bucket1")) {
       S3LifecycleConfiguration configuration = (S3LifecycleConfiguration) response.getEntity();
@@ -984,7 +984,7 @@ public class TestS3LifecycleConfigurationPut {
   public void testVersioningNamesInTextRemainSupported() throws Exception {
     String xml = "<LifecycleConfiguration><Rule><ID>NoncurrentVersionExpiration</ID>"
         + "<Prefix>NoncurrentVersionTransition/ExpiredObjectDeleteMarker/</Prefix><Status>Enabled</Status>"
-        + "<Expiration><Days>30</Days></Expiration><UnknownElement>ignored</UnknownElement>"
+        + "<Expiration><Days>30</Days></Expiration>"
         + "</Rule></LifecycleConfiguration>";
     try (Response response = bucketEndpoint.put("bucket1",
         new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)))) {
@@ -1004,6 +1004,99 @@ public class TestS3LifecycleConfigurationPut {
     assertErrorResponse(ACCESS_DENIED,
         () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
     verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("unsupportedLifecycleElements")
+  public void testRejectUnsupportedLifecycleElements(String elements, boolean namespace) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<LifecycleConfiguration" + (namespace ? " xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\"" : "")
+        + "><Rule><ID>unsupported</ID><Status>Enabled</Status>"
+        + elements + "</Rule></LifecycleConfiguration>";
+    assertErrorResponse(MALFORMED_XML,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  private static Stream<Arguments> unsupportedLifecycleElements() {
+    String prefix = "<Prefix>prefix/</Prefix>";
+    String expiration = "<Expiration><Days>30</Days></Expiration>";
+    return Stream.of(
+        prefix + expiration + "<UnknownElement/>",
+        prefix + "<Expiration><Days>30</Days><UnknownElement/></Expiration>",
+        prefix + "<Expiration><Days>30<UnknownElement/></Days></Expiration>",
+        prefix + "<AbortIncompleteMultipartUpload><DaysAfterInitiation>1</DaysAfterInitiation>"
+            + "<UnknownElement/></AbortIncompleteMultipartUpload>",
+        expiration + "<Filter><Prefix>prefix/</Prefix><ObjectSizeGreaterThan>1</ObjectSizeGreaterThan></Filter>",
+        expiration + "<Filter><Prefix>prefix/</Prefix><ObjectSizeLessThan>1000</ObjectSizeLessThan></Filter>",
+        expiration + "<Filter><And><Prefix>prefix/</Prefix><Tag><Key>key</Key><Value>value</Value></Tag>"
+            + "<ObjectSizeGreaterThan>1</ObjectSizeGreaterThan></And></Filter>",
+        expiration + "<Filter><Tag><Key>key</Key><Value>value</Value><UnknownElement/></Tag></Filter>",
+        prefix + "<Expiration><Days>30</Days><ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker>"
+            + "</Expiration>" + expiration,
+        prefix + "<Expiration><Days>30</Days><Tag><Key>key</Key><Value>value</Value></Tag></Expiration>",
+        prefix + "<Transition><Days>30</Days><StorageClass>GLACIER</StorageClass><UnknownElement/></Transition>")
+        .flatMap(elements -> Stream.of(Arguments.of(elements, false), Arguments.of(elements, true)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"<UnknownElement/>", "<Prefix>prefix/</Prefix>"})
+  public void testRejectUnsupportedRootElements(String element) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<LifecycleConfiguration>" + element
+        + "<Rule><Prefix>prefix/</Prefix><Status>Enabled</Status><Expiration><Days>30</Days></Expiration>"
+        + "</Rule></LifecycleConfiguration>";
+    assertErrorResponse(MALFORMED_XML,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {
+      "<Rule xsi:nil=\"true\"><Prefix>prefix/</Prefix><Status>Enabled</Status>"
+          + "<Expiration><Days>30</Days></Expiration><UnknownElement/></Rule>",
+      "<Rule><Prefix>prefix/</Prefix><Status>Enabled</Status>"
+          + "<Expiration xsi:nil=\"true\"><Days>30</Days><UnknownElement/></Expiration></Rule>",
+      "<Rule><Prefix>prefix/</Prefix><Status>Enabled</Status>"
+          + "<Expiration xsi:type=\"xs:string\"><Days>30</Days><UnknownElement/></Expiration></Rule>"
+  })
+  public void testRejectUnsupportedElementsWithXmlTypeOverrides(String rule) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<LifecycleConfiguration xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+        + " xmlns:xs=\"http://www.w3.org/2001/XMLSchema\">" + rule + "</LifecycleConfiguration>";
+    assertErrorResponse(MALFORMED_XML,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testSupportedLifecycleElementPaths(boolean namespace) throws Exception {
+    String xml = "<LifecycleConfiguration" + (namespace ? " xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\"" : "")
+        + "><Rule><ID>and</ID><Status>Enabled</Status><Expiration><Days>30</Days></Expiration>"
+        + "<Filter><And><Prefix>prefix/</Prefix><Tag><Key>key</Key><Value>value</Value></Tag></And></Filter></Rule>"
+        + "<Rule><ID>prefix</ID><Status>Disabled</Status><Expiration><Date>2044-01-19T00:00:00Z</Date></Expiration>"
+        + "<Filter><Prefix>prefix/</Prefix></Filter></Rule>"
+        + "<Rule><ID>tag</ID><Status>Enabled</Status><Expiration><Days>60</Days></Expiration>"
+        + "<Filter><Tag><Key>key</Key><Value>value</Value></Tag></Filter></Rule>"
+        + "<Rule><ID>abort</ID><Status>Enabled</Status><Prefix>prefix/</Prefix>"
+        + "<AbortIncompleteMultipartUpload><DaysAfterInitiation>1</DaysAfterInitiation>"
+        + "</AbortIncompleteMultipartUpload></Rule></LifecycleConfiguration>";
+    try (Response response = bucketEndpoint.put("bucket1",
+        new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)))) {
+      assertEquals(HTTP_OK, response.getStatus());
+    }
+    try (Response response = bucketEndpoint.get("bucket1")) {
+      S3LifecycleConfiguration result = (S3LifecycleConfiguration) response.getEntity();
+      assertEquals(4, result.getRules().size());
+      assertEquals("value", result.getRules().get(0).getFilter().getAndOperator().getTags().get(0).getValue());
+      assertEquals("2044-01-19T00:00:00Z", result.getRules().get(1).getExpiration().getDate());
+      assertEquals("key", result.getRules().get(2).getFilter().getTag().getKey());
+      assertEquals(1, result.getRules().get(3).getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+    }
   }
 
   private BucketEndpoint newProtocolEndpoint(ClientProtocol proxy, HttpHeaders requestHeaders, BucketLayout layout)
