@@ -26,12 +26,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.net.NetUtils;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -98,6 +100,18 @@ public class TestDiskBalancerSubCommandUtil {
   }
 
   @Test
+  public void testGetClientRpcAddressWithIpv6() throws IOException {
+    DatanodeDetails details = DatanodeDetails.getFromProtoBuf(
+        buildNode(DN_UUID, "nodename", "2001:db8::5", HDDS_DATANODE_CLIENT_PORT_DEFAULT).getNodeID());
+
+    String address = DiskBalancerSubCommandUtil.getClientRpcAddress(details);
+
+    assertEquals("[2001:db8::5]:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT, address);
+    assertEquals(new InetSocketAddress("2001:db8::5", HDDS_DATANODE_CLIENT_PORT_DEFAULT),
+        NetUtils.createSocketAddr(address));
+  }
+
+  @Test
   public void testGetDatanodeHostAndIp() {
     HddsProtos.DatanodeDetailsProto nodeProto = buildNode(
         "6d8157c2-280d-4eb2-a264-d388b05a0a87",
@@ -107,6 +121,16 @@ public class TestDiskBalancerSubCommandUtil {
 
     assertEquals(
         "ozone-datanode-2.ozone_default (172.18.0.6:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT + ")",
+        DiskBalancerSubCommandUtil.getDatanodeHostAndIp(nodeProto));
+  }
+
+  @Test
+  public void testGetDatanodeHostAndIpWithIpv6() {
+    HddsProtos.DatanodeDetailsProto nodeProto = buildNode(
+        DN_UUID, "ozone-datanode-2.ozone_default", "2001:db8::5", HDDS_DATANODE_CLIENT_PORT_DEFAULT).getNodeID();
+
+    assertEquals(
+        "ozone-datanode-2.ozone_default ([2001:db8::5]:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT + ")",
         DiskBalancerSubCommandUtil.getDatanodeHostAndIp(nodeProto));
   }
 

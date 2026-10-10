@@ -79,7 +79,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
       if (hostAddr.isPresent()) {
         int port = hostport
             .orElse(config.getObject(GrpcOmTransport.GrpcOmTransportConfig.class).getPort());
-        String rpcAddrStr = hostAddr.get() + ":" + port;
+        String rpcAddrStr = HddsUtils.getHostPortString(hostAddr.get(), port);
         omProxies.add(OMProxyInfo.newInstance(createOMProxy(), omSvcId, nodeId, rpcAddrStr));
       } else {
         LOG.error("expected host address not defined for: {}", rpcAddrKey);
