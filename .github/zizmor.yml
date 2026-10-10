@@ -13,32 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: pull request
-
-on:
-  pull_request:
-    types:
-      - reopened
-      - opened
-      - edited
-      - synchronize
-
-permissions: { }
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
-jobs:
-  title:
-    runs-on: ubuntu-slim
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - name: Check pull request title
-        env:
-          TITLE: ${{ github.event.pull_request.title }}
-        run:
-          dev-support/ci/pr_title_check.sh "${TITLE}"
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        actions/*: ref-pin
+        apache/*: ref-pin
