@@ -333,43 +333,17 @@ public final class ChunkUtils {
   }
 
   /**
-   * Validates chunk data and returns a file object to Chunk File that we are
-   * expected to write data to.
-   *
-   * @param chunkFile - chunkFile to write data into.
-   * @param info - chunk info.
-   * @return true if the chunkFile exists and chunkOffset &lt; chunkFile length,
-   *         false otherwise.
-   */
-  public static boolean validateChunkForOverwrite(File chunkFile,
-      ChunkInfo info) {
-
-    if (isOverWriteRequested(chunkFile, info)) {
-      if (!isOverWritePermitted(info)) {
-        LOG.warn("Duplicate write chunk request. Chunk overwrite " +
-            "without explicit request. {}", info);
-      }
-      return true;
-    }
-
-    // TODO: when overwriting a chunk, we should ensure that the new chunk
-    //  size is same as the old chunk size
-
-    return false;
-  }
-
-  /**
    * Validates chunk data and returns a boolean value that indicates if the
    * chunk data should be overwritten.
    *
-   * @param fileLen - current length of the block file.
+   * @param fileLen - current length of the chunk or block file.
    * @param info - chunk info.
    * @return true if the chunkOffset is less than the chunkFile length,
    *         false otherwise.
    */
   public static boolean validateChunkForOverwrite(long fileLen, ChunkInfo info) {
 
-    if (isOverWriteRequested(fileLen, info)) {
+    if (info.getOffset() < fileLen) {
       if (!isOverWritePermitted(info)) {
         LOG.warn("Duplicate write chunk request. Chunk overwrite " +
             "without explicit request. {}", info);
@@ -381,38 +355,6 @@ public final class ChunkUtils {
     //  size is same as the old chunk size
 
     return false;
-  }
-
-  /**
-   * Checks if we are getting a request to overwrite an existing range of
-   * chunk.
-   *
-   * @param chunkFile - File
-   * @param chunkInfo - Buffer to write
-   * @return bool
-   */
-  public static boolean isOverWriteRequested(File chunkFile, ChunkInfo
-      chunkInfo) {
-
-    if (!chunkFile.exists()) {
-      return false;
-    }
-
-    long offset = chunkInfo.getOffset();
-    return offset < chunkFile.length();
-  }
-
-  /**
-   * Checks if a request to overwrite an existing range of a chunk has been
-   * received.
-   *
-   * @param fileLen - current length of the block file
-   * @param chunkInfo - Chunk information containing the offset
-   * @return true if the offset is less than the file length, indicating
-   *         a request to overwrite an existing range; false otherwise
-   */
-  public static boolean isOverWriteRequested(long fileLen, ChunkInfo chunkInfo) {
-    return chunkInfo.getOffset() < fileLen;
   }
 
   /**

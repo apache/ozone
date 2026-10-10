@@ -118,8 +118,7 @@ public class FilePerChunkStrategy implements ChunkManager {
 
       File chunkFile = getChunkFile(kvContainer, blockID, info);
 
-      boolean isOverwrite = ChunkUtils.validateChunkForOverwrite(
-          chunkFile, info);
+      boolean isOverwrite = ChunkUtils.validateChunkForOverwrite(chunkFile.length(), info);
       File tmpChunkFile = getTmpChunkFile(chunkFile, dispatcherContext);
       if (LOG.isDebugEnabled()) {
         LOG.debug(
