@@ -29,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -626,9 +627,10 @@ public class TestOMRatisSnapshots {
         "Simulated backup move failure for test"));
     followerOM.setExitManagerForTesting(new DummyExitManager());
     try {
-      TermIndex termIndex = followerOM.installCheckpoint(
-          leaderOMNodeId, leaderCheckpointLocation, leaderCheckpointTrxnInfo);
-      assertNull(termIndex, "Install should have been reported as failed");
+      IOException exception = assertThrows(IOException.class, () ->
+          followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation,
+              leaderCheckpointTrxnInfo));
+      assertThat(exception).hasMessageContaining("Cannot replace DB");
 
       // Everything present before the aborted install must still be present.
       assertThat(topLevelNames(followerMetaDir)).containsAll(namesBefore);
