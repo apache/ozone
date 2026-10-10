@@ -25,8 +25,10 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -113,6 +115,14 @@ public class TestObjectTaggingDelete {
     assertEquals(
         ImmutableMap.of("tag1", "value1", "tag2", "value2"),
         client.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_WITH_TAG).getTags());
+  }
+
+  @Test
+  public void testDeleteTaggingWithNullVersionId() throws IOException, OS3Exception {
+    rest.queryParamsForTest().set(QueryParams.VERSION_ID, NULL_VERSION_ID);
+
+    assertThat(deleteTagging(rest, BUCKET_NAME, KEY_WITH_TAG).getStatus()).isEqualTo(HTTP_NO_CONTENT);
+    assertThat(client.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_WITH_TAG).getTags()).isEmpty();
   }
 
   @Test

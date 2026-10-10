@@ -17,13 +17,17 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static java.net.HttpURLConnection.HTTP_NO_CONTENT;
 import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.delete;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -109,5 +113,13 @@ public class TestObjectNotImplemented {
 
     assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> delete(objectEndpoint, BUCKET_NAME, KEY_NAME));
     assertKeyContent(bucket, KEY_NAME, CONTENT);
+  }
+
+  @Test
+  public void deleteWithNullVersionIdDeletesObject() throws IOException {
+    objectEndpoint.queryParamsForTest().set(QueryParams.VERSION_ID, NULL_VERSION_ID);
+
+    assertStatus(HTTP_NO_CONTENT, () -> delete(objectEndpoint, BUCKET_NAME, KEY_NAME));
+    assertThat(bucket.listKeys("")).isExhausted();
   }
 }
