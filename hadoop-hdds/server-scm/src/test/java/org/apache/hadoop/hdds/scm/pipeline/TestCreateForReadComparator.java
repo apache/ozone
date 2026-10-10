@@ -20,19 +20,14 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceDead;
 import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceHealthy;
 import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceStale;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.Comparator;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Tests for {@link ECPipelineProvider#CREATE_FOR_READ_COMPARATOR}.
@@ -42,14 +37,6 @@ class TestCreateForReadComparator {
 
   int compare(NodeStatus left, NodeStatus right) {
     return comparator.compare(left, right);
-  }
-
-  @ParameterizedTest
-  @EnumSource
-  void readOnly(HddsProtos.NodeOperationalState state) {
-    assertEquals(0, compare(
-        NodeStatus.valueOf(state, HEALTHY),
-        NodeStatus.valueOf(state, HEALTHY_READONLY)));
   }
 
   @Test

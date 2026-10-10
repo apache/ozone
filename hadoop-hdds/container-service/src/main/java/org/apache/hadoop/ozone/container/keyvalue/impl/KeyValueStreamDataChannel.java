@@ -152,6 +152,25 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
     }
   }
 
+  /**
+   * Write all the data in {@link #buffers} to the channel.
+   * It must be called before committing a PutBlock in the middle of the stream;
+   * otherwise, the buffered data is not yet in the block file.
+   */
+  public void drainBuffers() throws IOException {
+    assertOpen();
+    if (buffers.isEmpty()) {
+      return;
+    }
+    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+    final ByteBuf buf = ref.retain();
+    try {
+      writeFully(buf.nioBuffer(), super::writeFileChannel);
+    } finally {
+      ref.release();
+    }
+  }
+
   static ContainerCommandRequestProto closeBuffers(
       Buffers buffers, WriteMethod writeMethod) throws IOException {
     final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();

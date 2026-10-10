@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -78,6 +79,7 @@ import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -785,10 +787,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         OzoneConfiguration dnConf = dnFactory.apply(conf);
         if (hosts != null) {
           dnConf.set(HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY, hosts[i]);
+          initializeDatanodeIdentity(dnConf, hosts[i]);
         }
 
-        // Bypass InetAddress.getName() resolution for custom hostnames by starting DN via YAML.
-        confDatanodeViaYaml(dnConf);
         HddsDatanodeService datanode = new HddsDatanodeService(NO_ARGS);
         dnConf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, conf.getStrings(ScmConfigKeys.OZONE_SCM_NAMES));
         datanode.setConfiguration(dnConf);
@@ -798,13 +799,28 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       return hddsDatanodes;
     }
 
-    private void confDatanodeViaYaml(OzoneConfiguration dnConf) throws IOException {
+    /**
+     * Seeds the datanode.id file for a Datanode with a synthetic hostname: such a hostname
+     * cannot be resolved, so the Datanode cannot discover its own IP address, which is a
+     * required field of the registration request.  The layout version is stamped as well,
+     * since a datanode.id file without a VERSION file marks the Datanode as an installation
+     * predating the upgrade framework, which would make it start pre-finalized.
+     */
+    private void initializeDatanodeIdentity(OzoneConfiguration dnConf, String hostName)
+        throws IOException {
       DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()
           .setID(DatanodeID.randomID())
-          .setHostName(dnConf.get(HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY))
+          .setHostName(hostName)
           .setIpAddress("127.0.0.1")
           .build();
       datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
+
+      DatanodeStorage layoutStorage = new DatanodeStorage(dnConf,
+          datanodeDetails.getUuidString(), HDDSVersion.SOFTWARE_VERSION.serialize());
+      if (layoutStorage.getState() != StorageState.INITIALIZED) {
+        layoutStorage.initialize();
+      }
+
       String dnFilePath = HddsServerUtil.getDatanodeIdFilePath(dnConf);
       ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, new File(dnFilePath), dnConf);
     }

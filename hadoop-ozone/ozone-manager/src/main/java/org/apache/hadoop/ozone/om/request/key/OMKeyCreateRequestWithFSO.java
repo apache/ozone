@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -184,8 +185,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
-      CreateKeyResponse.Builder createKeyResponseBuilder =
-          getResponseBuilderWithDerivedKey(getOmRequest(), ozoneManager, createKeyRequest);
+      CreateKeyResponse.Builder createKeyResponseBuilder = CreateKeyResponse.newBuilder();
       perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       omBucketInfo.incrUsedNamespace(numKeysCreated);
 
@@ -206,7 +206,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
 
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.
-      int clientVersion = getOmRequest().getVersion();
+      ClientVersion clientVersion = ClientVersion.deserialize(getOmRequest().getVersion());
       createKeyResponseBuilder.setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
                   keyArgs.getLatestVersionLocation()))
               .setID(clientID)

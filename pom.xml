@@ -43,11 +43,11 @@
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
     <bouncycastle.version>1.86</bouncycastle.version>
     <build-helper-maven-plugin.version>3.6.2</build-helper-maven-plugin.version>
-    <byte-buddy.version>1.18.13</byte-buddy.version>
+    <byte-buddy.version>1.18.14</byte-buddy.version>
     <cdi-api.version>2.0.SP1</cdi-api.version>
     <checkstyle.version>9.3</checkstyle.version>
     <classpath.skip>true</classpath.skip>
-    <com.nimbusds.nimbus-jose-jwt.version>10.9.1</com.nimbusds.nimbus-jose-jwt.version>
+    <com.nimbusds.nimbus-jose-jwt.version>10.10</com.nimbusds.nimbus-jose-jwt.version>
     <common-pool2.version>2.13.1</common-pool2.version>
     <commons-codec.version>1.22.1</commons-codec.version>
     <commons-collections.version>4.6.0</commons-collections.version>
@@ -56,7 +56,7 @@
     <commons-csv.version>1.14.1</commons-csv.version>
     <commons-fileupload.version>1.6.0</commons-fileupload.version>
     <commons-io.version>2.22.0</commons-io.version>
-    <commons-lang3.version>3.20.0</commons-lang3.version>
+    <commons-lang3.version>3.21.0</commons-lang3.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-text.version>1.15.0</commons-text.version>
     <commons-validator.version>1.11.0</commons-validator.version>
@@ -74,9 +74,9 @@
     <distMgmtStagingId>apache.staging.https</distMgmtStagingId>
     <distMgmtStagingName>Apache Release Distribution Repository</distMgmtStagingName>
     <distMgmtStagingUrl>https://repository.apache.org/service/local/staging/deploy/maven2</distMgmtStagingUrl>
-    <download-maven-plugin.version>1.9.0</download-maven-plugin.version>
+    <download-maven-plugin.version>2.1.0</download-maven-plugin.version>
     <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
-    <enforced.maven.version>[3.6.3,)</enforced.maven.version>
+    <enforced.maven.version>[3.9.6,)</enforced.maven.version>
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <errorprone.version>2.42.0</errorprone.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
@@ -85,7 +85,7 @@
     <failIfNoTests>false</failIfNoTests>
     <frontend-maven-plugin.version>1.15.4</frontend-maven-plugin.version>
     <gson.version>2.14.0</gson.version>
-    <guava.version>33.7.1-jre</guava.version>
+    <guava.version>33.7.2-jre</guava.version>
     <guice.version>6.0.0</guice.version>
     <hadoop.version>3.4.3</hadoop.version>
     <hadoop2.version>2.10.2</hadoop2.version>
@@ -94,9 +94,8 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <iceberg.version>1.10.2</iceberg.version>
     <io.grpc.version>1.77.1</io.grpc.version>
-    <jackson2-bom.version>2.21.6</jackson2-bom.version>
+    <jackson2-bom.version>2.21.7</jackson2-bom.version>
     <jacoco.version>0.8.15</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
@@ -111,12 +110,12 @@
     <jdeb.version>1.14</jdeb.version>
     <jersey.version>1.19.4</jersey.version>
     <jersey2.version>2.48</jersey2.version>
-    <jetty.version>9.4.58.v20250814</jetty.version>
+    <jetty.version>12.1.14</jetty.version>
     <jgrapht.version>1.4.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
     <jline.version>3.30.17</jline.version>
-    <jnr-constants.version>0.11.0</jnr-constants.version>
-    <jnr-posix.version>3.2.2</jnr-posix.version>
+    <jnr-constants.version>0.11.2</jnr-constants.version>
+    <jnr-posix.version>3.2.4</jnr-posix.version>
     <joda.time.version>2.12.7</joda.time.version>
     <jooq.version>3.19.37</jooq.version>
     <jsch.version>0.1.55</jsch.version>
@@ -184,7 +183,7 @@
     <prometheus.version>0.16.0</prometheus.version>
     <properties.maven.plugin.version>1.3.1</properties.maven.plugin.version>
     <proto-backwards-compatibility.version>1.0.7</proto-backwards-compatibility.version>
-    <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
+    <protobuf-maven-plugin.version>5.1.11</protobuf-maven-plugin.version>
     <protobuf.version>3.25.9</protobuf.version>
     <ranger.version>2.9.0</ranger.version>
     <!-- versions included in ratis-thirdparty, update in sync -->
@@ -198,9 +197,10 @@
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>3.0.1</restrict-imports.enforcer.version>
     <rocksdb.version>10.10.1.1</rocksdb.version>
-    <servlet-api.version>3.1.0</servlet-api.version>
+    <!-- version of org.eclipse.jetty.toolchain:jetty-servlet-api, the javax.servlet 4.0 API for Jetty EE8 -->
+    <servlet-api.version>4.0.9</servlet-api.version>
     <shell-executable>bash</shell-executable>
-    <slf4j.version>2.0.19</slf4j.version>
+    <slf4j.version>2.0.20</slf4j.version>
     <snakeyaml.version>2.5</snakeyaml.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
@@ -225,7 +225,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.6</zookeeper.version>
-    <zstd-jni.version>1.5.7-16</zstd-jni.version>
+    <zstd-jni.version>1.5.7-20</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
@@ -259,15 +259,15 @@
         <scope>import</scope>
       </dependency>
       <dependency>
-        <groupId>org.apache.iceberg</groupId>
-        <artifactId>iceberg-bom</artifactId>
-        <version>${iceberg.version}</version>
+        <groupId>org.eclipse.jetty</groupId>
+        <artifactId>jetty-bom</artifactId>
+        <version>${jetty.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
       <dependency>
-        <groupId>org.eclipse.jetty</groupId>
-        <artifactId>jetty-bom</artifactId>
+        <groupId>org.eclipse.jetty.ee8</groupId>
+        <artifactId>jetty-ee8-bom</artifactId>
         <version>${jetty.version}</version>
         <type>pom</type>
         <scope>import</scope>
@@ -616,11 +616,6 @@
         <version>${javax.inject.version}</version>
       </dependency>
       <dependency>
-        <groupId>javax.servlet</groupId>
-        <artifactId>javax.servlet-api</artifactId>
-        <version>${servlet-api.version}</version>
-      </dependency>
-      <dependency>
         <groupId>javax.servlet.jsp</groupId>
         <artifactId>jsp-api</artifactId>
         <version>${jsp-api.version}</version>
@@ -849,6 +844,10 @@
             <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
           </exclusion>
@@ -871,6 +870,11 @@
           <exclusion>
             <groupId>org.apache.zookeeper</groupId>
             <artifactId>zookeeper</artifactId>
+          </exclusion>
+          <exclusion>
+            <!-- Ozone provides Jetty 12; hadoop-common still brings Jetty 9 -->
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.slf4j</groupId>
@@ -906,6 +910,10 @@
             <artifactId>commons-logging</artifactId>
           </exclusion>
           <exclusion>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-math3</artifactId>
           </exclusion>
@@ -916,6 +924,11 @@
           <exclusion>
             <groupId>org.apache.zookeeper</groupId>
             <artifactId>zookeeper</artifactId>
+          </exclusion>
+          <exclusion>
+            <!-- Ozone provides Jetty 12; hadoop-common still brings Jetty 9 -->
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.xerial.snappy</groupId>
@@ -956,6 +969,11 @@
             <artifactId>*</artifactId>
           </exclusion>
           <exclusion>
+            <!-- Ozone provides javax.servlet via jetty-servlet-api -->
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+          </exclusion>
+          <exclusion>
             <groupId>log4j</groupId>
             <artifactId>log4j</artifactId>
           </exclusion>
@@ -986,6 +1004,11 @@
           <exclusion>
             <groupId>io.netty</groupId>
             <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <!-- Ozone provides javax.servlet via jetty-servlet-api -->
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
           </exclusion>
           <exclusion>
             <groupId>org.fusesource.leveldbjni</groupId>
@@ -1025,6 +1048,11 @@
           <exclusion>
             <groupId>io.netty</groupId>
             <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <!-- Ozone provides javax.servlet via jetty-servlet-api -->
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
           </exclusion>
           <exclusion>
             <groupId>log4j</groupId>
@@ -1552,6 +1580,11 @@
         <version>${bouncycastle.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.eclipse.jetty.toolchain</groupId>
+        <artifactId>jetty-servlet-api</artifactId>
+        <version>${servlet-api.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.glassfish.hk2</groupId>
         <artifactId>guice-bridge</artifactId>
         <version>${hk2.version}</version>
@@ -1940,6 +1973,9 @@
           <version>${maven-enforcer-plugin.version}</version>
           <configuration>
             <rules>
+              <requireJavaVersion>
+                <version>${ozone.java.version.server}</version>
+              </requireJavaVersion>
               <requireMavenVersion>
                 <version>${enforced.maven.version}</version>
               </requireMavenVersion>
@@ -2224,7 +2260,7 @@
           <version>${jacoco.version}</version>
         </plugin>
         <plugin>
-          <groupId>com.googlecode.maven-download-plugin</groupId>
+          <groupId>io.github.download-maven-plugin</groupId>
           <artifactId>download-maven-plugin</artifactId>
           <version>${download-maven-plugin.version}</version>
         </plugin>
@@ -2244,10 +2280,9 @@
           <version>${jdeb.version}</version>
         </plugin>
         <plugin>
-          <groupId>org.xolstice.maven.plugins</groupId>
+          <groupId>io.github.ascopes</groupId>
           <artifactId>protobuf-maven-plugin</artifactId>
           <version>${protobuf-maven-plugin.version}</version>
-          <extensions>true</extensions>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -2678,9 +2713,8 @@
             </executions>
           </plugin>
           <plugin>
-            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <groupId>io.github.download-maven-plugin</groupId>
             <artifactId>download-maven-plugin</artifactId>
-            <version>${download-maven-plugin.version}</version>
             <inherited>false</inherited>
             <executions>
               <execution>
@@ -3061,9 +3095,8 @@
       <build>
         <plugins>
           <plugin>
-            <groupId>com.googlecode.maven-download-plugin</groupId>
+            <groupId>io.github.download-maven-plugin</groupId>
             <artifactId>download-maven-plugin</artifactId>
-            <version>${download-maven-plugin.version}</version>
             <inherited>false</inherited>
             <executions>
               <execution>

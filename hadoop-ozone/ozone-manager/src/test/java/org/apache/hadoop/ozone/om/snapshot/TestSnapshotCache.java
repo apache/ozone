@@ -170,6 +170,20 @@ class TestSnapshotCache {
     verify(lock, times(1)).releaseReadLock(eq(SNAPSHOT_DB_LOCK), eq(dbKey.toString()));
   }
 
+  @Test
+  @DisplayName("get() of an inactive snapshot does not count towards cache size")
+  void testGetInactiveSnapshotDoesNotIncrementCacheSize() throws Exception {
+    final UUID dbKey = UUID.randomUUID();
+    when(cacheLoader.load(eq(dbKey)))
+        .thenThrow(new OMException("Snapshot is no longer active", OMException.ResultCodes.FILE_NOT_FOUND));
+    for (int i = 0; i < 3; i++) {
+      OMException ex = assertThrows(OMException.class, () -> snapshotCache.get(dbKey));
+      assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
+      assertEquals(0, snapshotCache.size());
+      assertEquals(0, omMetrics.getNumSnapshotCacheSize());
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 5, 10})
   @DisplayName("Tests get() holds a read lock")

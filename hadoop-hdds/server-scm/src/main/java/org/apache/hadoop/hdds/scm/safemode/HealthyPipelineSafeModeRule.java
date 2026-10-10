@@ -33,14 +33,12 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
 import org.slf4j.Logger;
@@ -64,7 +62,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final Set<PipelineID> processedPipelineIDs = new HashSet<>();
   private final PipelineManager pipelineManager;
   private final int minHealthyPipelines;
-  private final SCMContext scmContext;
   private final Set<PipelineID> unProcessedPipelineSet = new HashSet<>();
   private final NodeManager nodeManager;
   private final RatisReplicationConfig targetReplicationConfig =
@@ -76,10 +73,9 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
-      ConfigurationSource configuration, SCMContext scmContext, NodeManager nodeManager) {
+      ConfigurationSource configuration, NodeManager nodeManager) {
     super(manager, eventQueue);
     this.pipelineManager = pipelineManager;
-    this.scmContext = scmContext;
     this.nodeManager = nodeManager;
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
@@ -121,14 +117,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   protected synchronized boolean validate() {
-    boolean shouldRunSafemodeCheck =
-        FinalizationManager.shouldCreateNewPipelines(
-            scmContext.getFinalizationCheckpoint());
-    if (!shouldRunSafemodeCheck) {
-      LOG.info("All SCM pipelines are closed due to ongoing upgrade " +
-          "finalization. Bypassing healthy pipeline safemode rule.");
-      return true;
-    }
     if (!validateBasedOnReportProcessing()) {
       return validateHealthyPipelineSafeModeRuleUsingPipelineManager();
     }
@@ -188,7 +176,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
     if (!badDnsWithReasons.isEmpty()) {
       String badDnSummary = badDnsWithReasons.entrySet().stream()
-          .map(entry -> String.format("DN %s: %s", entry.getKey().getID(), entry.getValue()))
+          .map(entry -> String.format("DN %s: %s", entry.getKey(), entry.getValue()))
           .collect(Collectors.joining("; "));
       LOG.warn("Below DNs reported by Pipeline: {} are either in bad health or un-registered with SCMs. Details: {}",
           pipeline.getId(), badDnSummary);
@@ -289,12 +277,12 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
         NodeStatus status = nodeManager.getNodeStatus(dn);
         if (!status.equals(NodeStatus.inServiceHealthy())) {
           LOG.debug("Pipeline {} is not healthy: DN {} has status - Health: {}, Operational State: {}",
-              pipeline.getId(), dn.getUuidString(), status.getHealth(), status.getOperationalState());
+              pipeline.getId(), dn, status.getHealth(), status.getOperationalState());
           return false;
         }
       } catch (NodeNotFoundException e) {
         LOG.warn("Pipeline {} is not healthy: DN {} not found in node manager",
-            pipeline.getId(), dn.getUuidString());
+            pipeline.getId(), dn);
         return false;
       }
     }

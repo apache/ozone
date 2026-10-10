@@ -251,7 +251,6 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
   @Override
   public void start() throws IllegalContainerBalancerStateException,
       InvalidContainerBalancerConfigurationException {
-    startedAt = OffsetDateTime.now();
     lock.lock();
     try {
       // should be leader-ready, out of safe mode, and not running already
@@ -278,6 +277,9 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
               ozoneConfiguration);
       validateConfiguration(configuration);
       this.config = configuration;
+      // Set startedAt only after validation has passed, so a rejected start
+      // does not overwrite the recorded start time of the previous run.
+      startedAt = OffsetDateTime.now();
       startBalancingThread(proto.getNextIterationIndex(), true);
     } finally {
       lock.unlock();
@@ -299,7 +301,6 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
   public void startBalancer(ContainerBalancerConfiguration configuration)
       throws IllegalContainerBalancerStateException,
       InvalidContainerBalancerConfigurationException, IOException {
-    startedAt = OffsetDateTime.now();
     lock.lock();
     try {
       // validates state, config, and then saves config
@@ -312,6 +313,9 @@ public class ContainerBalancer extends StatefulService<ContainerBalancerConfigur
               "(hdds.container.balancer.balancing.iteration.interval).",
           configuration.getBalancingInterval().getSeconds());
 
+      // Set startedAt only after validation has passed, so a rejected start
+      // does not overwrite the recorded start time of the previous run.
+      startedAt = OffsetDateTime.now();
       //start balancing task
       startBalancingThread(0, false);
     } finally {

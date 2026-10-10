@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -47,6 +48,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -57,6 +59,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test cases for mini ozone cluster.
@@ -109,6 +112,27 @@ public class TestMiniOzoneCluster {
         assertTrue(client.isConnected(pipeline.getFirstNode()));
       }
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDatanodesStartWithLatestLayoutVersion(boolean withCustomHostnames)
+      throws Exception {
+    MiniOzoneCluster.Builder builder =
+        MiniOzoneCluster.newBuilder(new OzoneConfiguration(conf))
+            .setNumDatanodes(1)
+            .setStartDataNodes(false);
+    if (withCustomHostnames) {
+      builder.setHosts(new String[] {"host0.test"});
+    }
+    cluster = builder.build();
+
+    OzoneConfiguration dnConf = cluster.getHddsDatanodes().get(0).getConf();
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(),
+        new DatanodeStorage(dnConf).getApparentVersion(),
+        "Datanode must start at the latest metadata layout version. A "
+            + "datanode.id file written before the datanode starts makes it "
+            + "come up pre-finalized, as if upgraded from an older install.");
   }
 
   @Test

@@ -121,7 +121,6 @@ public class KeyLifecycleService extends BackgroundService {
 
   private final OzoneManager ozoneManager;
   private int keyDeleteBatchSize;
-  private int listMaxSize;
   private int mpuAbortLimitPerTask;
   private long cachedDirMaxCount;
   private final AtomicBoolean suspended;
@@ -152,7 +151,6 @@ public class KeyLifecycleService extends BackgroundService {
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT);
     Preconditions.checkArgument(keyDeleteBatchSize > 0,
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE + " should be a positive value.");
-    this.listMaxSize = keyDeleteBatchSize >= 10000 ? keyDeleteBatchSize : 10000;
     this.mpuAbortLimitPerTask = conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK,
         OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT);
     Preconditions.checkArgument(mpuAbortLimitPerTask > 0,
@@ -398,8 +396,8 @@ public class KeyLifecycleService extends BackgroundService {
               .collect(Collectors.toList());
 
           if (!expirationRules.isEmpty()) {
-            LimitedExpiredObjectList expiredKeyList = new LimitedExpiredObjectList(listMaxSize);
-            LimitedExpiredObjectList expiredDirList = new LimitedExpiredObjectList(listMaxSize);
+            LimitedExpiredObjectList expiredKeyList = new LimitedExpiredObjectList(keyDeleteBatchSize);
+            LimitedExpiredObjectList expiredDirList = new LimitedExpiredObjectList(keyDeleteBatchSize);
             Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(bucket.getBucketLayout());
             /**
              * Filter treatment.
@@ -1248,7 +1246,7 @@ public class KeyLifecycleService extends BackgroundService {
       OMRequest omRequest = OMRequest.newBuilder()
           .setCmdType(OzoneManagerProtocolProtos.Type.AbortExpiredMultiPartUploads)
           .setMultipartUploadsExpiredAbortRequest(abortRequest)
-          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT.serialize())
           .setClientId(clientId.toString())
           .build();
 
@@ -1395,7 +1393,7 @@ public class KeyLifecycleService extends BackgroundService {
 
         OMRequest omRequest = OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.SaveLifecycleScanState)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(clientId.toString())
             .setSaveLifecycleScanStateRequest(saveRequest)
             .build();
@@ -1462,7 +1460,7 @@ public class KeyLifecycleService extends BackgroundService {
           if (deleteKeysRequest.getSerializedSize() < ratisByteLimit) {
             OMRequest omRequestRaw = OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
-                .setVersion(ClientVersion.CURRENT_VERSION)
+                .setVersion(ClientVersion.CURRENT.serialize())
                 .setClientId(clientId.toString())
                 .setDeleteKeysRequest(deleteKeysRequest)
                 .build();
@@ -1590,7 +1588,7 @@ public class KeyLifecycleService extends BackgroundService {
         // send request out
         OMRequest omRequest = OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(clientId.toString())
             .setRenameKeyRequest(renameKeyRequest)
             .build();
@@ -1654,7 +1652,7 @@ public class KeyLifecycleService extends BackgroundService {
           OMRequest omRequest = OMRequest.newBuilder().setCreateDirectoryRequest(
                   CreateDirectoryRequest.newBuilder().setKeyArgs(keyArgs))
               .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
-              .setVersion(ClientVersion.CURRENT_VERSION)
+              .setVersion(ClientVersion.CURRENT.serialize())
               .setClientId(clientId.toString())
               .build();
           try {
@@ -1707,8 +1705,8 @@ public class KeyLifecycleService extends BackgroundService {
   }
 
   @VisibleForTesting
-  public void setListMaxSize(int size) {
-    this.listMaxSize = size;
+  public void setKeyDeleteBatchSize(int size) {
+    this.keyDeleteBatchSize = size;
   }
 
   // Returns the test-injected OzoneTrash if set, otherwise the live instance
