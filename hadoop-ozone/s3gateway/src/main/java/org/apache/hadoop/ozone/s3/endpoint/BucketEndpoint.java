@@ -195,6 +195,8 @@ public class BucketEndpoint extends BucketOperationHandler {
             if (delimiterIndex >= 0) {
               // means key has multiple delimiters in its value.
               // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
+              // Keys that equal prefix + delimiter (ex: dir/ with prefix dir and
+              // delimiter /) also hit this branch and become a common prefix.
               String dirName = relativeKeyName.substring(0, delimiterIndex);
               if (!dirName.equals(prevDir)) {
                 response.addPrefix(EncodingTypeObject.createNullable(
@@ -202,12 +204,6 @@ public class BucketEndpoint extends BucketOperationHandler {
                 prevDir = dirName;
                 count++;
               }
-            } else if (relativeKeyName.endsWith(delimiter)) {
-              // means or key is same as prefix with delimiter at end and ends with
-              // delimiter. ex: dir/, where prefix is dir and delimiter is /
-              response.addPrefix(
-                  EncodingTypeObject.createNullable(relativeKeyName, encodingType));
-              count++;
             } else {
               // means our key is matched with prefix if prefix is given and it
               // does not have any common prefix.

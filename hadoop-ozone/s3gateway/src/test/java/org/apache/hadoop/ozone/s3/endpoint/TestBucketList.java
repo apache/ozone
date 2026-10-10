@@ -99,6 +99,25 @@ public class TestBucketList {
     assertEquals(0, getBucketResponse.getContents().size());
   }
 
+  /**
+   * Key equal to prefix + delimiter (dir/ with prefix dir) is handled by the
+   * indexOf(delimiter) branch as a common prefix. An endsWith(delimiter)
+   * fallback after indexOf &lt; 0 is unreachable and must not be required.
+   */
+  @Test
+  public void listExactPrefixWithTrailingDelimiter() throws OS3Exception, IOException {
+    setup("dir/", "dir/file1", "other");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.PREFIX, "dir");
+    ListObjectResponse response =
+        (ListObjectResponse) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertEquals(1, response.getCommonPrefixes().size());
+    assertEquals("dir/", response.getCommonPrefixes().get(0).getPrefix().getName());
+    assertEquals(0, response.getContents().size());
+  }
+
   @Test
   public void listSubDir() throws OS3Exception, IOException {
     setup("dir1/file2", "dir1/dir2/file2", "dir1bh/file", "dir1bha/file2");
