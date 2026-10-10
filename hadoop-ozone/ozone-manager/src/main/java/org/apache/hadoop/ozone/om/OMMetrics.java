@@ -230,6 +230,7 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numTrashRenames;
   private @Metric MutableCounterLong numTrashDeletes;
   private @Metric MutableCounterLong numTrashListStatus;
+  private @Metric MutableCounterLong numTrashGetFileStatus;
   private @Metric MutableCounterLong numTrashGetTrashRoots;
   private @Metric MutableCounterLong numTrashExists;
   private @Metric MutableCounterLong numTrashWriteRequests;
@@ -1457,6 +1458,10 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumTrashListStatus() {
     numTrashListStatus.incr();
+  }
+
+  public void incNumTrashGetFileStatus() {
+    numTrashGetFileStatus.incr();
   }
 
   public void incNumTrashGetTrashRoots() {
