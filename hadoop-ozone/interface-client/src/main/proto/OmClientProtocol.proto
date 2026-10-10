@@ -1951,6 +1951,7 @@ message Part {
 
 message MultipartUploadAbortRequest {
     required KeyArgs keyArgs = 1;
+    optional bool assumeS3Context = 2 [default = false];
 }
 
 message MultipartUploadAbortResponse {

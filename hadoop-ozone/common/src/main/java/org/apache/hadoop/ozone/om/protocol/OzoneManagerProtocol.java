@@ -622,6 +622,11 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
+  /** Abort a multipart upload, optionally resolving its S3 volume on OM. */
+  default void abortMultipartUpload(OmKeyArgs omKeyArgs, boolean assumeS3Context) throws IOException {
+    throw new UnsupportedOperationException("Write requests are handled through OMClientRequest");
+  }
+
   /**
    * Abort multipart upload.
    * @param omKeyArgs

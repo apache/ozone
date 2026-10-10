@@ -22,11 +22,17 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorR
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -43,7 +49,9 @@ public class TestAbortMultipartUpload {
 
     String bucket = OzoneConsts.S3_BUCKET;
     String key = OzoneConsts.KEY;
-    OzoneClient client = new OzoneClientStub();
+    OzoneClient client = spy(new OzoneClientStub());
+    ObjectStore store = spy(client.getObjectStore());
+    doReturn(store).when(client).getObjectStore();
     client.getObjectStore().createS3Bucket(bucket);
 
     HttpHeaders headers = mock(HttpHeaders.class);
@@ -57,8 +65,12 @@ public class TestAbortMultipartUpload {
 
     String uploadID = initiateMultipartUpload(rest, bucket, key);
 
+    clearInvocations(store);
+
     // Abort multipart upload
     assertStatus(HttpStatus.SC_NO_CONTENT, () -> abortMultipartUpload(rest, bucket, key, uploadID));
+
+    verify(store, never()).getS3Volume();
 
     // test with unknown upload Id.
     assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD, () -> abortMultipartUpload(rest, bucket, key, "random"));
