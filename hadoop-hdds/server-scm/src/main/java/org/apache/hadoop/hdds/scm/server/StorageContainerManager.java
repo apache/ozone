@@ -117,6 +117,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
@@ -1626,6 +1627,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       IOUtils.close(LOG, reconfigurationHandler, scmHAManager);
       stopReplicationManager(); // started eagerly
       return;
+    }
+
+    SCMStateMachine stateMachine = getScmHAManager().getRatisServer()
+        .getSCMStateMachine();
+    if (stateMachine != null) {
+      stateMachine.stopDNServerStartRetry();
     }
     try {
       if (containerBalancer.isBalancerRunning()) {
