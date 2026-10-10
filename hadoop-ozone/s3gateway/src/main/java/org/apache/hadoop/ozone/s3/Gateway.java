@@ -68,6 +68,12 @@ public class Gateway extends GenericCli implements Callable<Void> {
   private S3GatewayMetrics metrics;
   private S3GatewayVersionMetrics versionMetrics;
   private NettyMetrics nettyMetrics;
+  /**
+   * Withdrawn by {@link #stop()}: a hook left behind keeps a stopped gateway reachable for the
+   * life of the JVM and would still run {@link S3GatewayMetrics#unRegister()}, a static global
+   * shared with whichever gateway is current when several start in turn in one JVM.
+   */
+  private Runnable shutdownHook;
 
   private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
 
@@ -100,13 +106,14 @@ public class Gateway extends GenericCli implements Callable<Void> {
     nettyMetrics = NettyMetrics.create();
     start();
 
-    ShutdownHookManager.get().addShutdownHook(() -> {
+    shutdownHook = () -> {
       try {
         stop();
       } catch (Exception e) {
         LOG.error("Error during stop S3Gateway", e);
       }
-    }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
+    };
+    ShutdownHookManager.get().addShutdownHook(shutdownHook, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
   }
 
@@ -126,6 +133,15 @@ public class Gateway extends GenericCli implements Callable<Void> {
 
   public void stop() throws Exception {
     LOG.info("Stopping Ozone S3 gateway");
+    if (shutdownHook != null) {
+      // Withdrawn before the stop runs, so the hook firing during JVM shutdown does not repeat
+      // a stop that already happened. Skipped while the hook itself is running, since
+      // ShutdownHookManager rejects removal once shutdown is in progress.
+      if (!ShutdownHookManager.get().isShutdownInProgress()) {
+        ShutdownHookManager.get().removeShutdownHook(shutdownHook);
+      }
+      shutdownHook = null;
+    }
     IOUtils.closeQuietly(httpServer, contentServer, stsServer);
     jvmPauseMonitor.stop();
     S3GatewayMetrics.unRegister();
