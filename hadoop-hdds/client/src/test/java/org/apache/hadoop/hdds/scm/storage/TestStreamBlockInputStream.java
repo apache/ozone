@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
@@ -36,6 +37,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
@@ -45,6 +47,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -65,6 +72,7 @@ import org.apache.hadoop.hdds.scm.StreamingReadResponse;
 import org.apache.hadoop.hdds.scm.StreamingReaderSpi;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
@@ -86,6 +94,95 @@ public class TestStreamBlockInputStream {
 
   private static final Duration STREAM_READ_TIMEOUT = Duration.ofSeconds(5);
   private static final Function<BlockID, BlockLocationInfo> NO_REFRESH = b -> null;
+
+  @Test
+  public void testPositionedReadsOverlapWithoutMovingCursor() throws Exception {
+    XceiverClientGrpc client = mock(XceiverClientGrpc.class);
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any())).thenReturn(client);
+    Map<StreamingReadResponse, StreamingReaderSpi> readers = new ConcurrentHashMap<>();
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      StreamingReadResponse response = new StreamingReadResponse(
+          MockDatanodeDetails.randomDatanodeDetails(), mock(ClientCallStreamObserver.class));
+      reader.setStreamingReadResponse(response);
+      readers.put(response, reader);
+      return null;
+    }).when(client).initStreamRead(any(), any(), any());
+    CountDownLatch started = new CountDownLatch(2);
+    doAnswer(inv -> {
+      ContainerCommandRequestProto request = inv.getArgument(0);
+      started.countDown();
+      assertTrue(started.await(5, TimeUnit.SECONDS), "positioned reads must overlap");
+      long offset = request.getReadBlock().getOffset();
+      assertEquals(2, request.getReadBlock().getLength(), "positioned reads must not request read-ahead");
+      StreamingReaderSpi reader = readers.get(inv.getArgument(1));
+      reader.onNext(buildResponseProto(new byte[] {(byte) offset}, offset));
+      reader.onNext(buildResponseProto(new byte[] {(byte) (offset + 1)}, offset + 1));
+      reader.onCompleted();
+      return null;
+    }).when(client).streamRead(any(), any());
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try (StreamBlockInputStream stream = new StreamBlockInputStream(new BlockID(1, 22), 100,
+        mockStandalonePipeline(), null, factory, NO_REFRESH, newStreamReadConfig())) {
+      stream.seek(50);
+      Future<?> first = executor.submit(() -> {
+        ByteBuffer buffer = ByteBuffer.allocate(2);
+        stream.readFully(10, buffer);
+        assertArrayEquals(new byte[] {10, 11}, buffer.array());
+        return null;
+      });
+      Future<?> second = executor.submit(() -> {
+        byte[] buffer = new byte[2];
+        stream.readFully(20, buffer);
+        assertArrayEquals(new byte[] {20, 21}, buffer);
+        return null;
+      });
+      first.get(10, TimeUnit.SECONDS);
+      second.get(10, TimeUnit.SECONDS);
+      assertEquals(50, stream.getPos());
+    } finally {
+      executor.shutdownNow();
+    }
+    verify(factory, times(2)).releaseClientForReadData(client, false);
+    verify(client, times(2)).completeStreamRead();
+    for (StreamingReadResponse response : readers.keySet()) {
+      verify(response.getRequestObserver()).onCompleted();
+    }
+  }
+
+  @Test
+  public void testIncompletePositionedReadReleasesResources() throws Exception {
+    ClientCallStreamObserver<ContainerCommandRequestProto> observer = mock(ClientCallStreamObserver.class);
+    XceiverClientGrpc client = mockCapturingStreamingReadClient(observer, StreamingReaderSpi::onCompleted);
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any())).thenReturn(client);
+    try (StreamBlockInputStream stream = new StreamBlockInputStream(new BlockID(1, 23), 100,
+        mockStandalonePipeline(), null, factory, NO_REFRESH, newStreamReadConfig())) {
+      stream.seek(50);
+      ByteBuffer buffer = ByteBuffer.allocate(2);
+      assertThrows(EOFException.class, () -> stream.readFully(10, buffer));
+      assertEquals(0, buffer.position());
+      assertEquals(50, stream.getPos());
+    }
+    verify(factory).releaseClientForReadData(client, false);
+    verify(client).completeStreamRead();
+    verify(observer).onCompleted();
+  }
+
+  @Test
+  public void testFailedPositionedReadInitializationReleasesClient() throws Exception {
+    XceiverClientGrpc client = mock(XceiverClientGrpc.class);
+    doThrow(new IOException("initialization failed")).when(client).initStreamRead(any(), any(), any());
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any())).thenReturn(client);
+    try (StreamBlockInputStream stream = new StreamBlockInputStream(new BlockID(1, 24), 100,
+        mockStandalonePipeline(), null, factory, NO_REFRESH, newStreamReadConfig())) {
+      assertThrows(IOException.class, () -> stream.readFully(10, ByteBuffer.allocate(2)));
+    }
+    verify(factory).releaseClientForReadData(client, false);
+    verify(client, never()).completeStreamRead();
+  }
 
   @Test
   public void testCustomStreamReadConfigIsApplied() throws Exception {
@@ -152,8 +249,12 @@ public class TestStreamBlockInputStream {
       ByteBuffer dst = ByteBuffer.allocate(10);
       assertEquals(-1, sbis.readPositioned(data.length, dst));
       assertEquals(-1, sbis.readPositioned(data.length + 1, dst));
-      // An empty buffer also gets -1, as PartInputStream#readPositioned documents.
-      assertEquals(-1, sbis.readPositioned(0, ByteBuffer.allocate(0)));
+      ByteBuffer empty = ByteBuffer.allocate(1);
+      empty.position(1);
+      for (long position : new long[] {0, data.length, data.length + 1}) {
+        assertEquals(0, sbis.readPositioned(position, empty));
+        assertEquals(0, sbis.read(position, empty));
+      }
     }
   }
 
@@ -181,6 +282,18 @@ public class TestStreamBlockInputStream {
     }
 
     verify(xceiverClient, never()).completeStreamRead();
+  }
+
+  @Test
+  public void testPositionedReadReleasesUnexpectedClient() throws Exception {
+    XceiverClientSpi client = mock(XceiverClientSpi.class);
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any(Pipeline.class))).thenReturn(client);
+    try (StreamBlockInputStream stream = new StreamBlockInputStream(
+        new BlockID(1, 25), 64, mockStandalonePipeline(), null, factory, NO_REFRESH, newStreamReadConfig())) {
+      assertThrows(IOException.class, () -> stream.readPositioned(0, ByteBuffer.allocate(1)));
+    }
+    verify(factory).releaseClientForReadData(client, false);
   }
 
   @Test
