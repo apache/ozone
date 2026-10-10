@@ -2325,7 +2325,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     // unregister, in case metrics already exist
     // so that the metric tags will get updated.
     SCMHAMetrics.unRegister();
-    scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId);
+    scmHAMetrics = SCMHAMetrics.create(getScmId(), leaderId,
+        scmHAManager.asSCMHADBTransactionBuffer());
   }
 
   @Override

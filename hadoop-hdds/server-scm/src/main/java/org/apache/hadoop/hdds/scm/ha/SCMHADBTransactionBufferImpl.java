@@ -129,6 +129,26 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   }
 
   @Override
+  public long getLatestSnapshotIndex() {
+    rwLock.readLock().lock();
+    try {
+      return latestSnapshot.get().getIndex();
+    } finally {
+      rwLock.readLock().unlock();
+    }
+  }
+
+  @Override
+  public long getLastSnapshotTimeMs() {
+    rwLock.readLock().lock();
+    try {
+      return lastSnapshotTimeMs;
+    } finally {
+      rwLock.readLock().unlock();
+    }
+  }
+
+  @Override
   public void setLatestSnapshot(SnapshotInfo latestSnapshot) {
     LOG.info("{}: Set latest Snapshot to {}",
         scm.getScmHAManager().getRatisServer().getDivision().getId(), latestSnapshot);
