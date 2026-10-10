@@ -52,6 +52,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
@@ -269,6 +270,79 @@ public class TestOzoneManagerStateMachine {
 
     ExecutionException ex = assertThrows(ExecutionException.class, future::get);
     assertInstanceOf(InterruptedException.class, ex.getCause());
+  }
+
+  @Test
+  public void testPauseRejectsApplyUntilUnpause() throws Exception {
+    OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
+        om, doubleBuffer, handler, executor, null) {
+      @Override
+      public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+        return doubleBuffer;
+      }
+    };
+    try {
+      OMRequest request = sampleWriteRequest();
+      TransactionContext trx = mockTrx(request, 1, 5);
+
+      OMResponse expectedResponse = OMResponse.newBuilder()
+          .setCmdType(Type.CreateKey)
+          .setStatus(Status.OK)
+          .setSuccess(true)
+          .build();
+      OMClientResponse clientResponse = mock(OMClientResponse.class);
+      when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+      when(clientResponse.getOmLockDetails()).thenReturn(null);
+
+      CountDownLatch handlerInvoked = new CountDownLatch(1);
+      doAnswer(invocation -> {
+        handlerInvoked.countDown();
+        return clientResponse;
+      }).when(handler).handleWriteRequest(eq(request), any(), eq(doubleBuffer));
+
+      testSm.pause();
+      CompletableFuture<Message> pausedFuture = testSm.applyTransaction(trx);
+      ExecutionException ex = assertThrows(ExecutionException.class, pausedFuture::get);
+      assertInstanceOf(IOException.class, ex.getCause());
+      assertFalse(handlerInvoked.await(200, TimeUnit.MILLISECONDS),
+          "apply should be rejected while state machine is paused");
+
+      testSm.unpause(5, 1);
+
+      CompletableFuture<Message> future = testSm.applyTransaction(trx);
+      assertTrue(handlerInvoked.await(2, TimeUnit.SECONDS),
+          "apply should continue after state machine unpause");
+      assertNotNull(future.get(2, TimeUnit.SECONDS));
+    } finally {
+      testSm.stop();
+    }
+  }
+
+  @Test
+  public void testApplyTransactionExecutorRejectDoesNotBlockPause() throws Exception {
+    ExecutorService rejectedExecutor = Executors.newSingleThreadExecutor();
+    rejectedExecutor.shutdownNow();
+    OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
+        om, doubleBuffer, handler, rejectedExecutor, null);
+    try {
+      OMRequest request = sampleWriteRequest();
+      TransactionContext trx = mockTrx(request, 1, 5);
+
+      CompletableFuture<Message> future = testSm.applyTransaction(trx);
+      ExecutionException ex = assertThrows(ExecutionException.class, future::get);
+      assertInstanceOf(RejectedExecutionException.class, ex.getCause());
+      verify(doubleBuffer).releaseUnFlushedTransactions(1);
+
+      ExecutorService pauseExecutor = Executors.newSingleThreadExecutor();
+      try {
+        Future<?> pauseFuture = pauseExecutor.submit(testSm::pause);
+        pauseFuture.get(2, TimeUnit.SECONDS);
+      } finally {
+        pauseExecutor.shutdownNow();
+      }
+    } finally {
+      testSm.stop();
+    }
   }
 
   // --- runCommand tests ---

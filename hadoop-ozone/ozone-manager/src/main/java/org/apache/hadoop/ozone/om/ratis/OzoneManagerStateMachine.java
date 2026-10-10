@@ -98,6 +98,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final ExecutorService installSnapshotExecutor;
   private final boolean isTracingEnabled;
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
+  private final Object applyTransactionMonitor = new Object();
+  private volatile boolean applyTransactionPaused = false;
+  private int inFlightApplyTransactions = 0;
   private final String threadPrefix;
 
   /**
@@ -434,12 +437,37 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // lastAppliedIndex in OzoneManager StateMachine, even if other
       // executor has completed the transactions with id more.
 
-      //if there are too many pending requests, wait for doubleBuffer flushing
-      ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
+      if (!tryEnterApplyTransaction()) {
+        return completeExceptionally(new IOException("Cannot apply transaction while state machine is paused."));
+      }
+      try {
+        //if there are too many pending requests, wait for doubleBuffer flushing
+        ozoneManagerDoubleBuffer.acquireUnFlushedTransactions(1);
+      } catch (Exception ex) {
+        exitApplyTransaction();
+        throw ex;
+      }
 
-      return CompletableFuture.supplyAsync(() -> runCommand(request, termIndex), executorService)
-          .thenApply(this::processResponse);
+      final CompletableFuture<OMResponse> runFuture;
+      try {
+        runFuture = CompletableFuture.supplyAsync(() -> {
+          try {
+            return runCommand(request, termIndex);
+          } finally {
+            exitApplyTransaction();
+          }
+        }, executorService);
+      } catch (RuntimeException ex) {
+        ozoneManagerDoubleBuffer.releaseUnFlushedTransactions(1);
+        exitApplyTransaction();
+        throw ex;
+      }
+
+      return runFuture.thenApply(this::processResponse);
     } catch (Exception e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
       return completeExceptionally(e);
     }
   }
@@ -485,18 +513,34 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  public synchronized void pause() {
-    LOG.info("OzoneManagerStateMachine is pausing");
-    statePausedCount.incrementAndGet();
-    final LifeCycle.State state = getLifeCycleState();
-    if (state == LifeCycle.State.PAUSED) {
-      return;
-    }
-    if (state != LifeCycle.State.NEW) {
-      getLifeCycle().transition(LifeCycle.State.PAUSING);
-      getLifeCycle().transition(LifeCycle.State.PAUSED);
+  public void pause() {
+    synchronized (this) {
+      LOG.info("OzoneManagerStateMachine is pausing");
+      statePausedCount.incrementAndGet();
+      final LifeCycle.State state = getLifeCycleState();
+      if (state == LifeCycle.State.PAUSED) {
+        return;
+      }
+      if (state != LifeCycle.State.NEW) {
+        getLifeCycle().transition(LifeCycle.State.PAUSING);
+        getLifeCycle().transition(LifeCycle.State.PAUSED);
+      }
     }
 
+    pauseApplyTransaction();
+    boolean interrupted = false;
+    while (true) {
+      try {
+        ozoneManagerDoubleBuffer.awaitFlush();
+        break;
+      } catch (InterruptedException ex) {
+        interrupted = true;
+        LOG.warn("Interrupted while waiting for OM double buffer to flush during pause.", ex);
+      }
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
     ozoneManagerDoubleBuffer.stop();
   }
 
@@ -508,14 +552,18 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   public synchronized void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
     if (statePausedCount.decrementAndGet() == 0) {
-      getLifeCycle().startAndTransition(() -> {
-        this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-        restoreLastAppliedTermIndex(TermIndex.valueOf(
-            newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
-        LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
-            "newLastAppliedSnapshotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
-                getId(), newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
-      });
+      try {
+        getLifeCycle().startAndTransition(() -> {
+          this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
+          restoreLastAppliedTermIndex(TermIndex.valueOf(
+              newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
+          LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
+                  "newLastAppliedSnapshotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
+              getId(), newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
+        });
+      } finally {
+        resumeApplyTransaction();
+      }
     }
   }
 
@@ -729,6 +777,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   public void stop() {
+    resumeApplyTransaction();
     ozoneManagerDoubleBuffer.stop();
     HadoopExecutors.shutdown(executorService, LOG, 5, TimeUnit.SECONDS);
     HadoopExecutors.shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
@@ -749,5 +798,55 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   @VisibleForTesting
   public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
     return ozoneManagerDoubleBuffer;
+  }
+
+  private void pauseApplyTransaction() {
+    synchronized (applyTransactionMonitor) {
+      if (applyTransactionPaused) {
+        return;
+      }
+      applyTransactionPaused = true;
+      boolean interrupted = false;
+      while (inFlightApplyTransactions > 0) {
+        try {
+          applyTransactionMonitor.wait();
+        } catch (InterruptedException ex) {
+          LOG.warn("Interrupted while waiting for in-flight apply transactions to complete.");
+          interrupted = true;
+        }
+      }
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
+  private void resumeApplyTransaction() {
+    synchronized (applyTransactionMonitor) {
+      if (!applyTransactionPaused) {
+        return;
+      }
+      applyTransactionPaused = false;
+      applyTransactionMonitor.notifyAll();
+    }
+  }
+
+  private boolean tryEnterApplyTransaction() {
+    synchronized (applyTransactionMonitor) {
+      if (applyTransactionPaused) {
+        return false;
+      }
+      inFlightApplyTransactions++;
+      return true;
+    }
+  }
+
+  private void exitApplyTransaction() {
+    synchronized (applyTransactionMonitor) {
+      inFlightApplyTransactions--;
+      if (inFlightApplyTransactions == 0) {
+        applyTransactionMonitor.notifyAll();
+      }
+    }
   }
 }
