@@ -32,6 +32,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import jakarta.annotation.Nullable;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -47,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.ratis.util.Preconditions;
@@ -76,6 +78,10 @@ public abstract class ContainerData {
 
   // Path to Physical file system where chunks are stored.
   private String chunksPath;
+
+  // Chunks directory resolved and validated once from chunksPath, cached to
+  // avoid re-stat-ing it on every chunk operation. Not serialized.
+  private transient volatile File chunksDirFile;
 
   // State of the Container
   private ContainerDataProto.State state;
@@ -263,6 +269,27 @@ public abstract class ContainerData {
    */
   public void setChunksPath(String chunkPath) {
     this.chunksPath = chunkPath;
+    this.chunksDirFile = null;
+  }
+
+  /**
+   * Read-path accessor for the chunks directory. Resolves and validates it once
+   * via {@link ContainerUtils#getChunkDir(ContainerData)}, then returns the
+   * cached result on later calls to skip the per-read stat. Writes and other
+   * callers use {@code ContainerUtils.getChunkDir} directly, so a missing
+   * directory still surfaces as a storage failure on every operation.
+   *
+   * @return the resolved chunks directory
+   * @throws StorageContainerException if the chunks directory cannot be resolved
+   */
+  @JsonIgnore
+  public File getChunksDirForRead() throws StorageContainerException {
+    File dir = chunksDirFile;
+    if (dir == null) {
+      dir = ContainerUtils.getChunkDir(this);
+      chunksDirFile = dir;
+    }
+    return dir;
   }
 
   /**

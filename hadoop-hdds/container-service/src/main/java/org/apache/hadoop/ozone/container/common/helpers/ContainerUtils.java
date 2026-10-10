@@ -298,7 +298,7 @@ public final class ContainerUtils {
   }
 
   /**
-   * Get the chunk directory from the containerData.
+   * Resolve and validate the chunk directory from the container data.
    *
    * @param containerData {@link ContainerData}
    * @return the file of chunk directory
