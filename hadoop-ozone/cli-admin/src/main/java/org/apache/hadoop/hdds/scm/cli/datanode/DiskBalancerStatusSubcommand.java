@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 import java.io.IOException;
@@ -28,6 +29,7 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeDiskBalancerInfoProto;
 import picocli.CommandLine.Command;
 
 /**
@@ -102,7 +104,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
   private String generateStatus(
       List<DatanodeDiskBalancerInfoProto> protos, List<String> datanodeDisplayNames) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
-        "%-60s %-10s %-15s %-15s %-10s %-18s %-30s %-12s %-12s %-15s %-18s %-20s%n");
+        "%-60s %-10s %-15s %-15s %-10s %-18s %-30s %-12s %-12s %-15s %-18s %-40s %-20s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
@@ -116,11 +118,13 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
     contentList.add("FailureMove");
     contentList.add("BytesMoved(MB)");
     contentList.add("EstBytesToMove(MB)");
+    contentList.add("StorageTypeEstBytesToMove(MB)");
     contentList.add("EstTimeLeft(min)");
 
     for (int i = 0; i < protos.size(); i++) {
       HddsProtos.DatanodeDiskBalancerInfoProto proto = protos.get(i);
-      formatBuilder.append("%-60s %-10s %-15s %-15s %-10s %-18s %-30s %-12s %-12s %-15s %-18s %-20s%n");
+      formatBuilder.append(
+          "%-60s %-10s %-15s %-15s %-10s %-18s %-30s %-12s %-12s %-15s %-18s %-40s %-20s%n");
       long estimatedTimeLeft = calculateEstimatedTimeLeft(proto);
       long bytesMovedMB = (long) Math.ceil(proto.getBytesMoved() / (1024.0 * 1024.0));
       long bytesToMoveMB = (long) Math.ceil(proto.getBytesToMove() / (1024.0 * 1024.0));
@@ -142,6 +146,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
       contentList.add(String.valueOf(proto.getFailureMoveCount()));
       contentList.add(String.valueOf(bytesMovedMB));
       contentList.add(String.valueOf(bytesToMoveMB));
+      contentList.add(formatStorageTypeBytesToMove(proto));
       contentList.add(estimatedTimeLeft >= 0 ? String.valueOf(estimatedTimeLeft) : "N/A");
     }
 
@@ -185,9 +190,39 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
     result.put("failureMove", status.getFailureMoveCount());
     result.put("bytesMovedMB", (long) Math.ceil(status.getBytesMoved() / (1024.0 * 1024.0)));
     result.put("estBytesToMoveMB", (long) Math.ceil(status.getBytesToMove() / (1024.0 * 1024.0)));
+    if (status.getStorageTypeInfoCount() > 0) {
+      result.put("storageTypes", createStorageTypeResults(status));
+    }
     long estimatedTimeLeft = calculateEstimatedTimeLeft(status);
     result.put("estTimeLeftMin", estimatedTimeLeft >= 0 ? estimatedTimeLeft : null);
     return result;
+  }
+
+  private static String formatStorageTypeBytesToMove(DatanodeDiskBalancerInfoProto status) {
+    if (status.getStorageTypeInfoCount() == 0) {
+      return "-";
+    }
+    return status.getStorageTypeInfoList().stream()
+        .map(info -> info.getBalanceable()
+            ? String.format("%s=%d", info.getStorageType(),
+                (long) Math.ceil(info.getBytesToMove() / (1024.0 * 1024.0)))
+            : info.getStorageType() + "=N/A")
+        .collect(joining(", "));
+  }
+
+  private static List<Map<String, Object>> createStorageTypeResults(
+      DatanodeDiskBalancerInfoProto status) {
+    List<Map<String, Object>> storageTypes = new ArrayList<>();
+    for (StorageTypeDiskBalancerInfoProto info : status.getStorageTypeInfoList()) {
+      Map<String, Object> storageType = new LinkedHashMap<>();
+      storageType.put("storageType", info.getStorageType().name());
+      storageType.put("balanceable", info.getBalanceable());
+      storageType.put("usableVolumeCount", info.getUsableVolumeCount());
+      storageType.put("estBytesToMoveMB",
+          (long) Math.ceil(info.getBytesToMove() / (1024.0 * 1024.0)));
+      storageTypes.add(storageType);
+    }
+    return storageTypes;
   }
 
   private long calculateEstimatedTimeLeft(DatanodeDiskBalancerInfoProto proto) {

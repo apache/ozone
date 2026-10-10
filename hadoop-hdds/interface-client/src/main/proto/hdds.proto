@@ -610,6 +610,16 @@ message VolumeReportProto {
     optional uint64 effectiveUsedSpace = 6;
     optional double utilization = 7;
     optional uint64 ozoneAvailable = 8;
+    optional StorageTypeProto storageType = 9;
+}
+
+message StorageTypeDiskBalancerInfoProto {
+    optional StorageTypeProto storageType = 1;
+    optional double currentVolumeDensitySum = 2;
+    optional uint64 bytesToMove = 3;
+    optional double idealUsage = 4;
+    optional uint32 usableVolumeCount = 5;
+    optional bool balanceable = 6;
 }
 
 message DatanodeDiskBalancerInfoProto {
@@ -623,4 +633,5 @@ message DatanodeDiskBalancerInfoProto {
     optional uint64 bytesMoved = 8;
     optional double idealUsage = 9;
     repeated VolumeReportProto volumeInfo = 10;
+    repeated StorageTypeDiskBalancerInfoProto storageTypeInfo = 11;
 }

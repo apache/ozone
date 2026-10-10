@@ -53,6 +53,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeDiskBalancerInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.junit.jupiter.api.AfterEach;
@@ -455,6 +457,8 @@ public class TestDiskBalancerSubCommands {
 
       String output = outContent.toString(DEFAULT_ENCODING);
       assertTrue(output.contains("Status result"));
+      assertTrue(output.contains("StorageTypeEstBytesToMove(MB)"));
+      assertTrue(output.contains("DISK="));
       assertTrue(output.contains("host-1"));
       assertTrue(output.contains("host-2"));
       assertTrue(output.contains("host-3"));
@@ -483,6 +487,8 @@ public class TestDiskBalancerSubCommands {
       assertTrue(output.contains("\"bandwidthInMB\""));
       assertTrue(output.contains("\"threads\""));
       assertTrue(output.contains("\"stopAfterDiskEven\""));
+      assertTrue(output.contains("\"storageTypes\""));
+      assertTrue(output.contains("\"storageType\""));
     }
   }
 
@@ -885,6 +891,33 @@ public class TestDiskBalancerSubCommands {
     }
   }
 
+  /**
+   * On a datanode with more than one storage type, the JSON report must carry the per-type ideal
+   * usages and not the node-level average, which is not a target any container move can reach.
+   */
+  @Test
+  public void testReportJsonOmitsCrossStorageTypeIdealUsage() throws Exception {
+    DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
+
+    when(mockProtocol.getDiskBalancerInfo())
+        .thenReturn(createMixedStorageTypeReportProto("host-1"));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("--json", "host-1");
+      cmd.call();
+
+      String output = outContent.toString(DEFAULT_ENCODING);
+      // Per-type ideal usages are reported.
+      assertThat(output).contains("\"storageTypes\"");
+      assertThat(output).contains("20.00%");
+      assertThat(output).contains("80.00%");
+      // The node-level average across storage types is not.
+      assertThat(output).doesNotContain("50.00%");
+      assertThat(output).doesNotContain("\"thresholdRange\" : \"(40.00%, 60.00%)\"");
+    }
+  }
+
   @Test
   public void testReportDiskBalancerWithInServiceDatanodes() throws Exception {
     DiskBalancerReportSubcommand cmd = new DiskBalancerReportSubcommand();
@@ -905,6 +938,8 @@ public class TestDiskBalancerSubCommands {
 
       String output = outContent.toString(DEFAULT_ENCODING);
       assertTrue(output.contains("Report result"));
+      assertTrue(output.contains("Storage Type Details:"));
+      assertTrue(output.contains("StorageType"));
       assertTrue(output.contains("host-1"));
       assertTrue(output.contains("host-2"));
       assertTrue(output.contains("host-3"));
@@ -930,7 +965,9 @@ public class TestDiskBalancerSubCommands {
       assertTrue(output.contains("\"datanode\""));
       assertTrue(output.contains("\"volumeDensity\""));
       assertTrue(output.contains("\"idealUsage\""));
+      assertTrue(output.contains("\"storageTypes\""));
       assertTrue(output.contains("\"volumes\""));
+      assertTrue(output.contains("\"storageType\""));
       assertTrue(output.contains("\"storageId\""));
       assertTrue(output.contains("\"storagePath\""));
       assertTrue(output.contains("\"ozoneCapacity\""));
@@ -1061,6 +1098,12 @@ public class TestDiskBalancerSubCommands {
         .setFailureMoveCount(failureMove)
         .setBytesMoved(bytesMoved)
         .setBytesToMove(bytesToMove)
+        .addStorageTypeInfo(StorageTypeDiskBalancerInfoProto.newBuilder()
+            .setStorageType(StorageTypeProto.DISK)
+            .setBalanceable(true)
+            .setUsableVolumeCount(2)
+            .setBytesToMove(bytesToMove)
+            .build())
         .build();
   }
 
@@ -1120,6 +1163,7 @@ public class TestDiskBalancerSubCommands {
     String path1 = "/data/hdds-" + hostname + "-1";
     String path2 = "/data/hdds-" + hostname + "-2";
     VolumeReportProto vol1 = VolumeReportProto.newBuilder()
+        .setStorageType(StorageTypeProto.DISK)
         .setStorageId("DISK-" + hostname + "-vol1")
         .setStoragePath(path1)
         .setUtilization(util1)
@@ -1130,6 +1174,7 @@ public class TestDiskBalancerSubCommands {
         .setEffectiveUsedSpace(effective1)
         .build();
     VolumeReportProto vol2 = VolumeReportProto.newBuilder()
+        .setStorageType(StorageTypeProto.DISK)
         .setStorageId("DISK-" + hostname + "-vol2")
         .setStoragePath(path2)
         .setUtilization(util2)
@@ -1145,6 +1190,13 @@ public class TestDiskBalancerSubCommands {
         .setCurrentVolumeDensitySum(volumeDensity)
         .setIdealUsage(idealUsage)
         .setDiskBalancerConf(configProto)
+        .addStorageTypeInfo(StorageTypeDiskBalancerInfoProto.newBuilder()
+            .setStorageType(StorageTypeProto.DISK)
+            .setCurrentVolumeDensitySum(volumeDensity)
+            .setIdealUsage(idealUsage)
+            .setUsableVolumeCount(2)
+            .setBalanceable(true)
+            .build())
         .addVolumeInfo(vol1)
         .addVolumeInfo(vol2)
         .build();
@@ -1166,6 +1218,42 @@ public class TestDiskBalancerSubCommands {
         .setCurrentVolumeDensitySum(0.1408700123786014)
         .setIdealUsage(idealUsage)
         .setDiskBalancerConf(createConfigProto(thresholdPercent, 100L, 5, true))
+        .build();
+  }
+
+  /**
+   * A datanode with SSD volumes at 20% and DISK volumes at 80%. Each storage type is balanced
+   * within itself, but the node-level idealUsage averages to 50%, which no move can reach.
+   */
+  private DatanodeDiskBalancerInfoProto createMixedStorageTypeReportProto(String hostname) {
+    DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
+        .setHostName(hostname)
+        .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
+        .build();
+
+    return DatanodeDiskBalancerInfoProto.newBuilder()
+        .setNode(nodeProto)
+        .setCurrentVolumeDensitySum(0.0)
+        .setIdealUsage(0.5)
+        .setDiskBalancerConf(createConfigProto(10.0, 100L, 5, true))
+        .addStorageTypeInfo(StorageTypeDiskBalancerInfoProto.newBuilder()
+            .setStorageType(StorageTypeProto.SSD)
+            .setUsableVolumeCount(2)
+            .setBalanceable(true)
+            .setIdealUsage(0.2)
+            .setCurrentVolumeDensitySum(0.0)
+            .build())
+        .addStorageTypeInfo(StorageTypeDiskBalancerInfoProto.newBuilder()
+            .setStorageType(StorageTypeProto.DISK)
+            .setUsableVolumeCount(2)
+            .setBalanceable(true)
+            .setIdealUsage(0.8)
+            .setCurrentVolumeDensitySum(0.0)
+            .build())
         .build();
   }
 

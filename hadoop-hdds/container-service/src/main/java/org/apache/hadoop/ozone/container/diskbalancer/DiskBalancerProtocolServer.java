@@ -85,6 +85,7 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
         .setRunningStatus(info.getOperationalState())
         .setIdealUsage(info.getIdealUsage())
         .addAllVolumeInfo(info.getVolumeInfo())
+        .addAllStorageTypeInfo(info.getStorageTypeInfo())
         .build();
   }
 
@@ -166,5 +167,4 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
     // No resources to clean up
   }
 }
-
 
