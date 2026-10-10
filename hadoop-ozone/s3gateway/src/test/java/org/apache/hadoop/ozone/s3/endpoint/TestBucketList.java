@@ -106,7 +106,7 @@ public class TestBucketList {
    */
   @Test
   public void listExactPrefixWithTrailingDelimiter() throws OS3Exception, IOException {
-    setup("dir/", "dir/file1", "other");
+    setup("dir/", "other");
 
     bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
     bucketEndpoint.queryParamsForTest().set(QueryParams.PREFIX, "dir");
