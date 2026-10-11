@@ -33,6 +33,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -114,6 +115,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
     HddsServerUtil.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
             ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
+    HddsUtils.validateAdvertisedAddressConfig(configuration, ReconConfigKeys.OZONE_RECON_ADDRESS_KEY);
 
     try {
       reconAdmins = createReconAdmins(configuration);

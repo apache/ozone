@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultVersionProto;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
@@ -43,6 +44,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -116,6 +118,7 @@ import org.apache.hadoop.ozone.recon.api.types.AclMetadata;
 import org.apache.hadoop.ozone.recon.api.types.BucketObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.BucketsResponse;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeDiskInfo;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.api.types.PipelineMetadata;
@@ -382,6 +385,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setFsCapacity(40000)
             .setFsAvailable(15000)
             .setStorageUuid(UUID.randomUUID().toString())
+            .setOpenContainerCount(3)
             .setFailed(false).build();
     StorageReportProto storageReportProto2 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
@@ -617,6 +621,17 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
       assertEquals(pipeline.getLeaderNode().getHostName(),
           datanodeMetadata.getPipelines().get(0).getLeaderNode());
       assertEquals(1, datanodeMetadata.getLeaderCount());
+      assertEquals(2, datanodeMetadata.getDisks().size());
+      DatanodeDiskInfo disk1 = datanodeMetadata.getDisks().stream()
+          .filter(d -> "/disk1".equals(d.getStorageLocation()))
+          .findFirst().orElse(null);
+      assertNotNull(disk1);
+      assertEquals(3L, disk1.getOpenContainerCount());
+      DatanodeDiskInfo disk2 = datanodeMetadata.getDisks().stream()
+          .filter(d -> "/disk2".equals(d.getStorageLocation()))
+          .findFirst().orElse(null);
+      assertNotNull(disk2);
+      assertNull(disk2.getOpenContainerCount());
       break;
     case HOST2:
       assertEquals(130000,
@@ -788,6 +803,52 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .getFile())
     );
     verify(outputStreamMock).write(fileBytes, 0, fileBytes.length);
+  }
+
+  @Test
+  public void testGetMetricsResponseWithNonEnumStatusCode() throws Exception {
+    HttpServletResponse responseMock = mock(HttpServletResponse.class);
+    ServletOutputStream outputStreamMock = mock(ServletOutputStream.class);
+    when(responseMock.getOutputStream()).thenReturn(outputStreamMock);
+    UriInfo uriInfoMock = mock(UriInfo.class);
+    URI uriMock = mock(URI.class);
+    when(uriMock.getQuery()).thenReturn("");
+    when(uriInfoMock.getRequestUri()).thenReturn(uriMock);
+
+    // 422 has no Response.Status enum constant; the error body must still be proxied back.
+    byte[] errorBody = "{\"status\":\"error\",\"errorType\":\"bad_data\"}".getBytes(UTF_8);
+    HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
+    when(urlConnectionMock.getResponseCode()).thenReturn(422);
+    when(urlConnectionMock.getErrorStream())
+        .thenReturn(new ByteArrayInputStream(errorBody));
+    when(reconUtilsMock.makeHttpCall(any(URLConnectionFactory.class),
+        anyString(), anyBoolean())).thenReturn(urlConnectionMock);
+
+    metricsProxyEndpoint.getMetricsResponse(PROMETHEUS_INSTANT_QUERY_API,
+        uriInfoMock, responseMock);
+
+    verify(responseMock).setStatus(HttpServletResponse.SC_BAD_GATEWAY);
+    verify(outputStreamMock).write(errorBody, 0, errorBody.length);
+  }
+
+  @Test
+  public void testGetMetricsResponseWithNullErrorStream() throws Exception {
+    HttpServletResponse responseMock = mock(HttpServletResponse.class);
+    UriInfo uriInfoMock = mock(UriInfo.class);
+    URI uriMock = mock(URI.class);
+    when(uriMock.getQuery()).thenReturn("");
+    when(uriInfoMock.getRequestUri()).thenReturn(uriMock);
+
+    HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
+    when(urlConnectionMock.getResponseCode()).thenReturn(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+    when(urlConnectionMock.getErrorStream()).thenReturn(null);
+    when(reconUtilsMock.makeHttpCall(any(URLConnectionFactory.class),
+        anyString(), anyBoolean())).thenReturn(urlConnectionMock);
+
+    assertDoesNotThrow(() -> metricsProxyEndpoint.getMetricsResponse(PROMETHEUS_INSTANT_QUERY_API,
+        uriInfoMock, responseMock));
+
+    verify(responseMock).setStatus(HttpServletResponse.SC_BAD_GATEWAY);
   }
 
   @Test

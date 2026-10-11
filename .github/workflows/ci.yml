@@ -56,17 +56,18 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
-      test-classes: ${{ steps.selective-checks.outputs.test-classes }}
+      acceptance-versions: ${{ steps.acceptance-suites.outputs.versions }}
+      basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       integration-suites: ${{ steps.integration-suites.outputs.suites }}
       kubernetes-suites: ${{ steps.kubernetes-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
-      basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
       needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
       sha: ${{ steps.get-sha.outputs.sha }}
+      test-classes: ${{ steps.selective-checks.outputs.test-classes }}
       # `env` context cannot be used when calling reusable workflow, so we need to convert these to `outputs`
       build-args: ${{ env.BUILD_ARGS }}
       java-version: ${{ env.TEST_JAVA_VERSION }}
@@ -328,6 +329,35 @@ jobs:
     strategy:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
+        exclude:
+          - suite: compat-old
+      fail-fast: false
+
+  # acceptance (compat-old), split by old Ozone version
+  compat-old:
+    name: acceptance (compat-old)
+    needs:
+      - build-info
+      - build
+      - basic
+      - dependency
+      - license
+    if: needs.build-info.outputs.needs-compose-tests == 'true'
+    uses: $/.github/workflows/check.yml
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    with:
+      needs-ozone-binary-tarball: true
+      ratis-args: ${{ inputs.ratis_args }}
+      script: acceptance
+      script-args: compat-old ${{ matrix.version }}
+      sha: ${{ needs.build-info.outputs.sha }}
+      split: compat-old-${{ matrix.version }}
+      timeout-minutes: 30
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    strategy:
+      matrix:
+        version: ${{ fromJson(needs.build-info.outputs.acceptance-versions) }}
       fail-fast: false
 
   kubernetes:
@@ -414,6 +444,7 @@ jobs:
     needs:
       - build-info
       - acceptance
+      - compat-old
       - integration
     steps:
       - name: Checkout project
