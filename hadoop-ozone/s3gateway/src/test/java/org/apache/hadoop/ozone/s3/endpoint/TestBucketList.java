@@ -101,8 +101,7 @@ public class TestBucketList {
 
   /**
    * Key equal to prefix + delimiter (dir/ with prefix dir) is handled by the
-   * indexOf(delimiter) branch as a common prefix. An endsWith(delimiter)
-   * fallback after indexOf &lt; 0 is unreachable and must not be required.
+   * indexOf(delimiter) branch as a common prefix.
    */
   @Test
   public void listExactPrefixWithTrailingDelimiter() throws OS3Exception, IOException {
