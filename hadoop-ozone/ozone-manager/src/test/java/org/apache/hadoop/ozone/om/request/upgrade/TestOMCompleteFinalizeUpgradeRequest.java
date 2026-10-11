@@ -19,19 +19,27 @@ package org.apache.hadoop.ozone.om.request.upgrade;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.om.execution.OMExecutionFlow;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.TestOzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequestTests;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -50,6 +58,27 @@ import org.junit.jupiter.api.Test;
 public class TestOMCompleteFinalizeUpgradeRequest extends OMKeyRequestTests {
 
   @Test
+  public void testExternalCompletionIsRejectedBeforeRatis() throws Exception {
+    OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
+    when(ozoneManager.getOmRatisServer()).thenReturn(ratisServer);
+    when(ozoneManager.getOmRpcServerAddr()).thenReturn(new InetSocketAddress("localhost", 9862));
+    when(ratisServer.submitRequest(any(OzoneManagerProtocolProtos.OMRequest.class), eq(true)))
+        .thenReturn(OMResponse.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.CompleteFinalizeUpgrade)
+            .setStatus(Status.OK).setSuccess(true).build());
+    OzoneManagerProtocolProtos.OMRequest request = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CompleteFinalizeUpgrade)
+        .setClientId(ClientId.randomId().toString())
+        .build();
+
+    OMResponse response = new OMExecutionFlow(ozoneManager).submit(request, true);
+
+    assertFalse(response.getSuccess());
+    assertEquals(Status.INVALID_REQUEST, response.getStatus());
+    verifyNoInteractions(ratisServer);
+    verify(ozoneManager, never()).finalizeUpgrade();
+  }
+
+  @Test
   public void testFinalizationInProgressKeyRemoved() throws IOException {
     OMVersionManager omVersionManager = mock(OMVersionManager.class);
     when(omVersionManager.getApparentVersion()).thenReturn(OzoneManagerVersion.DEFAULT_VERSION);
@@ -66,6 +95,7 @@ public class TestOMCompleteFinalizeUpgradeRequest extends OMKeyRequestTests {
     assertEquals(1, omMetrics.getFinalizationInProgress(),
         "metric should be 1 before finalizing");
     submitRequest();
+    verify(ozoneManager).finalizeUpgrade();
 
     progressKey = omMetadataManager.getMetaTable().get(OzoneConsts.FINALIZATION_IN_PROGRESS_KEY);
     assertNull(progressKey);
@@ -94,7 +124,6 @@ public class TestOMCompleteFinalizeUpgradeRequest extends OMKeyRequestTests {
         .build();
     OMCompleteFinalizeUpgradeRequest request = new OMCompleteFinalizeUpgradeRequest(omRequest);
     ExecutionContext context = ExecutionContext.of(1, TermIndex.INITIAL_VALUE);
-    request.preExecute(ozoneManager);
 
     OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     OMResponse omResponse = response.getOMResponse();
@@ -111,11 +140,9 @@ public class TestOMCompleteFinalizeUpgradeRequest extends OMKeyRequestTests {
     OMCompleteFinalizeUpgradeRequest request = new OMCompleteFinalizeUpgradeRequest(omRequest);
     ExecutionContext context = ExecutionContext.of(1, TermIndex.INITIAL_VALUE);
 
-    OzoneManagerProtocolProtos.OMRequest modifiedOmRequest = request.preExecute(ozoneManager);
-
-    // Will not be equal, as UserInfo will be set.
-    assertNotEquals(omRequest, modifiedOmRequest);
-    request.validateAndUpdateCache(ozoneManager, context);
+    // Internal requests are applied from Ratis without preExecute().
+    OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
+    assertTrue(response.getOMResponse().getSuccess());
   }
 
 }
