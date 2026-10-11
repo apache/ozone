@@ -2587,16 +2587,11 @@
           },
           {
             "selected": false,
-            "text": "healthy_readonly",
-            "value": "healthy_readonly"
-          },
-          {
-            "selected": false,
             "text": "stale",
             "value": "stale"
           }
         ],
-        "query": "dead,healthy,healthy_readonly,stale",
+        "query": "dead,healthy,stale",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"

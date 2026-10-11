@@ -94,6 +94,7 @@ public class TestSCMHATransactionBufferMonitorTask {
     deletedBlockLog = mock(DeletedBlockLogImpl.class);
     Clock clock = mock(Clock.class);
     when(clock.millis()).thenAnswer(invocation -> clockMillis.get());
+    when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getScmMetadataStore()).thenReturn(metadataStore);
     when(scm.getSystemClock()).thenReturn(clock);
     when(scm.getScmBlockManager()).thenReturn(blockManager);

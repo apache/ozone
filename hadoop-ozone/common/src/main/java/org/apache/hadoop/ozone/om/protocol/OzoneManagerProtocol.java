@@ -476,6 +476,9 @@ public interface OzoneManagerProtocol
   boolean triggerRangerBGSync(boolean noWait) throws IOException;
 
   /**
+   * This command is retained so that new clients can finalize old OM servers. All new finalize requests should use
+   * `void finalizeUpgrade()`.
+   *
    * Initiate metadata upgrade finalization.
    * This method when called, initiates finalization of Ozone Manager metadata
    * during an upgrade. The status returned contains the status
@@ -504,9 +507,46 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            when finalization is already in progress.
    */
+  @Deprecated
   UpgradeFinalization.StatusAndMessages finalizeUpgrade(String upgradeClientID) throws IOException;
 
   /**
+   * Initiate metadata upgrade finalization.
+   * This method when called, performs two actions. First, it will result in OM making a call to SCM to start
+   * finalizing the HDDS layer. After that call completes successfully, the HDDS finalization will be in progress.
+   * Second, a key will be written to the OM database to persist the fact that OM finalization is pending. It will
+   * complete once the HDDS layer has completed. OM will poll SCM periodically to check the status of the SCM
+   * finalization progress, and OM will only finalize when SCM indicates it is OK for it to do so.
+   *
+   * This command is async, and will return before finalization is complete. The caller must issue a Query Finalization
+   * Progress command to monitor the progress.
+   *
+   * @throws IOException If any error occurs. If this happens finalization is not in progress and the command must be
+   *                     retried.
+   */
+  void finalizeUpgrade() throws IOException;
+
+  /**
+   * Same as {@link #finalizeUpgrade()}, but the OM skips the peer software version check before
+   * finalizing. Use this to finalize when a peer is intentionally down or on a different version.
+   *
+   * @throws IOException If any error occurs. If this happens finalization is not in progress and the command must be
+   *                     retried.
+   */
+  void forceFinalizeUpgrade() throws IOException;
+
+  /**
+   * Returns the upgrade status of the cluster. This call is received by OM which will in turn query SCM to get the
+   * status of it and the datanodes, and return the combined status to the caller.
+   * @return QueryUpgradeStatusResponse containing details of the overall cluster state
+   * @throws IOException If any error occurs.
+   */
+  OzoneManagerProtocolProtos.QueryUpgradeStatusResponse queryUpgradeStatus() throws IOException;
+
+  /**
+   * This command is retained so that new clients can query status of old OM servers. All new finalize requests should
+   * use `void queryUpgradeStatus()`.
+   *
    * Queries the current status of finalization.
    * This method when called, returns the status messages from the finalization
    * progress, if any. The status returned is
@@ -534,6 +574,7 @@ public interface OzoneManagerProtocol
    * @throws OMException
    *            if finalization is needed but not yet started
    */
+  @Deprecated
   UpgradeFinalization.StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean takeover, boolean readonly
   ) throws IOException;

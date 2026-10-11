@@ -26,8 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -226,6 +230,39 @@ public class TestHttpServer2 {
   }
 
   /**
+   * An unencoded "#" in the request target is rejected with a 400 rather than
+   * silently truncating the object key. Jetty 12.1 added
+   * {@link UriCompliance.Violation#FRAGMENT}, which the relaxed Ozone modes
+   * deliberately do not allow: before it existed, Jetty split such a target and
+   * handed the servlet only the part before the "#", so a request for the S3 key
+   * "my#key" operated on "my" with a 200. Rejecting the malformed target is the
+   * safer behavior, so this is pinned rather than relaxed. A conforming client
+   * percent-encodes the character, and "%23" still reaches the servlet.
+   */
+  @Test
+  public void testUnencodedFragmentRejectedRatherThanTruncatingKey()
+      throws Exception {
+    HttpServer2 server = new HttpServer2.Builder()
+        .setConf(new OzoneConfiguration())
+        .setName("test")
+        .addEndpoint(URI.create("http://localhost:0"))
+        .allowAmbiguousUri(true)
+        .allowEncodedDotSegments(true)
+        .build();
+    server.addServlet("echo", "/echo/*", OkServlet.class);
+    server.start();
+    try {
+      int port = server.getConnectorAddress(0).getPort();
+      assertEquals(HttpURLConnection.HTTP_BAD_REQUEST,
+          rawStatusOf(port, "/echo/my#key"));
+      assertEquals(HttpURLConnection.HTTP_OK,
+          rawStatusOf(port, "/echo/my%23key"));
+    } finally {
+      server.stop();
+    }
+  }
+
+  /**
    * With allowEncodedDotSegments -- the S3 Gateway mode -- the encoded "." and
    * ".." segments an object key may contain reach the servlet instead of being
    * rejected with a 400, as Jetty 9.4 (pre-migration) accepted them. The %u
@@ -385,6 +422,28 @@ public class TestHttpServer2 {
       return conn.getResponseCode();
     } finally {
       conn.disconnect();
+    }
+  }
+
+  /**
+   * Sends the request target on a raw socket, so that characters a URL-based
+   * client would rewrite or strip -- notably an unencoded "#", which
+   * {@link URL} treats as a fragment and never puts on the wire -- reach the
+   * connector verbatim.
+   */
+  private static int rawStatusOf(int port, String target) throws IOException {
+    try (Socket socket = new Socket()) {
+      socket.connect(new InetSocketAddress("localhost", port), 5000);
+      socket.setSoTimeout(5000);
+      socket.getOutputStream().write(("GET " + target + " HTTP/1.1\r\n"
+          + "Host: localhost\r\nConnection: close\r\n\r\n")
+          .getBytes(StandardCharsets.ISO_8859_1));
+      socket.getOutputStream().flush();
+      BufferedReader reader = new BufferedReader(new InputStreamReader(
+          socket.getInputStream(), StandardCharsets.ISO_8859_1));
+      String statusLine = reader.readLine();
+      assertNotNull(statusLine, "no response for " + target);
+      return Integer.parseInt(statusLine.split(" ")[1]);
     }
   }
 

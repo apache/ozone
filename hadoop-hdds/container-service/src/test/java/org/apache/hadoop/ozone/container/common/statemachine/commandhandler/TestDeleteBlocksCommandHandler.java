@@ -468,6 +468,8 @@ public class TestDeleteBlocksCommandHandler {
     dnConf.setBlockDeleteQueueLimit(blockDeleteQueueLimit);
     handler = new DeleteBlocksCommandHandler(
         container, configuration, dnConf, "");
+    // Stop the worker so that handle() can fill the queue without commands being consumed.
+    handler.stop();
 
     // Check if the command status is as expected: PENDING when queue is not full, FAILED when queue is full
     for (int i = 0; i < blockDeleteQueueLimit + 2; i++) {
@@ -482,6 +484,7 @@ public class TestDeleteBlocksCommandHandler {
         assertEquals(cmdStatus.getProtoBufMessage().getBlockDeletionAck().getResultsCount(), 0);
       }
     }
+    assertEquals(blockDeleteQueueLimit, handler.getQueuedCount());
   }
 
   @ContainerTestVersionInfo.ContainerTest
