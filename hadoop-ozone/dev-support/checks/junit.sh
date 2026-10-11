@@ -70,6 +70,9 @@ if [[ "${OZONE_REPO_CACHED}" == "true" ]] && [[ "${CHECK}" == "integration" ]]; 
       INTEGRATION_REACTOR_PL=(-pl :ozone-integration-test)
     fi
   fi
+  if [[ "$*" == *"-Phadoop-native-lib"* ]]; then
+    mvn ${MAVEN_OPTIONS} -N -Phadoop-native-lib generate-resources
+  fi
 fi
 
 if [[ ${ITERATIONS} -gt 1 ]] && [[ ${OZONE_REPO_CACHED} == "false" ]]; then
