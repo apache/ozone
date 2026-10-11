@@ -194,7 +194,7 @@ public class TestStreamRead {
       long shiftedOffset = chunks.get(1).getOffset();
       assertTrue(shiftedOffset % config.getBytesPerChecksum() != 0, "second chunk must shift the checksum grid");
       try (KeyInputStream in = bucket.getKeyInputStream(key)) {
-        assertTrue(in.isStreamBlockInputStream());
+        in.getPartStreams().forEach(part -> assertInstanceOf(StreamBlockInputStream.class, part));
         byte[] actual = new byte[expected.length];
         org.apache.hadoop.io.IOUtils.readFully(in, actual, 0, actual.length);
         assertArrayEquals(expected, actual);
