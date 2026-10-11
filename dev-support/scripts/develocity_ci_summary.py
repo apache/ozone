@@ -169,6 +169,11 @@ def main() -> None:
       default=f'maven.topLevelProjectName:"{ROOT_PROJECT}" tag:CI',
       help="Develocity advanced search query",
   )
+  ap.add_argument(
+      "--failures-only",
+      action="store_true",
+      help="Also summarize buildOutcome:failed hasNonVerificationFailure builds",
+  )
   args = ap.parse_args()
 
   access_key = load_access_key(args.creds)
@@ -190,6 +195,14 @@ def main() -> None:
     raise SystemExit(f"Develocity API HTTP {e.code}: {body}") from e
 
   summarize(builds, args.query)
+  if args.failures_only:
+    fail_query = f"{args.query} buildOutcome:failed hasNonVerificationFailure:true"
+    print()
+    print("--- Non-verification failures (focused sample) ---")
+    summarize(
+        fetch_build_page(access_key, args.from_ms, fail_query, args.max_builds),
+        fail_query,
+    )
 
 
 if __name__ == "__main__":
