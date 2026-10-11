@@ -203,6 +203,6 @@ public final class ExportJob {
   
   @Override
   public String toString() {
-    return "ExportJob" + id;
+    return "ExportJob-" + id;
   }
 }

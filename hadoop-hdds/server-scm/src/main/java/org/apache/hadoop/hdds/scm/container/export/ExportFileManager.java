@@ -32,6 +32,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -150,7 +151,7 @@ final class ExportFileManager {
     return Files.newOutputStream(jobDirectory(jobId).resolve(partFileName));
   }
 
-  void writeArchive(ExportJob job) throws IOException {
+  void writeArchive(ExportJob job, BooleanSupplier isLeaderReady) throws IOException {
     Path jobDir = jobDirectory(job.getId());
     File[] parts = jobDir.toFile().listFiles((dir, name) -> name.endsWith(".txt"));
     if (parts == null || parts.length == 0) {
@@ -162,15 +163,20 @@ final class ExportFileManager {
          GZIPOutputStream gzipOut = new GZIPOutputStream(atomicOut);
          ArchiveOutputStream<TarArchiveEntry> tarOut = Archiver.tar(gzipOut)) {
       for (File part : parts) {
+        if (!isLeaderReady.getAsBoolean()) {
+          // close() would publish the partial archive; abort() discards the temp file instead.
+          atomicOut.abort();
+          throw new IOException("SCM lost leadership while archiving " + job);
+        }
         Archiver.includeFile(part, part.getName(), tarOut);
       }
     }
   }
 
-  void deleteJobDirectory(ExportJob.Id jobId) throws IOException {
+  void deleteJobDirectory(ExportJob.Id jobId) {
     Path jobDir = jobDirectory(jobId);
-    if (Files.exists(jobDir)) {
-      FileUtils.deleteDirectory(jobDir.toFile());
+    if (Files.exists(jobDir) && !FileUtils.deleteQuietly(jobDir.toFile())) {
+      LOG.warn("Failed to delete container export job directory {}; it will be removed on next SCM start", jobDir);
     }
   }
 

@@ -31,15 +31,21 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -48,8 +54,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.AtomicFileOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -93,7 +101,25 @@ public class TestContainerExportManager {
   public void testRejectSubmitWhenNotLeader() throws Exception {
     exportManager.shutdown();
     exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, () -> false);
-    assertNull(exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
+    SCMException e = assertThrows(SCMException.class, () ->
+        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
+    assertEquals(SCMException.ResultCodes.SCM_NOT_LEADER, e.getResult());
+  }
+
+  @Test
+  public void testRejectSubmitAfterShutdown() {
+    exportManager.shutdown();
+    IOException e = assertThrows(IOException.class, () ->
+        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
+    assertTrue(e.getMessage().contains("shut down"));
+  }
+
+  @Test
+  public void testRejectNonPositiveSizes() {
+    assertThrows(IllegalArgumentException.class, () ->
+        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 0, 1));
+    assertThrows(IllegalArgumentException.class, () ->
+        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 1, 0));
   }
 
   @Test
@@ -102,7 +128,7 @@ public class TestContainerExportManager {
   }
 
   @Test
-  public void testRejectConcurrentExport() {
+  public void testRejectConcurrentExport() throws Exception {
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
         .thenReturn(ids(1));
@@ -116,7 +142,53 @@ public class TestContainerExportManager {
     ExportJob first = exportManager.submitJob(ContainerID.valueOf(0), null,
         ContainerHealthState.MISSING);
     assertNotNull(first);
-    assertNull(exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
+    IOException e = assertThrows(IOException.class, () ->
+        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
+    assertTrue(e.getMessage().contains("already running"));
+  }
+
+  @Test
+  public void testRejectSubmitWhileArchivingThenAcceptAfterDone() throws Exception {
+    final AtomicBoolean allIdsWritten = new AtomicBoolean();
+    final CountDownLatch archivingStarted = new CountDownLatch(1);
+    final CountDownLatch releaseArchiving = new CountDownLatch(1);
+    exportManager.shutdown();
+    exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, () -> {
+      // submitJob also calls this on the caller thread; only hold the worker.
+      if (allIdsWritten.get() && Thread.currentThread().getName().endsWith("-ContainerExportWorker")) {
+        archivingStarted.countDown();
+        try {
+          releaseArchiving.await();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
+      return true;
+    });
+
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenReturn(ids(1));
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(2)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenAnswer(invocation -> {
+          allIdsWritten.set(true);
+          return Collections.emptyList();
+        });
+
+    ExportJob first = exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    assertTrue(archivingStarted.await(30, TimeUnit.SECONDS));
+    assertFalse(exportManager.getExportStatus(first.getId()).isDone());
+
+    IOException e = assertThrows(IOException.class, () ->
+        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
+    assertTrue(e.getMessage().contains("already running"));
+
+    releaseArchiving.countDown();
+    ExportJob.Status status = waitForDone(first.getId());
+    assertNull(status.getException());
+    assertTrue(archiveFile(first).exists());
+    assertNotNull(exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
   }
 
   @Test
@@ -212,6 +284,7 @@ public class TestContainerExportManager {
 
   @Test
   public void testMultiPartExportCreatesTar() throws Exception {
+    // partSize=3, batchSize=2: part 1 ends mid-batch (after 3), part 2 ends exactly where batch (5,6) runs out.
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
         .thenReturn(ids(1, 2));
@@ -220,6 +293,12 @@ public class TestContainerExportManager {
         .thenReturn(ids(3, 4));
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenReturn(ids(5, 6));
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(7)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenReturn(ids(7));
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(8)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
         .thenReturn(Collections.emptyList());
 
     ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), null,
@@ -228,7 +307,7 @@ public class TestContainerExportManager {
 
     ExportJob.Status status = waitForDone(job.getId());
     assertNull(status.getException());
-    assertEquals(4, status.getIdsWritten());
+    assertEquals(7, status.getIdsWritten());
     assertTrue(job.getFileName().endsWith(ExportFileManager.EXPORT_ARCHIVE_SUFFIX));
     File archive = archiveFile(job);
     assertTrue(archive.exists());
@@ -237,18 +316,44 @@ public class TestContainerExportManager {
     Path extractDir = Files.createTempDirectory("export-archive");
     try {
       extractGzTar(archive, extractDir);
-      String part2Name;
-      try (java.util.stream.Stream<Path> stream = Files.list(extractDir)) {
-        part2Name = stream.map(path -> path.getFileName().toString())
-            .filter(name -> name.endsWith("part002.txt"))
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("part002.txt not found in archive"));
+      List<Path> parts;
+      try (Stream<Path> stream = Files.list(extractDir)) {
+        parts = stream.sorted().collect(Collectors.toList());
       }
-      assertTrue(Files.readAllLines(extractDir.resolve(part2Name)).contains(
-          "# partStartContainerId=#4"));
+      assertEquals(3, parts.size());
+      assertTrue(parts.get(0).getFileName().toString().endsWith("part001.txt"));
+      assertTrue(parts.get(2).getFileName().toString().endsWith("part003.txt"));
+      assertTrue(Files.readAllLines(parts.get(1)).contains("# partStartContainerId=#4"));
+      assertTrue(Files.readAllLines(parts.get(2)).contains("# partStartContainerId=#7"));
+
+      List<String> exportedIds = new ArrayList<>();
+      for (Path part : parts) {
+        for (String line : Files.readAllLines(part)) {
+          if (!line.isEmpty() && !line.startsWith("#")) {
+            exportedIds.add(line);
+          }
+        }
+      }
+      assertEquals(Arrays.asList("1", "2", "3", "4", "5", "6", "7"), exportedIds);
     } finally {
       FileUtils.deleteQuietly(extractDir.toFile());
     }
+  }
+
+  @Test
+  public void testLeadershipLostWhileArchivingLeavesNoArchive() throws Exception {
+    ExportFileManager fileManager = new ExportFileManager(tempDir.getAbsolutePath());
+    ExportJob job = new ExportJob(ExportScope.of(null, ContainerHealthState.MISSING),
+        ContainerID.valueOf(0), TEST_BATCH_SIZE, TEST_PART_SIZE);
+    fileManager.createJobDirectory(job.getId());
+    try (OutputStream out = fileManager.newPartOutputStream(job.getId(), job.partFileName(1))) {
+      job.writeMetadataHeader(out, 1, ContainerID.valueOf(1));
+    }
+
+    IOException e = assertThrows(IOException.class, () -> fileManager.writeArchive(job, () -> false));
+    assertTrue(e.getMessage().contains("lost leadership"));
+    assertFalse(archiveFile(job).exists());
+    assertFalse(AtomicFileOutputStream.getTemporaryFile(archiveFile(job)).exists());
   }
 
   @Test

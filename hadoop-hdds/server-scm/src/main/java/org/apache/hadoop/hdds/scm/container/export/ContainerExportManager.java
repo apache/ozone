@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +78,10 @@ public class ContainerExportManager {
 
   ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
       String exportDirectory, int partSize, int batchSize) {
+    if (partSize <= 0 || batchSize <= 0) {
+      throw new IllegalArgumentException("partSize and batchSize must be positive: partSize=" + partSize
+          + ", batchSize=" + batchSize);
+    }
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");
     this.fileManager = new ExportFileManager(exportDirectory);
@@ -104,21 +110,31 @@ public class ContainerExportManager {
   /**
    * Submit a container ID export job on the SCM leader.
    *
-   * @return the submitted job, or {@code null} if not leader or another export is already running
+   * @return the submitted job
+   * @throws SCMException with {@link SCMException.ResultCodes#SCM_NOT_LEADER} if this SCM is not the ready leader
+   * @throws IOException if another export is already running or the export worker is shut down
    */
-  public ExportJob submitJob(ContainerID start, LifeCycleState lifeCycleState, ContainerHealthState healthState) {
+  public ExportJob submitJob(ContainerID start, LifeCycleState lifeCycleState, ContainerHealthState healthState)
+      throws IOException {
     if (!isLeaderReady.getAsBoolean()) {
-      return null;
+      throw new SCMException("Container ID export can only be submitted on the SCM leader",
+          SCMException.ResultCodes.SCM_NOT_LEADER);
     }
 
     final ExportScope scope = ExportScope.of(lifeCycleState, healthState);
     final ExportJob job = new ExportJob(scope, start, batchSize, partSize);
     if (!runningJob.compareAndSet(null, job)) {
-      return null;
+      throw new IOException("Another container ID export is already running");
     }
 
     jobMap.put(job.getId(), job);
-    workerPool.submit(() -> executeExport(job));
+    try {
+      workerPool.submit(() -> executeExport(job));
+    } catch (RejectedExecutionException e) {
+      jobMap.remove(job.getId());
+      runningJob.compareAndSet(job, null);
+      throw new IOException("Container ID export worker is shut down", e);
+    }
     LOG.info("Submitted container ID export job {} (scope={}, start={}, batchSize={}, partSize={})",
         job, scope, start, batchSize, partSize);
     return job;
@@ -132,13 +148,25 @@ public class ContainerExportManager {
   public void shutdown() {
     LOG.info("Shutting down ContainerExportManager");
     workerPool.shutdownNow();
+    boolean terminated = false;
     try {
-      if (!workerPool.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-        LOG.warn("Timed out waiting for export worker shutdown");
-      }
+      terminated = workerPool.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS);
     } catch (InterruptedException e) {
       LOG.warn("Interrupted waiting for export worker shutdown");
       Thread.currentThread().interrupt();
+    }
+    if (!terminated) {
+      // The worker may still be writing under the export directory; keep the lock so that
+      // a new manager cannot start and delete files in use.
+      LOG.warn("Export worker did not stop within {} ms (or shutdown was interrupted); "
+          + "keeping the container export directory lock", SHUTDOWN_TIMEOUT_MS);
+      return;
+    }
+
+    // A job accepted but drained from the executor queue by shutdownNow() never ran; fail it.
+    final ExportJob notStarted = runningJob.getAndSet(null);
+    if (notStarted != null) {
+      notStarted.getFuture().completeExceptionally(new InterruptedException("Export cancelled: SCM shutting down"));
     }
     try {
       fileManager.unlock();
@@ -148,37 +176,43 @@ public class ContainerExportManager {
   }
 
   private void executeExport(ExportJob job) {
+    Long idsWritten = null;
+    Throwable failure = new IllegalStateException(job + " terminated unexpectedly");
     try {
       fileManager.createJobDirectory(job.getId());
 
-      final Long idsWritten = writeContainerIDs(job);
+      idsWritten = writeContainerIDs(job);
       if (idsWritten == null) {
-        fileManager.cleanupFailedJob(job);
-        job.getFuture().completeExceptionally(new InterruptedException("Export cancelled"));
+        failure = new InterruptedException("Export cancelled");
         LOG.info("Export {} was cancelled", job);
       } else {
         if (idsWritten > 0) {
-          fileManager.writeArchive(job);
+          fileManager.writeArchive(job, isLeaderReady);
           LOG.info("{} completed: {} ids, archive={}", job, idsWritten, job.getFileName());
         } else {
           LOG.info("{} completed with {} matching containers", job, idsWritten);
         }
-        job.getFuture().complete(idsWritten);
+        fileManager.deleteJobDirectory(job.getId());
+        failure = null;
       }
-
-      fileManager.deleteJobDirectory(job.getId());
     } catch (Exception e) {
-      fileManager.cleanupFailedJob(job);
-      job.getFuture().completeExceptionally(e);
+      failure = e;
       LOG.error("Export {} failed", job, e);
     } finally {
+      if (failure != null) {
+        fileManager.cleanupFailedJob(job);
+      }
       final boolean cleared = runningJob.compareAndSet(job, null);
+      if (failure == null) {
+        job.getFuture().complete(idsWritten);
+      } else {
+        job.getFuture().completeExceptionally(failure);
+      }
       Preconditions.assertTrue(cleared);
     }
   }
 
   private Long writeContainerIDs(ExportJob job) throws IOException {
-    // Pre-allocated buffer: ~12 chars per ID (up to 20 digits + newline) per batch.
     final byte[] buffer = new byte[job.getBatchSize() * 12];
     int partNumber = 1;
     long idsWritten = 0;
@@ -200,6 +234,7 @@ public class ContainerExportManager {
         if (batch.isEmpty()) {
           break;
         }
+        cursor = nextCursor(batch);
       }
 
       final ContainerID partStartContainerId = batch.get(batchIndex);
@@ -212,13 +247,13 @@ public class ContainerExportManager {
         while (idsInCurrentPart < job.getPartSize()
             && (batchIndex < batch.size() || cursor != null)) {
           if (batchIndex >= batch.size()) {
-            cursor = ContainerID.valueOf(batch.get(batch.size() - 1).getProtobuf().getId() + 1);
             batch = fetchContainerIds(job, cursor);
             batchIndex = 0;
             if (batch.isEmpty()) {
               cursor = null;
               break;
             }
+            cursor = nextCursor(batch);
           }
 
           final ContainerID containerId = batch.get(batchIndex++);
@@ -240,6 +275,10 @@ public class ContainerExportManager {
       partNumber++;
     }
     return idsWritten;
+  }
+
+  private static ContainerID nextCursor(List<ContainerID> batch) {
+    return ContainerID.valueOf(batch.get(batch.size() - 1).getProtobuf().getId() + 1);
   }
 
   private List<ContainerID> fetchContainerIds(ExportJob job, ContainerID cursor) throws IOException {
