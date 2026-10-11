@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.commons.lang3.RandomStringUtils.secure;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,6 +45,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
@@ -65,6 +67,8 @@ import org.apache.hadoop.util.Timer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Verify that {@link MutableVolumeSet} correctly checks for failed disks
@@ -248,8 +252,9 @@ public class TestVolumeSetDiskChecks {
    * And FCR report is being sent.
    * @throws IOException
    */
-  @Test
-  public void testVolumeFailure() throws IOException {
+  @ParameterizedTest
+  @EnumSource(value = State.class, names = {"CLOSED", "RECOVERING"})
+  public void testVolumeFailure(State state) throws IOException {
     final int numVolumes = 5;
 
     conf = getConfWithDataNodeDirs(numVolumes);
@@ -276,7 +281,7 @@ public class TestVolumeSetDiskChecks {
         new KeyValueContainerData(containerID, layout,
             ContainerTestHelper.CONTAINER_MAX_SIZE,
             UUID.randomUUID().toString(), datanodeId.toString());
-    data.closeContainer();
+    data.setState(state);
     data.setSchemaVersion(OzoneConsts.SCHEMA_V3);
 
     long containerID1 = ContainerTestHelper.getTestContainerID();
@@ -284,7 +289,7 @@ public class TestVolumeSetDiskChecks {
         new KeyValueContainerData(containerID1, layout,
             ContainerTestHelper.CONTAINER_MAX_SIZE,
             UUID.randomUUID().toString(), datanodeId.toString());
-    data1.closeContainer();
+    data1.setState(state);
     data1.setSchemaVersion(OzoneConsts.SCHEMA_V3);
 
     final MutableVolumeSet volumeSet = new MutableVolumeSet(
@@ -310,6 +315,7 @@ public class TestVolumeSetDiskChecks {
     container1.create(volumeSet1,
         new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
     conSet.addContainer(container1);
+    assertThat(conSet.getRecoveringContainerMap()).hasSize(state == RECOVERING ? 2 : 0);
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
     StateContext stateContext = new StateContext(
@@ -332,8 +338,10 @@ public class TestVolumeSetDiskChecks {
     // ContainerID1 should be removed belonging to failed volume
     assertNull(conSet.getContainer(containerID1));
     assertTrue(conSet.getMissingContainerSet().contains(containerID1));
+    assertThat(conSet.getRecoveringContainerMap()).doesNotContainKey(containerID1);
     // ContainerID should exist belonging to normal volume
     assertNotNull(conSet.getContainer(containerID));
+    assertThat(conSet.getRecoveringContainerMap()).hasSize(state == RECOVERING ? 1 : 0);
     expectedReportCount.put(
         StorageContainerDatanodeProtocolProtos.ContainerReportsProto
             .getDescriptor().getFullName(), 1);

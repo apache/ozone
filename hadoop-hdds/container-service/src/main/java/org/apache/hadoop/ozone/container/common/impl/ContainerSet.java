@@ -383,6 +383,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     if (markMissing) {
       missingContainerSet.add(containerId);
     }
+    removeRecoveringContainer(containerId);
     Container<?> removed = containerMap.remove(containerId);
     if (removeFromDB) {
       deleteFromContainerTable(containerId);
