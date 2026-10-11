@@ -1761,7 +1761,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     GetObjectTaggingResponse.Builder resp =
         GetObjectTaggingResponse.newBuilder();
 
-    Map<String, String> result = impl.getObjectTagging(omKeyArgs);
+    Map<String, String> result = impl.getObjectTagging(omKeyArgs,
+        request.getAssumeS3Context());
 
     resp.addAllTags(KeyValueUtil.toProtobuf(result));
     return resp.build();

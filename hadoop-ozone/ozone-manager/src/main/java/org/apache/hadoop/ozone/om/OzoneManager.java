@@ -5773,8 +5773,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public Map<String, String> getObjectTagging(final OmKeyArgs args)
       throws IOException {
-    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader = getReader(args)) {
-      return rcReader.get().getObjectTagging(args);
+    return getObjectTagging(args, false);
+  }
+
+  @Override
+  public Map<String, String> getObjectTagging(final OmKeyArgs args,
+      boolean assumeS3Context) throws IOException {
+    OmKeyArgs keyArgs = args;
+    if (assumeS3Context) {
+      keyArgs = args.toBuilder().setVolumeName(
+          getS3VolumeContext(true).getOmVolumeArgs().getVolume()).build();
+    }
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader = getReader(keyArgs)) {
+      return rcReader.get().getObjectTagging(keyArgs);
     }
   }
 

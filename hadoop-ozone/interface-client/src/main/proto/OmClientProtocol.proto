@@ -2598,6 +2598,8 @@ message PutObjectTaggingResponse {
 
 message GetObjectTaggingRequest {
   required KeyArgs keyArgs = 1;
+  // Resolve the S3 volume from the request authentication context.
+  optional bool assumeS3Context = 2;
 }
 
 message GetObjectTaggingResponse {

@@ -3029,11 +3029,20 @@ public class RpcClient implements ClientProtocol {
   @Override
   public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName)
       throws IOException {
+    return getObjectTagging(volumeName, bucketName, keyName, false);
+  }
+
+  @Override
+  public Map<String, String> getObjectTagging(String volumeName,
+      String bucketName, String keyName, boolean assumeS3Context)
+      throws IOException {
     if (!OzoneManagerVersion.S3_OBJECT_TAGGING_API.isSupportedBy(omVersion)) {
       throw new IOException("OzoneManager does not support S3 object tagging API");
     }
 
-    verifyVolumeName(volumeName);
+    if (!assumeS3Context) {
+      verifyVolumeName(volumeName);
+    }
     verifyBucketName(bucketName);
     Objects.requireNonNull(keyName, "keyName == null");
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
@@ -3041,7 +3050,7 @@ public class RpcClient implements ClientProtocol {
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .build();
-    return ozoneManagerClient.getObjectTagging(keyArgs);
+    return ozoneManagerClient.getObjectTagging(keyArgs, assumeS3Context);
   }
 
   @Override
