@@ -43,7 +43,8 @@ import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmClient;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -58,11 +59,14 @@ import org.junit.jupiter.api.Timeout;
 @Timeout(300)
 public class TestOmSCMNodesReconfiguration {
 
-  private MiniOzoneHAClusterImpl cluster = null;
-  private String scmServiceId;
+  private static MiniOzoneHAClusterImpl cluster;
+  private static String scmServiceId;
+  private static String scmNodesKey;
+  private static String initialScmNodes;
+  private static final Map<String, String> INITIAL_SCM_ADDRESSES = new HashMap<>();
 
-  @BeforeEach
-  public void init() throws Exception {
+  @BeforeAll
+  public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     scmServiceId = "scm-service-test1";
     cluster = MiniOzoneCluster.newHABuilder(conf)
@@ -72,10 +76,30 @@ public class TestOmSCMNodesReconfiguration {
         .setNumOfOzoneManagers(1)
         .build();
     cluster.waitForClusterToBeReady();
+
+    scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+    OzoneConfiguration omConf = cluster.getOzoneManager().getConfiguration();
+    initialScmNodes = omConf.get(scmNodesKey);
+    for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
+      String scmAddrKey = ConfUtils.addKeySuffixes(
+          OZONE_SCM_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
+      INITIAL_SCM_ADDRESSES.put(scmAddrKey, omConf.get(scmAddrKey));
+    }
   }
 
-  @AfterEach
-  public void shutdown() {
+  @BeforeEach
+  public void resetScmConfiguration() throws ReconfigurationException {
+    ReconfigurationHandler handler = cluster.getOzoneManager().getReconfigurationHandler();
+
+    for (Map.Entry<String, String> scmAddress : INITIAL_SCM_ADDRESSES.entrySet()) {
+      handler.reconfigureProperty(scmAddress.getKey(), scmAddress.getValue());
+    }
+
+    handler.reconfigureProperty(scmNodesKey, initialScmNodes);
+  }
+
+  @AfterAll
+  public static void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
