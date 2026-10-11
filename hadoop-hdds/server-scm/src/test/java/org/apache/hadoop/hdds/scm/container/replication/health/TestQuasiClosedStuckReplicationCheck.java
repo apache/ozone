@@ -67,7 +67,6 @@ public class TestQuasiClosedStuckReplicationCheck {
     rmConf = new OzoneConfiguration().getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     handler = new QuasiClosedStuckReplicationCheck(rmConf);
     report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
-    report.resetContainerHealthState();  // Reset before each test
     queue = new ReplicationQueue();
   }
 

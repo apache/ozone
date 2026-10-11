@@ -85,7 +85,7 @@ public class TestECBlockInputStream {
     }
 
     // EC-3-2, very large block, so all 3 data locations are needed
-    keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, 5000 * ONEMB);
+    keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, 5000L * ONEMB);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, null, null, new TestBlockInputStreamFactory(),
         clientConfig)) {

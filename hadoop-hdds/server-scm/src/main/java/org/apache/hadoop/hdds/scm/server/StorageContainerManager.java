@@ -117,6 +117,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
@@ -125,16 +126,15 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
-import org.apache.hadoop.hdds.scm.node.HealthyReadOnlyNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NewNodeHandler;
 import org.apache.hadoop.hdds.scm.node.NodeAddressUpdateHandler;
 import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeReportHandler;
-import org.apache.hadoop.hdds.scm.node.ReadOnlyHealthyToHealthyNodeHandler;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.StaleNodeHandler;
 import org.apache.hadoop.hdds.scm.node.StartDatanodeAdminHandler;
+import org.apache.hadoop.hdds.scm.node.UnhealthyToHealthyNodeHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineActionHandler;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
@@ -149,7 +149,7 @@ import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.Containe
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManagerImpl;
-import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.token.ContainerTokenGenerator;
@@ -171,7 +171,6 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
@@ -187,11 +186,8 @@ import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
-import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseManagerNotRunningException;
-import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -250,7 +246,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private NodeDecommissionManager scmDecommissionManager;
   private WritableContainerFactory writableContainerFactory;
   private FinalizationManager finalizationManager;
-  private HDDSLayoutVersionManager scmLayoutVersionManager;
+  private ScmVersionManager versionManager;
   private LeaseManager<Object> leaseManager;
 
   private SCMMetadataStore scmMetadataStore;
@@ -512,12 +508,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         pipelineManager, containerManager, null);
     StartDatanodeAdminHandler datanodeStartAdminHandler =
         new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
-    ReadOnlyHealthyToHealthyNodeHandler readOnlyHealthyToHealthyNodeHandler =
-        new ReadOnlyHealthyToHealthyNodeHandler(serviceManager);
-    HealthyReadOnlyNodeHandler
-        healthyReadOnlyNodeHandler =
-        new HealthyReadOnlyNodeHandler(scmNodeManager,
-            pipelineManager);
+    UnhealthyToHealthyNodeHandler unhealthyToHealthyNodeHandler =
+        new UnhealthyToHealthyNodeHandler(serviceManager);
     ContainerActionsHandler actionsHandler = new ContainerActionsHandler();
 
     ContainerReportHandler containerReportHandler =
@@ -534,7 +526,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new ReplicationManagerEventHandler(replicationManager, scmContext);
 
     ReconcileContainerEventHandler reconcileContainerEventHandler =
-        new ReconcileContainerEventHandler(containerManager, scmContext);
+        new ReconcileContainerEventHandler(containerManager, scmContext, scmNodeManager);
 
     eventQueue.addHandler(SCMEvents.DATANODE_COMMAND, scmNodeManager);
     eventQueue.addHandler(SCMEvents.RETRIABLE_DATANODE_COMMAND, scmNodeManager);
@@ -597,10 +589,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     eventQueue.addHandler(SCMEvents.NODE_ADDRESS_UPDATE,
             nodeAddressUpdateHandler);
     eventQueue.addHandler(SCMEvents.STALE_NODE, staleNodeHandler);
-    eventQueue.addHandler(SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE,
-        readOnlyHealthyToHealthyNodeHandler);
-    eventQueue.addHandler(SCMEvents.HEALTHY_READONLY_NODE,
-        healthyReadOnlyNodeHandler);
+    eventQueue.addHandler(SCMEvents.UNHEALTHY_TO_HEALTHY_NODE, unhealthyToHealthyNodeHandler);
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
     eventQueue.addHandler(SCMEvents.START_ADMIN_ON_NODE,
         datanodeStartAdminHandler);
@@ -714,24 +703,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       leaseManager = new LeaseManager<>(threadNamePrefix, timeDuration);
     }
 
-    scmLayoutVersionManager = new HDDSLayoutVersionManager(
-        scmStorageConfig.getLayoutVersion());
-    VersionedDatanodeFeatures.initialize(scmLayoutVersionManager);
-
-    UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-        finalizationExecutor;
-    if (configurator.getUpgradeFinalizationExecutor() != null) {
-      finalizationExecutor = configurator.getUpgradeFinalizationExecutor();
-    } else {
-      finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
-    }
+    versionManager = new ScmVersionManager(scmStorageConfig, this);
     finalizationManager = new FinalizationManagerImpl.Builder()
-        .setConfiguration(conf)
-        .setLayoutVersionManager(scmLayoutVersionManager)
-        .setStorage(scmStorageConfig)
         .setHAManager(scmHAManager)
         .setFinalizationStore(scmMetadataStore.getMetaTable())
-        .setFinalizationExecutor(finalizationExecutor)
+        .setVersionManager(versionManager)
         .build();
 
     // inline upgrade for SequenceIdGenerator
@@ -750,7 +726,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
           .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.INITIAL)
           .setSCM(this)
           .setThreadNamePrefix(threadNamePrefix)
-          .setFinalizationCheckpoint(finalizationManager.getCheckpoint())
           .build();
     }
 
@@ -760,7 +735,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmNodeManager = configurator.getScmNodeManager();
     } else {
       scmNodeManager = new SCMNodeManager(conf, scmStorageConfig, eventQueue,
-          clusterMap, scmContext, scmLayoutVersionManager,
+          clusterMap, scmContext, versionManager,
           this::resolveNodeLocation);
     }
 
@@ -790,9 +765,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               systemClock
               );
     }
-
-    finalizationManager.buildUpgradeContext(scmNodeManager, pipelineManager,
-        scmContext);
 
     ReplicationManager.ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
@@ -1334,7 +1306,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         LOG.info("SCM initialization succeeded. Current cluster id for sd={}"
                 + "; cid={}; layoutVersion={}; scmId={}",
             scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
-            scmStorageConfig.getLayoutVersion(), scmStorageConfig.getScmId());
+            scmStorageConfig.getApparentVersion(), scmStorageConfig.getScmId());
         return true;
       } catch (IOException ioe) {
         LOG.error("Could not initialize SCM version file", ioe);
@@ -1368,7 +1340,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.info("SCM already initialized. Reusing existing cluster id for sd={}"
               + ";cid={}; layoutVersion={}; HAEnabled={}",
           scmStorageConfig.getStorageDir(), scmStorageConfig.getClusterID(),
-          scmStorageConfig.getLayoutVersion(), scmStorageConfig.isSCMHAEnabled());
+          scmStorageConfig.getApparentVersion(), scmStorageConfig.isSCMHAEnabled());
       return true;
     }
   }
@@ -1656,6 +1628,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       stopReplicationManager(); // started eagerly
       return;
     }
+
+    SCMStateMachine stateMachine = getScmHAManager().getRatisServer()
+        .getSCMStateMachine();
+    if (stateMachine != null) {
+      stateMachine.stopDNServerStartRetry();
+    }
     try {
       if (containerBalancer.isBalancerRunning()) {
         LOG.info("Stopping Container Balancer service.");
@@ -1708,8 +1686,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       LOG.error("Storage Container Manager HTTP server stop failed.", ex);
     }
 
-    LOG.info("Stopping SCM LayoutVersionManager Service.");
-    scmLayoutVersionManager.close();
+    LOG.info("Stopping SCM version manager metrics.");
+    versionManager.close();
 
     if (getSecurityProtocolServer() != null) {
       getSecurityProtocolServer().stop();
@@ -2120,12 +2098,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return getScmStorageConfig().getClusterID();
   }
 
-  public HDDSLayoutVersionManager getLayoutVersionManager() {
-    return scmLayoutVersionManager;
-  }
-
+  /**
+   * @return The {@link FinalizationManager} which can be used to finalize an SCM quorum through Ratis.
+   */
   public FinalizationManager getFinalizationManager() {
     return finalizationManager;
+  }
+
+  /**
+   * @return The {@link ScmVersionManager} which can be used to check this SCM's local apparent and software versions.
+   *  To finalize all SCM's via Ratis, use {@link FinalizationManager} instead.
+   */
+  public ScmVersionManager getVersionManager() {
+    return versionManager;
   }
 
   /**

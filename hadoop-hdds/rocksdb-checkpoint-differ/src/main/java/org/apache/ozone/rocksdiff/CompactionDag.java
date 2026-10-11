@@ -83,7 +83,7 @@ public class CompactionDag {
     Set<String> sstFilesPruned = pruneForwardDag(forwardCompactionDAG, nodesToRemove);
     // Remove SST file nodes from compactionNodeMap too,
     // since those nodes won't be needed after clean up.
-    nodesToRemove.forEach(compactionNodeMap::remove);
+    nodesToRemove.forEach(node -> compactionNodeMap.remove(node.getFileName()));
     return sstFilesPruned;
   }
 

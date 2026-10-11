@@ -76,6 +76,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private DatanodeID id;
   private Server server;
   private final ContainerDispatcher storageContainer;
+  private final GrpcXceiverService xceiverService;
   private boolean isStarted;
   private DatanodeDetails datanodeDetails;
   private EventLoopGroup eventLoopGroup;
@@ -136,7 +137,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     }
 
     LOG.info("GrpcServer channel type {}", channelType.getSimpleName());
-    GrpcXceiverService xceiverService = new GrpcXceiverService(dispatcher);
+    xceiverService = new GrpcXceiverService(dispatcher, dnConf.getStreamReadFileIdleTimeout(),
+        datanodeDetails.threadNamePrefix());
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .bossEventLoopGroup(eventLoopGroup)
@@ -234,6 +236,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       try {
         server.shutdown();
         server.awaitTermination(5, TimeUnit.SECONDS);
+        xceiverService.shutdown();
         eventLoopGroup.shutdownGracefully().sync();
       } catch (InterruptedException e) {
         LOG.error("failed to shutdown XceiverServerGrpc", e);

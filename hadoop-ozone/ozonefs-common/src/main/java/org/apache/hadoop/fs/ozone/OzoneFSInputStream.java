@@ -35,9 +35,17 @@ import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 /**
  * The input stream for Ozone file system.
- *
- * TODO: Make inputStream generic for both rest and rpc clients
- * This class is not thread safe.
+ * <p>
+ * Sequential reads are NOT thread safe.
+ * <p>
+ * Positioned reads are thread safe.
+ * When the underlying stream is an {@link ExtendedInputStream} and
+ * when it supports {@link ExtendedInputStream#readFully(long, ByteBuffer)},
+ * they delegate to it.
+ * Otherwise, they fall back to the default synchronized seek-read-restore implementation.
+ * <p>
+ * Applications must use either sequential reads or position reads at any given time,
+ * but not concurrent sequential/position reads
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -46,6 +54,7 @@ public class OzoneFSInputStream extends FSInputStream
 
   private final InputStream inputStream;
   private final Statistics statistics;
+  private final Object positionedReadLock = new Object();
 
   public OzoneFSInputStream(InputStream inputStream, Statistics statistics) {
     this.inputStream = inputStream;
@@ -158,57 +167,161 @@ public class OzoneFSInputStream extends FSInputStream
   }
 
   /**
-   * @param buf the ByteBuffer to receive the results of the read operation.
+   * @param buffer to receive the results of the read operation.
    * @param position offset
    * @return the number of bytes read, possibly zero, or -1 if
    *         reach end-of-stream
    * @throws IOException if there is some error performing the read
    */
   @Override
-  public int read(long position, ByteBuffer buf) throws IOException {
-    if (!buf.hasRemaining()) {
+  public int read(long position, ByteBuffer buffer) throws IOException {
+    if (!buffer.hasRemaining()) {
       return 0;
     }
-    if (inputStream instanceof ExtendedInputStream) {
-      final int remainingBeforeRead = buf.remaining();
-      try {
-        if (((ExtendedInputStream) inputStream).readFully(position, buf)) {
-          return remainingBeforeRead - buf.remaining();
-        }
-      } catch (EOFException e) {
-        return -1;
-      }
+    if (position < 0) {
+      throw new EOFException("position is negative: " + position);
     }
+    return readImpl(position, buffer);
+  }
 
-    long oldPos = this.getPos();
-    int bytesRead;
-    try {
-      ((Seekable) inputStream).seek(position);
-      bytesRead = ((ByteBufferReadable) inputStream).read(buf);
-    } catch (EOFException e) {
-      // Either position is negative or it has reached EOF
-      return -1;
-    } finally {
-      ((Seekable) inputStream).seek(oldPos);
+  @Override
+  public int read(long position, byte[] array, int offset, int length) throws IOException {
+    if (length == 0) {
+      return 0;
     }
-    return bytesRead;
+    validatePositionedReadArgs(position, array, offset, length);
+    return readImpl(position, ByteBuffer.wrap(array, offset, length));
+  }
+
+  private int readImpl(long position, ByteBuffer buffer) throws IOException {
+    final Integer n = bestEffortExtendedInputStreamRead(position, buffer, false);
+    if (n != null) {
+      return n;
+    }
+    // Fallback: stateful seek-read-restore on the shared cursor.
+    return bestEffortReadFullySynchronized(position, buffer);
   }
 
   /**
-   * @param buf the ByteBuffer to receive the results of the read operation.
+   * @param buffer to receive the results of the read operation.
    * @param position offset
    * @throws IOException if there is some error performing the read
    * @throws EOFException if end of file reached before reading fully
    */
   @Override
-  public void readFully(long position, ByteBuffer buf) throws IOException {
-    int bytesRead;
-    for (int readCount = 0; buf.hasRemaining(); readCount += bytesRead) {
-      bytesRead = this.read(position + (long)readCount, buf);
-      if (bytesRead < 0) {
-        // Still buffer has space to read but stream has already reached EOF
-        throw new EOFException("End of file reached before reading fully.");
+  public void readFully(long position, ByteBuffer buffer) throws IOException {
+    if (!buffer.hasRemaining()) {
+      return;
+    }
+    if (position < 0) {
+      throw new EOFException("position is negative: " + position);
+    }
+    readFullyImpl(position, buffer);
+  }
+
+  @Override
+  public void readFully(long position, byte[] array, int offset, int length) throws IOException {
+    if (length == 0) {
+      return;
+    }
+    validatePositionedReadArgs(position, array, offset, length);
+    readFullyImpl(position, ByteBuffer.wrap(array, offset, length));
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer) throws IOException {
+    readFully(position, buffer, 0, buffer.length);
+  }
+
+  private void readFullyImpl(long position, ByteBuffer buffer) throws IOException {
+    final int length = buffer.remaining();
+    final Integer n = bestEffortExtendedInputStreamRead(position, buffer, true);
+    if (n != null) {
+      if (n < length) {
+        throw new EOFException("Failed to read fully length " + length + " at position " + position);
       }
+      return;
+    }
+    final int m = bestEffortReadFullySynchronized(position, buffer);
+    if (m < length) {
+      throw new EOFException("Failed to read fully length " + length + " at position " + position);
+    }
+  }
+
+  /**
+   * Best effort read via {@link ExtendedInputStream#readFully(long, ByteBuffer)}.
+   *
+   * @return the number of bytes read; or null when the native stateless path is unsupported.
+   */
+  private Integer bestEffortExtendedInputStreamRead(long position, ByteBuffer buffer,
+      boolean isReadFully) throws IOException {
+    if (!(inputStream instanceof ExtendedInputStream)) {
+      return null; // not an ExtendedInputStream
+    }
+    final int remainingBeforeRead = buffer.remaining();
+    try {
+      if (!((ExtendedInputStream) inputStream).readFully(position, buffer)) {
+        return null; // ExtendedInputStream does not support readFully
+      }
+    } catch (EOFException e) {
+      if (isReadFully) {
+        throw e;
+      }
+      // read() semantics: EOF -> -1 (fall through to bytesRead == 0 check below)
+    }
+    final int bytesRead = remainingBeforeRead - buffer.remaining();
+    if (bytesRead == 0) {
+      return -1;
+    }
+    if (statistics != null) {
+      statistics.incrementBytesRead(bytesRead);
+    }
+    return bytesRead;
+  }
+
+  /**
+   * Fallback positioned read via synchronized seek-read-restore.
+   * Uses {@link #read(ByteBuffer)} -- which handles streams that do not implement
+   * {@link org.apache.hadoop.fs.ByteBufferReadable} (e.g. GDPR
+   * {@code javax.crypto.CipherInputStream}) -- so this works for any {@link Seekable}
+   * inner stream.
+   *
+   * @return the number of bytes read
+   */
+  private int bestEffortReadFullySynchronized(long position, ByteBuffer buffer) throws IOException {
+    synchronized (positionedReadLock) {
+      final long oldPos = getPos();
+      try {
+        ((Seekable) inputStream).seek(position);
+        final int n = bestEffortRead(buffer);
+        if (statistics != null) {
+          statistics.incrementBytesRead(n);
+        }
+        return n;
+      } finally {
+        ((Seekable) inputStream).seek(oldPos);
+      }
+    }
+  }
+
+  /**
+   * Best effort read to fill up the buffer using {@link #read(ByteBuffer)}.
+   *
+   * @return the number of bytes read
+   */
+  private int bestEffortRead(ByteBuffer buffer) throws IOException {
+    int readLength = 0;
+    try {
+      while (buffer.hasRemaining()) {
+        final int n = read(buffer);
+        if (n < 0) {
+          return readLength;
+        }
+        readLength += n;
+      }
+      return readLength;
+    } catch (EOFException e) {
+      return readLength;
     }
   }
 }
