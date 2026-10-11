@@ -241,6 +241,7 @@ jobs:
         env:
           COMMAND: hadoop-ozone/dev-support/checks/${{ inputs.script }}.sh ${{ inputs.script-args }} ${{ inputs.ratis-args }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          OZONE_REPO_CACHED: ${{ inputs.needs-ozone-repo == true && 'true' || 'false' }}
           OZONE_WITH_COVERAGE: ${{ inputs.with-coverage }}
 
       - name: Execute post-failure steps
