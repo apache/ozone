@@ -128,10 +128,6 @@ public class GrpcOMFailoverProxyProvider<T> extends
     return super.shouldFailover(ex);
   }
 
-  public synchronized boolean shouldFailoverForFollowerRead(Exception ex) {
-    return shouldFailover(ex);
-  }
-
   @Override
   public synchronized void close() throws IOException { }
 
