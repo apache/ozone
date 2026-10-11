@@ -25,6 +25,7 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.time.Duration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -37,7 +38,7 @@ class TestLocalOzoneRecon {
   private Path tempDir;
 
   @Test
-  void reconServesRequestsWhenEnabled() throws Exception {
+  void reconServesRequestsAndStopsSyncThreadOnClose() throws Exception {
     LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
             tempDir.resolve("local-ozone-recon"))
         .setS3gEnabled(false)
@@ -50,7 +51,15 @@ class TestLocalOzoneRecon {
 
       assertTrue(cluster.getReconPort() > 0);
       assertHttpEndpointResponds(cluster.getReconEndpoint() + "/api/v1/clusterState");
+      assertTrue(syncThreadRunning());
     }
+
+    GenericTestUtils.waitFor(() -> !syncThreadRunning(), 100, 10_000);
+  }
+
+  private static boolean syncThreadRunning() {
+    return Thread.getAllStackTraces().keySet().stream()
+        .anyMatch(thread -> thread.getName().contains("SyncSCMContainerInfo"));
   }
 
   private static void assertHttpEndpointResponds(String endpoint) throws Exception {
