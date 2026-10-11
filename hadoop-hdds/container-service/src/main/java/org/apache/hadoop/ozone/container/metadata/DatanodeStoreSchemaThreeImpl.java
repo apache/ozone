@@ -86,7 +86,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
       throws IOException {
     // Here we need to filter the keys with containerID as prefix
     // and followed by metadata prefixes such as #deleting#.
-    return new KeyValueBlockIterator(containerID,
+    return new KeyValueBlockIterator(this, containerID,
         getBlockDataTableWithIterator()
             .iterator(getContainerKeyPrefix(containerID)),
         KeyPrefixFilter.newFilter(getContainerKeyPrefix(containerID) + "#", true));
@@ -95,7 +95,7 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
   @Override
   public BlockIterator<BlockData> getBlockIterator(long containerID, KeyPrefixFilter filter)
       throws IOException {
-    return new KeyValueBlockIterator(containerID,
+    return new KeyValueBlockIterator(this, containerID,
         getBlockDataTableWithIterator()
             .iterator(getContainerKeyPrefix(containerID)), filter);
   }

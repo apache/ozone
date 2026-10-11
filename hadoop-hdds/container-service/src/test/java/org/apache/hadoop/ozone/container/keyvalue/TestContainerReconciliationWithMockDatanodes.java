@@ -39,6 +39,7 @@ import  static org.mockito.Mockito.spy;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -169,7 +170,7 @@ public class TestContainerReconciliationWithMockDatanodes {
       dnDetails.setHostName("dn" + (i + 1));
       MockDatanode dn = new MockDatanode(dnDetails, containerDir);
       // This will close the container and build a data checksum based on the chunk checksums in the metadata.
-      dn.addContainerWithBlocks(CONTAINER_ID, 15);
+      dn.addContainerWithBlocks(CONTAINER_ID, 15, false);
       datanodes.add(dn);
     }
     long dataChecksumFromMetadata = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
@@ -332,6 +333,48 @@ public class TestContainerReconciliationWithMockDatanodes {
     }
     // Even failure of Reconciliation should have triggered a second on-demand scan for each replica.
     waitForExpectedScanCount(2);
+  }
+
+  /**
+   * An hsync client that stops before the end of a block leaves the last chunk in the last chunk info table.
+   * The scanner and reconciliation must still cover that chunk.
+   */
+  @Test
+  public void testContainerReconciliationWithLastChunkInfo() throws Exception {
+    long containerID = CONTAINER_ID + 1;
+    for (MockDatanode dn : datanodes) {
+      dn.addContainerWithBlocks(containerID, 5, true);
+    }
+    // The checksum built from metadata when the container closes should match the one from a scan.
+    long checksumFromMetadata = assertUniqueChecksumCount(containerID, datanodes, 1);
+    datanodes.forEach(d -> d.scanContainer(containerID));
+    long healthyChecksum = assertUniqueChecksumCount(containerID, datanodes, 1);
+    assertEquals(checksumFromMetadata, healthyChecksum);
+    datanodes.forEach(MockDatanode::resetOnDemandScanCount);
+
+    // Corrupt the last chunk of a block on one datanode, and the first chunk of the same block on another.
+    datanodes.get(0).corruptChunk(containerID, 0, CHUNKS_PER_BLOCK - 1);
+    datanodes.get(1).corruptChunk(containerID, 0, 0);
+    datanodes.forEach(d -> d.scanContainer(containerID));
+    assertUniqueChecksumCount(containerID, datanodes, 3);
+    waitForExpectedScanCount(1);
+
+    for (MockDatanode current : datanodes) {
+      List<DatanodeDetails> peers = datanodes.stream()
+          .map(MockDatanode::getDnDetails)
+          .filter(other -> !current.getDnDetails().equals(other))
+          .collect(Collectors.toList());
+      current.reconcileContainerSuccess(dnClient, peers, containerID);
+    }
+    waitForExpectedScanCount(2);
+    assertEquals(healthyChecksum, assertUniqueChecksumCount(containerID, datanodes, 1));
+
+    // The repaired replicas wrote the full chunk list of the block, so its last chunk info row is gone.
+    assertFalse(datanodes.get(0).hasLastChunkInfo(containerID, 0));
+    assertFalse(datanodes.get(1).hasLastChunkInfo(containerID, 0));
+    for (MockDatanode dn : datanodes) {
+      assertEquals(CHUNKS_PER_BLOCK, dn.getBlock(new BlockID(containerID, 0)).getBlockData().getChunksCount());
+    }
   }
 
   /**
@@ -606,8 +649,10 @@ public class TestContainerReconciliationWithMockDatanodes {
     /**
      * Create a container with the specified number of blocks. Block data is human-readable so the block files can be
      * inspected when debugging the test.
+     * @param incrementalChunkList write each block like an hsync client that stops before the end of the block, so
+     *     the last chunk of the block stays in the last chunk info table.
      */
-    public void addContainerWithBlocks(long containerId, int blocks) throws Exception {
+    public void addContainerWithBlocks(long containerId, int blocks, boolean incrementalChunkList) throws Exception {
       ContainerProtos.CreateContainerRequestProto createRequest =
           ContainerProtos.CreateContainerRequestProto.newBuilder()
               .setContainerType(ContainerProtos.ContainerType.KeyValueContainer)
@@ -669,7 +714,10 @@ public class TestContainerReconciliationWithMockDatanodes {
         handler.getChunkManager().finishWriteChunks(container, blockData);
         blockData.setChunks(chunkList);
         blockData.setBlockCommitSequenceId(i);
-        handler.getBlockManager().putBlock(container, blockData);
+        if (incrementalChunkList) {
+          blockData.addMetadata(OzoneConsts.INCREMENTAL_CHUNK_LIST, "");
+        }
+        handler.getBlockManager().putBlock(container, blockData, !incrementalChunkList);
       }
       ContainerLayoutTestInfo.FILE_PER_BLOCK.validateFileCount(chunksPath, blocks, (long) blocks * CHUNKS_PER_BLOCK);
       container.markContainerForClose();
@@ -734,6 +782,31 @@ public class TestContainerReconciliationWithMockDatanodes {
         corruptFileAtOffset(blockFile, chunkInfo.getOffset(), chunkInfo.getLen());
         log.info("Corrupting block {} at offset {} in container {}", blockData.getBlockID().getLocalID(),
             chunkInfo.getOffset(), containerID);
+      }
+    }
+
+    /**
+     * Flip the bits of the last byte of one chunk in a block.
+     */
+    public void corruptChunk(long containerID, long localID, int chunkIndex) throws IOException {
+      KeyValueContainer container = getContainer(containerID);
+      ContainerProtos.ChunkInfo chunk = handler.getBlockManager()
+          .getBlock(container, new BlockID(containerID, localID)).getChunks().get(chunkIndex);
+      File blockFile = ContainerTestCorruptions.getBlock(container, localID);
+      try (RandomAccessFile file = new RandomAccessFile(blockFile, "rws")) {
+        long position = chunk.getOffset() + chunk.getLen() - 1;
+        file.seek(position);
+        int original = file.read();
+        file.seek(position);
+        file.write(~original);
+      }
+      log.info("Corrupting chunk {} of block {} in container {}", chunkIndex, localID, containerID);
+    }
+
+    public boolean hasLastChunkInfo(long containerID, long localID) throws IOException {
+      KeyValueContainerData containerData = getContainer(containerID).getContainerData();
+      try (DBHandle db = BlockUtils.getDB(containerData, conf)) {
+        return db.getStore().getLastChunkInfoTable().get(containerData.getBlockKey(localID)) != null;
       }
     }
 
