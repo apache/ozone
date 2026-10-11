@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -641,6 +642,23 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         handleError(submitRequest(omRequest)).getInfoBucketResponse();
 
     return OmBucketInfo.getFromProtobuf(resp.getBucketInfo());
+  }
+
+  @Override
+  public BucketInfoWithS3Context getS3BucketInfo(String bucketName) throws IOException {
+    OMRequest request = createOMRequest(Type.InfoBucket)
+        .setInfoBucketRequest(InfoBucketRequest.newBuilder()
+            // Required by the wire format; OM resolves the volume from S3 authentication.
+            .setVolumeName("")
+            .setBucketName(bucketName)
+            .setAssumeS3Context(true))
+        .build();
+    InfoBucketResponse response = handleError(submitRequest(request)).getInfoBucketResponse();
+    if (!response.hasBucketInfo() || !response.hasUserPrincipal()) {
+      throw new IOException("InfoBucket response is missing S3 context");
+    }
+    return new BucketInfoWithS3Context(OmBucketInfo.getFromProtobuf(response.getBucketInfo()),
+        response.getUserPrincipal());
   }
 
   /**

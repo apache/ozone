@@ -1078,10 +1078,12 @@ message CreateBucketResponse {
 message InfoBucketRequest {
     required string volumeName = 1;
     required string bucketName = 2;
+    optional bool assumeS3Context = 3;
 }
 
 message InfoBucketResponse {
     optional BucketInfo bucketInfo = 2;
+    optional string userPrincipal = 3;
 }
 
 message SetBucketPropertyRequest {

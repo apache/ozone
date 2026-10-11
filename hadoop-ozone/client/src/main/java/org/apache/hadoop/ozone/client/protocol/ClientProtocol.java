@@ -342,6 +342,11 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Returns the bucket in the volume resolved from S3 authentication.
+   */
+  OzoneBucket getS3BucketDetails(String bucketName) throws IOException;
+
+  /**
    * Returns the List of Buckets in the Volume that matches the bucketPrefix,
    * size of the returned list depends on maxListResult. The caller has to make
    * multiple calls to read all volumes.

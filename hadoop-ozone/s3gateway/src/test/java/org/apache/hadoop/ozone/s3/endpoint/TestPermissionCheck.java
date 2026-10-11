@@ -67,6 +67,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test operation permission check result.
@@ -309,12 +310,15 @@ public class TestPermissionCheck {
     assertErrorResponse(S3ErrorTable.ACCESS_DENIED, () -> delete(objectEndpoint, "bucketName", "keyPath"));
   }
 
-  @Test
-  public void testMultiUploadKey() throws IOException {
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
-    doThrow(exception).when(bucket).initiateMultipartUpload(anyString(), any(), anyMap(), anyMap());
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testMultiUploadKey(boolean lookupDenied) throws IOException {
+    if (lookupDenied) {
+      when(clientProtocol.getS3BucketDetails(anyString())).thenThrow(exception);
+    } else {
+      when(clientProtocol.getS3BucketDetails(anyString())).thenReturn(bucket);
+      doThrow(exception).when(bucket).initiateMultipartUpload(anyString(), any(), anyMap(), anyMap());
+    }
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)

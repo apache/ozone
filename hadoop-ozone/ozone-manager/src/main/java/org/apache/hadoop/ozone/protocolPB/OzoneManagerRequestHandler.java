@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -685,9 +686,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       throws IOException {
     InfoBucketResponse.Builder resp =
         InfoBucketResponse.newBuilder();
-    OmBucketInfo omBucketInfo = impl.getBucketInfo(
-        request.getVolumeName(), request.getBucketName());
-    resp.setBucketInfo(omBucketInfo.getProtobuf());
+    if (request.getAssumeS3Context()) {
+      BucketInfoWithS3Context result = impl.getS3BucketInfo(request.getBucketName());
+      resp.setBucketInfo(result.getBucketInfo().getProtobuf());
+      resp.setUserPrincipal(result.getUserPrincipal());
+    } else {
+      OmBucketInfo omBucketInfo = impl.getBucketInfo(request.getVolumeName(), request.getBucketName());
+      resp.setBucketInfo(omBucketInfo.getProtobuf());
+    }
 
     return resp.build();
   }

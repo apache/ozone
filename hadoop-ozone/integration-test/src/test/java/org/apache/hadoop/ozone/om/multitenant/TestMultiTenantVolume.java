@@ -26,22 +26,29 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OMUpgradeTestUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -145,6 +152,74 @@ public class TestMultiTenantVolume {
         .getClientProxy().getOzoneManagerClient();
     omClient.finalizeUpgrade();
     OMUpgradeTestUtils.waitForFinalization(omClient);
+  }
+
+  @Test
+  public void testS3BucketInfoPreservesTenantAndLinkMetadata() throws Exception {
+    String tenant = "mpu-tenant";
+    String principal = "mpu-user";
+    String accessId = tenant + "$" + principal;
+    String bucketName = "shared-mpu-bucket";
+    String linkName = "mpu-link";
+    RatisReplicationConfig one = RatisReplicationConfig.getInstance(ReplicationFactor.ONE);
+    RatisReplicationConfig three = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+    ObjectStore adminStore = client.getObjectStore();
+    adminStore.createTenant(tenant);
+    adminStore.tenantAssignUserAccessId(principal, tenant, accessId);
+    OzoneVolume defaultVolume = adminStore.getS3Volume();
+    defaultVolume.createBucket(bucketName, BucketArgs.newBuilder().setBucketLayout(BucketLayout.OBJECT_STORE)
+        .setOwner("default-owner").setDefaultReplicationConfig(new DefaultReplicationConfig(three)).build());
+    RpcClient tenantClient = new RpcClient(cluster.getOzoneManager().getConfiguration(), null);
+    try {
+      tenantClient.setThreadLocalS3Auth(new S3Auth("string", "signature", accessId, accessId));
+      ObjectStore tenantStore = new ObjectStore(cluster.getOzoneManager().getConfiguration(), tenantClient);
+      OzoneVolume tenantVolume = tenantStore.getS3Volume();
+      tenantVolume.createBucket(bucketName, BucketArgs.newBuilder().setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+          .setDefaultReplicationConfig(new DefaultReplicationConfig(one)).build());
+      // The combined lookup must resolve both the namespace and the principal independently.
+      tenantClient.setThreadLocalS3Auth(new S3Auth("string", "signature", accessId, accessId));
+      OzoneBucket tenantBucket = tenantClient.getS3BucketDetails(bucketName);
+      assertEquals(tenant, tenantBucket.getVolumeName());
+      assertEquals(principal, tenantClient.getThreadLocalS3Auth().getUserPrincipal());
+      assertEquals(BucketLayout.FILE_SYSTEM_OPTIMIZED, tenantBucket.getBucketLayout());
+      assertEquals(one, tenantBucket.getReplicationConfig());
+      OmMultipartInfo upload = tenantBucket.initiateMultipartUpload("tenant-key");
+      assertEquals(tenant, upload.getVolumeName());
+      assertEquals(one, tenantBucket.listParts("tenant-key", upload.getUploadID(), 0, 10).getReplicationConfig());
+      OMMetadataManager metadata = cluster.getOzoneManager().getMetadataManager();
+      String openKey = metadata.getMultipartKeyFSO(tenant, bucketName, "tenant-key", upload.getUploadID());
+      assertEquals(principal, metadata.getOpenKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).get(openKey).getOwnerName());
+      tenantBucket.abortMultipartUpload("tenant-key", upload.getUploadID());
+
+      // The ordinary lookup still honors its explicit volume, even with tenant S3 authentication.
+      assertEquals(BucketLayout.OBJECT_STORE,
+          tenantClient.getBucketDetails(defaultVolume.getName(), bucketName).getBucketLayout());
+      tenantVolume.createBucket(linkName, BucketArgs.newBuilder().setSourceVolume(defaultVolume.getName())
+          .setSourceBucket(bucketName).build());
+      OzoneBucket link = tenantClient.getS3BucketDetails(linkName);
+      assertEquals(tenant, link.getVolumeName());
+      assertEquals(linkName, link.getName());
+      assertEquals(principal, link.getOwner());
+      assertThat(link.getOwner()).isNotEqualTo(defaultVolume.getBucket(bucketName).getOwner());
+      assertEquals(defaultVolume.getName(), link.getSourceVolume());
+      assertEquals(bucketName, link.getSourceBucket());
+      assertEquals(BucketLayout.OBJECT_STORE, link.getBucketLayout());
+      assertEquals(three, link.getReplicationConfig());
+      OmMultipartInfo linked = link.initiateMultipartUpload("linked-key");
+      assertEquals(defaultVolume.getName(), linked.getVolumeName());
+      assertEquals(bucketName, linked.getBucketName());
+      assertEquals(three, link.listParts("linked-key", linked.getUploadID(), 0, 10).getReplicationConfig());
+      link.abortMultipartUpload("linked-key", linked.getUploadID());
+      tenantVolume.deleteBucket(linkName);
+      tenantVolume.deleteBucket(bucketName);
+      defaultVolume.deleteBucket(bucketName);
+      adminStore.tenantRevokeUserAccessId(accessId);
+      adminStore.deleteTenant(tenant);
+      adminStore.deleteVolume(tenant);
+    } finally {
+      tenantClient.clearThreadLocalS3Auth();
+      tenantClient.close();
+    }
   }
 
   @Test

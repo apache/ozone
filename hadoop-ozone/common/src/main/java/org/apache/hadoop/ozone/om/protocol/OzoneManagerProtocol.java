@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -208,6 +209,11 @@ public interface OzoneManagerProtocol
    */
   OmBucketInfo getBucketInfo(String volumeName, String bucketName)
       throws IOException;
+
+  /**
+   * Resolves S3 context and returns bucket information with the user principal.
+   */
+  BucketInfoWithS3Context getS3BucketInfo(String bucketName) throws IOException;
 
   /**
    * Sets bucket property from args.

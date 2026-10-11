@@ -120,6 +120,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneBucket getS3BucketDetails(String bucketName) throws IOException {
+    return objectStoreStub.getS3Volume().getBucket(bucketName);
+  }
+
+  @Override
   public S3VolumeContext getS3VolumeContext() throws IOException {
     return null;
   }

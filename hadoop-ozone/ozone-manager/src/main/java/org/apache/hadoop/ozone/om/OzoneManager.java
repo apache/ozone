@@ -268,6 +268,7 @@ import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -4376,6 +4377,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         metadataManager.getLock().releaseReadLock(VOLUME_LOCK, volumeName);
       }
     }
+  }
+
+  @Override
+  public BucketInfoWithS3Context getS3BucketInfo(String bucketName) throws IOException {
+    S3VolumeContext context = getS3VolumeContext();
+    String volumeName = context.getOmVolumeArgs().getVolume();
+    // Preserve the validation order of getS3VolumeContext followed by getBucketDetails.
+    OmUtils.validateVolumeName(volumeName, false);
+    OmUtils.validateBucketName(bucketName, false);
+    return new BucketInfoWithS3Context(getBucketInfo(volumeName, bucketName), context.getUserPrincipal());
   }
 
   @Override
