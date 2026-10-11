@@ -83,6 +83,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTPS_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_BIND_HOST_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ENABLED_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DB_DIR;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY;
@@ -463,6 +464,14 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   }
 
   private void configureLocalDefaults(OzoneConfiguration conf) throws IOException {
+    if (config.isS3gEnabled() || config.isReconEnabled()) {
+      // getS3Endpoint() and getReconEndpoint() advertise the HTTP listener, which a policy without HTTP leaves unbound.
+      HttpConfig.Policy httpPolicy =
+          HttpConfig.Policy.fromString(conf.get(OZONE_HTTP_POLICY_KEY, OZONE_HTTP_POLICY_DEFAULT));
+      if (httpPolicy != null && !httpPolicy.isHttpEnabled()) {
+        rejectUserConfigured(conf, OZONE_HTTP_POLICY_KEY, "HTTP_ONLY or HTTP_AND_HTTPS");
+      }
+    }
     conf.set(OZONE_METADATA_DIRS, metadataDir().toString());
     // SCM and OM share one configuration and JVM, so the Jetty base dir is a
     // single service-neutral location; Jetty keeps per-context temp dirs.
@@ -711,12 +720,6 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     if (!config.isS3gEnabled()) {
       return -1;
     }
-    // getS3Endpoint() advertises the HTTP listener, which a policy without HTTP leaves unbound.
-    HttpConfig.Policy httpPolicy =
-        HttpConfig.Policy.fromString(conf.get(OZONE_HTTP_POLICY_KEY, OZONE_HTTP_POLICY_DEFAULT));
-    if (httpPolicy != null && !httpPolicy.isHttpEnabled()) {
-      rejectUserConfigured(conf, OZONE_HTTP_POLICY_KEY, "HTTP_ONLY or HTTP_AND_HTTPS");
-    }
     // getS3gPort() reads the port back off this listener.
     setLocalOverride(conf, OZONE_S3G_HTTP_ENABLED_KEY, true);
     // S3StorageType maps an explicit STANDARD to RATIS/THREE regardless of the local STAND_ALONE/ONE replication.
@@ -743,6 +746,8 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     if (!config.isReconEnabled()) {
       return -1;
     }
+    // getReconEndpoint() advertises this listener and start() waits for it to answer.
+    setLocalOverride(conf, OZONE_RECON_HTTP_ENABLED_KEY, true);
     Path reconDir = config.getDataDir().resolve(RECON_DIR_NAME);
     conf.setIfUnset(OZONE_RECON_DB_DIR, reconDir.toString());
     conf.setIfUnset(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconDir.toString());

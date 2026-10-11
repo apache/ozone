@@ -40,6 +40,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_HOST_KE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ENABLED_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_KEY;
@@ -510,6 +511,40 @@ class TestLocalOzoneCluster {
     }
     assertFalse(loadPortState(dataDir).stringPropertyNames().stream()
         .anyMatch(key -> key.startsWith("recon.")));
+  }
+
+  @Test
+  void prepareConfigurationRejectsDisabledReconHttpListener() {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.setBoolean(OZONE_RECON_HTTP_ENABLED_KEY, false);
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(tempDir.resolve("local-ozone"))
+        .setReconEnabled(true)
+        .build();
+
+    IOException error = assertPrepareFails(config, seed);
+
+    assertMessageContains(error, OZONE_RECON_HTTP_ENABLED_KEY);
+  }
+
+  @ParameterizedTest
+  @EnumSource(HttpConfig.Policy.class)
+  void prepareConfigurationChecksHttpPolicyForRecon(HttpConfig.Policy policy) throws Exception {
+    OzoneConfiguration seed = new OzoneConfiguration();
+    seed.set(OZONE_HTTP_POLICY_KEY, policy.name(), "test-ozone-site.xml");
+    LocalOzoneClusterConfig reconOnly = LocalOzoneClusterConfig.builder(tempDir.resolve("local-ozone"))
+        .setS3gEnabled(false)
+        .setReconEnabled(true)
+        .build();
+
+    if (policy.isHttpEnabled()) {
+      try (LocalOzoneCluster cluster = new LocalOzoneCluster(reconOnly, seed)) {
+        cluster.prepareConfiguration();
+      }
+    } else {
+      IOException error = assertPrepareFails(reconOnly, seed);
+      assertMessageContains(error, OZONE_HTTP_POLICY_KEY);
+      assertMessageContains(error, "test-ozone-site.xml");
+    }
   }
 
   @Test
