@@ -27,9 +27,11 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -161,5 +163,81 @@ public class TestSCMNodeInfo {
         scmNodeInfos.get(0).getScmClientAddress());
     assertEquals("localhost:" + OZONE_SCM_DATANODE_PORT_DEFAULT,
         scmNodeInfos.get(0).getScmDatanodeAddress());
+  }
+
+  @Test
+  public void testSCMHANodeInfoRejectsWildcardSCMAddress() {
+    for (String nodeId : nodes) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+          scmServiceId, nodeId), "localhost");
+    }
+    String addressKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        scmServiceId, "scm1");
+    conf.set(addressKey, "0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> SCMNodeInfo.buildNodeInfo(conf));
+
+    assertThat(e.getMessage()).contains(addressKey).contains("0.0.0.0");
+  }
+
+  /**
+   * The SCM address property names a host and takes its ports from separate
+   * properties, so a bare IPv6 literal is unambiguous there.
+   */
+  @Test
+  public void testSCMHANodeInfoAcceptsBareIPv6SCMAddress() {
+    for (String nodeId : nodes) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+          scmServiceId, nodeId), "2001:db8::1");
+    }
+
+    List<SCMNodeInfo> scmNodeInfos = SCMNodeInfo.buildNodeInfo(conf);
+
+    assertEquals("[2001:db8::1]:" + OZONE_SCM_CLIENT_PORT_DEFAULT,
+        scmNodeInfos.get(0).getScmClientAddress());
+  }
+
+  @Test
+  public void testSCMHANodeInfoRejectsBracketedWildcardSCMAddress() {
+    for (String nodeId : nodes) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+          scmServiceId, nodeId), "localhost");
+    }
+    String addressKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        scmServiceId, "scm1");
+    conf.set(addressKey, "[::]");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> SCMNodeInfo.buildNodeInfo(conf));
+
+    assertThat(e.getMessage()).contains(addressKey).contains("[::]");
+  }
+
+  /**
+   * A non-HA SCM rewrites its address properties with the bound host, so a
+   * process that shares its configuration reads the wildcard back.
+   */
+  @Test
+  public void testNonHAAcceptsWildcardListenAddress() {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:9860");
+    config.set(OZONE_SCM_DATANODE_ADDRESS_KEY, "0.0.0.0:9861");
+
+    List<SCMNodeInfo> scmNodeInfos = SCMNodeInfo.buildNodeInfo(config);
+
+    assertEquals("0.0.0.0:9860", scmNodeInfos.get(0).getScmClientAddress());
+    assertEquals("0.0.0.0:9861", scmNodeInfos.get(0).getScmDatanodeAddress());
+  }
+
+  @Test
+  public void testNonHARejectsWildcardScmNames() {
+    OzoneConfiguration config = new OzoneConfiguration();
+    config.set(OZONE_SCM_NAMES, "0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> SCMNodeInfo.buildNodeInfo(config));
+
+    assertThat(e.getMessage()).contains(OZONE_SCM_NAMES).contains("0.0.0.0");
   }
 }

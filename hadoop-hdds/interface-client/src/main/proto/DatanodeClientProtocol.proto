@@ -203,6 +203,9 @@ message ContainerCommandRequestProto {
 
   optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
   optional   ReadBlockRequestProto readBlock = 28;
+  // Version that datanodes should use for this write operation.
+  // Set by SCM and forwarded by the client to the datanodes.
+  optional   uint32 writePipelineVersion = 29;
 
   // clientId and callId are used to distinguish different requests from different local clients for shortCircuitRead
   optional   bytes clientId = 100;
@@ -395,12 +398,15 @@ message ReadBlockRequestProto {
   required uint64 offset = 2;
   optional uint64 length = 3;
   optional uint32 responseDataSize = 4;
+  optional bool includeChecksums = 5 [default = true];
 }
 
 message ReadBlockResponseProto {
-  required ChecksumData checksumData = 1;
+  reserved 1;
+  reserved "checksumData";
   required uint64 offset = 2;
   required bytes data = 3;
+  repeated ChunkInfo chunkInfoList = 4;
 }
 
 message EchoRequestProto {
