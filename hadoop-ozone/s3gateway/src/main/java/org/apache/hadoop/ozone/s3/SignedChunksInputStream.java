@@ -17,13 +17,23 @@
 
 package org.apache.hadoop.ozone.s3;
 
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.xml.bind.DatatypeConverter;
+import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 
 /**
  * Input stream implementation to read body of a signed chunked upload. This should also work
@@ -39,6 +49,7 @@ import java.util.regex.Pattern;
  * 0;chunk-signature=b6c6ea8a5354eaf15b3cb7646744f4275b71ea724fed81ceb9323e279d449df9\r\n
  * x-amz-checksum-crc32c:sOO8/Q==\r\n
  * x-amz-trailer-signature:63bddb248ad2590c92712055f51b8e78ab024eead08276b24f010b0efd74843f\r\n
+ * \r\n
  * </pre>
  * </p>
  * For the first chunk 10000 will be read and decoded from base-16 representation to 65536, which is the size of
@@ -53,8 +64,9 @@ import java.util.regex.Pattern;
  * </p>
  *
  * <p>
- * Note that there are no actual chunk signature verification taking place. The InputStream only
- * returns the actual chunk payload from chunked signatures format.
+ * If a {@link ChunksValidator} is supplied, the signature of each chunk is verified (in real time, without
+ * buffering the whole chunk) as the payload is read. Without a validator the stream only strips the chunk
+ * signatures format and returns the payload. Trailer contents are consumed without validation.
  * </p>
  *
  * Reference:
@@ -71,10 +83,32 @@ import java.util.regex.Pattern;
  */
 public class SignedChunksInputStream extends InputStream {
 
-  private final Pattern signatureLinePattern =
-      Pattern.compile("([0-9A-Fa-f]+);chunk-signature=.*");
+  /**
+   * Chunk header line. The signature is HMAC-SHA256, i.e. exactly 64 hex characters: the S3 Gateway only
+   * accepts the AWS4-HMAC-SHA256 signing algorithm, so this is the only chunk signature format it can see.
+   */
+  private static final Pattern SIGNATURE_LINE_PATTERN =
+      Pattern.compile("([0-9A-Fa-f]+);chunk-signature=([0-9A-Fa-f]{64})");
+  private static final Pattern TRAILER_SIGNATURE_PATTERN =
+      Pattern.compile("x-amz-trailer-signature:([0-9A-Fa-f]{64})", Pattern.CASE_INSENSITIVE);
+  private static final int MAX_LINE_LENGTH = 8 * 1024;
 
   private final InputStream originalStream;
+
+  /** Identifies the object in the S3 error response for a malformed body. */
+  private final String keyPath;
+
+  /** Verifies each chunk signature, or {@code null} to skip verification. */
+  private ChunksValidator validator;
+
+  /** SHA-256 of the current chunk payload; {@code null} when not verifying. */
+  private MessageDigest chunkDigest;
+
+  /** Signature parsed from the current chunk header line. */
+  private String chunkSignature;
+
+  /** Checksum header declared by x-amz-trailer, or NONE for a regular signed stream. */
+  private final TrailerHeader trailerHeader;
 
   /**
    * Size of the chunk payload. If zero, the signature line should be parsed to
@@ -88,34 +122,95 @@ public class SignedChunksInputStream extends InputStream {
    */
   private boolean isFinalChunkEncountered = false;
 
-  public SignedChunksInputStream(InputStream inputStream) {
+  /** Supported checksum trailers, or no trailer for a regular signed stream. */
+  public enum TrailerHeader {
+    NONE(""),
+    CRC32("x-amz-checksum-crc32"),
+    CRC32C("x-amz-checksum-crc32c"),
+    CRC64NVME("x-amz-checksum-crc64nvme"),
+    SHA1("x-amz-checksum-sha1"),
+    SHA256("x-amz-checksum-sha256");
+
+    private final String headerName;
+
+    TrailerHeader(String headerName) {
+      this.headerName = headerName;
+    }
+
+    /** Parse the required single-checksum declaration of a signed trailer upload. */
+    public static TrailerHeader fromHeader(String header, String keyPath) {
+      if (StringUtils.isBlank(header)) {
+        OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, keyPath);
+        ex.setErrorMessage("The " + X_AMZ_TRAILER + " header is required for signed trailing headers");
+        throw ex;
+      }
+      String name = header.trim().toLowerCase(Locale.ROOT);
+      for (TrailerHeader trailer : values()) {
+        if (trailer != NONE && trailer.headerName.equals(name)) {
+          return trailer;
+        }
+      }
+      OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyPath);
+      ex.setErrorMessage("Invalid x-amz-trailer header");
+      throw ex;
+    }
+  }
+
+  public SignedChunksInputStream(InputStream inputStream, String keyPath) {
+    this(inputStream, keyPath, TrailerHeader.NONE);
+  }
+
+  /**
+   * Creates a signed chunk stream. Supports one checksum trailer; comma-separated trailer names are not supported.
+   *
+   * @param inputStream the encoded request body
+   * @param keyPath resource used in S3 errors
+   * @param trailerHeader the checksum trailer, or NONE when no trailer is expected
+   */
+  public SignedChunksInputStream(InputStream inputStream, String keyPath, TrailerHeader trailerHeader) {
     originalStream = inputStream;
+    this.keyPath = keyPath;
+    this.trailerHeader = Objects.requireNonNull(trailerHeader, "trailerHeader == null");
+  }
+
+  /**
+   * Enable chunk-signature verification. Used when the signing key (derived by
+   * OM, see HDDS-15140) only becomes available after the key is opened, i.e.
+   * after this stream is constructed. Must be called before the first read.
+   */
+  public void attachValidator(ChunksValidator chunksValidator) {
+    this.validator = Objects.requireNonNull(chunksValidator, "chunksValidator == null");
+    this.chunkDigest = newSha256();
+  }
+
+  /**
+   * @return the signed chunk stream the request body is built on, or {@code null} if the body is not
+   *         a signed multi-chunk upload.
+   */
+  public static SignedChunksInputStream unwrap(InputStream body) {
+    if (body instanceof MultiDigestInputStream) {
+      InputStream wrapped = ((MultiDigestInputStream) body).getWrappedStream();
+      if (wrapped instanceof SignedChunksInputStream) {
+        return (SignedChunksInputStream) wrapped;
+      }
+    }
+    return null;
   }
 
   @Override
   public int read() throws IOException {
-    if (isFinalChunkEncountered) {
+    if (isFinalChunkEncountered || !ensureChunkPayload()) {
       return -1;
     }
-    if (remainingData > 0) {
-      int curr = originalStream.read();
-      remainingData--;
-      if (remainingData == 0) {
-        //read the "\r\n" at the end of the data section
-        originalStream.read();
-        originalStream.read();
-      }
-      return curr;
-    } else {
-      remainingData = readContentLengthFromHeader();
-      if (remainingData <= 0) {
-        // there is always a final zero byte chunk so we can stop reading
-        // if we encounter this chunk
-        isFinalChunkEncountered = true;
-        return -1;
-      }
-      return read();
+    int curr = originalStream.read();
+    if (curr == -1) {
+      stopAtUnexpectedEof();
+      return -1;
     }
+    remainingData--;
+    updateDigest((byte) curr);
+    endChunkIfComplete();
+    return curr;
   }
 
   @Override
@@ -126,59 +221,115 @@ public class SignedChunksInputStream extends InputStream {
           + len + " don't match the array length of " + b.length);
     } else if (len == 0) {
       return 0;
-    } else if (isFinalChunkEncountered) {
-      return -1;
     }
     int currentOff = off;
     int currentLen = len;
     int totalReadBytes = 0;
-    int realReadLen = 0;
-    int maxReadLen = 0;
-    do {
-      if (remainingData > 0) {
-        // The chunk payload size has been decoded, now read the actual chunk payload
-        maxReadLen = Math.min(remainingData, currentLen);
-        realReadLen = originalStream.read(b, currentOff, maxReadLen);
-        if (realReadLen == -1) {
-          break;
-        }
-        currentOff += realReadLen;
-        currentLen -= realReadLen;
-        totalReadBytes += realReadLen;
-        remainingData -= realReadLen;
-        if (remainingData == 0) {
-          //read the "\r\n" at the end of the data section
-          originalStream.read();
-          originalStream.read();
-        }
-      } else {
-        remainingData = readContentLengthFromHeader();
-        if (remainingData == 0) {
-          // there is always a final zero byte chunk so we can stop reading
-          // if we encounter this chunk
-          isFinalChunkEncountered = true;
-        }
-        if (isFinalChunkEncountered || remainingData == -1) {
-          break;
-        }
+    while (currentLen > 0 && !isFinalChunkEncountered && ensureChunkPayload()) {
+      // The chunk payload size has been decoded, now read the actual chunk payload
+      int realReadLen = originalStream.read(b, currentOff, Math.min(remainingData, currentLen));
+      if (realReadLen == -1) {
+        stopAtUnexpectedEof();
+        break;
       }
-    } while (currentLen > 0);
+      updateDigest(b, currentOff, realReadLen);
+      currentOff += realReadLen;
+      currentLen -= realReadLen;
+      totalReadBytes += realReadLen;
+      remainingData -= realReadLen;
+      endChunkIfComplete();
+    }
     return totalReadBytes > 0 ? totalReadBytes : -1;
   }
 
-  private int readContentLengthFromHeader() throws IOException {
-    int prev = -1;
-    int curr = 0;
-    StringBuilder buf = new StringBuilder();
-
-    //read everything until the next \r\n
-    while (!eol(prev, curr) && curr != -1) {
-      int next = originalStream.read();
-      if (next != -1) {
-        buf.append((char) next);
+  /**
+   * Make sure a chunk payload is available to read, reading the next chunk header if the previous chunk was
+   * fully consumed. Returns false at the end of the chunked stream: either the terminating zero-byte chunk
+   * (verified here, since it has an empty payload) or a body that ends without one.
+   */
+  private boolean ensureChunkPayload() throws IOException {
+    if (remainingData > 0) {
+      return true;
+    }
+    remainingData = readContentLengthFromHeader();
+    if (remainingData > 0) {
+      return true;
+    }
+    if (remainingData == 0) {
+      // The final zero-byte chunk has no payload terminator when trailing headers follow it.
+      if (trailerHeader == TrailerHeader.NONE) {
+        readChunkTerminator();
       }
-      prev = curr;
-      curr = next;
+      validateChunk();
+      if (trailerHeader != TrailerHeader.NONE) {
+        validateTrailer();
+      }
+      isFinalChunkEncountered = true;
+    } else {
+      stopAtUnexpectedEof();
+    }
+    return false;
+  }
+
+  /** Read the "\r\n" after the payload and verify the chunk, once its payload is fully consumed. */
+  private void endChunkIfComplete() throws IOException {
+    if (remainingData == 0) {
+      readChunkTerminator();
+      validateChunk();
+    }
+  }
+
+  /**
+   * A malformed chunked body is the client's error, so it must not surface as an InternalError.
+   * The message is specific; the S3 error code is the generic InvalidRequest (HTTP 400).
+   */
+  private OS3Exception invalidBody(String message) {
+    OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyPath);
+    ex.setErrorMessage(message);
+    return ex;
+  }
+
+  private void stopAtUnexpectedEof() throws IOException {
+    checkNotTruncated();
+    isFinalChunkEncountered = true;
+  }
+
+  /**
+   * Complete verification after the caller has consumed the decoded content length. This verifies the terminating
+   * zero-byte chunk and rejects a decoded length that ends in the middle of a chunk. No-op without a validator.
+   */
+  public void verifyComplete() throws IOException {
+    if (validator == null || isFinalChunkEncountered) {
+      return;
+    }
+    if (read() != -1) {
+      throw invalidBody("Decoded content length ended before the chunked stream");
+    }
+  }
+
+  /**
+   * A verified stream must end with the terminating 0-byte chunk. Reaching EOF before it means the
+   * body was truncated, so the payload read so far was never fully authenticated. Without a validator
+   * the stream keeps its lenient behavior.
+   */
+  private void checkNotTruncated() throws IOException {
+    if (validator != null) {
+      throw invalidBody("Chunked stream ended before the terminating 0-byte chunk");
+    }
+  }
+
+  private void readChunkTerminator() throws IOException {
+    int carriageReturn = originalStream.read();
+    int lineFeed = originalStream.read();
+    if (validator != null && (carriageReturn != '\r' || lineFeed != '\n')) {
+      throw invalidBody("Invalid chunk data terminator");
+    }
+  }
+
+  private int readContentLengthFromHeader() throws IOException {
+    String signatureLine = readLine(false);
+    if (signatureLine == null) {
+      return -1;
     }
     // Example of a single chunk data:
     //  10000;chunk-signature=b474d8862b1487a5145d686f57f013e54db672cee1c953b3010fb58501ef5aa2\r\n
@@ -186,17 +337,119 @@ public class SignedChunksInputStream extends InputStream {
     //
     // 10000 will be read and decoded from base-16 representation to 65536, which is the size of
     // the subsequent chunk payload.
-    String signatureLine = buf.toString().trim();
+    signatureLine = signatureLine.trim();
     if (signatureLine.isEmpty()) {
       return -1;
     }
 
-    //parse the data length.
-    Matcher matcher = signatureLinePattern.matcher(signatureLine);
-    if (matcher.matches()) {
-      return Integer.parseInt(matcher.group(1), 16);
-    } else {
-      throw new IOException("Invalid signature line: " + signatureLine);
+    //parse the data length and the chunk signature.
+    Matcher matcher = SIGNATURE_LINE_PATTERN.matcher(signatureLine);
+    if (!matcher.matches()) {
+      throw invalidBody("Invalid signature line: " + signatureLine);
+    }
+    chunkSignature = matcher.group(2);
+    return Integer.parseInt(matcher.group(1), 16);
+  }
+
+  private void validateTrailer() throws IOException {
+    if (validator == null) {
+      // Consume trailers through their blank-line terminator, tolerating EOF as for unverified chunks.
+      String line;
+      do {
+        line = readLine(true);
+      } while (StringUtils.isNotEmpty(line));
+      return;
+    }
+    String trailerLine = readLine(true);
+    if (trailerLine == null || trailerLine.isEmpty()) {
+      throw invalidBody("Missing trailing checksum header");
+    }
+    int separator = trailerLine.indexOf(':');
+    if (separator <= 0) {
+      throw invalidBody("Invalid trailing header: " + trailerLine);
+    }
+    String name = trailerLine.substring(0, separator).trim().toLowerCase(Locale.ROOT);
+    String value = trailerLine.substring(separator + 1).trim();
+    if (!trailerHeader.headerName.equals(name)) {
+      throw invalidBody("Unexpected trailing header: " + name);
+    }
+
+    String signatureLine = readLine(true);
+    if (signatureLine == null) {
+      throw invalidBody("Missing trailing signature");
+    }
+    Matcher matcher = TRAILER_SIGNATURE_PATTERN.matcher(signatureLine.trim());
+    if (!matcher.matches()) {
+      throw invalidBody("Invalid trailing signature");
+    }
+    validator.validateTrailer(matcher.group(1), DigestUtils.sha256Hex(name + ":" + value + "\n"));
+    // AWS SDKs terminate the trailer section with a blank line after the signature.
+    if (!"".equals(readLine(true))) {
+      throw invalidBody("Invalid trailer terminator");
+    }
+    if (originalStream.read() != -1) {
+      throw invalidBody("Unexpected data after trailing signature");
+    }
+  }
+
+  private String readLine(boolean trailingHeader) throws IOException {
+    StringBuilder line = new StringBuilder();
+    int previous = -1;
+    while (true) {
+      int current = originalStream.read();
+      if (current == -1) {
+        if (trailingHeader && validator != null && line.length() > 0) {
+          throw invalidBody("Truncated trailing header");
+        }
+        if (!trailingHeader) {
+          checkNotTruncated();
+        }
+        return line.length() == 0 ? null : line.toString();
+      }
+      line.append((char) current);
+      if (line.length() > MAX_LINE_LENGTH) {
+        throw invalidBody("Chunk or trailing header line is too long");
+      }
+      if (eol(previous, current)) {
+        line.setLength(line.length() - 2);
+        return line.toString();
+      }
+      previous = current;
+    }
+  }
+
+  private void updateDigest(byte b) {
+    if (chunkDigest != null) {
+      chunkDigest.update(b);
+    }
+  }
+
+  private void updateDigest(byte[] b, int off, int len) {
+    if (chunkDigest != null) {
+      chunkDigest.update(b, off, len);
+    }
+  }
+
+  /**
+   * Verify the signature of the chunk just read. {@link MessageDigest#digest()}
+   * also resets the digest for the next chunk. No-op without a validator.
+   */
+  private void validateChunk() {
+    if (validator != null) {
+      validator.validateChunk(chunkSignature,
+          DatatypeConverter.printHexBinary(chunkDigest.digest()).toLowerCase(Locale.ROOT));
+    }
+  }
+
+  /**
+   * A dedicated instance rather than {@code EndpointBase.getSha256DigestInstance()}: that is a shared
+   * ThreadLocal, and {@link MultiDigestInputStream} may already be using it for the request's own SHA-256.
+   */
+  private static MessageDigest newSha256() {
+    try {
+      return MessageDigest.getInstance("SHA-256");
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 not available", e);
     }
   }
 }

@@ -47,12 +47,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconcileContainerCommandProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -70,7 +73,9 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,11 +88,11 @@ import org.mockito.ArgumentCaptor;
  * container state, and dispatches commands to datanodes accordingly.
  */
 public class TestReconcileContainerEventHandler {
-  private NodeManager nodeManager;
   private ContainerManager containerManager;
   private EventPublisher eventPublisher;
   private ReconcileContainerEventHandler eventHandler;
   private SCMContext scmContext;
+  private NodeManager nodeManager;
 
   private static final ContainerID CONTAINER_ID = ContainerID.valueOf(123L);
   private static final long LEADER_TERM = 3L;
@@ -109,6 +114,12 @@ public class TestReconcileContainerEventHandler {
     nodeManager = mock(NodeManager.class);
     // Unless a test overrides it, every datanode is healthy and in service so all replicas participate.
     when(nodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
+    // By default every datanode is known and reports the current version, so
+    // the reconcile path can resolve an apparent version. Individual tests
+    // override this for specific nodes.
+    DatanodeInfo defaultNodeInfo = mock(DatanodeInfo.class);
+    when(defaultNodeInfo.getLastKnownApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(nodeManager.getNode(any(DatanodeID.class))).thenReturn(defaultNodeInfo);
     eventHandler = new ReconcileContainerEventHandler(containerManager, scmContext, nodeManager);
   }
 
@@ -290,14 +301,16 @@ public class TestReconcileContainerEventHandler {
     for (int i = 0; i < nodes.size(); i++) {
       when(nodeManager.getNodeStatus(nodes.get(i))).thenReturn(statuses[i]);
     }
+    DatanodeInfo excludedOlderInfo = mock(DatanodeInfo.class);
+    when(excludedOlderInfo.getLastKnownApparentVersion()).thenReturn(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION);
+    when(nodeManager.getNode(nodes.get(2).getID())).thenReturn(excludedOlderInfo);
 
-    // Healthy (including read-only) in-service nodes are targets.
+    // Only healthy in-service nodes are targets; the deprecated read-only state is excluded.
     Set<DatanodeID> expectedTargets = new HashSet<>(Arrays.asList(
-        nodes.get(0).getID(), nodes.get(1).getID(), nodes.get(8).getID()));
+        nodes.get(0).getID(), nodes.get(1).getID()));
     // Healthy nodes that have not decommissioned or entered maintenance are peers.
     Set<DatanodeID> expectedPeers = new HashSet<>(Arrays.asList(
-        nodes.get(0).getID(), nodes.get(1).getID(), nodes.get(4).getID(), nodes.get(5).getID(),
-        nodes.get(8).getID()));
+        nodes.get(0).getID(), nodes.get(1).getID(), nodes.get(4).getID(), nodes.get(5).getID()));
 
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     verify(eventPublisher, times(expectedTargets.size())).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
@@ -315,8 +328,13 @@ public class TestReconcileContainerEventHandler {
           .map(dn -> DatanodeID.fromProto(dn.getId()))
           .collect(Collectors.toSet());
       assertThat(actualPeerIDs).isEqualTo(expectedPeerIDs);
+      assertThat(((ReconcileContainerCommand) dnCommand.getCommand()).getApparentVersion())
+          .isEqualTo(HDDSVersion.SOFTWARE_VERSION);
     }
     assertThat(actualTargets).isEqualTo(expectedTargets);
+    for (int i : new int[] {2, 3, 6, 7, 8}) {
+      verify(nodeManager, never()).getNode(nodes.get(i).getID());
+    }
   }
 
   @Test
@@ -334,6 +352,8 @@ public class TestReconcileContainerEventHandler {
     CommandForDatanode<ReconcileContainerCommandProto> command = commandCaptor.getValue();
     assertThat(command.getDatanodeId()).isEqualTo(nodes.get(0).getID());
     assertThat(command.getCommand().getProto().getPeersList()).isEmpty();
+    assertThat(((ReconcileContainerCommand) command.getCommand()).getApparentVersion())
+        .isEqualTo(HDDSVersion.SOFTWARE_VERSION);
   }
 
   @Test
@@ -348,6 +368,7 @@ public class TestReconcileContainerEventHandler {
 
     eventHandler.onMessage(CONTAINER_ID, eventPublisher);
     verify(eventPublisher, never()).fireEvent(eq(DATANODE_COMMAND), any());
+    verify(nodeManager, never()).getNode(any(DatanodeID.class));
   }
 
   @Test
@@ -375,8 +396,57 @@ public class TestReconcileContainerEventHandler {
       assertThat(peerIDs).doesNotContain(nodes.get(2).getID());
       assertThat(peerIDs)
           .isEqualTo(eligible.stream().filter(id -> !id.equals(targetID)).collect(Collectors.toSet()));
+      assertThat(((ReconcileContainerCommand) dnCommand.getCommand()).getApparentVersion())
+          .isEqualTo(HDDSVersion.SOFTWARE_VERSION);
     }
     assertThat(actualTargets).isEqualTo(eligible);
+    verify(nodeManager, never()).getNode(nodes.get(2).getID());
+  }
+
+  @Test
+  public void testReconcileCommandCarriesLowestApparentVersion() throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    Set<ContainerReplica> replicas = addReplicasToContainer(3);
+
+    // Every node defaults to SOFTWARE_VERSION; stub one replica lower so all
+    // dispatched commands must fall back to the lower version.
+    ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
+    DatanodeDetails olderNode = replicas.iterator().next().getDatanodeDetails();
+    DatanodeInfo olderInfo = mock(DatanodeInfo.class);
+    when(olderInfo.getLastKnownApparentVersion()).thenReturn(lower);
+    when(nodeManager.getNode(olderNode.getID())).thenReturn(olderInfo);
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+
+    verify(eventPublisher, times(replicas.size())).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    int numCmds = 0;
+    for (CommandForDatanode<ReconcileContainerCommandProto> dnCommand : commandCaptor.getAllValues()) {
+      ReconcileContainerCommand command = (ReconcileContainerCommand) dnCommand.getCommand();
+      assertEquals(lower, command.getApparentVersion());
+      numCmds++;
+    }
+    assertEquals(3, numCmds);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = NodeOperationalState.class, names = {"DECOMMISSIONING", "ENTERING_MAINTENANCE"})
+  public void testReconcileCommandVersionIncludesTransitioningPeers(NodeOperationalState operationalState)
+      throws Exception {
+    addContainer(RATIS_THREE_REP, LifeCycleState.CLOSED);
+    DatanodeDetails olderPeer = addReplicasToContainer(3).iterator().next().getDatanodeDetails();
+    when(nodeManager.getNodeStatus(olderPeer)).thenReturn(NodeStatus.valueOf(operationalState, HEALTHY));
+    ComponentVersion lower = HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION;
+    DatanodeInfo olderInfo = mock(DatanodeInfo.class);
+    when(olderInfo.getLastKnownApparentVersion()).thenReturn(lower);
+    when(nodeManager.getNode(olderPeer.getID())).thenReturn(olderInfo);
+
+    eventHandler.onMessage(CONTAINER_ID, eventPublisher);
+
+    verify(eventPublisher, times(2)).fireEvent(eq(DATANODE_COMMAND), commandCaptor.capture());
+    for (CommandForDatanode<ReconcileContainerCommandProto> command : commandCaptor.getAllValues()) {
+      assertThat(command.getDatanodeId()).isNotEqualTo(olderPeer.getID());
+      assertThat(((ReconcileContainerCommand) command.getCommand()).getApparentVersion()).isEqualTo(lower);
+    }
   }
 
   @ParameterizedTest
@@ -429,8 +499,8 @@ public class TestReconcileContainerEventHandler {
     // Add one container replica for each replica state specified.
     // If no states are specified, replica list will be empty.
     Set<ContainerReplica> replicas = new HashSet<>();
-    try (MockNodeManager mockNodeManager = new MockNodeManager(true, replicaStates.length)) {
-      List<DatanodeInfo> nodes = mockNodeManager.getAllNodes();
+    try (MockNodeManager nodeManager = new MockNodeManager(true, replicaStates.length)) {
+      List<DatanodeInfo> nodes = nodeManager.getAllNodes();
       for (int i = 0; i < replicaStates.length; i++) {
         replicas.addAll(HddsTestUtils.getReplicas(CONTAINER_ID, replicaStates[i], nodes.get(i)));
       }

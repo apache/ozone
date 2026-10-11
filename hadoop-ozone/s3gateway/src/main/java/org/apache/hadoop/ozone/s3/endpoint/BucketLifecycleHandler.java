@@ -93,7 +93,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
   protected void deleteLifecycleConfiguration(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
     try {
-      context.getVolume().getBucket(bucketName).deleteLifecycleConfiguration();
+      context.getBucket(bucketName).deleteLifecycleConfiguration();
     } catch (OMException ex) {
       // DeleteBucketLifecycle is idempotent: deleting a missing config
       // must still return 204, not 404 — same as normal key deletion.
@@ -114,7 +114,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     }
 
     try {
-      String actualOwner = context.getVolume().getBucket(bucketName).getOwner();
+      String actualOwner = context.getBucket(bucketName).getOwner();
       if (actualOwner != null && !actualOwner.equals(expectedBucketOwner)) {
         LOG.debug("Bucket: {}, ExpectedBucketOwner: {}, ActualBucketOwner: {}",
             bucketName, expectedBucketOwner, actualOwner);
@@ -130,7 +130,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
       throws IOException, OS3Exception {
     verifyBucketOwner(context, bucketName);
     S3LifecycleConfiguration s3LifecycleConfiguration;
-    OzoneBucket ozoneBucket = context.getVolume().getBucket(bucketName);
+    OzoneBucket ozoneBucket = context.getBucket(bucketName);
     OmLifecycleConfiguration lcc;
     try {
       s3LifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(body);
@@ -142,7 +142,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
       // translation maps to InvalidRequest. AWS S3 uses InvalidArgument for a rejected lifecycle
       // configuration, so only this validation step is remapped.
       if (ex.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, bucketName, ex);
+        throw S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, bucketName, ex).withMessage(ex.getMessage());
       }
       throw S3ErrorTable.newError(bucketName, ex);
     }
@@ -152,6 +152,9 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     } catch (OMException ex) {
       // OM raises INVALID_REQUEST for server-side conditions as well, such as a bucket layout
       // mismatch, so its result codes keep the shared translation instead of being remapped.
+      if (ex.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
+        throw S3ErrorTable.newError(bucketName, ex).withMessage(ex.getMessage());
+      }
       throw S3ErrorTable.newError(bucketName, ex);
     }
     return Response.ok().build();
@@ -169,8 +172,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
   protected OzoneLifecycleConfiguration getLifecycleConfiguration(
       S3RequestContext context, String bucketName) throws IOException, OS3Exception {
     try {
-      OzoneBucket ozoneBucket = context.getVolume().getBucket(bucketName);
-      return ozoneBucket.getLifecycleConfiguration();
+      return getClientProtocol().getLifecycleConfiguration(context.getVolume().getName(), bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND) {
         throw S3ErrorTable.newError(

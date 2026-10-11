@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.QuotaRepairRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -91,5 +92,59 @@ public class TestOMQuotaRepairRequest extends OMVolumeRequestTests {
 
     OmBucketInfo durableBucket = omMetadataManager.getBucketTable().getSkipCache(bucketKey);
     assertThat(durableBucket.getUsedBytes()).isEqualTo(0);
+  }
+
+  @Test
+  public void testStaleDeltaSkippedWhenBucketRecreatedUnderSameName() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, BucketLayout.OBJECT_STORE);
+
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo originalBucket = omMetadataManager.getBucketTable().get(bucketKey);
+    long staleObjectID = originalBucket.getObjectID();
+
+    // Simulate the bucket being deleted and recreated under the same name after the
+    // repair scan captured staleObjectID, but before the repair transaction commits.
+    OmBucketInfo recreatedBucket = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketLayout(originalBucket.getBucketLayout())
+        .setCreationTime(Time.now())
+        .setObjectID(staleObjectID + 1)
+        .setUsedBytes(0)
+        .setUsedNamespace(0)
+        .build();
+    omMetadataManager.getBucketTable().put(bucketKey, recreatedBucket);
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(bucketKey), CacheValue.get(1L, recreatedBucket));
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setClientId("test-client")
+        .setCmdType(Type.QuotaRepair)
+        .setQuotaRepairRequest(QuotaRepairRequest.newBuilder()
+            .addBucketCount(BucketQuotaCount.newBuilder()
+                .setVolName(volumeName)
+                .setBucketName(bucketName)
+                .setBucketObjectID(staleObjectID)
+                .setDiffUsedBytes(-1000)
+                .setDiffUsedNamespace(-1)
+                .setSupportOldQuota(false)
+                .build())
+            .setSupportVolumeOldQuota(false)
+            .build())
+        .build();
+
+    OMQuotaRepairRequest omQuotaRepairRequest = new OMQuotaRepairRequest(omRequest);
+    OMClientResponse omClientResponse =
+        omQuotaRepairRequest.validateAndUpdateCache(ozoneManager, 2L);
+    assertThat(omClientResponse.getOMResponse().getStatus()).isEqualTo(Status.OK);
+
+    OmBucketInfo cachedBucket =
+        OMKeyRequest.getBucketInfo(omMetadataManager, volumeName, bucketName);
+    assertThat(cachedBucket.getObjectID()).isEqualTo(staleObjectID + 1);
+    assertThat(cachedBucket.getUsedBytes()).isEqualTo(0);
+    assertThat(cachedBucket.getUsedNamespace()).isEqualTo(0);
   }
 }

@@ -83,6 +83,10 @@ public enum OMAction implements AuditAction {
   SET_S3_SECRET,
   REVOKE_S3_SECRET,
 
+  // STS Actions
+  S3_ASSUME_ROLE,
+  REVOKE_STS_TOKEN,
+
   CREATE_TENANT,
   DELETE_TENANT,
   LIST_TENANT,
@@ -105,8 +109,6 @@ public enum OMAction implements AuditAction {
 
   ABORT_EXPIRED_MULTIPART_UPLOAD,
 
-  UPGRADE_PREPARE,
-  UPGRADE_CANCEL,
   UPGRADE_FINALIZE,
 
   LIST_OPEN_FILES,

@@ -44,4 +44,9 @@ class BucketGetLocationHandler extends BucketOperationHandler {
     context.setAction(S3GAction.GET_BUCKET_LOCATION);
     throw newError(NOT_IMPLEMENTED, "GetBucketLocation");
   }
+
+  @Override
+  S3GAction getAction() {
+    return queryParams().get(QueryParams.LOCATION) == null ? null : S3GAction.NOT_IMPLEMENTED;
+  }
 }
