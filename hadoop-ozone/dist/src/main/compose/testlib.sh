@@ -120,7 +120,8 @@ find_tests(){
 ## start while all backends are still in DOWN state and HAProxy returns 503.
 ## Only waits when the multi-instance HAProxy setup (s3g1/s3g2/s3g3) is present.
 wait_for_s3g_ready() {
-  if ! docker-compose config --services 2>/dev/null | grep -q "^s3g1$"; then
+  # Not grep -q: exiting early may kill docker-compose with SIGPIPE, failing the pipeline under pipefail
+  if ! docker-compose config --services 2>/dev/null | grep "^s3g1$" > /dev/null; then
     return 0
   fi
   echo "Waiting for S3 Gateway (s3g1) to report ready..."
