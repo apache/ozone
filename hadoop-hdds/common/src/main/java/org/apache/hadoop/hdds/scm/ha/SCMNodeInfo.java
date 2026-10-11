@@ -96,6 +96,7 @@ public class SCMNodeInfo {
         if (scmAddress == null) {
           throw new ConfigurationException(addressKey + "is not defined");
         }
+        HddsUtils.validateAdvertisedHost(addressKey, scmAddress);
 
         // Get port from Address Key if defined, else fall back to port key.
         int scmClientPort = getPort(conf, scmServiceId, scmNodeId,
@@ -125,6 +126,11 @@ public class SCMNodeInfo {
       return scmNodeInfoList;
     } else {
       scmServiceId = SCM_DUMMY_SERVICE_ID;
+
+      // The *.address properties double as the non-HA SCM's listen addresses,
+      // which it rewrites with its bound host (a wildcard by default) once its
+      // RPC servers start, so only ozone.scm.names is checked for the host.
+      HddsUtils.validateAdvertisedAddressConfig(conf, OZONE_SCM_NAMES);
 
       // Following current approach of fall back to
       // OZONE_SCM_CLIENT_ADDRESS_KEY to figure out hostname.

@@ -54,7 +54,8 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -118,9 +119,8 @@ public class S3MultipartRequestTests {
     // uploads therefore use the legacy (schema 0) inline parts layout. Tests
     // that need the finalized behaviour (split parts table, schema 1) opt in
     // by calling finalizeMpuPartsTableSplit().
-    OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
-    when(lvm.getMetadataLayoutVersion()).thenReturn(0);
-    when(ozoneManager.getVersionManager()).thenReturn(lvm);
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockPreFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
   }

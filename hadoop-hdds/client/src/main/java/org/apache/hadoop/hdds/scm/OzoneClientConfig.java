@@ -213,7 +213,7 @@ public class OzoneClientConfig {
       description = "Ozone client to verify checksum of the checksum "
           + "blocksize data.",
       tags = ConfigTag.CLIENT)
-  private boolean checksumVerify = true;
+  private volatile boolean checksumVerify = true;
 
   @Config(key = "ozone.client.max.ec.stripe.write.retries",
       defaultValue = "10",

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.rpc.read;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.countReplicas;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -272,8 +273,10 @@ class TestKeyInputStream extends InputStreamTests {
 
     // Since we read data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
-    assertEquals(readChunkCount + 2,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+    // A ReadChunk to a follower that has not yet applied the block fails with UNKNOWN_BCSID and is retried on
+    // another datanode, which is counted again.
+    assertThat(metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk))
+        .isGreaterThanOrEqualTo(readChunkCount + 2);
 
     keyInputStream.close();
 
@@ -365,8 +368,10 @@ class TestKeyInputStream extends InputStreamTests {
 
     // Since we reading data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
-    assertEquals(readChunkCount + 2,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+    // A ReadChunk to a follower that has not yet applied the block fails with UNKNOWN_BCSID and is retried on
+    // another datanode, which is counted again.
+    assertThat(metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk))
+        .isGreaterThanOrEqualTo(readChunkCount + 2);
 
     keyInputStream.close();
 

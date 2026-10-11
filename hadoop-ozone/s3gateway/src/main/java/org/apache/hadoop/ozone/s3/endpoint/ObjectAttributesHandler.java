@@ -134,6 +134,8 @@ class ObjectAttributesHandler extends ObjectOperationHandler {
       NavigableMap<Integer, Long> completedPartSizes = null;
       boolean directoryBucketLayout = false;
       try {
+        // AWS requires the credentials to support both s3:GetObject and s3:GetObjectAttributes actions. OM checks
+        // both while authorizing this single request, which is sent with the GetObjectAttributes action.
         if (requestedAttributes.contains(ATTR_OBJECT_PARTS)) {
           S3HeadObjectAttributes headAttributes =
               getClientProtocol().headS3ObjectAttributes(bucketName, keyPath);

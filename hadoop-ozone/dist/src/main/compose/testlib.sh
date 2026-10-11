@@ -124,7 +124,11 @@ wait_for_s3g_ready() {
     return 0
   fi
   echo "Waiting for S3 Gateway (s3g1) to report ready..."
-  wait_for_execute_command s3g1 120 "curl -sf http://localhost:19878/health/ready"
+  # Accept 200 (ready) and 404: a 404 means the gateway predates /health/ready
+  # (the old release used in upgrade tests), so there is no readiness signal to
+  # wait for. 503 (not ready) and connection failures keep retrying.
+  local status_cmd='curl -s -o /dev/null -w "%{http_code}" http://localhost:19878/health/ready'
+  wait_for_execute_command s3g1 120 "code=\$($status_cmd); test \"\$code\" = 200 || test \"\$code\" = 404"
 }
 
 wait_for_safemode_exit(){
@@ -305,7 +309,7 @@ reorder_om_nodes() {
   local new_order="$1"
 
   if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
-    for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om'); do
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om' -e 's3g-haproxy'); do
       docker exec "${c}" sh -c \
         "if [ -f /etc/hadoop/ozone-site.xml ]; then \
           sed -i -e 's/om1,om2,om3/${new_order}/' /etc/hadoop/ozone-site.xml; \
@@ -318,7 +322,7 @@ reorder_om_nodes() {
 ## @description Create stack dump of each java process in each container
 create_stack_dumps() {
   local c pid procname
-  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm | grep -v -e prometheus); do
+  for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e om -e recon -e s3g -e scm | grep -v -e prometheus -e s3g-haproxy); do
     while read -r pid procname; do
       echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
       docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
