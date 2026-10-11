@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -25,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -110,6 +112,38 @@ public class TestOMKeysRenameRequest extends OMKeyRequestTests {
     assertEquals("testKey", unRenamedKeys.getFromKeyName());
   }
 
+  @Test
+  public void testKeysRenameRequestToExistingKey() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
+
+    String fromKeyName = parentDir.concat("/fromKey");
+    String toKeyName = parentDir.concat("/toKey");
+    OmKeyInfo fromKeyInfo = OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName, fromKeyName,
+        RatisReplicationConfig.getInstance(THREE), omMetadataManager);
+    OmKeyInfo toKeyInfo = OMRequestTestUtils.addKeyToTableCache(volumeName, bucketName, toKeyName,
+        RatisReplicationConfig.getInstance(THREE), omMetadataManager);
+
+    RenameKeysMap renameKey = RenameKeysMap.newBuilder().setFromKeyName(fromKeyName).setToKeyName(toKeyName).build();
+    // fromKey does not exist either, the pair should still be reported only once.
+    RenameKeysMap missingRenameKey =
+        RenameKeysMap.newBuilder().setFromKeyName("testKey").setToKeyName(toKeyName).build();
+    OMRequest omRequest = createRenameKeyRequest(Arrays.asList(renameKey, missingRenameKey));
+
+    OMClientResponse omKeysRenameResponse =
+        new OMKeysRenameRequest(omRequest, getBucketLayout()).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertThat(omKeysRenameResponse.getOMResponse().getStatus())
+        .isEqualTo(OzoneManagerProtocolProtos.Status.PARTIAL_RENAME);
+    assertThat(omKeysRenameResponse.getOMResponse().getRenameKeysResponse().getUnRenamedKeysList())
+        .containsExactly(renameKey, missingRenameKey);
+
+    // The existing toKey must not be overwritten, and fromKey must stay.
+    assertThat(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneKey(volumeName, bucketName, fromKeyName))).isEqualTo(fromKeyInfo);
+    assertThat(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName))).isEqualTo(toKeyInfo);
+  }
+
   /**
    * Create OMRequest which encapsulates RenameKeyRequest.
    *
@@ -144,6 +178,10 @@ public class TestOMKeysRenameRequest extends OMKeyRequestTests {
       renameKeyList.add(renameKey.build());
     }
 
+    return createRenameKeyRequest(renameKeyList);
+  }
+
+  private OMRequest createRenameKeyRequest(List<RenameKeysMap> renameKeyList) {
     RenameKeysArgs.Builder renameKeyArgs = RenameKeysArgs.newBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
