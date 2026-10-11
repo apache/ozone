@@ -111,17 +111,47 @@ def fetch_build_page(
   return data
 
 
-def summarize(builds: List[Dict[str, Any]]) -> None:
+def median_ms(durations: List[int]) -> Optional[int]:
+  if not durations:
+    return None
+  ordered = sorted(durations)
+  return ordered[len(ordered) // 2]
+
+
+def summarize(builds: List[Dict[str, Any]], query: str) -> None:
   total = len(builds)
   failed = sum(1 for b in builds if b.get("buildOutcome") == "failed")
-  durations = [b.get("buildDuration") for b in builds if b.get("buildDuration") is not None]
+  non_verif = sum(1 for b in builds if b.get("hasNonVerificationFailure"))
+  verif = sum(1 for b in builds if b.get("hasVerificationFailure"))
+  print(f"Query: {query}")
   print(f"Build scans (sample): {total}")
-  print(f"Failed: {failed} ({100.0 * failed / total:.1f}%)" if total else "Failed: 0")
-  if durations:
-    durations.sort()
-    mid = durations[len(durations) // 2]
-    print(f"Build duration median (ms): {mid}")
-    print(f"Build duration max (ms): {max(durations)}")
+  if total:
+    print(f"Failed: {failed} ({100.0 * failed / total:.1f}%)")
+    print(f"hasNonVerificationFailure: {non_verif}")
+    print(f"hasVerificationFailure: {verif}")
+  else:
+    print("Failed: 0")
+
+  all_durations = [b["buildDuration"] for b in builds if b.get("buildDuration") is not None]
+  if all_durations:
+    print(f"Build duration median (ms): {median_ms(all_durations)}")
+    print(f"Build duration max (ms): {max(all_durations)}")
+
+  for outcome in ("succeeded", "failed"):
+    subset = [
+        b["buildDuration"] for b in builds
+        if b.get("buildOutcome") == outcome and b.get("buildDuration") is not None
+    ]
+    med = median_ms(subset)
+    if med is not None:
+      print(f"Build duration median ({outcome}, ms): {med}")
+
+  failed_builds = [b for b in builds if b.get("buildOutcome") == "failed"][:5]
+  if failed_builds:
+    print("Recent failed scans (newest first in sample):")
+    for b in failed_builds:
+      scan_id = b.get("id", "?")
+      print(f"  {DEVELOCITY_HOST}/s/{scan_id}")
 
 
 def main() -> None:
@@ -159,7 +189,7 @@ def main() -> None:
           f"query may match no builds: {args.query}\n{body}") from e
     raise SystemExit(f"Develocity API HTTP {e.code}: {body}") from e
 
-  summarize(builds)
+  summarize(builds, args.query)
 
 
 if __name__ == "__main__":
