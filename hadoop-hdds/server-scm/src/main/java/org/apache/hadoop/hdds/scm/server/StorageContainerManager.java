@@ -1653,6 +1653,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     stopReplicationManager();
+    stopContainerExportManager();
 
     try {
       LOG.info("Stopping the Datanode Admin Monitor.");
@@ -1708,13 +1709,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       scmBlockManager.stop();
     } catch (Exception ex) {
       LOG.error("SCM block manager service stop failed.", ex);
-    }
-
-    try {
-      LOG.info("Shutting down Container Export Manager.");
-      containerExportManager.shutdown();
-    } catch (Exception ex) {
-      LOG.error("Container Export Manager shutdown failed.", ex);
     }
 
     if (metrics != null) {
@@ -1790,6 +1784,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       replicationManager.stop();
     } catch (Exception ex) {
       LOG.error("Replication manager service stop failed.", ex);
+    }
+  }
+
+  private void stopContainerExportManager() {
+    try {
+      LOG.info("Shutting down Container Export Manager.");
+      containerExportManager.shutdown();
+    } catch (Exception ex) {
+      LOG.error("Container Export Manager shutdown failed.", ex);
     }
   }
 
