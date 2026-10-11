@@ -88,7 +88,12 @@ def verify_api_permission(access_key: str) -> None:
           "'Access build data via the API' (API Client / exportData). "
           "Create a new access key with that permission, or ask an admin to "
           "assign the API Client or Developer role, then update "
-          "~/.asf-jira-pat [develocity] DEVELOCITY_ACCESS_KEY.") from e
+          "~/.asf-jira-pat [develocity] DEVELOCITY_ACCESS_KEY.\n\n"
+          "Baseline (Failures UI export, Apache Ozone Main, Jul–Sep 2026):\n"
+          "  MDEP-187 reactor unpack (~75 builds) — addressed in HDDS-16600\n"
+          "  ozone-manager artifact:compare (~10) — intermittent on current CI\n"
+          "  hdds-rocks-native RocksDB wget timeout (~8) — HDDS-16600 retries\n"
+          "  dependency cascades from rocks-native (~8 each) — downstream of wget") from e
     raise SystemExit(f"Develocity token probe HTTP {e.code}: {body[:500]}") from e
 
 
