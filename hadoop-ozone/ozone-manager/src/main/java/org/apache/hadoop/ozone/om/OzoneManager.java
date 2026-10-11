@@ -5500,8 +5500,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (!visited.isEmpty()
           && (e.getResult() == VOLUME_NOT_FOUND || e.getResult() == BUCKET_NOT_FOUND)) {
         throw new OMException(
-            "Cannot follow bucket link: linked source bucket does not exist",
-            BUCKET_NOT_FOUND);
+            "Cannot follow bucket link: linked source bucket does not exist", e, e.getResult());
       }
       throw e;
     }
