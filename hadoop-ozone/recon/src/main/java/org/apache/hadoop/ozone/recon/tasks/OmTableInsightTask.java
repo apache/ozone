@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_PARTS_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 
@@ -42,6 +43,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
@@ -61,6 +64,7 @@ public class OmTableInsightTask implements ReconOmTask {
   private ReconGlobalStatsManager reconGlobalStatsManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private Map<String, OmTableHandler> tableHandlers;
+  private MultipartInfoInsightHandler multipartInfoInsightHandler;
   private Collection<String> tables;
   private Map<String, Long> objectCountMap;
   private Map<String, Long> unReplicatedSizeMap;
@@ -79,7 +83,8 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_KEY_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
-    tableHandlers.put(MULTIPART_INFO_TABLE, new MultipartInfoInsightHandler());
+    multipartInfoInsightHandler = new MultipartInfoInsightHandler();
+    tableHandlers.put(MULTIPART_INFO_TABLE, multipartInfoInsightHandler);
     this.maxKeysInMemory = reconOMMetadataManager.getOzoneConfiguration().getInt(
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
@@ -315,6 +320,10 @@ public class OmTableInsightTask implements ReconOmTask {
       } else {
         String countKey = getTableCountKeyFromTable(tableName);
         objectCountMap.computeIfPresent(countKey, (k, count) -> count + 1L);
+        if (tableName.equals(MULTIPART_PARTS_TABLE)) {
+          multipartInfoInsightHandler.handlePartPutEvent(castToPartEvent(event),
+              unReplicatedSizeMap, replicatedSizeMap);
+        }
       }
     }
   }
@@ -329,6 +338,10 @@ public class OmTableInsightTask implements ReconOmTask {
       } else {
         objectCountMap.computeIfPresent(getTableCountKeyFromTable(tableName),
             (k, count) -> count > 0 ? count - 1L : 0L);
+        if (tableName.equals(MULTIPART_PARTS_TABLE)) {
+          multipartInfoInsightHandler.handlePartDeleteEvent(castToPartEvent(event),
+              unReplicatedSizeMap, replicatedSizeMap);
+        }
       }
     }
   }
@@ -342,8 +355,25 @@ public class OmTableInsightTask implements ReconOmTask {
         // Handle update for only size related tables
         tableHandler.handleUpdateEvent(event, tableName, objectCountMap,
             unReplicatedSizeMap, replicatedSizeMap);
+      } else if (tableName.equals(MULTIPART_PARTS_TABLE)) {
+        multipartInfoInsightHandler.handlePartUpdateEvent(castToPartEvent(event),
+            unReplicatedSizeMap, replicatedSizeMap);
       }
     }
+  }
+
+  /**
+   * The multipartPartsTable is not registered in {@link #tableHandlers}, so its events fall
+   * through to the generic {@code tableHandler == null} branch above for object counting, and are
+   * additionally routed here to update multipartInfoTable's sizes. Its keys/values are genuinely
+   * {@link OmMultipartPartKey}/{@link OmMultipartPartInfo} at runtime (see
+   * {@code OMDBUpdatesHandler}); erasure makes this cast safe despite the static
+   * {@code OMDBUpdateEvent<String, Object>} type of {@code event}.
+   */
+  @SuppressWarnings("unchecked")
+  private static OMDBUpdateEvent<OmMultipartPartKey, OmMultipartPartInfo> castToPartEvent(
+      OMDBUpdateEvent<String, Object> event) {
+    return (OMDBUpdateEvent<OmMultipartPartKey, OmMultipartPartInfo>) (OMDBUpdateEvent<?, ?>) event;
   }
 
   /**

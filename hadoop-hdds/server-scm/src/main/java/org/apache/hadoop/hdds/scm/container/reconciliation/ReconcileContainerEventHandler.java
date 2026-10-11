@@ -19,8 +19,10 @@ package org.apache.hadoop.hdds.scm.container.reconciliation;
 
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.DATANODE_COMMAND;
 
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -28,6 +30,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibilityHandler.EligibilityResult;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -46,10 +51,13 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
 
   private final ContainerManager containerManager;
   private final SCMContext scmContext;
+  private final NodeManager nodeManager;
 
-  public ReconcileContainerEventHandler(ContainerManager containerManager, SCMContext scmContext) {
+  public ReconcileContainerEventHandler(ContainerManager containerManager, SCMContext scmContext,
+      NodeManager nodeManager) {
     this.containerManager = containerManager;
     this.scmContext = scmContext;
+    this.nodeManager = nodeManager;
   }
 
   @Override
@@ -75,12 +83,18 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
 
       LOG.info("Reconcile container event triggered for container {} with peers {}", containerID, allReplicaNodes);
 
+      List<DatanodeInfo> involved = allReplicaNodes.stream()
+          .map(this::getDatanodeInfo)
+          .collect(Collectors.toList());
+      ComponentVersion apparentVersion = ScmVersionManager.computeVersionForReplication(involved);
+
       for (DatanodeDetails replica : allReplicaNodes) {
         Set<DatanodeDetails> otherReplicas = allReplicaNodes.stream()
             .filter(other -> !other.equals(replica))
             .collect(Collectors.toSet());
         ReconcileContainerCommand command = new ReconcileContainerCommand(containerID.getId(), otherReplicas);
         command.setTerm(scmContext.getTermOfLeader());
+        command.setApparentVersion(apparentVersion);
         publisher.fireEvent(DATANODE_COMMAND, new CommandForDatanode<>(replica, command));
       }
     } catch (ContainerNotFoundException ex) {
@@ -88,5 +102,14 @@ public class ReconcileContainerEventHandler implements EventHandler<ContainerID>
     } catch (NotLeaderException nle) {
       LOG.info("Skip reconciling container {} since current SCM is not leader.", containerID);
     }
+  }
+
+  private DatanodeInfo getDatanodeInfo(DatanodeDetails dnDetails) {
+    DatanodeInfo datanodeInfo = nodeManager.getNode(dnDetails.getID());
+    if (datanodeInfo == null) {
+      throw new IllegalArgumentException("Datanode " + dnDetails + " not " +
+          "found in NodeManager. Should not happen");
+    }
+    return datanodeInfo;
   }
 }

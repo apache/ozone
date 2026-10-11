@@ -33,76 +33,25 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
  * Enum class for namespace type.
  */
 public enum EntityType {
-  ROOT {
-    @Override
-    public EntityHandler create(
-        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-        ReconOMMetadataManager omMetadataManager,
-        OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler, String path) {
-      return new RootEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, path);
-    }
-  },
-  VOLUME {
-    @Override
-    public EntityHandler create(
-        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-        ReconOMMetadataManager omMetadataManager,
-        OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler, String path) {
-      return new VolumeEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, path);
-    }
-  },
-  BUCKET {
-    @Override
-    public EntityHandler create(
-        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-        ReconOMMetadataManager omMetadataManager,
-        OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler, String path) {
-      return new BucketEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketHandler, path);
-    }
-  },
-  DIRECTORY {
-    @Override
-    public EntityHandler create(
-        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-        ReconOMMetadataManager omMetadataManager,
-        OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler, String path) {
-      return new DirectoryEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketHandler, path);
-    }
-  },
-  KEY {
-    @Override
-    public EntityHandler create(
-        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-        ReconOMMetadataManager omMetadataManager,
-        OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler, String path) {
-      return new KeyEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM, bucketHandler, path);
-    }
-  },
-  UNKNOWN { // if path is invalid
-    @Override
-    public EntityHandler create(
-        ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-        ReconOMMetadataManager omMetadataManager,
-        OzoneStorageContainerManager reconSCM,
-        BucketHandler bucketHandler, String path) {
-      return new UnknownEntityHandler(reconNamespaceSummaryManager,
-              omMetadataManager, reconSCM);
-    }
-  };
+  ROOT,
+  VOLUME,
+  BUCKET,
+  DIRECTORY,
+  KEY,
+  UNKNOWN; // if path is invalid
 
-  public abstract EntityHandler create(
-      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+  public EntityHandler create(
+      ReconNamespaceSummaryManager nsSummaryManager,
       ReconOMMetadataManager omMetadataManager,
       OzoneStorageContainerManager reconSCM,
-      BucketHandler bucketHandler, String path);
+      BucketHandler bucketHandler, String path) {
+    return switch (this) {
+    case ROOT -> new RootEntityHandler(nsSummaryManager, omMetadataManager, reconSCM, path);
+    case VOLUME -> new VolumeEntityHandler(nsSummaryManager, omMetadataManager, reconSCM, path);
+    case BUCKET -> new BucketEntityHandler(nsSummaryManager, omMetadataManager, reconSCM, bucketHandler, path);
+    case DIRECTORY -> new DirectoryEntityHandler(nsSummaryManager, omMetadataManager, reconSCM, bucketHandler, path);
+    case KEY -> new KeyEntityHandler(nsSummaryManager, omMetadataManager, reconSCM, bucketHandler, path);
+    case UNKNOWN -> new UnknownEntityHandler(nsSummaryManager, omMetadataManager, reconSCM);
+    };
+  }
 }

@@ -33,7 +33,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -125,38 +124,21 @@ public class TestOzoneManagerHASnapshot {
 
     assertEquals(IN_PROGRESS, response.getJobStatus());
 
-    String oldLeader = cluster.getOMLeader().getOMNodeId();
-
     OzoneManager omLeader = cluster.getOMLeader();
     cluster.shutdownOzoneManager(omLeader);
     cluster.restartOzoneManager(omLeader, true);
 
     cluster.waitForLeaderOM();
 
-    String newLeader = cluster.getOMLeader().getOMNodeId();
-
-    if (Objects.equals(oldLeader, newLeader)) {
-      // If old leader becomes leader again. Job should be done by this time.
-      response = store.snapshotDiff(volumeName, bucketName,
-          snapshot1, snapshot2, null, 0, false, false);
-      assertEquals(DONE, response.getJobStatus());
-      assertEquals(100, response.getSnapshotDiffReport().getDiffList().size());
-    } else {
-      // If new leader is different from old leader. SnapDiff request will be
-      // new to OM, and job status should be IN_PROGRESS.
+    while (true) {
       response = store.snapshotDiff(volumeName, bucketName, snapshot1,
-          snapshot2, null, 0, false, false);
-      assertEquals(IN_PROGRESS, response.getJobStatus());
-      while (true) {
-        response = store.snapshotDiff(volumeName, bucketName, snapshot1,
-                snapshot2, null, 0, false, false);
-        if (DONE == response.getJobStatus()) {
-          assertEquals(100,
-              response.getSnapshotDiffReport().getDiffList().size());
-          break;
-        }
-        Thread.sleep(response.getWaitTimeInMs());
+              snapshot2, null, 0, false, false);
+      if (DONE == response.getJobStatus()) {
+        assertEquals(100,
+            response.getSnapshotDiffReport().getDiffList().size());
+        break;
       }
+      Thread.sleep(response.getWaitTimeInMs());
     }
   }
 

@@ -99,6 +99,12 @@ public final class CodecTestUtil {
     final T fromWrappedArray = codec.fromCodecBuffer(wrapped);
     wrapped.release();
     assertEquals(original, fromWrappedArray);
+
+    // deserialize from direct CodecBuffer, which is what table get and iterator use
+    try (CodecBuffer direct = codec.toCodecBuffer(original, CodecBuffer.Allocator.getDirect())) {
+      assertTrue(direct.isDirect());
+      assertEquals(original, codec.fromCodecBuffer(direct));
+    }
   }
 
   public static <T> Codec<T> newCodecWithoutCodecBuffer(Codec<T> codec) {

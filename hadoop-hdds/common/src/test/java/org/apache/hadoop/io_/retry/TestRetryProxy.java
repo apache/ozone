@@ -25,6 +25,7 @@ import static org.apache.hadoop.io_.retry.RetryPolicies.retryUpToMaximumCountWit
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -51,7 +53,10 @@ import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction;
 import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.io_.retry.UnreliableInterface.UnreliableException;
+import org.apache.hadoop.ipc_.Client.ConnectionId;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.RpcProxy;
 import org.apache.hadoop.security.AccessControlException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -141,6 +146,24 @@ public class TestRetryProxy {
     
     // For non-proxy the method must return false
     assertFalse(RetryInvocationHandler.isRpcInvocation(new Object()));
+  }
+
+  @Test
+  public void testConcreteRpcProxy() throws Exception {
+    RpcProxy proxy = mock(RpcProxy.class);
+    assertTrue(RetryInvocationHandler.isRpcInvocation(proxy));
+    verifyNoInteractions(proxy);
+
+    ConnectionId connectionId = mock(ConnectionId.class);
+    when(proxy.getConnectionId()).thenReturn(connectionId);
+    assertSame(connectionId, RPC.getConnectionIdForProxy(proxy));
+
+    ProtocolTranslator translator = () -> proxy;
+    assertTrue(RetryInvocationHandler.isRpcInvocation(translator));
+    assertSame(connectionId, RPC.getConnectionIdForProxy(translator));
+
+    RPC.stopProxy(proxy);
+    verify(proxy).close();
   }
   
   @Test
