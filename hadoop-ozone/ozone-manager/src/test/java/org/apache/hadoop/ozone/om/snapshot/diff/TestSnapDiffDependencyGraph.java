@@ -74,7 +74,7 @@ class TestSnapDiffDependencyGraph {
         entry(2L, 0L, RENAME, "old/key", "dir/key"));
 
     assertThrows(IllegalStateException.class,
-        () -> new SnapDiffDependencyGraph(entries));
+        () -> new SnapDiffDependencyGraph(entries.iterator()));
   }
 
   @Test
@@ -192,7 +192,7 @@ class TestSnapDiffDependencyGraph {
         entry(2L, 0L, RENAME, "B", "A"));
 
     assertThrows(IllegalStateException.class,
-        () -> new SnapDiffDependencyGraph(entries).getOrderedEntries());
+        () -> new SnapDiffDependencyGraph(entries.iterator()).getOrderedEntries());
   }
 
   @Test
@@ -298,7 +298,8 @@ class TestSnapDiffDependencyGraph {
   @Test
   void testEmptyInputProducesEmptyOrdering() {
     List<SnapDiffDependencyEntry> ordered =
-        new SnapDiffDependencyGraph(Collections.emptyList()).getOrderedEntries();
+        new SnapDiffDependencyGraph(Collections.<SnapDiffDependencyEntry>emptyList().iterator())
+            .getOrderedEntries();
     assertTrue(ordered.isEmpty());
   }
 
@@ -416,7 +417,7 @@ class TestSnapDiffDependencyGraph {
         entry(3L, 0L, RENAME, "C", "A"));
 
     assertThrows(IllegalStateException.class,
-        () -> new SnapDiffDependencyGraph(entries).getOrderedEntries());
+        () -> new SnapDiffDependencyGraph(entries.iterator()).getOrderedEntries());
   }
 
   @Test
@@ -426,7 +427,7 @@ class TestSnapDiffDependencyGraph {
         entry(1L, 0L, CREATE, "parent"));
 
     List<DiffReportEntry> orderedEntries = SnapDiffDependencyGraph
-        .toOrderedReportEntries(new SnapDiffDependencyGraph(entries).getOrderedEntries());
+        .toOrderedReportEntries(new SnapDiffDependencyGraph(entries.iterator()).getOrderedEntries());
 
     assertEquals(2, orderedEntries.size());
     assertEquals(CREATE, orderedEntries.get(0).getType());
@@ -438,7 +439,7 @@ class TestSnapDiffDependencyGraph {
 
   private static List<SnapDiffDependencyEntry> sort(
       List<SnapDiffDependencyEntry> entries) {
-    return new SnapDiffDependencyGraph(entries).getOrderedEntries();
+    return new SnapDiffDependencyGraph(entries.iterator()).getOrderedEntries();
   }
 
   private static SnapDiffDependencyEntry entry(long objectId, long parentObjectId,
