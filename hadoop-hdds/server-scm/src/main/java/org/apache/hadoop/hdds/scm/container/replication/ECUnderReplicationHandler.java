@@ -370,8 +370,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             selectedDatanodes, availableSourceNodes);
       }
       if (0 < targetCount) {
-        usedNodes.addAll(selectedDatanodes);
-        availableSourceNodes.addAll(selectedDatanodes);
         List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
             sourceDatanodesWithIndex = new ArrayList<>();
 
@@ -422,6 +420,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                 repConfig);
         replicationManager.sendThrottledReconstructionCommand(
             container, reconstructionCommand);
+        usedNodes.addAll(selectedDatanodes);
+        availableSourceNodes.addAll(selectedDatanodes);
         for (int i = 0; i < missingIndexes.size(); i++) {
           adjustPendingOps(
               replicaCount, selectedDatanodes.get(i), missingIndexes.get(i));

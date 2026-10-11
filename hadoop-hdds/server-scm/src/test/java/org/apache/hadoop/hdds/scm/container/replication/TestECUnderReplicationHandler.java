@@ -548,6 +548,43 @@ public class TestECUnderReplicationHandler {
   }
 
   @Test
+  public void testUnderReplicationWithDecomNodesFallsBackWhenReconstructionThrottledOneTarget()
+      throws IOException {
+    replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    DatanodeDetails decomNode = availableReplicas.stream()
+        .filter(r -> r.getReplicaIndex() == 1)
+        .findFirst().get().getDatanodeDetails();
+    when(replicationManager.isNodeHighlyLoaded(decomNode)).thenReturn(true);
+    throwOverloadedExceptionOnReconstruction.set(true);
+
+    // One spare target when existing replicas occupy usedNodes (5 used, 6 total).
+    PlacementPolicySpy spy = new PlacementPolicySpy(ecPlacementPolicy,
+        availableReplicas.size() + 1);
+
+    ECUnderReplicationHandler ecURH =
+        new ECUnderReplicationHandler(ecPlacementPolicy, conf, replicationManager);
+    UnderReplicatedHealthResult result =
+        mock(UnderReplicatedHealthResult.class);
+    when(result.isUnrecoverable()).thenReturn(false);
+    when(result.getContainerInfo()).thenReturn(container);
+
+    ecURH.processAndSendCommands(availableReplicas, ImmutableList.of(),
+        result, remainingMaintenanceRedundancy);
+
+    assertEquals(2, spy.callCount());
+    assertEquals(spy.usedNodes(0).size(), spy.usedNodes(1).size());
+    assertTrue(commandsSent.stream()
+        .anyMatch(c -> c.getValue() instanceof ReplicateContainerCommand));
+    assertTrue(commandsSent.stream()
+        .noneMatch(c -> c.getValue() instanceof ReconstructECContainersCommand));
+  }
+
+  @Test
   public void testUnderReplicationWithDecomNodesFallsBackWhenInsufficientSources()
       throws IOException {
     replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
