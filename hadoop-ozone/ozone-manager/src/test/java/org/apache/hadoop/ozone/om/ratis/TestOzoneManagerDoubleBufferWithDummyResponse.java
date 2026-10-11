@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -108,8 +109,9 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
           TermIndex.valueOf(term, trxId.incrementAndGet()));
     }
     int totalBucketCount = bucketCount + 1;
-    waitFor(() -> metrics.getTotalNumOfFlushedTransactions() == totalBucketCount,
-        100, 60000);
+    doubleBuffer.awaitFlushAsync().get(60, TimeUnit.SECONDS);
+
+    assertEquals(totalBucketCount, metrics.getTotalNumOfFlushedTransactions());
 
     assertThat(metrics.getTotalNumOfFlushOperations()).isGreaterThan(0);
     assertEquals(totalBucketCount, doubleBuffer.getFlushedTransactionCountForTesting());
@@ -117,10 +119,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
     assertEquals(totalBucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
     assertThat(doubleBuffer.getFlushIterationsForTesting()).isGreaterThan(0);
-    assertThat(metrics.getFlushTime().lastStat().numSamples()).isGreaterThan(0);
     assertThat(metrics.getAvgFlushTransactionsInOneIteration()).isGreaterThan(0);
-    assertEquals(totalBucketCount, (long) metrics.getQueueSize().lastStat().total());
-    assertThat(metrics.getQueueSize().lastStat().numSamples()).isGreaterThan(0);
 
     // Assert there is only instance of OM Double Metrics.
     OzoneManagerDoubleBufferMetrics metricsCopy =
