@@ -19,14 +19,13 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.apache.ozone.recon.schema.SqlDbUtils.indexExists;
 import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import javax.sql.DataSource;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
@@ -58,21 +57,21 @@ public class TestUnhealthyContainersStateContainerIdIndexUpgradeAction
   @Test
   public void testCreatesIndexWhenMissing() throws Exception {
     createTableWithoutIndex();
-    assertFalse(indexExists(INDEX_NAME));
+    assertFalse(tableHasIndex(INDEX_NAME));
 
     upgradeAction.execute(dataSource);
 
-    assertTrue(indexExists(INDEX_NAME));
+    assertTrue(tableHasIndex(INDEX_NAME));
   }
 
   @Test
   public void testExecuteIsIdempotentWhenIndexAlreadyExists() throws Exception {
     createTableWithoutIndex();
     upgradeAction.execute(dataSource);
-    assertTrue(indexExists(INDEX_NAME));
+    assertTrue(tableHasIndex(INDEX_NAME));
 
     assertDoesNotThrow(() -> upgradeAction.execute(dataSource));
-    assertTrue(indexExists(INDEX_NAME));
+    assertTrue(tableHasIndex(INDEX_NAME));
   }
 
   @Test
@@ -99,19 +98,9 @@ public class TestUnhealthyContainersStateContainerIdIndexUpgradeAction
     }
   }
 
-  private boolean indexExists(String indexName) throws SQLException {
+  private boolean tableHasIndex(String indexName) throws SQLException {
     try (Connection conn = dataSource.getConnection()) {
-      DatabaseMetaData metaData = conn.getMetaData();
-      try (ResultSet rs = metaData.getIndexInfo(
-          null, null, UNHEALTHY_CONTAINERS_TABLE_NAME, false, false)) {
-        while (rs.next()) {
-          String existing = rs.getString("INDEX_NAME");
-          if (existing != null && existing.equalsIgnoreCase(indexName)) {
-            return true;
-          }
-        }
-      }
+      return indexExists(conn, UNHEALTHY_CONTAINERS_TABLE_NAME, indexName);
     }
-    return false;
   }
 }

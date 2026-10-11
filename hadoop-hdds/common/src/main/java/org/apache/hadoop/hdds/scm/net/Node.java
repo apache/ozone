@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.ClientVersion;
 
 /**
  * The interface defines a node in a network topology.
@@ -130,7 +131,7 @@ public interface Node {
   boolean isDescendant(String nodePath);
 
   default HddsProtos.NetworkNode toProtobuf(
-      int clientVersion) {
+      ClientVersion clientVersion) {
     return null;
   }
 }

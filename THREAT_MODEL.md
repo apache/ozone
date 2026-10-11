@@ -195,9 +195,10 @@ stock install and must be explicitly enabled:
   Hadoop `AccessControlList`.)*
 - **TDE/KMS** is optional and protects data at rest only for encrypted buckets;
   it requires a configured KMS, for example via `hadoop.security.key.provider.path`.
+- **HTTP authentication (SPNEGO)** is off by default (`ozone.security.http.kerberos.enabled=false`, and each web server's own type, for example `ozone.om.http.auth.type=simple`). With these defaults the web endpoints are not authenticated, and the OM and SCM DB checkpoint endpoints, which serve the metadata DB, are served without an admin check. *(documented — `ozone-default.xml`.)*
 
 So a finding that assumes ACLs / block/container tokens / transport encryption /
-TDE are active in a default build is `OUT-OF-MODEL: non-default-build` unless the
+TDE / HTTP authentication are active in a default build is `OUT-OF-MODEL: non-default-build` unless the
 operator enabled them (§10); the §10 checklist lists these as required
 production hardening. (Answers the Q-authz / Q-token / Q-tde default-state and
 lifetime/rotation mechanism questions.)
@@ -326,6 +327,7 @@ Per-boundary input trust (grouped by family):
 - **Protect service metadata at rest.** The OM, SCM, and Recon RocksDB stores
   hold critical credential/identity data — set restrictive file permissions and,
   ideally, encrypt them on disk. *(maintainer — jojochuang, 2026-06-25.)*
+- **Enable HTTP authentication (SPNEGO)** for the OM and SCM web servers, or network-isolate their HTTP ports. The DB checkpoint endpoints serve the metadata DB.
 - **Isolate the KMS** in a separate, firewalled network segment. *(maintainer —
   jojochuang, 2026-06-25.)*
 - **Client side:** treat data read from Ozone per your own trust needs; protect

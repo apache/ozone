@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.Config;
@@ -79,11 +81,13 @@ import org.apache.hadoop.hdds.scm.container.replication.health.VulnerableUnhealt
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
@@ -582,8 +586,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     DatanodeDetails source = selectAndOptionallyExcludeDatanode(
         1, sourceWithCmds);
 
-    ReplicateContainerCommand cmd =
-        ReplicateContainerCommand.toTarget(containerID, target);
+    ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(
+        containerID, target, computeVersionForReplication(source, target));
     cmd.setReplicaIndex(replicaIndex);
     sendDatanodeCommand(cmd, containerInfo, source);
   }
@@ -623,10 +627,38 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
           }
           DatanodeDetails target = selectAndOptionallyExcludeDatanode(
               rmConf.getReconstructionCommandWeight(), targetWithCmds);
+          command.setApparentVersion(computeVersionForReconstruction(command));
           // sendDatanodeCommand schedules one pending ADD per missing index and
           // increments ecReconstructionCmdsSentTotal.
           sendDatanodeCommand(command, containerInfo, target);
         });
+  }
+
+  private ComponentVersion computeVersionForReconstruction(ReconstructECContainersCommand command) {
+    List<DatanodeInfo> involved = new ArrayList<>();
+    for (ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex source : command.getSources()) {
+      involved.add(getDatanodeInfo(source.getDnDetails()));
+    }
+    for (DatanodeDetails target : command.getTargetDatanodes()) {
+      involved.add(getDatanodeInfo(target));
+    }
+    // Reconstruction is handled as a specific type of replication command which uses the same generic logic within the
+    // version manager as computing a version for full container replication.
+    return ScmVersionManager.computeVersionForReplication(involved);
+  }
+
+  private ComponentVersion computeVersionForReplication(DatanodeDetails source, DatanodeDetails target) {
+    return ScmVersionManager.computeVersionForReplication(
+        Arrays.asList(getDatanodeInfo(source), getDatanodeInfo(target)));
+  }
+
+  private DatanodeInfo getDatanodeInfo(DatanodeDetails dnDetails) {
+    DatanodeInfo datanodeInfo = nodeManager.getNode(dnDetails.getID());
+    if (datanodeInfo == null) {
+      throw new IllegalArgumentException("Datanode " + dnDetails + " not " +
+          "found in NodeManager. Should not happen");
+    }
+    return datanodeInfo;
   }
 
   private DatanodeDetails selectAndOptionallyExcludeDatanode(
@@ -707,8 +739,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       final ContainerInfo container, int replicaIndex, DatanodeDetails source,
       DatanodeDetails target, long scmDeadlineEpochMs)
       throws NotLeaderException {
-    final ReplicateContainerCommand command = ReplicateContainerCommand
-        .toTarget(container.getContainerID(), target);
+    final ReplicateContainerCommand command = ReplicateContainerCommand.toTarget(
+        container.getContainerID(), target, computeVersionForReplication(source, target));
     command.setReplicaIndex(replicaIndex);
     command.setPriority(ReplicationCommandPriority.LOW);
     sendDatanodeCommand(command, container, source, scmDeadlineEpochMs);

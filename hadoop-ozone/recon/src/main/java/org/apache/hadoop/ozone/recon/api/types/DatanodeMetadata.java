@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import javax.xml.bind.annotation.XmlAccessType;
@@ -84,13 +85,16 @@ public final class DatanodeMetadata {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private String revision;
 
-  @XmlElement(name = "layoutVersion")
+  @XmlElement(name = "apparentVersion")
   @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-  private int layoutVersion;
+  private int apparentVersion;
 
   @XmlElement(name = "networkLocation")
   @JsonInclude(JsonInclude.Include.NON_NULL)
   private String networkLocation;
+
+  @XmlElement(name = "disks")
+  private List<DatanodeDiskInfo> disks;
 
   private DatanodeMetadata(Builder builder) {
     this.hostname = builder.hostname;
@@ -106,8 +110,9 @@ public final class DatanodeMetadata {
     this.version = builder.version;
     this.setupTime = builder.setupTime;
     this.revision = builder.revision;
-    this.layoutVersion = builder.layoutVersion;
+    this.apparentVersion = builder.apparentVersion;
     this.networkLocation = builder.networkLocation;
+    this.disks = builder.disks;
   }
 
   public String getHostname() {
@@ -162,12 +167,16 @@ public final class DatanodeMetadata {
     return revision;
   }
 
-  public int getLayoutVersion() {
-    return layoutVersion;
+  public int getApparentVersion() {
+    return apparentVersion;
   }
 
   public String getNetworkLocation() {
     return networkLocation;
+  }
+
+  public List<DatanodeDiskInfo> getDisks() {
+    return disks;
   }
 
   /**
@@ -196,13 +205,15 @@ public final class DatanodeMetadata {
     private String version;
     private long setupTime;
     private String revision;
-    private int layoutVersion;
+    private int apparentVersion;
     private String networkLocation;
+    private List<DatanodeDiskInfo> disks;
 
     public Builder() {
       this.containers = 0;
       this.openContainers = 0;
       this.leaderCount = 0;
+      this.disks = Collections.emptyList();
     }
 
     public Builder setHostname(String hostname) {
@@ -260,9 +271,14 @@ public final class DatanodeMetadata {
 
       this.version = datanode.getVersion();
       this.revision = datanode.getRevision();
-      this.layoutVersion = datanode.getLastKnownLayoutVersion().getMetadataLayoutVersion();
+      this.apparentVersion = datanode.getLastKnownApparentVersion().serialize();
 
       this.setupTime = datanode.getSetupTime();
+      return this;
+    }
+
+    public Builder setDisks(List<DatanodeDiskInfo> disks) {
+      this.disks = disks;
       return this;
     }
 

@@ -73,7 +73,6 @@ import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -87,9 +86,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequestArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -105,7 +101,6 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.LogProtoUtils;
@@ -208,81 +203,6 @@ public class TestOzoneManagerStateMachine {
 
     assertThrows(IllegalArgumentException.class,
         () -> sm.startTransaction(clientRequest));
-  }
-
-  // --- preAppendTransaction tests ---
-
-  @Test
-  public void testPreAppendTransactionPrepareGate() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    OzoneManagerPrepareState ps = new OzoneManagerPrepareState(conf);
-    when(om.getPrepareState()).thenReturn(ps);
-    when(om.isAdmin(any(UserGroupInformation.class))).thenReturn(true);
-
-    OMRequest writeRequest = sampleWriteRequest();
-    OMRequest prepareRequest = OMRequest.newBuilder()
-        .setPrepareRequest(PrepareRequest.newBuilder()
-            .setArgs(PrepareRequestArgs.getDefaultInstance()))
-        .setCmdType(Type.Prepare)
-        .setClientId("123")
-        .setUserInfo(UserInfo.newBuilder()
-            .setUserName("user")
-            .setHostName("localhost")
-            .setRemoteAddress("127.0.0.1"))
-        .build();
-
-    // Write request passes before prepare
-    TransactionContext writeTrx = mockTrx(writeRequest, 1, 1);
-    assertSame(writeTrx, sm.preAppendTransaction(writeTrx));
-    assertEquals(PrepareStatus.NOT_PREPARED, ps.getState().getStatus());
-
-    // Prepare enables gate
-    TransactionContext prepareTrx = mockTrx(prepareRequest, 1, 2);
-    assertSame(prepareTrx, sm.preAppendTransaction(prepareTrx));
-    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
-        ps.getState().getStatus());
-
-    // Write request now blocked
-    TransactionContext writeTrx2 = mockTrx(writeRequest, 1, 3);
-    StateMachineException ex = assertThrows(StateMachineException.class,
-        () -> sm.preAppendTransaction(writeTrx2));
-    assertFalse(ex.leaderShouldStepDown());
-    assertInstanceOf(OMException.class, ex.getCause());
-    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
-        ((OMException) ex.getCause()).getResult());
-
-    // Can prepare again
-    TransactionContext prepareTrx2 = mockTrx(prepareRequest, 1, 4);
-    assertSame(prepareTrx2, sm.preAppendTransaction(prepareTrx2));
-  }
-
-  @Test
-  public void testPreAppendTransactionAclDenied() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    OzoneManagerPrepareState ps = new OzoneManagerPrepareState(conf);
-    when(om.getPrepareState()).thenReturn(ps);
-    when(om.isAdminAuthorizationEnabled()).thenReturn(true);
-    when(om.isAdmin(any(UserGroupInformation.class))).thenReturn(false);
-
-    OMRequest prepareRequest = OMRequest.newBuilder()
-        .setPrepareRequest(PrepareRequest.newBuilder()
-            .setArgs(PrepareRequestArgs.getDefaultInstance()))
-        .setCmdType(Type.Prepare)
-        .setClientId("123")
-        .setUserInfo(UserInfo.newBuilder()
-            .setUserName("nonAdminUser")
-            .setHostName("localhost")
-            .setRemoteAddress("127.0.0.1"))
-        .build();
-
-    TransactionContext trx = mockTrx(prepareRequest, 1, 1);
-
-    StateMachineException ex = assertThrows(StateMachineException.class,
-        () -> sm.preAppendTransaction(trx));
-    assertFalse(ex.leaderShouldStepDown());
-    assertInstanceOf(OMException.class, ex.getCause());
-    assertEquals(OMException.ResultCodes.ACCESS_DENIED,
-        ((OMException) ex.getCause()).getResult());
   }
 
   // --- applyTransaction tests ---

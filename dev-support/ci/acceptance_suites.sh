@@ -21,6 +21,10 @@
 
 SUITES=$(grep --no-filename -r '^#suite:' hadoop-ozone/dist/src/main/compose \
   | sort -u | cut -f2 -d':' | grep -v 'failing')
+VERSIONS=$(grep '^old_versions=' hadoop-ozone/dist/src/main/compose/xcompat/lib.sh \
+  | cut -f2 -d'"')
 
 initialization::ga_output suites \
     "$(initialization::parameters_to_json ${SUITES})"
+initialization::ga_output versions \
+    "$(initialization::parameters_to_json ${VERSIONS})"

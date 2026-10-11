@@ -36,13 +36,16 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVIC
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.net.InetSocketAddress;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmRatisServerConfig;
@@ -57,6 +60,8 @@ import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Test for SCM HA-related configuration.
@@ -209,6 +214,30 @@ class TestSCMConfiguration {
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
     assertEquals(TimeDuration.ZERO, t,
         RaftServerConfigKeys.Log.Appender.WAIT_TIME_MIN_KEY);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"scm1, 0.0.0.0", "scm2, 169.254.1.1"})
+  void testSCMConfigRejectsUnadvertisableAddress(String nodeId, String address) {
+    String scmServiceId = "scmserviceId";
+    conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
+    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY + "." + scmServiceId,
+        "scm1,scm2,scm3");
+    conf.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, "scm1");
+    for (String node : new String[] {"scm1", "scm2", "scm3"}) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId,
+          node), "localhost");
+    }
+    String addressKey = ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+        scmServiceId, nodeId);
+    conf.set(addressKey, address);
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getState()).thenReturn(Storage.StorageState.NOT_INITIALIZED);
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig));
+
+    assertThat(e.getMessage()).contains(addressKey).contains(address);
   }
 
   @Test
