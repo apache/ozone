@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -235,11 +236,11 @@ class TestReconAndAdminContainerCLI {
   void testNodesInDecommissionOrMaintenance(
       NodeOperationalState initialState, NodeOperationalState finalState,
       boolean isMaintenance) throws Exception {
-    Pipeline pipeline =
-        scmClient.getContainerWithPipeline(containerIdR3).getPipeline();
+    OzoneTestHelper.waitForStableReplicaCount(containerIdR3, 3, cluster);
 
     List<DatanodeDetails> details =
-        pipeline.getNodes().stream()
+        scmContainerManager.getContainerReplicas(ContainerID.valueOf(containerIdR3)).stream()
+            .map(ContainerReplica::getDatanodeDetails)
             .filter(d -> d.getPersistedOpState().equals(IN_SERVICE))
             .collect(Collectors.toList());
 
@@ -272,7 +273,7 @@ class TestReconAndAdminContainerCLI {
     // a new replica-copy is made to another node.
     // For maintenance, there is no replica-copy in this case.
     if (!isMaintenance) {
-      OzoneTestHelper.waitForReplicaCount(containerIdR3, 4, cluster);
+      OzoneTestHelper.waitForStableReplicaCount(containerIdR3, 4, cluster);
     }
 
     compareRMReportToReconResponse(underReplicatedState);
@@ -299,7 +300,7 @@ class TestReconAndAdminContainerCLI {
     // There will be a replica copy for both maintenance and decommission.
     // maintenance 3 -> 4, decommission 4 -> 5.
     int expectedReplicaNum = isMaintenance ? 4 : 5;
-    OzoneTestHelper.waitForReplicaCount(containerIdR3, expectedReplicaNum, cluster);
+    OzoneTestHelper.waitForStableReplicaCount(containerIdR3, expectedReplicaNum, cluster);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
@@ -315,6 +316,8 @@ class TestReconAndAdminContainerCLI {
 
     NodeTestUtil.waitForDnToReachPersistedOpState(nodeToGoOffline1, IN_SERVICE);
     NodeTestUtil.waitForDnToReachPersistedOpState(nodeToGoOffline2, IN_SERVICE);
+
+    OzoneTestHelper.waitForStableReplicaCount(containerIdR3, 3, cluster);
 
     compareRMReportToReconResponse(underReplicatedState);
     compareRMReportToReconResponse(overReplicatedState);
