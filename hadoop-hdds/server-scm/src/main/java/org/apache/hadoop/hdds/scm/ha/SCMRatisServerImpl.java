@@ -356,7 +356,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       if (raftClientReply.isSuccess()) {
         LOG.info("Successfully added new SCM: {}.", request.getScmId());
       } else {
-        LOG.error("Failed to add new SCM: {}. Ratis reply: {}" +
+        LOG.error("Failed to add new SCM: {}. Ratis reply: {}",
             request.getScmId(), raftClientReply);
         throw new IOException(raftClientReply.getException());
       }
@@ -392,7 +392,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       if (raftClientReply.isSuccess()) {
         LOG.info("Successfully removed SCM: {}.", request.getScmId());
       } else {
-        LOG.error("Failed to remove SCM: {}. Ratis reply: {}" +
+        LOG.error("Failed to remove SCM: {}. Ratis reply: {}",
             request.getScmId(), raftClientReply);
         throw new IOException(raftClientReply.getException());
       }

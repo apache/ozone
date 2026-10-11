@@ -89,12 +89,12 @@ public final class OMAuditLogger {
     CMD_AUDIT_ACTION_MAP.put(Type.AbortExpiredMultiPartUploads, OMAction.ABORT_EXPIRED_MULTIPART_UPLOAD);
     CMD_AUDIT_ACTION_MAP.put(Type.SetVolumeProperty, OMAction.SET_OWNER);
     CMD_AUDIT_ACTION_MAP.put(Type.SetBucketProperty, OMAction.UPDATE_BUCKET);
-    CMD_AUDIT_ACTION_MAP.put(Type.Prepare, OMAction.UPGRADE_PREPARE);
-    CMD_AUDIT_ACTION_MAP.put(Type.CancelPrepare, OMAction.UPGRADE_CANCEL);
     CMD_AUDIT_ACTION_MAP.put(Type.FinalizeUpgrade, OMAction.UPGRADE_FINALIZE);
     CMD_AUDIT_ACTION_MAP.put(Type.GetObjectTagging, OMAction.GET_OBJECT_TAGGING);
     CMD_AUDIT_ACTION_MAP.put(Type.PutObjectTagging, OMAction.PUT_OBJECT_TAGGING);
     CMD_AUDIT_ACTION_MAP.put(Type.DeleteObjectTagging, OMAction.DELETE_OBJECT_TAGGING);
+    CMD_AUDIT_ACTION_MAP.put(Type.AssumeRole, OMAction.S3_ASSUME_ROLE);
+    CMD_AUDIT_ACTION_MAP.put(Type.RevokeSTSToken, OMAction.REVOKE_STS_TOKEN);
     CMD_AUDIT_ACTION_MAP.put(Type.GetBucketTagging, OMAction.GET_BUCKET_TAGGING);
     CMD_AUDIT_ACTION_MAP.put(Type.PutBucketTagging, OMAction.PUT_BUCKET_TAGGING);
     CMD_AUDIT_ACTION_MAP.put(Type.DeleteBucketTagging, OMAction.DELETE_BUCKET_TAGGING);

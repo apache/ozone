@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.METADATA_ERROR;
 
@@ -44,7 +43,6 @@ import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
@@ -52,12 +50,10 @@ import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerRequestHandler;
 import org.apache.hadoop.ozone.protocolPB.RequestHandler;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
@@ -68,7 +64,6 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
-import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.RaftLog;
@@ -104,6 +99,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final boolean isTracingEnabled;
   private final AtomicInteger statePausedCount = new AtomicInteger(0);
   private final String threadPrefix;
+
+  /**
+   * Guards updates to notified, skipped and applied term-index state.
+   * When both locks are needed, acquire the state-machine monitor first.
+   */
+  private final Object termIndexLock = new Object();
 
   /** The last {@link TermIndex} received from {@link #notifyTermIndexUpdated(long, long)}. */
   private volatile TermIndex lastNotifiedTermIndex = TermIndex.valueOf(0, RaftLog.INVALID_LOG_INDEX);
@@ -239,18 +240,20 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   /** Notified by Ratis for non-StateMachine term-index update. */
   @Override
-  public synchronized void notifyTermIndexUpdated(long currentTerm, long newIndex) {
-    // lastSkippedIndex is start of sequence (one less) of continuous notification from ratis
-    // if there is any applyTransaction (double buffer index), then this gap is handled during double buffer
-    // notification and lastSkippedIndex will be the start of last continuous sequence.
-    final long oldIndex = lastNotifiedTermIndex.getIndex();
-    if (newIndex - oldIndex > 1) {
-      lastSkippedIndex = newIndex - 1;
-    }
-    final TermIndex newTermIndex = TermIndex.valueOf(currentTerm, newIndex);
-    lastNotifiedTermIndex = assertUpdateIncreasingly("lastNotified", lastNotifiedTermIndex, newTermIndex);
-    if (lastNotifiedTermIndex.getIndex() - getLastAppliedTermIndex().getIndex() == 1) {
-      updateLastAppliedTermIndex(lastNotifiedTermIndex);
+  public void notifyTermIndexUpdated(long currentTerm, long newIndex) {
+    synchronized (termIndexLock) {
+      // lastSkippedIndex is start of sequence (one less) of continuous notification from ratis
+      // if there is any applyTransaction (double buffer index), then this gap is handled during double buffer
+      // notification and lastSkippedIndex will be the start of last continuous sequence.
+      final long oldIndex = lastNotifiedTermIndex.getIndex();
+      if (newIndex - oldIndex > 1) {
+        lastSkippedIndex = newIndex - 1;
+      }
+      final TermIndex newTermIndex = TermIndex.valueOf(currentTerm, newIndex);
+      lastNotifiedTermIndex = assertUpdateIncreasingly("lastNotified", lastNotifiedTermIndex, newTermIndex);
+      if (lastNotifiedTermIndex.getIndex() - getLastAppliedTermIndex().getIndex() == 1) {
+        updateLastAppliedTermIndex(lastNotifiedTermIndex);
+      }
     }
   }
 
@@ -259,17 +262,26 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   @Override
-  protected synchronized boolean updateLastAppliedTermIndex(TermIndex newTermIndex) {
-    TermIndex lastApplied = getLastAppliedTermIndex();
-    assertUpdateIncreasingly("lastApplied", lastApplied, newTermIndex);
-    // if newTermIndex getting updated is within sequence of notifiedTermIndex (i.e. from lastSkippedIndex and
-    // notifiedTermIndex), then can update directly to lastNotifiedTermIndex as it ensure previous double buffer's
-    // Index is notified or getting notified matching lastSkippedIndex
-    if (newTermIndex.getIndex() < getLastNotifiedTermIndex().getIndex()
-        && newTermIndex.getIndex() >= lastSkippedIndex) {
-      newTermIndex = getLastNotifiedTermIndex();
+  protected boolean updateLastAppliedTermIndex(TermIndex newTermIndex) {
+    synchronized (termIndexLock) {
+      TermIndex lastApplied = getLastAppliedTermIndex();
+      assertUpdateIncreasingly("lastApplied", lastApplied, newTermIndex);
+      // if newTermIndex getting updated is within sequence of notifiedTermIndex (i.e. from lastSkippedIndex and
+      // notifiedTermIndex), then can update directly to lastNotifiedTermIndex as it ensure previous double buffer's
+      // Index is notified or getting notified matching lastSkippedIndex
+      if (newTermIndex.getIndex() < getLastNotifiedTermIndex().getIndex()
+          && newTermIndex.getIndex() >= lastSkippedIndex) {
+        newTermIndex = getLastNotifiedTermIndex();
+      }
+      return super.updateLastAppliedTermIndex(newTermIndex);
     }
-    return super.updateLastAppliedTermIndex(newTermIndex);
+  }
+
+  /** Restore the applied term index when loading persisted state. */
+  private void restoreLastAppliedTermIndex(TermIndex termIndex) {
+    synchronized (termIndexLock) {
+      setLastAppliedTermIndex(termIndex);
+    }
   }
 
   /** Assert if the given {@link TermIndex} is updated increasingly. */
@@ -394,52 +406,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         .build();
   }
 
-  @Override
-  public TransactionContext preAppendTransaction(TransactionContext trx)
-      throws IOException {
-    final OMRequest request = (OMRequest) trx.getStateMachineContext();
-    OzoneManagerProtocolProtos.Type cmdType = request.getCmdType();
-
-    OzoneManagerPrepareState prepareState = ozoneManager.getPrepareState();
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("{}: preAppendTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
-    }
-
-    if (cmdType == OzoneManagerProtocolProtos.Type.Prepare) {
-      // Must authenticate prepare requests here, since we must determine
-      // whether or not to apply the prepare gate before proceeding with the
-      // prepare request.
-      UserGroupInformation userGroupInformation =
-          UserGroupInformation.createRemoteUser(
-          request.getUserInfo().getUserName());
-      if (ozoneManager.isAdminAuthorizationEnabled()
-          && !ozoneManager.isAdmin(userGroupInformation)) {
-        String message = "Access denied for user " + userGroupInformation
-            + ". Superuser privilege is required to prepare upgrade/downgrade.";
-        OMException cause =
-            new OMException(message, OMException.ResultCodes.ACCESS_DENIED);
-        // Leader should not step down because of this failure.
-        throw new StateMachineException(message, cause, false);
-      } else {
-        prepareState.enablePrepareGate();
-      }
-    }
-
-    // In prepare mode, only prepare and cancel requests are allowed to go
-    // through.
-    if (prepareState.requestAllowed(cmdType)) {
-      return trx;
-    } else {
-      String message = "Cannot apply write request " +
-          request.getCmdType().name() + " when OM is in prepare mode.";
-      OMException cause = new OMException(message,
-          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
-      // Indicate that the leader should not step down because of this failure.
-      throw new StateMachineException(message, cause, false);
-    }
-  }
-
   /*
    * Apply a committed log entry to the state machine.
    */
@@ -544,7 +510,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     if (statePausedCount.decrementAndGet() == 0) {
       getLifeCycle().startAndTransition(() -> {
         this.ozoneManagerDoubleBuffer = buildDoubleBufferForRatis();
-        this.setLastAppliedTermIndex(TermIndex.valueOf(
+        restoreLastAppliedTermIndex(TermIndex.valueOf(
             newLastAppliedSnapShotTermIndex, newLastAppliedSnaphsotIndex));
         LOG.info("{}: OzoneManagerStateMachine un-pause completed. " +
             "newLastAppliedSnapshotIndex: {}, newLastAppliedSnapShotTermIndex: {}",
@@ -593,20 +559,33 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return takeSnapshotImpl();
   }
 
+  /**
+   * Keep this synchronized on the state-machine monitor so an in-progress
+   * snapshot finishes before checkpoint pause returns and installation can
+   * replace the metadata store. The nested term-index lock provides a
+   * consistent index to persist.
+   */
   private synchronized long takeSnapshotImpl() throws IOException {
-    final TermIndex applied = getLastAppliedTermIndex();
-    final TermIndex notified = getLastNotifiedTermIndex();
-    final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
+    synchronized (termIndexLock) {
+      final TermIndex applied = getLastAppliedTermIndex();
+      final TermIndex notified = getLastNotifiedTermIndex();
+      final TermIndex snapshot = applied.compareTo(notified) > 0 ? applied : notified;
 
-    long startTime = Time.monotonicNow();
-    final TransactionInfo transactionInfo = TransactionInfo.valueOf(snapshot);
-    ozoneManager.setTransactionInfo(transactionInfo);
-    ozoneManager.getMetadataManager().getTransactionInfoTable().put(TRANSACTION_INFO_KEY, transactionInfo);
-    ozoneManager.getMetadataManager().getStore().flushDB();
-    LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
-        "notified = {}, current snapshot index = {}, took {} ms",
-            getId(), applied, lastSkippedIndex, notified, snapshot, Time.monotonicNow() - startTime);
-    return snapshot.getIndex();
+      long startTime = Time.monotonicNow();
+      // The double buffer may have committed transactions past the index computed above, since it
+      // advances lastAppliedTermIndex only after its batch commit returns. Persisting through it
+      // keeps the stored index from moving backwards over that data, and yields whichever value is
+      // actually stored so the in-memory copy Ratis reads cannot disagree with the DB.
+      final TransactionInfo transactionInfo =
+          ozoneManagerDoubleBuffer.persistIfNewer(TransactionInfo.valueOf(snapshot));
+      ozoneManager.setTransactionInfo(transactionInfo);
+      ozoneManager.getMetadataManager().getStore().flushDB();
+      LOG.info("{}: taking snapshot. applied = {}, skipped = {}, " +
+          "notified = {}, current snapshot index = {}, took {} ms",
+              getId(), applied, lastSkippedIndex, notified, transactionInfo.getTermIndex(),
+              Time.monotonicNow() - startTime);
+      return transactionInfo.getTermIndex().getIndex();
+    }
   }
 
   /**
@@ -666,18 +645,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   @VisibleForTesting
   OMResponse runCommand(OMRequest request, TermIndex termIndex) {
-    try {
+    try (OMThreadContext.Scope ignored =
+             OMThreadContext.forWrite(request, ozoneManager).applyToCurrentThread()) {
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
           request, context, ozoneManagerDoubleBuffer);
-      OMLockDetails omLockDetails = omClientResponse.getOmLockDetails();
-      OMResponse omResponse = omClientResponse.getOMResponse();
-      if (omLockDetails != null) {
-        return omResponse.toBuilder()
-            .setOmLockDetails(omLockDetails.toProtobufBuilder()).build();
-      } else {
-        return omResponse;
-      }
+      OMLockDetails lockDetails = omClientResponse.getOmLockDetails();
+      OMResponse response = omClientResponse.getOMResponse();
+      return lockDetails == null ? response
+          : response.toBuilder().setOmLockDetails(lockDetails.toProtobufBuilder()).build();
     } catch (IOException e) {
       LOG.warn("Failed to write, Exception occurred ", e);
       return createErrorResponse(request, e, termIndex);
@@ -715,7 +691,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             ozoneManager.getMetadataManager());
     if (transactionInfo != null) {
       final TermIndex ti =  transactionInfo.getTermIndex();
-      setLastAppliedTermIndex(ti);
+      restoreLastAppliedTermIndex(ti);
       ozoneManager.setTransactionInfo(transactionInfo);
       LOG.info("LastAppliedIndex is set from TransactionInfo from OM DB as {}", ti);
     } else {
@@ -728,9 +704,12 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @param request OMRequest
    * @return response from OM
    */
-  private Message queryCommand(OMRequest request) {
-    OMResponse response = handler.handleReadRequest(request);
-    return OMRatisHelper.convertResponseToMessage(response);
+  private Message queryCommand(OMRequest request) throws IOException {
+    try (OMThreadContext.Scope context =
+             OMThreadContext.forRead(request, ozoneManager).applyToCurrentThread()) {
+      OMResponse response = handler.handleReadRequest(request);
+      return OMRatisHelper.convertResponseToMessage(context.addLockDetails(response));
+    }
   }
 
   private static <T> CompletableFuture<T> completeExceptionally(Exception e) {

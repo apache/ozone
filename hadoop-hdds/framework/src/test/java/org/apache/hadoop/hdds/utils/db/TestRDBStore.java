@@ -32,12 +32,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -257,6 +262,47 @@ public class TestRDBStore {
     checkpoint.cleanupCheckpoint();
     assertFalse(Files.exists(
         checkpoint.getCheckpointLocation()));
+  }
+
+  @Test
+  public void testCheckpointAfterManagerClose(@TempDir File cpDir) throws Exception {
+    insertRandomData(rdbStore, 1);
+    RDBCheckpointManager manager = new RDBCheckpointManager(rdbStore.getDb(), "test");
+    manager.close();
+
+    RocksDBCheckpoint checkpoint = manager.createCheckpoint(cpDir.getAbsolutePath());
+    assertNotNull(checkpoint);
+    assertThat(checkpoint.getCheckpointLocation()).exists();
+  }
+
+  @Test
+  public void testCheckpointAfterDbClose(@TempDir File cpDir) throws Exception {
+    RocksDatabase db = rdbStore.getDb();
+    db.close();
+
+    assertThrows(RocksDatabaseException.class, () -> db.createCheckpoint(cpDir.toPath().resolve("cp")));
+  }
+
+  @Test
+  public void testConcurrentCheckpoints(@TempDir File cpRoot) throws Exception {
+    insertRandomData(rdbStore, 1);
+    int threads = 4;
+    ExecutorService executor = Executors.newFixedThreadPool(threads);
+    try {
+      List<Future<DBCheckpoint>> futures = new ArrayList<>();
+      for (int i = 0; i < threads; i++) {
+        File parent = new File(cpRoot, "cp-" + i);
+        assertTrue(parent.mkdirs());
+        futures.add(executor.submit(() -> rdbStore.getCheckpoint(parent.getAbsolutePath(), false)));
+      }
+      for (Future<DBCheckpoint> future : futures) {
+        DBCheckpoint checkpoint = future.get(30, TimeUnit.SECONDS);
+        assertNotNull(checkpoint);
+        assertThat(checkpoint.getCheckpointLocation()).exists();
+      }
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @Test

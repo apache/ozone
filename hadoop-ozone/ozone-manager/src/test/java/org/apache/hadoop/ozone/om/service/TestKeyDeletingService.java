@@ -351,6 +351,45 @@ class TestKeyDeletingService extends OzoneTestBase {
     }
 
     @Test
+    void checkPurgedBytesMatchBlocksQueuedForDeletion() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String keyName = uniqueObjectName("key");
+      final long initialDeletedCount = getDeletedKeyCount();
+
+      // Create Volume and Bucket with versioning enabled
+      createVolumeAndBucket(volumeName, bucketName, true);
+
+      keyDeletingService.suspend();
+
+      // Create 2 versions of the same key, so the delete entry spans two version groups
+      OmKeyArgs firstVersion = createAndCommitKey(volumeName, bucketName, keyName, 1);
+      OmKeyArgs secondVersion = createAndCommitKey(volumeName, bucketName, keyName, 3);
+      writeClient.deleteKey(firstVersion);
+      // The delete has to reach RocksDB before getPendingDeletionKeys() can see it.
+      om.awaitDoubleBufferFlush();
+
+      // Both versions are queued for deletion, so the purged bytes must account for both.
+      long expectedPurgedBytes =
+          QuotaUtil.getReplicatedSize(firstVersion.getDataSize(), firstVersion.getReplicationConfig())
+              + QuotaUtil.getReplicatedSize(secondVersion.getDataSize(), secondVersion.getReplicationConfig());
+
+      Map<String, PurgedKey> purgedKeys =
+          keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE).getPurgedKeys();
+      assertThat(purgedKeys).hasSize(1);
+      PurgedKey purgedKey = purgedKeys.values().iterator().next();
+      assertEquals(4, purgedKey.getBlockGroup().getDeletedBlocks().size(),
+          "the 1st version has 1 block and the 2nd version has 3");
+      assertEquals(expectedPurgedBytes, purgedKey.getPurgedBytes());
+
+      // Drain the key so it does not remain pending for the next test.
+      keyDeletingService.resume();
+      GenericTestUtils.waitFor(
+          () -> getDeletedKeyCount() >= initialDeletedCount + 1,
+          1000, 10000);
+    }
+
+    @Test
     void checkDeletedTableCleanUpForSnapshot() throws Exception {
       final String volumeName = getTestName();
       final String bucketName1 = uniqueObjectName("bucket");
@@ -1329,6 +1368,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       // wait for AOS deleted keys to be reclaimed and
       // snap2 to be deep cleaned.
       directoryDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       keyDeletingService.runPeriodicalTaskNow();
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 10, 100, 10000);
       // Verify last run AOS deletion metrics.
@@ -1347,6 +1387,8 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Delete snap1. Which also sets the snap2 to be deep cleaned.
       writeClient.deleteSnapshot(volumeName, bucketName, snap1);
+      // SnapshotDeletingService silently skips snap1 until its delete is flushed, and the 1h interval never retries.
+      om.awaitDoubleBufferFlush();
       keyManager.getSnapshotDeletingService().runPeriodicalTaskNow();
       // Wait for changes to the snap2 to be flushed.
       GenericTestUtils.waitFor(
@@ -1361,6 +1403,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // wait for snap2 to be deep cleaned.
       directoryDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       keyDeletingService.runPeriodicalTaskNow();
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 20, 100, 10000);
 

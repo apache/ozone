@@ -1135,14 +1135,17 @@ public class TestSnapshotDiffManager {
 
     spy.loadJobsOnStartUp();
 
-    // Wait for sometime to make sure that job finishes.
-    attempt(() ->
-        verify(spy, atLeast(1))
-            .generateSnapshotDiffReport(anyString(), anyString(),
-                eq(VOLUME_NAME), eq(BUCKET_NAME), eq(snapshotInfo.getName()),
-                eq(snapshotInfoList.get(1).getName()), eq(false),
-                eq(false)),
-        10, TimeDuration.ONE_SECOND, null, null);
+    // Wait until the job's status is persisted as DONE. Mockito records the
+    // invocation before running the stubbed answer, so waiting on verify(...)
+    // alone can return while the answer is still executing and has not yet
+    // written DONE to the DB, leaving the read below to observe IN_PROGRESS.
+    attempt(() -> {
+      if (getSnapshotDiffJobFromDb(snapshotInfo, snapshotInfoList.get(1))
+          .getStatus() != DONE) {
+        throw new IllegalStateException("Snapshot diff job is not DONE yet.");
+      }
+      return null;
+    }, 10, TimeDuration.ONE_SECOND, null, null);
 
     SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(snapshotInfo,
         snapshotInfoList.get(1));
@@ -1559,6 +1562,24 @@ public class TestSnapshotDiffManager {
     SnapshotDiffJob updated = spy.getSnapDiffJobTable().get(ctx.diffJobKey);
     assertNotNull(updated);
     assertEquals(IN_PROGRESS, updated.getStatus());
+  }
+
+  @Test
+  public void testUpdateJobStatusToDoneSkipsSupersededJob() throws IOException {
+    SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
+    String liveJobId = UUID.randomUUID().toString();
+    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey,
+        new SnapshotDiffJob(0L, liveJobId, IN_PROGRESS, ctx.volumeName, ctx.bucketName,
+            ctx.fromSnapshotName, ctx.toSnapshotName, false, false, 0L, null, 0.0, null));
+
+    // A superseded task's publish is ignored, the live job's own publish goes through.
+    snapshotDiffManager.updateJobStatusToDone(ctx.diffJobKey, UUID.randomUUID().toString(), 5L, "staleKey");
+    assertEquals(IN_PROGRESS, snapshotDiffManager.getSnapDiffJobTable().get(ctx.diffJobKey).getStatus());
+
+    snapshotDiffManager.updateJobStatusToDone(ctx.diffJobKey, liveJobId, 5L, "liveKey");
+    SnapshotDiffJob done = snapshotDiffManager.getSnapDiffJobTable().get(ctx.diffJobKey);
+    assertEquals(DONE, done.getStatus());
+    assertEquals("liveKey", done.getLargestEntryKey());
   }
 
   @Test

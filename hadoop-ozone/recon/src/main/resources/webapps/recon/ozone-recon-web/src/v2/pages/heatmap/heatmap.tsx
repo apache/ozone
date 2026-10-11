@@ -28,7 +28,6 @@ import { HeatmapChild, HeatmapResponse, HeatmapState, InputPathState, InputPathV
 import HeatmapPlot from '@/v2/components/plots/heatmapPlot';
 
 import './heatmap.less';
-import { useLocation } from 'react-router-dom';
 
 let minSize = Infinity;
 let maxSize = 0;
@@ -40,10 +39,6 @@ const DEFAULT_HEATMAP_RESPONSE: HeatmapResponse = {
   size: 0,
   maxAccessCount: 0,
   minAccessCount: 0
-};
-
-const DEFAULT_DISABLED_FEATURES_RESPONSE = {
-  data: []
 };
 
 const Heatmap: React.FC<{}> = () => {
@@ -62,8 +57,9 @@ const Heatmap: React.FC<{}> = () => {
   const [searchPath, setSearchPath] = useState<string>(CONSTANTS.ROOT_PATH);
   const [treeEndpointFailed, setTreeEndpointFailed] = useState<boolean>(false);
 
-  const location = useLocation();
-  const [isHeatmapEnabled, setIsHeatmapEnabled] = useState<boolean>((location?.state as any)?.isHeatmapEnabled);
+  // Heatmap availability is derived from the data endpoint: AccessHeatMapEndpoint returns 404
+  // when the feature is disabled in config (same source as disabledFeatures).
+  const [isHeatmapEnabled, setIsHeatmapEnabled] = useState<boolean>(true);
 
   // Use the modern hooks pattern for heatmap data - only trigger on searchPath change
   const heatmapData = useApiData<HeatmapResponse>(
@@ -74,9 +70,11 @@ const Heatmap: React.FC<{}> = () => {
     {
       retryAttempts: 2,
       onError: (error: any) => {
-        if (error.response?.status !== 404) {
-          showDataFetchError(error.message.toString());
+        if (error.response?.status === 404) {
+          setIsHeatmapEnabled(false);
+          return;
         }
+        showDataFetchError(error.message.toString());
         setTreeEndpointFailed(true);
         setInputPathState(prevState => ({
           ...prevState,
@@ -84,16 +82,6 @@ const Heatmap: React.FC<{}> = () => {
         }));
         setSearchPath(CONSTANTS.ROOT_PATH);
       }
-    }
-  );
-
-  // Use the modern hooks pattern for disabled features
-  const disabledFeaturesData = useApiData<{ data: string[] }>(
-    '/api/v1/features/disabledFeatures',
-    DEFAULT_DISABLED_FEATURES_RESPONSE,
-    {
-      retryAttempts: 2,
-      onError: (error: any) => showDataFetchError(error)
     }
   );
 
@@ -110,13 +98,6 @@ const Heatmap: React.FC<{}> = () => {
       setTreeEndpointFailed(false);
     }
   }, [heatmapData.data]);
-
-  // Process disabled features data when it changes
-  useEffect(() => {
-    if (disabledFeaturesData.data && disabledFeaturesData.data.data) {
-      setIsHeatmapEnabled(!disabledFeaturesData.data.data.includes('HEATMAP'));
-    }
-  }, [disabledFeaturesData.data]);
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
@@ -233,7 +214,7 @@ const Heatmap: React.FC<{}> = () => {
 
   const { date, entityType, heatmapResponse } = state;
   const { inputPath, helpMessage, isInputPathValid } = inputPathState;
-  const loading = heatmapData.loading || disabledFeaturesData.loading;
+  const loading = heatmapData.loading;
 
   const menuCalendar = (
     <Menu

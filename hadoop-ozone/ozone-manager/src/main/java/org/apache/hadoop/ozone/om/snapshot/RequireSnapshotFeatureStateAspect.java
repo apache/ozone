@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 /**
  * 'Aspect' for checking whether snapshot feature is enabled.
  * All methods annotated with the specific annotation will have pre-processing
- * done here to check layout version compatibility.
+ * done here to check snapshot feature / component version compatibility.
  * Note: Append class to
  *  hadoop-ozone/ozone-manager/src/main/resources/META-INF/aop.xml
  * if the annotation doesn't seem to take affect on other classes' methods.
