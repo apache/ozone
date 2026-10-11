@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om.ratis;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.SIMPLE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -340,6 +342,60 @@ public class TestOzoneManagerStateMachine {
       } finally {
         pauseExecutor.shutdownNow();
       }
+    } finally {
+      testSm.stop();
+    }
+  }
+
+  @Test
+  public void testUnpauseKeepingOldDbFailsWhenApplyAboveItWasRejected() throws Exception {
+    OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
+        om, doubleBuffer, handler, executor, null) {
+      @Override
+      public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+        return doubleBuffer;
+      }
+    };
+    try {
+      OMRequest request = sampleWriteRequest();
+      // A rejected entry at or below the restored index is in the kept DB, so applies resume.
+      testSm.pause();
+      assertRejectedWhilePaused(testSm.applyTransaction(mockTrx(request, 1, 5)));
+      testSm.unpause(5, 1, true);
+
+      // Ratis never retries an entry above the restored index, so applies must stay rejected.
+      testSm.pause();
+      assertRejectedWhilePaused(testSm.applyTransaction(mockTrx(request, 1, 7)));
+      assertThatThrownBy(() -> testSm.unpause(6, 1, true))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("up to index 7");
+      assertRejectedWhilePaused(testSm.applyTransaction(mockTrx(request, 1, 8)));
+    } finally {
+      testSm.stop();
+    }
+  }
+
+  private static void assertRejectedWhilePaused(CompletableFuture<Message> future) {
+    ExecutionException ex = assertThrows(ExecutionException.class, future::get);
+    assertThat(ex.getCause()).isInstanceOf(IOException.class).hasMessageContaining("while state machine is paused");
+  }
+
+  @Test
+  public void testUnpauseChecksAppliesRejectedWhileRebuildingDoubleBuffer() {
+    OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
+        om, doubleBuffer, handler, executor, null) {
+      @Override
+      public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+        assertRejectedWhilePaused(applyTransaction(mockTrx(sampleWriteRequest(), 1, 7)));
+        return doubleBuffer;
+      }
+    };
+    try {
+      testSm.pause();
+      assertThatThrownBy(() -> testSm.unpause(6, 1, true))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("up to index 7");
+      assertRejectedWhilePaused(testSm.applyTransaction(mockTrx(sampleWriteRequest(), 1, 8)));
     } finally {
       testSm.stop();
     }
@@ -1114,6 +1170,32 @@ public class TestOzoneManagerStateMachine {
     assertThrows(IOException.class, () -> sm.takeSnapshot());
   }
 
+  @Test
+  public void testAwaitAppliedWaitsForFlush() throws Exception {
+    sm.notifyTermIndexUpdated(1, 0);
+    when(om.isStopped()).thenReturn(false);
+    doAnswer(invocation -> {
+      sm.updateLastAppliedTermIndex(TermIndex.valueOf(1, 2));
+      return null;
+    }).when(doubleBuffer).awaitFlush();
+
+    sm.awaitApplied(2);
+    assertTermIndex(1, 2, sm.getLastAppliedTermIndex());
+    verify(doubleBuffer).awaitFlush();
+
+    // Already applied: returns without waiting.
+    sm.awaitApplied(1);
+    verify(doubleBuffer).awaitFlush();
+  }
+
+  @Test
+  public void testAwaitAppliedOmStopped() {
+    when(om.isStopped()).thenReturn(true);
+    sm.notifyTermIndexUpdated(1, 0);
+
+    assertThrows(IOException.class, () -> sm.awaitApplied(1));
+  }
+
   // --- loadSnapshotInfoFromDB tests ---
 
   @Test
@@ -1353,6 +1435,58 @@ public class TestOzoneManagerStateMachine {
     sm.pause();
 
     verify(doubleBuffer, times(2)).stop();
+  }
+
+  @Test
+  public void testPauseWaitsForSnapshotDuringFlush() throws Exception {
+    initializeStateMachine();
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    when(om.getMetadataManager()).thenReturn(metadataManager);
+    when(metadataManager.getStore()).thenReturn(mock(DBStore.class));
+
+    CountDownLatch flushWaitReached = new CountDownLatch(1);
+    CountDownLatch releaseFlushWait = new CountDownLatch(1);
+    CountDownLatch snapshotWriteReached = new CountDownLatch(1);
+    CountDownLatch releaseSnapshotWrite = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      flushWaitReached.countDown();
+      awaitUninterruptibly(releaseFlushWait);
+      return null;
+    }).when(doubleBuffer).awaitFlush();
+    when(doubleBuffer.persistIfNewer(any(TransactionInfo.class))).thenAnswer(invocation -> {
+      snapshotWriteReached.countDown();
+      awaitUninterruptibly(releaseSnapshotWrite);
+      return invocation.getArgument(0);
+    });
+
+    AtomicReference<Thread> pauseThread = new AtomicReference<>();
+    ExecutorService pauseExecutor = Executors.newSingleThreadExecutor(runnable -> {
+      Thread thread = new Thread(runnable, "test-pause-during-snapshot");
+      pauseThread.set(thread);
+      return thread;
+    });
+    ExecutorService snapshotExecutor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> pauseFuture = pauseExecutor.submit(sm::pause);
+      assertTrue(flushWaitReached.await(5, TimeUnit.SECONDS));
+      Future<Long> snapshotFuture = snapshotExecutor.submit(sm::takeSnapshot);
+      assertTrue(snapshotWriteReached.await(5, TimeUnit.SECONDS));
+
+      releaseFlushWait.countDown();
+      waitFor(() -> pauseThread.get().getState() == Thread.State.BLOCKED, 10, 5000);
+      assertFalse(pauseFuture.isDone());
+
+      releaseSnapshotWrite.countDown();
+      snapshotFuture.get(5, TimeUnit.SECONDS);
+      pauseFuture.get(5, TimeUnit.SECONDS);
+    } finally {
+      releaseFlushWait.countDown();
+      releaseSnapshotWrite.countDown();
+      pauseExecutor.shutdownNow();
+      snapshotExecutor.shutdownNow();
+      pauseExecutor.awaitTermination(5, TimeUnit.SECONDS);
+      snapshotExecutor.awaitTermination(5, TimeUnit.SECONDS);
+    }
   }
 
   /**

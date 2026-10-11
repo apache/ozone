@@ -101,6 +101,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private final Object applyTransactionMonitor = new Object();
   private volatile boolean applyTransactionPaused = false;
   private int inFlightApplyTransactions = 0;
+  // Highest index whose apply was rejected while paused. Reset when a pause starts (not by a nested pause).
+  private long lastRejectedApplyIndex = RaftLog.INVALID_LOG_INDEX;
   private final String threadPrefix;
 
   /**
@@ -437,7 +439,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // lastAppliedIndex in OzoneManager StateMachine, even if other
       // executor has completed the transactions with id more.
 
-      if (!tryEnterApplyTransaction()) {
+      if (!tryEnterApplyTransaction(termIndex.getIndex())) {
         return completeExceptionally(new IOException("Cannot apply transaction while state machine is paused."));
       }
       try {
@@ -541,7 +543,9 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     if (interrupted) {
       Thread.currentThread().interrupt();
     }
-    ozoneManagerDoubleBuffer.stop();
+    synchronized (this) {
+      ozoneManagerDoubleBuffer.stop();
+    }
   }
 
   /**
@@ -551,6 +555,15 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    */
   public synchronized void unpause(long newLastAppliedSnaphsotIndex,
       long newLastAppliedSnapShotTermIndex) {
+    unpause(newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex, false);
+  }
+
+  /**
+   * Same as {@link #unpause(long, long)}. If oldDbKept, Ratis does not reload the state machine, so it never
+   * retries an apply rejected while paused: if one is above the restored index, keep rejecting applies and throw.
+   */
+  public synchronized void unpause(long newLastAppliedSnaphsotIndex,
+      long newLastAppliedSnapShotTermIndex, boolean oldDbKept) {
     if (statePausedCount.decrementAndGet() == 0) {
       try {
         getLifeCycle().startAndTransition(() -> {
@@ -562,7 +575,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
               getId(), newLastAppliedSnaphsotIndex, newLastAppliedSnapShotTermIndex);
         });
       } finally {
-        resumeApplyTransaction();
+        resumeApplyTransaction(oldDbKept ? newLastAppliedSnaphsotIndex : Long.MAX_VALUE);
       }
     }
   }
@@ -795,6 +808,20 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     ozoneManagerDoubleBuffer.awaitFlush();
   }
 
+  /** Wait until the state machine has applied and flushed up to the given index. */
+  public void awaitApplied(long index) throws IOException {
+    while (getLastAppliedTermIndex().getIndex() < index) {
+      if (ozoneManager.isStopped()) {
+        throw new IOException("OzoneManager is already stopped: " + ozoneManager.getNodeDetails());
+      }
+      try {
+        ozoneManagerDoubleBuffer.awaitFlush();
+      } catch (InterruptedException e) {
+        throw IOUtils.toInterruptedIOException("Interrupted ozoneManagerDoubleBuffer.awaitFlush", e);
+      }
+    }
+  }
+
   @VisibleForTesting
   public OzoneManagerDoubleBuffer getOzoneManagerDoubleBuffer() {
     return ozoneManagerDoubleBuffer;
@@ -806,6 +833,7 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
         return;
       }
       applyTransactionPaused = true;
+      lastRejectedApplyIndex = RaftLog.INVALID_LOG_INDEX;
       boolean interrupted = false;
       while (inFlightApplyTransactions > 0) {
         try {
@@ -822,18 +850,27 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   }
 
   private void resumeApplyTransaction() {
+    resumeApplyTransaction(Long.MAX_VALUE);
+  }
+
+  private void resumeApplyTransaction(long restoredIndex) {
     synchronized (applyTransactionMonitor) {
       if (!applyTransactionPaused) {
         return;
+      }
+      if (lastRejectedApplyIndex > restoredIndex) {
+        throw new IllegalStateException("Transactions up to index " + lastRejectedApplyIndex
+            + " were rejected while the state machine was paused, above the restored index " + restoredIndex);
       }
       applyTransactionPaused = false;
       applyTransactionMonitor.notifyAll();
     }
   }
 
-  private boolean tryEnterApplyTransaction() {
+  private boolean tryEnterApplyTransaction(long index) {
     synchronized (applyTransactionMonitor) {
       if (applyTransactionPaused) {
+        lastRejectedApplyIndex = Math.max(lastRejectedApplyIndex, index);
         return false;
       }
       inFlightApplyTransactions++;
