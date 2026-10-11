@@ -64,7 +64,11 @@ if [[ "${OZONE_REPO_CACHED}" == "true" ]] && [[ "${CHECK}" == "integration" ]]; 
   args_str="$*"
   if [[ "${args_str}" != *"-Ptest-filesystem"* ]] && [[ "${args_str}" != *"-Ptest-flaky"* ]] \
       && [[ "${args_str}" != *"-Dtest="* ]]; then
-    INTEGRATION_REACTOR_PL=(-pl '!:ozone-integration-test,!:ozone-integration-test-recon,!:ozone-integration-test-s3')
+    if [[ "${args_str}" == *"-Ptest-recon"* ]]; then
+      INTEGRATION_REACTOR_PL=(-pl :ozone-integration-test-recon)
+    else
+      INTEGRATION_REACTOR_PL=(-pl :ozone-integration-test)
+    fi
   fi
 fi
 

@@ -107,7 +107,7 @@ def fetch_build_page(
 ) -> List[Dict[str, Any]]:
   params = {
       "fromInstant": str(from_instant),
-      "reverse": "true",
+      "reverse": "false",
       "maxBuilds": str(max_builds),
       "maxWaitSecs": "30",
       "query": query,
@@ -122,7 +122,10 @@ def median_ms(durations: List[int]) -> Optional[int]:
   if not durations:
     return None
   ordered = sorted(durations)
-  return ordered[len(ordered) // 2]
+  mid = len(ordered) // 2
+  if len(ordered) % 2 == 0:
+    return (ordered[mid - 1] + ordered[mid]) // 2
+  return ordered[mid]
 
 
 def summarize(builds: List[Dict[str, Any]], query: str) -> None:
