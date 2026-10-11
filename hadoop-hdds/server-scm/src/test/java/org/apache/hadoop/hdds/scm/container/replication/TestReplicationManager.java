@@ -2359,4 +2359,67 @@ public class TestReplicationManager {
         .isEmpty());
     assertEquals(0, rm.getInflightReconstructionCount());
   }
+
+  @Test
+  public void testIsNodeHighlyLoadedAtThresholdBoundary()
+      throws IOException, NodeNotFoundException {
+    rmConf.setEcDecommissionReconstructionLoadFactor(0.9);
+    rmConf.setDatanodeReplicationLimit(10);
+    ReplicationManager rm = createReplicationManager();
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+
+    mockReplicationCommandCounts(any -> 9, any -> 0);
+    assertTrue(rm.isNodeHighlyLoaded(dn));
+
+    mockReplicationCommandCounts(any -> 8, any -> 0);
+    assertFalse(rm.isNodeHighlyLoaded(dn));
+  }
+
+  @Test
+  public void testIsNodeHighlyLoadedReconstructionCommandWeight()
+      throws IOException, NodeNotFoundException {
+    rmConf.setEcDecommissionReconstructionLoadFactor(0.9);
+    rmConf.setDatanodeReplicationLimit(20);
+    ReplicationManager rm = createReplicationManager();
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+
+    mockReplicationCommandCounts(any -> 15, any -> 1);
+    assertTrue(rm.isNodeHighlyLoaded(dn));
+
+    mockReplicationCommandCounts(any -> 14, any -> 1);
+    assertFalse(rm.isNodeHighlyLoaded(dn));
+  }
+
+  @Test
+  public void testIsNodeHighlyLoadedOutOfServiceLimit()
+      throws IOException, NodeNotFoundException {
+    configuration.set("hdds.datanode.replication.outofservice.limit.factor", "2.0");
+    rmConf = configuration.getObject(
+        ReplicationManager.ReplicationManagerConfiguration.class);
+    rmConf.setEcDecommissionReconstructionLoadFactor(0.9);
+    rmConf.setDatanodeReplicationLimit(10);
+    ReplicationManager rm = createReplicationManager();
+
+    DatanodeDetails inServiceDn = MockDatanodeDetails.randomDatanodeDetails();
+    mockReplicationCommandCounts(any -> 9, any -> 0);
+    assertTrue(rm.isNodeHighlyLoaded(inServiceDn));
+
+    DatanodeDetails decomDn = MockDatanodeDetails.randomDatanodeDetails();
+    decomDn.setPersistedOpState(DECOMMISSIONING);
+    mockReplicationCommandCounts(any -> 18, any -> 0);
+    assertTrue(rm.isNodeHighlyLoaded(decomDn));
+
+    mockReplicationCommandCounts(any -> 17, any -> 0);
+    assertFalse(rm.isNodeHighlyLoaded(decomDn));
+  }
+
+  @Test
+  public void testIsNodeHighlyLoadedNodeNotFound()
+      throws IOException, NodeNotFoundException {
+    ReplicationManager rm = createReplicationManager();
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    when(nodeManager.getTotalDatanodeCommandCounts(any(), any(), any()))
+        .thenThrow(new NodeNotFoundException(dn.getID()));
+    assertTrue(rm.isNodeHighlyLoaded(dn));
+  }
 }
