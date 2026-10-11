@@ -69,23 +69,23 @@ public abstract class XceiverClientSpi implements Closeable {
     this.referenceCount.incrementAndGet();
   }
 
-  void decrementReference() {
+  /** @return true if the caller should now close this client. */
+  boolean decrementReference() {
     this.referenceCount.decrementAndGet();
-    cleanup();
+    return shouldClose();
   }
 
-  void setEvicted() {
+  /** @return true if the caller should now close this client. */
+  boolean setEvicted() {
     isEvicted = true;
-    cleanup();
+    return shouldClose();
   }
 
   // close the xceiverClient only if,
   // 1) there is no refcount on the client
   // 2) it has been evicted from the cache.
-  private void cleanup() {
-    if (referenceCount.get() == 0 && isEvicted) {
-      close();
-    }
+  private boolean shouldClose() {
+    return referenceCount.get() == 0 && isEvicted;
   }
 
   @VisibleForTesting

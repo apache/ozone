@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -115,7 +116,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
   }
 
   @Test
-  public void testFreeByReference(@TempDir Path metaDir) throws IOException {
+  public void testFreeByReference(@TempDir Path metaDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     ScmClientConfig clientConfig = conf.getObject(ScmClientConfig.class);
     clientConfig.setMaxSize(1);
@@ -160,6 +161,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       clientManager.releaseClient(client1, false);
 
       // Create container should throw exception on closed client
+      GenericTestUtils.waitFor(client1::isClosed, 100, 10000);
       Throwable t = assertThrows(IOException.class,
           () -> ContainerProtocolCalls.createContainer(client1,
               container1.getContainerInfo().getContainerID(), null));
@@ -170,7 +172,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
   }
 
   @Test
-  public void testFreeByEviction(@TempDir Path metaDir) throws IOException {
+  public void testFreeByEviction(@TempDir Path metaDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     ScmClientConfig clientConfig = conf.getObject(ScmClientConfig.class);
     clientConfig.setMaxSize(1);
@@ -209,6 +211,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       assertNull(nonExistent);
 
       // Any container operation should now fail
+      GenericTestUtils.waitFor(client1::isClosed, 100, 10000);
       Throwable t = assertThrows(IOException.class,
           () -> ContainerProtocolCalls.createContainer(client1,
               container1.getContainerInfo().getContainerID(), null));
