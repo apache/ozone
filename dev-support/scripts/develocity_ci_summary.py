@@ -86,11 +86,11 @@ def verify_api_permission(access_key: str) -> None:
     body = e.read().decode("utf-8", errors="replace")
     if e.code == 403 and "accessBuildDataViaApi" in body:
       raise SystemExit(
-          "This access key can sign in to Develocity but lacks "
-          "'Access build data via the API' (API Client / exportData). "
-          "Create a new access key with that permission, or ask an admin to "
-          "assign the API Client or Developer role, then update "
-          "~/.asf-jira-pat [develocity] DEVELOCITY_ACCESS_KEY.\n\n"
+          "This access key can sign in to Develocity (viewScan works) but lacks "
+          "'Access build data via the API' (accessBuildDataViaApi / api-client role). "
+          "New keys inherit account permissions only — in My settings → Permissions "
+          "confirm that permission, or ask a Develocity admin for the API Client role, "
+          "then update ~/.asf-jira-pat [develocity] DEVELOCITY_ACCESS_KEY.\n\n"
           "Baseline (Failures UI export, Apache Ozone Main, Jul–Sep 2026):\n"
           "  MDEP-187 reactor unpack (~75 builds) — addressed in HDDS-16600\n"
           "  ozone-manager artifact:compare (~10) — intermittent on current CI\n"
