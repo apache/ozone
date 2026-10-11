@@ -45,14 +45,16 @@ def load_access_key(creds_path: str) -> str:
   parser = configparser.ConfigParser()
   parser.read(creds_path)
   if parser.has_section("develocity"):
-    key = parser.get("develocity", "DEVELOCITY_ACCESS_KEY", fallback="").strip()
-    if key:
-      return key
+    for option in ("DEVELOCITY_ACCESS_KEY", "develocity_access_key"):
+      key = parser.get("develocity", option, fallback="").strip()
+      if key:
+        return key
 
   raise SystemExit(
       "Add a Develocity access key to ~/.asf-jira-pat:\n"
       "  [develocity]\n"
       "  DEVELOCITY_ACCESS_KEY=<key from develocity.apache.org My settings>\n"
+      "Enable 'Access build data via the API' when creating the key.\n"
       "Or export DEVELOCITY_ACCESS_KEY.")
 
 
@@ -179,7 +181,27 @@ def main() -> None:
       action="store_true",
       help="Also summarize buildOutcome:failed hasNonVerificationFailure builds",
   )
+  ap.add_argument(
+      "--builds-json",
+      metavar="FILE",
+      help="Analyze a saved /api/builds JSON array (skip live API; no key permission needed)",
+  )
   args = ap.parse_args()
+
+  if args.builds_json:
+    with open(args.builds_json, encoding="utf-8") as f:
+      builds = json.load(f)
+    if not isinstance(builds, list):
+      raise SystemExit(f"--builds-json must be a JSON array, got {type(builds)}")
+    summarize(builds, args.query)
+    if args.failures_only:
+      filtered = [
+          b for b in builds
+          if b.get("buildOutcome") == "failed" and b.get("hasNonVerificationFailure")]
+      print()
+      print("--- Non-verification failures (from file) ---")
+      summarize(filtered, f"{args.query} (filtered from file)")
+    return
 
   access_key = load_access_key(args.creds)
   verify_api_permission(access_key)
