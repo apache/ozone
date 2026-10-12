@@ -682,7 +682,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
 
     OMException omEx = assertThrows(OMException.class,
         () -> omSpy.resolveBucketLink(Pair.of(targetVolume, "dangling-link")));
-    assertEquals(ResultCodes.BUCKET_NOT_FOUND, omEx.getResult());
+    assertEquals(ResultCodes.VOLUME_NOT_FOUND, omEx.getResult());
     assertThat(omEx.getMessage()).contains("Cannot follow bucket link");
   }
 
@@ -734,7 +734,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
 
     OMException omEx = assertThrows(OMException.class,
         () -> omSpy.listKeys(targetVolume, "dangling-link-list", null, null, 100));
-    assertEquals(ResultCodes.BUCKET_NOT_FOUND, omEx.getResult());
+    assertEquals(ResultCodes.VOLUME_NOT_FOUND, omEx.getResult());
     assertThat(omEx.getMessage()).contains("Cannot follow bucket link");
     verify(bucketManager).getBucketInfo(eq(targetVolume), eq("dangling-link-list"));
     verify(bucketManager).getBucketInfo(eq(missingSourceVolume), eq("any-bucket"));
