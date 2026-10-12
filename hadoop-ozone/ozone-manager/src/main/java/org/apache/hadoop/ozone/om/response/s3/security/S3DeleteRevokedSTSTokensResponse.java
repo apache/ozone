@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.s3.security;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 
 import jakarta.annotation.Nonnull;
@@ -26,14 +25,12 @@ import java.util.List;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for DeleteRevokedSTSTokens request.
  */
-@CleanupTableInfo(cleanupTables = {S3_REVOKED_STS_TOKEN_TABLE})
 public class S3DeleteRevokedSTSTokensResponse extends OMClientResponse {
 
   private final List<String> originalAccessKeyIds;

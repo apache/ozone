@@ -421,7 +421,7 @@ public final class TestContainerBalancerAdvisor {
         .setUuid(UUID.randomUUID())
         .build();
     return DatanodeUsageInfoProto.newBuilder()
-        .setNode(datanode.toProto(DEFAULT_VERSION.toProtoValue()))
+        .setNode(datanode.toProto(DEFAULT_VERSION))
         .setCapacity(capacity)
         .setRemaining(remaining)
         .setUsed(capacity - remaining)

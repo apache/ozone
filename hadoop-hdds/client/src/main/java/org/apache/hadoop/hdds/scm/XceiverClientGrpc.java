@@ -327,7 +327,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
             futureHashMap = new HashMap<>();
     if (!request.hasVersion()) {
       ContainerCommandRequestProto.Builder builder = ContainerCommandRequestProto.newBuilder(request);
-      builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+      builder.setVersion(ClientVersion.CURRENT.serialize());
       request = builder.build();
     }
     for (DatanodeDetails dn : datanodeList) {
@@ -419,7 +419,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
               ContainerCommandRequestProto.newBuilder(request)
                   .setTraceID(TracingUtil.exportCurrentSpan());
           if (!request.hasVersion()) {
-            builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+            builder.setVersion(ClientVersion.CURRENT.serialize());
           }
           return sendCommandWithRetry(builder.build(), validators);
         });
@@ -618,8 +618,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           throw new IOException("Failed to get gRPC stub for DataNode: " + dn);
         }
         LOG.debug("initStreamRead {} on datanode {}", blockID.getContainerBlockID(), dn);
-        stub.withDeadlineAfter(timeout, TimeUnit.SECONDS)
-            .send(new ReadyAwareResponseObserver(dn, streamObserver));
+        // No deadline: it would bound the entire long-lived streaming call. Per-request timeliness is
+        // enforced by streamReadTimeout in streamRead() and StreamingReader.poll().
+        stub.send(new ReadyAwareResponseObserver(dn, streamObserver));
         return;
       } catch (IOException e) {
         LOG.error("Failed to start streaming read to DataNode {}", dn, e);
@@ -725,7 +726,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           ContainerCommandRequestProto.newBuilder(request)
               .setTraceID(TracingUtil.exportCurrentSpan());
       if (!request.hasVersion()) {
-        builder.setVersion(ClientVersion.CURRENT.toProtoValue());
+        builder.setVersion(ClientVersion.CURRENT.serialize());
       }
       XceiverClientReply asyncReply =
           sendCommandAsync(builder.build(), pipeline.getFirstNode());

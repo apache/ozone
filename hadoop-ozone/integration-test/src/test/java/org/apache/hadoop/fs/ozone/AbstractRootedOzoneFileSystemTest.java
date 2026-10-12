@@ -1882,6 +1882,67 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
+  void testGetFileChecksumUsesSingleOmRpc() throws Exception {
+    Path filePath = new Path(bucketPath,
+        "checksum-rpc-" + RandomStringUtils.secure().nextAlphanumeric(5));
+    ContractTestUtils.createFile(fs, filePath, true, "data".getBytes(StandardCharsets.UTF_8));
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+    long volumeInfosBefore = metrics.getNumVolumeInfos();
+    long keyLookupsBefore = metrics.getNumKeyLookups();
+
+    assertNotNull(fs.getFileChecksum(filePath));
+
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
+        "getFileChecksum must not trigger InfoBucket");
+    assertEquals(volumeInfosBefore, metrics.getNumVolumeInfos(),
+        "getFileChecksum must not trigger InfoVolume");
+    assertEquals(keyLookupsBefore, metrics.getNumKeyLookups(),
+        "getFileChecksum must use LookupFile, not LookupKey");
+  }
+
+  @Test
+  void testGetFileChecksumRejectsObsBucket() throws Exception {
+    OzoneBucket obsBucket =
+        DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    String keyName = "obs-key-" + RandomStringUtils.secure().nextAlphabetic(5);
+    DataTestUtil.createKey(obsBucket, keyName,
+        "data".getBytes(StandardCharsets.UTF_8));
+    Path keyPath = new Path(new Path(
+        new Path(OZONE_URI_DELIMITER, obsBucket.getVolumeName()),
+        obsBucket.getName()), keyName);
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> fs.getFileChecksum(keyPath));
+    assertThat(exception.getMessage()).contains(obsBucket.getName());
+    assertThat(exception.getMessage()).contains("OBJECT_STORE");
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(),
+        "getFileChecksum must not trigger InfoBucket");
+  }
+
+  @Test
+  void testGetFileChecksumOnDirectory() throws Exception {
+    Path dir = new Path(bucketPath,
+        "checksum-dir-" + RandomStringUtils.secure().nextAlphanumeric(5));
+    fs.mkdirs(dir);
+
+    assertThrows(FileNotFoundException.class, () -> fs.getFileChecksum(dir));
+  }
+
+  @Test
+  void testGetFileChecksumOnNonExistentFile() throws Exception {
+    Path missing = new Path(bucketPath,
+        "checksum-missing-" + RandomStringUtils.secure().nextAlphanumeric(5));
+
+    assertThrows(FileNotFoundException.class,
+        () -> fs.getFileChecksum(missing));
+  }
+
+  @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);
@@ -2195,6 +2256,11 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     Path volumePath1 = new Path(OZONE_URI_DELIMITER, bucket1.getVolumeName());
     Path bucketPath1 = new Path(volumePath1, bucket1.getName());
     setTimes(bucketPath1);
+  }
+
+  @Test
+  void testSetVerifyChecksum() throws Exception {
+    setVerifyChecksum(cluster, new Path(bucketPath, "testSetVerifyChecksum"));
   }
 
   @Test

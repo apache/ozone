@@ -98,11 +98,16 @@ class Buffers {
       refs.add(ref);
       array[i] = ref.get();
     }
+    length = 0;
     final ByteBuf buf = Unpooled.wrappedBuffer(array).asReadOnly();
     return ReferenceCountedObject.wrap(buf, () -> { }, () -> {
       buf.release();
       refs.forEach(ReferenceCountedObject::release);
     });
+  }
+
+  boolean isEmpty() {
+    return deque.isEmpty();
   }
 
   void cleanUpAll() {

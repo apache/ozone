@@ -35,6 +35,7 @@ public final class S3Consts {
   // Constants related to AWS Signature Version V4 calculation
   // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
   public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
+  public static final String X_AMZ_TRAILER = "x-amz-trailer";
 
   public static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
   public static final String STREAMING_UNSIGNED_PAYLOAD_TRAILER = "STREAMING-UNSIGNED-PAYLOAD-TRAILER";
@@ -82,6 +83,15 @@ public final class S3Consts {
   public static final String RESERVED_USER_METADATA_KEY_PREFIX = "ozone-s3-internal-";
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
   public static final String STORAGE_CONFIG_HEADER = "storage-config";
+  public static final String READ_CONSISTENCY_HEADER =
+      "x-ozone-read-consistency";
+  public static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
+      "x-ozone-local-lease-log-limit";
+  public static final String READ_CONSISTENCY_FOLLOWER_STALE =
+      "follower-stale";
+  public static final String READ_CONSISTENCY_FOLLOWER_LINEARIZABLE =
+      "follower-linearizable";
+  public static final String READ_CONSISTENCY_LEADER_ONLY = "leader-only";
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";
@@ -181,6 +191,41 @@ public final class S3Consts {
     public static final String UPLOADS = "uploads";
     public static final String LIFECYCLE = "lifecycle";
     public static final String ATTRIBUTES = "attributes";
+    public static final String VERSION_ID = "versionId";
+
+    // Subresources of S3 APIs that are not implemented. They are only recognized so that the
+    // request can be rejected with NotImplemented instead of falling through to another operation.
+    // See BucketOperationNotImplementedHandler and ObjectOperationNotImplementedHandler.
+    public static final String ABAC = "abac";
+    public static final String ACCELERATE = "accelerate";
+    public static final String ANALYTICS = "analytics";
+    public static final String ANNOTATION = "annotation";
+    public static final String CORS = "cors";
+    public static final String ENCRYPTION = "encryption";
+    public static final String INTELLIGENT_TIERING = "intelligent-tiering";
+    public static final String INVENTORY = "inventory";
+    public static final String LEGAL_HOLD = "legal-hold";
+    public static final String LOGGING = "logging";
+    public static final String METADATA_ANNOTATION_TABLE = "metadataAnnotationTable";
+    public static final String METADATA_CONFIGURATION = "metadataConfiguration";
+    public static final String METADATA_INVENTORY_TABLE = "metadataInventoryTable";
+    public static final String METADATA_JOURNAL_TABLE = "metadataJournalTable";
+    public static final String METADATA_TABLE = "metadataTable";
+    public static final String METRICS = "metrics";
+    public static final String NOTIFICATION = "notification";
+    public static final String OBJECT_LOCK = "object-lock";
+    public static final String OWNERSHIP_CONTROLS = "ownershipControls";
+    public static final String POLICY = "policy";
+    public static final String POLICY_STATUS = "policyStatus";
+    public static final String PUBLIC_ACCESS_BLOCK = "publicAccessBlock";
+    public static final String RENAME_OBJECT = "renameObject";
+    public static final String REPLICATION = "replication";
+    public static final String REQUEST_PAYMENT = "requestPayment";
+    public static final String RETENTION = "retention";
+    public static final String SESSION = "session";
+    public static final String VERSIONING = "versioning";
+    public static final String VERSIONS = "versions";
+    public static final String WEBSITE = "website";
 
     private QueryParams() {
       // no instances
