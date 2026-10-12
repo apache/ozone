@@ -224,6 +224,34 @@ public class TestFileChecksumHelper {
     return mockBucket;
   }
 
+  /**
+   * Exercises {@link BaseFileChecksumHelper#checksumBlock} skipping empty blocks
+   * without pre-setting checksum type (unlike {@link FakeChecksumComputer}).
+   */
+  private static class EmptyBlockRealPathHelper extends ReplicatedFileChecksumHelper {
+    EmptyBlockRealPathHelper(OzoneVolume volume, OzoneBucket bucket, OmKeyInfo keyInfo,
+        RpcClient rpcClient) throws IOException {
+      super(volume, bucket, keyInfo.getKeyName(), Long.MAX_VALUE, COMPOSITE_CRC, rpcClient, keyInfo);
+    }
+
+    @Override
+    protected List<ContainerProtos.ChunkInfo> getChunkInfos(OmKeyLocationInfo keyLocationInfo) {
+      return Collections.emptyList();
+    }
+  }
+
+  private static class EmptyBlockRealPathEcHelper extends ECFileChecksumHelper {
+    EmptyBlockRealPathEcHelper(OzoneVolume volume, OzoneBucket bucket, OmKeyInfo keyInfo,
+        RpcClient rpcClient) throws IOException {
+      super(volume, bucket, keyInfo.getKeyName(), Long.MAX_VALUE, COMPOSITE_CRC, rpcClient, keyInfo);
+    }
+
+    @Override
+    protected List<ContainerProtos.ChunkInfo> getChunkInfos(OmKeyLocationInfo keyLocationInfo) {
+      return Collections.emptyList();
+    }
+  }
+
   private static byte[] randomBytes(int len, long seed) {
     byte[] data = new byte[len];
     new Random(seed).nextBytes(data);
@@ -320,6 +348,21 @@ public class TestFileChecksumHelper {
       throws IOException {
     assertEquals(compositeChecksum(helperType),
         compositeChecksum(helperType, EMPTY_BLOCK));
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"EC", "RATIS"})
+  public void testCompositeCrcOfZeroLengthKeyWithEmptyBlockRealPath(ReplicationType helperType)
+      throws IOException {
+    List<OmKeyLocationInfo> located = Collections.singletonList(blockLocation(1, 0));
+    OmKeyInfo keyInfo = omKeyInfo(helperType, noCachedChecksum, located, 0);
+    BaseFileChecksumHelper helper = helperType == ReplicationType.RATIS
+        ? new EmptyBlockRealPathHelper(mockVolume(), mockBucket(), keyInfo,
+        mockRpcClientForChecksumHelper())
+        : new EmptyBlockRealPathEcHelper(mockVolume(), mockBucket(), keyInfo,
+        mockRpcClientForChecksumHelper());
+    helper.compute();
+    assertEquals(compositeChecksum(helperType), helper.getFileChecksum());
   }
 
   @ParameterizedTest

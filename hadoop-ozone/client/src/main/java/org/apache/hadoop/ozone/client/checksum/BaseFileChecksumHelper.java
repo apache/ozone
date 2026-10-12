@@ -387,11 +387,35 @@ public abstract class BaseFileChecksumHelper {
     }
   }
 
-  FileChecksum makeCompositeCrcResult() throws IOException {
-    long blockSizeHint = 0;
-    if (!keyLocationInfos.isEmpty()) {
-      blockSizeHint = keyLocationInfos.get(0).getLength();
+  private long consumedBlockLength(int blockIndex, long sumBlockLengths) {
+    OmKeyLocationInfo block = keyLocationInfos.get(blockIndex);
+    if (blockIndex < keyLocationInfos.size() - 1) {
+      return block.getLength();
     }
+    return Math.min(length - sumBlockLengths, block.getLength());
+  }
+
+  private boolean hasBytesToComposite() {
+    long sumBlockLengths = 0;
+    for (int i = 0; i < keyLocationInfos.size(); ++i) {
+      long consumedLength = consumedBlockLength(i, sumBlockLengths);
+      if (consumedLength == 0) {
+        continue;
+      }
+      sumBlockLengths += consumedLength;
+    }
+    return sumBlockLengths > 0;
+  }
+
+  FileChecksum makeCompositeCrcResult() throws IOException {
+    if (!hasBytesToComposite()) {
+      // Every block is empty, e.g. a zero-length key whose writer died
+      // after allocating a block. Treat it like a key without blocks.
+      // Detect this before constructing CrcComposer because skipped empty
+      // blocks never set checksumType.
+      return makeEmptyFileChecksum();
+    }
+    long blockSizeHint = keyLocationInfos.get(0).getLength();
     CrcComposer crcComposer =
         CrcComposer.newCrcComposer(toHadoopChecksumType(), blockSizeHint);
     byte[] blockChecksumBytes = blockChecksumBuf.getData();
@@ -406,9 +430,7 @@ public abstract class BaseFileChecksumHelper {
       // to accurately reflect the number of key bytes digested in the block
       // checksum. For the last one, only the bytes within the requested
       // length are digested.
-      long consumedLength = i < keyLocationInfos.size() - 1
-          ? block.getLength()
-          : Math.min(length - sumBlockLengths, block.getLength());
+      long consumedLength = consumedBlockLength(i, sumBlockLengths);
       if (consumedLength == 0) {
         // An empty block adds no bytes to the key, and datanodes return an
         // empty block checksum for it, so there is no CRC to read.
@@ -424,11 +446,6 @@ public abstract class BaseFileChecksumHelper {
           Integer.toString(blockCrc, 16), i, consumedLength);
     }
 
-    if (sumBlockLengths == 0) {
-      // Every block is empty, e.g. a zero-length key whose writer died
-      // after allocating a block. Treat it like a key without blocks.
-      return makeEmptyFileChecksum();
-    }
     int compositeCrc = CrcUtil.readInt(crcComposer.digest(), 0);
     return new CompositeCrcFileChecksum(
         compositeCrc, toHadoopChecksumType(), bytesPerCRC);
