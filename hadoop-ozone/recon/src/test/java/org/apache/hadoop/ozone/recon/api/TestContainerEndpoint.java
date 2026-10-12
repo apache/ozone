@@ -1101,8 +1101,8 @@ public class TestContainerEndpoint {
     for (int i = 0; i < 2; i++) {
       ReconConstants.resetTableTruncatedFlags();
       ReconDBProvider stagedProvider = reconDBProvider.getStagedReconDBProvider();
-      ReconContainerMetadataManager stagedManager = reconContainerMetadataManager.getStagedReconContainerMetadataManager(
-          stagedProvider.getDbStore());
+      ReconContainerMetadataManager stagedManager =
+          reconContainerMetadataManager.getStagedReconContainerMetadataManager(stagedProvider.getDbStore());
       assertTrue(new ContainerKeyMapperTaskOBS(stagedManager, omConfiguration)
           .reprocess(reconOMMetadataManager).isTaskSuccess());
       reconDBProvider.replaceStagedDb(stagedProvider);
