@@ -28,13 +28,17 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -45,18 +49,36 @@ class TestLocalOzoneRecon {
   @TempDir
   private Path tempDir;
 
-  @Test
-  void reconServesRequestsAndStopsSyncThreadOnClose() throws Exception {
-    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config(false, true), new OzoneConfiguration())) {
+  static Stream<Arguments> services() {
+    return Stream.of(false, true).flatMap(s3g -> Stream.of(false, true).map(recon -> Arguments.of(s3g, recon)));
+  }
+
+  /** A 200 from Recon's /api/v1/clusterState shows that Recon resources can be injected in the shared JVM. */
+  @ParameterizedTest(name = "s3g={0}, recon={1}")
+  @MethodSource("services")
+  void enabledServicesServeAndStopOnClose(boolean s3gEnabled, boolean reconEnabled) throws Exception {
+    List<String> endpoints = new ArrayList<>();
+    try (LocalOzoneCluster cluster =
+        new LocalOzoneCluster(config(s3gEnabled, reconEnabled), new OzoneConfiguration())) {
       cluster.start();
 
-      assertTrue(cluster.getReconPort() > 0);
-      // Query the API to verify that Recon resources can be injected in the shared JVM.
-      assertEquals(200, responseCode(cluster.getReconEndpoint() + "/api/v1/clusterState"));
-      assertTrue(syncThreadRunning());
+      assertEquals(reconEnabled, syncThreadRunning());
+      if (reconEnabled) {
+        assertEquals(200, responseCode(cluster.getReconEndpoint() + "/api/v1/clusterState"));
+        endpoints.add(cluster.getReconEndpoint());
+      }
+      if (s3gEnabled) {
+        assertTrue(responseCode(cluster.getS3Endpoint()) > 0);
+        endpoints.add(cluster.getS3Endpoint());
+      } else {
+        assertEquals(-1, cluster.getS3gPort());
+      }
     }
 
     GenericTestUtils.waitFor(() -> !syncThreadRunning(), 100, 10_000);
+    for (String endpoint : endpoints) {
+      assertThrows(ConnectException.class, () -> responseCode(endpoint), endpoint);
+    }
   }
 
   /**
