@@ -20,8 +20,12 @@ package org.apache.hadoop.ozone.client.checksum;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType.CRC32;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType.CRC32C;
+import static org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode.COMPOSITE_CRC;
+import static org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -29,10 +33,12 @@ import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.fs.FileChecksum;
@@ -69,18 +75,24 @@ import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.util.DataChecksum;
+import org.apache.hadoop.util.PureJavaCrc32C;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.slf4j.event.Level;
 
 /**
  * Unit tests for Replicated and EC FileChecksumHelper class.
  */
 public class TestFileChecksumHelper {
+  private static final int BYTES_PER_CRC = 512;
+  private static final byte[] EMPTY_BLOCK = new byte[0];
+
   private final FileChecksum noCachedChecksum = null;
   private OzoneClient client;
   private ObjectStore store;
@@ -121,7 +133,13 @@ public class TestFileChecksumHelper {
     client.close();
   }
 
-  private OmKeyInfo omKeyInfo(ReplicationType type, FileChecksum cachedChecksum, List<OmKeyLocationInfo> locationInfo) {
+  private OmKeyInfo omKeyInfo(ReplicationType type, FileChecksum cachedChecksum,
+      List<OmKeyLocationInfo> locationInfo) {
+    return omKeyInfo(type, cachedChecksum, locationInfo, 0);
+  }
+
+  private OmKeyInfo omKeyInfo(ReplicationType type, FileChecksum cachedChecksum,
+      List<OmKeyLocationInfo> locationInfo, long dataSize) {
     ReplicationConfig config = type == ReplicationType.EC ? new ECReplicationConfig(6, 3)
         : RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
 
@@ -133,12 +151,135 @@ public class TestFileChecksumHelper {
             new OmKeyLocationInfoGroup(0, locationInfo)))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
-        .setDataSize(0)
+        .setDataSize(dataSize)
         .setReplicationConfig(config)
         .setFileEncryptionInfo(null)
         .setFileChecksum(cachedChecksum)
         .setAcls(null)
         .build();
+  }
+
+  /**
+   * Feeds block checksums the way datanodes return them, without talking to
+   * any datanode. For COMPOSITE_CRC a non-empty block yields a 4-byte CRC,
+   * while an empty block yields no bytes at all.
+   */
+  private static class FakeChecksumComputer extends BaseFileChecksumHelper {
+    private final List<byte[]> blockChecksums;
+
+    FakeChecksumComputer(OzoneVolume volume, OzoneBucket bucket, OmKeyInfo keyInfo,
+        List<byte[]> blockChecksums, OzoneClientConfig.ChecksumCombineMode mode,
+        RpcClient rpcClient) throws IOException {
+      super(volume, bucket, keyInfo.getKeyName(), Long.MAX_VALUE, mode, rpcClient, keyInfo);
+      this.blockChecksums = blockChecksums;
+    }
+
+    @Override
+    protected AbstractBlockChecksumComputer getBlockChecksumComputer(
+        List<ContainerProtos.ChunkInfo> chunkInfos, long blockLength) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    protected List<ContainerProtos.ChunkInfo> getChunkInfos(
+        OmKeyLocationInfo keyLocationInfo) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    protected void checksumBlocks() throws IOException {
+      if (getCombineMode() == COMPOSITE_CRC) {
+        setChecksumType(CRC32C);
+        setBytesPerCRC(BYTES_PER_CRC);
+      } else {
+        setChecksumType(CRC32);
+        setBytesPerCRC(BYTES_PER_CRC);
+      }
+      for (byte[] blockChecksum : blockChecksums) {
+        getBlockChecksumBuf().write(blockChecksum);
+      }
+    }
+
+    String populateCompositeBlockChecksumForDebug(ByteBuffer blockChecksumByteBuffer)
+        throws IOException {
+      return populateBlockChecksumBuf(blockChecksumByteBuffer);
+    }
+  }
+
+  private static RpcClient mockRpcClientForChecksumHelper() {
+    RpcClient mockRpcClient = mock(RpcClient.class);
+    when(mockRpcClient.getXceiverClientManager()).thenReturn(mock(XceiverClientFactory.class));
+    return mockRpcClient;
+  }
+
+  private static OzoneVolume mockVolume() {
+    OzoneVolume mockVolume = mock(OzoneVolume.class);
+    when(mockVolume.getName()).thenReturn("vol1");
+    return mockVolume;
+  }
+
+  private static OzoneBucket mockBucket() {
+    OzoneBucket mockBucket = mock(OzoneBucket.class);
+    when(mockBucket.getName()).thenReturn("bucket");
+    return mockBucket;
+  }
+
+  private static byte[] randomBytes(int len, long seed) {
+    byte[] data = new byte[len];
+    new Random(seed).nextBytes(data);
+    return data;
+  }
+
+  private static int crc32c(byte[]... parts) {
+    PureJavaCrc32C crc = new PureJavaCrc32C();
+    for (byte[] part : parts) {
+      crc.update(part, 0, part.length);
+    }
+    return (int) crc.getValue();
+  }
+
+  private static OmKeyLocationInfo blockLocation(long localId, long length) {
+    return new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(1, localId))
+        .setLength(length)
+        .build();
+  }
+
+  private static List<OmKeyLocationInfo> locationsFor(byte[]... blocks) {
+    List<OmKeyLocationInfo> located = new ArrayList<>();
+    for (int i = 0; i < blocks.length; i++) {
+      located.add(blockLocation(i + 1, blocks[i].length));
+    }
+    return located;
+  }
+
+  private static List<byte[]> compositeBlockChecksums(byte[]... blocks) {
+    List<byte[]> checksums = new ArrayList<>();
+    for (byte[] block : blocks) {
+      checksums.add(block.length == 0
+          ? EMPTY_BLOCK : CrcUtil.intToBytes(crc32c(block)));
+    }
+    return checksums;
+  }
+
+  private FileChecksum compositeChecksum(ReplicationType type, byte[]... blocks)
+      throws IOException {
+    long fileLength = 0;
+    for (byte[] block : blocks) {
+      fileLength += block.length;
+    }
+    List<OmKeyLocationInfo> located = locationsFor(blocks);
+    FakeChecksumComputer computer = new FakeChecksumComputer(
+        mockVolume(), mockBucket(),
+        omKeyInfo(type, noCachedChecksum, located, fileLength),
+        compositeBlockChecksums(blocks), COMPOSITE_CRC, mockRpcClientForChecksumHelper());
+    computer.compute();
+    return computer.getFileChecksum();
+  }
+
+  private static FileChecksum expectedComposite(byte[]... data) {
+    return new CompositeCrcFileChecksum(
+        crc32c(data), DataChecksum.Type.CRC32C, BYTES_PER_CRC);
   }
 
   private BaseFileChecksumHelper checksumHelper(ReplicationType type, OzoneVolume mockVolume, OzoneBucket mockBucket,
@@ -161,6 +302,70 @@ public class TestFileChecksumHelper {
         .setState(Pipeline.PipelineState.CLOSED)
         .setNodes(datanodeDetails)
         .build();
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"EC", "RATIS"})
+  public void testCompositeCrcOfNonEmptyBlocks(ReplicationType helperType)
+      throws IOException {
+    byte[] a = randomBytes(1000, 1);
+    byte[] b = randomBytes(700, 2);
+    assertEquals(expectedComposite(a), compositeChecksum(helperType, a));
+    assertEquals(expectedComposite(a, b), compositeChecksum(helperType, a, b));
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"EC", "RATIS"})
+  public void testCompositeCrcOfZeroLengthKeyWithEmptyBlock(ReplicationType helperType)
+      throws IOException {
+    assertEquals(compositeChecksum(helperType),
+        compositeChecksum(helperType, EMPTY_BLOCK));
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"EC", "RATIS"})
+  public void testCompositeCrcSkipsTrailingEmptyBlock(ReplicationType helperType)
+      throws IOException {
+    byte[] a = randomBytes(1000, 3);
+    assertEquals(expectedComposite(a), compositeChecksum(helperType, a, EMPTY_BLOCK));
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"EC", "RATIS"})
+  public void testCompositeCrcSkipsEmptyBlockInTheMiddle(ReplicationType helperType)
+      throws IOException {
+    byte[] a = randomBytes(1000, 4);
+    byte[] b = randomBytes(700, 5);
+    assertEquals(expectedComposite(a, b),
+        compositeChecksum(helperType, a, EMPTY_BLOCK, b));
+  }
+
+  @Test
+  public void testMd5CrcOfZeroLengthKeyWithEmptyBlockIsUnchanged() throws IOException {
+    List<OmKeyLocationInfo> located =
+        Collections.singletonList(blockLocation(1, 0));
+    List<byte[]> checksums = new ArrayList<>();
+    // An MD5CRC block checksum is always a 16-byte MD5, even for empty blocks.
+    checksums.add(new byte[16]);
+    FakeChecksumComputer computer = new FakeChecksumComputer(
+        mockVolume(), mockBucket(),
+        omKeyInfo(ReplicationType.RATIS, noCachedChecksum, located),
+        checksums, MD5MD5CRC, mockRpcClientForChecksumHelper());
+    computer.compute();
+    assertInstanceOf(MD5MD5CRC32GzipFileChecksum.class, computer.getFileChecksum());
+  }
+
+  @Test
+  public void testPopulateEmptyCompositeBlockChecksumWithDebugLogging()
+      throws IOException {
+    GenericTestUtils.setLogLevel(BaseFileChecksumHelper.class, Level.DEBUG);
+    FakeChecksumComputer computer = new FakeChecksumComputer(
+        mockVolume(), mockBucket(),
+        omKeyInfo(ReplicationType.RATIS, noCachedChecksum, new ArrayList<>()),
+        new ArrayList<>(), COMPOSITE_CRC, mockRpcClientForChecksumHelper());
+    assertNotEquals(null, computer.populateCompositeBlockChecksumForDebug(
+        ByteBuffer.allocate(0)));
+    assertEquals(0, computer.getBlockChecksumBuf().getLength());
   }
 
   @ParameterizedTest
