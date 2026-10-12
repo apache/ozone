@@ -34,7 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -63,6 +63,7 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ozone.test.tag.Flaky;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.TestInstance;
@@ -83,7 +84,7 @@ public class TestBlockDataStreamOutput {
   private static final String VOLUME_NAME = "testblockoutputstream";
   private static final String BUCKET_NAME = VOLUME_NAME;
   private static String keyString = UUID.randomUUID().toString();
-  private static final DatanodeVersion DN_OLD_VERSION = DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+  private static final HDDSVersion DN_OLD_VERSION = HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
 
   static MiniOzoneCluster createCluster() throws IOException,
       InterruptedException, TimeoutException {
@@ -135,6 +136,7 @@ public class TestBlockDataStreamOutput {
         .setNumDatanodes(5)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
             .setCurrentVersion(DN_OLD_VERSION)
+            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION)
             .build())
         .build();
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE,
@@ -170,17 +172,17 @@ public class TestBlockDataStreamOutput {
 
   private static Stream<Arguments> streamWriteParameters() {
     return dataLengthParameters().flatMap(dataLength ->
-        Stream.of(true, false).map(putBlockOnCloseEnabled ->
-            Arguments.of(dataLength.get()[0], putBlockOnCloseEnabled)));
+        Stream.of(true, false).map(putBlockWithoutRaft ->
+            Arguments.of(dataLength.get()[0], putBlockWithoutRaft)));
   }
 
   static OzoneClientConfig newClientConfig(ConfigurationSource source,
                                            boolean flushDelay,
-                                           boolean putBlockOnCloseEnabled) {
+                                           boolean putBlockWithoutRaft) {
     OzoneClientConfig clientConfig = source.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(flushDelay);
-    clientConfig.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
+    clientConfig.setDatastreamPutBlockWithoutRaftEnabled(putBlockWithoutRaft);
     return clientConfig;
   }
 
@@ -210,13 +212,13 @@ public class TestBlockDataStreamOutput {
   @ParameterizedTest
   @MethodSource("streamWriteParameters")
   @Flaky("HDDS-12027")
-  public void testStreamWrite(int dataLength, boolean putBlockOnCloseEnabled) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), false, putBlockOnCloseEnabled);
+  public void testStreamWrite(int dataLength, boolean putBlockWithoutRaft) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), false, putBlockWithoutRaft);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       testWrite(client, dataLength);
       // Forced container close before stream close relies on async PutBlock recovery;
       // that path is not used when PutBlock is committed only on data stream close.
-      if (!putBlockOnCloseEnabled) {
+      if (!putBlockWithoutRaft) {
         testWriteWithFailure(client, dataLength);
       }
     }
@@ -267,9 +269,9 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testPutBlockAtBoundary(boolean flushDelay, boolean putBlockOnCloseEnabled)
+  public void testPutBlockAtBoundary(boolean flushDelay, boolean putBlockWithoutRaft)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockWithoutRaft);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       int dataLength = 500;
       XceiverClientMetrics metrics =
@@ -287,22 +289,30 @@ public class TestBlockDataStreamOutput {
       key.write(ByteBuffer.wrap(data));
       assertThat(metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock))
           .isLessThanOrEqualTo(pendingPutBlockCount + 1);
+      BlockDataStreamOutputEntry entry =
+          ((KeyDataStreamOutput) key.getByteBufStreamOutput()).getStreamEntries().get(0);
       key.close();
       // Since data length is 500, first putBlock will be at 400 (flush boundary).
-      // Close commits via WriteAsync PutBlock only when putBlockOnClose is disabled.
-      int expectedPutBlocks = putBlockOnCloseEnabled ? 1 : 2;
+      // Close commits via WriteAsync PutBlock only when PutBlock does not go through the data stream.
+      int expectedPutBlocks = putBlockWithoutRaft ? 1 : 2;
       assertEquals(
           metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
           putBlockCount + expectedPutBlocks);
+      if (putBlockWithoutRaft) {
+        // No PutBlock went through Raft, so there is no log index to use as block commit sequence id.
+        assertEquals(0, entry.getBlockID().getBlockCommitSequenceId());
+      } else {
+        assertThat(entry.getBlockID().getBlockCommitSequenceId()).isPositive();
+      }
       validateData(client, keyName, data);
     }
   }
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testMinPacketSize(boolean flushDelay, boolean putBlockOnCloseEnabled)
+  public void testMinPacketSize(boolean flushDelay, boolean putBlockWithoutRaft)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockWithoutRaft);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       XceiverClientMetrics metrics =
@@ -329,9 +339,9 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testTotalAckDataLength(boolean flushDelay, boolean putBlockOnCloseEnabled)
+  public void testTotalAckDataLength(boolean flushDelay, boolean putBlockWithoutRaft)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockWithoutRaft);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       int dataLength = 400;
       String keyName = getKeyName();
@@ -350,17 +360,18 @@ public class TestBlockDataStreamOutput {
     }
   }
 
+  @Unhealthy("Requires HDDS-16044 to finish implementing datanode version passing to client.")
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testDatanodeVersion(boolean flushDelay, boolean putBlockOnCloseEnabled)
+  public void testDatanodeVersion(boolean flushDelay, boolean putBlockWithoutRaft)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockWithoutRaft);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       // Verify all DNs internally have versions set correctly
       List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
       for (HddsDatanodeService dn : dns) {
         DatanodeDetails details = dn.getDatanodeDetails();
-        assertEquals(DN_OLD_VERSION.toProtoValue(), details.getCurrentVersion());
+        assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
       }
 
       String keyName = getKeyName();
@@ -368,10 +379,10 @@ public class TestBlockDataStreamOutput {
       KeyDataStreamOutput keyDataStreamOutput = (KeyDataStreamOutput) key.getByteBufStreamOutput();
       BlockDataStreamOutputEntry stream = keyDataStreamOutput.getStreamEntries().get(0);
 
-      // Now check 3 DNs in a random pipeline returns the correct DN versions
+     // Now check 3 DNs in a random pipeline returns the correct DN versions
       List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
       for (DatanodeDetails details : streamDnDetails) {
-        assertEquals(DN_OLD_VERSION.toProtoValue(), details.getCurrentVersion());
+        assertEquals(DN_OLD_VERSION, details.getCurrentVersion());
       }
     }
   }

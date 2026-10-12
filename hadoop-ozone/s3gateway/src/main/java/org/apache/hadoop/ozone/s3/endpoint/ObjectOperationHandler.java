@@ -20,18 +20,29 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import java.io.IOException;
 import java.io.InputStream;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint.ObjectRequestContext;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 /** Interface for handling object operations using chain of responsibility pattern. */
 abstract class ObjectOperationHandler extends EndpointBase {
 
-  Response handleDeleteRequest(ObjectRequestContext context, String keyName) throws IOException, OS3Exception {
+  /**
+   * Returns the action for the current request if this handler is responsible for its subresource, null otherwise.
+   * A handler that does not support all HTTP methods of its subresource returns
+   * {@link S3GAction#NOT_IMPLEMENTED} for the unsupported ones, which the default implementations of
+   * {@code handleDeleteRequest}, {@code handleGetRequest} and {@code handlePutRequest} reject.
+   */
+  S3GAction getAction() {
     return null;
   }
 
+  Response handleDeleteRequest(ObjectRequestContext context, String keyName) throws IOException, OS3Exception {
+    return rejectNotImplemented(context, getAction(), keyName);
+  }
+
   Response handleGetRequest(ObjectRequestContext context, String keyName) throws IOException, OS3Exception {
-    return null;
+    return rejectNotImplemented(context, getAction(), keyName);
   }
 
   Response handleHeadRequest(ObjectRequestContext context, String keyName) throws IOException, OS3Exception {
@@ -40,7 +51,7 @@ abstract class ObjectOperationHandler extends EndpointBase {
 
   Response handlePutRequest(ObjectRequestContext context, String keyName, InputStream body)
       throws IOException, OS3Exception {
-    return null;
+    return rejectNotImplemented(context, getAction(), keyName);
   }
 
   ObjectOperationHandler copyDependenciesFrom(EndpointBase other) {

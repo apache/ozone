@@ -35,17 +35,38 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneBucketStub;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.S3HeadObjectAttributes;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
@@ -60,6 +81,7 @@ public class TestObjectAttributesGet {
 
   private static final String CONTENT = "0123456789";
   private static final String BUCKET_NAME = "b1";
+  private static final String FSO_BUCKET_NAME = "fso-b1";
   private static final String KEY_NAME = "key1";
   private ObjectEndpoint rest;
   private OzoneBucket bucket;
@@ -299,13 +321,129 @@ public class TestObjectAttributesGet {
     assertEquals(partThreeContent.length(), paginatedParts.getParts().get(0).getSize());
   }
 
-  private void completeMultipartUploadWithParts(String key, String... partContents)
+  @Test
+  public void testGetObjectAttrFsoMPUPartsWithoutChecksum()
       throws IOException, OS3Exception {
-    String uploadID = initiateMultipartUpload(rest, BUCKET_NAME, key);
+    OzoneClient client = rest.getClient();
+    String volumeName = rest.getOzoneConfiguration().get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
+        OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
+    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    volume.createBucket(FSO_BUCKET_NAME, BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .build());
+
+    final String key = "fso-mpu-key";
+    completeMultipartUploadWithPartsInBucket(FSO_BUCKET_NAME, key, "part-one", "part-two");
+
+    Response response = getObjectAttributes(rest, FSO_BUCKET_NAME, key, "ObjectParts");
+
+    assertEquals(HTTP_OK, response.getStatus());
+    GetObjectAttributesResponse.ObjectParts objectParts =
+        ((GetObjectAttributesResponse) response.getEntity()).getObjectParts();
+    assertNotNull(objectParts);
+    assertEquals(2, objectParts.getPartsCount().intValue());
+    assertEquals(2, objectParts.getParts().size());
+    assertEquals(1, objectParts.getParts().get(0).getPartNumber());
+    assertEquals("part-one".length(), objectParts.getParts().get(0).getSize());
+    assertEquals(2, objectParts.getParts().get(1).getPartNumber());
+    assertEquals("part-two".length(), objectParts.getParts().get(1).getSize());
+  }
+
+  /**
+   * Regression: multipart {@code ObjectParts} must not call {@code context.getBucket()}
+   * (bucket READ). Layout and part sizes come from {@code headS3ObjectAttributes} only.
+   */
+  @Test
+  public void testGetObjectAttributesObjectPartsWithoutBucketRead()
+      throws IOException, OS3Exception {
+    OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    ozoneConfiguration.set(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
+        OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
+
+    ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    OzoneClient client = mock(OzoneClient.class);
+    ObjectStore objectStore = mock(ObjectStore.class);
+    OzoneVolume volume = mock(OzoneVolume.class);
+
+    when(client.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(client.getObjectStore()).thenReturn(objectStore);
+    when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getClientProxy()).thenReturn(clientProtocol);
+    when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getBucket(anyString())).thenThrow(
+        new OMException("bucket read denied", ResultCodes.ACCESS_DENIED));
+
+    final String mpuKey = "mpu-key";
+    OzoneKey ozoneKey = new OzoneKey("s3v", BUCKET_NAME, mpuKey, 10, 0, 0,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        true, "owner");
+    ozoneKey.setMetadata(Collections.singletonMap(OzoneConsts.ETAG, "\"abc-2\""));
+
+    NavigableMap<Integer, Long> partSizes = new TreeMap<>();
+    partSizes.put(1, 5L);
+    partSizes.put(2, 5L);
+    S3HeadObjectAttributes headAttributes = new S3HeadObjectAttributes(ozoneKey, partSizes,
+        BucketLayout.OBJECT_STORE);
+    when(clientProtocol.headS3ObjectAttributes(BUCKET_NAME, mpuKey)).thenReturn(headAttributes);
+
+    HttpHeaders headers = Mockito.mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
+
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(client)
+        .setHeaders(headers)
+        .build();
+
+    Response response = getObjectAttributes(endpoint, BUCKET_NAME, mpuKey, "ObjectParts");
+
+    assertEquals(HTTP_OK, response.getStatus());
+    GetObjectAttributesResponse.ObjectParts objectParts =
+        ((GetObjectAttributesResponse) response.getEntity()).getObjectParts();
+    assertNotNull(objectParts);
+    assertEquals(2, objectParts.getPartsCount().intValue());
+    assertTrue(objectParts.getParts().isEmpty());
+
+    verify(volume, never()).getBucket(anyString());
+    verify(clientProtocol).headS3ObjectAttributes(BUCKET_NAME, mpuKey);
+  }
+
+  @Test
+  public void testShouldIncludePartElements() {
+    assertFalse(ObjectAttributesHandler.shouldIncludePartElements(null, false));
+    assertTrue(ObjectAttributesHandler.shouldIncludePartElements(null, true));
+
+    OzoneKey obsKeyNoChecksum = testOzoneKey(false);
+    assertFalse(ObjectAttributesHandler.shouldIncludePartElements(obsKeyNoChecksum, false));
+
+    OzoneKey obsKeyWithChecksum = testOzoneKey(true);
+    assertTrue(ObjectAttributesHandler.shouldIncludePartElements(obsKeyWithChecksum, false));
+
+    assertTrue(ObjectAttributesHandler.shouldIncludePartElements(obsKeyNoChecksum, true));
+    assertTrue(ObjectAttributesHandler.shouldIncludePartElements(obsKeyWithChecksum, true));
+  }
+
+  private static OzoneKey testOzoneKey(boolean withAdditionalChecksum) {
+    OzoneKey key = new OzoneKey("vol", "b", "k", 0, 0, 0,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        true, "owner");
+    if (withAdditionalChecksum) {
+      key.setMetadata(Collections.singletonMap("x-amz-checksum-crc32", "abc"));
+    }
+    return key;
+  }
+
+  private void completeMultipartUploadWithPartsInBucket(String bucketName, String key,
+      String... partContents) throws IOException, OS3Exception {
+    String uploadID = initiateMultipartUpload(rest, bucketName, key);
     List<Part> partsList = new ArrayList<>();
     for (int i = 0; i < partContents.length; i++) {
-      partsList.add(uploadPart(rest, BUCKET_NAME, key, i + 1, uploadID, partContents[i]));
+      partsList.add(uploadPart(rest, bucketName, key, i + 1, uploadID, partContents[i]));
     }
-    completeMultipartUpload(rest, BUCKET_NAME, key, uploadID, partsList);
+    completeMultipartUpload(rest, bucketName, key, uploadID, partsList);
+  }
+
+  private void completeMultipartUploadWithParts(String key, String... partContents)
+      throws IOException, OS3Exception {
+    completeMultipartUploadWithPartsInBucket(BUCKET_NAME, key, partContents);
   }
 }

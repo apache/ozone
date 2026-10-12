@@ -27,6 +27,11 @@ OZONE_ROOT=$(pwd -P)
 : ${OZONE_ACCEPTANCE_TEST_TYPE:="robot"}
 : ${OZONE_WITH_COVERAGE:="false"}
 
+if [[ "${OZONE_ACCEPTANCE_SUITE}" == "compat-old" ]]; then
+  : ${OZONE_OLD_VERSIONS:="${2:-}"}
+  export OZONE_OLD_VERSIONS
+fi
+
 source "${DIR}/_lib.sh"
 
 REPORT_DIR=${OUTPUT_DIR:-"${OZONE_ROOT}/target/acceptance"}
