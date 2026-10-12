@@ -21,6 +21,7 @@ import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
@@ -28,6 +29,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.QUOTA_EXCEEDED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
@@ -348,6 +350,17 @@ public class TestS3LifecycleConfigurationPut {
   public void testPutLifecycleConfigurationWithAbortDaysAfterInitiationOverflow() throws Exception {
     testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withAbortDaysAfterInitiationOverflow,
         HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationRejectsTransition() throws Exception {
+    // Ozone does not support lifecycle Transition actions. A rule containing one must be
+    // rejected instead of returning HTTP 200 for a rule Ozone can never enforce.
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.put("bucket1", withTransition()));
+    assertEquals(HTTP_NOT_IMPLEMENTED, ex.getHttpCode());
+    assertEquals(NOT_IMPLEMENTED.getCode(), ex.getCode());
+    assertTrue(ex.getErrorMessage().contains("EC"));
   }
 
   private static InputStream onePrefix() {
@@ -811,6 +824,20 @@ public class TestS3LifecycleConfigurationPut {
         "<Prefix>prefix/</Prefix>" +
         "<Status>Enabled</Status>" +
         "<Expiration><Days>3323232323232323232323232323232323232323232</Days></Expiration>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withTransition() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>unsupported-transition</ID>" +
+        "<Prefix></Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration><Date>2044-01-19T00:00:00Z</Date></Expiration>" +
+        "<Transition><Days>1</Days><StorageClass>EC</StorageClass></Transition>" +
         "</Rule>" +
         "</LifecycleConfiguration>";
 

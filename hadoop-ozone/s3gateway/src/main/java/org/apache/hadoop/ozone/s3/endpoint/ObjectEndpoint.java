@@ -1287,7 +1287,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           ? stripQuotes(sourceETag) : null;
 
       try (OzoneInputStream src = runWithS3ActionString(
-              "GetObject", () -> getClientProtocol().getKey(volume.getName(), sourceBucket, sourceKey));
+              "GetObject", sourceKeyDetails::getContent);
            DigestInputStream sourceDigestInputStream = new DigestInputStream(src, md5Digest)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
         if (reusedETag != null) {

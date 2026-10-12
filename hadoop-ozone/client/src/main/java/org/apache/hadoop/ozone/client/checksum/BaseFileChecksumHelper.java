@@ -30,8 +30,6 @@ import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -50,8 +48,8 @@ public abstract class BaseFileChecksumHelper {
       LoggerFactory.getLogger(BaseFileChecksumHelper.class);
   private OmKeyInfo keyInfo;
 
-  private OzoneVolume volume;
-  private OzoneBucket bucket;
+  private String volumeName;
+  private String bucketName;
   private String keyName;
   private final long length;
 
@@ -68,12 +66,12 @@ public abstract class BaseFileChecksumHelper {
   private long crcPerBlock = 0;
 
   // initialization
-  public BaseFileChecksumHelper(OzoneVolume volume, OzoneBucket bucket,
+  public BaseFileChecksumHelper(String volumeName, String bucketName,
       String keyName, long length,
       OzoneClientConfig.ChecksumCombineMode checksumCombineMode,
       ClientProtocol rpcClient, OmKeyInfo keyInfo) throws IOException {
-    this.volume = volume;
-    this.bucket = bucket;
+    this.volumeName = volumeName;
+    this.bucketName = bucketName;
     this.keyName = keyName;
     this.length = length;
     this.combineMode = checksumCombineMode;
@@ -87,8 +85,7 @@ public abstract class BaseFileChecksumHelper {
   }
 
   protected String getSrc() {
-    return "Volume: " + volume.getName() + " Bucket: " + bucket.getName() + " "
-        + keyName;
+    return "Volume: " + volumeName + " Bucket: " + bucketName + " " + keyName;
   }
 
   protected long getLength() {
@@ -268,8 +265,8 @@ public abstract class BaseFileChecksumHelper {
       OzoneManagerProtocol ozoneManagerClient =
           getRpcClient().getOzoneManagerClient();
       OmKeyArgs keyArgs =
-          new OmKeyArgs.Builder().setVolumeName(volume.getName())
-              .setBucketName(bucket.getName()).setKeyName(keyName)
+          new OmKeyArgs.Builder().setVolumeName(volumeName)
+              .setBucketName(bucketName).setKeyName(keyName)
               .setSortDatanodesInPipeline(true)
               .setLatestVersionLocation(true).build();
       keyInfo = ozoneManagerClient.lookupKey(keyArgs);
