@@ -64,6 +64,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
   private Long expectedDataGeneration = null;
+  // Original S3/list prefix when keyName is empty (root listing). Used for STS
+  // auth to check LIST on this prefix instead of "*".
+  private final String listPrefix;
   private final String expectedETag;
   private final boolean derivedKeyPiggyBacking;
   // When null, OM resolves the policy from the bucket, then the cluster default.
@@ -89,6 +92,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.listPrefix = b.listPrefix;
     this.expectedETag = b.expectedETag;
     this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
     this.storagePolicy = b.storagePolicy;
@@ -172,6 +176,14 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
   public Long getExpectedDataGeneration() {
     return expectedDataGeneration;
+  }
+
+  /**
+   * Original S3/list prefix when keyName is empty (root listing).
+   * Used for STS auth to check LIST on this prefix instead of "*".
+   */
+  public String getListPrefix() {
+    return listPrefix;
   }
 
   public String getExpectedETag() {
@@ -263,6 +275,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private boolean forceUpdateContainerCacheFromSCM;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private String listPrefix = null;
     private String expectedETag;
     private boolean derivedKeyPiggyBacking;
     private StoragePolicy storagePolicy;
@@ -316,6 +329,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.storagePolicy = obj.storagePolicy;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
+      this.listPrefix = obj.listPrefix;
     }
 
     public Builder setVolumeName(String volume) {
@@ -446,6 +460,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setExpectedDataGeneration(long generation) {
       this.expectedDataGeneration = generation;
+      return this;
+    }
+
+    public Builder setListPrefix(String prefix) {
+      this.listPrefix = prefix;
       return this;
     }
 

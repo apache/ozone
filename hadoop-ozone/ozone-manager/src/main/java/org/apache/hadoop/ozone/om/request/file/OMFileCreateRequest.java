@@ -84,7 +84,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    CreateFileRequest createFileRequest = super.preExecute(ozoneManager)
+    final CreateFileRequest createFileRequest = super.preExecute(ozoneManager)
         .getCreateFileRequest();
     Objects.requireNonNull(createFileRequest, "createFileRequest == null");
 
@@ -232,7 +232,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
       // do open key
       omBucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
+          getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
       final ReplicationConfig repConfig = OzoneConfigUtil
           .resolveReplicationConfigPreference(keyArgs.getType(),
               keyArgs.getFactor(), keyArgs.getEcReplicationConfig(),
@@ -281,6 +281,9 @@ public class OMFileCreateRequest extends OMKeyRequest {
       OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
           bucketName, omBucketInfo.getBucketLayout(),
           null, missingParentInfos, trxnLogIndex);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
       // Prepare response
       omResponse.setCreateFileResponse(CreateFileResponse.newBuilder()

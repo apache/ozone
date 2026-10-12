@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getLongGauge;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -153,7 +154,7 @@ public class TestOmMetrics {
     long initialNumVolumeInfos = getLongCounter("NumVolumeInfos", omMetrics);
     long initialNumVolumeDeletes = getLongCounter("NumVolumeDeletes", omMetrics);
     long initialNumVolumeLists = getLongCounter("NumVolumeLists", omMetrics);
-    long initialNumVolumes = getLongCounter("NumVolumes", omMetrics);
+    long initialNumVolumes = getLongGauge("NumVolumes", omMetrics);
 
     long initialNumVolumeCreateFails = getLongCounter("NumVolumeCreateFails", omMetrics);
     long initialNumVolumeUpdateFails = getLongCounter("NumVolumeUpdateFails", omMetrics);
@@ -171,7 +172,7 @@ public class TestOmMetrics {
     assertEquals(initialNumVolumeInfos + 1, getLongCounter("NumVolumeInfos", omMetrics));
     assertEquals(initialNumVolumeDeletes + 1, getLongCounter("NumVolumeDeletes", omMetrics));
     assertEquals(initialNumVolumeLists + 1, getLongCounter("NumVolumeLists", omMetrics));
-    assertEquals(initialNumVolumes, getLongCounter("NumVolumes", omMetrics));
+    assertEquals(initialNumVolumes, getLongGauge("NumVolumes", omMetrics));
 
     volumeArgs = createVolumeArgs();
     writeClient.createVolume(volumeArgs);
@@ -183,7 +184,7 @@ public class TestOmMetrics {
 
     omMetrics = getMetrics("OMMetrics");
     // Accounting 's3v' volume which is created by default.
-    assertEquals(initialNumVolumes + 2, getLongCounter("NumVolumes", omMetrics));
+    assertEquals(initialNumVolumes + 2, getLongGauge("NumVolumes", omMetrics));
 
     // inject exception to test for Failure Metrics on the read path
     doThrow(exception).when(mockVm).getVolumeInfo(any());
@@ -211,7 +212,7 @@ public class TestOmMetrics {
     assertEquals(initialNumVolumeInfoFails + 1, getLongCounter("NumVolumeInfoFails", omMetrics));
     assertEquals(initialNumVolumeDeleteFails + 1, getLongCounter("NumVolumeDeleteFails", omMetrics));
     assertEquals(initialNumVolumeListFails + 1, getLongCounter("NumVolumeListFails", omMetrics));
-    assertEquals(initialNumVolumes + 2, getLongCounter("NumVolumes", omMetrics));
+    assertEquals(initialNumVolumes + 2, getLongGauge("NumVolumes", omMetrics));
 
     // restore state
     HddsWhiteboxTestUtils.setInternalState(ozoneManager,
@@ -235,7 +236,7 @@ public class TestOmMetrics {
     long initialNumBucketInfos = getLongCounter("NumBucketInfos", omMetrics);
     long initialNumBucketDeletes = getLongCounter("NumBucketDeletes", omMetrics);
     long initialNumBucketLists = getLongCounter("NumBucketLists", omMetrics);
-    long initialNumBuckets = getLongCounter("NumBuckets", omMetrics);
+    long initialNumBuckets = getLongGauge("NumBuckets", omMetrics);
     long initialEcBucketCreateTotal = getLongCounter("EcBucketCreateTotal", omMetrics);
     long initialEcBucketCreateFailsTotal = getLongCounter("EcBucketCreateFailsTotal", omMetrics);
 
@@ -255,7 +256,7 @@ public class TestOmMetrics {
     assertEquals(initialNumBucketInfos + 1, getLongCounter("NumBucketInfos", omMetrics));
     assertEquals(initialNumBucketDeletes + 1, getLongCounter("NumBucketDeletes", omMetrics));
     assertEquals(initialNumBucketLists + 1, getLongCounter("NumBucketLists", omMetrics));
-    assertEquals(initialNumBuckets, getLongCounter("NumBuckets", omMetrics));
+    assertEquals(initialNumBuckets, getLongGauge("NumBuckets", omMetrics));
 
     OmBucketInfo ecBucketInfo = createBucketInfo(true);
     writeClient.createBucket(ecBucketInfo);
@@ -275,7 +276,7 @@ public class TestOmMetrics {
         bucketInfo.getBucketName());
 
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumBuckets + 2, getLongCounter("NumBuckets", omMetrics));
+    assertEquals(initialNumBuckets + 2, getLongGauge("NumBuckets", omMetrics));
 
     // inject exception to test for Failure Metrics on the read path
     doThrow(exception).when(mockBm).getBucketInfo(any(), any());
@@ -309,7 +310,7 @@ public class TestOmMetrics {
     assertEquals(initialNumBucketInfoFails + 1, getLongCounter("NumBucketInfoFails", omMetrics));
     assertEquals(initialNumBucketDeleteFails + 1, getLongCounter("NumBucketDeleteFails", omMetrics));
     assertEquals(initialNumBucketListFails + 1, getLongCounter("NumBucketListFails", omMetrics));
-    assertEquals(initialNumBuckets + 2, getLongCounter("NumBuckets", omMetrics));
+    assertEquals(initialNumBuckets + 2, getLongGauge("NumBuckets", omMetrics));
 
     // restore state
     HddsWhiteboxTestUtils.setInternalState(ozoneManager,
@@ -333,7 +334,7 @@ public class TestOmMetrics {
     long initialNumKeyLookup = getLongCounter("NumKeyLookup", omMetrics);
     long initialNumKeyDeletes = getLongCounter("NumKeyDeletes", omMetrics);
     long initialNumKeyLists = getLongCounter("NumKeyLists", omMetrics);
-    long initialNumKeys = getLongCounter("NumKeys", omMetrics);
+    long initialNumKeys = getLongGauge("NumKeys", omMetrics);
     long initialNumInitiateMultipartUploads = getLongCounter("NumInitiateMultipartUploads", omMetrics);
     long initialNumGetObjectTagging = getLongCounter("NumGetObjectTagging", omMetrics);
     long initialNumPutObjectTagging = getLongCounter("NumPutObjectTagging", omMetrics);
@@ -364,7 +365,7 @@ public class TestOmMetrics {
     assertEquals(initialNumKeyLookup + 1, getLongCounter("NumKeyLookup", omMetrics));
     assertEquals(initialNumKeyDeletes + 1, getLongCounter("NumKeyDeletes", omMetrics));
     assertEquals(initialNumKeyLists + 1, getLongCounter("NumKeyLists", omMetrics));
-    assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
+    assertEquals(initialNumKeys, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialNumInitiateMultipartUploads + 1, getLongCounter("NumInitiateMultipartUploads", omMetrics));
     assertEquals(initialNumGetObjectTagging + 1, getLongCounter("NumGetObjectTagging", omMetrics));
     assertEquals(initialNumPutObjectTagging + 1, getLongCounter("NumPutObjectTagging", omMetrics));
@@ -375,7 +376,7 @@ public class TestOmMetrics {
     doKeyOps(keyArgs);
 
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
+    assertEquals(initialNumKeys, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialEcKeyCreateTotal + 1, getLongCounter("EcKeyCreateTotal", omMetrics));
 
     keyArgs = createKeyArgs(volumeName, bucketName,
@@ -403,7 +404,7 @@ public class TestOmMetrics {
     }
 
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeys + 2, getLongCounter("NumKeys", omMetrics));
+    assertEquals(initialNumKeys + 2, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialNumBlockAllocationFails + 1, getLongCounter("NumBlockAllocationFails", omMetrics));
 
     // inject exception to test for Failure Metrics on the read path
@@ -439,7 +440,7 @@ public class TestOmMetrics {
     assertEquals(initialNumKeyListFails + 1, getLongCounter("NumKeyListFails", omMetrics));
     assertEquals(initialNumInitiateMultipartUploadFails + 1, getLongCounter(
         "NumInitiateMultipartUploadFails", omMetrics));
-    assertEquals(initialNumKeys + 2, getLongCounter("NumKeys", omMetrics));
+    assertEquals(initialNumKeys + 2, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialNumGetObjectTaggingFails + 1,  getLongCounter("NumGetObjectTaggingFails", omMetrics));
     assertEquals(initialNumPutObjectTaggingFails + 1, getLongCounter("NumPutObjectTaggingFails", omMetrics));
     assertEquals(initialNumDeleteObjectTaggingFails + 1, getLongCounter("NumDeleteObjectTaggingFails", omMetrics));
@@ -467,7 +468,7 @@ public class TestOmMetrics {
   public void testDirectoryOps(BucketLayout bucketLayout) throws Exception {
     // get initial values for metrics
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
-    long initialNumKeys = getLongCounter("NumKeys", omMetrics);
+    long initialNumKeys = getLongGauge("NumKeys", omMetrics);
     long initialNumCreateDirectory = getLongCounter("NumCreateDirectory", omMetrics);
     long initialNumKeyDeletes = getLongCounter("NumKeyDeletes", omMetrics);
     long initialNumKeyRenames = getLongCounter("NumKeyRenames", omMetrics);
@@ -496,7 +497,7 @@ public class TestOmMetrics {
     assertEquals(bucketLayout,
         client.getObjectStore().getVolume(volumeName).getBucket(bucketName).getBucketLayout());
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeys + 2, getLongCounter("NumKeys", omMetrics));
+    assertEquals(initialNumKeys + 2, getLongGauge("NumKeys", omMetrics));
     // Only one directory create command is given, even though it created two directories.
     assertEquals(initialNumCreateDirectory + 1, getLongCounter("NumCreateDirectory", omMetrics));
     assertEquals(initialNumKeyDeletes, getLongCounter("NumKeyDeletes", omMetrics));
@@ -507,7 +508,7 @@ public class TestOmMetrics {
     ContractTestUtils.touch(fs, new Path(dirPath, "file1"));
     ContractTestUtils.touch(fs, new Path(dirPath.getParent(), "file2"));
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeys + 4, getLongCounter("NumKeys", omMetrics));
+    assertEquals(initialNumKeys + 4, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialNumCreateDirectory + 1, getLongCounter("NumCreateDirectory", omMetrics));
     assertEquals(initialNumKeyDeletes, getLongCounter("NumKeyDeletes", omMetrics));
     assertEquals(initialNumKeyRenames, getLongCounter("NumKeyRenames", omMetrics));
@@ -515,7 +516,7 @@ public class TestOmMetrics {
     // Rename the child directory.
     fs.rename(dirPath, new Path(dirPath.getParent(), "new-name"));
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeys + 4, getLongCounter("NumKeys", omMetrics));
+    assertEquals(initialNumKeys + 4, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialNumCreateDirectory + 1, getLongCounter("NumCreateDirectory", omMetrics));
     assertEquals(initialNumKeyDeletes, getLongCounter("NumKeyDeletes", omMetrics));
     long expectedRenames = 1;
@@ -526,17 +527,17 @@ public class TestOmMetrics {
     assertEquals(initialNumKeyRenames + expectedRenames, getLongCounter("NumKeyRenames", omMetrics));
 
     // Delete metric should be decremented by directory deleting service in the background.
-    long numKeysBeforeDeletion = getLongCounter("NumKeys", omMetrics);
+    long numKeysBeforeDeletion = getLongGauge("NumKeys", omMetrics);
     fs.delete(dirPath.getParent(), true);
     GenericTestUtils.waitFor(() -> {
-      long keyCount = getLongCounter("NumKeys", getMetrics("OMMetrics"));
+      long keyCount = getLongGauge("NumKeys", getMetrics("OMMetrics"));
       return keyCount == 0;
     }, timeoutMillis / 5, timeoutMillis);
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
+    assertEquals(initialNumKeys, getLongGauge("NumKeys", omMetrics));
     // This is the number of times the create directory command was given, not the current number of directories.
     assertEquals(initialNumCreateDirectory + 1, getLongCounter("NumCreateDirectory", omMetrics));
-    numKeysDeleted += numKeysBeforeDeletion - getLongCounter("NumKeys", omMetrics);
+    numKeysDeleted += numKeysBeforeDeletion - getLongGauge("NumKeys", omMetrics);
     assertEquals(initialNumKeyDeletes + numKeysDeleted, getLongCounter("NumKeyDeletes", omMetrics));
     assertEquals(initialNumKeyRenames + expectedRenames, getLongCounter("NumKeyRenames", omMetrics));
 
@@ -546,17 +547,17 @@ public class TestOmMetrics {
     ContractTestUtils.touch(fs, new Path(dirPath, "file1"));
     ContractTestUtils.touch(fs, new Path(dirPath.getParent(), "file2"));
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeys + 4, getLongCounter("NumKeys", omMetrics));
-    numKeysBeforeDeletion = getLongCounter("NumKeys", omMetrics);
+    assertEquals(initialNumKeys + 4, getLongGauge("NumKeys", omMetrics));
+    numKeysBeforeDeletion = getLongGauge("NumKeys", omMetrics);
     fs.delete(bucketPath, true);
     GenericTestUtils.waitFor(() -> {
-      long keyCount = getLongCounter("NumKeys", getMetrics("OMMetrics"));
+      long keyCount = getLongGauge("NumKeys", getMetrics("OMMetrics"));
       return keyCount == 0;
     }, timeoutMillis / 5, timeoutMillis);
     omMetrics = getMetrics("OMMetrics");
-    assertEquals(initialNumKeys, getLongCounter("NumKeys", omMetrics));
+    assertEquals(initialNumKeys, getLongGauge("NumKeys", omMetrics));
     assertEquals(initialNumCreateDirectory + 2, getLongCounter("NumCreateDirectory", omMetrics));
-    numKeysDeleted += numKeysBeforeDeletion - getLongCounter("NumKeys", omMetrics);
+    numKeysDeleted += numKeysBeforeDeletion - getLongGauge("NumKeys", omMetrics);
     assertEquals(initialNumKeyDeletes + numKeysDeleted, getLongCounter("NumKeyDeletes", omMetrics));
     assertEquals(initialNumKeyRenames + expectedRenames, getLongCounter("NumKeyRenames", omMetrics));
   }

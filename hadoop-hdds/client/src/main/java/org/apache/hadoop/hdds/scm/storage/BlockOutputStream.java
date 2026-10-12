@@ -193,19 +193,13 @@ public class BlockOutputStream extends OutputStream {
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
-    ContainerProtos.DatanodeBlockID.Builder blkIDBuilder =
-        ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(blockID.getContainerID())
-            .setLocalID(blockID.getLocalID())
-            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
-    if (replicationIndex > 0) {
-      blkIDBuilder.setReplicaIndex(replicationIndex);
-    }
-    if (storageType != null) {
-      blkIDBuilder.setStorageTypeID(StorageTypeUtils.getID(storageType));
-    }
-    this.containerBlockData = BlockData.newBuilder().setBlockID(
-        blkIDBuilder.build()).addMetadata(keyValue);
+
+    // Send the storage type SCM chose for this block so the datanode places it on a volume of
+    // that type. Null leaves the datanode free to pick any volume.
+    this.containerBlockData = BlockData.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicationIndex,
+            storageType == null ? null : StorageTypeUtils.getID(storageType)))
+        .addMetadata(keyValue);
     this.pipeline = pipeline;
     // tell DataNode I will send incremental chunk list
     this.supportIncrementalChunkList = canEnableIncrementalChunkList();

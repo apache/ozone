@@ -513,13 +513,6 @@ public class ReconContainerMetadataManagerImpl
               .getSkipCache(containerKeyPrefix.getKeyPrefix());
     }
     List<Pipeline> pipelines = new ArrayList<>();
-    if (null != omKeyInfo) {
-      omKeyInfo.getKeyLocationVersions().stream().map(
-          omKeyLocationInfoGroup ->
-              omKeyLocationInfoGroup.createLocationList()
-                  .stream().map(omKeyLocationInfo -> pipelines.add(
-                      omKeyLocationInfo.getPipeline())));
-    }
     return pipelines;
   }
 

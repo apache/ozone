@@ -432,8 +432,7 @@ public class TestOzoneStoragePolicy {
         assertTrue(pipeline.getNodeSet().contains(datanode.getDatanodeDetails()));
 
         ContainerProtos.BlockData blockData = ContainerProtocolCalls.getBlock(
-            client, block.getBlockID(), null,
-            client.getPipeline().getReplicaIndexes()).getBlockData();
+            client, block.getBlockID(), null, client.getPipeline()).getBlockData();
         assertEquals(expectedStorageType, StorageTypeUtils
             .getStorageTypeFromID(blockData.getBlockID().getStorageTypeID()));
         replicasChecked++;

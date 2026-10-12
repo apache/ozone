@@ -1134,7 +1134,7 @@ class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
       HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
           OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
       assertNotNull(followerReadFailoverProxyProvider);
-      assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
+      assertTrue(followerReadFailoverProxyProvider.isOmServiceSupportsFollowerRead());
 
 
       // Trigger write so that the leader failover proxy provider points to the leader
@@ -1158,7 +1158,7 @@ class TestOzoneManagerHAWithAllRunning extends OzoneManagerHATests {
 
       // Client follower read is disabled since it detected that the cluster does not
       // support follower read
-      assertFalse(followerReadFailoverProxyProvider.isUseFollowerRead());
+      assertFalse(followerReadFailoverProxyProvider.isOmServiceSupportsFollowerRead());
       OMProxyInfo<OzoneManagerProtocolPB> lastProxy =
           (OMProxyInfo<OzoneManagerProtocolPB>) followerReadFailoverProxyProvider.getLastProxy();
       // The last read will be done on the leader

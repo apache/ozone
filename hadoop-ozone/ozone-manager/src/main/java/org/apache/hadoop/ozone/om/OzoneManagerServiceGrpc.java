@@ -20,11 +20,14 @@ package org.apache.hadoop.ozone.om;
 import com.google.protobuf.RpcController;
 import io.grpc.Status;
 import java.io.IOException;
+import java.util.EnumSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc.OzoneManagerServiceImplBase;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.ozone.util.UUIDUtil;
@@ -41,11 +44,24 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
    * RpcController is not used and hence is set to null.
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
+  /**
+   * OMRequests the S3 gateway client must issue before any per-request S3
+   * identity exists: RpcClient bootstrap (OzoneClientCache.initialize ->
+   * getServiceInfo), the background CA-cert refresher, and server-defaults
+   * lookups all fetch the ServiceList before EndpointBase has set any
+   * thread-local S3Auth. These identity-free, read-only cmdTypes stay
+   * callable without S3 authentication in secure mode.
+   */
+  private static final Set<Type> S3_AUTH_EXEMPT_CMD_TYPES =
+      EnumSet.of(Type.ServiceList);
   private final OzoneManagerProtocolServerSideTranslatorPB omTranslator;
+  private final boolean s3AuthRequired;
 
   OzoneManagerServiceGrpc(
-      OzoneManagerProtocolServerSideTranslatorPB omTranslator) {
+      OzoneManagerProtocolServerSideTranslatorPB omTranslator,
+      boolean s3AuthRequired) {
     this.omTranslator = omTranslator;
+    this.s3AuthRequired = s3AuthRequired;
   }
 
   @Override
@@ -55,6 +71,22 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
     LOG.debug("OzoneManagerServiceGrpc: OzoneManagerServiceImplBase " +
         "processing s3g client submit request - for command {}",
         request.getCmdType().name());
+
+    // This endpoint carries no channel-level client authentication, so in
+    // secure mode a request acting on behalf of a user must present S3
+    // authentication (validated downstream against the caller's S3 secret);
+    // without it the request identity would be client-asserted. Only the
+    // identity-free bootstrap reads in S3_AUTH_EXEMPT_CMD_TYPES are exempt.
+    if (s3AuthRequired && !request.hasS3Authentication()
+        && !S3_AUTH_EXEMPT_CMD_TYPES.contains(request.getCmdType())) {
+      LOG.warn("Rejecting {} OMRequest without S3 authentication received" +
+          " on the S3G gRPC endpoint", request.getCmdType().name());
+      responseObserver.onError(Status.UNAUTHENTICATED
+          .withDescription("S3 authentication is required for requests to" +
+              " this endpoint in secure mode (ozone.om.s3.grpc.auth.required)")
+          .asRuntimeException());
+      return;
+    }
     AtomicInteger callCount = new AtomicInteger(0);
 
     org.apache.hadoop.ipc_.Server.getCurCall().set(new Server.Call(1,
