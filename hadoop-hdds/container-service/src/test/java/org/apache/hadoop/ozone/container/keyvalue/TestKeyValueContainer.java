@@ -1057,8 +1057,6 @@ public class TestKeyValueContainer {
       // After moving away from using Table.loadFromFile(), no SST files are generated unless the db is force flushed
       assertEquals(0, fileMetaDataList1.size());
       hddsVolume.compactDb();
-      // Sleep a while to wait for compaction to complete
-      Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
       assertThat(fileMetaDataList2).hasSizeLessThanOrEqualTo(fileMetaDataList1.size());
