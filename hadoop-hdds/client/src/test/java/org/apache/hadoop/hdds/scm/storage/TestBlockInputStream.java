@@ -103,6 +103,7 @@ public class TestBlockInputStream {
     createChunkList(5);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
+    clientConfig.setReadRetryInterval(0);
 
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     blockStream = new DummyBlockInputStream(blockID, blockSize, pipeline, null,
@@ -435,6 +436,7 @@ public class TestBlockInputStream {
       ChunkInputStream stream) throws IOException {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
+    clientConfig.setReadRetryInterval(0);
     return new DummyBlockInputStream(blockID, blockSize, pipeline, null,
         null, refreshFunction, chunks, null, clientConfig) {
       @Override
@@ -495,6 +497,7 @@ public class TestBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
+    clientConfig.setReadRetryInterval(0);
     BlockInputStream subject = new BlockInputStream(
         new BlockLocationInfo(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(blockSize)),
         pipeline, null, clientFactory, refreshFunction,
@@ -574,6 +577,7 @@ public class TestBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(false);
+    clientConfig.setReadRetryInterval(0);
     Pipeline pipeline = MockPipeline.createSingleNodePipeline();
     return new DummyBlockInputStream(blockID, blockSize, pipeline, null,
         null, refreshFunction, chunks, chunkDataMap, clientConfig);
