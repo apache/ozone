@@ -774,6 +774,39 @@ public class TestSnapshotDiffManager {
     }
   }
 
+  @Test
+  public void testCreatePageResponseDependencyOrderedReportKeys() throws Exception {
+    String testJobId = "dependencyJob";
+    int totalNumberOfRecords = 3;
+    List<String> orderedIndexTokens = new ArrayList<>();
+    for (int idx = 0; idx < totalNumberOfRecords; idx++) {
+      String indexToken = org.apache.commons.lang3.StringUtils.leftPad(String.valueOf(idx), 21, '0');
+      orderedIndexTokens.add(indexToken);
+      String reportEntryKey = SnapshotDiffManager.getReportKeyForIndex(testJobId, indexToken);
+      db.get().put(snapDiffReportTable,
+          codecRegistry.asRawData(reportEntryKey),
+          codecRegistry.asRawData(getTestDiffEntry(testJobId, idx)));
+    }
+    String largestIndexToken = orderedIndexTokens.get(totalNumberOfRecords - 1);
+    SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, testJobId,
+        JobStatus.DONE, "vol", "buck", "fs", "ts", false,
+        true, totalNumberOfRecords, null, 0.0,
+        testJobId + DELIMITER + largestIndexToken);
+
+    SnapshotDiffReportOzone firstPage = snapshotDiffManager.createPageResponse(snapshotDiffJob,
+        "vol", "buck", "fs", "ts", "", 2);
+    assertEquals(2, firstPage.getDiffList().size());
+    assertEquals(getTestDiffEntry(testJobId, 0), firstPage.getDiffList().get(0));
+    assertEquals(getTestDiffEntry(testJobId, 1), firstPage.getDiffList().get(1));
+    assertEquals(orderedIndexTokens.get(2), firstPage.getToken());
+
+    SnapshotDiffReportOzone secondPage = snapshotDiffManager.createPageResponse(snapshotDiffJob,
+        "vol", "buck", "fs", "ts", firstPage.getToken(), 2);
+    assertEquals(1, secondPage.getDiffList().size());
+    assertEquals(getTestDiffEntry(testJobId, 2), secondPage.getDiffList().get(0));
+    assertNull(secondPage.getToken());
+  }
+
   /**
    * Once a job is cancelled, it stays in the table until
    * SnapshotDiffCleanupService removes it.
@@ -1149,6 +1182,55 @@ public class TestSnapshotDiffManager {
 
     assertEquals(DONE, snapDiffJob.getStatus());
     assertEquals(1L, snapDiffJob.getTotalDiffEntries());
+  }
+
+  @Test
+  public void testLoadJobsOnStartUpClearsPartialReportRows() throws Exception {
+    SnapshotDiffJob inProgressJob = snapDiffJobs.get(1);
+    assertEquals(IN_PROGRESS, inProgressJob.getStatus());
+    uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(1), inProgressJob);
+
+    SnapshotDiffJob doneJob = snapDiffJobs.get(2);
+    assertEquals(DONE, doneJob.getStatus());
+    uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(2), doneJob);
+
+    String jobId = inProgressJob.getJobId();
+    String doneJobId = doneJob.getJobId();
+    DiffReportEntry legacyEntry = getTestDiffEntry(jobId, 0);
+    byte[] legacyEntryBytes = codecRegistry.asRawData(legacyEntry);
+    byte[] inProgressLegacyKey = codecRegistry.asRawData(
+        jobId + DELIMITER + "3" + org.apache.commons.lang3.StringUtils.leftPad("0", 20, '0'));
+    byte[] doneJobLegacyKey = codecRegistry.asRawData(
+        doneJobId + DELIMITER + "3" + org.apache.commons.lang3.StringUtils.leftPad("0", 20, '0'));
+    byte[] currentLayoutKey = codecRegistry.asRawData(
+        SnapshotDiffManager.getReportKeyForIndex(jobId, SnapshotDiffReport.DiffType.CREATE, 0));
+
+    db.get().put(snapDiffReportTable, inProgressLegacyKey, legacyEntryBytes);
+    db.get().put(snapDiffReportTable, doneJobLegacyKey, legacyEntryBytes);
+
+    DiffReportEntry createEntry = new DiffReportEntry(SnapshotDiffReport.DiffType.CREATE,
+        codecRegistry.asRawData("created-after-resume"));
+
+    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    doAnswer(invocation -> {
+      db.get().put(snapDiffReportTable, currentLayoutKey, codecRegistry.asRawData(createEntry));
+      return null;
+    }).when(spy).generateSnapshotDiffReport(anyString(), eq(jobId),
+        eq(VOLUME_NAME), eq(BUCKET_NAME), eq(snapshotInfo.getName()),
+        eq(snapshotInfoList.get(1).getName()), eq(false), eq(false));
+
+    spy.loadJobsOnStartUp();
+
+    attempt(() -> {
+      if (db.get().get(snapDiffReportTable, currentLayoutKey) == null) {
+        throw new IllegalStateException("Resumed job has not written the CREATE report row yet.");
+      }
+      return null;
+    }, 10, TimeDuration.ONE_SECOND, null, null);
+
+    assertNull(db.get().get(snapDiffReportTable, inProgressLegacyKey));
+    assertNotNull(db.get().get(snapDiffReportTable, currentLayoutKey));
+    assertNotNull(db.get().get(snapDiffReportTable, doneJobLegacyKey));
   }
 
   private SnapshotDiffJob getSnapshotDiffJobFromDb(SnapshotInfo fromSnapshot,

@@ -35,8 +35,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
@@ -120,6 +118,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
 import org.apache.hadoop.metrics2.util.MBeans;
@@ -136,9 +136,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition;
-import org.apache.hadoop.ozone.om.snapshot.diff.FullDiffSequentialReader;
-import org.apache.hadoop.ozone.om.snapshot.diff.MergeJoinSnapDiffWriter;
-import org.apache.hadoop.ozone.om.snapshot.diff.SnapDiffJobStore;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer;
 import org.apache.hadoop.ozone.om.snapshot.util.TableMergeIterator;
@@ -181,7 +178,6 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   // TODO: [SNAPSHOT] Use different wait time based of job status.
   private final long defaultWaitTime;
   private final long maxAllowedKeyChangesForASnapDiff;
-  private final long maxInMemoryEntriesPerJob;
 
   /**
    * Global table to keep the diff report. Each key is prefixed by the jobID
@@ -254,10 +250,6 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
             OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB,
             OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT
         );
-
-    this.maxInMemoryEntriesPerJob = ozoneManager.getConfiguration().getLong(
-        OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB,
-        OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT);
 
     int threadPoolSize = ozoneManager.getConfiguration().getInt(
         OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE,
@@ -725,7 +717,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
       final String index,
       final int pageSize
   ) throws IOException {
-    if (!isBlank(index)) {
+    if (!isBlank(index) && !index.startsWith("0")) {
       if (DIFF_TYPE_STRING_MAP.values().stream().noneMatch(index::startsWith)) {
         throw new IOException("Token " + index + " has invalid prefix. Valid prefixes: "
             + DIFF_TYPE_STRING_MAP.values().stream().map(String::valueOf).collect(Collectors.joining(",")));
@@ -736,11 +728,12 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     if (isBlank(index)) {
       idx = 0;
     } else {
+      String idxString = index.startsWith("0") ? index : index.substring(1);
       try {
-        idx = Integer.parseInt(index.substring(1));
+        idx = Integer.parseInt(idxString);
       } catch (NumberFormatException e) {
-        throw new IOException("Token " + index + " has invalid numeric part: " +
-            index.substring(1) + ". It should be a valid integer.", e);
+        throw new IOException("Token " + index + " has invalid numeric part: " + idxString +
+            ". It should be a valid integer.", e);
       }
     }
     if (idx < 0 ||
@@ -1657,46 +1650,6 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   }
 
   /**
-   * Optimized full-diff report generation.
-   */
-  @VisibleForTesting
-  @SuppressWarnings("checkstyle:ParameterNumber")
-  Pair<Long, String> generateDiffReportOptimized(
-      final String jobId,
-      final Table<byte[], byte[]> fsKeyTable,
-      final Table<byte[], byte[]> tsKeyTable,
-      final Table<byte[], byte[]> fsDirTable,
-      final Table<byte[], byte[]> tsDirTable,
-      final byte[] keyPrefix,
-      final Long updateIdGate,
-      final long bucketObjectId,
-      final boolean isFSOBucket,
-      final String volumeName,
-      final String bucketName,
-      final String fromSnapshotName,
-      final String toSnapshotName,
-      boolean dependencyOrderingEnabled) throws IOException {
-    LOG.info("Starting optimized diff report generation for jobId: {}.", jobId);
-    try (SnapDiffJobStore store = SnapDiffJobStore.open(db, codecRegistry, familyOptions, jobId,
-        isFSOBucket, snapDiffReportCfh, null,
-        maxInMemoryEntriesPerJob)) {
-      FullDiffSequentialReader reader = updateIdGate != null
-          ? new FullDiffSequentialReader(store, updateIdGate)
-          : new FullDiffSequentialReader(store);
-      reader.scanFileTables(fsKeyTable, tsKeyTable, keyPrefix);
-      if (isFSOBucket) {
-        reader.scanDirectoryTables(fsDirTable, tsDirTable, keyPrefix);
-      }
-      if (!areDiffJobAndSnapshotsActive(volumeName, bucketName,
-          fromSnapshotName, toSnapshotName)) {
-        return Pair.of(-1L, null);
-      }
-      return MergeJoinSnapDiffWriter.writeReport(this, store, bucketObjectId, isFSOBucket,
-          dependencyOrderingEnabled);
-    }
-  }
-
-  /**
    * Checks if the key has been modified b/w snapshots.
    * @param fromKey Key info in source snapshot.
    * @param toKey Key info in target snapshot.
@@ -1747,8 +1700,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   private String addToReport(String jobId, long index, DiffReportEntry diffReportEntry)
       throws IOException {
     String jobReportKey = getReportKeyForIndex(jobId, diffReportEntry.getType(), index);
-    snapDiffReportTable.put(codecRegistry.asRawData(jobReportKey),
-        codecRegistry.asRawData(diffReportEntry));
+    snapDiffReportTable.put(codecRegistry.asRawData(jobReportKey), codecRegistry.asRawData(diffReportEntry));
     return jobReportKey;
   }
 
@@ -1880,6 +1832,23 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
    * When client re-submits previously queued job, workflow will pick it and
    * execute it.
    */
+  /**
+   * Deletes all persisted report rows for {@code jobId}. Resume after OM restart
+   * regenerates the report from scratch; without this, partial rows from an earlier
+   * run (including under a previous diff-type key prefix) would remain visible.
+   */
+  private void deleteReportEntriesForJob(String jobId) throws IOException {
+    try (ManagedWriteBatch writeBatch = new ManagedWriteBatch();
+         ManagedWriteOptions writeOptions = new ManagedWriteOptions()) {
+      byte[] beginKey = codecRegistry.asRawData(jobId + DELIMITER + 0);
+      byte[] endKey = codecRegistry.asRawData(getLexicographicallyHigherString(jobId + DELIMITER));
+      writeBatch.deleteRange(snapDiffReportCfh, beginKey, endKey);
+      db.get().write(writeOptions, writeBatch);
+    } catch (RocksDBException e) {
+      throw new IOException(e);
+    }
+  }
+
   @VisibleForTesting
   void loadJobsOnStartUp() {
 
@@ -1890,6 +1859,14 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
         String jobKey = next.getKey();
         SnapshotDiffJob snapshotDiffJob = next.getValue();
         if (snapshotDiffJob.getStatus() == IN_PROGRESS) {
+          try {
+            deleteReportEntriesForJob(snapshotDiffJob.getJobId());
+          } catch (IOException e) {
+            LOG.error("Failed to clear partial snap diff report for job {} on OM restart",
+                snapshotDiffJob.getJobId(), e);
+            updateJobStatusToFailed(jobKey, e.getMessage());
+            continue;
+          }
           // This is done just to be in parity of the workflow.
           // If job status is not updated to QUEUED, workflow will fail when
           // job gets submitted to executor and its status is IN_PROGRESS.
