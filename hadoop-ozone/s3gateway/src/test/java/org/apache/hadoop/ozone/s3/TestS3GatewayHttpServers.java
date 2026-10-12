@@ -59,16 +59,29 @@ class TestS3GatewayHttpServers {
    * realm, which the JDK resolves from these properties when there is no
    * krb5.conf, as in CI.
    */
+  private static String previousKerberosRealm;
+  private static String previousKerberosKdc;
+
   @BeforeAll
   static void fakeKerberosRealm() {
+    previousKerberosRealm = System.getProperty("java.security.krb5.realm");
+    previousKerberosKdc = System.getProperty("java.security.krb5.kdc");
     System.setProperty("java.security.krb5.realm", "EXAMPLE.COM");
     System.setProperty("java.security.krb5.kdc", "localhost");
   }
 
   @AfterAll
   static void clearKerberosRealm() {
-    System.clearProperty("java.security.krb5.realm");
-    System.clearProperty("java.security.krb5.kdc");
+    if (previousKerberosRealm == null) {
+      System.clearProperty("java.security.krb5.realm");
+    } else {
+      System.setProperty("java.security.krb5.realm", previousKerberosRealm);
+    }
+    if (previousKerberosKdc == null) {
+      System.clearProperty("java.security.krb5.kdc");
+    } else {
+      System.setProperty("java.security.krb5.kdc", previousKerberosKdc);
+    }
   }
 
   /**
