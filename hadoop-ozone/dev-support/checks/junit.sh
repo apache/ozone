@@ -37,6 +37,7 @@ fi
 
 export MAVEN_OPTS="-Xmx4096m ${MAVEN_OPTS:-}"
 MAVEN_OPTIONS="-B -V -DskipDocs -DskipRecon -Dnative.lib.tmp.dir=/tmp --no-transfer-progress"
+MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
@@ -55,13 +56,14 @@ if [[ -f hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh ]]; then
   ozone_java_setup
 fi
 
-mvn ${MAVEN_OPTIONS} clean
+mvn ${MAVEN_OPTIONS} clean -Dscan=false
 
 if [[ ${ITERATIONS} -gt 1 ]] && [[ ${OZONE_REPO_CACHED} == "false" ]]; then
   mvn ${MAVEN_OPTIONS} -DskipTests install
 fi
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
+BASE_DIR="$(pwd -P)"
+REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/${CHECK}"}
 REPORT_FILE="${REPORT_DIR}/summary.txt"
 mkdir -p "$REPORT_DIR"
 
