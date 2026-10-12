@@ -165,11 +165,18 @@ Key paths:
   Do not rewrite branch history unless explicitly asked.
 - To bring a branch up to date with `master`, merge instead of rebasing: `git merge --no-edit origin/master`
 - Avoid force-push when updating a PR unless a maintainer explicitly asks for rewritten history.
+- Committers: keep about one hour between merges to `master` so the GitHub Actions queue has room for other PRs.
+- Committers: allow at least 24 hours for contributors in all time zones to provide feedback before merging non-trivial PRs, except for CI-breakage fixes.
+- Before opening or marking a PR ready, run a clean fork CI check. Keep the PR in draft while the implementation is unstable, review comments are open, or fork CI is failing; do not spend CI resources on obsolete revisions.
+- Trigger CI only when the change is necessary, and do not rerun unrelated flaky tests that are already fixed on `master`.
+- Keep distinct issues separate. Avoid unrelated changes, and move build changes, refactoring, or cleanup into a follow-up PR when they obscure the functional change. For cleanup, consider compatibility and deprecation before removing public interfaces, and notify the original authors when practical.
+- For test fixes, inspect the failure evidence and address the cause instead of only increasing a timeout.
 - PR descriptions should include the Jira link, the problem statement,
   the chosen approach, and how the patch was tested.
 - When non-trivial content is generated with AI tooling,
   disclose it in the PR description as `Generated-by: TOOL (MODEL)`.
   See the ASF generative tooling policy.
+- Validate AI-generated analysis and proposed fixes before relying on them, and keep PR summaries concise.
 
 ## Ask First
 
