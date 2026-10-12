@@ -61,7 +61,12 @@ public enum OzoneManagerVersion implements ComponentVersion {
   S3_BUCKET_TAGGING_API(13,
       "OzoneManager version that supports S3 bucket tagging APIs, such as "
           + "PutBucketTagging, GetBucketTagging, and DeleteBucketTagging"),
-    
+
+  GET_FILE_STATUS_REJECTS_OBS(14,
+      "OzoneManager version that rejects getFileStatus on OBJECT_STORE "
+          + "buckets server-side, so file system clients no longer need the "
+          + "client-side InfoBucket layout check"),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 

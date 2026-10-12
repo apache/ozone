@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.OutputStream;
@@ -255,32 +256,57 @@ public class TestWatchForCommit {
                 xceiverClient.getPipeline()));
         reply.getResponse().get();
         long index = reply.getLogIndex();
-        cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
-        cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
+        // Shut down the Ratis leader and one follower so that no reachable
+        // leader remains to answer the watch with NotReplicatedException, which
+        // would let an ALL_COMMITTED watch degrade to a normal (majority) reply.
+        shutdownRatisLeaderAndOneFollower(pipeline);
         // emulate closing pipeline when SCM detects DEAD datanodes
         cluster.getStorageContainerManager()
             .getPipelineManager().closePipeline(pipeline.getId());
-        // again write data with more than max buffer limit. This wi
-        // just watch for a log index which in not updated in the commitInfo Map
-        // as well as there is no logIndex generate in Ratis.
-        // The basic idea here is just to test if its throws an exception.
+        // Watch for a log index which is neither present in the commitInfo map
+        // nor generated in Ratis. With no reachable leader this must fail.
+        // The basic idea here is just to test that it throws an exception.
         ExecutionException e = assertThrows(ExecutionException.class,
             () -> xceiverClient.watchForCommit(index + RandomUtils.secure().randomInt(0, 100) + 10)
                 .get());
-        // since the timeout value is quite long, the watch request will either
-        // fail with NotReplicated exceptio, RetryFailureException or
-        // RuntimeException
+        // The watch fails via retry/replication (or group mismatch) failure,
+        // not a bare timeout.
         assertFalse(HddsClientUtils
             .checkForException(e) instanceof TimeoutException);
-        // client should not attempt to watch with
-        // MAJORITY_COMMITTED replication level, except the grpc IO issue
-        if (!logCapturer.getOutput().contains("Connection refused")) {
-          assertThat(e.getMessage()).doesNotContain("Watch-MAJORITY_COMMITTED");
-        }
+        // The client attempts the watch at the requested replication level.
+        assertThat(logCapturer.getOutput()).contains(watchType + " way commit failed");
       } finally {
         clientManager.releaseClient(xceiverClient, false);
       }
     }
+  }
+
+  private void shutdownRatisLeaderAndOneFollower(Pipeline pipeline) throws Exception {
+    // Leader detection and shutdown happen in two steps. This assumes the leader
+    // stays stable in between, which holds here because the pipeline is freshly
+    // formed and idle (no writes in flight), so no Ratis re-election is expected
+    // during the scan. If one did occur, a stale leader could be shut down while
+    // the real leader survives.
+    DatanodeDetails leader = null;
+    DatanodeDetails follower = null;
+    for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+      DatanodeDetails details = dn.getDatanodeDetails();
+      if (!pipeline.getNodes().contains(details)) {
+        continue;
+      }
+      if (RatisTestHelper.isRatisLeader(dn, pipeline)) {
+        leader = details;
+      } else if (follower == null && RatisTestHelper.isRatisFollower(dn, pipeline)) {
+        follower = details;
+      }
+      if (leader != null && follower != null) {
+        break;
+      }
+    }
+    assertNotNull(leader, "No Ratis leader found in pipeline " + pipeline.getId());
+    assertNotNull(follower, "No Ratis follower found in pipeline " + pipeline.getId());
+    cluster.shutdownHddsDatanode(leader);
+    cluster.shutdownHddsDatanode(follower);
   }
 
   @ParameterizedTest

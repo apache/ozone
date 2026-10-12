@@ -98,7 +98,7 @@ public class SecretKeyProtocolClientSideTranslatorPB implements
       throws SCMSecretKeyException {
     if (resp.getStatus() != SCMSecretKeyProtocolProtos.Status.OK) {
       throw new SCMSecretKeyException(resp.getMessage(),
-          SCMSecretKeyException.ErrorCode.values()[resp.getStatus().ordinal()]);
+          SCMSecretKeyException.ErrorCode.valueOf(resp.getStatus().name()));
     }
     return resp;
   }

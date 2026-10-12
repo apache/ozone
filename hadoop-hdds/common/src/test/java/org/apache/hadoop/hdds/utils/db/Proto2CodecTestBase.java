@@ -42,6 +42,19 @@ public abstract class Proto2CodecTestBase<T> {
         .contains("the input ended unexpectedly");
   }
 
+  /**
+   * {@link Proto2Codec#fromCodecBuffer(CodecBuffer)} parses the buffer in place; a buffer which is
+   * not a valid message must still surface as a {@link CodecException}.
+   */
+  @Test
+  public void testInvalidProtocolBufferFromCodecBuffer() {
+    try (CodecBuffer buffer = CodecBuffer.wrap("random".getBytes(UTF_8))) {
+      final CodecException exception =
+          assertThrows(CodecException.class, () -> getCodec().fromCodecBuffer(buffer));
+      assertInstanceOf(InvalidProtocolBufferException.class, exception.getCause());
+    }
+  }
+
   @Test
   public void testFromPersistedFormat() {
     assertThrows(NullPointerException.class,

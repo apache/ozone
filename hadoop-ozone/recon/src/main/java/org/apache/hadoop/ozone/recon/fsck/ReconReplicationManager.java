@@ -21,12 +21,13 @@ import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -239,28 +240,29 @@ public class ReconReplicationManager extends ReplicationManager {
    * </ul>
    * </p>
    *
-   * <p>This uses checksum mismatch logic:
-   * {@code replicas.stream().map(ContainerReplica::getDataChecksum).distinct().count() != 1}
-   * </p>
+   * <p>EC replicas are compared only within the same replica index, since different indexes contain different data or
+   * parity fragments. Non-EC replicas are compared together.</p>
    *
+   * @param container Container whose replicas are checked
    * @param replicas Set of container replicas to check
-   * @return true if replicas have different data checksums
+   * @return true if comparable replicas have different data checksums
    */
-  private boolean hasDataChecksumMismatch(Set<ContainerReplica> replicas) {
+  private boolean hasDataChecksumMismatch(ContainerInfo container, Set<ContainerReplica> replicas) {
     if (replicas == null || replicas.isEmpty()) {
       return false;
     }
 
-    // Count distinct checksums (filter out nulls)
-    long distinctChecksums = replicas.stream()
-        .map(ContainerReplica::getDataChecksum)
-        .filter(Objects::nonNull)
-        .distinct()
-        .count();
-
-    // More than 1 distinct checksum = data mismatch
-    // 0 distinct checksums = all nulls, no mismatch
-    return distinctChecksums > 1;
+    boolean isEC = container.getReplicationType() == ReplicationType.EC;
+    Map<Integer, Long> checksumsByIndex = new HashMap<>();
+    for (ContainerReplica replica : replicas) {
+      int replicaIndex = isEC ? replica.getReplicaIndex() : 0;
+      long checksum = replica.getDataChecksum();
+      Long previousChecksum = checksumsByIndex.putIfAbsent(replicaIndex, checksum);
+      if (previousChecksum != null && previousChecksum != checksum) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -314,7 +316,7 @@ public class ReconReplicationManager extends ReplicationManager {
         processContainer(container, replicas, pendingOps, nullQueue, report, true);
 
         // ADDITIONAL CHECK: Detect REPLICA_MISMATCH (Recon-specific, not in SCM)
-        if (hasDataChecksumMismatch(replicas)) {
+        if (hasDataChecksumMismatch(container, replicas)) {
           report.addReplicaMismatchContainer(cid);
           LOG.debug("Container {} has data checksum mismatch across replicas", cid);
         }

@@ -157,7 +157,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
                 CacheValue.get(trxnLogIndex));
       }
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       long quotaReleased = sumBlockLengths(omKeyInfo);
       // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
@@ -187,6 +187,9 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
         auditMap.put(OzoneConsts.DATA_SIZE, String.valueOf(omKeyInfo.getDataSize()));
         auditMap.put(OzoneConsts.REPLICATION_CONFIG, omKeyInfo.getReplicationConfig().toString());
       }
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
       omClientResponse = new OMKeyDeleteResponseWithFSO(omResponse
           .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),

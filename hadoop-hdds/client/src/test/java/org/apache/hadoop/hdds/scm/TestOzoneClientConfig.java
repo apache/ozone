@@ -93,19 +93,19 @@ class TestOzoneClientConfig {
   }
 
   @Test
-  void testDatastreamPutBlockOnCloseEnabledDefault() {
+  void testDatastreamPutBlockWithoutRaftEnabledDefault() {
     OzoneClientConfig subject = new OzoneConfiguration()
         .getObject(OzoneClientConfig.class);
-    assertFalse(subject.isDatastreamPutBlockOnCloseEnabled());
+    assertFalse(subject.isDatastreamPutBlockWithoutRaftEnabled());
   }
 
   @Test
-  void testDatastreamPutBlockOnCloseConfigParsing() {
+  void testDatastreamPutBlockWithoutRaftConfigParsing() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean("ozone.client.datastream.putblock.on.close.enabled", true);
+    conf.setBoolean("ozone.client.datastream.putblock.without.raft.enabled", true);
 
     OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
 
-    assertTrue(subject.isDatastreamPutBlockOnCloseEnabled());
+    assertTrue(subject.isDatastreamPutBlockWithoutRaftEnabled());
   }
 }
