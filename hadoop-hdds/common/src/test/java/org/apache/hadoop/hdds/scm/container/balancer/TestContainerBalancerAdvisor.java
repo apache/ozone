@@ -271,6 +271,7 @@ public final class TestContainerBalancerAdvisor {
       assertTrue(result.succeeded());
       assertNotNull(result.getEstimation());
       assertTrue(result.getEstimation().succeeded());
+      assertEquals(result.getMaxSizeToMovePerIteration(), result.getEstimation().getMaxSizeToMovePerIteration());
       assertTrue(result.getRecommendedIterations() >= result.getEstimation().getEstimatedIterations());
       assertFalse(result.getRationale().isEmpty());
     }
@@ -328,6 +329,7 @@ public final class TestContainerBalancerAdvisor {
     assertEquals(10L * OzoneConsts.GB, slow.getMaxSizeEnteringTarget());
     assertEquals(10L * OzoneConsts.GB, slow.getMaxSizeLeavingSource());
     assertEquals(30L * OzoneConsts.GB, slow.getMaxSizeToMovePerIteration());
+    assertEquals(slow.getMaxSizeToMovePerIteration(), slow.getEstimation().getMaxSizeToMovePerIteration());
     assertTrue(slow.getMaxSizeToMovePerIteration() >= slow.getMaxSizeEnteringTarget());
     assertTrue(slow.getMaxSizeToMovePerIteration() >= slow.getMaxSizeLeavingSource());
   }

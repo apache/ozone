@@ -94,17 +94,17 @@ public final class ContainerBalancerCliHelper {
       Optional<String> includeNodes,
       Optional<String> excludeNodes) {
     StringBuilder sb = new StringBuilder("ozone admin containerbalancer start");
-    sb.append(" -t ").append(formatThreshold(recommendation.getThresholdPercent()));
-    sb.append(" -i ").append(recommendation.getRecommendedIterations());
-    sb.append(" -d ").append(recommendation.getMaxDatanodesPercentage());
-    sb.append(" -s ").append(bytesToGb(recommendation.getMaxSizeToMovePerIteration()));
-    sb.append(" -e ").append(bytesToGb(recommendation.getMaxSizeEnteringTarget()));
-    sb.append(" -l ").append(bytesToGb(recommendation.getMaxSizeLeavingSource()));
-    sb.append(" --balancing-iteration-interval-minutes ")
-        .append(recommendation.getBalancingIntervalMillis() / 60000);
-    sb.append(" --move-timeout-minutes ")
-        .append(recommendation.getMoveTimeoutMillis() / 60000);
-    sb.append(" --move-replication-timeout-minutes ")
+    sb.append(" -t ").append(formatThreshold(recommendation.getThresholdPercent()))
+        .append(" -i ").append(recommendation.getRecommendedIterations())
+        .append(" -d ").append(recommendation.getMaxDatanodesPercentage())
+        .append(" -s ").append(bytesToGb(recommendation.getMaxSizeToMovePerIteration()))
+        .append(" -e ").append(bytesToGb(recommendation.getMaxSizeEnteringTarget()))
+        .append(" -l ").append(bytesToGb(recommendation.getMaxSizeLeavingSource()))
+        .append(" --balancing-iteration-interval-minutes ")
+        .append(recommendation.getBalancingIntervalMillis() / 60000)
+        .append(" --move-timeout-minutes ")
+        .append(recommendation.getMoveTimeoutMillis() / 60000)
+        .append(" --move-replication-timeout-minutes ")
         .append(recommendation.getMoveReplicationTimeoutMillis() / 60000);
     appendNodeFilters(sb, includeNodes, excludeNodes);
     return sb.toString();

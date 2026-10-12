@@ -83,7 +83,7 @@ public final class ContainerBalancerAdvisor {
     List<ContainerBalancerProfile> profiles = selectProfiles(request);
     List<ContainerBalancerEstimation> estimations = new ArrayList<>(profiles.size());
     for (ContainerBalancerProfile profile : profiles) {
-      estimations.add(estimateForProfile(conf, request, profile, snapshot, balancerConfig, thresholdPercent));
+      estimations.add(estimateForProfile(conf, request, profile, snapshot, balancerConfig, thresholdPercent, null));
     }
     return Collections.unmodifiableList(estimations);
   }
@@ -168,20 +168,20 @@ public final class ContainerBalancerAdvisor {
       validateMoveTimeouts(conf, moveReplicationTimeoutMillis, moveTimeoutMillis);
       validateBalancingIntervalMillis(balancingIntervalMillis);
 
+      long configCeiling = balancerConfig.getMaxSizeToMovePerIteration();
+      ContainerBalancerEstimation initialEstimation = estimateForProfile(
+          conf, request, profile, snapshot, balancerConfig, thresholdPercent, null);
+      if (!initialEstimation.succeeded()) {
+        throw new IllegalArgumentException(initialEstimation.getFailureMessage());
+      }
+      long recommendedMaxMove = computeRecommendedMaxSizeToMove(configCeiling, initialEstimation);
+
+      // Estimate with the recommended max-size-to-move so it matches the suggested command.
       ContainerBalancerEstimation estimation = estimateForProfile(
-          conf, request, profile, snapshot, balancerConfig, thresholdPercent);
+          conf, request, profile, snapshot, balancerConfig, thresholdPercent, recommendedMaxMove);
       if (!estimation.succeeded()) {
         throw new IllegalArgumentException(estimation.getFailureMessage());
       }
-
-      long configCeiling = balancerConfig.getMaxSizeToMovePerIteration();
-      long recommendedMaxMove = computeRecommendedMaxSizeToMove(configCeiling, estimation);
-
-      validateResolvedMoveLimits(
-          conf,
-          estimation.getMaxSizeEnteringTarget(),
-          estimation.getMaxSizeLeavingSource(),
-          recommendedMaxMove);
 
       int recommendedIterations = (int) Math.ceil(
           estimation.getEstimatedIterations() * PLANNING_ITERATION_BUFFER);
@@ -271,7 +271,8 @@ public final class ContainerBalancerAdvisor {
 
   private static ContainerBalancerEstimation estimateForProfile(OzoneConfiguration conf, AdvisorRequest request,
       ContainerBalancerProfile profile, ContainerBalancerClusterSnapshot snapshot,
-      ContainerBalancerConfiguration balancerConfig, double thresholdPercent) {
+      ContainerBalancerConfiguration balancerConfig, double thresholdPercent,
+      Long resolvedMaxSizeToMovePerIteration) {
     
     boolean userProvidedMaxDatanodesPercentage =
         request.maxDatanodesPercentageToInvolvePerIteration != null;
@@ -287,6 +288,9 @@ public final class ContainerBalancerAdvisor {
     long maxSizeToMovePerIteration = request.maxSizeToMovePerIteration != null
         ? request.maxSizeToMovePerIteration
         : balancerConfig.getMaxSizeToMovePerIteration();
+    if (resolvedMaxSizeToMovePerIteration != null) {
+      maxSizeToMovePerIteration = resolvedMaxSizeToMovePerIteration;
+    }
     long moveTimeoutMillis = request.moveTimeoutMillis != null
         ? request.moveTimeoutMillis
         : balancerConfig.getMoveTimeout().toMillis();
@@ -443,7 +447,7 @@ public final class ContainerBalancerAdvisor {
     return result;
   }
 
-  private static void validateSnapshotForEstimation(ContainerBalancerClusterSnapshot snapshot ) {
+  private static void validateSnapshotForEstimation(ContainerBalancerClusterSnapshot snapshot) {
     if (snapshot.getSourceCount() < 1) {
       throw new IllegalArgumentException("No over-utilized datanodes (sources) found.");
     }
