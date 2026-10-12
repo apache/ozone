@@ -491,13 +491,6 @@ const Containers: React.FC<{}> = () => {
 
   const autoReload = useAutoReload(loadContainersData);
 
-  useEffect(() => {
-    // Auto-reload performs the initial fetch when enabled.
-    if (sessionStorage.getItem('autoReloadEnabled') === 'false') {
-      loadContainersData();
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const {
     lastUpdated,
     totalContainers,

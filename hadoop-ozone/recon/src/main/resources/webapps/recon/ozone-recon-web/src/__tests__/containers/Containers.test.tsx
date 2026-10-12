@@ -50,21 +50,6 @@ vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
   return {
     ...actual,
     useApiData: <T,>(url: string, defaultValue: T, options = {}) => {
-      // Containers fetches clusterState with initialFetch: true and again via useAutoReload on mount;
-      // the second call aborts the first, which surfaces as unhandled CanceledError in tests.
-      if (url === '/api/v1/clusterState') {
-        return {
-          data: ClusterState as T,
-          loading: false,
-          error: null,
-          lastUpdated: Date.now(),
-          success: true,
-          execute: vi.fn(),
-          refetch: vi.fn(() => Promise.resolve({ data: ClusterState })),
-          clearError: vi.fn(),
-          reset: vi.fn(),
-        };
-      }
       return actual.useApiData(url, defaultValue, {
         ...options,
         retryAttempts: 0,
@@ -92,6 +77,7 @@ async function waitForLoadingToFinish(container: HTMLElement) {
 
 describe('Containers Component', () => {
   beforeEach(() => {
+    sessionStorage.removeItem('autoReloadEnabled');
     vi.mocked(commonUtils.showDataFetchError).mockClear();
   });
   beforeAll(() => containersServer.listen());
@@ -109,6 +95,34 @@ describe('Containers Component', () => {
 
     await waitForContainerRows();
     expect(getEnabledSearchInput()).toBeInTheDocument();
+  });
+
+  test.each([null, 'true', 'false'])('loads each initial endpoint once with auto reload %s', async (enabled) => {
+    if (enabled !== null) {
+      sessionStorage.setItem('autoReloadEnabled', enabled);
+    }
+    const requests: string[] = [];
+    const countRequest = ({ request }: { request: Request }) => {
+      requests.push(new URL(request.url).pathname);
+    };
+    containersServer.events.on('request:start', countRequest);
+    try {
+      render(<Containers />);
+      await waitForContainerRows();
+      await waitFor(() => expect(highlightValue('Total Containers')).toHaveTextContent(
+        new RegExp(`^${ClusterState.containers}$`)));
+      await waitFor(() => expect(highlightValue('Quasi Closed')).toHaveTextContent(/^2$/));
+      for (const endpoint of [
+        '/api/v1/clusterState',
+        '/api/v1/containers/unhealthy/MISSING',
+        '/api/v1/containers/quasiClosed',
+      ]) {
+        expect(requests.filter(url => url === endpoint)).toHaveLength(1);
+      }
+    } finally {
+      containersServer.events.removeListener('request:start', countRequest);
+      sessionStorage.removeItem('autoReloadEnabled');
+    }
   });
 
   test('Loads data on mount', async () => {
