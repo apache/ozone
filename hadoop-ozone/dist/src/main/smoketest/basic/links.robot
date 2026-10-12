@@ -98,14 +98,14 @@ Link to non-existent bucket
 Link to non-existent source volume
                         Execute                     ozone sh bucket link no-such-volume/no-such-bucket ${target}/dangling-missing-vol
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/dangling-missing-vol
-                        Should Contain              ${result}         BUCKET_NOT_FOUND
+                        Should Contain              ${result}         VOLUME_NOT_FOUND
                         Should Contain              ${result}         Cannot follow bucket link
 
 Link chain to broken source
                         Execute                     ozone sh bucket link no-such-volume/no-such-bucket ${target}/link-bucket2
                         Execute                     ozone sh bucket link ${target}/link-bucket2 ${target}/link-bucket1
     ${result} =         Execute And Ignore Error    ozone sh key list ${target}/link-bucket1
-                        Should Contain              ${result}         BUCKET_NOT_FOUND
+                        Should Contain              ${result}         VOLUME_NOT_FOUND
                         Should Contain              ${result}         Cannot follow bucket link
 
 Key create passthrough
