@@ -112,4 +112,21 @@ export const QuasiClosedResponse = {
   }],
 };
 
+/** IDs 101–125; honors minContainerId + limit (page uses limit = pageSize + 1). */
+export function paginatedMissingResponse(minContainerId: number, limit: number) {
+  const allIds = Array.from({ length: 25 }, (_, i) => 101 + i);
+  const ids = allIds.filter((id) => id > minContainerId).slice(0, limit);
+  const containers = ids.map((id) => missingContainer(id));
+  return {
+    missingCount: 25,
+    underReplicatedCount: 15,
+    overReplicatedCount: 12,
+    misReplicatedCount: 13,
+    replicaMismatchCount: 11,
+    firstKey: ids[0] ?? 0,
+    lastKey: ids[ids.length - 1] ?? 0,
+    containers,
+  };
+}
+
 export const ExportJobsResponse: [] = [];

@@ -23,6 +23,7 @@ import { http, HttpResponse } from 'msw';
 import { vi } from 'vitest';
 
 import Containers from '@/v2/pages/containers/containers';
+import * as apiData from '@/v2/hooks/useAPIData.hook';
 import * as commonUtils from '@/utils/common';
 import { ClusterState } from '@tests/mocks/overviewMocks/overviewResponseMocks';
 import { containersServer } from '@tests/mocks/containerMocks/containersServer';
@@ -49,6 +50,8 @@ vi.mock('@/v2/hooks/useAPIData.hook', async (importOriginal) => {
   return {
     ...actual,
     useApiData: <T,>(url: string, defaultValue: T, options = {}) => {
+      // Containers fetches clusterState with initialFetch: true and again via useAutoReload on mount;
+      // the second call aborts the first, which surfaces as unhandled CanceledError in tests.
       if (url === '/api/v1/clusterState') {
         return {
           data: ClusterState as T,
@@ -76,8 +79,15 @@ function getEnabledSearchInput() {
   return inputs.find((el) => !(el as HTMLInputElement).disabled) ?? inputs[0];
 }
 
-async function debouncedSearch() {
-  await new Promise((r) => { setTimeout(r, 310); });
+function highlightValue(label: string) {
+  return screen.getByText(label, { selector: '.highlight-content' })
+    .querySelector('.highlight-content-value');
+}
+
+async function waitForLoadingToFinish(container: HTMLElement) {
+  await waitFor(() => {
+    expect(container.querySelector('.ant-spin-spinning')).not.toBeInTheDocument();
+  });
 }
 
 describe('Containers Component', () => {
@@ -114,10 +124,10 @@ describe('Containers Component', () => {
 
     await waitForContainerRows();
 
-    const highlightsCard = screen.getByText('Highlights').closest('.ant-card');
-    expect(highlightsCard).toHaveTextContent(String(ClusterState.containers));
-    expect(highlightsCard).toHaveTextContent('25');
-    expect(highlightsCard).toHaveTextContent('2');
+    await waitFor(() =>
+      expect(highlightValue('Total Containers')).toHaveTextContent(new RegExp(`^${ClusterState.containers}$`)));
+    expect(highlightValue('Missing')).toHaveTextContent(/^25$/);
+    await waitFor(() => expect(highlightValue('Quasi Closed')).toHaveTextContent(/^2$/));
   });
 
   test('Renders table with correct number of rows', async () => {
@@ -133,39 +143,67 @@ describe('Containers Component', () => {
         HttpResponse.json(containerMocks.EmptyUnhealthyResponse))
     );
 
-    render(<Containers />);
+    const { container } = render(<Containers />);
 
-    await waitFor(() => expect(screen.getByText('No Data')).toBeInTheDocument());
+    await waitForLoadingToFinish(container);
+    await waitFor(() => {
+      expect(screen.queryAllByTestId(containerLocators.containerRowRegex)).toHaveLength(0);
+      expect(screen.getByText('No Data')).toBeInTheDocument();
+    });
   });
 
-  test('lazy-loads data when switching to under-replicated tab', async () => {
-    render(<Containers />);
-    await waitForContainerRows();
+  test('loads the next page of missing containers when Next is clicked', async () => {
+    containersServer.use(
+      http.get('/api/v1/containers/unhealthy/MISSING', ({ request }) => {
+        const url = new URL(request.url);
+        const minContainerId = Number(url.searchParams.get('minContainerId') ?? 0);
+        const limit = Number(url.searchParams.get('limit') ?? 11);
+        return HttpResponse.json(
+          containerMocks.paginatedMissingResponse(minContainerId, limit));
+      })
+    );
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Under-Replicated' }));
+    render(<Containers />);
 
     await waitFor(() =>
-      expect(screen.getByTestId(containerLocators.containerTableRow(201))).toBeInTheDocument());
+      expect(screen.getAllByTestId(containerLocators.containerRowRegex)).toHaveLength(10));
+    expect(screen.getByTestId(containerLocators.containerTableRow(101))).toBeInTheDocument();
+    expect(screen.getByTestId(containerLocators.containerTableRow(110))).toBeInTheDocument();
+    expect(screen.queryByTestId(containerLocators.containerTableRow(111))).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /Next/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId(containerLocators.containerTableRow(111))).toBeInTheDocument());
+    expect(screen.queryByTestId(containerLocators.containerTableRow(101))).not.toBeInTheDocument();
   });
 
-  test('lazy-loads data when switching to over-replicated tab', async () => {
-    render(<Containers />);
-    await waitForContainerRows();
+  test.each([
+    { tab: 'Under-Replicated', endpoint: '/api/v1/containers/unhealthy/UNDER_REPLICATED', id: 201 },
+    { tab: 'Over-Replicated', endpoint: '/api/v1/containers/unhealthy/OVER_REPLICATED', id: 301 },
+    { tab: 'Quasi Closed', endpoint: '/api/v1/containers/quasiClosed', id: 401 },
+  ])('lazy-loads $tab once on first activation', async ({ tab, endpoint, id }) => {
+    const requests = vi.spyOn(apiData, 'fetchData');
+    const tableRequests = () => requests.mock.calls.filter(
+      ([url, , params]) => url === endpoint && params?.limit !== 0
+    );
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Over-Replicated' }));
+    try {
+      render(<Containers />);
+      await waitForContainerRows();
+      expect(tableRequests()).toHaveLength(0);
 
-    await waitFor(() =>
-      expect(screen.getByTestId(containerLocators.containerTableRow(301))).toBeInTheDocument());
-  });
+      await userEvent.click(screen.getByRole('tab', { name: tab }));
+      await waitFor(() =>
+        expect(screen.getByTestId(containerLocators.containerTableRow(id))).toBeInTheDocument());
+      expect(tableRequests()).toHaveLength(1);
 
-  test('lazy-loads quasi closed containers when switching tabs', async () => {
-    render(<Containers />);
-    await waitForContainerRows();
-
-    await userEvent.click(screen.getByRole('tab', { name: 'Quasi Closed' }));
-
-    await waitFor(() =>
-      expect(screen.getByTestId(containerLocators.containerTableRow(401))).toBeInTheDocument());
+      await userEvent.click(screen.getByRole('tab', { name: 'Missing' }));
+      await userEvent.click(screen.getByRole('tab', { name: tab }));
+      expect(tableRequests()).toHaveLength(1);
+    } finally {
+      requests.mockRestore();
+    }
   });
 
   test('Handles search input change', async () => {
@@ -173,10 +211,9 @@ describe('Containers Component', () => {
     await waitForContainerRows();
 
     fireEvent.change(getEnabledSearchInput(), { target: { value: '101' } });
-    await debouncedSearch();
 
-    const rows = await waitFor(() => screen.getAllByTestId(containerLocators.containerRowRegex));
-    expect(rows).toHaveLength(1);
+    await waitFor(() =>
+      expect(screen.getAllByTestId(containerLocators.containerRowRegex)).toHaveLength(1));
   });
 
   test('Displays a message when no results match the search term', async () => {
