@@ -54,6 +54,33 @@ ozone.http.filter.initializers | org.apache.hadoop.security.AuthenticationFilter
 After that, individual component needs to configure properly to completely enable
 SPNEGO or SIMPLE authentication.
 
+### Resolving `_HOST` in the Kerberos principal
+
+`HTTP/_HOST@REALM` in `*.http.auth.kerberos.principal` is expanded at startup. The
+hostname must match your **keytab** and the **host in the browser URL**.
+
+Ozone takes `_HOST` from the **advertised** web address (`ozone.<service>.http-address`
+or `https-address`), **not** from `*-http-bind-host`. Bind host only chooses where
+the process listens (`0.0.0.0`, `::`, a NIC IP, and so on).
+
+| Property (OM example) | Example | Used for `_HOST` |
+|-----------------------|---------|------------------|
+| `ozone.om.http-address` | `om1.example.com:9874` | Yes |
+| `ozone.om.http-bind-host` | `0.0.0.0` or `::` | No |
+
+If `*-address` uses a wildcard host (`0.0.0.0` or `[::]`), Ozone uses this machine's
+**canonical hostname** (same idea as default Hadoop installs).
+
+**Recommended:** set `*-address` to the FQDN in the keytab; keep `*-bind-host` on
+`0.0.0.0` or `::` if needed; open the UI with that FQDN. For **IPv6 bind `::`**, still
+set a non-wildcard FQDN in `*-address`. S3 web admin (and Kerberos `/secret/*` when
+enabled) follows `ozone.s3g.webadmin.http-address` / `https-address` the same way.
+
+**SPNEGO fails:** check `klist -k -t <keytab>` against `*-address` and the browser URL
+(FQDN, short name, and IP are not interchangeable).
+
+See [HDDS-16347](https://issues.apache.org/jira/browse/HDDS-16347) for the code change.
+
 ### Enable SPNEGO authentication for OM HTTP
 Property| Value
 -----------------------------------|-----------------------------------------
