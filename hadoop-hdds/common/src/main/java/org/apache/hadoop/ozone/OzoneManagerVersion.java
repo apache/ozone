@@ -67,6 +67,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "buckets server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check"),
 
+  S3_BUCKET_INFO_WITH_VOLUME_CONTEXT(15,
+      "OzoneManager version that resolves the S3 volume in InfoBucket when assumeS3Context is set"),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 

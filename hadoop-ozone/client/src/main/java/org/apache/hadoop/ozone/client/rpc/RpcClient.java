@@ -1340,6 +1340,14 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneBucket getS3BucketDetails(String bucketName) throws IOException {
     verifyBucketName(bucketName);
+    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_INFO_WITH_VOLUME_CONTEXT) < 0) {
+      // Older OM ignores assumeS3Context and would look up the bucket in the default S3 volume,
+      // so resolve the S3 volume with a separate call.
+      String volumeName = getS3VolumeContext().getOmVolumeArgs().getVolume();
+      return getBucketDetails(volumeName, bucketName);
+    }
+    // Volume name is not important, as we call InfoBucket with
+    // assumeS3Context = true, OM will infer the correct s3 volume.
     BucketInfoWithVolumeContext bucketInfo =
         ozoneManagerClient.getBucketInfo(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT, bucketName, true);
     bucketInfo.getUserPrincipal().ifPresent(this::updateS3Principal);

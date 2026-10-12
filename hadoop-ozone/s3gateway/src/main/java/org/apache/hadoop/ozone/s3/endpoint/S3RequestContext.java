@@ -21,6 +21,7 @@ import jakarta.annotation.Nullable;
 import java.io.IOException;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.S3GAction;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.util.Time;
 
@@ -30,6 +31,7 @@ class S3RequestContext {
   private final EndpointBase endpoint;
   private S3GAction action;
   private OzoneVolume volume;
+  private OzoneBucket bucket;
 
   S3RequestContext(EndpointBase endpoint, S3GAction action) {
     this.endpoint = endpoint;
@@ -52,6 +54,23 @@ class S3RequestContext {
       volume = endpoint.getVolume();
     }
     return volume;
+  }
+
+  /**
+   * Returns the S3 bucket, looked up at most once per request for the same bucket name.
+   */
+  OzoneBucket getBucket(String bucketName) throws IOException {
+    if (bucket == null || !bucketName.equals(bucket.getName())) {
+      bucket = endpoint.getClientProtocol().getS3BucketDetails(bucketName);
+    }
+    return bucket;
+  }
+
+  /**
+   * Returns the S3 volume name, reusing the bucket already looked up in this request to avoid another call.
+   */
+  String getVolumeName() throws IOException {
+    return bucket != null ? bucket.getVolumeName() : getVolume().getName();
   }
 
   S3GAction getAction() {

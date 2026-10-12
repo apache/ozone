@@ -91,7 +91,7 @@ public class BucketAclHandler extends BucketOperationHandler {
     context.setAction(S3GAction.GET_ACL);
 
     try {
-      OzoneBucket bucket = getClientProtocol().getS3BucketDetails(bucketName);
+      OzoneBucket bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       S3Owner owner = S3Owner.of(bucket.getOwner());
 
@@ -143,7 +143,7 @@ public class BucketAclHandler extends BucketOperationHandler {
 
     try {
       OzoneVolume volume = context.getVolume();
-      OzoneBucket bucket = volume.getBucket(bucketName);
+      OzoneBucket bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
 
       List<OzoneAcl> ozoneAclListOnBucket = new ArrayList<>();

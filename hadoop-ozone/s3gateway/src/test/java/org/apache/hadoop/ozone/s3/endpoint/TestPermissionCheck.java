@@ -84,7 +84,7 @@ public class TestPermissionCheck {
   private HttpHeaders headers;
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws IOException {
     conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
         OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
@@ -103,6 +103,8 @@ public class TestPermissionCheck {
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
+    when(clientProtocol.getS3BucketDetails(anyString())).thenReturn(bucket);
+    when(bucket.getVolumeName()).thenReturn("s3Volume");
   }
 
   /**

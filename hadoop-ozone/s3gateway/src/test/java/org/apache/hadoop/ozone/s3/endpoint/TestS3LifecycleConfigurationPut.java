@@ -50,7 +50,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -261,7 +260,6 @@ public class TestS3LifecycleConfigurationPut {
   private OS3Exception putLifecycleConfigurationThrowingOm(OMException omException) throws Exception {
     OzoneClient mockClient = mock(OzoneClient.class);
     ObjectStore mockObjectStore = mock(ObjectStore.class);
-    OzoneVolume mockVolume = mock(OzoneVolume.class);
     OzoneBucket mockBucket = mock(OzoneBucket.class);
     when(mockBucket.getVolumeName()).thenReturn("s3v");
     when(mockBucket.getName()).thenReturn("bucket1");
@@ -271,8 +269,7 @@ public class TestS3LifecycleConfigurationPut {
     when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
     when(mockClient.getProxy()).thenReturn(clientProtocol);
     when(mockObjectStore.getClientProxy()).thenReturn(clientProtocol);
-    when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
-    when(mockVolume.getBucket("bucket1")).thenReturn(mockBucket);
+    when(clientProtocol.getS3BucketDetails("bucket1")).thenReturn(mockBucket);
 
     BucketEndpoint endpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(mockClient)
@@ -280,6 +277,36 @@ public class TestS3LifecycleConfigurationPut {
     endpoint.queryParamsForTest().set(S3Consts.QueryParams.LIFECYCLE, "");
 
     return assertThrows(OS3Exception.class, () -> endpoint.put("bucket1", onePrefix()));
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationLooksUpBucketOnce() throws Exception {
+    OzoneClient mockClient = mock(OzoneClient.class);
+    ObjectStore mockObjectStore = mock(ObjectStore.class);
+    OzoneBucket mockBucket = mock(OzoneBucket.class);
+    when(mockBucket.getVolumeName()).thenReturn("s3v");
+    when(mockBucket.getName()).thenReturn("bucket1");
+    when(mockBucket.getOwner()).thenReturn("owner");
+    when(mockBucket.getBucketLayout()).thenReturn(BucketLayout.OBJECT_STORE);
+    ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
+    when(mockClient.getProxy()).thenReturn(clientProtocol);
+    when(mockObjectStore.getClientProxy()).thenReturn(clientProtocol);
+    // The bucket lookup resolves the volume, so no separate S3 volume lookup is expected.
+    when(mockObjectStore.getS3Volume()).thenThrow(new AssertionError("Unexpected S3 volume lookup"));
+    when(clientProtocol.getS3BucketDetails("bucket1")).thenReturn(mockBucket);
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner");
+
+    BucketEndpoint endpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(mockClient)
+        .setHeaders(headers)
+        .build();
+    endpoint.queryParamsForTest().set(S3Consts.QueryParams.LIFECYCLE, "");
+
+    assertEquals(HTTP_OK, endpoint.put("bucket1", onePrefix()).getStatus());
+    // The owner check and the lifecycle update share the bucket cached in the request context.
+    verify(clientProtocol).getS3BucketDetails("bucket1");
+    verify(mockBucket).setLifecycleConfiguration(any());
   }
 
   @Test

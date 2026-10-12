@@ -26,6 +26,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.audit.S3GAction;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
@@ -92,7 +93,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
   protected void deleteLifecycleConfiguration(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
     try {
-      context.getVolume().getBucket(bucketName).deleteLifecycleConfiguration();
+      context.getBucket(bucketName).deleteLifecycleConfiguration();
     } catch (OMException ex) {
       // DeleteBucketLifecycle is idempotent: deleting a missing config
       // must still return 204, not 404 — same as normal key deletion.
@@ -102,7 +103,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     }
   }
 
-  private void verifyBucketOwner(S3RequestContext context, String bucketName) throws OS3Exception, IOException {
+  private void verifyBucketOwner(S3RequestContext context, String bucketName) throws OS3Exception {
     HttpHeaders httpHeaders = getHeaders();
     if (httpHeaders == null) {
       return;
@@ -113,7 +114,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     }
 
     try {
-      String actualOwner = context.getVolume().getBucket(bucketName).getOwner();
+      String actualOwner = context.getBucket(bucketName).getOwner();
       if (actualOwner != null && !actualOwner.equals(expectedBucketOwner)) {
         LOG.debug("Bucket: {}, ExpectedBucketOwner: {}, ActualBucketOwner: {}",
             bucketName, expectedBucketOwner, actualOwner);
@@ -129,10 +130,11 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
       throws IOException, OS3Exception {
     verifyBucketOwner(context, bucketName);
     S3LifecycleConfiguration s3LifecycleConfiguration;
+    OzoneBucket ozoneBucket = context.getBucket(bucketName);
     OmLifecycleConfiguration lcc;
     try {
       s3LifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(body);
-      lcc = s3LifecycleConfiguration.toOmLifecycleConfiguration(context.getVolume().getBucket(bucketName));
+      lcc = s3LifecycleConfiguration.toOmLifecycleConfiguration(ozoneBucket);
     } catch (WebApplicationException ex) {
       throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName);
     } catch (OMException ex) {
@@ -146,7 +148,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
     }
 
     try {
-      context.getVolume().getBucket(bucketName).setLifecycleConfiguration(lcc);
+      ozoneBucket.setLifecycleConfiguration(lcc);
     } catch (OMException ex) {
       // OM raises INVALID_REQUEST for server-side conditions as well, such as a bucket layout
       // mismatch, so its result codes keep the shared translation instead of being remapped.
@@ -170,7 +172,7 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
   protected OzoneLifecycleConfiguration getLifecycleConfiguration(
       S3RequestContext context, String bucketName) throws IOException, OS3Exception {
     try {
-      return getClientProtocol().getLifecycleConfiguration(context.getVolume().getName(), bucketName);
+      return getClientProtocol().getLifecycleConfiguration(context.getBucket(bucketName).getVolumeName(), bucketName);
     } catch (OMException ex) {
       if (ex.getResult() == OMException.ResultCodes.LIFECYCLE_CONFIGURATION_NOT_FOUND) {
         throw S3ErrorTable.newError(
