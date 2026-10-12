@@ -885,6 +885,10 @@ public class NodeStateManager implements Runnable, Closeable {
 
   @Override
   public void close() {
+    // Cancel the pending delayed health check, otherwise awaitTermination waits for it to fire.
+    if (healthCheckFuture != null) {
+      healthCheckFuture.cancel(false);
+    }
     executorService.shutdown();
     try {
       if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
