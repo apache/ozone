@@ -258,6 +258,25 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int ecReconstructStripeWritePoolLimit = 10 * 3;
 
+  @Config(key = "ozone.client.ec.parallel.read.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "When enabled, a read of an EC block that spans more than one cell reads the cells of different" +
+          " data indexes from their datanodes in parallel, instead of one cell at a time. Reads within a single" +
+          " cell, and reads that need reconstruction, are not affected.",
+      tags = ConfigTag.CLIENT)
+  private boolean ecParallelReadEnabled = false;
+
+  @Config(key = "ozone.client.ec.parallel.read.pool.limit",
+      defaultValue = "30",
+      description = "Thread pool max size for reading the cells of an EC block in parallel, when" +
+          " ozone.client.ec.parallel.read.enabled is true. When the pool is saturated, the reading thread reads" +
+          " the remaining cells itself.",
+      tags = ConfigTag.CLIENT)
+  // For the largest recommended EC policy rs-10-4-1024k, a read can span
+  // 10 data indexes, so this allows 3 such reads in parallel.
+  private int ecParallelReadPoolLimit = 10 * 3;
+
   @Config(key = "ozone.client.checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
       description = "The combined checksum type [MD5MD5CRC / COMPOSITE_CRC] "
@@ -623,6 +642,22 @@ public class OzoneClientConfig {
 
   public int getEcReconstructStripeWritePoolLimit() {
     return ecReconstructStripeWritePoolLimit;
+  }
+
+  public boolean isEcParallelReadEnabled() {
+    return ecParallelReadEnabled;
+  }
+
+  public void setEcParallelReadEnabled(boolean ecParallelReadEnabled) {
+    this.ecParallelReadEnabled = ecParallelReadEnabled;
+  }
+
+  public int getEcParallelReadPoolLimit() {
+    return ecParallelReadPoolLimit;
+  }
+
+  public void setEcParallelReadPoolLimit(int poolLimit) {
+    this.ecParallelReadPoolLimit = poolLimit;
   }
 
   public void setFsDefaultBucketLayout(String bucketLayout) {

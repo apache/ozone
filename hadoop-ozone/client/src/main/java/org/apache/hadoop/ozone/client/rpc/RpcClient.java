@@ -210,6 +210,10 @@ public class RpcClient implements ClientProtocol {
   // for reconstruction.
   private static final int EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE = 3;
 
+  // A parallel read of the minimal recommended EC policy rs-3-2-1024k
+  // spans at most 3 data indexes.
+  private static final int EC_PARALLEL_READ_POOL_MIN_SIZE = 3;
+
   private static final int WRITE_POOL_MIN_SIZE = 1;
 
   private final ConfigurationSource conf;
@@ -230,6 +234,7 @@ public class RpcClient implements ClientProtocol {
   private final BlockInputStreamFactory blockInputStreamFactory;
   private final OzoneManagerVersion omVersion;
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
+  private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
   private final ContainerClientMetrics clientMetrics;
   private final MemoizedSupplier<ExecutorService> writeExecutor;
@@ -257,6 +262,8 @@ public class RpcClient implements ClientProtocol {
     this.ecReconstructExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
         EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE, clientConfig.getEcReconstructStripeReadPoolLimit(),
         "ec-reconstruct-reader-TID-%d"));
+    this.ecParallelReadExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
+        EC_PARALLEL_READ_POOL_MIN_SIZE, clientConfig.getEcParallelReadPoolLimit(), "ec-parallel-reader-TID-%d"));
     this.writeExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
         WRITE_POOL_MIN_SIZE, Integer.MAX_VALUE, "client-write-TID-%d"));
 
@@ -339,7 +346,7 @@ public class RpcClient implements ClientProtocol {
         StorageUnit.GB);
     this.byteBufferPool = new BoundedElasticByteBufferPool(maxPoolSize);
     this.blockInputStreamFactory = BlockInputStreamFactoryImpl
-        .getInstance(byteBufferPool, ecReconstructExecutor);
+        .getInstance(byteBufferPool, ecReconstructExecutor, ecParallelReadExecutor);
     this.clientMetricsHandle = ContainerClientMetrics.acquireHandle();
     this.clientMetrics = clientMetricsHandle.metrics();
 
@@ -2075,6 +2082,7 @@ public class RpcClient implements ClientProtocol {
   public void close() throws IOException {
     IOUtils.cleanupWithLogger(LOG,
         () -> shutdownExecutor(ecReconstructExecutor),
+        () -> shutdownExecutor(ecParallelReadExecutor),
         () -> shutdownExecutor(writeExecutor),
         ozoneManagerClient,
         xceiverClientManager,

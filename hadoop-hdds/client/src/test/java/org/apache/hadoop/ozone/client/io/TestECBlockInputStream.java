@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.client.io;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -27,12 +28,19 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -49,9 +57,13 @@ import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ByteReaderStrategy;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Tests for ECBlockInputStream.
@@ -63,12 +75,29 @@ public class TestECBlockInputStream {
   private ECReplicationConfig repConfig;
   private TestBlockInputStreamFactory streamFactory;
   private OzoneConfiguration conf = new OzoneConfiguration();
+  // counts the tasks handed to the parallel read executor
+  private final AtomicInteger parallelReadTasks = new AtomicInteger();
+  private ExecutorService parallelReadExecutor;
 
   @BeforeEach
   public void setup() {
     repConfig = new ECReplicationConfig(3, 2,
         ECReplicationConfig.EcCodec.RS, ONEMB);
     streamFactory = new TestBlockInputStreamFactory();
+    // same shape as the client's pool: no queue, and the caller runs the task when it is saturated
+    parallelReadExecutor = new ThreadPoolExecutor(0, 30, 60, TimeUnit.SECONDS, new SynchronousQueue<>(),
+        new ThreadPoolExecutor.CallerRunsPolicy()) {
+      @Override
+      public void execute(Runnable command) {
+        parallelReadTasks.incrementAndGet();
+        super.execute(command);
+      }
+    };
+  }
+
+  @AfterEach
+  public void teardown() {
+    parallelReadExecutor.shutdownNow();
   }
 
   @Test
@@ -595,6 +624,187 @@ public class TestECBlockInputStream {
       assertEquals(1, failed.size());
       // The failure should map to index = 1 (stream 0)
       assertEquals(1, datanodes.get(failed.get(0)));
+    }
+  }
+
+  public static Stream<Arguments> parallelReadConfigs() {
+    return Stream.of(
+        Arguments.of(new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100)),
+        Arguments.of(new ECReplicationConfig(6, 3, ECReplicationConfig.EcCodec.RS, 100)),
+        Arguments.of(new ECReplicationConfig(10, 4, ECReplicationConfig.EcCodec.RS, 100)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("parallelReadConfigs")
+  public void testParallelReadReturnsWrittenData(ECReplicationConfig ecConfig) throws IOException {
+    repConfig = ecConfig;
+    int chunk = ecConfig.getEcChunkSize();
+    int stripe = chunk * ecConfig.getData();
+    // two full stripes and a partial last stripe ending inside its second cell
+    int blockLength = 2 * stripe + chunk + chunk / 2;
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(ecConfig, ecConfig.getRequiredNodes(), blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+    int[][] ranges = {
+        {10, 50},                          // within one cell
+        {50, 100},                         // across two cells
+        {stripe - 30, 60},                 // across a stripe boundary
+        {0, blockLength},                  // the whole block
+        {2 * stripe + 10, chunk + 40},     // into the partial last stripe
+        {blockLength - 130, 500},          // past the end of the block
+    };
+    try (ECBlockInputStream ecb = createParallelStream(keyInfo, dataStreamFactory, true)) {
+      for (int[] range : ranges) {
+        ecb.seek(range[0]);
+        ByteBuffer buf = ByteBuffer.allocate(range[1]);
+        int expected = Math.min(range[1], blockLength - range[0]);
+        assertEquals(expected, ecb.read(buf), "range " + Arrays.toString(range));
+        assertDataMatches(buf, range[0], expected);
+        assertEquals(range[0] + expected, ecb.getPos());
+      }
+      assertEquals(-1, ecb.read(ByteBuffer.allocate(10)));
+
+      // sequential reads without a seek, through a byte array
+      ecb.seek(0);
+      byte[] all = new byte[blockLength];
+      int offset = 0;
+      int read;
+      while ((read = ecb.read(all, offset, Math.min(stripe + chunk / 2, blockLength - offset))) > 0) {
+        offset += read;
+      }
+      assertEquals(blockLength, offset);
+      assertDataMatches(ByteBuffer.wrap(all), 0, blockLength);
+    }
+    assertThat(parallelReadTasks.get()).isPositive();
+  }
+
+  @Test
+  public void testMultiCellReadReadsIndexesConcurrently() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
+    int blockLength = 3 * 300;
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    // each read of the three data indexes blocks until all three are in flight, so a serial read times out
+    dataStreamFactory.setReadBarrier(new CountDownLatch(3));
+
+    try (ECBlockInputStream ecb = createParallelStream(keyInfo, dataStreamFactory, true)) {
+      ByteBuffer buf = ByteBuffer.allocate(300);
+      assertEquals(300, ecb.read(buf));
+      assertDataMatches(buf, 0, 300);
+    }
+    // the calling thread reads the first index itself
+    assertEquals(2, parallelReadTasks.get());
+  }
+
+  @Test
+  public void testSingleCellReadAndDisabledFlagDoNotUseExecutor() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
+    int blockLength = 3 * 300;
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, blockLength);
+
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    try (ECBlockInputStream ecb = createParallelStream(keyInfo, dataStreamFactory, true)) {
+      ecb.seek(120);
+      ByteBuffer buf = ByteBuffer.allocate(80);
+      assertEquals(80, ecb.read(buf));
+      assertDataMatches(buf, 120, 80);
+    }
+    assertEquals(0, parallelReadTasks.get());
+
+    dataStreamFactory = createDataStreamFactory(blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    try (ECBlockInputStream ecb = createParallelStream(keyInfo, dataStreamFactory, false)) {
+      ByteBuffer buf = ByteBuffer.allocate(blockLength);
+      assertEquals(blockLength, ecb.read(buf));
+      assertDataMatches(buf, 0, blockLength);
+    }
+    assertEquals(0, parallelReadTasks.get());
+  }
+
+  @Test
+  public void testParallelReadReportsAllFailedIndexes() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
+    int blockLength = 3 * 300;
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, blockLength);
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    dataStreamFactory.setFailIndexes(2, 3);
+
+    try (ECBlockInputStream ecb = createParallelStream(keyInfo, dataStreamFactory, true)) {
+      ByteBuffer buf = ByteBuffer.allocate(300);
+      BadDataLocationException e = assertThrows(BadDataLocationException.class, () -> ecb.read(buf));
+      assertEquals(Arrays.asList(1, 2), e.getFailedLocationIndexes());
+      assertEquals(2, e.getFailedLocations().size());
+      for (DatanodeDetails dn : e.getFailedLocations()) {
+        assertThat(keyInfo.getPipeline().getReplicaIndex(dn)).isIn(2, 3);
+      }
+      // the first cell was read, and the failure of the second must not be hidden by the third
+      assertEquals(100, ecb.getPos());
+      assertEquals(100, buf.position());
+    }
+  }
+
+  @Test
+  public void testParallelReadRetriesFailedIndexOnSpare() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
+    int blockLength = 3 * 300;
+    Map<DatanodeDetails, Integer> datanodes = new LinkedHashMap<>();
+    for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
+      datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), i);
+    }
+    // a spare location for index 2
+    datanodes.put(MockDatanodeDetails.randomDatanodeDetails(), 2);
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, blockLength, datanodes);
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    dataStreamFactory.setFailIndexes(2);
+
+    try (ECBlockInputStream ecb = createParallelStream(keyInfo, dataStreamFactory, true)) {
+      ecb.seek(50);
+      ByteBuffer buf = ByteBuffer.allocate(600);
+      assertEquals(600, ecb.read(buf));
+      assertDataMatches(buf, 50, 600);
+      assertEquals(650, ecb.getPos());
+    }
+  }
+
+  private ECBlockInputStream createParallelStream(BlockLocationInfo keyInfo,
+      BlockInputStreamFactory factory, boolean parallelReadEnabled) {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setEcParallelReadEnabled(parallelReadEnabled);
+    return new ECBlockInputStream(repConfig, keyInfo, null, null, factory, clientConfig,
+        () -> parallelReadExecutor);
+  }
+
+  /**
+   * Creates a stream factory whose data index streams hold the block data, where the byte at block offset p is
+   * {@link #dataAt(long)}.
+   */
+  private ECStreamTestUtil.TestBlockInputStreamFactory createDataStreamFactory(int blockLength) {
+    List<ByteBuffer> indexData = new ArrayList<>();
+    for (int i = 1; i <= repConfig.getRequiredNodes(); i++) {
+      indexData.add(ByteBuffer.allocate((int) ECBlockInputStream.internalBlockLength(i, repConfig, blockLength)));
+    }
+    int chunk = repConfig.getEcChunkSize();
+    for (long p = 0; p < blockLength; p++) {
+      int index = (int) ((p / chunk) % repConfig.getData());
+      indexData.get(index).put(dataAt(p));
+    }
+    ECStreamTestUtil.TestBlockInputStreamFactory factory = new ECStreamTestUtil.TestBlockInputStreamFactory();
+    factory.setBlockStreamData(indexData);
+    return factory;
+  }
+
+  private static byte dataAt(long blockOffset) {
+    return (byte) (blockOffset * 31 + 7);
+  }
+
+  private static void assertDataMatches(ByteBuffer buf, long blockOffset, int length) {
+    for (int i = 0; i < length; i++) {
+      assertEquals(dataAt(blockOffset + i), buf.get(i), "byte " + i + " at block offset " + (blockOffset + i));
     }
   }
 
