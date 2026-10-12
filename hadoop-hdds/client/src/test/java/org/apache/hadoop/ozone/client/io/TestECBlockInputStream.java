@@ -61,14 +61,22 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Tests for ECBlockInputStream.
+ * Tests for ECBlockInputStream, run with cells read one at a time and in parallel.
  */
+@ParameterizedClass
+@ValueSource(booleans = {false, true})
 public class TestECBlockInputStream {
+
+  @Parameter
+  private boolean parallelRead;
 
   private static final int ONEMB = 1024 * 1024;
 
@@ -166,9 +174,7 @@ public class TestECBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       ecb.read(buf);
       // We expect only 1 block stream and it should have a length passed of
       // ONEMB - 100.
@@ -186,9 +192,7 @@ public class TestECBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       ecb.read(buf);
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       assertEquals(ONEMB, streams.get(0).getLength());
@@ -205,9 +209,7 @@ public class TestECBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       ecb.read(buf);
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       assertEquals(ONEMB, streams.get(0).getLength());
@@ -225,9 +227,7 @@ public class TestECBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       ecb.read(buf);
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       assertEquals(4 * ONEMB, streams.get(0).getLength());
@@ -245,9 +245,7 @@ public class TestECBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       ecb.read(buf);
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       assertEquals(ONEMB, streams.get(0).getLength());
@@ -263,9 +261,7 @@ public class TestECBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       ecb.read(buf);
       List<TestBlockInputStream> streams = streamFactory.getBlockStreams();
       assertEquals(3 * ONEMB, streams.get(0).getLength());
@@ -280,9 +276,7 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
 
       ByteBuffer buf = ByteBuffer.allocate(100);
 
@@ -306,9 +300,7 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 1, ONEMB);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
 
       ByteBuffer buf = ByteBuffer.allocate(100);
 
@@ -328,9 +320,7 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 50);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
 
       ByteBuffer buf = ByteBuffer.allocate(100);
 
@@ -350,9 +340,7 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
 
       // EC Chunk size is 100 and 3-2. Create a byte buffer to read 3.5 chunks,
       // so 350
@@ -375,6 +363,7 @@ public class TestECBlockInputStream {
       validateBufferContents(buf, 250, 350, (byte) 0);
 
     }
+    assertEquals(parallelRead, parallelReadTasks.get() > 0);
     for (TestBlockInputStream s : streamFactory.getBlockStreams()) {
       assertTrue(s.isClosed());
     }
@@ -388,9 +377,7 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 100);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       assertThrows(EOFException.class, () -> ecb.seek(1000));
     }
   }
@@ -403,9 +390,7 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 100);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       // When seek more than the length, should throw EOFException.
       assertThrows(EOFException.class, () -> ecb.seek(101));
     }
@@ -419,9 +404,7 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 0);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       ecb.seek(0);
       assertEquals(0, ecb.getPos());
       assertEquals(0, ecb.getRemaining());
@@ -436,9 +419,7 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       ecb.seek(ONEMB - 1);
       assertEquals(ONEMB - 1, ecb.getPos());
       assertEquals(ONEMB * 4 + 1, ecb.getRemaining());
@@ -468,9 +449,7 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 5, 5 * ONEMB);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       // Read a full stripe to ensure all streams are created in the stream
       // factory
       ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
@@ -502,9 +481,7 @@ public class TestECBlockInputStream {
         ECStreamTestUtil.createKeyInfo(repConfig, 8 * ONEMB, datanodes);
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       // Read a full stripe to ensure all streams are created in the stream
       // factory
       ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
@@ -569,9 +546,7 @@ public class TestECBlockInputStream {
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory,
-        clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
       Pipeline pipeline =
           ecb.ecPipelineRefreshFunction(3, refreshFunction)
               .apply(blockID)
@@ -598,8 +573,7 @@ public class TestECBlockInputStream {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumVerify(true);
 
-    try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
-        keyInfo, null, null, streamFactory, clientConfig)) {
+    try (ECBlockInputStream ecb = createStream(keyInfo, streamFactory, clientConfig)) {
 
       // Read a full stripe first to initialize and create streams in the factory
       ByteBuffer buf = ByteBuffer.allocate(3 * ONEMB);
@@ -769,6 +743,13 @@ public class TestECBlockInputStream {
       assertDataMatches(buf, 50, 600);
       assertEquals(650, ecb.getPos());
     }
+  }
+
+  /** Creates the stream under test, reading the cells in parallel if the class runs with parallelRead. */
+  private ECBlockInputStream createStream(BlockLocationInfo keyInfo, BlockInputStreamFactory factory,
+      OzoneClientConfig clientConfig) {
+    clientConfig.setEcParallelReadEnabled(parallelRead);
+    return new ECBlockInputStream(repConfig, keyInfo, null, null, factory, clientConfig, () -> parallelReadExecutor);
   }
 
   private ECBlockInputStream createParallelStream(BlockLocationInfo keyInfo,

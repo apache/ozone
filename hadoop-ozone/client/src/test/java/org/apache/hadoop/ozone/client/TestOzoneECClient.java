@@ -74,14 +74,22 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 /**
  * Real unit test for OzoneECClient.
  * <p>
- * Used for testing Ozone client without external network calls.
+ * Used for testing Ozone client without external network calls. Every test runs with EC cells read one at a time
+ * and with them read in parallel.
  */
+@ParameterizedClass
+@ValueSource(booleans = {false, true})
 public class TestOzoneECClient {
+  @Parameter
+  private boolean parallelRead;
   private int chunkSize = 1024;
   private int dataBlocks = 3;
   private int parityBlocks = 2;
@@ -112,8 +120,12 @@ public class TestOzoneECClient {
     createNewClient(config, new MockOmTransport(blkAllocator));
   }
 
-  private void createNewClient(ConfigurationSource config,
+  private void createNewClient(ConfigurationSource source,
       final MockOmTransport transport) throws IOException {
+    OzoneConfiguration config = new OzoneConfiguration(OzoneConfiguration.of(source));
+    OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
+    clientConfig.setEcParallelReadEnabled(parallelRead);
+    config.setFromObject(clientConfig);
     client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
