@@ -179,8 +179,12 @@ public class TestS3GetSecretRequest {
 
   @AfterEach
   public void tearDown() throws Exception {
+    if (omMetadataManager != null) {
+      omMetadataManager.close();
+    }
     omMetrics.unRegister();
     framework().clearInlineMocks();
+    Server.getCurCall().remove();
   }
 
   private OMRequest createTenantRequest(String tenantNameStr) {
@@ -370,6 +374,36 @@ public class TestS3GetSecretRequest {
     // Get secret of "carol@EXAMPLE.COM" (as another regular user).
     // Run preExecute, expect USER_MISMATCH
     processFailedSecretRequest(USER_CAROL);
+  }
+
+  @Test
+  public void testSecretRequestsWithoutRpcUser() throws IOException {
+    // Create the secret first so that the set request passes its existence check.
+    processSuccessSecretRequest(USER_ALICE, 1, true);
+    when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+    Server.getCurCall().remove();
+
+    assertPreExecuteDenied(new S3GetSecretRequest(s3GetSecretRequest(USER_ALICE)));
+    assertPreExecuteDenied(new OMSetSecretRequest(OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.SetS3Secret)
+        .setSetS3SecretRequest(OzoneManagerProtocolProtos.SetS3SecretRequest.newBuilder()
+            .setAccessId(USER_ALICE)
+            .setSecretKey("secretKey12345")
+            .build())
+        .build()));
+    assertPreExecuteDenied(new S3RevokeSecretRequest(OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.RevokeS3Secret)
+        .setRevokeS3SecretRequest(OzoneManagerProtocolProtos.RevokeS3SecretRequest.newBuilder()
+            .setKerberosID(USER_ALICE)
+            .build())
+        .build()));
+  }
+
+  private void assertPreExecuteDenied(OMClientRequest request) {
+    OMException e = assertThrows(OMException.class, () -> request.preExecute(ozoneManager));
+    assertEquals(ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
   @Test

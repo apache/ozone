@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.upgrade;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -42,6 +43,7 @@ public class ReconLayoutVersionManager {
   private final ReconSchemaVersionTableManager schemaVersionTableManager;
   private final ReconContext reconContext;
   private final DataSource dataSource;
+  private final ReconUpgradeAction taskStatusSchemaRepairAction;
 
   // Metadata Layout Version (MLV) of the Recon Metadata on disk
   private int currentMLV;
@@ -49,10 +51,20 @@ public class ReconLayoutVersionManager {
   public ReconLayoutVersionManager(ReconSchemaVersionTableManager schemaVersionTableManager,
                                    ReconContext reconContext, DataSource dataSource)
       throws SQLException {
+    this(schemaVersionTableManager, reconContext, dataSource,
+        new ReconTaskStatusTableUpgradeAction());
+  }
+
+  @VisibleForTesting
+  ReconLayoutVersionManager(
+      ReconSchemaVersionTableManager schemaVersionTableManager,
+      ReconContext reconContext, DataSource dataSource,
+      ReconUpgradeAction taskStatusSchemaRepairAction) throws SQLException {
     this.schemaVersionTableManager = schemaVersionTableManager;
     this.currentMLV = determineMLV();
     this.reconContext = reconContext;
     this.dataSource = dataSource;
+    this.taskStatusSchemaRepairAction = taskStatusSchemaRepairAction;
     ReconLayoutFeature.registerUpgradeActions();  // Register actions via annotation
   }
 
@@ -80,38 +92,47 @@ public class ReconLayoutVersionManager {
    * feature that is registered for finalization.
    */
   public void finalizeLayoutFeatures() {
-    // Get features that need finalization, sorted by version
-    List<ReconLayoutFeature> featuresToFinalize = getRegisteredFeatures();
-    LOG.debug("Starting finalization of {} features.", featuresToFinalize.size());
+    try {
+      repairTaskStatusSchemaIfRequired();
 
-    try (Connection connection = dataSource.getConnection()) {
-      connection.setAutoCommit(false); // Turn off auto-commit for transactional control
+      // Get features that need finalization, sorted by version
+      List<ReconLayoutFeature> featuresToFinalize = getRegisteredFeatures();
+      LOG.debug("Starting finalization of {} features.",
+          featuresToFinalize.size());
 
-      for (ReconLayoutFeature feature : featuresToFinalize) {
-        LOG.debug("Processing feature version: {}", feature.getVersion());
-        try {
-          // Fetch the action for the feature
-          Optional<ReconUpgradeAction> action = feature.getAction();
-          if (action.isPresent()) {
-            LOG.debug("Finalize action found for feature version: {}", feature.getVersion());
-            // Update the schema version in the database
-            updateSchemaVersion(feature.getVersion(), connection);
+      try (Connection connection = dataSource.getConnection()) {
+        connection.setAutoCommit(false);
 
-            // Execute the upgrade action
-            action.get().execute(dataSource);
+        for (ReconLayoutFeature feature : featuresToFinalize) {
+          LOG.debug("Processing feature version: {}", feature.getVersion());
+          try {
+            // Fetch the action for the feature
+            Optional<ReconUpgradeAction> action = feature.getAction();
+            if (action.isPresent()) {
+              LOG.debug("Finalize action found for feature version: {}",
+                  feature.getVersion());
+              // Update the schema version in the database
+              updateSchemaVersion(feature.getVersion(), connection);
 
-            // Commit the transaction only if both operations succeed
-            connection.commit();
-            LOG.info("Feature versioned {} finalized successfully.", feature.getVersion());
-          } else {
-            LOG.info("No finalize action found for feature version: {}", feature.getVersion());
+              // Execute the upgrade action
+              action.get().execute(dataSource);
+
+              // Commit the transaction only if both operations succeed
+              connection.commit();
+              LOG.info("Feature versioned {} finalized successfully.",
+                  feature.getVersion());
+            } else {
+              LOG.info("No finalize action found for feature version: {}",
+                  feature.getVersion());
+            }
+          } catch (Exception e) {
+            // Rollback pending changes for the current feature on failure
+            connection.rollback();
+            currentMLV = determineMLV();
+            LOG.error("Failed to finalize feature {}. Rolling back changes.",
+                feature.getVersion(), e);
+            throw e;
           }
-        } catch (Exception e) {
-          // Rollback any pending changes for the current feature due to failure
-          connection.rollback();
-          currentMLV = determineMLV(); // Rollback the MLV to the original value
-          LOG.error("Failed to finalize feature {}. Rolling back changes.", feature.getVersion(), e);
-          throw e;
         }
       }
     } catch (Exception e) {
@@ -121,6 +142,18 @@ public class ReconLayoutVersionManager {
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       throw new RuntimeException("Recon failed to finalize layout features. Startup halted.", e);
     }
+  }
+
+  /**
+   * Repairs the RECON_TASK_STATUS schema based on the table's actual column
+   * state, independent of the stored layout version. Running this before feature
+   * finalization ensures the required columns exist and completes any partially
+   * applied migration, so a table left in an inconsistent state is recovered
+   * regardless of what the layout version reports.
+   */
+  private void repairTaskStatusSchemaIfRequired() throws Exception {
+    LOG.info("Checking whether the Recon task status schema requires repair.");
+    taskStatusSchemaRepairAction.execute(dataSource);
   }
 
   /**
