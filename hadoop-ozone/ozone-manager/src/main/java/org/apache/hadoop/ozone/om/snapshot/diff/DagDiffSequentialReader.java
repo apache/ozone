@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.snapshot.diff;
 
+import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
+
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +26,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.IteratorType;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator;
@@ -53,6 +56,9 @@ import org.apache.hadoop.ozone.util.ClosableIterator;
  * <p>Sequence gating ({@code fromSnapshot.dbTxSequenceNumber}) is passed to the K-way merge
  * iterator; this reader consumes only entries the iterator emits (tombstones and rows with
  * {@code sequence > fromSnapshot.dbTxSequenceNumber}).
+ *
+ * <p>Delta SST scans honor the bucket {@code keyPrefix} via native SST iterator bounds. The
+ * {@code keyPrefix} array must not be modified for the duration of each delta SST scan.
  */
 public class DagDiffSequentialReader {
 
@@ -73,16 +79,19 @@ public class DagDiffSequentialReader {
    * Scans file/key-table delta SSTs with interleaved batched {@code multiGetSkipCache} against
    * {@code fromSnapshot.file/keyTable}.
    *
+   * @param keyPrefix     optional bucket prefix as stored in RocksDB; {@code null} scans the full
+   *                      delta SST key range
    * @param deltaSstFiles delta SST paths for the to-side file/key table
    * @param fromFileTable raw {@code fromSnapshot}'s file or key table
    */
-  public void scanFileTables(Collection<Path> deltaSstFiles,
+  public void scanFileTables(byte[] keyPrefix, Collection<Path> deltaSstFiles,
       Table<byte[], byte[]> fromFileTable) throws IOException {
     if (deltaSstFiles.isEmpty()) {
       return;
     }
     try (LatestVersionedKWayMergeIterator iterator =
-        LatestVersionedKWayMergeIterator.overRawSstFilesFromSequence(deltaSstFiles, exclusiveMinSequenceNumber)) {
+        LatestVersionedKWayMergeIterator.overRawSstFilesFromSequence(deltaSstFiles,
+            exclusiveMinSequenceNumber, keyPrefix, prefixUpperBoundExclusive(keyPrefix))) {
       scanFileDeltaEntries(iterator, fromFileTable);
     }
   }
@@ -102,7 +111,8 @@ public class DagDiffSequentialReader {
       Table<byte[], byte[]> toDirectoryTable) throws IOException {
     if (!deltaSstFiles.isEmpty()) {
       try (LatestVersionedKWayMergeIterator iterator =
-          LatestVersionedKWayMergeIterator.overRawSstFilesFromSequence(deltaSstFiles, exclusiveMinSequenceNumber)) {
+          LatestVersionedKWayMergeIterator.overRawSstFilesFromSequence(deltaSstFiles,
+              exclusiveMinSequenceNumber, keyPrefix, prefixUpperBoundExclusive(keyPrefix))) {
         scanDirectoryDeltaEntries(iterator);
       }
     }
@@ -249,5 +259,13 @@ public class DagDiffSequentialReader {
 
   private static byte[] nameBytes(String name) {
     return (name == null ? "" : name).getBytes(StandardCharsets.UTF_8);
+  }
+
+  private static byte[] prefixUpperBoundExclusive(byte[] keyPrefix) {
+    if (keyPrefix == null || keyPrefix.length == 0) {
+      return null;
+    }
+    return StringUtils.string2Bytes(
+        getLexicographicallyHigherString(new String(keyPrefix, StandardCharsets.UTF_8)));
   }
 }
