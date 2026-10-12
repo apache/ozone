@@ -539,6 +539,17 @@ public class TestBlockInputStream {
   }
 
   @Test
+  public void testPositionedReadAtEof() throws Exception {
+    ByteBuffer empty = ByteBuffer.allocate(0);
+    for (long position : new long[] {0, blockSize, blockSize + 1}) {
+      assertEquals(0, blockStream.readPositioned(position, empty));
+      assertEquals(0, blockStream.read(position, empty));
+    }
+    assertEquals(-1, blockStream.readPositioned(blockSize, ByteBuffer.allocate(1)));
+    assertEquals(-1, blockStream.readPositioned(blockSize + 1, ByteBuffer.allocate(1)));
+  }
+
+  @Test
   public void testConcurrentPositionedRead() throws Exception {
     try (BlockInputStream largeBlockStream = createLargeBlockStream()) {
       largeBlockStream.initialize();

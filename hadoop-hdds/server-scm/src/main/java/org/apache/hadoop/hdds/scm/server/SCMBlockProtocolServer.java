@@ -35,6 +35,7 @@ import com.google.protobuf.BlockingService;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,10 +44,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
 import org.apache.hadoop.hdds.scm.ScmInfo;
@@ -55,13 +58,17 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.DeleteBlockResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
@@ -78,6 +85,7 @@ import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.common.DeletedBlock;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -440,6 +448,144 @@ public class SCMBlockProtocolServer implements
   @Override
   public InnerNode getNetworkTopology() {
     return (InnerNode) scm.getClusterMap().getNode(ROOT);
+  }
+
+  @Override
+  public void finalizeUpgrade() throws IOException {
+    finalizeUpgrade(false);
+  }
+
+  @Override
+  public void forceFinalizeUpgrade() throws IOException {
+    finalizeUpgrade(true);
+  }
+
+  private void finalizeUpgrade(boolean force) throws IOException {
+    final Map<String, String> auditMap = Collections.singletonMap("force", String.valueOf(force));
+    try {
+      if (force) {
+        LOG.warn("Forcing upgrade finalization by skipping SCM peer and datanode software version checks");
+      } else {
+        validatePeerScmVersionsBeforeFinalize();
+        validateDatanodeVersionsBeforeFinalize();
+      }
+      scm.getFinalizationManager().finalizeUpgrade();
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.FINALIZE_SCM_UPGRADE, auditMap));
+    } catch (Exception ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.FINALIZE_SCM_UPGRADE, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  /**
+   * Verifies that every peer SCM in the Ratis group runs the same software version as this leader
+   * before finalization begins. Rejects the finalize command if any peer reports a differing
+   * version or cannot be reached. The resulting exception propagates back to the OM (which triggered
+   * finalization) and on to the client, leaving nothing finalized.
+   */
+  private void validatePeerScmVersionsBeforeFinalize() throws SCMException {
+    List<SCMNodeDetails> peerNodes = scm.getSCMHANodeDetails().getPeerNodeDetails();
+    if (peerNodes.isEmpty()) {
+      return;
+    }
+    HDDSVersion leaderVersion = HDDSVersion.SOFTWARE_VERSION;
+    OzoneConfiguration conf = scm.getConfiguration();
+    List<String> failedPeers = new ArrayList<>();
+    for (SCMNodeDetails peer : peerNodes) {
+      String peerId = peer.getNodeId();
+      ScmNodeTarget target = new ScmNodeTarget();
+      target.setNodeId(peerId);
+      StorageContainerLocationProtocol peerClient = null;
+      try {
+        // Contact the peer SCM as this SCM's service (Kerberos keytab) identity, not the remote client's identity.
+        // This runs inside the finalize RPC handler's doAs context, whose UGI has no credentials to open a fresh
+        // outbound RPC to the peer SCM.
+        peerClient = HAUtils.getScmContainerClientForNode(conf, target, UserGroupInformation.getLoginUser());
+        HDDSVersion peerVersion = peerClient.getPeerUpgradeStatus();
+        if (!peerVersion.equals(leaderVersion)) {
+          LOG.warn("SCM peer {} is running software version {} but leader is running version {}. "
+              + "Rejecting finalize command.", peerId, peerVersion, leaderVersion);
+          failedPeers.add(peerId + " (version: " + peerVersion + ")");
+        }
+      } catch (IOException e) {
+        LOG.warn("Failed to contact SCM peer {} to check software version before finalize.", peerId, e);
+        failedPeers.add(peerId + " (unreachable: " + e.getMessage() + ")");
+      } finally {
+        IOUtils.cleanupWithLogger(LOG, peerClient);
+      }
+    }
+    if (!failedPeers.isEmpty()) {
+      throw new SCMException("Finalize rejected: the following SCM peers did not confirm matching software "
+          + "version (expected version=" + leaderVersion + "): " + String.join(", ", failedPeers),
+          SCMException.ResultCodes.UNSUPPORTED_OPERATION);
+    }
+  }
+
+  /**
+   * Verifies that every healthy datanode runs the same software version as this SCM before
+   * finalization begins. Datanodes finalize only after SCM instructs them to, so this does not
+   * require them to be finalized; it requires their binaries to match SCM's software version.
+   * Rejects the finalize command if any healthy datanode reports a differing (or unknown) software
+   * version. The resulting exception propagates back to the OM (which triggered finalization) and on
+   * to the client, leaving nothing finalized.
+   */
+  private void validateDatanodeVersionsBeforeFinalize() throws SCMException {
+    NodeManager.DatanodeFinalizationCounts counts =
+        scm.getScmNodeManager().getDatanodeFinalizationCounts();
+    if (!counts.allSoftwareVersionsMatchScmVersion()) {
+      LOG.warn("Rejecting finalize command: not all {} healthy datanodes are running SCM's software "
+          + "version {}.", counts.getTotalHealthyDatanodes(), HDDSVersion.SOFTWARE_VERSION);
+      throw new SCMException("Finalize rejected: not all healthy datanodes are running the SCM software version "
+          + HDDSVersion.SOFTWARE_VERSION, SCMException.ResultCodes.UNSUPPORTED_OPERATION);
+    }
+  }
+
+  @Override
+  public HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException {
+    try {
+      if (scm.getScmContext().isInSafeMode()) {
+        throw new SCMException("Cannot query upgrade status while SCM is in safe mode. Wait until SCM exits "
+            + "safe mode and try again.", SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
+      }
+
+      // Set SCM finalization status to return to the client.
+      // Since SCM finalization goes through Ratis, it moves from unfinalized to finalized immediately with no
+      // in-progress state.
+      boolean scmFinalized = !scm.getVersionManager().needsFinalization();
+      HddsProtos.FinalizationStatus scmFinalizationStatus =
+          scmFinalized ? HddsProtos.FinalizationStatus.FINALIZED : HddsProtos.FinalizationStatus.UNFINALIZED;
+
+      // Set overall HDDS finalization status (SCM and Datanodes) to return to the client.
+      NodeManager.DatanodeFinalizationCounts datanodeFinalizationCounts =
+          scm.getScmNodeManager().getDatanodeFinalizationCounts();
+      int finalizedDatanodes = datanodeFinalizationCounts.getNumFinalizedDatanodes();
+      int healthyDatanodes = datanodeFinalizationCounts.getTotalHealthyDatanodes();
+      HddsProtos.FinalizationStatus hddsFinalizationStatus;
+      if (!scmFinalized) {
+        // SCM must finish finalizing before Datanodes can start finalizing.
+        hddsFinalizationStatus = HddsProtos.FinalizationStatus.UNFINALIZED;
+      } else if (datanodeFinalizationCounts.allNodesFinalized()) {
+        hddsFinalizationStatus = HddsProtos.FinalizationStatus.FINALIZED;
+      } else {
+        hddsFinalizationStatus = HddsProtos.FinalizationStatus.IN_PROGRESS;
+      }
+
+      HddsProtos.UpgradeStatus result = HddsProtos.UpgradeStatus.newBuilder()
+          .setScmFinalizationStatus(scmFinalizationStatus)
+          .setNumDatanodesFinalized(finalizedDatanodes)
+          .setNumDatanodesTotal(healthyDatanodes)
+          .setHddsFinalizationStatus(hddsFinalizationStatus)
+          .setScmApparentVersion(scm.getVersionManager().getApparentVersion().serialize())
+          .setMinDatanodeApparentVersion(datanodeFinalizationCounts.getMinApparentVersion())
+          .setMaxDatanodeApparentVersion(datanodeFinalizationCounts.getMaxApparentVersion())
+          .build();
+
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.QUERY_UPGRADE_STATUS, null));
+      return result;
+    } catch (IOException ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.QUERY_UPGRADE_STATUS, null, ex));
+      throw ex;
+    }
   }
 
   @Override

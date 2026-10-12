@@ -34,8 +34,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedMap;
@@ -154,9 +152,8 @@ public final class StringToSignProducer {
       String payloadHash
   ) throws OS3Exception {
 
-    Iterable<String> parts = split("/", uri);
     List<String> encParts = new ArrayList<>();
-    for (String p : parts) {
+    for (String p : StringUtils.splitPreserveAllTokens(uri, '/')) {
       encParts.add(urlEncode(p));
     }
     String canonicalUri = join("/", encParts);
@@ -208,26 +205,6 @@ public final class StringToSignProducer {
       addSeparator = true;
     }
     return result.toString();
-  }
-
-  /**
-   * Returns matching strings.
-   *
-   * @param regex Regular expression to split by
-   * @param whole The string to split
-   * @return pieces
-   */
-  private static Iterable<String> split(String regex, String whole) {
-    Pattern p = Pattern.compile(regex);
-    Matcher m = p.matcher(whole);
-    List<String> result = new ArrayList<>();
-    int pos = 0;
-    while (m.find()) {
-      result.add(whole.substring(pos, m.start()));
-      pos = m.end();
-    }
-    result.add(whole.substring(pos));
-    return result;
   }
 
   private static String urlEncode(String str) {

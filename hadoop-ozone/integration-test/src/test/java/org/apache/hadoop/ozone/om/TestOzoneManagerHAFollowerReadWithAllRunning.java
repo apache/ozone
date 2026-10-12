@@ -43,7 +43,9 @@ import java.net.InetSocketAddress;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -218,7 +220,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(Type.CreateVolume)
             .setCreateVolumeRequest(req)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(randomUUID().toString())
             .build();
 
@@ -547,7 +549,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(Type.ListVolume)
             .setListVolumeRequest(req)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(randomUUID().toString())
             .build();
 
@@ -643,16 +645,19 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
       assertNotNull(followerReadFailoverProxyProvider);
       assertTrue(followerReadFailoverProxyProvider.isOmServiceSupportsFollowerRead());
 
-      String currentOMNodeId = followerReadFailoverProxyProvider.getCurrentProxy().getNodeId();
-      OzoneManager ozoneManager = getCluster().getOzoneManager(currentOMNodeId);
-      assertNotNull(ozoneManager);
-      assertEquals(currentOMNodeId, ozoneManager.getOMNodeId());
-
-      long previousLocalLeaseSuccess = ozoneManager.getMetrics().getNumFollowerReadLocalLeaseSuccess();
+      Map<String, Long> previousLocalLeaseSuccess = new HashMap<>();
+      for (OzoneManager om : getCluster().getOzoneManagersList()) {
+        previousLocalLeaseSuccess.put(om.getOMNodeId(), om.getMetrics().getNumFollowerReadLocalLeaseSuccess());
+      }
 
       objectStore.listVolumes("");
+      OMProxyInfo<OzoneManagerProtocolPB> lastProxy =
+          (OMProxyInfo<OzoneManagerProtocolPB>) followerReadFailoverProxyProvider.getLastProxy();
+      assertNotNull(lastProxy);
+      OzoneManager ozoneManager = getCluster().getOzoneManager(lastProxy.getNodeId());
+      assertNotNull(ozoneManager);
       long currentLocalLeaseSuccess = ozoneManager.getMetrics().getNumFollowerReadLocalLeaseSuccess();
-      assertThat(currentLocalLeaseSuccess).isGreaterThan(previousLocalLeaseSuccess);
+      assertThat(currentLocalLeaseSuccess).isGreaterThan(previousLocalLeaseSuccess.get(lastProxy.getNodeId()));
     } finally {
       IOUtils.closeQuietly(ozoneClient);
     }

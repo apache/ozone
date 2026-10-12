@@ -785,6 +785,9 @@ public final class HttpServer2 implements FilterContainer {
       AccessControlList adminsAcl, final String appDir) {
     WebAppContext ctx = new WebAppContext();
     ctx.setDefaultsDescriptor(null);
+    // S3 Gateway starts Weld through its web.xml listener; other services do not use CDI.
+    ctx.setAttribute("org.eclipse.jetty.containerInitializerExclusionPattern",
+        "org.jboss.weld.environment.servlet.EnhancedListener");
     ServletHolder holder = new ServletHolder(new DefaultServlet());
     Map<String, String> params = ImmutableMap.<String, String>builder()
         .put("acceptRanges", "true")

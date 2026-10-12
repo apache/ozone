@@ -360,6 +360,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
             .register("prometheus", "Hadoop metrics prometheus exporter",
                 prometheusMetricsSink);
       }
+      BuildInfoMetrics.create(name);
       updateConnectorAddress();
     }
 
@@ -372,6 +373,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
   public void stop() throws Exception {
     if (httpServer != null) {
       httpServer.stop();
+      BuildInfoMetrics.unregister();
     }
   }
 

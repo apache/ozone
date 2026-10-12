@@ -101,14 +101,16 @@ public class TestListInfoSubcommand {
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
+      if (state == HddsProtos.NodeState.HEALTHY_READONLY) {
+        continue; // HEALTHY_READONLY is no longer a valid state and the protobuf definition is deprecated.
+      }
       p = Pattern.compile(
           "^Health State:\\s+" + state + "$", Pattern.MULTILINE);
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
-    // Ensure the nodes are ordered by health state HEALTHY,
-    // HEALTHY_READONLY, STALE, DEAD
-    p = Pattern.compile(".+HEALTHY.+STALE.+DEAD.+HEALTHY_READONLY.+",
+    // Ensure the nodes are ordered by health state HEALTHY, STALE, DEAD
+    p = Pattern.compile(".+HEALTHY.+STALE.+DEAD.+",
         Pattern.DOTALL);
 
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
@@ -149,12 +151,15 @@ public class TestListInfoSubcommand {
 
     // Check all expected health states are present
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
+      if (state == HddsProtos.NodeState.HEALTHY_READONLY) {
+        continue; // HEALTHY_READONLY is no longer a valid state and the protobuf definition is deprecated.
+      }
       assertTrue(healthStates.contains(state.toString()),
           "Expected health state: " + state + " but not found");
     }
 
-    // Check order: HEALTHY -> STALE -> DEAD -> HEALTHY_READONLY
-    List<String> expectedOrder = Arrays.asList("HEALTHY", "STALE", "DEAD", "HEALTHY_READONLY");
+    // Check order: HEALTHY -> STALE -> DEAD
+    List<String> expectedOrder = Arrays.asList("HEALTHY", "STALE", "DEAD");
     int lastIndex = -1;
     for (String state : healthStates) {
       int index = expectedOrder.indexOf(state);
@@ -480,10 +485,6 @@ public class TestListInfoSubcommand {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.DECOMMISSIONING);
         builder.addNodeStates(HddsProtos.NodeState.DEAD);
-      } else if (i == 2) {
-        builder.addNodeOperationalStates(
-            HddsProtos.NodeOperationalState.IN_SERVICE);
-        builder.addNodeStates(HddsProtos.NodeState.HEALTHY_READONLY);
       } else {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.IN_SERVICE);
