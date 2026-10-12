@@ -26,7 +26,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -179,7 +178,7 @@ public class TestBackgroundService {
       @Override
       public BackgroundTaskQueue getTasks() {
         if (getTasksCalls.incrementAndGet() == 1) {
-          throw new NoSuchElementException("simulated failure");
+          throw new RuntimeException("simulated failure");
         }
         return queue;
       }
