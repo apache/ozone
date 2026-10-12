@@ -24,6 +24,7 @@ import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.Preconditions;
 
 class S3RequestContext {
   private final long startNanos;
@@ -56,12 +57,11 @@ class S3RequestContext {
     return volume;
   }
 
-  /**
-   * Returns the S3 bucket, looked up at most once per request for the same bucket name.
-   */
-  OzoneBucket getBucket(String bucketName) throws IOException {
-    if (bucket == null || !bucketName.equals(bucket.getName())) {
-      bucket = endpoint.getClientProtocol().getS3BucketDetails(bucketName);
+  OzoneBucket getBucket(String name) throws IOException {
+    if (bucket == null) {
+      bucket = endpoint.getClientProtocol().getS3BucketDetails(name);
+    } else {
+      Preconditions.assertEquals(bucket.getName(), name, "Multiple buckets in one request are not supported");
     }
     return bucket;
   }

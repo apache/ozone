@@ -32,6 +32,8 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BU
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
@@ -110,6 +112,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
@@ -123,6 +126,7 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
+import org.apache.hadoop.ozone.s3.util.ReadConsistencyContext;
 import org.apache.hadoop.ozone.s3.util.S3GActionIamMapper;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -260,6 +264,7 @@ public abstract class EndpointBase {
     ClientProtocol clientProtocol =
         getClient().getObjectStore().getClientProxy();
     clientProtocol.setThreadLocalS3Auth(s3Auth);
+    setReadConsistencyFromHeader(clientProtocol);
 
     bufferSize = (int) getOzoneConfiguration().getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
@@ -284,6 +289,27 @@ public abstract class EndpointBase {
 
   protected void init() {
     // hook method
+  }
+
+  private void setReadConsistencyFromHeader(ClientProtocol clientProtocol) {
+    ReadConsistencyContext readConsistencyContext =
+        ReadConsistencyContext.fromHeaders(getHeaders());
+    ReadConsistency readConsistency = readConsistencyContext.getReadConsistency();
+    if (OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())) {
+      // S3 credential validation currently requires the OM leader so that
+      // revoked credentials are never accepted by a stale follower.
+      clientProtocol.setThreadLocalReadConsistency(
+          ReadConsistency.LINEARIZABLE_LEADER_ONLY);
+      return;
+    }
+    if (readConsistency == null) {
+      clientProtocol.clearThreadLocalReadConsistency();
+    } else if (readConsistency == ReadConsistency.LOCAL_LEASE) {
+      clientProtocol.setThreadLocalReadConsistency(readConsistency,
+          readConsistencyContext.getLocalLeaseLogLimit(), null);
+    } else {
+      clientProtocol.setThreadLocalReadConsistency(readConsistency);
+    }
   }
 
   /**
@@ -692,6 +718,7 @@ public abstract class EndpointBase {
     }
     target.queryParams = queryParams;
     target.s3Auth = s3Auth;
+    target.s3StsEnabled = s3StsEnabled;
     target.setClient(this.client);
     target.setOzoneConfiguration(this.ozoneConfiguration);
     target.setContext(this.context);
@@ -795,9 +822,12 @@ public abstract class EndpointBase {
 
     ReplicationConfig clientConfiguredReplicationConfig =
         OzoneClientUtils.getClientConfiguredReplicationConfig(getOzoneConfiguration());
+    boolean standardUsesClientDefault = getOzoneConfiguration().getBoolean(
+        OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY,
+        OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT);
 
     return S3Utils.resolveS3ClientSideReplicationConfig(storageType, storageConfig,
-        clientConfiguredReplicationConfig, ozoneBucket.getReplicationConfig());
+        clientConfiguredReplicationConfig, ozoneBucket.getReplicationConfig(), standardUsesClientDefault);
   }
 
   /**

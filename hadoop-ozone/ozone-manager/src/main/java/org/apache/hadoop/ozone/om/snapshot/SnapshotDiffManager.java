@@ -1185,7 +1185,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
                 LOG.debug("Generated snapshot diff report, entry count: {}, elapsed: {}ms, jobId: {}",
                     reportEntries.getKey(), Time.monotonicNow() - reportGenStart, jobId);
               }
-              updateJobStatusToDone(jobKey, reportEntries.getKey(), reportEntries.getValue());
+              updateJobStatusToDone(jobKey, jobId, reportEntries.getKey(), reportEntries.getValue());
             }
             return null;
           }
@@ -1744,10 +1744,17 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     snapDiffJobTable.put(jobKey, snapshotDiffJob);
   }
 
-  private synchronized void updateJobStatusToDone(String jobKey,
-                                                  long totalDiffEntries,
-                                                  String largestJobKey) {
+  synchronized void updateJobStatusToDone(String jobKey,
+                                          String jobId,
+                                          long totalDiffEntries,
+                                          String largestJobKey) {
     SnapshotDiffJob snapshotDiffJob = snapDiffJobTable.get(jobKey);
+    // A cancelled job's task keeps running, and a resubmit reuses the jobKey with a new jobId.
+    if (!snapshotDiffJob.getJobId().equals(jobId)) {
+      LOG.warn("Not marking snapshot diff job {} as DONE: task jobId {} was superseded by jobId {}.",
+          jobKey, jobId, snapshotDiffJob.getJobId());
+      return;
+    }
     if (snapshotDiffJob.getStatus() != IN_PROGRESS) {
       throw new IllegalStateException("Invalid job status for jobID: " +
           snapshotDiffJob.getJobId() + ". Job's current status is '" +

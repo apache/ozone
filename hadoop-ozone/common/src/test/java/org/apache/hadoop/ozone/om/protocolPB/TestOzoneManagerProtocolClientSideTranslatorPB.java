@@ -31,14 +31,18 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeyError;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteKeysResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQuotaRepairRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StartQuotaRepairResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -110,6 +114,82 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
   }
 
   @Test
+  void submitRequestAddsThreadLocalReadConsistencyHint() throws Exception {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+
+    client.setThreadLocalReadConsistency(ReadConsistency.LOCAL_LEASE);
+
+    client.getServiceList();
+
+    assertThat(transport.getLastRequest().hasReadConsistencyHint()).isTrue();
+    assertThat(transport.getLastRequest()
+        .getReadConsistencyHint()
+        .getReadConsistency())
+        .isEqualTo(ReadConsistency.LOCAL_LEASE.toProto());
+  }
+
+  @Test
+  void submitRequestAddsThreadLocalLocalLeaseContext() throws Exception {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+
+    client.setThreadLocalReadConsistency(ReadConsistency.LOCAL_LEASE, 10L, 100L);
+
+    client.getServiceList();
+
+    assertThat(transport.getLastRequest().hasReadConsistencyHint()).isTrue();
+    assertThat(transport.getLastRequest()
+        .getReadConsistencyHint()
+        .getReadConsistency())
+        .isEqualTo(ReadConsistency.LOCAL_LEASE.toProto());
+    assertThat(transport.getLastRequest()
+        .getReadConsistencyHint()
+        .hasLocalLeaseContext())
+        .isTrue();
+    assertThat(transport.getLastRequest()
+        .getReadConsistencyHint()
+        .getLocalLeaseContext()
+        .getLogLimit())
+        .isEqualTo(10L);
+    assertThat(transport.getLastRequest()
+        .getReadConsistencyHint()
+        .getLocalLeaseContext()
+        .getLeaseTimeMs())
+        .isEqualTo(100L);
+  }
+
+  @Test
+  void submitRequestOmitsReadConsistencyHintByDefault() throws Exception {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+
+    client.getServiceList();
+
+    assertThat(transport.getLastRequest().hasReadConsistencyHint()).isFalse();
+  }
+
+  @Test
+  void getS3VolumeContextUsesLeaderOnlyWithS3Authentication()
+      throws Exception {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+    client.setThreadLocalS3Auth(new S3Auth("string-to-sign", "signature",
+        "access-id", "user-principal"));
+    client.setThreadLocalReadConsistency(ReadConsistency.LOCAL_LEASE);
+
+    client.getS3VolumeContext();
+
+    assertThat(transport.getLastRequest().getReadConsistencyHint()
+        .getReadConsistency())
+        .isEqualTo(ReadConsistency.LINEARIZABLE_LEADER_ONLY.toProto());
+  }
+
+  @Test
   void testQuietDeleteKeysThrowsWhenWholeBatchFails() throws IOException {
     // Whole-batch failure at OM: non-OK status, DeleteKeysResponse has status=false and no per-key errors.
     when(omTransport.submitRequest(any(OMRequest.class))).thenReturn(
@@ -160,6 +240,34 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
             .build());
 
     assertThat(pb.deleteKeys(DELETE_KEYS, true)).isEmpty();
+  }
+
+  private static final class CapturingTransport implements OmTransport {
+    private OMRequest lastRequest;
+
+    @Override
+    public OMResponse submitRequest(OMRequest payload) {
+      lastRequest = payload;
+      return OMResponse.newBuilder()
+          .setCmdType(payload.getCmdType())
+          .setStatus(Status.OK)
+          .setSuccess(true)
+          .setServiceListResponse(ServiceListResponse.newBuilder())
+          .build();
+    }
+
+    @Override
+    public Text getDelegationTokenService() {
+      return new Text();
+    }
+
+    @Override
+    public void close() throws IOException {
+    }
+
+    private OMRequest getLastRequest() {
+      return lastRequest;
+    }
   }
 
 }

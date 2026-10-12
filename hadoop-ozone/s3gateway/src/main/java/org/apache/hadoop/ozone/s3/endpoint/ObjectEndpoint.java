@@ -236,8 +236,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       if (copyHeader != null) {
         //Copy object, as copy source available.
         context.setAction(S3GAction.COPY_OBJECT);
-        CopyObjectResponse copyObjectResponse = copyObject(bucket,
-            bucketName, keyPath, replicationConfig, perf);
+        CopyObjectResponse copyObjectResponse = copyObject(bucket, keyPath, replicationConfig, perf);
         return Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build();
       }
@@ -1133,8 +1132,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
    * is not re-hashed.
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  CopyResult copy(OzoneBucket destBucket, DigestInputStream src, String reusedETag, long srcKeyLen,
-      String destKey,
+  CopyResult copy(DigestInputStream src, String reusedETag, long srcKeyLen,
+      String destKey, OzoneBucket destBucket,
       ReplicationConfig replication,
       Map<String, String> metadata,
       PerformanceStringBuilder perf, long startNanos,
@@ -1176,10 +1175,11 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     return new CopyResult(eTag, copyLength, modificationTime);
   }
 
-  private CopyObjectResponse copyObject(OzoneBucket destOzoneBucket,
-      String destBucket, String destkey, ReplicationConfig replicationConfig,
+  private CopyObjectResponse copyObject(OzoneBucket destinationBucket, String destkey,
+      ReplicationConfig replicationConfig,
       PerformanceStringBuilder perf)
       throws OS3Exception, IOException {
+    String destBucket = destinationBucket.getName();
     String copyHeader = getHeaders().getHeaderString(COPY_SOURCE_HEADER);
     String storageType = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
     boolean storageTypeDefault = StringUtils.isEmpty(storageType);
@@ -1198,7 +1198,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       S3Owner.verifyBucketOwnerConditionOnCopyOperation(getHeaders(), sourceBucket, sourceBucketOwner, null, null);
     }
     try {
-      final String volumeName = destOzoneBucket.getVolumeName();
+      final String volumeName = destinationBucket.getVolumeName();
       final OzoneKeyDetails sourceKeyDetails = runWithS3ActionString(
           "GetObject", () -> getClientProtocol().getKeyDetails(volumeName, sourceBucket, sourceKey));
       // Metadata directive is read up front: a self-copy is legal when metadata
@@ -1285,7 +1285,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           ? stripQuotes(sourceETag) : null;
 
       try (OzoneInputStream src = runWithS3ActionString(
-              "GetObject", () -> getClientProtocol().getKey(volumeName, sourceBucket, sourceKey));
+              "GetObject", sourceKeyDetails::getContent);
            DigestInputStream sourceDigestInputStream = new DigestInputStream(src, md5Digest)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
         if (reusedETag != null) {
@@ -1293,7 +1293,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           sourceDigestInputStream.on(false);
         }
         final CopyResult copyResult = runWithS3ActionString("PutObject", () ->
-            copy(destOzoneBucket, sourceDigestInputStream, reusedETag, sourceKeyLen, destkey,
+            copy(sourceDigestInputStream, reusedETag, sourceKeyLen, destkey, destinationBucket,
               replicationConfig, customMetadata, perf, startNanos, tags, writeConditions));
 
         getMetrics().updateCopyObjectSuccessStats(startNanos);

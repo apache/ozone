@@ -17,9 +17,12 @@
 
 package org.apache.hadoop.fs.ozone;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonPathCapabilities.FS_ACLS;
 import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.corruptData;
+import static org.apache.hadoop.hdds.utils.ClusterContainersUtil.getContainerByID;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
@@ -50,7 +53,9 @@ import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -379,6 +384,25 @@ public abstract class OzoneFileSystemTestBase {
     fileStatus = fs.getFileStatus(path);
     // Verify that mtime is NOT updated as expected.
     assertEquals(mtime, fileStatus.getModificationTime());
+  }
+
+  void setVerifyChecksum(MiniOzoneCluster cluster, Path path) throws Exception {
+    FileSystem fs = getFs();
+    byte[] data = "sample value".getBytes(UTF_8);
+    // Single replica, so that a read cannot fall back to a healthy one.
+    try (FSDataOutputStream stream = fs.create(path, (short) 1)) {
+      stream.write(data);
+    }
+    OzoneKeyDetails key = getKey(path, false);
+    assertEquals(1, key.getReplicationConfig().getRequiredNodes());
+    corruptData(cluster, getContainerByID(cluster, key.getOzoneKeyLocations().get(0).getContainerID()), key);
+
+    // Use a separate instance, the shared one must keep verifying.
+    try (FileSystem noChecksumFs = FileSystem.newInstance(fs.getUri(), fs.getConf())) {
+      noChecksumFs.setVerifyChecksum(false);
+      assertThat(ContractTestUtils.readDataset(noChecksumFs, path, data.length)).isNotEqualTo(data);
+      assertThrows(OzoneChecksumException.class, () -> ContractTestUtils.readDataset(fs, path, data.length));
+    }
   }
 
   void verifyListStatus(Path root, PathFilter filter) throws Exception {

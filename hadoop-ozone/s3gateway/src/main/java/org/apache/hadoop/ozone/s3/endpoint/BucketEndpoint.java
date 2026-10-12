@@ -190,13 +190,12 @@ public class BucketEndpoint extends BucketOperationHandler {
           }
           String relativeKeyName = next.getName().substring(prefix.length());
 
-          int depth = StringUtils.countMatches(relativeKeyName, delimiter);
           if (!StringUtils.isEmpty(delimiter)) {
-            if (depth > 0) {
+            int delimiterIndex = relativeKeyName.indexOf(delimiter);
+            if (delimiterIndex >= 0) {
               // means key has multiple delimiters in its value.
               // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
-              String dirName = relativeKeyName.substring(0, relativeKeyName
-                  .indexOf(delimiter));
+              String dirName = relativeKeyName.substring(0, delimiterIndex);
               if (!dirName.equals(prevDir)) {
                 response.addPrefix(EncodingTypeObject.createNullable(
                     prefix + dirName + delimiter, encodingType));

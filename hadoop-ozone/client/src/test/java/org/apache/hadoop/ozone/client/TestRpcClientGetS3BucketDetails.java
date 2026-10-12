@@ -66,7 +66,7 @@ public class TestRpcClientGetS3BucketDetails {
   private OzoneClient newClient(OzoneManagerVersion omVersion) throws IOException {
     InMemoryConfigurationForTesting conf = new InMemoryConfigurationForTesting();
     conf.setFromObject(conf.getObject(OzoneClientConfig.class));
-    boolean resolvesS3Context = omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_INFO_WITH_VOLUME_CONTEXT) >= 0;
+    boolean resolvesS3Context = OzoneManagerVersion.S3_BUCKET_INFO_WITH_VOLUME_CONTEXT.isSupportedBy(omVersion);
     RpcClient rpcClient = new RpcClient(conf, null) {
       @Override
       protected OmTransport createOmTransport(String omServiceId) {
@@ -83,7 +83,7 @@ public class TestRpcClientGetS3BucketDetails {
                       .addServiceInfo(ServiceInfo.newBuilder()
                           .setNodeType(NodeType.OM)
                           .setHostname("om")
-                          .setOMVersion(omVersion.toProtoValue())))
+                          .setOMVersion(omVersion.serialize())))
                   .build();
             case GetS3VolumeContext:
               OMResponse volumeResponse = super.submitRequest(OMRequest.newBuilder(payload)

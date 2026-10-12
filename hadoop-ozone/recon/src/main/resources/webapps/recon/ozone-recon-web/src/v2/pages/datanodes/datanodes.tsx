@@ -178,7 +178,8 @@ const Datanodes: React.FC<{}> = () => {
           setupTime: datanode.setupTime,
           revision: datanode.revision,
           buildDate: datanode.buildDate,
-          networkLocation: datanode.networkLocation
+          networkLocation: datanode.networkLocation,
+          disks: datanode.disks
         })
       );
 
