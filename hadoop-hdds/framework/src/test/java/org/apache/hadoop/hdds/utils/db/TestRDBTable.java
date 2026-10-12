@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -28,6 +29,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.junit.jupiter.api.Test;
@@ -104,6 +107,26 @@ public class TestRDBTable {
     byte[] readBack = new byte[valueBytes.length];
     outValue.duplicate().get(readBack);
     assertArrayEquals(valueBytes, readBack);
+  }
+
+  @Test
+  public void testMultiGetSkipCacheDelegatesToDatabase() throws Exception {
+    RocksDatabase db = mock(RocksDatabase.class);
+    ColumnFamily columnFamily = mock(ColumnFamily.class);
+    RDBMetrics metrics = mock(RDBMetrics.class);
+    RDBTable table = new RDBTable(db, columnFamily, metrics);
+
+    byte[] key1 = "key-1".getBytes(UTF_8);
+    byte[] key2 = "key-2".getBytes(UTF_8);
+    byte[] value1 = "value-1".getBytes(UTF_8);
+    List<byte[]> keys = Arrays.asList(key1, key2);
+    when(db.multiGet(eq(columnFamily), eq(keys))).thenReturn(Arrays.asList(value1, null));
+
+    List<byte[]> values = table.multiGetSkipCache(keys);
+    assertEquals(2, values.size());
+    assertArrayEquals(value1, values.get(0));
+    assertNull(values.get(1));
+    verify(db).multiGet(eq(columnFamily), eq(keys));
   }
 }
 

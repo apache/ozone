@@ -571,6 +571,9 @@ public final class OzoneConfigKeys {
       "ozone.http.policy";
   public static final String OZONE_HTTP_POLICY_DEFAULT =
       HttpConfig.Policy.HTTP_ONLY.name();
+  public static final String OZONE_HTTP_SNI_HOST_CHECK_ENABLED =
+      "ozone.http.sni.host.check.enabled";
+  public static final boolean OZONE_HTTP_SNI_HOST_CHECK_ENABLED_DEFAULT = false;
   public static final String  OZONE_SSL_ENABLED_PROTOCOLS = "ozone.ssl.enabled.protocols";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY =
       "ozone.https.server.keystore.resource";
@@ -729,6 +732,10 @@ public final class OzoneConfigKeys {
   public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE =
       "ozone.client.elastic.byte.buffer.pool.max.size";
   public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT = "16GB";
+  
+  public static final String OZONE_S3G_STS_HTTP_ENABLED_KEY =
+      "ozone.s3g.sts.http.enabled";
+  public static final boolean OZONE_S3G_STS_HTTP_ENABLED_DEFAULT = false;
 
   public static final String OZONE_SCM_DEFAULT_STORAGE_TIER_KEY =
       "ozone.scm.default.storage.tier";

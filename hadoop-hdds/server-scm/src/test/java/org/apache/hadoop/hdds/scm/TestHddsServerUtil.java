@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,6 +36,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -178,6 +180,43 @@ public class TestHddsServerUtil {
     addr = HddsServerUtil.getScmDataNodeBindAddress(conf);
     assertEquals("5.6.7.8", addr.getHostString());
     assertEquals(200, addr.getPort());
+  }
+
+  /**
+   * Verify that a bind host holding an IPv6 literal, including the wildcard
+   * {@code ::}, yields a usable listener address.
+   */
+  @Test
+  void testBindAddressesAcceptIPv6BindHost() throws Exception {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, "::");
+    conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY, "::");
+    conf.set(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY, "::");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, "2001:db8::1");
+    conf.set(ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY, "2001:db8::1");
+
+    final InetAddress wildcard = InetAddress.getByName("::");
+    final InetAddress literal = InetAddress.getByName("2001:db8::1");
+
+    InetSocketAddress addr = HddsServerUtil.getScmClientBindAddress(conf);
+    assertEquals(wildcard, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getScmBlockClientBindAddress(conf);
+    assertEquals(wildcard, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getScmSecurityInetAddress(conf);
+    assertEquals(wildcard, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getScmDataNodeBindAddress(conf);
+    assertEquals(literal, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getReconDataNodeBindAddress(conf);
+    assertEquals(literal, addr.getAddress());
+    assertEquals(ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT, addr.getPort());
   }
 
   @Test

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.common;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -116,5 +117,20 @@ public class TestChecksum {
 
     final Checksum checksum = getChecksum(null, false);
     assertEquals(1, checksum.computeChecksum(data).getChecksums().size());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testRejectsIncrementalBufferInWriteMode(boolean useChecksumCache) {
+    try (ChunkBuffer data = ChunkBuffer.allocate(32, 8)) {
+      data.put(new byte[10]);
+
+      final Checksum checksum = getChecksum(null, useChecksumCache);
+      final IllegalStateException exception = assertThrows(
+          IllegalStateException.class,
+          () -> checksum.computeChecksum(data, useChecksumCache));
+      assertEquals("ChunkBuffer remaining byte count is 22, but its underlying buffers expose 6 bytes",
+          exception.getMessage());
+    }
   }
 }

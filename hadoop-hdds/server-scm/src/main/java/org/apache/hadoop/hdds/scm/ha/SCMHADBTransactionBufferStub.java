@@ -107,11 +107,26 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   }
 
   @Override
+  public boolean flushIfPendingLimitReached() {
+    return false;
+  }
+
+  @Override
   public void beginApplyingTransaction() {
   }
 
   @Override
   public void endApplyingTransaction() {
+  }
+
+  @Override
+  public void lock() {
+    rwLock.readLock().lock();
+  }
+
+  @Override
+  public void unlock() {
+    rwLock.readLock().unlock();
   }
 
   @Override

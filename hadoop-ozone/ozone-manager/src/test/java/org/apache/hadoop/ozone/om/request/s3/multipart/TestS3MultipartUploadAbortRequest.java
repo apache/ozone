@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -77,6 +79,10 @@ public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
     S3MultipartUploadAbortRequest s3MultipartUploadAbortRequest =
         getS3MultipartUploadAbortReq(abortMPURequest);
 
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    OmBucketInfo cachedBeforeAbort = omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey)).getCacheValue();
+
     omClientResponse =
         s3MultipartUploadAbortRequest.validateAndUpdateCache(ozoneManager, 2L);
 
@@ -94,6 +100,10 @@ public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
         .getOpenKeyTable(s3MultipartUploadAbortRequest.getBucketLayout())
         .get(multipartOpenKey));
 
+    // No part was committed, so the released quota is zero and only the instance identity shows
+    // that the abort published the copy it released on.
+    assertNotSame(cachedBeforeAbort, omMetadataManager.getBucketTable()
+        .getCacheValue(new CacheKey<>(bucketKey)).getCacheValue());
   }
 
   @Test

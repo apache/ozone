@@ -62,7 +62,7 @@ import org.junit.jupiter.api.Test;
  * Test class for create Lifecycle configuration request.
  */
 public class TestOMLifecycleConfigurationSetRequest extends
-    TestOMLifecycleConfigurationRequest {
+    OMLifecycleConfigurationRequestTestBase {
   @Test
   public void testPreExecute() throws Exception {
     String volumeName = UUID.randomUUID().toString();

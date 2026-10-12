@@ -28,6 +28,7 @@ cd "$DIR/../../.." || exit 1
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
 : ${OZONE_REPO_CACHED:="false"}
+: ${PHASE:="verify"}
 
 declare -i ITERATIONS
 if [[ ${ITERATIONS} -le 0 ]]; then
@@ -77,7 +78,7 @@ for i in $(seq 1 ${ITERATIONS}); do
     mkdir -p "${REPORT_DIR}"
   fi
 
-  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" verify \
+  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" "${PHASE}" \
       | tee "${REPORT_DIR}/output.log"
   irc=$?
 
