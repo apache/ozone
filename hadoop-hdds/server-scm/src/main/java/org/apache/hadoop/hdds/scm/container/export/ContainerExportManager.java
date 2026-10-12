@@ -26,8 +26,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
@@ -90,12 +91,17 @@ public class ContainerExportManager {
     this.workerPool = newWorkerPool(scmId);
   }
 
-  private static ExecutorService newWorkerPool(String scmId) {
-    return Executors.newSingleThreadExecutor(r -> {
+  private ExecutorService newWorkerPool(String scmId) {
+    return new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>(), r -> {
       Thread t = new Thread(r, scmId + "-ContainerExportWorker");
       t.setDaemon(true);
       return t;
-    });
+    }) {
+      @Override
+      protected void terminated() {
+        onWorkerTerminated();
+      }
+    };
   }
 
   /**
@@ -148,21 +154,23 @@ public class ContainerExportManager {
   public void shutdown() {
     LOG.info("Shutting down ContainerExportManager");
     workerPool.shutdownNow();
-    boolean terminated = false;
     try {
-      terminated = workerPool.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+      if (!workerPool.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+        LOG.warn("Export worker did not stop within {} ms; the container export directory lock is "
+            + "released once it stops", SHUTDOWN_TIMEOUT_MS);
+      }
     } catch (InterruptedException e) {
-      LOG.warn("Interrupted waiting for export worker shutdown");
+      LOG.warn("Interrupted waiting for export worker shutdown; the container export directory lock is "
+          + "released once it stops");
       Thread.currentThread().interrupt();
     }
-    if (!terminated) {
-      // The worker may still be writing under the export directory; keep the lock so that
-      // a new manager cannot start and delete files in use.
-      LOG.warn("Export worker did not stop within {} ms (or shutdown was interrupted); "
-          + "keeping the container export directory lock", SHUTDOWN_TIMEOUT_MS);
-      return;
-    }
+  }
 
+  /**
+   * Runs once the worker has stopped, so the export directory is no longer in use: the lock is kept
+   * until then so that a new manager cannot start and delete files the worker is still writing.
+   */
+  private void onWorkerTerminated() {
     // A job accepted but drained from the executor queue by shutdownNow() never ran; fail it.
     final ExportJob notStarted = runningJob.getAndSet(null);
     if (notStarted != null) {

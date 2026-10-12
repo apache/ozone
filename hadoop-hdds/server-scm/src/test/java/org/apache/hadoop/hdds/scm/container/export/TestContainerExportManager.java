@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -350,10 +351,56 @@ public class TestContainerExportManager {
       job.writeMetadataHeader(out, 1, ContainerID.valueOf(1));
     }
 
+    // Lost before the first part is copied.
     IOException e = assertThrows(IOException.class, () -> fileManager.writeArchive(job, () -> false));
     assertTrue(e.getMessage().contains("lost leadership"));
     assertFalse(archiveFile(job).exists());
     assertFalse(AtomicFileOutputStream.getTemporaryFile(archiveFile(job)).exists());
+
+    // Lost only after the last (here: the only) part is copied; the finished archive is kept.
+    final AtomicInteger checks = new AtomicInteger();
+    fileManager.writeArchive(job, () -> checks.incrementAndGet() <= 1);
+    assertEquals(1, checks.get());
+    assertTrue(archiveFile(job).exists());
+    assertFalse(AtomicFileOutputStream.getTemporaryFile(archiveFile(job)).exists());
+  }
+
+  @Test
+  public void testLockReleasedOnlyAfterWorkerStops() throws Exception {
+    final CountDownLatch workerBusy = new CountDownLatch(1);
+    final CountDownLatch releaseWorker = new CountDownLatch(1);
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
+        .thenAnswer(invocation -> {
+          workerBusy.countDown();
+          try {
+            releaseWorker.await();
+          } catch (InterruptedException ignored) {
+            // shutdownNow() interrupts; keep running to simulate a worker that is slow to stop.
+          }
+          releaseWorker.await();
+          return Collections.emptyList();
+        });
+
+    ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    assertTrue(workerBusy.await(30, TimeUnit.SECONDS));
+
+    // Returns after the 5s timeout while the worker is still running.
+    exportManager.shutdown();
+    ExportFileManager other = new ExportFileManager(tempDir.getAbsolutePath());
+    assertThrows(IOException.class, other::start);
+
+    releaseWorker.countDown();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        other.start();
+        return true;
+      } catch (IOException ex) {
+        return false;
+      }
+    }, 100, 30_000);
+    other.unlock();
+    assertTrue(waitForDone(job.getId()).isDone());
   }
 
   @Test

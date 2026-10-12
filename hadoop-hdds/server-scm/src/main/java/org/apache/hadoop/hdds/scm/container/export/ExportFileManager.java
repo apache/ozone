@@ -109,7 +109,7 @@ final class ExportFileManager {
     removeIncompleteWorkOnStartup();
   }
 
-  private void lock() throws IOException {
+  private synchronized void lock() throws IOException {
     if (exportDirectoryLock != null) {
       return;
     }
@@ -129,7 +129,7 @@ final class ExportFileManager {
     }
   }
 
-  void unlock() throws IOException {
+  synchronized void unlock() throws IOException {
     if (exportDirectoryLock == null) {
       return;
     }
