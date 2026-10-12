@@ -61,10 +61,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatu
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
@@ -107,6 +107,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -156,6 +157,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagResponse;
@@ -213,6 +215,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     Type cmdType = request.getCmdType();
     OMResponse.Builder responseBuilder = OmResponseUtil.getOMResponseBuilder(
         request);
+    final ClientVersion clientVersion = ClientVersion.deserialize(request.getVersion());
     try {
       switch (cmdType) {
       case CheckVolumeAccess:
@@ -242,12 +245,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case LookupKey:
         LookupKeyResponse lookupKeyResponse = lookupKey(
-            request.getLookupKeyRequest(), request.getVersion());
+            request.getLookupKeyRequest(), clientVersion);
         responseBuilder.setLookupKeyResponse(lookupKeyResponse);
         break;
       case ListKeys:
         ListKeysResponse listKeysResponse = listKeys(
-            request.getListKeysRequest(), request.getVersion());
+            request.getListKeysRequest(), clientVersion);
         responseBuilder.setListKeysResponse(listKeysResponse);
         break;
       case ListKeysLight:
@@ -267,7 +270,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case ListOpenFiles:
         ListOpenFilesResponse listOpenFilesResponse = listOpenFiles(
-            request.getListOpenFilesRequest(), request.getVersion());
+            request.getListOpenFilesRequest(), clientVersion);
         responseBuilder.setListOpenFilesResponse(listOpenFilesResponse);
         break;
       case GetBucketDeletedBytes:
@@ -293,23 +296,22 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case GetFileStatus:
         GetFileStatusResponse getFileStatusResponse = getOzoneFileStatus(
-            request.getGetFileStatusRequest(), request.getVersion());
+            request.getGetFileStatusRequest(), clientVersion);
         responseBuilder.setGetFileStatusResponse(getFileStatusResponse);
         break;
       case LookupFile:
         LookupFileResponse lookupFileResponse =
-            lookupFile(request.getLookupFileRequest(), request.getVersion());
+            lookupFile(request.getLookupFileRequest(), clientVersion);
         responseBuilder.setLookupFileResponse(lookupFileResponse);
         break;
       case ListStatus:
         ListStatusResponse listStatusResponse =
-            listStatus(request.getListStatusRequest(), request.getVersion());
+            listStatus(request.getListStatusRequest(), clientVersion);
         responseBuilder.setListStatusResponse(listStatusResponse);
         break;
       case ListStatusLight:
         ListStatusLightResponse listStatusLightResponse =
-            listStatusLight(request.getListStatusRequest(),
-                request.getVersion());
+            listStatusLight(request.getListStatusRequest());
         responseBuilder.setListStatusLightResponse(listStatusLightResponse);
         break;
       case GetAcl:
@@ -326,6 +328,16 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       case PrepareStatus:
         PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
+        break;
+      case Prepare:
+        PrepareResponse prepareResponse = prepare();
+        responseBuilder.setPrepareResponse(prepareResponse);
+        responseBuilder.setMessage("Prepare is no longer required in this version");
+        break;
+      case CancelPrepare:
+        CancelPrepareResponse cancelPrepareResponse = cancelPrepare();
+        responseBuilder.setCancelPrepareResponse(cancelPrepareResponse);
+        responseBuilder.setMessage("Cancel Prepare is no longer required in this version");
         break;
       case GetS3VolumeContext:
         GetS3VolumeContextResponse s3VolumeContextResponse =
@@ -355,7 +367,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case GetKeyInfo:
         responseBuilder.setGetKeyInfoResponse(
-            getKeyInfo(request.getGetKeyInfoRequest(), request.getVersion()));
+            getKeyInfo(request.getGetKeyInfoRequest(), clientVersion));
         break;
       case ListSnapshot:
         OzoneManagerProtocolProtos.ListSnapshotResponse listSnapshotResponse =
@@ -447,6 +459,11 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         GetBucketTaggingResponse getBucketTaggingResponse =
             getBucketTagging(request.getGetBucketTaggingRequest());
         responseBuilder.setGetBucketTaggingResponse(getBucketTaggingResponse);
+        break;
+      case QueryUpgradeStatus:
+        OzoneManagerProtocolProtos.QueryUpgradeStatusResponse queryUpgradeStatusResponse =
+            getOzoneManager().queryUpgradeStatus();
+        responseBuilder.setQueryUpgradeStatusResponse(queryUpgradeStatusResponse);
         break;
       default:
         responseBuilder.setSuccess(false);
@@ -565,7 +582,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
-    // Layout version should have been set up the leader while serializing
+    // Apparent version should have been set up the leader while serializing
     // the request, and hence cannot be null. This version is used by each
     // node to identify which request handler version to use.
     if (omRequest.getLayoutVersion() == null) {
@@ -676,7 +693,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private LookupKeyResponse lookupKey(LookupKeyRequest request,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
     LookupKeyResponse.Builder resp =
         LookupKeyResponse.newBuilder();
     KeyArgs keyArgs = request.getKeyArgs();
@@ -696,7 +713,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private GetKeyInfoResponse getKeyInfo(GetKeyInfoRequest request,
-                                        int clientVersion) throws IOException {
+                                        ClientVersion clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
@@ -793,7 +810,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  private ListKeysResponse listKeys(ListKeysRequest request, int clientVersion)
+  private ListKeysResponse listKeys(ListKeysRequest request, ClientVersion clientVersion)
       throws IOException {
     ListKeysResponse.Builder resp =
         ListKeysResponse.newBuilder();
@@ -974,7 +991,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
 
   @DisallowedUntilLayoutVersion(HBASE_SUPPORT)
   private ListOpenFilesResponse listOpenFiles(ListOpenFilesRequest req,
-                                              int clientVersion)
+                                              ClientVersion clientVersion)
       throws IOException {
     ListOpenFilesResponse.Builder resp = ListOpenFilesResponse.newBuilder();
 
@@ -1127,7 +1144,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private GetFileStatusResponse getOzoneFileStatus(
-      GetFileStatusRequest request, int clientVersion) throws IOException {
+      GetFileStatusRequest request, ClientVersion clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
@@ -1232,7 +1249,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private LookupFileResponse lookupFile(LookupFileRequest request,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
@@ -1306,7 +1323,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private ListStatusResponse listStatus(
-      ListStatusRequest request, int clientVersion) throws IOException {
+      ListStatusRequest request, ClientVersion clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
@@ -1330,8 +1347,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return listStatusResponseBuilder.build();
   }
 
-  private ListStatusLightResponse listStatusLight(
-      ListStatusRequest request, int clientVersion) throws IOException {
+  private ListStatusLightResponse listStatusLight(ListStatusRequest request) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs.Builder omKeyArgsBuilder = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
@@ -1457,12 +1473,31 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
   }
 
-  private PrepareStatusResponse getPrepareStatus() {
-    OzoneManagerPrepareState.State prepareState =
-        impl.getPrepareState().getState();
+  private PrepareStatusResponse getPrepareStatus() throws IOException {
+    impl.checkAdminUserPrivilege("get prepare status");
+
+    // Prepare is no longer used, always return PREPARE_COMPLETED for backward compatibility
     return PrepareStatusResponse.newBuilder()
-        .setStatus(prepareState.getStatus())
-        .setCurrentTxnIndex(prepareState.getIndex()).build();
+        .setStatus(PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED)
+        .setCurrentTxnIndex(0).build();
+  }
+
+  private PrepareResponse prepare() throws IOException {
+    // Prepare functionality is no longer supported. An empty successful transaction is returned for compatibility
+    // with older clients and upgrade processes.
+    impl.checkAdminUserPrivilege("prepare for upgrade");
+
+    return PrepareResponse.newBuilder()
+        .setTxnID(0)  // Dummy transaction ID
+        .build();
+  }
+
+  private CancelPrepareResponse cancelPrepare() throws IOException {
+    // Cancel Prepare functionality is no longer supported. An empty successful transaction is returned for
+    // compatibility with older clients and upgrade processes.
+    impl.checkAdminUserPrivilege("cancel prepare");
+
+    return CancelPrepareResponse.newBuilder().build();
   }
 
   private GetLifecycleConfigurationResponse infoLifecycleConfiguration(

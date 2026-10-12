@@ -33,7 +33,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.sql.DataSource;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.recon.metrics.NSSummaryMetrics;
 import org.apache.hadoop.ozone.recon.metrics.ReconTaskStatusMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconSafeModeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
+import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.security.ReconCertificateClient;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -58,7 +59,8 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
-import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutVersionManager;
+import org.apache.hadoop.ozone.recon.upgrade.ReconVersionManager;
+import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -84,7 +86,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
   private ReconDBProvider reconDBProvider;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
-  private OzoneStorageContainerManager reconStorageContainerManager;
+  private ReconStorageContainerManagerFacade reconStorageContainerManager;
   private OzoneConfiguration configuration;
   private ReconStorageConfig reconStorage;
   private CertificateClient certClient;
@@ -113,6 +115,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
     HddsServerUtil.startupShutdownMessage(OzoneVersionInfo.OZONE_VERSION_INFO,
             ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
+    HddsUtils.validateAdvertisedAddressConfig(configuration, ReconConfigKeys.OZONE_RECON_ADDRESS_KEY);
 
     try {
       reconAdmins = createReconAdmins(configuration);
@@ -169,8 +172,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       httpServer = injector.getInstance(ReconHttpServer.class);
       this.ozoneManagerServiceProvider =
           injector.getInstance(OzoneManagerServiceProvider.class);
-      this.reconStorageContainerManager =
-          injector.getInstance(OzoneStorageContainerManager.class);
+      this.reconStorageContainerManager = injector.getInstance(ReconStorageContainerManagerFacade.class);
 
       this.reconTaskStatusMetrics =
           injector.getInstance(ReconTaskStatusMetrics.class);
@@ -179,23 +181,12 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       LOG.info("Initializing support of Recon Features...");
       FeatureProvider.initFeatureSupport(configuration);
 
+      finalizeUpgrade();
+
       LOG.debug("Now starting all services of Recon...");
       // Start all services
       start();
       isStarted = true;
-
-      LOG.info("Finalizing Layout Features.");
-      // Handle Recon Schema Versioning
-      ReconSchemaVersionTableManager versionTableManager =
-          injector.getInstance(ReconSchemaVersionTableManager.class);
-      DataSource dataSource = injector.getInstance(DataSource.class);
-
-      ReconLayoutVersionManager layoutVersionManager =
-          new ReconLayoutVersionManager(versionTableManager, reconContext, dataSource);
-      // Run the upgrade framework to finalize layout features if needed
-      layoutVersionManager.finalizeLayoutFeatures();
-
-      LOG.info("Recon schema versioning completed.");
 
       // Register ReconTaskStatusMetrics after schema upgrade completes
       // This ensures the RECON_TASK_STATUS table has all required columns
@@ -223,6 +214,31 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       }
     }, DEFAULT_SHUTDOWN_HOOK_PRIORITY);
     return null;
+  }
+
+  private void finalizeUpgrade() {
+    LOG.info("Finalizing Recon versions.");
+    ReconContext reconContext = injector.getInstance(ReconContext.class);
+    ReconVersionManager reconVersionManager = injector.getInstance(ReconVersionManager.class);
+    try {
+      reconVersionManager.finalizeUpgrade();
+    } catch (UpgradeException e) {
+      LOG.error("Failed to finalize Recon versions.", e);
+      reconContext.updateErrors(ReconContext.ErrorCode.UPGRADE_FAILURE);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      throw new RuntimeException("Recon failed to finalize schema versions. Startup halted.", e);
+    }
+
+    try {
+      reconStorageContainerManager.finalizeScmVersionUpgrade();
+    } catch (UpgradeException e) {
+      LOG.error("Failed to finalize Recon SCM apparent version.", e);
+      reconContext.updateErrors(ReconContext.ErrorCode.UPGRADE_FAILURE);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      throw new RuntimeException("Recon failed to finalize SCM version. Startup halted.", e);
+    }
+
+    LOG.info("Recon upgrade finalization completed.");
   }
 
   private void updateAndLogReconHealthStatus() {

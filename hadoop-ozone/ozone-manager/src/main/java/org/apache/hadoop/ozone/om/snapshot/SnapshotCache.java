@@ -227,6 +227,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
           LOG.info("Loading SnapshotId: '{}'", k);
           try {
             v = new ReferenceCounted<>(cacheLoader.load(key), false, this);
+            omMetrics.incNumSnapshotCacheSize();
           } catch (OMException omEx) {
             // Return null if the snapshot is no longer active
             if (!omEx.getResult().equals(OMException.ResultCodes.FILE_NOT_FOUND)) {
@@ -239,7 +240,6 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
             // Unexpected and unknown exception thrown from CacheLoader#load
             throw new IllegalStateException(ex);
           }
-          omMetrics.incNumSnapshotCacheSize();
         }
         if (v != null) {
           // When RC OmSnapshot is successfully loaded
