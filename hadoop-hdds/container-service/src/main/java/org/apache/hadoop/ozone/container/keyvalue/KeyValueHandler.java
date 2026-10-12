@@ -175,6 +175,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
@@ -2316,6 +2317,8 @@ public class KeyValueHandler extends Handler {
       final StorageContainerException sce = new StorageContainerException(
           "Failed to readBlock " + request.getReadBlock(), ioe, IO_EXCEPTION);
       responseProto = ContainerUtils.logAndReturnError(LOG, sce, request);
+    } catch (StatusRuntimeException e) {
+      throw e;
     } catch (Exception e) {
       final StorageContainerException sce = new StorageContainerException(
           "Failed to readBlock " + request.getReadBlock(), e, CONTAINER_INTERNAL_ERROR);
