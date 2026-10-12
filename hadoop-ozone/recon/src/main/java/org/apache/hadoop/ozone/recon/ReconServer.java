@@ -58,6 +58,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.upgrade.ReconVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
@@ -85,6 +86,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private OzoneManagerServiceProvider ozoneManagerServiceProvider;
   private ReconDBProvider reconDBProvider;
+  private ReconReplicaHistoryDBProvider replicaHistoryDBProvider;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconStorageContainerManagerFacade reconStorageContainerManager;
   private OzoneConfiguration configuration;
@@ -153,6 +155,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       }
       jvmPauseMonitor = newJvmPauseMonitor("Recon");
       this.reconDBProvider = injector.getInstance(ReconDBProvider.class);
+      this.replicaHistoryDBProvider = injector.getInstance(ReconReplicaHistoryDBProvider.class);
       this.reconContainerMetadataManager =
           injector.getInstance(ReconContainerMetadataManager.class);
       this.reconNamespaceSummaryManager =
@@ -182,6 +185,9 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       FeatureProvider.initFeatureSupport(configuration);
 
       finalizeUpgrade();
+
+      // Fresh SQL installations are initialized at the software version and do not run upgrade actions.
+      replicaHistoryDBProvider.migrateReplicaHistory(reconDBProvider.getDbStore());
 
       LOG.debug("Now starting all services of Recon...");
       // Start all services
@@ -370,6 +376,13 @@ public class ReconServer extends GenericCli implements Callable<Void> {
         } catch (Exception ex) {
           LOG.error("Recon Container Key DB close failed", ex);
         }
+      }
+    }
+    if (replicaHistoryDBProvider != null) {
+      try {
+        replicaHistoryDBProvider.close();
+      } catch (IOException ex) {
+        LOG.error("Recon replica history DB close failed", ex);
       }
     }
     if (certClient != null) {
