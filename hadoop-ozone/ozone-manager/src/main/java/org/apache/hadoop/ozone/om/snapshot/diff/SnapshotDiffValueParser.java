@@ -94,7 +94,6 @@ public final class SnapshotDiffValueParser {
       int fieldNumber = WireFormat.getTagFieldNumber(tag);
       switch (fieldNumber) {
       case KeyInfo.DATASIZE_FIELD_NUMBER:
-      case KeyInfo.RETENTIONDATE_FIELD_NUMBER:
         updateDigestWithLong(digest, fieldNumber, input.readUInt64());
         break;
       case KeyInfo.KEYLOCATIONLIST_FIELD_NUMBER:
@@ -109,7 +108,7 @@ public final class SnapshotDiffValueParser {
         break;
       case KeyInfo.FILECHECKSUM_FIELD_NUMBER:
       case KeyInfo.ACLS_FIELD_NUMBER:
-      case KeyInfo.RETENTIONCONFIG_FIELD_NUMBER:
+      case KeyInfo.RETENTION_FIELD_NUMBER:
         updateDigestWithBytes(digest, fieldNumber, input.readBytes());
         break;
       case KeyInfo.LEGALHOLD_FIELD_NUMBER:

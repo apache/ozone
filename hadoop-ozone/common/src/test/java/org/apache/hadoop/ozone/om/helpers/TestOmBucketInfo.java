@@ -42,8 +42,8 @@ public class TestOmBucketInfo {
 
   @Test
   public void objectLockProtobufConversionAndCopy() {
-    Retention retention = new Retention(OzoneManagerProtocolProtos.Rule.newBuilder()
-        .setRetentionMode(OzoneManagerProtocolProtos.RetentionMode.COMPLIANCE)
+    Retention retention = new Retention(OzoneManagerProtocolProtos.RetentionMode.COMPLIANCE,
+        OzoneManagerProtocolProtos.Rule.newBuilder()
         .setTimeUnit(OzoneManagerProtocolProtos.TimeUnit.DAYS).setDuration(30).build(), null);
     OmBucketInfo bucket = OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("bucket")
         .setObjectLockEnabled(true).setDefaultRetention(retention).build();

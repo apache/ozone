@@ -20,18 +20,25 @@ package org.apache.hadoop.ozone.om.helpers;
 import java.util.Objects;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionConfig;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Rule;
 
 /**
- * Immutable retention rules for a bucket or key. Applied expiration dates are stored separately on the key.
+ * Immutable default retention configuration for a bucket.
  */
 public final class Retention {
+  private final RetentionMode retentionMode;
   private final Rule rule;
   private final EventHold eventHold;
 
-  public Retention(Rule rule, EventHold eventHold) {
+  public Retention(RetentionMode retentionMode, Rule rule, EventHold eventHold) {
+    this.retentionMode = Objects.requireNonNull(retentionMode, "retention mode is null");
     this.rule = rule;
     this.eventHold = eventHold;
+  }
+
+  public RetentionMode getRetentionMode() {
+    return retentionMode;
   }
 
   public Rule getRule() {
@@ -44,11 +51,12 @@ public final class Retention {
 
   public static Retention fromProto(RetentionConfig proto) {
     Objects.requireNonNull(proto, "retention config is null");
-    return new Retention(proto.hasRule() ? proto.getRule() : null, proto.hasEventHold() ? proto.getEventHold() : null);
+    return new Retention(proto.getRetentionMode(), proto.hasRule() ? proto.getRule() : null,
+        proto.hasEventHold() ? proto.getEventHold() : null);
   }
 
   public RetentionConfig toProto() {
-    RetentionConfig.Builder builder = RetentionConfig.newBuilder();
+    RetentionConfig.Builder builder = RetentionConfig.newBuilder().setRetentionMode(retentionMode);
     if (rule != null) {
       builder.setRule(rule);
     }
@@ -67,11 +75,12 @@ public final class Retention {
       return false;
     }
     Retention that = (Retention) obj;
-    return Objects.equals(rule, that.rule) && Objects.equals(eventHold, that.eventHold);
+    return retentionMode == that.retentionMode && Objects.equals(rule, that.rule) &&
+        Objects.equals(eventHold, that.eventHold);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(rule, eventHold);
+    return Objects.hash(retentionMode, rule, eventHold);
   }
 }

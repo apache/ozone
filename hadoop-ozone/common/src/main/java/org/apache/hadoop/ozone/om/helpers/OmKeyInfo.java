@@ -112,8 +112,7 @@ public final class OmKeyInfo extends WithParentObjectId
   // been modified.
   private final Long expectedDataGeneration;
 
-  private final Long retentionDate;
-  private final Retention retentionConfig;
+  private final ObjectRetention retention;
   private final Boolean legalHold;
 
   private OmKeyInfo(Builder b) {
@@ -134,17 +133,12 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
-    this.retentionDate = b.retentionDate;
-    this.retentionConfig = b.retentionConfig;
+    this.retention = b.retention;
     this.legalHold = b.legalHold;
   }
 
-  public Long getRetentionDate() {
-    return retentionDate;
-  }
-
-  public Retention getRetentionConfig() {
-    return retentionConfig;
+  public ObjectRetention getRetention() {
+    return retention;
   }
 
   public Boolean getLegalHold() {
@@ -532,8 +526,7 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
-    private Long retentionDate;
-    private Retention retentionConfig;
+    private ObjectRetention retention;
     private Boolean legalHold;
 
     public Builder() {
@@ -563,8 +556,7 @@ public final class OmKeyInfo extends WithParentObjectId
               new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
                   keyLocationVersion.createLocationList(),
                   keyLocationVersion.isMultipartKey())));
-      this.retentionDate = obj.retentionDate;
-      this.retentionConfig = obj.retentionConfig;
+      this.retention = obj.retention;
       this.legalHold = obj.legalHold;
     }
 
@@ -582,13 +574,8 @@ public final class OmKeyInfo extends WithParentObjectId
           new OmKeyLocationInfoGroup(0, new ArrayList<>()));
     }
 
-    public Builder setRetentionDate(Long retentionDate) {
-      this.retentionDate = retentionDate;
-      return this;
-    }
-
-    public Builder setRetentionConfig(Retention retentionConfig) {
-      this.retentionConfig = retentionConfig;
+    public Builder setRetention(ObjectRetention retention) {
+      this.retention = retention;
       return this;
     }
 
@@ -897,11 +884,8 @@ public final class OmKeyInfo extends WithParentObjectId
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
-    if (retentionDate != null) {
-      kb.setRetentionDate(retentionDate);
-    }
-    if (retentionConfig != null) {
-      kb.setRetentionConfig(retentionConfig.toProto());
+    if (retention != null) {
+      kb.setRetention(retention.toProto());
     }
     if (legalHold != null) {
       kb.setLegalHold(legalHold);
@@ -936,11 +920,8 @@ public final class OmKeyInfo extends WithParentObjectId
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
         .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
-    if (keyInfo.hasRetentionDate()) {
-      builder.setRetentionDate(keyInfo.getRetentionDate());
-    }
-    if (keyInfo.hasRetentionConfig()) {
-      builder.setRetentionConfig(Retention.fromProto(keyInfo.getRetentionConfig()));
+    if (keyInfo.hasRetention()) {
+      builder.setRetention(ObjectRetention.fromProto(keyInfo.getRetention()));
     }
     if (keyInfo.hasLegalHold()) {
       builder.setLegalHold(keyInfo.getLegalHold());
@@ -1006,8 +987,7 @@ public final class OmKeyInfo extends WithParentObjectId
         Objects.equals(getMetadata(), omKeyInfo.getMetadata()) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         Objects.equals(getTags(), omKeyInfo.getTags()) &&
-        Objects.equals(retentionDate, omKeyInfo.retentionDate) &&
-        Objects.equals(retentionConfig, omKeyInfo.retentionConfig) &&
+        Objects.equals(retention, omKeyInfo.retention) &&
         Objects.equals(legalHold, omKeyInfo.legalHold) &&
         getObjectID() == omKeyInfo.getObjectID();
 

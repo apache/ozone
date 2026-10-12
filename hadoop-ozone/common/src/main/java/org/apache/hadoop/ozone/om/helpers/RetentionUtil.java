@@ -31,7 +31,7 @@ public final class RetentionUtil {
 
   public static void validateRule(Rule rule) {
     if (rule == null || !rule.isInitialized() || rule.getDuration() <= 0) {
-      throw new IllegalArgumentException("Retention requires a mode, time unit and positive signed-long duration");
+      throw new IllegalArgumentException("Retention rule requires a time unit and positive signed-long duration");
     }
   }
 

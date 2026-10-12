@@ -35,11 +35,11 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.ObjectRetention;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-import org.apache.hadoop.ozone.om.helpers.Retention;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Rule;
@@ -146,25 +146,29 @@ class TestSnapshotDiffValueParser {
     OmKeyInfo keyInfo = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
         createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
         Collections.singletonList(createKeyLocationGroup(1L)));
-    Rule rule = Rule.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE)
-        .setTimeUnit(TimeUnit.DAYS).setDuration(1).build();
-    OmKeyInfo retained = keyInfo.toBuilder().setRetentionDate(1_800_000_000_000L)
-        .setRetentionConfig(new Retention(rule, null)).setLegalHold(true).build();
+    Rule rule = Rule.newBuilder().setTimeUnit(TimeUnit.DAYS).setDuration(1).build();
+    ObjectRetention retention = new ObjectRetention(RetentionMode.GOVERNANCE, 1_800_000_000_000L, null);
+    OmKeyInfo retained = keyInfo.toBuilder().setRetention(retention).setLegalHold(true).build();
+    EventHold eventHold = EventHold.newBuilder().setEnabled(true).setRule(rule).build();
+    OmKeyInfo held = keyInfo.toBuilder()
+        .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null, eventHold)).build();
     return Stream.of(
         Arguments.of("unchanged absent fields", keyInfo, keyInfo.copyObject(), true),
         Arguments.of("unchanged Object Lock fields", retained, retained.copyObject(), true),
-        Arguments.of("retention date added", keyInfo, keyInfo.toBuilder().setRetentionDate(0L).build(), false),
-        Arguments.of("retention date changed", retained,
-            retained.toBuilder().setRetentionDate(1_800_000_000_001L).build(), false),
-        Arguments.of("retention config added", keyInfo,
-            keyInfo.toBuilder().setRetentionConfig(new Retention(rule, null)).build(), false),
-        Arguments.of("retention rule changed", retained, retained.toBuilder()
-            .setRetentionConfig(new Retention(
-                rule.toBuilder().setRetentionMode(RetentionMode.COMPLIANCE).build(), null))
+        Arguments.of("retention added", keyInfo, retained, false),
+        Arguments.of("retention removed", retained, retained.toBuilder().setRetention(null).build(), false),
+        Arguments.of("retention date changed", retained, retained.toBuilder()
+            .setRetention(new ObjectRetention(RetentionMode.GOVERNANCE, 1_800_000_000_001L, null)).build(), false),
+        Arguments.of("retention mode changed", retained, retained.toBuilder()
+            .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, retention.getRetentionDate(), null))
             .build(), false),
-        Arguments.of("event hold added", retained, retained.toBuilder()
-            .setRetentionConfig(new Retention(rule, EventHold.newBuilder().setEnabled(true).setRule(rule).build()))
-            .build(), false),
+        Arguments.of("event hold without date", keyInfo, held, false),
+        Arguments.of("event hold disabled", held, held.toBuilder()
+            .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null,
+                eventHold.toBuilder().setEnabled(false).build())).build(), false),
+        Arguments.of("event hold rule changed", held, held.toBuilder()
+            .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null,
+                eventHold.toBuilder().setRule(rule.toBuilder().setDuration(2)).build())).build(), false),
         Arguments.of("legal hold enabled", keyInfo, keyInfo.toBuilder().setLegalHold(true).build(), false),
         Arguments.of("legal hold disabled", retained, retained.toBuilder().setLegalHold(false).build(), false),
         Arguments.of("legal hold absent versus false", keyInfo,
