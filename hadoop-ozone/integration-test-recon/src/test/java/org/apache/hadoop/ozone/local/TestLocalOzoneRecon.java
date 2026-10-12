@@ -17,17 +17,25 @@
 
 package org.apache.hadoop.ozone.local;
 
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Path;
 import java.time.Duration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Integration tests for Recon in the {@code ozone local} runtime.
@@ -39,22 +47,44 @@ class TestLocalOzoneRecon {
 
   @Test
   void reconServesRequestsAndStopsSyncThreadOnClose() throws Exception {
-    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
-            tempDir.resolve("local-ozone-recon"))
-        .setS3gEnabled(false)
-        .setReconEnabled(true)
-        .setStartupTimeout(Duration.ofMinutes(2))
-        .build();
-
-    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config(false, true), new OzoneConfiguration())) {
       cluster.start();
 
       assertTrue(cluster.getReconPort() > 0);
-      assertHttpEndpointResponds(cluster.getReconEndpoint() + "/api/v1/clusterState");
+      // Query the API to verify that Recon resources can be injected in the shared JVM.
+      assertEquals(200, responseCode(cluster.getReconEndpoint() + "/api/v1/clusterState"));
       assertTrue(syncThreadRunning());
     }
 
     GenericTestUtils.waitFor(() -> !syncThreadRunning(), 100, 10_000);
+  }
+
+  /**
+   * Regression test: ReconServer#call() logged an initialization failure and returned normally, so when
+   * ReconStorageContainerManagerFacade#start() failed after the Recon HTTP server started, start() succeeded without
+   * the Recon datanode RPC server. A zero sync interval fails it there, because
+   * ScheduledExecutorService#scheduleWithFixedDelay rejects a delay that is not positive.
+   */
+  @ParameterizedTest(name = "s3g={0}")
+  @ValueSource(booleans = {false, true})
+  void startFailsAndStopsReconWhenReconFailsAfterHttpServerStarts(boolean s3gEnabled) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY, "0s");
+
+    try (LogCapturer httpLogs = LogCapturer.captureLogs(BaseHttpServer.class);
+        LocalOzoneCluster cluster = new LocalOzoneCluster(config(s3gEnabled, true), conf)) {
+      assertThrows(IllegalArgumentException.class, cluster::start);
+      assertThat(httpLogs.getOutput()).contains("HTTP server of recon listening");
+      assertThrows(ConnectException.class, () -> responseCode(cluster.getReconEndpoint()));
+    }
+  }
+
+  private LocalOzoneClusterConfig config(boolean s3gEnabled, boolean reconEnabled) {
+    return LocalOzoneClusterConfig.builder(tempDir.resolve("local-ozone-recon"))
+        .setS3gEnabled(s3gEnabled)
+        .setReconEnabled(reconEnabled)
+        .setStartupTimeout(Duration.ofMinutes(2))
+        .build();
   }
 
   private static boolean syncThreadRunning() {
@@ -62,13 +92,12 @@ class TestLocalOzoneRecon {
         .anyMatch(thread -> thread.getName().contains("SyncSCMContainerInfo"));
   }
 
-  private static void assertHttpEndpointResponds(String endpoint) throws Exception {
+  private static int responseCode(String endpoint) throws Exception {
     HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
     try {
       connection.setConnectTimeout(1_000);
       connection.setReadTimeout(1_000);
-      // Query the API to verify that Recon resources can be injected in the shared JVM.
-      assertEquals(200, connection.getResponseCode(), endpoint);
+      return connection.getResponseCode();
     } finally {
       connection.disconnect();
     }

@@ -66,6 +66,7 @@ import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -961,13 +962,15 @@ class TestLocalOzoneCluster {
 
   @Test
   void executeWithinStartupTimeoutPropagatesStartupFailure() {
+    AtomicBoolean cleanedUp = new AtomicBoolean();
     IOException error =
         assertThrows(IOException.class, () -> LocalOzoneCluster.executeWithinStartupTimeout(
             "Recon", () -> {
               throw new IOException("startup boom");
-            }, () -> { }, Duration.ofSeconds(30)));
+            }, () -> cleanedUp.set(true), Duration.ofSeconds(30)));
 
     assertMessageContains(error, "startup boom");
+    assertTrue(cleanedUp.get(), "a failed startup should run its cleanup");
   }
 
   private LocalOzoneCluster.PreparedConfiguration prepare(

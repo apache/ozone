@@ -100,10 +100,8 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_WEBADMIN_
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -284,8 +282,6 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       waitForClusterReadiness(config.getStartupTimeout());
       if (config.isReconEnabled()) {
         startRecon(prepared.getConfiguration());
-        waitForHttpEndpointReadiness(getReconEndpoint(), "Recon",
-            config.getStartupTimeout());
       }
       if (config.isS3gEnabled()) {
         startS3Gateway(prepared.getConfiguration());
@@ -746,7 +742,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     if (!config.isReconEnabled()) {
       return -1;
     }
-    // getReconEndpoint() advertises this listener and start() waits for it to answer.
+    // getReconEndpoint() advertises this listener.
     setLocalOverride(conf, OZONE_RECON_HTTP_ENABLED_KEY, true);
     Path reconDir = config.getDataDir().resolve(RECON_DIR_NAME);
     conf.setIfUnset(OZONE_RECON_DB_DIR, reconDir.toString());
@@ -994,45 +990,9 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     ConfigurationProvider.resetConfiguration();
     ConfigurationProvider.setConfiguration(new OzoneConfiguration(conf));
     ReconServer recon = new ReconServer();
-    int exitCode = executeWithinStartupTimeout("Recon", () -> recon.execute(NO_ARGS),
-        recon::stop, config.getStartupTimeout());
-    if (exitCode != 0) {
-      // execute() has returned, so stopping the partially started server cannot race it.
-      IOUtils.close(LOG, recon::stop);
-      throw new IOException("Failed to start local Recon. Exit code "
-          + exitCode + ".");
-    }
+    recon.getCmd().parseArgs();
+    executeWithinStartupTimeout("Recon", recon::call, recon::stop, config.getStartupTimeout());
     reconServer = recon;
-  }
-
-  private void waitForHttpEndpointReadiness(String endpoint,
-      String serviceName, Duration timeout) throws Exception {
-    waitForReadiness(() -> httpEndpointBlocker(endpoint, serviceName),
-        serviceName, timeout);
-  }
-
-  /**
-   * Returns why {@code endpoint} is not serving yet, or null once it is. {@code ReconServer#call()}
-   * returns success even when its initialization threw, so an HTTP response is the only readiness
-   * signal; the reason is kept because a refused connection, a wrong port and a hung listener are
-   * indistinguishable once the wait times out.
-   */
-  private static String httpEndpointBlocker(String endpoint, String serviceName) {
-    HttpURLConnection connection = null;
-    try {
-      connection = (HttpURLConnection) new URL(endpoint).openConnection();
-      connection.setConnectTimeout((int) READINESS_POLL_INTERVAL_MILLIS);
-      connection.setReadTimeout((int) READINESS_POLL_INTERVAL_MILLIS);
-      connection.getResponseCode();
-      return null;
-    } catch (IOException ex) {
-      LOG.debug("{} readiness probe of {} failed.", serviceName, endpoint, ex);
-      return endpoint + " is not answering (" + ex + ")";
-    } finally {
-      if (connection != null) {
-        connection.disconnect();
-      }
-    }
   }
 
   private void waitForClusterReadiness(Duration timeout) throws Exception {
