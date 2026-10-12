@@ -420,6 +420,10 @@ class TestLocalOzoneCluster {
     assertEquals(40000, allocator.reserve(40000));
   }
 
+  /**
+   * configureRecon() runs after configureLocalDefaults(), so the value has to be rejected where it is applied
+   * rather than by a check that only covers the keys set earlier.
+   */
   @Test
   void reconOverrideRejectsConflictingUserValue() {
     OzoneConfiguration seed = new OzoneConfiguration();
@@ -431,8 +435,6 @@ class TestLocalOzoneCluster {
 
     IOException error = assertPrepareFails(config, seed);
 
-    // configureRecon() runs after configureLocalDefaults(), so the value has to be rejected where
-    // it is applied rather than by a check that only covers the keys set earlier.
     String message = error.getMessage();
     assertTrue(message.contains(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD), message);
     assertTrue(message.contains("9m"), message);
@@ -945,8 +947,6 @@ class TestLocalOzoneCluster {
         assertThrows(IOException.class, () -> LocalOzoneCluster.executeWithinStartupTimeout(
             "Recon", () -> {
               try {
-                // Simulate an in-JVM startup that blocks until it leaves safe
-                // mode; the deadline must interrupt it rather than hang.
                 Thread.sleep(TimeUnit.MINUTES.toMillis(5));
               } catch (InterruptedException e) {
                 interrupted.countDown();

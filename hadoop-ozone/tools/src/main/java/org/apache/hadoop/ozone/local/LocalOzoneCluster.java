@@ -152,8 +152,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Starts the SCM, OM, datanode, and optional S3 Gateway and Recon portion of the {@code ozone local}
- * runtime.
+ * Starts the SCM, OM, datanode, and optional S3 Gateway and Recon portion of the {@code ozone local} runtime.
  */
 public final class LocalOzoneCluster implements LocalOzoneRuntime {
 
@@ -368,8 +367,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     if (!config.isReconEnabled()) {
       return -1;
     }
-    return preparedConfiguration == null ? config.getReconPort()
-        : preparedConfiguration.getReconPort();
+    return preparedConfiguration == null ? config.getReconPort() : preparedConfiguration.getReconPort();
   }
 
   @Override
@@ -736,9 +734,8 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     return s3gHttpPort;
   }
 
-  private int configureRecon(OzoneConfiguration conf,
-      PersistedPortState persistedPorts, PortAllocator portAllocator)
-      throws IOException {
+  private int configureRecon(OzoneConfiguration conf, PersistedPortState persistedPorts,
+      PortAllocator portAllocator) throws IOException {
     if (!config.isReconEnabled()) {
       return -1;
     }
@@ -750,27 +747,19 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     conf.setIfUnset(OZONE_RECON_SCM_DB_DIR, reconDir.toString());
 
     ReconSqlDbConfig dbConfig = conf.getObject(ReconSqlDbConfig.class);
-    dbConfig.setJdbcUrl("jdbc:derby:"
-        + reconDir.resolve("ozone_recon_derby.db"));
+    dbConfig.setJdbcUrl("jdbc:derby:" + reconDir.resolve("ozone_recon_derby.db"));
     conf.setFromObject(dbConfig);
 
-    int reconHttpPort = reservePort(portAllocator, persistedPorts,
-        RECON_HTTP_PORT_KEY, config.getReconPort());
-    int reconHttpsPort = reservePort(portAllocator, persistedPorts,
-        RECON_HTTPS_PORT_KEY, 0);
-    int reconDatanodePort = reservePort(portAllocator, persistedPorts,
-        RECON_DATANODE_PORT_KEY, 0);
+    int reconHttpPort = reservePort(portAllocator, persistedPorts, RECON_HTTP_PORT_KEY, config.getReconPort());
+    int reconHttpsPort = reservePort(portAllocator, persistedPorts, RECON_HTTPS_PORT_KEY, 0);
+    int reconDatanodePort = reservePort(portAllocator, persistedPorts, RECON_DATANODE_PORT_KEY, 0);
 
-    conf.set(OZONE_RECON_ADDRESS_KEY,
-        address(config.getHost(), reconDatanodePort));
-    conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY,
-        address(config.getHost(), reconDatanodePort));
+    conf.set(OZONE_RECON_ADDRESS_KEY, address(config.getHost(), reconDatanodePort));
+    conf.set(OZONE_RECON_DATANODE_ADDRESS_KEY, address(config.getHost(), reconDatanodePort));
     conf.set(OZONE_RECON_DATANODE_BIND_HOST_KEY, config.getBindHost());
-    conf.set(OZONE_RECON_HTTP_ADDRESS_KEY,
-        address(config.getHost(), reconHttpPort));
+    conf.set(OZONE_RECON_HTTP_ADDRESS_KEY, address(config.getHost(), reconHttpPort));
     conf.set(OZONE_RECON_HTTP_BIND_HOST_KEY, config.getBindHost());
-    conf.set(OZONE_RECON_HTTPS_ADDRESS_KEY,
-        address(config.getHost(), reconHttpsPort));
+    conf.set(OZONE_RECON_HTTPS_ADDRESS_KEY, address(config.getHost(), reconHttpsPort));
     conf.set(OZONE_RECON_HTTPS_BIND_HOST_KEY, config.getBindHost());
     // Recon's start-up blocks until it leaves safe mode and an empty local cluster never leaves
     // it on its own, so the shipped 300s default would stall every start for five minutes.
@@ -968,7 +957,6 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
       executor.submit(() -> IOUtils.close(LOG, startupCleanup));
       throw new IOException("Local " + serviceName + " did not start within " + timeout + ".", ex);
     } catch (InterruptedException ex) {
-      // Queued, not run here, for the reason given on this method: the startup may finish late.
       future.cancel(true);
       executor.submit(() -> IOUtils.close(LOG, startupCleanup));
       Thread.currentThread().interrupt();
@@ -985,8 +973,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   }
 
   private void startRecon(OzoneConfiguration conf) throws Exception {
-    // ReconServer reads its configuration from the static provider, and the reset is what lets a
-    // second in-JVM start win: setConfiguration() keeps the first value. Same pair as ReconService.
+    // ReconServer reads ConfigurationProvider; setConfiguration() keeps the first value.
     ConfigurationProvider.resetConfiguration();
     ConfigurationProvider.setConfiguration(new OzoneConfiguration(conf));
     ReconServer recon = new ReconServer();
