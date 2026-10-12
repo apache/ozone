@@ -55,6 +55,17 @@ public class SignatureInfo {
 
   private String stringToSign = null;
 
+  private String payloadHash = null;
+
+  private String service = null;
+
+  /**
+   * Optional AWS session token (x-amz-security-token / X-Amz-Security-Token).
+   * <p>
+   * This is required for STS temporary credentials when calling S3 APIs.
+   */
+  private String sessionToken = null;
+
   public SignatureInfo() { }
 
   private SignatureInfo(Builder b) {
@@ -72,7 +83,10 @@ public class SignatureInfo {
         .setAlgorithm(signatureInfo.getAlgorithm())
         .setSignPayload(signatureInfo.isSignPayload())
         .setUnfilteredURI(signatureInfo.getUnfilteredURI())
-        .setStringToSign(signatureInfo.getStringToSign()));
+        .setStringToSign(signatureInfo.getStringToSign())
+        .setPayloadHash(signatureInfo.getPayloadHash())
+        .setService(signatureInfo.getService())
+        .setSessionToken(signatureInfo.getSessionToken()));
   }
 
   private void initialize(Builder b) {
@@ -87,6 +101,9 @@ public class SignatureInfo {
     this.signPayload = b.signPayload;
     this.unfilteredURI = b.unfilteredURI;
     this.stringToSign = b.stringToSign;
+    this.payloadHash = b.payloadHash;
+    this.service = b.service;
+    this.sessionToken = b.sessionToken;
   }
 
   public String getAwsAccessId() {
@@ -141,6 +158,30 @@ public class SignatureInfo {
     this.stringToSign = strToSign;
   }
 
+  public String getPayloadHash() {
+    return this.payloadHash;
+  }
+
+  public void setPayloadHash(String payloadHash) {
+    this.payloadHash = payloadHash;
+  }
+
+  public String getService() {
+    return service;
+  }
+
+  public void setService(String service) {
+    this.service = service;
+  }
+
+  public String getSessionToken() {
+    return sessionToken;
+  }
+
+  public void setSessionToken(String sessionToken) {
+    this.sessionToken = sessionToken;
+  }
+
   /**
    * Signature version.
    */
@@ -163,6 +204,9 @@ public class SignatureInfo {
     private boolean signPayload = true;
     private String unfilteredURI = null;
     private String stringToSign = null;
+    private String payloadHash = null;
+    private String service = null;
+    private String sessionToken = null;
 
     public Builder(Version version) {
       this.version = version;
@@ -215,6 +259,21 @@ public class SignatureInfo {
 
     public Builder setStringToSign(String stringToSign) {
       this.stringToSign = stringToSign;
+      return this;
+    }
+
+    public Builder setPayloadHash(String payloadHash) {
+      this.payloadHash = payloadHash;
+      return this;
+    }
+
+    public Builder setService(String service) {
+      this.service = service;
+      return this;
+    }
+
+    public Builder setSessionToken(String sessionToken) {
+      this.sessionToken = sessionToken;
       return this;
     }
 

@@ -139,7 +139,7 @@ public class ClusterStateEndpoint {
           reportedNodes++;
         } else {
           LOG.debug("DataNode {} has not reported filesystem usage",
-              datanode.getUuidString());
+              datanode);
         }
       }
       if (reportedNodes < totalNodes) {

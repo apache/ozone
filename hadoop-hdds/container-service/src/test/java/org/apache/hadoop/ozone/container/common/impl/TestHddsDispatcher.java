@@ -1012,7 +1012,7 @@ public class TestHddsDispatcher {
         .build();
 
     ContainerProtos.DatanodeBlockID.Builder blockID =
-        new BlockID(containerId, localId).getDatanodeBlockIDProtobufBuilder();
+        new BlockID(containerId, localId).getDatanodeBlockIDProtobufBuilder(null);
     // TODO: Pass the real storage type from the write path once that BlockID support StorageType
     if (storageType != null) {
       blockID.setStorageTypeID(StorageTypeUtils.getIDFromProtobuf(storageType));
@@ -1263,7 +1263,8 @@ public class TestHddsDispatcher {
           newContext(Op.WRITE_STATE_MACHINE_DATA, WriteChunkStage.WRITE_DATA),
           newContext(Op.READ_STATE_MACHINE_DATA),
           newContext(Op.APPLY_TRANSACTION),
-          newContext(Op.STREAM_LINK, WriteChunkStage.COMMIT_DATA)
+          newContext(Op.STREAM_LINK, WriteChunkStage.COMMIT_DATA),
+          newContext(Op.STREAM_COMMAND, WriteChunkStage.COMMIT_DATA)
       };
       for (DispatcherContext context : notVerify) {
         LOG.info("notVerify {}", context);

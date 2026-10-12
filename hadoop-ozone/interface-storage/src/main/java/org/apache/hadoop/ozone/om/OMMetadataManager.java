@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.common.BlockGroup;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
@@ -510,7 +509,7 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   /**
    * @return list all LifecycleConfigurations.
    */
-  List<OmLifecycleConfiguration> listLifecycleConfigurations() throws OMException;
+  List<OmLifecycleConfiguration> listLifecycleConfigurations() throws IOException;
 
   /**
    * Fetches the lifecycle configuration by bucketName.
@@ -527,6 +526,14 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return meta table reference.
    */
   Table<String, String> getMetaTable();
+
+  /**
+   * Gets the S3RevokedStsTokenTable.
+   *
+   * @return Table.
+   */
+  Table<String, Long> getS3RevokedStsTokenTable();
+
 
   /**
    * Returns number of rows in a table.  This should not be used for very

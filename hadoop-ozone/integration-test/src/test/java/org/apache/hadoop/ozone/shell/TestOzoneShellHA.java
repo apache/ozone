@@ -52,6 +52,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -59,9 +60,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.crypto.key.kms.KMSClientProvider;
-import org.apache.hadoop.crypto.key.kms.server.MiniKMS;
+import org.apache.hadoop.crypto.key.KeyProviderFactory;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileChecksum;
@@ -73,7 +74,9 @@ import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.fs.ozone.OzoneTrashPolicy;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -103,7 +106,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.RaftServerConfigKeys;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -147,10 +149,10 @@ public class TestOzoneShellHA {
   private static java.nio.file.Path path;
   @TempDir
   private static File kmsDir;
+  private static final String ENCRYPTION_KEY_NAME = "shell-test-enckey";
   private static File testFile;
   private static String testFilePathString;
   private MiniOzoneHAClusterImpl cluster;
-  private static MiniKMS miniKMS;
   private OzoneClient client;
   private OzoneShell ozoneShell = null;
   private OzoneAdmin ozoneAdminShell = null;
@@ -174,14 +176,10 @@ public class TestOzoneShellHA {
   }
 
   @BeforeAll
-  static void startKMS() throws Exception {
+  static void initTestFile() throws Exception {
     testFilePathString = path + OZONE_URI_DELIMITER + "testFile";
     testFile = new File(testFilePathString);
     FileUtils.touch(testFile);
-
-    MiniKMS.Builder miniKMSBuilder = new MiniKMS.Builder();
-    miniKMS = miniKMSBuilder.setKmsConfDir(kmsDir).build();
-    miniKMS.start();
   }
 
   static MiniOzoneHAClusterImpl startCluster(boolean followerReadEnabled) throws Exception {
@@ -194,7 +192,7 @@ public class TestOzoneShellHA {
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean(OZONE_FS_HSYNC_ENABLED, true);
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
-        getKeyProviderURI(miniKMS));
+        getKeyProviderURI());
     conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 10);
     conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     conf.setInt(ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT, 1);
@@ -210,6 +208,10 @@ public class TestOzoneShellHA {
     omRatisConfig.setReadOption(option.name());
     conf.setFromObject(omRatisConfig);
 
+    // Seed the encryption key into the jceks store before the OMs start, so
+    // every OM instance loads it when it constructs its KeyProvider.
+    seedEncryptionKey(conf);
+
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
@@ -220,13 +222,6 @@ public class TestOzoneShellHA {
   @AfterParameterizedClassInvocation
   public void shutdown() {
     IOUtils.closeQuietly(client, cluster);
-  }
-
-  @AfterAll
-  void stopKMS() {
-    if (miniKMS != null) {
-      miniKMS.stop();
-    }
   }
 
   @BeforeEach
@@ -1279,6 +1274,160 @@ public class TestOzoneShellHA {
   }
 
   @Test
+  public void testShCreateBucketWithStoragePolicy() throws Exception {
+    ObjectStore objectStore = client.getObjectStore();
+    execute(ozoneShell, new String[]{"volume", "create", "spvol1"});
+    out.reset();
+
+    // No -sp: server defaults to WARM and allowFallback true.
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol1/bucket1"});
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket1")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.WARM);
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket1")
+        .getAllowFallbackStoragePolicy()).isTrue();
+
+    // -sp null on create still yields a non-null policy (defaults to WARM).
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol1/bucket2", "-s", "null"});
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket2")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.WARM);
+
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol1/bucket3", "-s", "HOT"});
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket3")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+
+    execute(ozoneShell,
+        new String[]{"bucket", "create", "spvol1/bucket4", "-s", "HOT", "-a", "false"});
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket4")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket4")
+        .getAllowFallbackStoragePolicy()).isFalse();
+
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol1/bucket5", "-s", "COLD"});
+    assertThat(objectStore.getVolume("spvol1").getBucket("bucket5")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+
+    objectStore.getVolume("spvol1").deleteBucket("bucket1");
+    objectStore.getVolume("spvol1").deleteBucket("bucket2");
+    objectStore.getVolume("spvol1").deleteBucket("bucket3");
+    objectStore.getVolume("spvol1").deleteBucket("bucket4");
+    objectStore.getVolume("spvol1").deleteBucket("bucket5");
+    objectStore.deleteVolume("spvol1");
+  }
+
+  @Test
+  public void testShUpdateBucketStoragePolicy() throws Exception {
+    ObjectStore objectStore = client.getObjectStore();
+    execute(ozoneShell, new String[]{"volume", "create", "spvol2"});
+    out.reset();
+
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol2/bucket1"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.WARM);
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getAllowFallbackStoragePolicy()).isTrue();
+
+    // Update policy only; allowFallback is left unchanged.
+    execute(ozoneShell, new String[]{"bucket", "update", "spvol2/bucket1", "-s", "HOT"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getAllowFallbackStoragePolicy()).isTrue();
+
+    // Update both policy and allowFallback.
+    execute(ozoneShell,
+        new String[]{"bucket", "update", "spvol2/bucket1", "-s", "COLD", "-a", "false"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getAllowFallbackStoragePolicy()).isFalse();
+
+    // Unset the policy via -sp null (case-insensitive).
+    execute(ozoneShell, new String[]{"bucket", "update", "spvol2/bucket1", "-s", "NULL"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isNull();
+
+    // Set it again, then unset via lowercase null.
+    execute(ozoneShell, new String[]{"bucket", "update", "spvol2/bucket1", "-s", "HOT"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+    execute(ozoneShell, new String[]{"bucket", "update", "spvol2/bucket1", "-s", "null"});
+    assertThat(objectStore.getVolume("spvol2").getBucket("bucket1")
+        .getStoragePolicy()).isNull();
+
+    objectStore.getVolume("spvol2").deleteBucket("bucket1");
+    objectStore.deleteVolume("spvol2");
+  }
+
+  @Test
+  public void testShUpdateBucketStoragePolicyLocalStateStaysConsistent() throws Exception {
+    ObjectStore objectStore = client.getObjectStore();
+    objectStore.createVolume("spvol4");
+    objectStore.getVolume("spvol4").createBucket("bucket1");
+
+    OzoneBucket bucket = objectStore.getVolume("spvol4").getBucket("bucket1");
+    bucket.setStoragePolicyProperty(OzoneStoragePolicy.COLD, false, false);
+
+    // The in-memory bucket object reflects the new values immediately,
+    // without needing to be re-fetched.
+    assertThat(bucket.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    assertThat(bucket.getAllowFallbackStoragePolicy()).isFalse();
+
+    // And the update was actually applied to this bucket (vol/name it was
+    // constructed for), not some other bucket.
+    OzoneBucket refetched = objectStore.getVolume("spvol4").getBucket("bucket1");
+    assertThat(refetched.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    assertThat(refetched.getAllowFallbackStoragePolicy()).isFalse();
+
+    bucket.setStoragePolicyProperty(null, null, true);
+    assertThat(bucket.getStoragePolicy()).isNull();
+    assertThat(objectStore.getVolume("spvol4").getBucket("bucket1")
+        .getStoragePolicy()).isNull();
+
+    objectStore.getVolume("spvol4").deleteBucket("bucket1");
+    objectStore.deleteVolume("spvol4");
+  }
+
+  @Test
+  public void testShUpdateBucketRejectsOwnerCombinedWithStoragePolicy() throws Exception {
+    ObjectStore objectStore = client.getObjectStore();
+    execute(ozoneShell, new String[]{"volume", "create", "spvol3"});
+    out.reset();
+
+    execute(ozoneShell, new String[]{"bucket", "create", "spvol3/bucket1"});
+    String baselineOwner = objectStore.getVolume("spvol3").getBucket("bucket1").getOwner();
+    StoragePolicy baselinePolicy = objectStore.getVolume("spvol3")
+        .getBucket("bucket1").getStoragePolicy();
+
+    // --user combined with --storage-policy is rejected before any RPC.
+    executeWithError(ozoneShell,
+        new String[]{"bucket", "update", "spvol3/bucket1", "-u", "bob", "-s", "COLD"},
+        "--user cannot be combined with --storage-policy");
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1").getOwner())
+        .isEqualTo(baselineOwner);
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1").getStoragePolicy())
+        .isEqualTo(baselinePolicy);
+
+    // --user combined with --allow-fallback-storage-policy is rejected too.
+    executeWithError(ozoneShell,
+        new String[]{"bucket", "update", "spvol3/bucket1", "-u", "bob", "-a", "false"},
+        "--user cannot be combined with");
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1").getOwner())
+        .isEqualTo(baselineOwner);
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1")
+        .getAllowFallbackStoragePolicy()).isTrue();
+
+    // --user alone still works as a single RPC.
+    execute(ozoneShell, new String[]{"bucket", "update", "spvol3/bucket1", "-u", "bob"});
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1").getOwner())
+        .isEqualTo("bob");
+    assertThat(objectStore.getVolume("spvol3").getBucket("bucket1").getStoragePolicy())
+        .isEqualTo(baselinePolicy);
+
+    objectStore.getVolume("spvol3").deleteBucket("bucket1");
+    objectStore.deleteVolume("spvol3");
+  }
+
+  @Test
   @SuppressWarnings("methodlength")
   public void testShQuota() throws Exception {
     ObjectStore objectStore = client.getObjectStore();
@@ -1833,19 +1982,11 @@ public class TestOzoneShellHA {
         client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket("bucket0");
     assertNull(bucket.getEncryptionKeyName());
-    String newEncKey = uniqueObjectName("enckey");
-
-    KeyProvider provider = cluster.getOzoneManager().getKmsProvider();
-    KeyProvider.Options options = KeyProvider.options(cluster.getConf());
-    options.setDescription(newEncKey);
-    options.setBitLength(128);
-    provider.createKey(newEncKey, options);
-    provider.flush();
 
     args = new String[]{"bucket", "set-encryption-key", bucketPath, "-k",
-        newEncKey};
+        ENCRYPTION_KEY_NAME};
     execute(ozoneShell, args);
-    assertEquals(newEncKey, volume.getBucket("bucket0").getEncryptionKeyName());
+    assertEquals(ENCRYPTION_KEY_NAME, volume.getBucket("bucket0").getEncryptionKeyName());
   }
 
   @Test
@@ -2577,12 +2718,19 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
   }
 
-  private static String getKeyProviderURI(MiniKMS kms) {
-    if (kms == null) {
-      return "";
+  private static String getKeyProviderURI() {
+    File jks = new File(kmsDir, "kms.jks");
+    return JavaKeyStoreProvider.SCHEME_NAME + "://file" + jks.toURI().getPath();
+  }
+
+  private static void seedEncryptionKey(OzoneConfiguration conf) throws Exception {
+    KeyProvider provider = KeyProviderFactory.get(new URI(getKeyProviderURI()), conf);
+    if (provider.getMetadata(ENCRYPTION_KEY_NAME) == null) {
+      KeyProvider.Options options = KeyProvider.options(conf);
+      options.setBitLength(128);
+      provider.createKey(ENCRYPTION_KEY_NAME, options);
+      provider.flush();
     }
-    return KMSClientProvider.SCHEME_NAME + "://" +
-        kms.getKMSUrl().toExternalForm().replace("://", "@");
   }
 
   protected MiniOzoneHAClusterImpl getCluster() {

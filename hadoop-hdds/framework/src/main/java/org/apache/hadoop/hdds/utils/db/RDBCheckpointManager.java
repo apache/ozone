@@ -24,7 +24,6 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.utils.db.RocksDatabase.RocksCheckpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +32,6 @@ import org.slf4j.LoggerFactory;
  */
 public class RDBCheckpointManager implements Closeable {
   private final RocksDatabase db;
-  private final RocksCheckpoint checkpoint;
   public static final String RDB_CHECKPOINT_DIR_PREFIX = "checkpoint_";
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBCheckpointManager.class);
@@ -48,7 +46,6 @@ public class RDBCheckpointManager implements Closeable {
   public RDBCheckpointManager(RocksDatabase db, String checkpointPrefix) {
     this.db = db;
     this.checkpointNamePrefix = checkpointPrefix;
-    this.checkpoint = db.createCheckpoint();
   }
 
   /**
@@ -82,9 +79,8 @@ public class RDBCheckpointManager implements Closeable {
       db.flushWal(true);
       db.flush();
 
-      checkpoint.createCheckpoint(checkpointPath);
       // Best guesstimate here. Not accurate.
-      final long latest = checkpoint.getLatestSequenceNumber();
+      final long latest = db.createCheckpoint(checkpointPath);
 
       Instant end = Instant.now();
       long duration = Duration.between(start, end).toMillis();
@@ -117,6 +113,6 @@ public class RDBCheckpointManager implements Closeable {
 
   @Override
   public void close() throws IOException {
-    checkpoint.close();
+    // Checkpoints are created and closed per call, nothing to release here.
   }
 }

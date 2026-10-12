@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation.Bytes;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.junit.jupiter.api.Test;
@@ -270,6 +271,19 @@ public final class TestCodec {
 
   static void runTestByteStringCodec(ByteString original) throws Exception {
     runTest(ByteStringCodec.get(), original, original.size());
+  }
+
+  @Test
+  public void testProto2Codec() throws Exception {
+    final Codec<KeyValue> codec = Proto2Codec.get(KeyValue.getDefaultInstance());
+    for (int i = 0; i < NUM_LOOPS; i++) {
+      final KeyValue original = KeyValue.newBuilder()
+          .setKey("key" + i)
+          .setValue("value" + ThreadLocalRandom.current().nextLong())
+          .build();
+      runTest(codec, original, original.getSerializedSize());
+    }
+    gc();
   }
 
   static Executable tryCatch(Executable executable) {

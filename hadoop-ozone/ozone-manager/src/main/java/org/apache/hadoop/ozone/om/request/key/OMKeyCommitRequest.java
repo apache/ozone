@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -87,7 +88,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest request = super.preExecute(ozoneManager);
+    final OMRequest request = super.preExecute(ozoneManager);
     CommitKeyRequest commitKeyRequest = request.getCommitKeyRequest();
     Objects.requireNonNull(commitKeyRequest, "commitKeyRequest == null");
 
@@ -194,7 +195,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       bucketLockAcquired = getOmLockDetails().isLockAcquired();
 
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       // Check for directory exists with same name, if it exists throw error.
       if (LOG.isDebugEnabled()) {
@@ -405,6 +406,13 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           dbOzoneKey, omKeyInfo, trxnLogIndex);
 
       omBucketInfo.incrUsedBytes(correctedSpace);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
+      omResponse.setCommitKeyResponse(CommitKeyResponse.newBuilder()
+          .setModificationTime(commitKeyArgs.getModificationTime())
+          .build());
 
       omClientResponse = new OMKeyCommitResponse(omResponse.build(),
           omKeyInfo, dbOzoneKey, dbOpenKey, omBucketInfo.copyObject(),

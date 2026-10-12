@@ -22,6 +22,7 @@ import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
@@ -30,20 +31,26 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.QUOTA_EXCEEDED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.function.Supplier;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -52,13 +59,19 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 /**
@@ -140,10 +153,13 @@ public class TestS3LifecycleConfigurationPut {
       throws Exception {
     // OM also raises INVALID_REQUEST for conditions that are not rejected rule values, such as the
     // bucket layout mismatch in OMLifecycleConfigurationSetRequest. Those keep reporting
-    // InvalidRequest instead of being remapped to InvalidArgument.
-    assertUnhandledOMExceptionPropagated(
-        new OMException("Bucket layout mismatch", OMException.ResultCodes.INVALID_REQUEST),
-        HTTP_BAD_REQUEST, INVALID_REQUEST.getCode());
+    // InvalidRequest instead of being remapped to InvalidArgument, and OM's message is surfaced.
+    OMException omException = new OMException("Bucket layout mismatch", OMException.ResultCodes.INVALID_REQUEST);
+    OS3Exception ex = putLifecycleConfigurationThrowingOm(omException);
+    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+    assertEquals(INVALID_REQUEST.getCode(), ex.getCode());
+    assertEquals(omException.getMessage(), ex.getErrorMessage(),
+        "OM's detailed message should be surfaced for server-side INVALID_REQUEST");
   }
 
   @Test
@@ -239,13 +255,21 @@ public class TestS3LifecycleConfigurationPut {
       throws Exception {
     // An unexpected internal OM failure must be reported as InternalError (HTTP 500),
     // not swallowed into a false HTTP 200 success.
-    assertUnhandledOMExceptionPropagated(
-        new OMException("boom", OMException.ResultCodes.INTERNAL_ERROR),
-        HTTP_INTERNAL_ERROR, INTERNAL_ERROR.getCode());
+    OMException omException = new OMException("boom", OMException.ResultCodes.INTERNAL_ERROR);
+    OS3Exception ex = putLifecycleConfigurationThrowingOm(omException);
+    assertEquals(HTTP_INTERNAL_ERROR, ex.getHttpCode());
+    assertEquals(INTERNAL_ERROR.getCode(), ex.getCode());
+    assertEquals(INTERNAL_ERROR.getErrorMessage(), ex.getErrorMessage());
   }
 
   private void assertUnhandledOMExceptionPropagated(OMException omException,
       int expectedHttpCode, String expectedErrorCode) throws Exception {
+    OS3Exception ex = putLifecycleConfigurationThrowingOm(omException);
+    assertEquals(expectedHttpCode, ex.getHttpCode());
+    assertEquals(expectedErrorCode, ex.getCode());
+  }
+
+  private OS3Exception putLifecycleConfigurationThrowingOm(OMException omException) throws Exception {
     OzoneClient mockClient = mock(OzoneClient.class);
     ObjectStore mockObjectStore = mock(ObjectStore.class);
     OzoneVolume mockVolume = mock(OzoneVolume.class);
@@ -266,10 +290,23 @@ public class TestS3LifecycleConfigurationPut {
         .build();
     endpoint.queryParamsForTest().set(S3Consts.QueryParams.LIFECYCLE, "");
 
-    OS3Exception ex = assertThrows(OS3Exception.class,
-        () -> endpoint.put("bucket1", onePrefix()));
-    assertEquals(expectedHttpCode, ex.getHttpCode());
-    assertEquals(expectedErrorCode, ex.getCode());
+    return assertThrows(OS3Exception.class, () -> endpoint.put("bucket1", onePrefix()));
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationWithPastExpirationDateReturnsDetailedMessage() throws Exception {
+    OMException omException = assertThrows(OMException.class,
+        () -> new OmLCExpiration.Builder().setDate("2020-01-01T00:00:00Z").build()
+            .valid(System.currentTimeMillis()));
+    assertTrue(omException.getMessage().contains("must be in the future"),
+        "Precondition: OM's real validation message should explain the date is in the past, got: "
+            + omException.getMessage());
+
+    OS3Exception ex = putLifecycleConfigurationThrowingOm(omException);
+    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+    assertEquals(INVALID_REQUEST.getCode(), ex.getCode());
+    assertEquals(omException.getMessage(), ex.getErrorMessage(),
+        "The client should receive OM's detailed message explaining the date is in the past");
   }
 
   @Test
@@ -292,6 +329,24 @@ public class TestS3LifecycleConfigurationPut {
     // Test with negative days - should fail
     testInvalidLifecycleConfiguration(
         TestS3LifecycleConfigurationPut::withAbortNegativeDays,
+        HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationWithExpirationDaysOverflowReportsSpecificMessage() throws Exception {
+    // A day count that overflows a 32-bit int must be rejected, not silently wrapped to an
+    // unrelated positive value that then gets persisted.
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.put("bucket1", withExpirationDaysOverflow()));
+    assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
+    assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
+    assertEquals("Invalid lifecycle configuration: Days value "
+        + "'3323232323232323232323232323232323232323232' is not a valid integer", ex.getErrorMessage());
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationWithAbortDaysAfterInitiationOverflow() throws Exception {
+    testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withAbortDaysAfterInitiationOverflow,
         HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
   }
 
@@ -748,4 +803,111 @@ public class TestS3LifecycleConfigurationPut {
 
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
+
+  private static InputStream withExpirationDaysOverflow() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>overflow-days</ID>" +
+        "<Prefix>prefix/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration><Days>3323232323232323232323232323232323232323232</Days></Expiration>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static InputStream withAbortDaysAfterInitiationOverflow() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>overflow-abort</ID>" +
+        "<Prefix>uploads/</Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<AbortIncompleteMultipartUpload>" +
+        "<DaysAfterInitiation>3323232323232323232323232323232323232323232</DaysAfterInitiation>" +
+        "</AbortIncompleteMultipartUpload>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
+  @ParameterizedTest
+  @CsvSource({", OBJECT_STORE", "'', OBJECT_STORE", "owner, OBJECT_STORE",
+      ", FILE_SYSTEM_OPTIMIZED", "owner, FILE_SYSTEM_OPTIMIZED"})
+  public void testPutLifecycleReusesBucket(String expectedOwner, BucketLayout layout) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders requestHeaders = mock(HttpHeaders.class);
+    when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, layout);
+
+    try (Response response = endpoint.put("bucket1", onePrefix())) {
+      assertThat(response.getStatus()).isEqualTo(HTTP_OK);
+    }
+
+    verify(proxy).getBucketDetails("volume1", "bucket1");
+    ArgumentCaptor<OmLifecycleConfiguration> config = ArgumentCaptor.forClass(OmLifecycleConfiguration.class);
+    verify(proxy).setLifecycleConfiguration(config.capture());
+    assertThat(config.getValue().getVolume()).isEqualTo("volume1");
+    assertThat(config.getValue().getBucket()).isEqualTo("bucket1");
+    assertThat(config.getValue().getBucketLayout()).isEqualTo(layout);
+  }
+
+  @Test
+  public void testPutLifecycleOwnerMismatchPrecedesXmlValidation() throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders requestHeaders = mock(HttpHeaders.class);
+    when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("other-owner");
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, BucketLayout.OBJECT_STORE);
+    assertErrorResponse(ACCESS_DENIED, () -> endpoint.put("bucket1", null));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @CsvSource({", BUCKET_NOT_FOUND, NO_SUCH_BUCKET", "owner, BUCKET_NOT_FOUND, ACCESS_DENIED",
+      ", INTERNAL_ERROR, INTERNAL_ERROR", "owner, INTERNAL_ERROR, ACCESS_DENIED",
+      ", PERMISSION_DENIED, ACCESS_DENIED", "owner, PERMISSION_DENIED, ACCESS_DENIED",
+      "'', PERMISSION_DENIED, ACCESS_DENIED", ", VOLUME_NOT_FOUND, NO_SUCH_BUCKET",
+      "owner, VOLUME_NOT_FOUND, ACCESS_DENIED"})
+  public void testPutLifecycleLookupFailurePrecedesXmlValidation(
+      String expectedOwner, ResultCodes code, S3ErrorTable expected) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders requestHeaders = mock(HttpHeaders.class);
+    when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, BucketLayout.OBJECT_STORE);
+    when(proxy.getBucketDetails("volume1", "bucket1")).thenThrow(new OMException("Lookup failed", code));
+    assertErrorResponse(expected, () -> endpoint.put("bucket1", null));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @Test
+  public void testPutLifecycleMatchingOwnerStillValidatesXml() throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders requestHeaders = mock(HttpHeaders.class);
+    when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner");
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, BucketLayout.OBJECT_STORE);
+    assertErrorResponse(MALFORMED_XML, () -> endpoint.put("bucket1", null));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  private BucketEndpoint newProtocolEndpoint(ClientProtocol proxy, HttpHeaders requestHeaders, BucketLayout layout)
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneVolume volume = OzoneVolume.newBuilder(conf, proxy)
+        .setName("volume1").setAcls(Collections.emptyList()).build();
+    OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
+        .setVolumeName("volume1").setName("bucket1").setOwner("owner").setBucketLayout(layout).build();
+    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    ObjectStore store = mock(ObjectStore.class);
+    when(store.getS3Volume()).thenReturn(volume);
+    when(store.getClientProxy()).thenReturn(proxy);
+    OzoneClient client = mock(OzoneClient.class);
+    when(client.getObjectStore()).thenReturn(store);
+    when(client.getProxy()).thenReturn(proxy);
+    BucketEndpoint endpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client).setHeaders(requestHeaders).build();
+    endpoint.queryParamsForTest().set(S3Consts.QueryParams.LIFECYCLE, "");
+    return endpoint;
+  }
+
 }

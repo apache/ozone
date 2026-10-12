@@ -27,6 +27,8 @@
 
   <properties>
     <classpath.skip>false</classpath.skip>
+    <!-- hdds-server-framework is used by ozone-tools -->
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
   </properties>
 
   <dependencies>
@@ -123,10 +125,6 @@
     <dependency>
       <groupId>jakarta.ws.rs</groupId>
       <artifactId>jakarta.ws.rs-api</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -226,15 +224,23 @@
     </dependency>
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-servlet</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-util</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-webapp</artifactId>
+      <groupId>org.eclipse.jetty.ee8</groupId>
+      <artifactId>jetty-ee8-nested</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.ee8</groupId>
+      <artifactId>jetty-ee8-servlet</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.ee8</groupId>
+      <artifactId>jetty-ee8-webapp</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.toolchain</groupId>
+      <artifactId>jetty-servlet-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.containers</groupId>

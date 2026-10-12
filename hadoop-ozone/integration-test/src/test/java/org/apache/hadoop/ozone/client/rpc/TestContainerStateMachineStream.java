@@ -77,23 +77,23 @@ public abstract class TestContainerStateMachineStream implements NonHATests.Test
 
   private static Stream<Arguments> streamingParameters() {
     return Stream.of(-1, +1).flatMap(offset ->
-        Stream.of(false, true).map(putBlockOnCloseEnabled ->
-            Arguments.of(offset, putBlockOnCloseEnabled)));
+        Stream.of(false, true).map(putBlockWithoutRaft ->
+            Arguments.of(offset, putBlockWithoutRaft)));
   }
 
   @ParameterizedTest
   @MethodSource("streamingParameters")
-  void testContainerStateMachineForStreaming(int offset, boolean putBlockOnCloseEnabled)
+  void testContainerStateMachineForStreaming(int offset, boolean putBlockWithoutRaft)
       throws Exception {
     final int size = chunkSize + offset;
     OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
+    clientConfig.setDatastreamPutBlockWithoutRaftEnabled(putBlockWithoutRaft);
     conf.setFromObject(clientConfig);
 
     final List<OmKeyLocationInfo> locationInfoList;
     try (OzoneClient streamingClient = OzoneClientFactory.getRpcClient(conf);
-         OzoneDataStreamOutput key = createStreamKey("key" + offset + "-" + putBlockOnCloseEnabled,
+         OzoneDataStreamOutput key = createStreamKey("key" + offset + "-" + putBlockWithoutRaft,
              ReplicationType.RATIS, size, streamingClient.getObjectStore(), volumeName, bucketName)) {
 
       byte[] data = ContainerTestHelper.generateData(size, true);
