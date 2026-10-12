@@ -164,7 +164,7 @@ const Containers: React.FC<{}> = () => {
     CONSTANTS.DEFAULT_CLUSTER_STATE,
     {
       retryAttempts: 2,
-      initialFetch: true,
+      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -425,11 +425,6 @@ const Containers: React.FC<{}> = () => {
     }
   };
 
-  useEffect(() => {
-    fetchTabData('1', 0, DEFAULT_PAGE_SIZE);
-    fetchQuasiClosedCount();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
   }
@@ -495,6 +490,13 @@ const Containers: React.FC<{}> = () => {
   };
 
   const autoReload = useAutoReload(loadContainersData);
+
+  useEffect(() => {
+    // Auto-reload performs the initial fetch when enabled.
+    if (sessionStorage.getItem('autoReloadEnabled') === 'false') {
+      loadContainersData();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const {
     lastUpdated,
