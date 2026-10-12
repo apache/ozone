@@ -236,6 +236,26 @@ public class TestBasicRootedOzoneClientAdapterListStatus {
     verify(proxy, never()).listStatus(any(ListStatusLightOptions.class));
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void zduOmFallsBackToClientSideBucketCheck(boolean lite) throws IOException {
+    // An OM finalized for ZDU reports ZDU even without this change, and such an
+    // OM ignores requireFileSystemLayout, so the client must still fetch the
+    // bucket and validate its layout.
+    when(proxy.getOmVersion()).thenReturn(OzoneManagerVersion.ZDU);
+
+    assertThat(listStatus(lite)).isEmpty();
+
+    verify(proxy).getBucketDetails("vol", "bucket");
+    if (lite) {
+      verify(bucket).listStatusLight("dir", false, "", 100);
+    } else {
+      verify(bucket).listStatus("dir", false, "", 100);
+    }
+    verify(proxy, never()).listStatus(any(ListStatusLightOptions.class));
+    verify(proxy, never()).listStatusLight(any(ListStatusLightOptions.class));
+  }
+
   @Test
   public void olderOmRejectsObsBucketClientSide() throws IOException {
     when(proxy.getOmVersion()).thenReturn(OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS);

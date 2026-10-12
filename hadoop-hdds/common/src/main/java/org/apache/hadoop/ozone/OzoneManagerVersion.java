@@ -72,12 +72,12 @@ public enum OzoneManagerVersion implements ComponentVersion {
       "OzoneManager version that rejects lookupFile on OBJECT_STORE buckets "
           + "server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check for getFileChecksum"),
-  LIST_STATUS_REJECTS_OBS(16,
+  ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
+  LIST_STATUS_REJECTS_OBS(101,
       "OzoneManager version that rejects listStatus on OBJECT_STORE buckets "
           + "server-side when the request sets requireFileSystemLayout, so file "
           + "system clients no longer need the client-side InfoBucket layout "
           + "check for listStatus"),
-  ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
 
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
