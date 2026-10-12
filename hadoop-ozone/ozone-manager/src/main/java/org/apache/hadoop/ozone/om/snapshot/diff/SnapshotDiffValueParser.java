@@ -108,7 +108,11 @@ public final class SnapshotDiffValueParser {
         break;
       case KeyInfo.FILECHECKSUM_FIELD_NUMBER:
       case KeyInfo.ACLS_FIELD_NUMBER:
+      case KeyInfo.RETENTION_FIELD_NUMBER:
         updateDigestWithBytes(digest, fieldNumber, input.readBytes());
+        break;
+      case KeyInfo.LEGALHOLD_FIELD_NUMBER:
+        updateDigestWithBoolean(digest, fieldNumber, input.readBool());
         break;
       case KeyInfo.TAGS_FIELD_NUMBER:
         byte[] tagDigest = parseKeyValueDigest(input.readBytes(), false, null);

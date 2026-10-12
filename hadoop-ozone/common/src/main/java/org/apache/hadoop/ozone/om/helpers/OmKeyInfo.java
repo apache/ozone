@@ -112,6 +112,9 @@ public final class OmKeyInfo extends WithParentObjectId
   // been modified.
   private final Long expectedDataGeneration;
 
+  private final ObjectRetention retention;
+  private final Boolean legalHold;
+
   private OmKeyInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -130,6 +133,16 @@ public final class OmKeyInfo extends WithParentObjectId
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.retention = b.retention;
+    this.legalHold = b.legalHold;
+  }
+
+  public ObjectRetention getRetention() {
+    return retention;
+  }
+
+  public Boolean getLegalHold() {
+    return legalHold;
   }
 
   /**
@@ -513,6 +526,8 @@ public final class OmKeyInfo extends WithParentObjectId
     private boolean isFile;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private ObjectRetention retention;
+    private Boolean legalHold;
 
     public Builder() {
       this.acls = AclListBuilder.empty();
@@ -541,6 +556,8 @@ public final class OmKeyInfo extends WithParentObjectId
               new OmKeyLocationInfoGroup(keyLocationVersion.getVersion(),
                   keyLocationVersion.createLocationList(),
                   keyLocationVersion.isMultipartKey())));
+      this.retention = obj.retention;
+      this.legalHold = obj.legalHold;
     }
 
     private Builder(OmDirectoryInfo dirInfo) {
@@ -555,6 +572,16 @@ public final class OmKeyInfo extends WithParentObjectId
           .getInstance(ReplicationFactor.ONE);
       this.omKeyLocationInfoGroups.add(
           new OmKeyLocationInfoGroup(0, new ArrayList<>()));
+    }
+
+    public Builder setRetention(ObjectRetention retention) {
+      this.retention = retention;
+      return this;
+    }
+
+    public Builder setLegalHold(Boolean legalHold) {
+      this.legalHold = legalHold;
+      return this;
     }
 
     public Builder setVolumeName(String volume) {
@@ -857,6 +884,12 @@ public final class OmKeyInfo extends WithParentObjectId
     if (ownerName != null) {
       kb.setOwnerName(ownerName);
     }
+    if (retention != null) {
+      kb.setRetention(retention.toProto());
+    }
+    if (legalHold != null) {
+      kb.setLegalHold(legalHold);
+    }
     return kb.build();
   }
 
@@ -887,6 +920,12 @@ public final class OmKeyInfo extends WithParentObjectId
         .setFileEncryptionInfo(keyInfo.hasFileEncryptionInfo() ?
             OMPBHelper.convert(keyInfo.getFileEncryptionInfo()) : null)
         .setAcls(OzoneAclUtil.fromProtobuf(keyInfo.getAclsList()));
+    if (keyInfo.hasRetention()) {
+      builder.setRetention(ObjectRetention.fromProto(keyInfo.getRetention()));
+    }
+    if (keyInfo.hasLegalHold()) {
+      builder.setLegalHold(keyInfo.getLegalHold());
+    }
     if (keyInfo.hasObjectID()) {
       builder.setObjectID(keyInfo.getObjectID());
     }
@@ -948,6 +987,8 @@ public final class OmKeyInfo extends WithParentObjectId
         Objects.equals(getMetadata(), omKeyInfo.getMetadata()) &&
         Objects.equals(acls, omKeyInfo.acls) &&
         Objects.equals(getTags(), omKeyInfo.getTags()) &&
+        Objects.equals(retention, omKeyInfo.retention) &&
+        Objects.equals(legalHold, omKeyInfo.legalHold) &&
         getObjectID() == omKeyInfo.getObjectID();
 
     if (isEqual && checkUpdateID) {
