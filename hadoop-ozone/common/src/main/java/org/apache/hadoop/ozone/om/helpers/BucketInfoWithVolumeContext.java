@@ -22,25 +22,19 @@ import java.util.Optional;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Wrapper class to return BucketInfo and optionally its Volume context.
+ * Wrapper class to return BucketInfo and optionally the S3 user principal.
  */
 public final class BucketInfoWithVolumeContext {
   private final OmBucketInfo bucketInfo;
-  private final OmVolumeArgs volumeArgs;
   private final String userPrincipal;
 
   private BucketInfoWithVolumeContext(Builder builder) {
     this.bucketInfo = builder.bucketInfo;
-    this.volumeArgs = builder.volumeArgs;
     this.userPrincipal = builder.userPrincipal;
   }
 
   public OmBucketInfo getBucketInfo() {
     return bucketInfo;
-  }
-
-  public Optional<OmVolumeArgs> getVolumeArgs() {
-    return Optional.ofNullable(volumeArgs);
   }
 
   public Optional<String> getUserPrincipal() {
@@ -53,8 +47,6 @@ public final class BucketInfoWithVolumeContext {
 
   public static BucketInfoWithVolumeContext fromProtobuf(OMResponse proto) throws IOException {
     return newBuilder()
-        .setVolumeArgs(proto.hasVolumeInfo() ?
-            OmVolumeArgs.getFromProtobuf(proto.getVolumeInfo()) : null)
         .setUserPrincipal(proto.hasUserPrincipal() ? proto.getUserPrincipal() : null)
         .setBucketInfo(OmBucketInfo.getFromProtobuf(proto.getInfoBucketResponse().getBucketInfo()))
         .build();
@@ -65,16 +57,10 @@ public final class BucketInfoWithVolumeContext {
    */
   public static class Builder {
     private OmBucketInfo bucketInfo;
-    private OmVolumeArgs volumeArgs;
     private String userPrincipal;
 
     public Builder setBucketInfo(OmBucketInfo bucket) {
       this.bucketInfo = bucket;
-      return this;
-    }
-
-    public Builder setVolumeArgs(OmVolumeArgs volume) {
-      this.volumeArgs = volume;
       return this;
     }
 

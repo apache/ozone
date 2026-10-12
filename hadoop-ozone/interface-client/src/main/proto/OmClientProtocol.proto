@@ -491,8 +491,7 @@ message OMResponse {
   optional GetCallerIdentityResponse         getCallerIdentityResponse      = 156;
   optional SnapshotCountResponse snapshotCountResponse = 157;
   optional GetBucketDeletedBytesResponse     getBucketDeletedBytesResponse  = 158;
-  optional VolumeInfo volumeInfo = 159;
-  optional string userPrincipal = 160;
+  optional string userPrincipal = 159;
 }
 
 enum Status {

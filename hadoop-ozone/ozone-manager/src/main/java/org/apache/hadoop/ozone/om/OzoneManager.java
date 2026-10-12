@@ -3302,7 +3302,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (assumeS3Context) {
       S3VolumeContext context = getS3VolumeContext(true);
       resolvedVolumeName = context.getOmVolumeArgs().getVolume();
-      builder.setVolumeArgs(context.getOmVolumeArgs());
       builder.setUserPrincipal(context.getUserPrincipal());
     }
     

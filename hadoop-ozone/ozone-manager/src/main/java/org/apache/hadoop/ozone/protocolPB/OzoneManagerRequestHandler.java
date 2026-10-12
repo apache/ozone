@@ -675,7 +675,6 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     resp.setBucketInfo(context.getBucketInfo().getProtobuf());
     if (assumeS3Context) {
       context.getUserPrincipal().ifPresent(responseBuilder::setUserPrincipal);
-      context.getVolumeArgs().ifPresent(v -> responseBuilder.setVolumeInfo(v.getProtobuf()));
     }
 
     return resp.build();
