@@ -68,6 +68,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -184,7 +185,7 @@ public final class HddsServerUtil {
       if (ifc.isUp()) {
         Enumeration<InetAddress> enumAdds = ifc.getInetAddresses();
         while (enumAdds.hasMoreElements()) {
-          InetAddress addr = enumAdds.nextElement();
+          InetAddress addr = dropScopeUnlessLinkLocal(enumAdds.nextElement());
 
           if (isValidInetForCsr(addr)) {
             LOG.info("Adding ip:{},host:{}", addr.getHostAddress(), addr.getHostName());
@@ -197,6 +198,21 @@ public final class HddsServerUtil {
     }
 
     return hostIps;
+  }
+
+  /**
+   * A network interface returns every IPv6 address with the interface as scope, which
+   * {@link #isScopedOrMaskingIPv6Address(InetAddress)} rejects. Only a link-local address needs the scope, so it is
+   * dropped from any other address.
+   *
+   * @param addr the InetAddress as returned by a network interface
+   * @return the address without scope, or the same address if it is link-local or not an IPv6 address
+   */
+  public static InetAddress dropScopeUnlessLinkLocal(InetAddress addr) throws UnknownHostException {
+    if (addr instanceof Inet6Address && !addr.isLinkLocalAddress()) {
+      return InetAddress.getByAddress(addr.getAddress());
+    }
+    return addr;
   }
 
   /**
