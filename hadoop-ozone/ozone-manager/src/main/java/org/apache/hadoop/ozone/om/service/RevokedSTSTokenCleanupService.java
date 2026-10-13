@@ -133,7 +133,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
 
       final long startTime = Time.monotonicNow();
       runCount.incrementAndGet();
-      // Read the metadata manager on every run, since installing a checkpoint replaces it.
+      // Read the metadata manager on every run, since installing a checkpoint replaces it
       final Table<String, Long> revokedStsTokenTable = ozoneManager.getMetadataManager().getS3RevokedStsTokenTable();
 
       long deletedInRun = 0;
