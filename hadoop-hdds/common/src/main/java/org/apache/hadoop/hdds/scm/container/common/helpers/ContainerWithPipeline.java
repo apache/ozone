@@ -18,12 +18,16 @@
 package org.apache.hadoop.hdds.scm.container.common.helpers;
 
 import java.util.Comparator;
+import java.util.Map;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.ClientVersion;
 
 /**
  * Class wraps ozone container info.
@@ -53,10 +57,15 @@ public class ContainerWithPipeline implements Comparator<ContainerWithPipeline>,
         Pipeline.getFromProtobuf(allocatedContainer.getPipeline()));
   }
 
-  public HddsProtos.ContainerWithPipeline getProtobuf(int clientVersion) {
+  /**
+   * Serializes with a per-datanode currentVersion override (keyed by datanode id), so read clients see each
+   * datanode's up-to-date version rather than the pipeline's possibly-stale frozen copy.
+   */
+  public HddsProtos.ContainerWithPipeline getProtobuf(ClientVersion clientVersion,
+      Map<DatanodeID, ComponentVersion> memberVersions) {
     return HddsProtos.ContainerWithPipeline.newBuilder()
         .setContainerInfo(getContainerInfo().getProtobuf())
-        .setPipeline(getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS))
+        .setPipeline(getPipeline().getProtobufMessage(clientVersion, Name.IO_PORTS, memberVersions))
         .build();
   }
 

@@ -591,7 +591,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
       int testKeyCount = 3;
 
-      keyLifecycleService.setListMaxSize(1);
+      keyLifecycleService.setKeyDeleteBatchSize(1);
       FaultInjectorImpl taskStart = new FaultInjectorImpl();
       installInjectors(taskStart);
 
@@ -821,7 +821,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       long keyIterated = metrics.getNumKeyIterated().value();
       int testKeyCount = 8;
 
-      keyLifecycleService.setListMaxSize(maxSize);
+      keyLifecycleService.setKeyDeleteBatchSize(maxSize);
       // Suspend service so it doesn't process immediately after we create the policy
       keyLifecycleService.suspend();
 
@@ -996,7 +996,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       String prefix = "";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-      keyLifecycleService.setListMaxSize(1);
+      keyLifecycleService.setKeyDeleteBatchSize(1);
       // Suspend service so it doesn't process immediately after we create the policy
       keyLifecycleService.suspend();
 
@@ -2328,7 +2328,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
       final int keyCount = 100;
       final int maxListSize = 20;
-      keyLifecycleService.setListMaxSize(maxListSize);
+      keyLifecycleService.setKeyDeleteBatchSize(maxListSize);
       // create keys
       List<OmKeyArgs> keyList =
           createKeys(volumeName, bucketName, bucketLayout, keyCount, 1, keyPrefix, null);
@@ -3522,7 +3522,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         KeyLifecycleService.setInjectors(null);
         keyLifecycleService.setOzoneTrash(null);
         keyLifecycleService.setMoveToTrashEnabled(true);
-        keyLifecycleService.setListMaxSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
+        keyLifecycleService.setKeyDeleteBatchSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
             OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
         keyLifecycleService.resume();
       }

@@ -49,8 +49,10 @@ prepare_for_image() {
 ##   the upgrade being tested if one exists. If neither exists, print a
 ##   warning that nothing was tested.
 ## @param The name of the function to run.
+## @param All remaining parameters are passed as parameters to the called function
 callback() {
   local func="$1"
+  shift
 
   set -u
   : "${OZONE_UPGRADE_CALLBACK}"
@@ -61,7 +63,7 @@ callback() {
     # Common callback always exists.
     source "$OZONE_COMMON_CALLBACK"
     if [[ "$(type -t "$func")" = function ]]; then
-      "$func"
+      "$func" "$@"
     fi
   )
 
@@ -70,7 +72,7 @@ callback() {
     if [[ -f "$OZONE_UPGRADE_CALLBACK" ]]; then
       source "$OZONE_UPGRADE_CALLBACK"
       if [[ "$(type -t "$func")" = function ]]; then
-        "$func"
+        "$func" "$@"
       fi
     fi
   )
@@ -112,4 +114,24 @@ run_test() {
   fi
 
   copy_results "$execution_dir" "$ALL_RESULT_DIR"
+}
+
+### CALLBACK HELPER METHODS ###
+
+## @description Generates data on the cluster.
+## @param The prefix to use for data generated.
+## @param The container to run the robot test in.
+## @param All remaining parameters are passed directly to the robot command,
+##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
+generate() {
+  execute_robot_test "${2}" -N "${OUTPUT_NAME}-generate-${1}" -v PREFIX:"$1" ${@:3} upgrade/generate.robot
+}
+
+## @description Validates that data exists on the cluster.
+## @param The prefix of the data to be validated.
+## @param The container to run the robot test in.
+## @param All remaining parameters are passed directly to the robot command,
+##        see https://robotframework.org/robotframework/latest/RobotFrameworkUserGuide.html#all-command-line-options
+validate() {
+  execute_robot_test "${2}" -N "${OUTPUT_NAME}-validate-${1}" -v PREFIX:"$1" ${@:3} upgrade/validate.robot
 }
