@@ -123,12 +123,13 @@ public class TestCreatePipelineCommandHandler {
         .thenReturn(true);
 
     final CreatePipelineCommandHandler commandHandler =
-        new CreatePipelineCommandHandler(conf, MoreExecutors.directExecutor());
+        new CreatePipelineCommandHandler((leader, tls) -> raftClient,
+            MoreExecutors.directExecutor());
     commandHandler.handle(command, ozoneContainer, stateContext,
         connectionManager);
 
     verify(writeChanel, times(0))
-        .addGroup(pipelineID.getProtobuf(), datanodes);
+        .addGroup(pipelineID.getProtobuf(), datanodes, Collections.nCopies(datanodes.size(), 0));
 
     verify(raftClientGroupManager, times(0))
         .add(any(RaftGroup.class));
