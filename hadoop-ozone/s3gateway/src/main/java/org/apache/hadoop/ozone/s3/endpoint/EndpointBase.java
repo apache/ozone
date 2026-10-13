@@ -795,8 +795,14 @@ public abstract class EndpointBase {
    * Versioning is not implemented, so each object only has the null version, i.e. the current object.
    *
    * @return true if {@code versionId} refers to any other version
+   * @throws OS3Exception InvalidArgument if {@code versionId} is empty, same as AWS S3
    */
   static boolean isUnsupportedVersionId(@Nullable String versionId) {
+    if (versionId != null && versionId.isEmpty()) {
+      OS3Exception ex = newError(INVALID_ARGUMENT, versionId);
+      ex.setErrorMessage("Version id cannot be the empty string");
+      throw ex;
+    }
     return versionId != null && !NULL_VERSION_ID.equals(versionId);
   }
 

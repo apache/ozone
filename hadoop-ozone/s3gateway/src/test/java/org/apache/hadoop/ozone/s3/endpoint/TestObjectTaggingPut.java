@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSuccee
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.createObjectEndpoint;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putTagging;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
@@ -121,6 +122,14 @@ public class TestObjectTaggingPut {
     objectEndpoint.queryParamsForTest().set(S3Consts.QueryParams.VERSION_ID, "nonexistent");
 
     assertErrorResponse(NOT_IMPLEMENTED, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, twoTags()));
+    assertThat(clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME).getTags()).isEmpty();
+  }
+
+  @Test
+  public void testPutObjectTaggingWithEmptyVersionIdIsInvalidArgument() throws Exception {
+    objectEndpoint.queryParamsForTest().set(S3Consts.QueryParams.VERSION_ID, "");
+
+    assertErrorResponse(INVALID_ARGUMENT, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, twoTags()));
     assertThat(clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME).getTags()).isEmpty();
   }
 

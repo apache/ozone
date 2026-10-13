@@ -116,6 +116,14 @@ public class TestObjectNotImplemented {
   }
 
   @Test
+  public void deleteWithEmptyVersionIdIsInvalidArgumentAndDoesNotDeleteObject() throws IOException {
+    objectEndpoint.queryParamsForTest().set(QueryParams.VERSION_ID, "");
+
+    assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT, () -> delete(objectEndpoint, BUCKET_NAME, KEY_NAME));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
+  }
+
+  @Test
   public void deleteWithNullVersionIdDeletesObject() throws IOException {
     objectEndpoint.queryParamsForTest().set(QueryParams.VERSION_ID, NULL_VERSION_ID);
 
