@@ -31,6 +31,7 @@ import org.xml.sax.SAXException;
  */
 public class PutBucketLifecycleConfigurationUnmarshaller
     extends MessageUnmarshaller<S3LifecycleConfiguration> {
+  // Newly supported lifecycle actions and fields must be added to this map.
   private static final ImmutableMap<String, ImmutableSet<String>> ALLOWED_CHILDREN =
       ImmutableMap.<String, ImmutableSet<String>>builder()
           .put("", ImmutableSet.of("LifecycleConfiguration"))
@@ -67,7 +68,7 @@ public class PutBucketLifecycleConfigurationUnmarshaller
       String name = localName == null || localName.isEmpty() ? qName : localName;
       String parent = parents.isEmpty() ? "" : parents.peek();
       if (!ALLOWED_CHILDREN.getOrDefault(parent, ImmutableSet.of()).contains(name)) {
-        throw new SAXException("Unsupported lifecycle element: " + name);
+        throw new SAXException("Unsupported or invalid lifecycle element: " + name);
       }
       parents.push(name);
       super.startElement(uri, localName, qName, attributes);
