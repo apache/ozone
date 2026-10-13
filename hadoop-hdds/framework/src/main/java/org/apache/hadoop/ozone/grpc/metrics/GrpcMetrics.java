@@ -56,7 +56,8 @@ public class GrpcMetrics implements MetricsSource {
 
   private final MetricsRegistry registry;
   private final boolean grpcQuantileEnable;
-  private String requestType;
+  // written by the gRPC handler threads and read by the metrics snapshot
+  private volatile String requestType;
 
   @Metric("Number of sent bytes")
   private MutableCounterLong sentBytes;
