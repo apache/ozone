@@ -26,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -166,28 +166,35 @@ public class TestKeyValueStreamDataChannel {
     assertArrayEquals(expected, Files.readAllBytes(tempFile.toPath()));
   }
 
-  @Test
-  public void testPollAllEmpty() {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testPollAll(boolean allowEmpty) {
     final Buffers buffers = new Buffers(PUT_BLOCK_REQUEST_LENGTH_MAX);
-    assertTrue(buffers.isEmpty());
+    final byte[] data = RandomUtils.secure().randomBytes(50);
+    final ReferenceCountedObject<ByteBuffer> offered =
+        ReferenceCountedObject.wrap(ByteBuffer.wrap(data), () -> { }, () -> { });
+    offered.retain();
+    assertFalse(buffers.offer(offered).iterator().hasNext());
+    offered.release();
+    assertFalse(buffers.isEmpty());
 
-    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(allowEmpty);
     final ByteBuf buf = ref.retain();
     try {
-      assertSame(Unpooled.EMPTY_BUFFER, buf);
-      assertFalse(buf.isReadable());
+      final byte[] polled = new byte[buf.readableBytes()];
+      buf.readBytes(polled);
+      assertArrayEquals(data, polled);
     } finally {
       ref.release();
     }
-
     assertTrue(buffers.isEmpty());
-    final ReferenceCountedObject<ByteBuf> again = buffers.pollAll();
-    final ByteBuf bufAgain = again.retain();
-    try {
-      assertSame(Unpooled.EMPTY_BUFFER, bufAgain);
-    } finally {
-      again.release();
+
+    if (allowEmpty) {
+      assertNull(buffers.pollAll(true));
+    } else {
+      assertThrows(IllegalStateException.class, () -> buffers.pollAll(false));
     }
+    assertTrue(buffers.isEmpty());
   }
 
   @Test
@@ -376,7 +383,7 @@ public class TestKeyValueStreamDataChannel {
 
     static ContainerCommandRequestProto closeBuffers(
         Buffers buffers, WriteMethod writeMethod) throws IOException {
-      final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+      final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(false);
       final ByteBuf buf = ref.retain();
       final ContainerCommandRequestProto putBlockRequest;
       try {

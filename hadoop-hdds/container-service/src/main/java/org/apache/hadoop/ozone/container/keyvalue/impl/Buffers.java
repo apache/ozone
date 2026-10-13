@@ -89,9 +89,17 @@ class Buffers {
     return polled;
   }
 
-  ReferenceCountedObject<ByteBuf> pollAll() {
+  /**
+   * Poll all the buffers from the deque and combine them into a single read-only {@link ByteBuf}.
+   *
+   * @param allowEmpty whether an empty deque is allowed.
+   * @return the combined buffer; or null if the deque is empty and allowEmpty is true.
+   * @throws IllegalStateException if the deque is empty and allowEmpty is false.
+   */
+  ReferenceCountedObject<ByteBuf> pollAll(boolean allowEmpty) {
     if (deque.isEmpty()) {
-      return ReferenceCountedObject.wrap(Unpooled.EMPTY_BUFFER);
+      Preconditions.checkState(allowEmpty, "The deque is empty");
+      return null;
     }
     final ByteBuffer[] array = new ByteBuffer[deque.size()];
     final List<ReferenceCountedObject<ByteBuffer>> refs = new ArrayList<>(deque.size());
