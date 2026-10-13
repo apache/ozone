@@ -1935,12 +1935,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setMultipartUploadID(omKeyArgs.getMultipartUploadID());
 
     MultipartUploadAbortRequest.Builder multipartUploadAbortRequest =
-        MultipartUploadAbortRequest.newBuilder().setAssumeS3Context(assumeS3Context);
+        MultipartUploadAbortRequest.newBuilder();
     multipartUploadAbortRequest.setKeyArgs(keyArgs);
 
     OMRequest omRequest = createOMRequest(
         Type.AbortMultiPartUpload)
         .setAbortMultiPartUploadRequest(multipartUploadAbortRequest.build())
+        .setAssumeS3Context(assumeS3Context)
         .build();
 
     handleError(submitRequest(omRequest));

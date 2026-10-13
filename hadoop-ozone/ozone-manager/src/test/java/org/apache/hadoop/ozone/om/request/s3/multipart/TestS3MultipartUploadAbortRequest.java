@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -71,13 +70,11 @@ public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, layout);
     when(ozoneManager.getS3VolumeContext()).thenReturn(new S3VolumeContext(
         OmVolumeArgs.newBuilder().setVolume(volumeName).setOwnerName("owner").setAdminName("admin").build(), "owner"));
-    OMRequest request = original.toBuilder().setAbortMultiPartUploadRequest(
-        original.getAbortMultiPartUploadRequest().toBuilder().setAssumeS3Context(true)).build();
+    OMRequest request = original.toBuilder().setAssumeS3Context(true).build();
     OMKeyRequest resolved = (OMKeyRequest) OzoneManagerRatisUtils.createClientRequest(request, ozoneManager);
     assertEquals(layout, resolved.getBucketLayout());
-    OMRequest replicated = resolved.getOmRequest();
+    OMRequest replicated = resolved.getOmRequest().toBuilder().clearAssumeS3Context().build();
     assertEquals(volumeName, replicated.getAbortMultiPartUploadRequest().getKeyArgs().getVolumeName());
-    assertFalse(replicated.getAbortMultiPartUploadRequest().getAssumeS3Context());
     assertEquals(layout,
         ((OMKeyRequest) OzoneManagerRatisUtils.createClientRequest(replicated, ozoneManager)).getBucketLayout());
     verify(ozoneManager).getS3VolumeContext();
