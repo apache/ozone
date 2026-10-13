@@ -214,7 +214,7 @@ jobs:
           fi
         env:
           CHECK: flaky
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
           repo_path: ${{ steps.download-ozone-repo.outputs.download-path }}
           ratis_args: ${{ needs.ratis.outputs.build-args }}
       - name: Summary of failures
