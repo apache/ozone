@@ -43,6 +43,8 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -339,29 +341,33 @@ public abstract class BaseHttpServer implements AutoCloseable {
 
   /**
    * Returns the host that replaces {@code _HOST} in this server's SPNEGO
-   * principal: the host of the advertised HTTP or HTTPS address unless it is
-   * a wildcard, otherwise the canonical name of the local host. An IP literal
-   * is reverse-resolved, since a principal names a host.
+   * principal: the host of the advertised address of an enabled scheme, HTTP
+   * before HTTPS, when it is a name, otherwise the canonical name of the local
+   * host.
    */
   protected String getSpnegoHost() throws UnknownHostException {
-    for (String addressKey : new String[] {getHttpAddressKey(), getHttpsAddressKey()}) {
+    List<String> addressKeys = new ArrayList<>(2);
+    if (policy.isHttpEnabled()) {
+      addressKeys.add(getHttpAddressKey());
+    }
+    if (policy.isHttpsEnabled()) {
+      addressKeys.add(getHttpsAddressKey());
+    }
+    for (String addressKey : addressKeys) {
       Optional<String> host = getHostNameFromConfigKeys(conf, addressKey);
-      if (!host.isPresent()) {
-        continue;
-      }
-      // Judged on the text first: InetAddresses.forString rejects a scoped
-      // literal unless this host owns the named interface.
-      if (host.get().indexOf('%') >= 0 || !InetAddresses.isInetAddress(host.get())) {
+      // An IP literal, wildcard or not, names no host, so it falls back to the
+      // local name exactly as the default wildcard bind address did before.
+      if (host.isPresent() && !isIpLiteral(host.get())) {
         return host.get();
-      }
-      InetAddress address = InetAddresses.forString(host.get());
-      if (!address.isAnyLocalAddress()) {
-        // The lookup SecurityUtil.getServerPrincipal(String, InetAddress)
-        // performs, and the one the bind address used to go through.
-        return address.getCanonicalHostName();
       }
     }
     return InetAddress.getLocalHost().getCanonicalHostName();
+  }
+
+  private static boolean isIpLiteral(String host) {
+    // A zone id (fe80::1%eth0) is checked on the text because
+    // InetAddresses.isInetAddress does not accept every scoped form.
+    return host.indexOf('%') >= 0 || InetAddresses.isInetAddress(host);
   }
 
   /**

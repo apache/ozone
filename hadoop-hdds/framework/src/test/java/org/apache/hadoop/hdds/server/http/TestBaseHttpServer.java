@@ -249,16 +249,22 @@ class TestBaseHttpServer {
 
   static Stream<Arguments> advertisedAddressesNamingNoHost() {
     return Stream.of(
-        Arguments.of(null, null),
-        Arguments.of("0.0.0.0:9874", "0.0.0.0:9875"),
-        Arguments.of("[::]:9874", "[::]:9875"));
+        Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, null, null),
+        Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, "0.0.0.0:9874", "0.0.0.0:9875"),
+        Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, "[::]:9874", "[::]:9875"),
+        Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, "127.0.0.1:9874", "[::1]:9875"),
+        Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, "192.0.2.1:9874", "[2001:db8::1]:9875"),
+        Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, "[fe80::1%eth0]:9874", null),
+        Arguments.of(HttpConfig.Policy.HTTP_ONLY, "0.0.0.0:9874", "om1.example.com:9875"),
+        Arguments.of(HttpConfig.Policy.HTTPS_ONLY, "om1.example.com:9874", "0.0.0.0:9875"));
   }
 
   @ParameterizedTest
   @MethodSource("advertisedAddressesNamingNoHost")
-  void spnegoHostFallsBackToLocalHostWithoutAdvertisedHost(
-      String httpAddress, String httpsAddress) throws Exception {
-    BaseHttpServer subject = newDisabledServer(httpAddress, httpsAddress);
+  void spnegoHostFallsBackToLocalHostWithoutAdvertisedName(
+      HttpConfig.Policy policy, String httpAddress, String httpsAddress)
+      throws Exception {
+    BaseHttpServer subject = newDisabledServer(policy, httpAddress, httpsAddress);
 
     assertEquals(InetAddress.getLocalHost().getCanonicalHostName(),
         subject.getSpnegoHost());
@@ -266,27 +272,17 @@ class TestBaseHttpServer {
 
   @ParameterizedTest
   @CsvSource({
-      "om1.example.com:9874, , om1.example.com",
-      "0.0.0.0:9874, om1.example.com:9875, om1.example.com",
+      "HTTP_ONLY, om1.example.com:9874, , om1.example.com",
+      "HTTP_AND_HTTPS, 0.0.0.0:9874, om1.example.com:9875, om1.example.com",
+      "HTTP_AND_HTTPS, om1.example.com:9874, om1-tls.example.com:9875, om1.example.com",
+      "HTTPS_ONLY, om1.example.com:9874, om1-tls.example.com:9875, om1-tls.example.com",
   })
-  void spnegoHostIsAdvertisedHost(String httpAddress, String httpsAddress,
-      String expectedHost) throws Exception {
-    BaseHttpServer subject = newDisabledServer(httpAddress, httpsAddress);
+  void spnegoHostIsAdvertisedNameOfEnabledScheme(HttpConfig.Policy policy,
+      String httpAddress, String httpsAddress, String expectedHost)
+      throws Exception {
+    BaseHttpServer subject = newDisabledServer(policy, httpAddress, httpsAddress);
 
     assertEquals(expectedHost, subject.getSpnegoHost());
-  }
-
-  @ParameterizedTest
-  @CsvSource({
-      "127.0.0.1:9874, 127.0.0.1",
-      "[::1]:9874, ::1",
-  })
-  void spnegoHostReverseResolvesAdvertisedIpLiteral(String httpAddress,
-      String literal) throws Exception {
-    BaseHttpServer subject = newDisabledServer(httpAddress, null);
-
-    assertEquals(InetAddress.getByName(literal).getCanonicalHostName(),
-        subject.getSpnegoHost());
   }
 
   /**
@@ -312,9 +308,9 @@ class TestBaseHttpServer {
     }
   }
 
-  private BaseHttpServer newDisabledServer(String httpAddress,
-      String httpsAddress) throws IOException {
-    MutableConfigurationSource conf = newConfig(HttpConfig.Policy.HTTP_ONLY);
+  private BaseHttpServer newDisabledServer(HttpConfig.Policy policy,
+      String httpAddress, String httpsAddress) throws IOException {
+    MutableConfigurationSource conf = newConfig(policy);
     conf.setBoolean(ENABLED_KEY, false);
     if (httpAddress != null) {
       conf.set(ADDRESS_HTTP_KEY, httpAddress);
