@@ -357,17 +357,11 @@ public abstract class BaseHttpServer implements AutoCloseable {
       Optional<String> host = getHostNameFromConfigKeys(conf, addressKey);
       // An IP literal, wildcard or not, names no host, so it falls back to the
       // local name exactly as the default wildcard bind address did before.
-      if (host.isPresent() && !isIpLiteral(host.get())) {
+      if (host.isPresent() && !InetAddresses.isInetAddress(host.get())) {
         return host.get();
       }
     }
     return InetAddress.getLocalHost().getCanonicalHostName();
-  }
-
-  private static boolean isIpLiteral(String host) {
-    // A zone id (fe80::1%eth0) is checked on the text because
-    // InetAddresses.isInetAddress does not accept every scoped form.
-    return host.indexOf('%') >= 0 || InetAddresses.isInetAddress(host);
   }
 
   /**

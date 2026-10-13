@@ -31,6 +31,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHandler;
 import org.apache.ozone.test.GenericTestUtils.PortAllocator;
 import org.eclipse.jetty.ee8.servlet.FilterHolder;
@@ -254,7 +255,7 @@ class TestBaseHttpServer {
         Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, "[::]:9874", "[::]:9875"),
         Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, "127.0.0.1:9874", "[::1]:9875"),
         Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, "192.0.2.1:9874", "[2001:db8::1]:9875"),
-        Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, "[fe80::1%eth0]:9874", null),
+        Arguments.of(HttpConfig.Policy.HTTP_AND_HTTPS, "[fe80::1%nosuchif0]:9874", null),
         Arguments.of(HttpConfig.Policy.HTTP_ONLY, "0.0.0.0:9874", "om1.example.com:9875"),
         Arguments.of(HttpConfig.Policy.HTTPS_ONLY, "om1.example.com:9874", "0.0.0.0:9875"));
   }
@@ -305,6 +306,31 @@ class TestBaseHttpServer {
           .getServletHandler().getFilter(HttpServer2.SPNEGO_FILTER);
       assertEquals("HTTP/om1.example.com@EXAMPLE.COM",
           spnegoFilter.getInitParameter(KerberosAuthenticationHandler.PRINCIPAL));
+    }
+  }
+
+  /**
+   * Secure clusters register {@code AuthenticationFilterInitializer} through
+   * {@code ozone.http.filter.initializers}; it expands {@code _HOST} from the
+   * {@code bind.address} that {@link HttpServer2} fills with the same host.
+   */
+  @Test
+  void filterInitializerPrincipalNamesAdvertisedHostNotBindHost()
+      throws Exception {
+    MutableConfigurationSource conf = newConfig(HttpConfig.Policy.HTTP_ONLY);
+    conf.set(BIND_HOST_HTTP_KEY, "::");
+    conf.set(ADDRESS_HTTP_KEY, "om1.example.com:" + BIND_PORT_HTTP_DEFAULT);
+    conf.set(HTTP_AUTH_TYPE_KEY, "kerberos");
+    conf.set(HTTP_AUTH_CONFIG_PREFIX + KerberosAuthenticationHandler.PRINCIPAL,
+        "HTTP/_HOST@EXAMPLE.COM");
+    conf.set(OzoneConfigKeys.OZONE_HTTP_FILTER_INITIALIZERS_KEY,
+        OzoneConsts.OZONE_HTTP_FILTER_INITIALIZERS_SECURE);
+
+    try (BaseHttpServer subject = new SecureTestingHttpServer(conf)) {
+      FilterHolder authFilter = httpServer2Of(subject).getWebAppContext()
+          .getServletHandler().getFilter("authentication");
+      assertEquals("HTTP/om1.example.com@EXAMPLE.COM",
+          authFilter.getInitParameter(KerberosAuthenticationHandler.PRINCIPAL));
     }
   }
 
