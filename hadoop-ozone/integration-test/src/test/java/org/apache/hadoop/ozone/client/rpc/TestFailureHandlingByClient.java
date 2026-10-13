@@ -65,6 +65,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -74,6 +75,8 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.server.RaftServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -159,8 +162,28 @@ public class TestFailureHandlingByClient {
     for (DatanodeDetails dataNode : restartDataNodes) {
       cluster.restartHddsDatanode(dataNode, false);
     }
-    restartDataNodes.clear();
     cluster.waitForClusterToBeReady();
+    // A restarted datanode can take tens of seconds to rejoin its Ratis groups, while SCM keeps allocating
+    // blocks on those pipelines. Wait for every group on it to have a leader before the next test writes.
+    for (DatanodeDetails dataNode : restartDataNodes) {
+      RaftServer server = assertInstanceOf(XceiverServerRatis.class,
+          cluster.getHddsDatanode(dataNode).getDatanodeStateMachine().getContainer().getWriteChannel()).getServer();
+      GenericTestUtils.waitFor(() -> allGroupsHaveLeader(server), 500, 120_000);
+    }
+    restartDataNodes.clear();
+  }
+
+  private static boolean allGroupsHaveLeader(RaftServer server) {
+    try {
+      for (RaftGroupId groupId : server.getGroupIds()) {
+        if (server.getDivision(groupId).getInfo().getLeaderId() == null) {
+          return false;
+        }
+      }
+      return true;
+    } catch (IOException e) {
+      return false;
+    }
   }
 
   @AfterAll
