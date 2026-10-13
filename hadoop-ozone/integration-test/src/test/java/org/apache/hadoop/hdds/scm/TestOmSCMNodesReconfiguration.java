@@ -61,7 +61,7 @@ public class TestOmSCMNodesReconfiguration {
 
   private static MiniOzoneHAClusterImpl cluster;
   private static String scmServiceId;
-  private static String scmNodesKey;
+  private static String scmNodesConfigKey;
   private static String initialScmNodes;
   private static final Map<String, String> INITIAL_SCM_ADDRESSES = new HashMap<>();
 
@@ -77,9 +77,10 @@ public class TestOmSCMNodesReconfiguration {
         .build();
     cluster.waitForClusterToBeReady();
 
-    scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+    scmNodesConfigKey =
+        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
     OzoneConfiguration omConf = cluster.getOzoneManager().getConfiguration();
-    initialScmNodes = omConf.get(scmNodesKey);
+    initialScmNodes = omConf.get(scmNodesConfigKey);
     for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
       String scmAddrKey = ConfUtils.addKeySuffixes(
           OZONE_SCM_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
@@ -95,7 +96,7 @@ public class TestOmSCMNodesReconfiguration {
       handler.reconfigureProperty(scmAddress.getKey(), scmAddress.getValue());
     }
 
-    handler.reconfigureProperty(scmNodesKey, initialScmNodes);
+    handler.reconfigureProperty(scmNodesConfigKey, initialScmNodes);
   }
 
   @AfterAll
