@@ -1134,6 +1134,11 @@ public class TestKeyValueHandler {
   }
 
   private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(Path path) throws IOException {
+    return createKeyValueHandlerWithVolumeSet(path, null);
+  }
+
+  private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(Path path, OzoneContainer ozoneContainer)
+      throws IOException {
     ContainerMetrics.remove();
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
@@ -1149,7 +1154,8 @@ public class TestKeyValueHandler {
     when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
 
     final KeyValueHandler kvHandler = ContainerTestUtils.getKeyValueHandler(conf,
-        DATANODE_UUID, containerSet, volumeSet, containerMetrics);
+        DATANODE_UUID, containerSet, volumeSet, containerMetrics,
+        new ContainerChecksumTreeManager(conf), ozoneContainer);
     kvHandler.setClusterID(CLUSTER_ID);
     hddsVolume.getVolumeInfoStats().unregister();
     hddsVolume.getVolumeIOStats().unregister();
@@ -1199,14 +1205,12 @@ public class TestKeyValueHandler {
         .build();
   }
 
-  private static void enableShortCircuitRead(KeyValueHandler handler) throws Exception {
+  private static OzoneContainer mockOzoneContainerWithSCDomainSocket() {
     OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     XceiverServerSpi domainSocketServer = mock(XceiverServerSpi.class);
     when(ozoneContainer.getReadDomainSocketChannel()).thenReturn(domainSocketServer);
     when(domainSocketServer.isStarted()).thenReturn(true);
-    Field field = KeyValueHandler.class.getDeclaredField("ozoneContainer");
-    field.setAccessible(true);
-    field.set(handler, ozoneContainer);
+    return ozoneContainer;
   }
 
   @Test
@@ -1214,7 +1218,8 @@ public class TestKeyValueHandler {
     Path testDir = Files.createTempDirectory("testGetBlockMetrics");
     try {
       conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
-      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir,
+          mockOzoneContainerWithSCDomainSocket());
       KeyValueHandler kvHandler = handlerWithVolume.getHandler();
       HddsDispatcher getBlockDispatcher = createGetBlockDispatcher(handlerWithVolume);
 
@@ -1235,8 +1240,6 @@ public class TestKeyValueHandler {
       assertCounter("bytesGetBlock", blockMetadataBytes, containerMetrics);
       assertCounter("localBytesGetBlock", 0L, containerMetrics);
 
-      // enable short-circuit read and verify that the metrics are updated correctly
-      enableShortCircuitRead(kvHandler);
       ContainerCommandRequestProto shortCircuitRequest = newGetBlockRequest(containerID, blockID, true);
       response = getBlockDispatcher.dispatch(shortCircuitRequest, null);
       assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
