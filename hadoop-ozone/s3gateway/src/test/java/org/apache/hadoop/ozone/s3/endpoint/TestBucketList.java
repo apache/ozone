@@ -742,6 +742,31 @@ public class TestBucketList {
   }
 
   @Test
+  public void listObjectVersionsRejectsNonNullVersionIdMarker() throws IOException {
+    setup("file1", "file2");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.KEY_MARKER, "file1");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSION_ID_MARKER, "nonexistent");
+
+    assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> bucketEndpoint.get(BUCKET_NAME));
+  }
+
+  @Test
+  public void listObjectVersionsIgnoresListObjectsV2Params() throws OS3Exception, IOException {
+    setup("file1", "file2");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    bucketEndpoint.queryParamsForTest().setInt(QueryParams.LIST_TYPE, 2);
+    bucketEndpoint.queryParamsForTest().set(QueryParams.START_AFTER, "file1");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, "invalid");
+    ListVersionsResult result = (ListVersionsResult) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertThat(result.getVersions()).extracting(v -> v.getKey().getName()).containsExactly("file1", "file2");
+    assertThat(result.getVersions()).allSatisfy(v -> assertThat(v.getOwner()).isNotNull());
+  }
+
+  @Test
   public void listObjectsDoesNotReturnVersionId() throws Exception {
     setup("file1");
 

@@ -117,7 +117,7 @@ public class TestObjectTaggingPut {
   }
 
   @Test
-  public void testPutObjectTaggingWithVersionIdIsNotImplemented() throws Exception {
+  public void testPutObjectTaggingWithNonNullVersionIdIsNotImplemented() throws Exception {
     objectEndpoint.queryParamsForTest().set(S3Consts.QueryParams.VERSION_ID, "nonexistent");
 
     assertErrorResponse(NOT_IMPLEMENTED, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, twoTags()));

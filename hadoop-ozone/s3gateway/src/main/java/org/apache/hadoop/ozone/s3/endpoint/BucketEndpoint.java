@@ -105,14 +105,14 @@ public class BucketEndpoint extends BucketOperationHandler {
 
   @Override
   Response handleGetRequest(S3RequestContext context, String bucketName) throws IOException, OS3Exception {
-    final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
+    final String continueToken = isListObjectVersions() ? null : queryParams().get(QueryParams.CONTINUATION_TOKEN);
     final String delimiter = queryParams().containsKey(QueryParams.DELIMITER) ?
         queryParams().get(QueryParams.DELIMITER) : null;
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
     final String marker = getListMarker();
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
     String prefix = queryParams().get(QueryParams.PREFIX, "");
-    String startAfter = queryParams().get(QueryParams.START_AFTER);
+    String startAfter = isListObjectVersions() ? null : queryParams().get(QueryParams.START_AFTER);
     boolean includeOwner = shouldIncludeOwnerInListResponse();
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
     // AWS S3 treats an empty continuation-token as no token: list from the
@@ -265,8 +265,14 @@ public class BucketEndpoint extends BucketOperationHandler {
       return queryParams().get(QueryParams.MARKER);
     }
     final String keyMarker = queryParams().get(QueryParams.KEY_MARKER);
-    if (StringUtils.isEmpty(keyMarker) && StringUtils.isNotEmpty(queryParams().get(QueryParams.VERSION_ID_MARKER))) {
-      throw newError(S3ErrorTable.INVALID_ARGUMENT, "A version-id marker cannot be specified without a key marker");
+    final String versionIdMarker = queryParams().get(QueryParams.VERSION_ID_MARKER);
+    if (StringUtils.isNotEmpty(versionIdMarker)) {
+      if (StringUtils.isEmpty(keyMarker)) {
+        throw newError(S3ErrorTable.INVALID_ARGUMENT, "A version-id marker cannot be specified without a key marker");
+      }
+      if (isUnsupportedVersionId(versionIdMarker)) {
+        throw newError(S3ErrorTable.NOT_IMPLEMENTED, versionIdMarker);
+      }
     }
     return keyMarker;
   }
@@ -373,7 +379,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       throw newError(S3ErrorTable.MALFORMED_XML, bucketName);
     }
 
-    // Deleting a specific version is not implemented; ignoring VersionId would delete the current object instead.
+    // Only the null version can be deleted; ignoring any other VersionId would delete the current object instead.
     if (request.getObjects() != null
         && request.getObjects().stream().anyMatch(o -> isUnsupportedVersionId(o.getVersionId()))) {
       throw newError(S3ErrorTable.NOT_IMPLEMENTED, bucketName);
@@ -524,6 +530,6 @@ public class BucketEndpoint extends BucketOperationHandler {
   private boolean shouldIncludeOwnerInListResponse() {
     int listType = queryParams().getInt(QueryParams.LIST_TYPE, 1);
     boolean fetchOwner = queryParams().getBoolean(QueryParams.FETCH_OWNER, false);
-    return listType != 2 || fetchOwner;
+    return isListObjectVersions() || listType != 2 || fetchOwner;
   }
 }

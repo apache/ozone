@@ -108,7 +108,7 @@ public class TestObjectNotImplemented {
   }
 
   @Test
-  public void deleteWithVersionIdIsNotImplementedAndDoesNotDeleteObject() throws IOException {
+  public void deleteWithNonNullVersionIdIsNotImplementedAndDoesNotDeleteObject() throws IOException {
     objectEndpoint.queryParamsForTest().set(QueryParams.VERSION_ID, "nonexistent");
 
     assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> delete(objectEndpoint, BUCKET_NAME, KEY_NAME));

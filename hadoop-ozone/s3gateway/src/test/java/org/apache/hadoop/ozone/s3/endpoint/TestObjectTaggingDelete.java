@@ -108,7 +108,7 @@ public class TestObjectTaggingDelete {
   }
 
   @Test
-  public void testDeleteTaggingWithVersionIdIsNotImplemented() throws IOException {
+  public void testDeleteTaggingWithNonNullVersionIdIsNotImplemented() throws IOException {
     rest.queryParamsForTest().set(QueryParams.VERSION_ID, "nonexistent");
 
     assertErrorResponse(NOT_IMPLEMENTED, () -> deleteTagging(rest, BUCKET_NAME, KEY_WITH_TAG));
