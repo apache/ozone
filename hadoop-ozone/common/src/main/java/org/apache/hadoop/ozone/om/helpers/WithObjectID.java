@@ -117,6 +117,7 @@ public abstract class WithObjectID extends WithMetadata {
     }
 
     protected void validate() {
+      // 0 means the object ID is not set yet. Once set, it cannot change.
       if (initialObjectID != objectID && initialObjectID != 0) {
         throw new UnsupportedOperationException("Attempt to modify object ID " +
             "which is not zero. Current Object ID is " + initialObjectID);
