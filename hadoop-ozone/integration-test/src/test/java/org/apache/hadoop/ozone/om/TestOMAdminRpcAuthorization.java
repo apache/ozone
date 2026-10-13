@@ -22,6 +22,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -29,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -38,6 +41,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
+import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -47,11 +51,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests admin authorization of two OM administrative RPCs that are only ever driven by admin
+ * Tests admin authorization of OM administrative RPCs that are only ever driven by admin
  * CLI tooling: refetchSecretKey() on the client protocol (mirrors the checkAdminUserPrivilege
  * gate used by transferLeadership/listOpenFiles), and getOMConfiguration() on the OM admin
  * protocol (mirrors the isAdmin check used by decommission()). Both must reject non-admin
- * callers and serve admins.
+ * callers and serve admins. bootstrap() on the OM inter service protocol carries the same
+ * isAdmin check and must reject non-admin callers.
  */
 public class TestOMAdminRpcAuthorization {
 
@@ -108,6 +113,19 @@ public class TestOMAdminRpcAuthorization {
     });
   }
 
+  private static void bootstrap(UserGroupInformation user) throws Exception {
+    OzoneConfiguration bootstrapConf = new OzoneConfiguration(conf);
+    bootstrapConf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 1);
+    user.doAs((PrivilegedExceptionAction<Void>) () -> {
+      try (OMInterServiceProtocolClientSideImpl interServiceClient =
+               new OMInterServiceProtocolClientSideImpl(bootstrapConf, user, null)) {
+        // Use the existing OM details to exercise authorization without introducing another OM.
+        interServiceClient.bootstrap(cluster.getOzoneManager().getNodeDetails());
+      }
+      return null;
+    });
+  }
+
   @Test
   void refetchSecretKeyNonAdminIsDenied() {
     UserGroupInformation nonAdmin =
@@ -139,5 +157,14 @@ public class TestOMAdminRpcAuthorization {
         UserGroupInformation.createUserForTesting("admin", new String[] {"admins"});
     OMConfiguration omConfig = getOMConfiguration(admin);
     assertFalse(omConfig.getCurrentPeerList().isEmpty());
+  }
+
+  @Test
+  void bootstrapNonAdminIsDenied() {
+    UserGroupInformation nonAdmin =
+        UserGroupInformation.createUserForTesting("nonadmin", new String[] {"users"});
+    assertThatThrownBy(() -> bootstrap(nonAdmin))
+        .isInstanceOf(IOException.class)
+        .hasMessageContaining("Only administrators are authorized to perform bootstrap.");
   }
 }
