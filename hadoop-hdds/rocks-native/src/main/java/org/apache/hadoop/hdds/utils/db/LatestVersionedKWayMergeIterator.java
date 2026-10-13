@@ -375,6 +375,7 @@ public final class LatestVersionedKWayMergeIterator implements
     private final ManagedRawSSTFileIterator<ManagedRawSSTFileIterator.KeyValue> iterator;
     private final ManagedSlice fromSlice;
     private final ManagedSlice toSlice;
+    private boolean closed;
 
     private RawSstIterator(ManagedOptions options, Path file, int readAheadSize,
         byte[] fromUserKeyInclusive, byte[] toUserKeyExclusive) {
@@ -417,6 +418,10 @@ public final class LatestVersionedKWayMergeIterator implements
 
     @Override
     public void close() {
+      if (closed) {
+        return;
+      }
+      closed = true;
       if (iterator != null) {
         iterator.close();
       }
