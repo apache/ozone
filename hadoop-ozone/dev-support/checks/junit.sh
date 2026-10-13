@@ -55,10 +55,22 @@ if [[ -f hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh ]]; then
   ozone_java_setup
 fi
 
-mvn ${MAVEN_OPTIONS} clean
+CLEAN="clean"
 
-if [[ ${ITERATIONS} -gt 1 ]] && [[ ${OZONE_REPO_CACHED} == "false" ]]; then
-  mvn ${MAVEN_OPTIONS} -DskipTests install
+if [[ ${ITERATIONS} -gt 1 ]]; then
+  CHECK=flaky
+
+  if [[ ${OZONE_REPO_CACHED} == "false" ]]; then
+    # Need to clean and build for local run.
+    # In flaky-test-check the jars come from separate workflow job.
+    mvn ${MAVEN_OPTIONS} -DskipTests "$@" clean install
+    CLEAN=""
+  fi
+fi
+
+if [[ ${CHECK} == "flaky" ]]; then
+  # repeated runs must execute the test, not load it from the build cache
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Ddevelocity.cache.remote.enabled=false"
 fi
 
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
@@ -75,12 +87,14 @@ for i in $(seq 1 ${ITERATIONS}); do
   if [[ ${ITERATIONS} -gt 1 ]]; then
     original_report_dir="${REPORT_DIR}"
     REPORT_DIR="${original_report_dir}/iteration${i}"
-    mkdir -p "${REPORT_DIR}"
   fi
 
-  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" "${PHASE}" \
-      | tee "${REPORT_DIR}/output.log"
+  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" ${CLEAN} "${PHASE}" \
+      | tee output.log
   irc=$?
+
+  mkdir -p "${REPORT_DIR}"
+  mv -f output.log "${REPORT_DIR}"/
 
   # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
   source "${DIR}/_mvn_unit_report.sh"
