@@ -303,8 +303,10 @@ public class ChunkInputStream extends InputStream
 
   /**
    * Acquire new client if previous one was released.
+   *
+   * @return the held client after ensuring it is acquired
    */
-  protected synchronized void acquireClient() throws IOException {
+  private synchronized void acquireClient() throws IOException {
     if (xceiverClientFactory != null && xceiverClient == null) {
       Pipeline pipeline = pipelineSupplier.get();
       xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
@@ -416,7 +418,11 @@ public class ChunkInputStream extends InputStream
   }
 
   /** Read a range with a client reference owned by this request. */
-  protected ByteBuffer[] readChunkPositioned(ChunkInfo range) throws IOException {
+  private ByteBuffer[] readChunkPositioned(ChunkInfo range) throws IOException {
+    if (xceiverClientFactory == null) {
+      // for LocalChunkInputStream, which does not use a xceiver client, just read the chunk directly
+      return readChunk(range);
+    }
     final Pipeline pipeline = pipelineSupplier.get();
     final DatanodeBlockID bid = buildDatanodeBlockId(pipeline);
     final XceiverClientSpi client = xceiverClientFactory.acquireClientForReadData(pipeline);

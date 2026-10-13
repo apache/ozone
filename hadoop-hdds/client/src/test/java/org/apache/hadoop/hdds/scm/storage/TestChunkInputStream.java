@@ -81,22 +81,6 @@ public class TestChunkInputStream {
   private ChunkInfo chunkInfo;
   private byte[] chunkData;
 
-  @Test
-  void concurrentLocalRangeReadsPreserveFileAndStreamPositions(@TempDir Path directory) throws Exception {
-    byte[] data = generateRandomData(PositionedReadTestHelper.SOURCE_SIZE);
-    Path path = Files.write(directory.resolve("block"), data);
-    ChunkInfo info = chunkInfo.toBuilder().setLen(data.length)
-        .setChecksumData(new Checksum(ChecksumType.CRC32, 4096).computeChecksum(data).getProtoBufMessage()).build();
-    try (FileChannel file = FileChannel.open(path);
-         LocalChunkInputStream stream = new LocalChunkInputStream(info, blockID, null, () -> null, true,
-             () -> null, null, file)) {
-      stream.seek(123);
-      PositionedReadTestHelper.runConcurrentPositionedReads(data, stream::readPositioned);
-      assertEquals(123, stream.getPos());
-      assertEquals(0, file.position());
-    }
-  }
-
   @BeforeEach
   public void setup() throws Exception {
     Checksum checksum = new Checksum(ChecksumType.CRC32, BYTES_PER_CHECKSUM);
@@ -255,6 +239,22 @@ public class TestChunkInputStream {
                   + " but read " + read);
             }
           });
+    }
+  }
+
+  @Test
+  void concurrentLocalRangeReadsPreserveFileAndStreamPositions(@TempDir Path directory) throws Exception {
+    byte[] data = generateRandomData(SOURCE_SIZE);
+    Path path = Files.write(directory.resolve("block"), data);
+    ChunkInfo info = chunkInfo.toBuilder().setLen(data.length)
+        .setChecksumData(new Checksum(ChecksumType.CRC32, 4096).computeChecksum(data).getProtoBufMessage()).build();
+    try (FileChannel file = FileChannel.open(path);
+         LocalChunkInputStream stream = new LocalChunkInputStream(info, blockID, null, () -> null, true,
+             () -> null, null, file)) {
+      stream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(data, stream::readPositioned);
+      assertEquals(123, stream.getPos());
+      assertEquals(0, file.position());
     }
   }
 

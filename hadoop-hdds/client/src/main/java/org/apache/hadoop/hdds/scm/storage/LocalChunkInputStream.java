@@ -62,7 +62,9 @@ public class LocalChunkInputStream extends ChunkInputStream
   LocalChunkInputStream(ChunkInfo chunkInfo, BlockID blockId, XceiverClientFactory xceiverClientFactory,
       Supplier<Pipeline> pipelineSupplier, boolean verifyChecksum, Supplier<Token<?>> tokenSupplier,
       XceiverClientShortCircuit xceiverClientShortCircuit, FileChannel dataIn) {
-    super(chunkInfo, blockId, xceiverClientFactory, pipelineSupplier, verifyChecksum, tokenSupplier);
+    // Pass null for xceiverClientFactory such readPositioned() is taken, both routing reads
+    // and checksum verification are done locally.
+    super(chunkInfo, blockId, null, pipelineSupplier, verifyChecksum, tokenSupplier);
     this.chunkInfo = chunkInfo;
     this.dataIn = dataIn;
     this.validator = this::validateChunk;
@@ -70,16 +72,6 @@ public class LocalChunkInputStream extends ChunkInputStream
     if (LOG.isDebugEnabled()) {
       LOG.debug("{} is created for {}", LocalChunkInputStream.class.getSimpleName(), blockId);
     }
-  }
-
-  @Override
-  protected void acquireClient() {
-    // The block stream owns the local file descriptor.
-  }
-
-  @Override
-  protected ByteBuffer[] readChunkPositioned(ChunkInfo range) throws IOException {
-    return readChunk(range);
   }
 
   /**
