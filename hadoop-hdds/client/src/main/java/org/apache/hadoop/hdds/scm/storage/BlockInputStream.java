@@ -217,7 +217,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
     }
   }
 
-  private void refreshBlockInfo(IOException cause) throws IOException {
+  private synchronized void refreshBlockInfo(IOException cause) throws IOException {
     refreshBlockInfo(cause, blockID, pipelineRef, tokenRef, refreshFunction);
   }
 
@@ -383,8 +383,8 @@ public class BlockInputStream extends BlockExtendedInputStream {
   protected ChunkInputStream createChunkInputStream(ChunkInfo chunkInfo) {
     if (blockFileInputStream != null) {
       // a non-empty blockFileInputStream means we have a direct local block replica to read from
-      return new LocalChunkInputStream(chunkInfo, blockID, xceiverClientFactory,
-          pipelineRef::get, verifyChecksum, tokenRef::get, xceiverClientShortCircuit, blockFileInputStream);
+      return new LocalChunkInputStream(chunkInfo, blockID, xceiverClientFactory, pipelineRef::get,
+          verifyChecksum, tokenRef::get, xceiverClientShortCircuit, blockFileInputStream.getChannel());
     } else {
       return new ChunkInputStream(chunkInfo, blockID,
           xceiverClientFactory, pipelineRef::get, verifyChecksum, tokenRef::get);
@@ -468,8 +468,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
    * {@code dst.remaining()} bytes starting from {@code blockRelativePosition}
    * without mutating this stream's cursor ({@code chunkIndex},
    * {@code blockPosition}) or the sequential chunk streams' buffered state.
-   * Each covering chunk is read through an ephemeral {@link ChunkInputStream}
-   * closed as soon as its bytes have been copied.
+   * Reuses each chunk's range reader, whose buffers and client references belong to the request.
    *
    * @return bytes copied into {@code dst}, or {@link #EOF} at EOF
    */
@@ -486,7 +485,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       initialize();
     }
     final long[] offsets;
-    final BlockData currentBlockData;
+    final List<ChunkInputStream> streams;
     final long blockLength;
     synchronized (this) {
       checkOpen();
@@ -494,22 +493,21 @@ public class BlockInputStream extends BlockExtendedInputStream {
         return EOF;
       }
 
-      offsets = Arrays.copyOf(chunkOffsets, chunkOffsets.length);
-      currentBlockData = blockData;
+      offsets = chunkOffsets;
+      streams = chunkStreams;
       blockLength = length;
     }
 
-    final List<ChunkInfo> chunkInfos = currentBlockData.getChunksList();
     int index = MultipartInputStream.binarySearchOffsetIndex(offsets, blockRelativePosition);
 
     long pos = blockRelativePosition;
     int totalReadLen = 0;
-    while (dst.hasRemaining() && pos < blockLength && index < chunkInfos.size()) {
-      final ChunkInfo chunkInfo = chunkInfos.get(index);
+    while (dst.hasRemaining() && pos < blockLength && index < streams.size()) {
+      final ChunkInputStream chunk = streams.get(index);
       final long chunkOffset = pos - offsets[index];
-      final long readLength = Math.min(Math.min(dst.remaining(), chunkInfo.getLen() - chunkOffset), blockLength - pos);
+      final long readLength = Math.min(Math.min(dst.remaining(), chunk.getLength() - chunkOffset), blockLength - pos);
       if (readLength > 0) {
-        final int numBytesRead = readChunkAt(chunkInfo, chunkOffset, (int) readLength, dst);
+        final int numBytesRead = readChunkAt(chunk, chunkOffset, (int) readLength, dst);
         totalReadLen += numBytesRead;
         pos += numBytesRead;
       }
@@ -518,56 +516,40 @@ public class BlockInputStream extends BlockExtendedInputStream {
     return totalReadLen == 0 ? EOF : totalReadLen;
   }
 
-  /**
-   * Read {@code readLength} bytes starting at {@code chunkOffset} of the given chunk into {@code dst}
-   * through an ephemeral {@link ChunkInputStream}, retrying like {@link #readWithStrategy(ByteReaderStrategy)}
-   * but with a retry counter local to this call.
-   */
-  private int readChunkAt(ChunkInfo chunkInfo, long chunkOffset, int readLength, ByteBuffer dst) throws IOException {
-    final int startPosition = dst.position();
+  /** Read a chunk range with a request-local retry counter and buffer position. */
+  private int readChunkAt(ChunkInputStream chunk, long chunkOffset, int readLength, ByteBuffer dst) throws IOException {
     int preadRetries = 0;
     while (true) {
-      final ChunkInputStream chunkStream;
-      synchronized (this) {
-        checkOpen();
-        chunkStream = createChunkInputStream(chunkInfo);
-      }
+      checkOpen();
+      final ByteBuffer target = dst.duplicate();
+      target.limit(target.position() + readLength);
       final int numBytesRead;
       try {
-        final int oldLimit = dst.limit();
-        try {
-          dst.limit(startPosition + readLength);
-          numBytesRead = chunkStream.readPositioned(chunkOffset, dst);
-        } finally {
-          dst.limit(oldLimit);
-        }
+        numBytesRead = chunk.readPositioned(chunkOffset, target);
       } catch (SCMSecurityException ex) {
         throw ex;
       } catch (StorageContainerException ex) {
         if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
           throw ex;
         }
-        handleReadError(ex);
-        dst.position(startPosition);
+        refreshBlockInfo(ex);
         continue;
       } catch (IOException ex) {
         if (!shouldRetryRead(ex, retryPolicy, ++preadRetries)) {
           throw ex;
         }
         if (isConnectivityIssue(ex)) {
-          handleReadError(ex);
+          refreshBlockInfo(ex);
         }
-        dst.position(startPosition);
         continue;
-      } finally {
-        chunkStream.close();
       }
 
       if (numBytesRead != readLength) {
         throw new IOException(String.format(
             "Inconsistent read for chunkName=%s length=%d readLength=%d numBytesRead=%d",
-            chunkInfo.getChunkName(), chunkInfo.getLen(), readLength, numBytesRead));
+            chunk.getChunkName(), chunk.getLength(), readLength, numBytesRead));
       }
+      dst.position(target.position());
       return numBytesRead;
     }
   }

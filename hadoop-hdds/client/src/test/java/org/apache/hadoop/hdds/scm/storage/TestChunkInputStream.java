@@ -25,15 +25,26 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.EOFException;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -51,6 +62,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -68,6 +80,22 @@ public class TestChunkInputStream {
   private BlockID blockID;
   private ChunkInfo chunkInfo;
   private byte[] chunkData;
+
+  @Test
+  void concurrentLocalRangeReadsPreserveFileAndStreamPositions(@TempDir Path directory) throws Exception {
+    byte[] data = generateRandomData(PositionedReadTestHelper.SOURCE_SIZE);
+    Path path = Files.write(directory.resolve("block"), data);
+    ChunkInfo info = chunkInfo.toBuilder().setLen(data.length)
+        .setChecksumData(new Checksum(ChecksumType.CRC32, 4096).computeChecksum(data).getProtoBufMessage()).build();
+    try (FileChannel file = FileChannel.open(path);
+         LocalChunkInputStream stream = new LocalChunkInputStream(info, blockID, null, () -> null, true,
+             () -> null, null, file)) {
+      stream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(data, stream::readPositioned);
+      assertEquals(123, stream.getPos());
+      assertEquals(0, file.position());
+    }
+  }
 
   @BeforeEach
   public void setup() throws Exception {
@@ -309,6 +337,46 @@ public class TestChunkInputStream {
     int bytesRead2 = chunkStream.read(b2, 0, 20);
     assertEquals(20, bytesRead2, "Expected to read 20 bytes");
     matchWithInputData(b2, 20, 20);
+  }
+
+  @Test
+  void rangeReadsOverlapWithoutChangingSourceBufferPositions() throws Exception {
+    ByteBuffer source = ByteBuffer.wrap(chunkData, 0, BYTES_PER_CHECKSUM).slice().asReadOnlyBuffer();
+    CountDownLatch entered = new CountDownLatch(2);
+    ChunkReader reader = new ChunkReader(chunkInfo, true, range -> {
+      entered.countDown();
+      try {
+        if (!entered.await(5, TimeUnit.SECONDS)) {
+          throw new IOException("Range reads were serialized");
+        }
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IOException(e);
+      }
+      return new ByteBuffer[] {source};
+    });
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> first = executor.submit(() -> {
+        ByteBuffer destination = ByteBuffer.allocate(7);
+        assertEquals(7, reader.read(3, destination));
+        assertArrayEquals(Arrays.copyOfRange(chunkData, 3, 10), destination.array());
+        return null;
+      });
+      Future<?> second = executor.submit(() -> {
+        ByteBuffer destination = ByteBuffer.allocate(7);
+        assertEquals(7, reader.read(12, destination));
+        assertArrayEquals(Arrays.copyOfRange(chunkData, 12, 19), destination.array());
+        return null;
+      });
+      first.get(10, TimeUnit.SECONDS);
+      second.get(10, TimeUnit.SECONDS);
+      assertEquals(0, source.position());
+      assertEquals(BYTES_PER_CHECKSUM, source.limit());
+    } finally {
+      executor.shutdownNow();
+      assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    }
   }
 
   @Test

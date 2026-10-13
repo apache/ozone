@@ -79,6 +79,11 @@ public class DummyChunkInputStream extends ChunkInputStream {
   }
 
   @Override
+  protected ByteBuffer[] readChunkPositioned(ChunkInfo range) {
+    return readChunk(range);
+  }
+
+  @Override
   protected void releaseClient() {
     // no-op
   }
