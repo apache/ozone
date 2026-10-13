@@ -268,13 +268,25 @@ class TestBaseHttpServer {
   @CsvSource({
       "om1.example.com:9874, , om1.example.com",
       "0.0.0.0:9874, om1.example.com:9875, om1.example.com",
-      "[2001:db8::1]:9874, , 2001:db8::1",
   })
   void spnegoHostIsAdvertisedHost(String httpAddress, String httpsAddress,
       String expectedHost) throws Exception {
     BaseHttpServer subject = newDisabledServer(httpAddress, httpsAddress);
 
     assertEquals(expectedHost, subject.getSpnegoHost());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "127.0.0.1:9874, 127.0.0.1",
+      "[::1]:9874, ::1",
+  })
+  void spnegoHostReverseResolvesAdvertisedIpLiteral(String httpAddress,
+      String literal) throws Exception {
+    BaseHttpServer subject = newDisabledServer(httpAddress, null);
+
+    assertEquals(InetAddress.getByName(literal).getCanonicalHostName(),
+        subject.getSpnegoHost());
   }
 
   /**

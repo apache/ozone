@@ -340,23 +340,28 @@ public abstract class BaseHttpServer implements AutoCloseable {
   /**
    * Returns the host that replaces {@code _HOST} in this server's SPNEGO
    * principal: the host of the advertised HTTP or HTTPS address unless it is
-   * a wildcard, otherwise the canonical name of the local host.
+   * a wildcard, otherwise the canonical name of the local host. An IP literal
+   * is reverse-resolved, since a principal names a host.
    */
   protected String getSpnegoHost() throws UnknownHostException {
     for (String addressKey : new String[] {getHttpAddressKey(), getHttpsAddressKey()}) {
       Optional<String> host = getHostNameFromConfigKeys(conf, addressKey);
-      if (host.isPresent() && !isWildcardHost(host.get())) {
+      if (!host.isPresent()) {
+        continue;
+      }
+      // Judged on the text first: InetAddresses.forString rejects a scoped
+      // literal unless this host owns the named interface.
+      if (host.get().indexOf('%') >= 0 || !InetAddresses.isInetAddress(host.get())) {
         return host.get();
+      }
+      InetAddress address = InetAddresses.forString(host.get());
+      if (!address.isAnyLocalAddress()) {
+        // The lookup SecurityUtil.getServerPrincipal(String, InetAddress)
+        // performs, and the one the bind address used to go through.
+        return address.getCanonicalHostName();
       }
     }
     return InetAddress.getLocalHost().getCanonicalHostName();
-  }
-
-  private static boolean isWildcardHost(String host) {
-    // Judged on the text first: InetAddresses.forString rejects a scoped
-    // literal unless this host owns the named interface.
-    return host.indexOf('%') < 0 && InetAddresses.isInetAddress(host)
-        && InetAddresses.forString(host).isAnyLocalAddress();
   }
 
   /**
