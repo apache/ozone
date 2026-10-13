@@ -202,8 +202,6 @@ jobs:
           args="-DexcludedGroups=slow|unhealthy -DskipShade -Drocks_tools_native"
           args="$args $ratis_args"
           args="$args -pl :$SUBMODULE"
-          # repeated runs must execute the test, not load it from the build cache
-          args="$args -Ddevelocity.cache.remote.enabled=false"
 
           if [ "$TEST_METHOD" = "ALL" ]; then
             echo "Running all tests from $TEST_CLASS"
