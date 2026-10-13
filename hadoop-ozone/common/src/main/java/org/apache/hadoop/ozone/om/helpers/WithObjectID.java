@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
-
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -119,7 +117,7 @@ public abstract class WithObjectID extends WithMetadata {
     }
 
     protected void validate() {
-      if (initialObjectID != objectID && initialObjectID != 0 && objectID != OBJECT_ID_RECLAIM_BLOCKS) {
+      if (initialObjectID != objectID && initialObjectID != 0) {
         throw new UnsupportedOperationException("Attempt to modify object ID " +
             "which is not zero. Current Object ID is " + initialObjectID);
       }
