@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -257,6 +258,16 @@ public class TestSCMStateMachine {
 
       assertThat(bootstrap.getIsStateMachineReady()).isFalse();
       assertThat(bootstrap.getLatestSnapshot()).isNull();
+    }
+  }
+
+  @Test
+  void testBootstrapStateMachineSkipsApplyTransaction() throws Exception {
+    try (SCMStateMachine bootstrap = new SCMStateMachine()) {
+      CompletableFuture<Message> future = bootstrap.applyTransaction(newTransaction(RequestType.CONTAINER, 1));
+
+      assertTrue(future.isDone());
+      assertFalse(future.isCompletedExceptionally());
     }
   }
 
