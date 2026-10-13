@@ -694,10 +694,47 @@ public class TestBucketList {
 
     StringWriter writer = new StringWriter();
     JAXB.marshal(result, writer);
-    assertThat(writer.toString())
-        .contains("<ListVersionsResult ", "<KeyMarker></KeyMarker>", "<VersionIdMarker></VersionIdMarker>")
-        .contains("<Version>", "<Key>file%2B1</Key>", "<VersionId>null</VersionId>", "<IsLatest>true</IsLatest>")
-        .doesNotContain("NextKeyMarker", "DeleteMarker");
+    // LastModified and the owner depend on the time and the user running the test
+    assertThat(writer.toString().replaceAll("<(LastModified|DisplayName|ID)>[^<]*</\\1>", "<$1/>")).isEqualTo("""
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <ListVersionsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+            <Name>b1</Name>
+            <Prefix></Prefix>
+            <KeyMarker></KeyMarker>
+            <VersionIdMarker></VersionIdMarker>
+            <MaxKeys>1000</MaxKeys>
+            <Delimiter>/</Delimiter>
+            <EncodingType>url</EncodingType>
+            <IsTruncated>false</IsTruncated>
+            <Version>
+                <Key>file%2B1</Key>
+                <Owner>
+                    <DisplayName/>
+                    <ID/>
+                </Owner>
+                <LastModified/>
+                <Size>0</Size>
+                <StorageClass>REDUCED_REDUNDANCY</StorageClass>
+                <VersionId>null</VersionId>
+                <IsLatest>true</IsLatest>
+            </Version>
+            <Version>
+                <Key>file3</Key>
+                <Owner>
+                    <DisplayName/>
+                    <ID/>
+                </Owner>
+                <LastModified/>
+                <Size>0</Size>
+                <StorageClass>REDUCED_REDUNDANCY</StorageClass>
+                <VersionId>null</VersionId>
+                <IsLatest>true</IsLatest>
+            </Version>
+            <CommonPrefixes>
+                <Prefix>dir1/</Prefix>
+            </CommonPrefixes>
+        </ListVersionsResult>
+        """);
   }
 
   @Test
