@@ -55,6 +55,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Tests startup migration and the independent lifetime of container replica history.
@@ -210,6 +212,37 @@ class TestReconReplicaHistoryDBProvider {
     assertEquals(departed.toProto(), history.get(departed.getId()).toProto());
     assertEquals(current.toProto(), history.get(current.getId()).toProto());
     assertNull(historyDBProvider.getReplicaHistoryTable().get(2L));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "10, 20, 30, 40, 10, 40, true",
+      "30, 40, 10, 20, 10, 40, false",
+      "10, 40, 30, 40, 10, 40, true"
+  })
+  void testShutdownBatchPreservesFirstSeenAndLatestReplicaInfo(long storedFirstSeen, long storedLastSeen,
+      long currentFirstSeen, long currentLastSeen, long expectedFirstSeen, long expectedLastSeen,
+      boolean currentFieldsExpected) throws Exception {
+    openHistoryDB();
+    ReconContainerMetadataManager manager = newManager();
+    DatanodeID id = DatanodeID.randomID();
+    ContainerReplicaHistory stored = new ContainerReplicaHistory(id, storedFirstSeen, storedLastSeen, 100L,
+        "OPEN", ContainerChecksums.of(1111L, 0L));
+    ContainerReplicaHistory current = new ContainerReplicaHistory(id, currentFirstSeen, currentLastSeen, 200L,
+        "CLOSED", ContainerChecksums.of(2222L, 0L));
+    manager.storeContainerReplicaHistory(1L, Collections.singletonMap(id, stored));
+    manager.batchStoreContainerReplicaHistory(Collections.singletonMap(1L, Collections.singletonMap(id, current)));
+    assertEquals(currentFirstSeen, current.getFirstSeenTime());
+    assertEquals(currentLastSeen, current.getLastSeenTime());
+    historyDBProvider.close();
+    openHistoryDB();
+
+    ContainerReplicaHistory expected = new ContainerReplicaHistory(id, expectedFirstSeen, expectedLastSeen,
+        currentFieldsExpected ? 200L : 100L, currentFieldsExpected ? "CLOSED" : "OPEN",
+        ContainerChecksums.of(currentFieldsExpected ? 2222L : 1111L, 0L));
+    Map<DatanodeID, ContainerReplicaHistory> history = newManager().getContainerReplicaHistory(1L);
+    assertEquals(1, history.size());
+    assertEquals(expected.toProto(), history.get(id).toProto());
   }
 
   private void openHistoryDB() throws IOException {

@@ -250,7 +250,12 @@ public class ReconContainerMetadataManagerImpl
         final long containerId = entry.getKey();
         // The in-memory map contains only current replicas; preserve departed datanodes on shutdown.
         final Map<DatanodeID, ContainerReplicaHistory> tsMap = getContainerReplicaHistory(containerId);
-        tsMap.putAll(entry.getValue());
+        entry.getValue().forEach((id, inMemory) -> tsMap.merge(id, inMemory, (stored, current) -> {
+          // Prefer the in-memory record on equal timestamps, as before.
+          ContainerReplicaHistory latest = stored.getLastSeenTime() > current.getLastSeenTime() ? stored : current;
+          return new ContainerReplicaHistory(id, Math.min(stored.getFirstSeenTime(), current.getFirstSeenTime()),
+              latest.getLastSeenTime(), latest.getBcsId(), latest.getState(), latest.getChecksums());
+        }));
 
         List<ContainerReplicaHistory> tsList = new ArrayList<>();
         for (Map.Entry<DatanodeID, ContainerReplicaHistory> e : tsMap.entrySet()) {
