@@ -202,6 +202,8 @@ jobs:
           args="-DexcludedGroups=slow|unhealthy -DskipShade -Drocks_tools_native"
           args="$args $ratis_args"
           args="$args -pl :$SUBMODULE"
+          # repeated runs must execute the test, not load it from the build cache
+          args="$args -Ddevelocity.cache.remote.enabled=false"
 
           if [ "$TEST_METHOD" = "ALL" ]; then
             echo "Running all tests from $TEST_CLASS"
@@ -213,7 +215,7 @@ jobs:
             hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS#$TEST_METHOD,Abstract*Test*\$*"
           fi
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
           repo_path: ${{ steps.download-ozone-repo.outputs.download-path }}
           ratis_args: ${{ needs.ratis.outputs.build-args }}
       - name: Summary of failures
