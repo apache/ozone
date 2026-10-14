@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import java.security.PrivilegedExceptionAction;
 import java.util.UUID;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -115,6 +116,30 @@ public class TestOMAdminRpcAuthorization {
               conf, user, cluster.getOzoneManager().getNodeDetails());
       return adminClient.getOMConfiguration();
     });
+  }
+
+  private static boolean setSafeMode(UserGroupInformation user, SafeModeAction action) throws Exception {
+    return user.doAs((PrivilegedExceptionAction<Boolean>) () -> {
+      try (OzoneManagerProtocolClientSideTranslatorPB omClient = new OzoneManagerProtocolClientSideTranslatorPB(
+          OmTransportFactory.create(conf, user, null), ClientId.randomId().toString())) {
+        return omClient.setSafeMode(action, false);
+      }
+    });
+  }
+
+  @Test
+  void forceExitSafeModeNonAdminIsDenied() throws Exception {
+    UserGroupInformation nonAdmin = UserGroupInformation.createUserForTesting("nonadmin", new String[] {"users"});
+    OMException ex = assertThrows(OMException.class, () -> setSafeMode(nonAdmin, SafeModeAction.FORCE_EXIT));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+    // Querying safe mode stays open to every user.
+    assertFalse(setSafeMode(nonAdmin, SafeModeAction.GET));
+  }
+
+  @Test
+  void forceExitSafeModeAdminIsAllowed() throws Exception {
+    UserGroupInformation admin = UserGroupInformation.createUserForTesting("admin", new String[] {"admins"});
+    assertTrue(setSafeMode(admin, SafeModeAction.FORCE_EXIT));
   }
 
   @Test
