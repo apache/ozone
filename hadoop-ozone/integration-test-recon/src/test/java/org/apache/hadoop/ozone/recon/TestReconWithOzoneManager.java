@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.recon;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
@@ -75,6 +74,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
+import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -104,6 +104,7 @@ public class TestReconWithOzoneManager {
   private static MiniOzoneCluster cluster = null;
   private static OMMetadataManager metadataManager;
   private static CloseableHttpClient httpClient;
+  private static String reconHttpURL;
   private static String taskStatusURL;
   private static ReconService recon;
 
@@ -146,8 +147,9 @@ public class TestReconWithOzoneManager {
 
     cluster.getStorageContainerManager().exitSafeMode();
 
-    String reconHTTPAddress = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY);
-    taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
+    // Keep requests on loopback when the HTTP server advertises the machine hostname.
+    reconHttpURL = "http://127.0.0.1:" + recon.getReconServer().getHttpServer().getHttpAddress().getPort();
+    taskStatusURL = reconHttpURL + "/api/v1/task/status";
 
     // initialize HTTPClient
     httpClient = HttpClientBuilder
@@ -455,8 +457,7 @@ public class TestReconWithOzoneManager {
     assertThat(reconLoadedSeqNumber).isGreaterThanOrEqualTo(omLatestSeqNumber);
 
     // 6. POST reinit
-    String triggerUrl = "http://" + cluster.getConf().get(OZONE_RECON_HTTP_ADDRESS_KEY) +
-        "/api/v1/triggerdbsync/om/reinit";
+    String triggerUrl = reconHttpURL + "/api/v1/triggerdbsync/om/reinit";
     org.apache.http.client.methods.HttpPost httpPost = new org.apache.http.client.methods.HttpPost(triggerUrl);
     HttpResponse response = httpClient.execute(httpPost);
     assertEquals(202, response.getStatusLine().getStatusCode());
@@ -506,7 +507,8 @@ public class TestReconWithOzoneManager {
   @Test
   public void testReplicaHistoryMigrationOnUpgradeAndRestart() throws Exception {
     OzoneConfiguration conf = cluster.getConf();
-    String jdbcUrl = recon.getReconServer().getConf().getObject(ReconSqlDbConfig.class).getJdbcUrl();
+    String jdbcUrl = ReconGuiceServletContextListener.getGlobalInjector()
+        .getInstance(DataSourceConfiguration.class).getJdbcUrl();
     long containerID = 987654321L;
     Map<DatanodeID, ContainerReplicaHistory> expected = new HashMap<>();
     for (int i = 0; i < 3; i++) {
@@ -532,7 +534,7 @@ public class TestReconWithOzoneManager {
       }
       try (Connection connection = DriverManager.getConnection(jdbcUrl, RECON_SCHEMA_NAME, "");
            PreparedStatement statement = connection.prepareStatement(
-               "UPDATE " + SCHEMA_VERSION_TABLE_NAME + " SET version_number = ?")) {
+               "UPDATE " + SCHEMA_VERSION_TABLE_NAME + " SET \"version_number\" = ?")) {
         statement.setInt(1, ReconVersion.UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX.serialize());
         assertEquals(1, statement.executeUpdate());
       }
@@ -573,7 +575,7 @@ public class TestReconWithOzoneManager {
   private int getReconSchemaVersion(String jdbcUrl) throws SQLException {
     try (Connection connection = DriverManager.getConnection(jdbcUrl, RECON_SCHEMA_NAME, "");
          PreparedStatement statement = connection.prepareStatement(
-             "SELECT version_number FROM " + SCHEMA_VERSION_TABLE_NAME);
+             "SELECT \"version_number\" FROM " + SCHEMA_VERSION_TABLE_NAME);
          ResultSet result = statement.executeQuery()) {
       assertTrue(result.next());
       return result.getInt(1);
@@ -590,8 +592,7 @@ public class TestReconWithOzoneManager {
       assertEquals(history.toProto(), actual.get(id).toProto());
     });
     List<Map<String, Object>> response = JsonTestUtils.readTreeAsListOfMaps(makeHttpCall(
-        "http://" + cluster.getConf().get(OZONE_RECON_HTTP_ADDRESS_KEY) +
-            "/api/v1/containers/" + containerID + "/replicaHistory"));
+        reconHttpURL + "/api/v1/containers/" + containerID + "/replicaHistory"));
     assertEquals(expected.size(), response.size());
   }
 
