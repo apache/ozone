@@ -25,11 +25,13 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 
 MAVEN_OPTIONS="-B -fae -Djacoco.skip -DskipDocs -DskipRecon -DskipShade --no-transfer-progress ${MAVEN_OPTIONS:-}"
 
-mvn ${MAVEN_OPTIONS} clean javadoc:aggregate "$@" | tee output.log
+log=$(mktemp)
+mvn ${MAVEN_OPTIONS} clean javadoc:aggregate "$@" | tee "${log}"
 rc=$?
 
 mkdir -p "$REPORT_DIR"
-mv -f output.log target/reports/apidocs "${REPORT_DIR}"/
+mv -f "${log}" "${REPORT_DIR}"/output.log
+mv -f target/reports/apidocs "$REPORT_DIR"/
 
 ERROR_PATTERN="\[ERROR\]"
 
