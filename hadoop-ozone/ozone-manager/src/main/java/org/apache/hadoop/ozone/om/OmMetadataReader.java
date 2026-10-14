@@ -252,6 +252,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
+      if (args.isRequireFileSystemLayout()) {
+        validateFileSystemLayout(bucket);
+      }
       if (isAclEnabled) {
         checkListStatusAcls(args, bucket);
       }
@@ -288,6 +291,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     OmKeyArgs resolvedArgs = bucket.update(args);
 
     try {
+      if (resolvedArgs.isRequireFileSystemLayout()) {
+        validateFileSystemLayout(bucket);
+      }
       if (isAclEnabled) {
         checkListStatusAcls(resolvedArgs, bucket);
       }
@@ -310,6 +316,25 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     }
   }
   
+  /**
+   * Rejects file system reads on a bucket whose link-resolved layout is
+   * OBJECT_STORE, so file system clients need no InfoBucket to check it.
+   * listStatus and listStatusLight call it only when the client asked for it,
+   * because they also serve object store callers (S3 shallow key listing).
+   */
+  private static void validateFileSystemLayout(ResolvedBucket bucket) throws OMException {
+    if (bucket.bucketLayout() != null) {
+      try {
+        OzoneFSUtils.validateBucketLayout(bucket.requestedBucket(), bucket.bucketLayout());
+      } catch (IllegalArgumentException e) {
+        // Convert to an OMException so it is returned to the client as a
+        // normal (non-retryable) RPC response instead of escaping the read
+        // handler's IOException catch and triggering a client retry storm.
+        throw new OMException(e.getMessage(), ResultCodes.NOT_SUPPORTED_OPERATION);
+      }
+    }
+  }
+
   @Override
   public OzoneFileStatus getFileStatus(OmKeyArgs args) throws IOException {
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
@@ -320,18 +345,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = bucket.update(args);
 
     try {
-      if (bucket.bucketLayout() != null) {
-        try {
-          OzoneFSUtils.validateBucketLayout(bucket.requestedBucket(),
-              bucket.bucketLayout());
-        } catch (IllegalArgumentException e) {
-          // Convert to an OMException so it is returned to the client as a
-          // normal (non-retryable) RPC response instead of escaping the read
-          // handler's IOException catch and triggering a client retry storm.
-          throw new OMException(e.getMessage(),
-              ResultCodes.NOT_SUPPORTED_OPERATION);
-        }
-      }
+      validateFileSystemLayout(bucket);
       if (isAclEnabled) {
         checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
       }
@@ -361,18 +375,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     args = normalizeKeyArgs(bucket.update(args), bucket);
 
     try {
-      if (bucket.bucketLayout() != null) {
-        try {
-          OzoneFSUtils.validateBucketLayout(bucket.requestedBucket(),
-              bucket.bucketLayout());
-        } catch (IllegalArgumentException e) {
-          // Convert to an OMException so it is returned to the client as a
-          // normal (non-retryable) RPC response instead of escaping the read
-          // handler's IOException catch and triggering a client retry storm.
-          throw new OMException(e.getMessage(),
-              ResultCodes.NOT_SUPPORTED_OPERATION);
-        }
-      }
+      validateFileSystemLayout(bucket);
       if (isAclEnabled) {
         checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ,
             bucket, args.getKeyName());
