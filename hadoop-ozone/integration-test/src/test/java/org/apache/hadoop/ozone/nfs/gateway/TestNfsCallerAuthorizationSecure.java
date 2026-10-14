@@ -644,8 +644,9 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       runCommand("env", "KRB5_CONFIG=" + contractKrb5, "kinit", "-kt",
           getTestUserKeytab().getAbsolutePath(), getTestUserPrincipal());
       verifyMountedKerberosCredentials(contractKrb5, clientKeytab, clientPrincipal, nfsPrincipal);
+      Path kerberosTrace = contractDir.resolve("rpc.gssd.trace");
       ProcessBuilder gssdBuilder = new ProcessBuilder("sudo", "env", "KRB5_CONFIG=" + contractKrb5,
-          "rpc.gssd", "-f", "-k", clientKeytab.getAbsolutePath(), "-v");
+          "KRB5_TRACE=" + kerberosTrace, "rpc.gssd", "-f", "-k", clientKeytab.getAbsolutePath(), "-v");
       gssdBuilder.redirectErrorStream(true);
       gssdBuilder.redirectOutput(contractDir.resolve("rpc.gssd.log").toFile());
       gssd = gssdBuilder.start();
@@ -664,7 +665,8 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
             "ozone-ci.example.test:/ozone/data", mount.toString());
       } catch (IOException ex) {
         throw new IOException(ex.getMessage() + "\nGanesha log:\n" + readText(contractDir.resolve("ganesha.log"))
-            + "\nrpc.gssd log:\n" + readText(contractDir.resolve("rpc.gssd.log")), ex);
+            + "\nrpc.gssd log:\n" + readText(contractDir.resolve("rpc.gssd.log"))
+            + "\nKerberos trace:\n" + readText(kerberosTrace), ex);
       }
       mounted = true;
 
