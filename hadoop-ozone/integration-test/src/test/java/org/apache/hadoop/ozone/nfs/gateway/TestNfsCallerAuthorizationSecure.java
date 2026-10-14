@@ -665,6 +665,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         + "    RecoveryBackend = fs_ng;\n"
         + "    RecoveryRoot = \"/var/lib/nfs/ganesha\";\n"
         + "    RecoveryDir = \"ozone-v4recov\";\n"
+        + "    Graceless = true;\n"
         + "}\n"
         + "EXPORT {\n"
         + "    Export_Id = 1;\n"
@@ -822,8 +823,12 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         operation, attempt * 15);
     Thread.getAllStackTraces().forEach((thread, stack) -> {
       String name = thread.getName();
+      boolean omRpcHandler = name.contains("IPC Server handler");
+      boolean idleOmRpcHandler = omRpcHandler && thread.getState() == Thread.State.WAITING
+          && Arrays.stream(stack).anyMatch(frame -> frame.getClassName().contains("LinkedBlockingQueue")
+              && frame.getMethodName().equals("take"));
       if (name.contains("Nfs") || name.contains("OMStateMachineApplyTransactionThread")
-          || name.contains("ForkJoinPool-1-worker")) {
+          || name.contains("ForkJoinPool-1-worker") || (omRpcHandler && !idleOmRpcHandler)) {
         LOG.warn("Thread {} is {}: {}", name, thread.getState(), Arrays.toString(stack));
       }
     });
