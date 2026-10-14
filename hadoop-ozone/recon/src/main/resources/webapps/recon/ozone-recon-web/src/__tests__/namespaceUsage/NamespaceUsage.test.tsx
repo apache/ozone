@@ -164,16 +164,26 @@ describe('Namespace Usage page (Disk Usage)', () => {
     expect(fileSizeRow).toHaveTextContent('2.93 KB');
   });
 
-  test('shows error when usage API returns PATH_NOT_FOUND', async () => {
+  test('shows error when API returns PATH_NOT_FOUND', async () => {
     render(<NamespaceUsage />);
     await confirmRootLoad();
-    await waitForMetadataEntityType('ROOT');
+    const metadataTable = await waitForMetadataEntityType('ROOT');
+    expect(within(metadataTable).getByText('Volumes')).toBeInTheDocument();
 
     await searchPathFromBreadcrumb('missing');
 
-    await waitFor(() =>
-      expect(commonUtils.showDataFetchError).toHaveBeenCalledWith('Invalid Path: /missing')
-    );
+    await waitFor(() => {
+      const invalidPathCalls = vi.mocked(commonUtils.showDataFetchError).mock.calls.filter(
+        (call) => call[0] === 'Invalid Path: /missing'
+      );
+      expect(invalidPathCalls).toHaveLength(2);
+    });
+
+    await waitFor(() => {
+      const table = screen.getByRole('table');
+      expect(within(table).queryByText('Entity Type')).not.toBeInTheDocument();
+      expect(within(table).queryByText('Volumes')).not.toBeInTheDocument();
+    });
   });
 
   test('notifies when namespace summary is still initializing', async () => {

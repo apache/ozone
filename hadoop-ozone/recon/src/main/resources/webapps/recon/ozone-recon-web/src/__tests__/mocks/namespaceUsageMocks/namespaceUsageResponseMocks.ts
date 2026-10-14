@@ -171,3 +171,20 @@ export const Bucket1QuotaResponse = {
   allowed: 1073741824,
   used: 6000
 };
+
+export const PathNotFoundSummaryResponse = {
+  status: 'PATH_NOT_FOUND',
+  path: '/missing',
+  type: 'UNKNOWN',
+  countStats: {
+    numVolume: 0,
+    numBucket: 0,
+    numDir: 0,
+    numKey: 0
+  },
+  objectInfo: {}
+};
+
+export const PathNotFoundQuotaResponse = {
+  status: 'PATH_NOT_FOUND'
+};

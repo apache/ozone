@@ -51,6 +51,9 @@ const usageHandler = http.get('/api/v1/namespace/usage', ({ request }) => {
 const summaryHandler = http.get('/api/v1/namespace/summary', ({ request }) => {
   const url = new URL(request.url);
   const path = url.searchParams.get('path') ?? '/';
+  if (path === '/missing') {
+    return HttpResponse.json(mockResponses.PathNotFoundSummaryResponse);
+  }
   if (path === '/vol1/bucket1/key1') {
     return HttpResponse.json(mockResponses.Key1SummaryResponse);
   }
@@ -66,6 +69,9 @@ const summaryHandler = http.get('/api/v1/namespace/summary', ({ request }) => {
 const quotaHandler = http.get('/api/v1/namespace/quota', ({ request }) => {
   const url = new URL(request.url);
   const path = url.searchParams.get('path') ?? '/';
+  if (path === '/missing') {
+    return HttpResponse.json(mockResponses.PathNotFoundQuotaResponse);
+  }
   if (path === '/vol1/bucket1' || path === '/vol1/bucket1/key1') {
     return HttpResponse.json(mockResponses.Bucket1QuotaResponse);
   }
