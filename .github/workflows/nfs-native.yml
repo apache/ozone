@@ -84,7 +84,8 @@ jobs:
           sudo hostname ozone-ci
           NFS_CI_IP="$(ip -4 route get 1.1.1.1 | awk '{for (i = 1; i <= NF; i++) if ($i == "src") print $(i + 1)}')"
           test -n "$NFS_CI_IP"
-          printf '%s ozone-ci.example.test ozone-ci\n' "$NFS_CI_IP" | sudo tee -a /etc/hosts
+          printf '127.0.0.1 ozone-ci\n' | sudo tee -a /etc/hosts
+          printf '%s ozone-ci.example.test\n' "$NFS_CI_IP" | sudo tee -a /etc/hosts
 
       - name: Prepare Linux NFSv4 Kerberos client
         run: |
