@@ -77,6 +77,20 @@ When replacing a gateway, use a distinct ID for the replacement process. OM perm
 
 The pinned Ganesha server configuration example is [ganesha.conf.example](src/main/ganesha/ganesha.conf.example). It enables only NFSv4.1, requires Kerberos privacy, and keeps Ganesha's recovery database in `RecoveryRoot`. Create that directory before starting Ganesha and make it writable by the Ganesha service account. For fenced active/passive replacement, both hosts must use the same durable `RecoveryRoot`, `Clustered = true`, the same explicit Ganesha node ID (`ganesha.nfsd -I 0`), export identity, NFS address, `Server_Scope`, and `Server_Owner`. Keep exactly one instance active; `fs_ng` does not provide active/active recovery. The Java gateway is loopback-only and owns the OM export lease, so it must also start on the replacement host and acquire the lease before that host serves requests. On 2026-10-14, the secure mounted contract passed across containers with different hostnames: it reclaimed an open file and verified read, append, fsync, and byte-exact contents after replacement. The replacement gateway waited for the prior OM export lease to expire before it started serving. This used a shared bind-mounted `RecoveryRoot` on one Docker host; separate physical hosts and remote shared-storage behavior remain production gates. The pinned V5.7 source maps the shared recovery path to `RecoveryRoot/RecoveryDir/node0` for this configuration. Automatic failover remains unsupported.
 
+### Separate-host recovery acceptance
+
+Run this gate on a disposable Linux client and two separate gateway hosts. The NFS client must keep one NFSv4.1 `sec=krb5p` mount at the same address through the transition. Both gateway hosts must use the same durable `RecoveryRoot` and the same Ganesha export/server identity; the replacement uses the same Ganesha node ID and a distinct Java gateway ID. The shared storage must provide durable writes, coherent reads, atomic rename, and exclusive ownership during host replacement. If using a shared block device, fence the old host before attaching and mounting it on the replacement. If using a shared filesystem, ensure the old Ganesha process is fenced before the replacement starts. Never use object storage for `RecoveryRoot` or allow both gateways to serve the export concurrently.
+
+Pass an operator-owned transition script as `--restart-command`. It must fence the old gateway host, move the stable NFS address, make `RecoveryRoot` available to the replacement, start the Java gateway with a new gateway ID, wait for its OM export lease, then start Ganesha with the original node ID and server identity. Keep the script idempotent and make it return nonzero if fencing, storage activation, or replacement startup fails. The mounted runner keeps a file open across this command, writes and fsyncs data before and after the transition, and compares final bytes. Invoke it with an outer timeout because a hard NFS mount can block during failover:
+
+```sh
+timeout -k 5 300 python3 hadoop-ozone/nfs-gateway/src/test/nfs/test_ganesha_reclaim.py \
+  --mount /mnt/ozone \
+  --restart-command /path/to/fenced-active-passive-transition
+```
+
+Accept only when evidence confirms the two daemons ran on different physical hosts, the old host was fenced before replacement service began, both hosts used the same durable recovery path and NFS identity, and the open file was reclaimed without remounting the client. Verify read/append/fsync and final bytes through the reclaim runner, then independently compare the corresponding OzoneFS key. Repeat with a hard power-off of the active host and again in the reverse direction. The runner verifies NFS open-state recovery and NFS-visible data bytes; the transition script and operator logs must establish host identity, fencing, storage semantics, and OM lease takeover. This is a manual active/passive acceptance test, not automatic failover.
+
 ```sh
 ozone nfs
 ```
