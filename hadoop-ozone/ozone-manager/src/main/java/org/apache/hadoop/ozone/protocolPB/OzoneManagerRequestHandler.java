@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatu
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
@@ -1673,7 +1674,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return impl;
   }
 
-  private EchoRPCResponse echoRPC(EchoRPCRequest req) {
+  private EchoRPCResponse echoRPC(EchoRPCRequest req) throws IOException {
+    // The caller chooses the size of the response payload, so EchoRPC is limited to admins.
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (impl.isAdminAuthorizationEnabled() && !impl.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi + ". Superuser privilege is required for EchoRPC.",
+          OMException.ResultCodes.ACCESS_DENIED);
+    }
     EchoRPCResponse.Builder builder = EchoRPCResponse.newBuilder();
     final ByteString payloadBytes = PayloadUtils.generatePayloadProto2(req.getPayloadSizeResp());
     builder.setPayload(payloadBytes);
