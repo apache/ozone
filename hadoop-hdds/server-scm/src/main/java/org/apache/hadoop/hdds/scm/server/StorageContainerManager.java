@@ -2179,6 +2179,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return scmAdmins.getAdminUsernames();
   }
 
+  public Collection<String> getScmAdminGroups() {
+    return scmAdmins.getAdminGroups();
+  }
+
   public Collection<String> getScmReadOnlyAdminUsernames() {
     return scmReadOnlyAdmins.getAdminUsernames();
   }

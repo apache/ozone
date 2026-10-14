@@ -17,7 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import java.util.Collections;
+import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_TYPE;
+
 import javax.servlet.ServletException;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -54,11 +55,13 @@ public class SCMDBCheckpointServlet extends DBCheckpointServlet {
       return;
     }
 
+    // SCM admin checks are not configurable on this branch, so SPNEGO alone enables the check.
+    final boolean spnegoEnabled = "kerberos".equals(scm.getConfiguration().get(HDDS_SCM_HTTP_AUTH_TYPE, "simple"));
     initialize(scm.getScmMetadataStore().getStore(),
         scm.getMetrics().getDBCheckpointMetrics(),
-        false,
-        Collections.emptyList(),
-        Collections.emptyList(),
-        false);
+        spnegoEnabled,
+        scm.getScmAdminUsernames(),
+        scm.getScmAdminGroups(),
+        spnegoEnabled);
   }
 }

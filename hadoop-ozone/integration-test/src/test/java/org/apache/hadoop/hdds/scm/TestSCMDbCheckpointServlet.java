@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
@@ -31,6 +33,8 @@ import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +45,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.Principal;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
@@ -93,7 +98,6 @@ public class TestSCMDbCheckpointServlet {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .build();
     cluster.waitForClusterToBeReady();
-    StorageContainerManager scm = cluster.getStorageContainerManager();
     scmMetrics = StorageContainerManager.getMetrics();
 
     requestMock = mock(HttpServletRequest.class);
@@ -105,12 +109,7 @@ public class TestSCMDbCheckpointServlet {
     scmDbCheckpointServletMock = mock(SCMDBCheckpointServlet.class);
     doCallRealMethod().when(scmDbCheckpointServletMock).init();
     doCallRealMethod().when(scmDbCheckpointServletMock).initialize(
-        scm.getScmMetadataStore().getStore(),
-        scmMetrics.getDBCheckpointMetrics(),
-        false,
-        Collections.emptyList(),
-        Collections.emptyList(),
-        false);
+        any(), any(), anyBoolean(), any(), any(), anyBoolean());
     doCallRealMethod().when(scmDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
     doCallRealMethod().when(scmDbCheckpointServletMock).doPost(requestMock,
@@ -207,6 +206,43 @@ public class TestSCMDbCheckpointServlet {
     scmDbCheckpointServletMock.doPost(requestMock, responseMock);
 
     verify(responseMock).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+  }
+
+  @ParameterizedTest
+  @MethodSource("getHttpMethods")
+  void testSpnegoEnabled(String httpMethod) throws Exception {
+    this.method = httpMethod;
+
+    OzoneConfiguration conf = cluster.getConf();
+    conf.set(OZONE_ADMINISTRATORS, "scmadmin");
+    conf.set(HDDS_SCM_HTTP_AUTH_TYPE, "kerberos");
+    cluster.restartStorageContainerManager(true);
+
+    ServletContext servletContextMock = mock(ServletContext.class);
+    when(scmDbCheckpointServletMock.getServletContext()).thenReturn(servletContextMock);
+    when(servletContextMock.getAttribute(OzoneConsts.SCM_CONTEXT_ATTRIBUTE))
+        .thenReturn(cluster.getStorageContainerManager());
+    when(scmDbCheckpointServletMock.getBootstrapStateLock()).thenReturn(new DBCheckpointServlet.Lock());
+    scmDbCheckpointServletMock.init();
+    setupHttpMethod(Collections.emptyList());
+
+    // No user principal in the request.
+    doEndpoint();
+    verify(responseMock, times(1)).setStatus(HttpServletResponse.SC_FORBIDDEN);
+
+    // An authenticated user that is not an SCM admin.
+    Principal userPrincipalMock = mock(Principal.class);
+    when(userPrincipalMock.getName()).thenReturn("dn/localhost@REALM");
+    when(requestMock.getUserPrincipal()).thenReturn(userPrincipalMock);
+    doEndpoint();
+    verify(responseMock, times(2)).setStatus(HttpServletResponse.SC_FORBIDDEN);
+    verify(scmDbCheckpointServletMock, never()).getCheckpoint(any(), anyBoolean());
+
+    // An SCM admin gets past the permission check.
+    when(userPrincipalMock.getName()).thenReturn("scmadmin");
+    doEndpoint();
+    verify(responseMock, times(2)).setStatus(HttpServletResponse.SC_FORBIDDEN);
+    verify(scmDbCheckpointServletMock).getCheckpoint(any(), anyBoolean());
   }
 
   /**
