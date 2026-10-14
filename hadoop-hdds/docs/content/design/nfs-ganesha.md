@@ -33,7 +33,7 @@ This proposal supplements the historical [NFS proposal](nfs.md), which selected 
 | Protocol | NFSv4.1 over TCP through Ganesha; NFSv3, pNFS, and delegations are disabled. |
 | Exports | Explicitly configured FSO buckets; no OBS, LEGACY, bucket links, or snapshot exports. |
 | Namespace | Export root is a bucket. Volume and bucket administration remain outside NFS. |
-| Data | Create new files, transfer their contents, and read existing files. |
+| Data | Create new files, transfer their contents, and read existing files. Writes, including append, are allowed only while the active NFS transfer lease owns a file created by that transfer. |
 | Namespace mutations | mkdir, rmdir, rename, and remove, subject to Ozone ACLs and active-transfer coordination. |
 | Writers | One mutation owner per file, enforced by OM across NFS and other supported clients. |
 | Durability | Successful stable WRITE and COMMIT survive loss of the gateway host. |
@@ -42,7 +42,7 @@ This proposal supplements the historical [NFS proposal](nfs.md), which selected 
 | Availability | One active gateway per export with restart and fenced replacement. Automatic failover is deferred. |
 | Compatibility | Files remain usable through supported OzoneFS and S3 operations. No silent weaker behavior on old OM versions. |
 
-Reject edits of existing content, append, arbitrary truncation, hard links, symbolic links, and user-requested POSIX byte-range locks. Preserve NFS OPEN share reservations required by the supported transfer contract. Creating an empty file and setting its size to zero during its active new-file transfer must be distinguished from truncating an existing file. Attribute handling must be tested with actual upload clients; successful mounting alone is insufficient.
+Reject edits to content that predates the active NFS transfer, appending to pre-existing files, arbitrary truncation, hard links, symbolic links, and user-requested POSIX byte-range locks. Preserve NFS OPEN share reservations required by the supported transfer contract. Appending to a file created by the active NFS transfer lease is allowed; creating an empty file and setting its size to zero during that transfer must be distinguished from truncating a pre-existing file. Attribute handling must be tested with actual upload clients; successful mounting alone is insufficient.
 
 Initially use RATIS replication for writable exports. EC write exports remain disabled until synchronization and recovery satisfy the same durability contract. Existing readable files require explicit coverage for the replication configurations advertised by the gateway.
 
@@ -200,7 +200,7 @@ The current implementation atomically creates a new FSO file and its OM-owned le
 
 ### Proposed OM ownership protocol
 
-Before implementing writable exports, add an OM-owned export lease keyed by export UUID and a file-transfer lease keyed by `(volumeID, bucketID, objectID)`. The export lease has a gateway incarnation, fencing generation, and server-assigned expiry. The file lease has the export UUID, transfer ID, opaque owner token, file fencing generation, and expiry. OM grants tokens and generations; clients cannot choose or advance them. Read operations do not require a lease. The first writable scope is a new file only: creating the file identity and acquiring its lease must be one OM transaction, so another client cannot mutate the file between creation and ownership acquisition. Opening an existing file for write, appending, or truncating remains rejected.
+Before implementing writable exports, add an OM-owned export lease keyed by export UUID and a file-transfer lease keyed by `(volumeID, bucketID, objectID)`. The export lease has a gateway incarnation, fencing generation, and server-assigned expiry. The file lease has the export UUID, transfer ID, opaque owner token, file fencing generation, and expiry. OM grants tokens and generations; clients cannot choose or advance them. Read operations do not require a lease. The first writable scope is a new file only: creating the file identity and acquiring its lease must be one OM transaction, so another client cannot mutate the file between creation and ownership acquisition. Opening a pre-existing file for write, appending to pre-existing content, or truncating a pre-existing file remains rejected; the lease owner may continue writing or append to the newly created file until the transfer is committed and closed.
 
 Renewal and release are conditional on the exact lease identity and fencing generation. Expiry/reclaim increments the generation before another owner can write. Each `KEY_COMMIT`, hsync/stable write, rename, and delete checks the current lease in the same OM transaction that changes the canonical FSO record; NFS writes must present the current OM-issued owner token and generation. OzoneFS and S3 requests without that context fail with `FILE_OPEN` while the lease is active. Directory rename/delete must also reject when any descendant has an active transfer. Reads remain available for the last committed content; uncommitted ranges are private to the active writer until the publication contract says otherwise.
 
