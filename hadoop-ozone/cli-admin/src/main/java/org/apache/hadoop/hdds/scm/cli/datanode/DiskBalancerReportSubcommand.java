@@ -30,6 +30,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeDiskBalancerInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 import org.apache.hadoop.util.StringUtils;
 import picocli.CommandLine.Command;
@@ -123,7 +125,10 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
           .append(formatPercent(p.getCurrentVolumeDensitySum()))
           .append(System.lineSeparator());
 
-      if (p.hasIdealUsage() && p.hasDiskBalancerConf()
+      if (p.getStorageTypeInfoCount() > 0 && p.hasDiskBalancerConf()
+          && p.getDiskBalancerConf().hasThreshold()) {
+        appendStorageTypeDetails(header, p);
+      } else if (p.hasIdealUsage() && p.hasDiskBalancerConf()
           && p.getDiskBalancerConf().hasThreshold()) {
         double idealUsage = p.getIdealUsage();
         double threshold = p.getDiskBalancerConf().getThreshold();
@@ -141,8 +146,9 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       formatBuilder.append("%s%n");
       contentList.add(header.toString());
 
-      if (p.getVolumeInfoCount() > 0 && p.hasIdealUsage()) {
-        formatBuilder.append("%-45s %-40s %15s %15s %15s %30s %20s %15s %15s%n");
+      if (p.getVolumeInfoCount() > 0 && (p.hasIdealUsage() || p.getStorageTypeInfoCount() > 0)) {
+        formatBuilder.append("%-12s %-45s %-40s %15s %15s %15s %30s %20s %15s %15s%n");
+        contentList.add("StorageType");
         contentList.add("StorageID");
         contentList.add("StoragePath");
         contentList.add("OzoneCapacity");
@@ -153,9 +159,11 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         contentList.add("Utilization");
         contentList.add("VolumeDensity");
 
-        double ideal = p.getIdealUsage();
+        Map<StorageTypeProto, StorageTypeDiskBalancerInfoProto> storageTypeInfo =
+            getStorageTypeInfo(p);
         for (VolumeReportProto v : p.getVolumeInfoList()) {
-          formatBuilder.append("%-45s %-40s %15s %15s %15s %30s %20s %15s %15s%n");
+          formatBuilder.append("%-12s %-45s %-40s %15s %15s %15s %30s %20s %15s %15s%n");
+          contentList.add(v.hasStorageType() ? v.getStorageType().name() : "-");
           contentList.add(v.hasStorageId() ? v.getStorageId() : "-");
           contentList.add(v.hasStoragePath() ? v.getStoragePath() : "-");
           contentList.add(v.hasTotalCapacity() ? StringUtils.byteDesc(v.getTotalCapacity()) : "-");
@@ -164,7 +172,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
           contentList.add(StringUtils.byteDesc(v.getCommittedBytes()));
           contentList.add(v.hasEffectiveUsedSpace() ? StringUtils.byteDesc(v.getEffectiveUsedSpace()) : "-");
           contentList.add(formatPercent(v.getUtilization()));
-          contentList.add(formatPercent(Math.abs(v.getUtilization() - ideal)));
+          contentList.add(formatVolumeDensity(p, v, storageTypeInfo));
         }
         formatBuilder.append("%n");
       }
@@ -175,7 +183,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
     }
 
     formatBuilder.append("%nNote:%n")
-        .append("  - Aggregate VolumeDataDensity: Sum of per-volume density (deviation from ideal);")
+        .append("  - Aggregate VolumeDataDensity: Sum of per-volume density from each storage type's ideal;")
         .append(" higher means more imbalance.%n")
         .append("  - IdealUsage: Target utilization (0-100%%) when volumes are evenly balanced.%n")
         .append("  - ThresholdRange: Acceptable deviation (percent); volumes within")
@@ -194,6 +202,53 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
             " this value is reflected only when diskBalancer is running else it is 0.%n");
 
     return String.format(formatBuilder.toString(), contentList.toArray(new Object[0]));
+  }
+
+  private static void appendStorageTypeDetails(StringBuilder header,
+      DatanodeDiskBalancerInfoProto report) {
+    double threshold = report.getDiskBalancerConf().getThreshold();
+    header.append("Storage Type Details:").append(System.lineSeparator());
+    for (StorageTypeDiskBalancerInfoProto info : report.getStorageTypeInfoList()) {
+      header.append("  ").append(info.getStorageType()).append(": ");
+      if (!info.getBalanceable() || !info.hasIdealUsage()) {
+        header.append("not balanceable (").append(info.getUsableVolumeCount())
+            .append(" usable volume(s))").append(System.lineSeparator());
+        continue;
+      }
+      double idealUsage = info.getIdealUsage();
+      double lowerThreshold = Math.max(0.0, idealUsage - threshold / 100.0);
+      double upperThreshold = Math.min(1.0, idealUsage + threshold / 100.0);
+      header.append("IdealUsage: ").append(formatPercent(idealUsage))
+          .append(" | ThresholdRange: (").append(formatPercent(lowerThreshold))
+          .append(", ").append(formatPercent(upperThreshold)).append(')')
+          .append(" | VolumeDataDensity: ")
+          .append(formatPercent(info.getCurrentVolumeDensitySum()))
+          .append(" | EstBytesToMove: ").append(StringUtils.byteDesc(info.getBytesToMove()))
+          .append(System.lineSeparator());
+    }
+    header.append(System.lineSeparator()).append("Volume Details:").append(System.lineSeparator());
+  }
+
+  private static Map<StorageTypeProto, StorageTypeDiskBalancerInfoProto> getStorageTypeInfo(
+      DatanodeDiskBalancerInfoProto report) {
+    Map<StorageTypeProto, StorageTypeDiskBalancerInfoProto> result = new LinkedHashMap<>();
+    for (StorageTypeDiskBalancerInfoProto info : report.getStorageTypeInfoList()) {
+      result.put(info.getStorageType(), info);
+    }
+    return result;
+  }
+
+  private static String formatVolumeDensity(DatanodeDiskBalancerInfoProto report,
+      VolumeReportProto volume,
+      Map<StorageTypeProto, StorageTypeDiskBalancerInfoProto> storageTypeInfo) {
+    if (volume.hasStorageType()) {
+      StorageTypeDiskBalancerInfoProto info = storageTypeInfo.get(volume.getStorageType());
+      if (info != null && info.hasIdealUsage()) {
+        return formatPercent(Math.abs(volume.getUtilization() - info.getIdealUsage()));
+      }
+    }
+    return report.hasIdealUsage()
+        ? formatPercent(Math.abs(volume.getUtilization() - report.getIdealUsage())) : "-";
   }
 
   @Override
@@ -218,7 +273,35 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
     result.put("status", "success");
     result.put("volumeDensity", formatPercent(report.getCurrentVolumeDensitySum()));
 
-    if (report.hasIdealUsage() && report.hasDiskBalancerConf()
+    Map<StorageTypeProto, StorageTypeDiskBalancerInfoProto> storageTypeInfo =
+        getStorageTypeInfo(report);
+    // Report ideal usage per storage type when the datanode sends it. The node-level
+    // idealUsage averages across storage types, which is not a target any move can reach
+    // on a datanode with more than one type, so it is only reported as a fallback for
+    // datanodes that predate the per-storage-type fields.
+    if (!storageTypeInfo.isEmpty()) {
+      double threshold = report.getDiskBalancerConf().getThreshold();
+      List<Map<String, Object>> storageTypes = new ArrayList<>();
+      for (StorageTypeDiskBalancerInfoProto info : report.getStorageTypeInfoList()) {
+        Map<String, Object> storageType = new LinkedHashMap<>();
+        storageType.put("storageType", info.getStorageType().name());
+        storageType.put("balanceable", info.getBalanceable());
+        storageType.put("usableVolumeCount", info.getUsableVolumeCount());
+        storageType.put("volumeDensity", formatPercent(info.getCurrentVolumeDensitySum()));
+        storageType.put("estBytesToMove", StringUtils.byteDesc(info.getBytesToMove()));
+        if (info.hasIdealUsage()) {
+          double idealUsage = info.getIdealUsage();
+          double lowerThreshold = Math.max(0.0, idealUsage - threshold / 100.0);
+          double upperThreshold = Math.min(1.0, idealUsage + threshold / 100.0);
+          storageType.put("idealUsage", formatPercent(idealUsage));
+          storageType.put("thresholdRange", String.format("(%s, %s)",
+              formatPercent(lowerThreshold), formatPercent(upperThreshold)));
+        }
+        storageTypes.add(storageType);
+      }
+      result.put("storageTypes", storageTypes);
+      result.put("threshold %", String.format(Locale.ROOT, PERCENT_FORMAT, threshold));
+    } else if (report.hasIdealUsage() && report.hasDiskBalancerConf()
         && report.getDiskBalancerConf().hasThreshold()) {
       double idealUsage = report.getIdealUsage();
       double threshold = report.getDiskBalancerConf().getThreshold();
@@ -231,10 +314,10 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
     }
 
     if (report.getVolumeInfoCount() > 0) {
-      double ideal = report.hasIdealUsage() ? report.getIdealUsage() : 0.0;
       List<Map<String, Object>> vols = new ArrayList<>();
       for (VolumeReportProto v : report.getVolumeInfoList()) {
         Map<String, Object> vm = new LinkedHashMap<>();
+        vm.put("storageType", v.hasStorageType() ? v.getStorageType().name() : "-");
         vm.put("storageId", v.getStorageId());
         vm.put("storagePath", v.hasStoragePath() ? v.getStoragePath() : "-");
         vm.put("ozoneCapacity", v.hasTotalCapacity() ? StringUtils.byteDesc(v.getTotalCapacity()) : "-");
@@ -244,7 +327,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         vm.put("effectiveUsedSpace", v.hasEffectiveUsedSpace() ?
             StringUtils.byteDesc(v.getEffectiveUsedSpace()) : "-");
         vm.put("utilization", formatPercent(v.getUtilization()));
-        vm.put("volumeDensity", formatPercent(Math.abs(v.getUtilization() - ideal)));
+        vm.put("volumeDensity", formatVolumeDensity(report, v, storageTypeInfo));
         vols.add(vm);
       }
 

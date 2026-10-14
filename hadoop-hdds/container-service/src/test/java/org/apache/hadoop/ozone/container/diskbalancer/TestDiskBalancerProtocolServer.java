@@ -35,6 +35,8 @@ import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.GetDiskB
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeDiskBalancerInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer.PrivilegedOperation;
@@ -101,6 +103,14 @@ class TestDiskBalancerProtocolServer {
         TEST_VOLUME_DENSITY
     );
     diskBalancerInfo.setIdealUsage(TEST_IDEAL_USAGE);
+    diskBalancerInfo.setStorageTypeInfo(Arrays.asList(
+        StorageTypeDiskBalancerInfoProto.newBuilder()
+            .setStorageType(StorageTypeProto.DISK)
+            .setCurrentVolumeDensitySum(TEST_VOLUME_DENSITY)
+            .setIdealUsage(TEST_IDEAL_USAGE)
+            .setUsableVolumeCount(TEST_VOLUME_INFO_COUNT)
+            .setBalanceable(true)
+            .build()));
     diskBalancerInfo.setVolumeInfo(Arrays.asList(
         VolumeReportProto.newBuilder()
             .setStorageId(TEST_STORAGE_ID_1)
@@ -154,6 +164,8 @@ class TestDiskBalancerProtocolServer {
     assertEquals(TEST_VOLUME_DENSITY, report.getCurrentVolumeDensitySum());
     assertEquals(TEST_IDEAL_USAGE, report.getIdealUsage());
     assertEquals(TEST_VOLUME_INFO_COUNT, report.getVolumeInfoCount());
+    assertEquals(1, report.getStorageTypeInfoCount());
+    assertEquals(StorageTypeProto.DISK, report.getStorageTypeInfo(0).getStorageType());
     assertEquals(TEST_STORAGE_ID_1, volReport0.getStorageId());
     assertEquals(TEST_STORAGE_PATH_1, volReport0.getStoragePath());
     assertEquals(TEST_UTILIZATION_1, volReport0.getUtilization());
@@ -325,4 +337,3 @@ class TestDiskBalancerProtocolServer {
         exception.getMessage());
   }
 }
-
