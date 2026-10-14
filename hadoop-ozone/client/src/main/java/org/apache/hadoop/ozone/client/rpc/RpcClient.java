@@ -2535,6 +2535,14 @@ public class RpcClient implements ClientProtocol {
     return builder.build();
   }
 
+  private OmKeyArgs prepareListStatusKeyArgs(ListStatusLightOptions options) {
+    final OmKeyArgs keyArgs = prepareOmKeyArgs(
+        options.getVolumeName(), options.getBucketName(), options.getKeyName(), options.getListPrefix());
+    return options.isRequireFileSystemLayout()
+        ? keyArgs.toBuilder().setRequireFileSystemLayout(true).build()
+        : keyArgs;
+  }
+
   @Override
   public OzoneDataStreamOutput createStreamFile(String volumeName,
       String bucketName, String keyName, long size,
@@ -2577,10 +2585,17 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
+  public List<OzoneFileStatus> listStatus(ListStatusLightOptions options)
+      throws IOException {
+    final OmKeyArgs keyArgs = prepareListStatusKeyArgs(options);
+    return ozoneManagerClient.listStatus(keyArgs, options.isRecursive(), options.getStartKey(),
+        options.getNumEntries(), options.isAllowPartialPrefixes());
+  }
+
+  @Override
   public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
       throws IOException {
-    final OmKeyArgs keyArgs = prepareOmKeyArgs(
-        options.getVolumeName(), options.getBucketName(), options.getKeyName(), options.getListPrefix());
+    final OmKeyArgs keyArgs = prepareListStatusKeyArgs(options);
     if (OzoneManagerVersion.LIGHTWEIGHT_LIST_STATUS.isSupportedBy(omVersion)) {
       return ozoneManagerClient.listStatusLight(
           keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),

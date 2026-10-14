@@ -64,6 +64,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // Original S3/list prefix when keyName is empty (root listing). Used for STS
   // auth to check LIST on this prefix instead of "*".
   private final String listPrefix;
+  // Set by file system clients so that OM rejects a listing on an
+  // OBJECT_STORE bucket.
+  private final boolean requireFileSystemLayout;
   private final String expectedETag;
   private final boolean derivedKeyPiggyBacking;
 
@@ -88,6 +91,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
     this.listPrefix = b.listPrefix;
+    this.requireFileSystemLayout = b.requireFileSystemLayout;
     this.expectedETag = b.expectedETag;
     this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
   }
@@ -180,6 +184,14 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return listPrefix;
   }
 
+  /**
+   * Whether OM must reject the request if the resolved bucket layout is
+   * OBJECT_STORE, because the caller needs file system semantics.
+   */
+  public boolean isRequireFileSystemLayout() {
+    return requireFileSystemLayout;
+  }
+
   public String getExpectedETag() {
     return expectedETag;
   }
@@ -262,6 +274,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
     private String listPrefix = null;
+    private boolean requireFileSystemLayout;
     private String expectedETag;
     private boolean derivedKeyPiggyBacking;
 
@@ -314,6 +327,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
       this.listPrefix = obj.listPrefix;
+      this.requireFileSystemLayout = obj.requireFileSystemLayout;
     }
 
     public Builder setVolumeName(String volume) {
@@ -449,6 +463,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setListPrefix(String prefix) {
       this.listPrefix = prefix;
+      return this;
+    }
+
+    public Builder setRequireFileSystemLayout(boolean require) {
+      this.requireFileSystemLayout = require;
       return this;
     }
 

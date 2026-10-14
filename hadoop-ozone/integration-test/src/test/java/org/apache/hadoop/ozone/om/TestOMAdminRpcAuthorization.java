@@ -34,9 +34,12 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.UUID;
+import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
@@ -44,11 +47,18 @@ import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.ClientId;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests admin authorization of OM administrative RPCs that are only ever driven by admin
@@ -126,6 +136,30 @@ public class TestOMAdminRpcAuthorization {
     });
   }
 
+  private static boolean setSafeMode(UserGroupInformation user, SafeModeAction action) throws Exception {
+    return user.doAs((PrivilegedExceptionAction<Boolean>) () -> {
+      try (OzoneManagerProtocolClientSideTranslatorPB omClient = new OzoneManagerProtocolClientSideTranslatorPB(
+          OmTransportFactory.create(conf, user, null), ClientId.randomId().toString())) {
+        return omClient.setSafeMode(action, false);
+      }
+    });
+  }
+
+  @Test
+  void forceExitSafeModeNonAdminIsDenied() throws Exception {
+    UserGroupInformation nonAdmin = UserGroupInformation.createUserForTesting("nonadmin", new String[] {"users"});
+    OMException ex = assertThrows(OMException.class, () -> setSafeMode(nonAdmin, SafeModeAction.FORCE_EXIT));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+    // Querying safe mode stays open to every user.
+    assertFalse(setSafeMode(nonAdmin, SafeModeAction.GET));
+  }
+
+  @Test
+  void forceExitSafeModeAdminIsAllowed() throws Exception {
+    UserGroupInformation admin = UserGroupInformation.createUserForTesting("admin", new String[] {"admins"});
+    assertTrue(setSafeMode(admin, SafeModeAction.FORCE_EXIT));
+  }
+
   @Test
   void refetchSecretKeyNonAdminIsDenied() {
     UserGroupInformation nonAdmin =
@@ -166,5 +200,50 @@ public class TestOMAdminRpcAuthorization {
     assertThatThrownBy(() -> bootstrap(nonAdmin))
         .isInstanceOf(IOException.class)
         .hasMessageContaining("Only administrators are authorized to perform bootstrap.");
+  }
+
+  private static int echoRPC(UserGroupInformation user, boolean writeToRatis) throws Exception {
+    return user.doAs((PrivilegedExceptionAction<Integer>) () -> {
+      try (OzoneManagerProtocolClientSideTranslatorPB omClient = new OzoneManagerProtocolClientSideTranslatorPB(
+          OmTransportFactory.create(conf, user, null), ClientId.randomId().toString())) {
+        return omClient.echoRPCReq(new byte[0], 16, writeToRatis).getPayload().size();
+      }
+    });
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void echoRPCNonAdminIsDenied(boolean writeToRatis) {
+    UserGroupInformation nonAdmin = UserGroupInformation.createUserForTesting("nonadmin", new String[] {"users"});
+    OMException ex = assertThrows(OMException.class, () -> echoRPC(nonAdmin, writeToRatis));
+    assertEquals(OMException.ResultCodes.ACCESS_DENIED, ex.getResult());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void echoRPCAdminIsAllowed(boolean writeToRatis) throws Exception {
+    UserGroupInformation admin = UserGroupInformation.createUserForTesting("admin", new String[] {"admins"});
+    assertEquals(16, echoRPC(admin, writeToRatis));
+  }
+
+  /** A call without an RPC user, as on the OM gRPC endpoint, must not be treated as the OM user. */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void echoRPCWithoutRpcUserIsDenied(boolean writeToRatis) throws Exception {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.EchoRPC)
+        .setClientId(ClientId.randomId().toString())
+        .setEchoRPCRequest(EchoRPCRequest.newBuilder().setPayloadSizeResp(16).setReadOnly(!writeToRatis))
+        .build();
+
+    // The call context that OzoneManagerServiceGrpc sets up: a client ID, but no connection and so no user.
+    Server.getCurCall().set(new Server.Call(1, 1, null, null, RPC.RpcKind.RPC_PROTOCOL_BUFFER,
+        ClientId.randomId().toByteString().toByteArray()));
+    try {
+      OMResponse response = cluster.getOzoneManager().getOmServerProtocol().submitRequest(null, request);
+      assertEquals(Status.ACCESS_DENIED, response.getStatus());
+    } finally {
+      Server.getCurCall().remove();
+    }
   }
 }

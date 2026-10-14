@@ -1253,6 +1253,18 @@ public interface ClientProtocol {
       long numEntries, boolean allowPartialPrefixes) throws IOException;
 
   /**
+   * List the status for a file or a directory and its contents, returning the
+   * full file status. Takes the same options as {@link #listStatusLight}.
+   *
+   * @param options Encapsulates volume, bucket, key, recursive, startKey,
+   *                numEntries, allowPartialPrefixes, and whether OM must reject
+   *                an OBJECT_STORE bucket.
+   * @return list of file status
+   */
+  List<OzoneFileStatus> listStatus(ListStatusLightOptions options)
+      throws IOException;
+
+  /**
    * Lightweight listStatus API.
    *
    * @param options Encapsulates volume, bucket, key, recursive, startKey,

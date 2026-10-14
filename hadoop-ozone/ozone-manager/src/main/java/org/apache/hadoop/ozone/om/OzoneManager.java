@@ -3909,10 +3909,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       services.add(scmServiceInfoBuilder.build());
     }
     metrics.incNumGetServiceLists();
-    // For now there is no exception that can can happen in this call,
-    // so failure metrics is not handled. In future if there is any need to
-    // handle exception in this method, we need to incorporate
-    // metrics.incNumGetServiceListFails()
     AUDIT.logReadSuccess(
         buildAuditMessageForSuccess(OMAction.GET_SERVICE_LIST,
             new LinkedHashMap<>()));
@@ -5740,6 +5736,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("Enter safe mode is unsupported",
           INTERNAL_ERROR);
     case FORCE_EXIT:
+      // SCM sees this call as coming from the OM user, so the caller has to be checked here.
+      checkAdminUserPrivilege("force exit safe mode.");
       return getScmClient().getContainerClient().forceExitSafeMode();
     case GET:
       return getScmClient().getContainerClient().inSafeMode();

@@ -73,6 +73,7 @@ public class AbstractReconContainerManagerTest {
   private OzoneConfiguration conf;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
   private DBStore store;
 
   @BeforeEach
@@ -102,6 +103,7 @@ public class AbstractReconContainerManagerTest {
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
         Clock.system(ZoneId.systemDefault()), null);
 
+    reconContainerMetadataManager = mock(ReconContainerMetadataManager.class);
     containerManager = new ReconContainerManager(
         conf,
         store,
@@ -109,7 +111,7 @@ public class AbstractReconContainerManagerTest {
         pipelineManager,
         getScmServiceProvider(),
         mock(ContainerHealthSchemaManager.class),
-        mock(ReconContainerMetadataManager.class),
+        reconContainerMetadataManager,
         scmhaManager,
         sequenceIdGen,
         pendingOps);
@@ -131,6 +133,10 @@ public class AbstractReconContainerManagerTest {
 
   protected ReconContainerManager getContainerManager() {
     return containerManager;
+  }
+
+  protected ReconContainerMetadataManager getReconContainerMetadataManager() {
+    return reconContainerMetadataManager;
   }
 
   private StorageContainerServiceProvider getScmServiceProvider()

@@ -154,6 +154,19 @@ public class TestNodeStateMap {
         map.getNodeCount(NodeOperationalState.DECOMMISSIONING, null));
   }
 
+  @Test
+  public void testToString() throws NodeAlreadyExistsException {
+    assertEquals("Total number of nodes: 0, HEALTHY: 0, STALE: 0, DEAD: 0, HEALTHY_READONLY: 0", map.toString());
+
+    addRandomNodeWithState(NodeOperationalState.IN_SERVICE, NodeState.HEALTHY, 0);
+    addRandomNodeWithState(NodeOperationalState.IN_SERVICE, NodeState.HEALTHY, 0);
+    addRandomNodeWithState(NodeOperationalState.DECOMMISSIONING, NodeState.HEALTHY, 0);
+    addRandomNodeWithState(NodeOperationalState.IN_SERVICE, NodeState.STALE, 0);
+    addRandomNodeWithState(NodeOperationalState.IN_MAINTENANCE, NodeState.DEAD, 0);
+
+    assertEquals("Total number of nodes: 5, HEALTHY: 3, STALE: 1, DEAD: 1, HEALTHY_READONLY: 0", map.toString());
+  }
+
   /**
    * Test if container list is iterable even if it's modified from other thread.
    */
