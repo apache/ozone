@@ -825,6 +825,8 @@ public class KeyLifecycleService extends BackgroundService {
         long numKeysExpired = 0;
         HashSet<String> deletedKeySetInCache = new HashSet();
         HashSet<String> keySetInCache = new HashSet();
+        // Cache iteration is unordered, so lastScannedKey must only be set from the sorted table iteration below,
+        // otherwise a resumed scan could seek past table keys that were never evaluated.
         Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter = keyTable.cacheIterator();
         while (cacheIter.hasNext()) {
           Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry = cacheIter.next();
@@ -850,7 +852,6 @@ public class KeyLifecycleService extends BackgroundService {
                 break;
               }
             }
-            lastScannedKey = entry.getKey().getCacheKey();
           }
         }
 
