@@ -193,7 +193,7 @@ public final class NfsTlsContractServer {
                 .setGeneration(1).setExpiresAtMillis(9999999999999L)
                 .setTransferID("00112233-4455-6677-8899-aabbccddeeff").build());
     org.mockito.Mockito.when(leaseManager.fileCommitRequest(org.mockito.ArgumentMatchers.any(),
-        org.mockito.ArgumentMatchers.eq(4L), org.mockito.ArgumentMatchers.anyString())).thenReturn(
+        org.mockito.ArgumentMatchers.any())).thenReturn(
             org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest.newBuilder()
                 .setExportUUID(export.toString()).setGatewayID("gateway").setGatewayGeneration(1)
                 .setTransferID("00112233-4455-6677-8899-aabbccddeeff").setFileGeneration(1)

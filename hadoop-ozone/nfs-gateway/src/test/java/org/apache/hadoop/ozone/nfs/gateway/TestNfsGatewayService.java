@@ -414,7 +414,7 @@ class TestNfsGatewayService {
         .setGatewayID("gateway").setGatewayGeneration(1).setTransferID("transfer-a").setFileGeneration(1)
         .setOwnerToken(ByteString.copyFromUtf8("owner")).build();
     when(leaseManager.recoverFileLease(exportUuid, 9, "alice")).thenReturn(lease);
-    when(leaseManager.fileCommitRequest(exportUuid, 9, "alice")).thenReturn(commitRequest);
+    when(leaseManager.fileCommitRequest(exportUuid, lease)).thenReturn(commitRequest);
     when(leaseManager.stagedFileSize(exportUuid, 9, "alice")).thenReturn(7L);
     NfsGatewayService leasedService = new NfsGatewayService(Map.of(exportUuid, reader), leaseManager);
     CommitRequest commit = CommitRequest.newBuilder().setContext(context).setHandle(handle).setFinalize(false).build();
@@ -443,7 +443,7 @@ class TestNfsGatewayService {
         .setGatewayID("gateway").setGatewayGeneration(1).setTransferID("transfer-a").setFileGeneration(1)
         .setOwnerToken(ByteString.copyFromUtf8("owner")).build();
     when(leaseManager.recoverFileLease(exportUuid, 9, "alice")).thenReturn(lease);
-    when(leaseManager.fileCommitRequest(exportUuid, 9, "alice")).thenReturn(commitRequest);
+    when(leaseManager.fileCommitRequest(exportUuid, lease)).thenReturn(commitRequest);
     when(leaseManager.stagedFileSize(exportUuid, 9, "alice")).thenReturn(7L);
     NfsGatewayService leasedService = new NfsGatewayService(Map.of(exportUuid, reader), leaseManager);
     CommitRequest commit = CommitRequest.newBuilder().setContext(context).setHandle(handle).setFinalize(true).build();
@@ -475,7 +475,7 @@ class TestNfsGatewayService {
         .setGatewayID("gateway").setGatewayGeneration(1).setTransferID("transfer-a").setFileGeneration(2)
         .setOwnerToken(ByteString.copyFromUtf8("owner")).build();
     when(leaseManager.recoverFileLease(exportUuid, 9, "alice")).thenReturn(lease);
-    when(leaseManager.fileCommitRequest(exportUuid, 9, "alice")).thenReturn(commitRequest);
+    when(leaseManager.fileCommitRequest(exportUuid, lease)).thenReturn(commitRequest);
     NfsGatewayService leasedService = new NfsGatewayService(Map.of(exportUuid, reader), leaseManager);
     CommitRequest commit = CommitRequest.newBuilder().setContext(context).setHandle(handle).setFinalize(true).build();
     StreamObserver<CommitResponse> observer = observer();

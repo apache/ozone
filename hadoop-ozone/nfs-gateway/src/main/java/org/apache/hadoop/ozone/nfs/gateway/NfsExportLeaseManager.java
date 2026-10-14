@@ -285,8 +285,7 @@ final class NfsExportLeaseManager implements Closeable {
     }
   }
 
-  NfsFileCommitRequest fileCommitRequest(ByteString exportUuid, long objectId, String principal) throws IOException {
-    NfsFileLeaseResponse fileLease = recoverFileLease(exportUuid, objectId, principal);
+  NfsFileCommitRequest fileCommitRequest(ByteString exportUuid, NfsFileLeaseResponse fileLease) throws IOException {
     LeaseState exportLease = leases.get(exportUuid);
     if (exportLease == null || !isActive(exportUuid)) {
       throw new IOException("NFS export lease is not active");

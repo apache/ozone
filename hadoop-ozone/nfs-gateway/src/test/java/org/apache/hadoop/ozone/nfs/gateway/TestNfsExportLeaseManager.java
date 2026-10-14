@@ -74,8 +74,9 @@ class TestNfsExportLeaseManager {
     manager.start();
 
     try {
+      NfsFileLeaseResponse recovered = manager.recoverFileLease(EXPORT_UUID, 101, "alice");
       org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest request =
-          manager.fileCommitRequest(EXPORT_UUID, 101, "alice");
+          manager.fileCommitRequest(EXPORT_UUID, recovered);
 
       assertEquals(2, request.getGatewayGeneration());
       assertEquals(4, request.getFileGeneration());

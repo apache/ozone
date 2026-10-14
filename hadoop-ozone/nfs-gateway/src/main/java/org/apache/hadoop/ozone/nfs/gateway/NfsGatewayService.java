@@ -232,8 +232,7 @@ public final class NfsGatewayService extends NfsGatewayGrpc.NfsGatewayImplBase {
       String principal = reader.getCallerUserName(request.getContext());
       NfsFileLeaseResponse lease = leaseManager.recoverFileLease(request.getContext().getExportUuid(), objectId,
           principal);
-      NfsFileCommitRequest commitRequest = leaseManager.fileCommitRequest(request.getContext().getExportUuid(),
-          objectId, principal);
+      NfsFileCommitRequest commitRequest = leaseManager.fileCommitRequest(request.getContext().getExportUuid(), lease);
       if (!lease.getContentPublished()) {
         leaseManager.refreshStagedRanges(request.getContext().getExportUuid(), objectId, principal);
         long fileSize = leaseManager.stagedFileSize(request.getContext().getExportUuid(), objectId, principal);
