@@ -18,10 +18,39 @@
 import argparse
 import os
 from pathlib import Path
+import select
+import socket
+import socketserver
 import subprocess
+import threading
 import tempfile
 import time
 import unittest
+
+
+class _TcpForwardHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        with socket.create_connection(("127.0.0.1", self.server.target_port)) as upstream:
+            sockets = [self.request, upstream]
+            while sockets:
+                readable, _, _ = select.select(sockets, [], [])
+                for source in readable:
+                    destination = upstream if source is self.request else self.request
+                    data = source.recv(65536)
+                    if data:
+                        destination.sendall(data)
+                    else:
+                        sockets.remove(source)
+                        destination.shutdown(socket.SHUT_WR)
+
+
+class _TcpForwardServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+    def __init__(self, target_port):
+        self.target_port = target_port
+        super().__init__(("", 0), _TcpForwardHandler)
 
 
 class GrpcTlsContract(unittest.TestCase):
@@ -208,7 +237,9 @@ class GrpcTlsContract(unittest.TestCase):
         if not OPTIONS.ganesha_image:
             self.skipTest("Ganesha runtime image was not supplied")
         self.capabilities_marker.unlink(missing_ok=True)
-        (self.root / "recovery").mkdir()
+        forwarder = _TcpForwardServer(self.port)
+        forwarder_thread = threading.Thread(target=forwarder.serve_forever, daemon=True)
+        forwarder_thread.start()
         (self.root / "ganesha.conf").write_text('''
 NFS_CORE_PARAM {
     Protocols = 4;
@@ -224,7 +255,7 @@ NFS_KRB5 {
 NFSv4 {
     Minor_Versions = 1;
     RecoveryBackend = fs_ng;
-    RecoveryRoot = "/contract/recovery";
+    RecoveryRoot = "/var/lib/nfs/ganesha";
     RecoveryDir = "ozone-v4recov";
 }
 
@@ -250,7 +281,7 @@ EXPORT {
         Timeout_Millis = 5000;
     }
 }
-''' % self.port)
+''' % forwarder.server_address[1])
         container_name = "ozone-nfs-ganesha-contract-{}".format(os.getpid())
         log_path = self.root / "ganesha.log"
         with open(log_path, "w") as ganesha_log:
@@ -280,6 +311,9 @@ EXPORT {
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait(timeout=5)
+                forwarder.shutdown()
+                forwarder.server_close()
+                forwarder_thread.join(timeout=5)
         self.assertTrue(self.capabilities_marker.exists(), log_path.read_text()[-4000:])
 
 
