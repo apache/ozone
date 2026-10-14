@@ -214,7 +214,8 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       boolean mountedContract = Boolean.getBoolean("ozone.nfs.mounted.contract");
       if (mountedContract) {
         grantMountedContractUser(client, bucket);
-        getConf().set("hadoop.proxyuser.scm.users", "scm,reader,test");
+        grantMountedContractMachineUser(client, bucket);
+        getConf().set("hadoop.proxyuser.scm.users", "scm,reader,test,host");
       }
       byte[] expected = "secure NFS gateway read".getBytes(StandardCharsets.UTF_8);
       try (OzoneOutputStream output = bucket.createKey("nfs-file", expected.length)) {
@@ -567,6 +568,14 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       volume.addAcl(testUserAcl);
       bucket.addAcl(testUserAcl);
     }
+  }
+
+  private void grantMountedContractMachineUser(OzoneClient client, OzoneBucket bucket) throws IOException {
+    OzoneVolume volume = client.getObjectStore().getVolume(bucket.getVolumeName());
+    OzoneAcl machineUserAcl = OzoneAcl.of(ACLIdentityType.USER, "host", OzoneAcl.AclScope.ACCESS,
+        IAccessAuthorizer.ACLType.READ, IAccessAuthorizer.ACLType.LIST);
+    volume.addAcl(machineUserAcl);
+    bucket.addAcl(machineUserAcl);
   }
 
   private void assertMountedGaneshaContract(Path tempDir, int gatewayPort, UUID exportId, long volumeId,
