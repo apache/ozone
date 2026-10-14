@@ -491,7 +491,12 @@ final class NfsExportLeaseManager implements Closeable {
       return;
     }
     try {
-      long fileLeaseDurationMillis = Math.max(1, leaseDurationMillis * 2 / 3);
+      long remainingExportLeaseMillis = TimeUnit.NANOSECONDS.toMillis(export.expiresAtNanos - System.nanoTime());
+      long fileLeaseDurationMillis = Math.min(Math.max(1, leaseDurationMillis * 2 / 3),
+          remainingExportLeaseMillis - 250);
+      if (fileLeaseDurationMillis <= 0) {
+        return;
+      }
       readers.get(key.exportUuid).updateFileLease(
           NfsFileLeaseRequest.Operation.RENEW, gatewayId, export.gatewayGeneration, current.objectId,
           current.transferId, current.generation, current.ownerToken, fileLeaseDurationMillis);
@@ -503,7 +508,8 @@ final class NfsExportLeaseManager implements Closeable {
   }
 
   private LeaseState state(NfsExportLeaseResponse response) {
-    long expiresAtNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(leaseDurationMillis);
+    long remainingMillis = Math.max(0, response.getExpiresAtMillis() - System.currentTimeMillis() - 250);
+    long expiresAtNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(remainingMillis);
     return new LeaseState(response.getGatewayGeneration(), response.getGeneration(), expiresAtNanos);
   }
 

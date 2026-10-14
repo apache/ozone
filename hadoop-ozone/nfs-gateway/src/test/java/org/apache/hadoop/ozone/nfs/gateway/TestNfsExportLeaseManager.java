@@ -268,6 +268,28 @@ class TestNfsExportLeaseManager {
   }
 
   @Test
+  void doesNotOutliveTheOmExportLeaseExpiry() throws Exception {
+    NfsObjectReader reader = org.mockito.Mockito.mock(NfsObjectReader.class);
+    NfsExportLeaseResponse shortLease = NfsExportLeaseResponse.newBuilder()
+        .setExportUUID(EXPORT_UUID.toStringUtf8()).setVolumeID(1).setBucketID(2).setGatewayID("gateway-a")
+        .setGatewayGeneration(2).setGeneration(3).setExpiresAtMillis(System.currentTimeMillis() + 1000).build();
+    when(reader.updateExportLease(eq(ACQUIRE), eq("gateway-a"), eq(3000L), any(), any()))
+        .thenReturn(shortLease);
+    when(reader.updateExportLease(eq(RELEASE), eq("gateway-a"), eq(0L), eq(2L), eq(3L)))
+        .thenReturn(leaseResponse());
+    NfsExportLeaseManager manager = new NfsExportLeaseManager(Map.of(EXPORT_UUID, reader), "gateway-a", 3000);
+    manager.start();
+
+    try {
+      assertTrue(manager.isActive(EXPORT_UUID));
+      Thread.sleep(850);
+      assertFalse(manager.isActive(EXPORT_UUID));
+    } finally {
+      manager.close();
+    }
+  }
+
+  @Test
   void renewsAndReleasesRegisteredFileLease() throws Exception {
     NfsObjectReader reader = org.mockito.Mockito.mock(NfsObjectReader.class);
     when(reader.updateExportLease(eq(ACQUIRE), eq("gateway-a"), eq(3000L), any(), any()))
