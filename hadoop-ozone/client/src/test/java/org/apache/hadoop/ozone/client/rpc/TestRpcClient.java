@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
@@ -30,9 +31,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
@@ -41,6 +45,9 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
@@ -342,6 +349,65 @@ public class TestRpcClient {
     }
   }
 
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testCreateKeyIfNotExistsRequiresSupportedOmVersion(OzoneManagerVersion version) throws IOException {
+    checkCreateKeyIfNotExistsOmVersion(version, false);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testCreateStreamKeyIfNotExistsRequiresSupportedOmVersion(OzoneManagerVersion version) throws IOException {
+    checkCreateKeyIfNotExistsOmVersion(version, true);
+  }
+
+  private static void checkCreateKeyIfNotExistsOmVersion(OzoneManagerVersion version, boolean streaming)
+      throws IOException {
+    AtomicInteger createKeyRequests = new AtomicInteger();
+    IOException requestSent = new IOException("CreateKey request sent");
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          OMResponse response = super.submitRequest(request);
+          return response.toBuilder().setServiceListResponse(response.getServiceListResponse().toBuilder()
+              .clearServiceInfo().addServiceInfo(om(version).getProtobuf())).build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          createKeyRequests.incrementAndGet();
+          assertThat(request.getCreateKeyRequest().getKeyArgs().hasExpectedDataGeneration()).isTrue();
+          assertEquals(OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT,
+              request.getCreateKeyRequest().getKeyArgs().getExpectedDataGeneration());
+          throw requestSent;
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      IOException error = assertThrows(IOException.class, () -> {
+        if (streaming) {
+          client.createStreamKeyIfNotExists("volume1", "bucket1", "key1", 0,
+              RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+              Collections.emptyMap(), Collections.emptyMap());
+        } else {
+          client.createKeyIfNotExists("volume1", "bucket1", "key1", 0,
+              RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+              Collections.emptyMap(), Collections.emptyMap());
+        }
+      });
+      if (version.serialize() < OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.serialize()) {
+        assertEquals("OzoneManager does not support atomic key creation.", error.getMessage());
+        assertEquals(0, createKeyRequests.get());
+      } else {
+        assertSame(requestSent, error);
+        assertEquals(1, createKeyRequests.get());
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   private static ServiceInfo om(OzoneManagerVersion version) {
     return new ServiceInfo.Builder()
         .setNodeType(HddsProtos.NodeType.OM)
@@ -355,11 +421,15 @@ public class TestRpcClient {
   }
 
   private static RpcClient createRpcClient() throws IOException {
+    return createRpcClient(new MockOmTransport());
+  }
+
+  private static RpcClient createRpcClient(OmTransport transport) throws IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     return new RpcClient(config, null) {
       @Override
       protected OmTransport createOmTransport(String omServiceId) {
-        return new MockOmTransport();
+        return transport;
       }
 
       @Override
