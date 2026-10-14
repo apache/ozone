@@ -686,12 +686,15 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         .replaceFirst("(?m)^\\[libdefaults\\]\\s*$", "[libdefaults]\nrdns = false");
     assertTrue(contractKrb5Contents.contains("rdns = false"), "MiniKdc krb5.conf must have a libdefaults section");
     Files.writeString(contractKrb5, contractKrb5Contents);
+    Path recoveryRoot = contractDir.resolve("ganesha-recovery");
+    Files.createDirectories(recoveryRoot);
     Path ganeshaConfig = contractDir.resolve("ganesha.conf");
     String config = String.format("NFS_CORE_PARAM {\n"
         + "    Protocols = 4;\n"
         + "    Enable_UDP = false;\n"
         + "    Enable_RQUOTA = false;\n"
         + "    NFS_Port = 2049;\n"
+        + "    Clustered = true;\n"
         + "}\n"
         + "NFS_KRB5 {\n"
         + "    Active_krb5 = true;\n"
@@ -700,10 +703,14 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         + "}\n"
         + "NFSv4 {\n"
         + "    Minor_Versions = 1;\n"
+        + "    Server_Scope = \"ozone-nfs-ci\";\n"
+        + "    Server_Owner = \"ozone-nfs-ci\";\n"
         + "    RecoveryBackend = fs_ng;\n"
         + "    RecoveryRoot = \"/var/lib/nfs/ganesha\";\n"
         + "    RecoveryDir = \"ozone-v4recov\";\n"
-        + "    Graceless = true;\n"
+        + "    Graceless = false;\n"
+        + "    Lease_Lifetime = 60;\n"
+        + "    Grace_Period = 90;\n"
         + "}\n"
         + "EXPORT {\n"
         + "    Export_Id = 1;\n"
@@ -737,6 +744,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     Path mount = contractDir.resolve("mount");
     Files.createDirectories(mount);
     String container = "ozone-nfs-mounted-contract-" + UUID.randomUUID().toString().substring(0, 8);
+    String replacementContainer = container + "-replacement";
     Process gssd = null;
     Process ganeshaLogTail = null;
     boolean mounted = false;
@@ -754,11 +762,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       Thread.sleep(500);
       assertTrue(gssd.isAlive(), "rpc.gssd failed to start: "
           + Files.readString(contractDir.resolve("rpc.gssd.log")));
-      runCommand("docker", "run", "--detach", "--rm", "--name", container, "--network", "host",
-          "--env", "KRB5_CONFIG=/contract/krb5.conf",
-          "--mount", "type=bind,source=" + contractDir + ",target=/contract",
-          image, "sh", "-c", "exec ganesha.nfsd -F -p /contract/ganesha.pid -L /contract/ganesha.log"
-              + " -N NIV_DEBUG -f /contract/ganesha.conf");
+      startMountedGanesha(image, container, "ozone-ci-active", contractDir, recoveryRoot);
       waitForNfsPort(contractDir.resolve("ganesha.log"));
       ganeshaLogTail = streamGaneshaLog(contractDir.resolve("ganesha.log"));
       Thread.sleep(1000);
@@ -778,7 +782,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       Path mountedFile = mount.resolve(name);
       LOG.info("Creating mounted NFS file {}", name);
       try (FileChannel channel = FileChannel.open(mountedFile, java.nio.file.StandardOpenOption.CREATE_NEW,
-          java.nio.file.StandardOpenOption.WRITE)) {
+          java.nio.file.StandardOpenOption.READ, java.nio.file.StandardOpenOption.WRITE)) {
         LOG.info("Mounted NFS file {} was opened", name);
         ByteBuffer data = ByteBuffer.wrap(expected);
         while (data.hasRemaining()) {
@@ -808,8 +812,10 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           syncWatchdog.interrupt();
         }
         LOG.info("Mounted NFS file {} was synced", name);
+        expected = reclaimMountedOpenFile(channel, mountedFile, expected, image, container, replacementContainer,
+            contractDir);
       }
-      LOG.info("Mounted NFS file was written and synced");
+      LOG.info("Mounted NFS file was written, reclaimed, and synced");
       assertArrayEquals(expected, Files.readAllBytes(mountedFile));
       long inode = (Long) Files.getAttribute(mountedFile, "unix:ino");
       assertEquals(name, bucket.getKey(name).getName());
@@ -844,6 +850,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         }
       }
       new ProcessBuilder("docker", "rm", "--force", container).start().waitFor(10, TimeUnit.SECONDS);
+      new ProcessBuilder("docker", "rm", "--force", replacementContainer).start().waitFor(10, TimeUnit.SECONDS);
       if (gssd != null) {
         gssd.destroy();
         if (!gssd.waitFor(5, TimeUnit.SECONDS)) {
@@ -854,6 +861,47 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       new ProcessBuilder("sudo", "kdestroy", "-c", "FILE:/tmp/krb5cc_machine").start().waitFor(10, TimeUnit.SECONDS);
       new ProcessBuilder("kdestroy").start().waitFor(10, TimeUnit.SECONDS);
     }
+  }
+
+  private static void startMountedGanesha(String image, String container, String hostname, Path contractDir,
+      Path recoveryRoot) throws Exception {
+    runCommand("docker", "run", "--detach", "--name", container, "--hostname", hostname, "--network", "host",
+          "--env", "KRB5_CONFIG=/contract/krb5.conf",
+          "--mount", "type=bind,source=" + contractDir + ",target=/contract",
+          "--mount", "type=bind,source=" + recoveryRoot + ",target=/var/lib/nfs/ganesha",
+          image, "sh", "-c", "exec ganesha.nfsd -F -p /contract/ganesha.pid -L /contract/ganesha.log"
+              + " -N NIV_DEBUG -I 1 -f /contract/ganesha.conf");
+  }
+
+  private static byte[] reclaimMountedOpenFile(FileChannel channel, Path mountedFile, byte[] expected, String image,
+      String container, String replacementContainer, Path contractDir) throws Exception {
+    String transferId = container.substring(container.lastIndexOf('-') + 1);
+    String replacementHostname = "ozone-ci-replacement-" + transferId;
+    Path recoveryRoot = contractDir.resolve("ganesha-recovery");
+    LOG.info("Crashing Ganesha while the mounted file remains open");
+    runCommand("docker", "kill", "--signal=KILL", container);
+    runCommand("docker", "wait", container);
+    runCommand("docker", "rm", container);
+    startMountedGanesha(image, replacementContainer, replacementHostname, contractDir, recoveryRoot);
+    waitForNfsPort(contractDir.resolve("ganesha.log"));
+    channel.position(0);
+    ByteBuffer contents = ByteBuffer.allocate(expected.length);
+    while (contents.hasRemaining()) {
+      assertTrue(channel.read(contents) > 0, "Reclaimed file ended before the previously synced bytes were read");
+    }
+    assertArrayEquals(expected, contents.array());
+    byte[] appended = "; write after Ganesha reclaim".getBytes(StandardCharsets.UTF_8);
+    channel.position(expected.length);
+    ByteBuffer append = ByteBuffer.wrap(appended);
+    while (append.hasRemaining()) {
+      channel.write(append);
+    }
+    channel.force(true);
+    byte[] updated = Arrays.copyOf(expected, expected.length + appended.length);
+    System.arraycopy(appended, 0, updated, expected.length, appended.length);
+    assertArrayEquals(updated, Files.readAllBytes(mountedFile));
+    LOG.info("Mounted open file was reclaimed; read, append, and fsync passed");
+    return updated;
   }
 
   private static void logNfsThreadDump(String operation, int attempt) {
