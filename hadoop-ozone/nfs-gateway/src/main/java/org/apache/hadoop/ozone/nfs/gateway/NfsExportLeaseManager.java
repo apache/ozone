@@ -508,7 +508,10 @@ final class NfsExportLeaseManager implements Closeable {
   }
 
   private LeaseState state(NfsExportLeaseResponse response) {
-    long remainingMillis = Math.max(0, response.getExpiresAtMillis() - System.currentTimeMillis() - 250);
+    long remainingMillis = response.getExpiresAtMillis() - System.currentTimeMillis() - 250;
+    if (remainingMillis <= 0) {
+      throw new IllegalStateException("OM returned an expired NFS export lease");
+    }
     long expiresAtNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(remainingMillis);
     return new LeaseState(response.getGatewayGeneration(), response.getGeneration(), expiresAtNanos);
   }
