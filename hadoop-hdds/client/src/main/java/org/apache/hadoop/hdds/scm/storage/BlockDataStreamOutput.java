@@ -435,7 +435,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         if (e != null || reply == null || !reply.isSuccess()) {
           LOG.warn("Failed executePutBlockClose, reply=" + reply, e);
           try {
-            executePutBlock(batch, true, false);
+            executePutBlock(true, false);
           } catch (IOException ex) {
             throw new CompletionException(ex);
           }
