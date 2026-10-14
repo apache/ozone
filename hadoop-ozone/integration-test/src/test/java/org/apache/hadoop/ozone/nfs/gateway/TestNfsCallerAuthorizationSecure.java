@@ -718,13 +718,16 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         LOG.info("Mounted NFS file {} was written; syncing", name);
         AtomicBoolean syncCompleted = new AtomicBoolean();
         Thread syncWatchdog = new Thread(() -> {
-          try {
-            Thread.sleep(TimeUnit.SECONDS.toMillis(15));
-            if (!syncCompleted.get()) {
-              logMountedSyncThreadDump();
+          for (int attempt = 0; attempt < 4 && !syncCompleted.get(); attempt++) {
+            try {
+              Thread.sleep(TimeUnit.SECONDS.toMillis(15));
+              if (!syncCompleted.get()) {
+                logMountedSyncThreadDump(attempt + 1);
+              }
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+              return;
             }
-          } catch (InterruptedException interrupted) {
-            Thread.currentThread().interrupt();
           }
         }, "nfs-mounted-sync-watchdog");
         syncWatchdog.setDaemon(true);
@@ -784,12 +787,13 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     }
   }
 
-  private static void logMountedSyncThreadDump() {
-    LOG.warn("Mounted NFS fsync is still blocked after 15 seconds; dumping NFS and OM threads");
+  private static void logMountedSyncThreadDump(int attempt) {
+    LOG.warn("Mounted NFS fsync is still blocked after {} seconds; dumping NFS and OM threads",
+        attempt * 15);
     Thread.getAllStackTraces().forEach((thread, stack) -> {
       String name = thread.getName();
       if (name.contains("Nfs") || name.contains("OMStateMachineApplyTransactionThread")
-          || name.contains("IPC Server handler") || name.contains("ForkJoinPool-1-worker")) {
+          || name.contains("ForkJoinPool-1-worker")) {
         LOG.warn("Thread {} is {}: {}", name, thread.getState(), Arrays.toString(stack));
       }
     });
