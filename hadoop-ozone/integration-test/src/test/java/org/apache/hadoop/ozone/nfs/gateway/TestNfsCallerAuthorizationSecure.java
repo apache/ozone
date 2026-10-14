@@ -311,6 +311,22 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       LOG.info("Starting secure NFS gateway");
       try (NfsGatewayServer server = NfsGatewayDaemon.start(getConf())) {
         LOG.info("Secure NFS gateway is listening on port {}", server.getPort());
+        AtomicBoolean gatewayContractComplete = new AtomicBoolean();
+        Thread gatewayWatchdog = new Thread(() -> {
+          for (int attempt = 0; attempt < 4 && !gatewayContractComplete.get(); attempt++) {
+            try {
+              Thread.sleep(TimeUnit.SECONDS.toMillis(15));
+              if (!gatewayContractComplete.get()) {
+                logNfsThreadDump("secure gateway contract", attempt + 1);
+              }
+            } catch (InterruptedException interrupted) {
+              Thread.currentThread().interrupt();
+              return;
+            }
+          }
+        }, "nfs-secure-gateway-watchdog");
+        gatewayWatchdog.setDaemon(true);
+        gatewayWatchdog.start();
         ManagedChannel channel = NettyChannelBuilder.forAddress("127.0.0.1", server.getPort())
             .overrideAuthority("localhost")
             .sslContext(GrpcSslContexts.forClient().keyManager(certificateFile, privateKeyFile)
@@ -319,19 +335,25 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         try {
           NfsGatewayGrpc.NfsGatewayBlockingStub stub = NfsGatewayGrpc.newBlockingStub(channel)
               .withDeadlineAfter(10, TimeUnit.SECONDS);
+          LOG.info("Requesting secure NFS capabilities");
           CapabilityResponse capabilities = stub.capabilities(CapabilityRequest.newBuilder().setVersion(1)
               .setExportUuid(exportUuid).build());
           assertEquals(NfsStatus.OK.getCode(), capabilities.getResult().getNfsStatus());
           assertTrue(capabilities.getOperationsList().contains(CapabilityResponse.Operation.CREATE));
+          LOG.info("Secure NFS capabilities negotiated");
+          LOG.info("Requesting secure NFS GETATTR");
           GetattrResponse attributes = stub.getattr(GetattrRequest.newBuilder().setContext(context)
               .setHandle(ByteString.copyFrom(handle.toBytes())).build());
           assertEquals(NfsStatus.OK.getCode(), attributes.getResult().getNfsStatus());
           assertEquals(keyInfo.getObjectID(), attributes.getAttributes().getObjectId());
+          LOG.info("Secure NFS GETATTR passed");
+          LOG.info("Requesting secure NFS RATIS read");
           ReadResponse read = stub.read(ReadRequest.newBuilder().setContext(context)
               .setHandle(ByteString.copyFrom(handle.toBytes())).setOffset(0).setCount(expected.length).build());
           assertEquals(NfsStatus.OK.getCode(), read.getResult().getNfsStatus());
           assertEquals(ByteString.copyFrom(expected), read.getData());
           assertTrue(read.getEof());
+          LOG.info("Secure NFS RATIS read passed");
           OmKeyInfo ecKeyInfo = om.lookupFile(new OmKeyArgs.Builder().setVolumeName(bucket.getVolumeName())
               .setBucketName(bucket.getName()).setKeyName("nfs-ec-file").build());
           NfsFileHandle ecHandle = new NfsFileHandle(exportId, volumeId, bucketId, ecKeyInfo.getObjectID(),
@@ -341,6 +363,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           assertEquals(NfsStatus.OK.getCode(), ecRead.getResult().getNfsStatus());
           assertEquals(ByteString.copyFrom(ecExpected), ecRead.getData());
           assertTrue(ecRead.getEof());
+          LOG.info("Secure NFS EC read passed");
           OmKeyInfo encryptedKeyInfo = om.lookupFile(new OmKeyArgs.Builder().setVolumeName(bucket.getVolumeName())
               .setBucketName(bucket.getName()).setKeyName("nfs-encrypted-file").build());
           assertNotNull(encryptedKeyInfo.getFileEncryptionInfo());
@@ -352,6 +375,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           assertEquals(NfsStatus.OK.getCode(), encryptedRead.getResult().getNfsStatus());
           assertEquals(ByteString.copyFrom(encryptedExpected), encryptedRead.getData());
           assertTrue(encryptedRead.getEof());
+          LOG.info("Secure NFS KMS-encrypted read passed");
 
           RequestContext readerContext = context.toBuilder().setCaller(Caller.newBuilder()
               .setKerberosPrincipal("reader@" + getRealm()).setProtection(Caller.Protection.PRIVACY)).build();
@@ -368,14 +392,18 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           CreateResponse readerCreate = stub.create(CreateRequest.newBuilder().setContext(readerContext)
               .setParentHandle(bucketHandle).setName("reader-must-not-create").build());
           assertEquals(NfsStatus.ACCESS.getCode(), readerCreate.getResult().getNfsStatus());
+          LOG.info("Secure NFS caller authorization checks passed");
           assertSecureGatewayWrite(stub, context, readerContext, exportId, volumeId, bucketId, metadata, bucket,
               stagingBucket, client.getObjectStore());
+          LOG.info("Secure NFS direct write and COMMIT passed");
           if (mountedContract) {
             LOG.info("Starting mounted Ganesha contract");
             assertMountedGaneshaContract(tempDir, server.getPort(), exportId, volumeId, bucketId, bucket);
             LOG.info("Mounted Ganesha contract completed");
           }
         } finally {
+          gatewayContractComplete.set(true);
+          gatewayWatchdog.interrupt();
           channel.shutdownNow();
         }
       }
@@ -455,9 +483,11 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     assertEquals(NfsStatus.OK.getCode(), readBeforeCommit.getResult().getNfsStatus());
     assertEquals(ByteString.EMPTY, readBeforeCommit.getData());
     assertTrue(readBeforeCommit.getEof());
+    LOG.info("Submitting secure NFS direct COMMIT");
     CommitResponse commit = stub.commit(CommitRequest.newBuilder().setContext(context)
         .setHandle(createdHandle).setFinalize(true).build());
     assertEquals(NfsStatus.OK.getCode(), commit.getResult().getNfsStatus());
+    LOG.info("Secure NFS direct COMMIT returned successfully");
     assertFalse(stagingBucket.listKeys(stagedPrefix).hasNext(),
         "Final COMMIT must remove its durable NFS range objects");
     try (org.apache.hadoop.ozone.client.io.OzoneInputStream input = bucket.readKey("secure-nfs-write")) {
@@ -722,7 +752,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
             try {
               Thread.sleep(TimeUnit.SECONDS.toMillis(15));
               if (!syncCompleted.get()) {
-                logMountedSyncThreadDump(attempt + 1);
+                logNfsThreadDump("mounted fsync", attempt + 1);
               }
             } catch (InterruptedException interrupted) {
               Thread.currentThread().interrupt();
@@ -787,9 +817,9 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     }
   }
 
-  private static void logMountedSyncThreadDump(int attempt) {
-    LOG.warn("Mounted NFS fsync is still blocked after {} seconds; dumping NFS and OM threads",
-        attempt * 15);
+  private static void logNfsThreadDump(String operation, int attempt) {
+    LOG.warn("NFS operation '{}' is still blocked after {} seconds; dumping NFS and OM threads",
+        operation, attempt * 15);
     Thread.getAllStackTraces().forEach((thread, stack) -> {
       String name = thread.getName();
       if (name.contains("Nfs") || name.contains("OMStateMachineApplyTransactionThread")
