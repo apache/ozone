@@ -22,13 +22,17 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.security.PrivilegedExceptionAction;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -71,6 +75,7 @@ public class TestOMAdminRpcAuthorization {
   @BeforeAll
   static void init() throws Exception {
     conf = new OzoneConfiguration();
+    conf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 0);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     conf.set(OZONE_ADMINISTRATORS, "admin");
@@ -130,6 +135,22 @@ public class TestOMAdminRpcAuthorization {
     UserGroupInformation admin =
         UserGroupInformation.createUserForTesting("admin", new String[] {"admins"});
     assertEquals(secretKeyId, refetchSecretKey(admin));
+  }
+
+  @Test
+  void refetchSecretKeyFailureIsReturned() {
+    SecretKeyClient original = cluster.getOzoneManager().getSecretKeyClient();
+    SecretKeyClient failingClient = mock(SecretKeyClient.class);
+    doThrow(new UncheckedIOException(new IOException("SCM fetch failed"))).when(failingClient).refetchSecretKey();
+    cluster.getOzoneManager().setSecretKeyClient(failingClient);
+    try {
+      UserGroupInformation admin = UserGroupInformation.createUserForTesting("admin", new String[] {"admins"});
+      OMException exception = assertThrows(OMException.class, () -> refetchSecretKey(admin));
+      assertEquals(OMException.ResultCodes.INTERNAL_ERROR, exception.getResult());
+      assertTrue(exception.getMessage().contains("SCM fetch failed"));
+    } finally {
+      cluster.getOzoneManager().setSecretKeyClient(original);
+    }
   }
 
   @Test
