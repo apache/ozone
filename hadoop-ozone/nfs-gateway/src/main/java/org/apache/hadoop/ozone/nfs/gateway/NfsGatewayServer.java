@@ -44,6 +44,7 @@ public final class NfsGatewayServer implements Closeable {
   private final Server server;
   private final ThreadPoolExecutor executor;
   private final NfsExportLeaseManager leaseManager;
+  private final NfsGatewayMetrics metrics;
 
   public NfsGatewayServer(InetSocketAddress address, File certificate, File key, File trustedCa,
       Map<String, Set<UUID>> allowedPeers, BindableService service) throws IOException {
@@ -60,15 +61,18 @@ public final class NfsGatewayServer implements Closeable {
     NfsTlsPeerInterceptor interceptor = new NfsTlsPeerInterceptor(allowedPeers);
     SslContext ssl = GrpcSslContexts.configure(SslContextBuilder.forServer(certificate, key), SslProvider.JDK)
         .trustManager(trustedCa).clientAuth(ClientAuth.REQUIRE).protocols("TLSv1.3", "TLSv1.2").build();
+    metrics = NfsGatewayMetrics.create();
     executor = new ThreadPoolExecutor(4, 4, 0, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(64),
         new ThreadFactoryBuilder().setNameFormat("NfsGateway-%d").setDaemon(true).build());
     server = NettyServerBuilder.forAddress(address).sslContext(ssl).executor(executor)
         .handshakeTimeout(10, TimeUnit.SECONDS).maxInboundMessageSize(MAX_MESSAGE_BYTES)
-        .maxConcurrentCallsPerConnection(64).addService(ServerInterceptors.intercept(service, interceptor)).build();
+        .maxConcurrentCallsPerConnection(64).addService(ServerInterceptors.intercept(service, interceptor,
+            new NfsGatewayMetricsInterceptor(metrics))).build();
     try {
       server.start();
     } catch (IOException | RuntimeException ex) {
       executor.shutdownNow();
+      NfsGatewayMetrics.unregister();
       throw ex;
     }
   }
@@ -93,6 +97,7 @@ public final class NfsGatewayServer implements Closeable {
       Thread.currentThread().interrupt();
     } finally {
       executor.shutdownNow();
+      NfsGatewayMetrics.unregister();
       if (leaseManager != null) {
         leaseManager.close();
       }
