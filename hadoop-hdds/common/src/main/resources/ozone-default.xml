@@ -3625,7 +3625,7 @@
   </property>
   <property>
     <name>ozone.network.topology.sort.group.by.rack</name>
-    <value>true</value>
+    <value>false</value>
     <tag>OZONE, PERFORMANCE</tag>
     <description>
       When sorting datanodes by network distance to a client, whether to keep

@@ -830,15 +830,15 @@ public class NetworkTopologyImpl implements NetworkTopology {
     for (List<N> list : tree.values()) {
       if (list != null) {
         shuffleOperation.accept(list);
-        if (!sortGroupByRack) {
+        if (sortGroupByRack) {
+          Map<String, List<N>> racks = new LinkedHashMap<>();
+          for (N node : list) {
+            racks.computeIfAbsent(node.getNetworkLocation(), k -> new ArrayList<>()).add(node);
+          }
+          racks.values().forEach(ret::addAll);
+        } else {
           ret.addAll(list);
-          continue;
         }
-        Map<String, List<N>> racks = new LinkedHashMap<>();
-        for (N node : list) {
-          racks.computeIfAbsent(node.getNetworkLocation(), k -> new ArrayList<>()).add(node);
-        }
-        racks.values().forEach(ret::addAll);
       }
     }
 
