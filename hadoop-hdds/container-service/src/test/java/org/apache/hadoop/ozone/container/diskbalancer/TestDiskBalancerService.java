@@ -444,6 +444,24 @@ public class TestDiskBalancerService {
     svc.shutdown();
   }
 
+  @Test
+  public void testInitialDiskBalancerInfoFallsBackToDefaultsForInvalidConfig() throws Exception {
+    File infoDir = tmpDir.resolve("diskBalancer-invalid-initial-info").toFile();
+    OzoneConfiguration testConf = confWithDiskBalancerInfoDir(infoDir);
+    testConf.setDouble(DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_THRESHOLD, 0d);
+    testConf.setLong(DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_BANDWIDTH, 0L);
+    testConf.setInt(DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_PARALLEL_THREAD, 0);
+    DiskBalancerInfo expected = new DiskBalancerInfo(DiskBalancerRunningStatus.STOPPED,
+        DiskBalancerConfiguration.DEFAULT_THRESHOLD, DiskBalancerConfiguration.DEFAULT_DISK_BANDWIDTH_IN_MB,
+        DiskBalancerConfiguration.DEFAULT_PARALLEL_THREAD, true);
+
+    DiskBalancerServiceTestImpl svc = getDiskBalancerService(testConf);
+
+    assertEquals(expected, svc.getDiskBalancerInfo());
+    assertEquals(expected, DiskBalancerYaml.readDiskBalancerInfoFile(getDiskBalancerInfoFile(infoDir)));
+    svc.shutdown();
+  }
+
   @ContainerTestVersionInfo.ContainerTest
   public void testDiskBalancerInfoWriteReportsDirectoryCreationFailure(
       ContainerTestVersionInfo versionInfo) throws Exception {
