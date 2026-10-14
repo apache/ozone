@@ -4955,6 +4955,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("Enter safe mode is unsupported",
           INTERNAL_ERROR);
     case FORCE_EXIT:
+      // SCM sees this call as coming from the OM user, so the caller has to be checked here.
+      checkAdminUserPrivilege("force exit safe mode.");
       return getScmClient().getContainerClient().forceExitSafeMode();
     case GET:
       return getScmClient().getContainerClient().inSafeMode();
