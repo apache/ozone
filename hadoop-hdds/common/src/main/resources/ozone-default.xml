@@ -234,6 +234,16 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.default.storagetype</name>
+    <value>DISK</value>
+    <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
+    <description>
+      The StorageType used to choose a volume when a request does not specify a StorageType.
+      Valid values are DISK, SSD, ARCHIVE. No volume is chosen if request doesn't specify
+      a StorageType and a volume of the default StorageType is not present.
+    </description>
+  </property>
+  <property>
     <name>hdds.container.ratis.enabled</name>
     <value>false</value>
     <tag>OZONE, MANAGEMENT, PIPELINE, RATIS</tag>
