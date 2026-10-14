@@ -642,7 +642,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       runCommand("sudo", "env", "KRB5_CONFIG=" + contractKrb5, "KRB5CCNAME=FILE:/tmp/krb5cc_0",
           "kinit", "-kt", getTestUserKeytab().getAbsolutePath(), getTestUserPrincipal());
       ProcessBuilder gssdBuilder = new ProcessBuilder("sudo", "env", "KRB5_CONFIG=" + contractKrb5,
-          "rpc.gssd", "-f", "-n", "-v");
+          "KRB5CCNAME=FILE:/tmp/krb5cc_0", "rpc.gssd", "-f", "-n", "-v");
       gssdBuilder.redirectErrorStream(true);
       gssdBuilder.redirectOutput(contractDir.resolve("rpc.gssd.log").toFile());
       gssd = gssdBuilder.start();
@@ -650,13 +650,19 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       assertTrue(gssd.isAlive(), "rpc.gssd failed to start: "
           + Files.readString(contractDir.resolve("rpc.gssd.log")));
       runCommand("docker", "run", "--detach", "--rm", "--name", container, "--network", "host",
+          "--env", "KRB5_CONFIG=/contract/krb5.conf",
           "--mount", "type=bind,source=" + contractDir + ",target=/contract",
           image, "sh", "-c", "exec ganesha.nfsd -F -p /contract/ganesha.pid -f /contract/ganesha.conf"
               + " > /contract/ganesha.log 2>&1");
       waitForNfsPort(contractDir.resolve("ganesha.log"));
       Thread.sleep(1000);
-      runCommand("sudo", "mount", "-t", "nfs4", "-o", "vers=4.1,sec=krb5p,actimeo=0",
-          "ozone-ci:/ozone/data", mount.toString());
+      try {
+        runCommand("sudo", "mount", "-t", "nfs4", "-o", "vers=4.1,sec=krb5p,actimeo=0",
+            "ozone-ci:/ozone/data", mount.toString());
+      } catch (IOException ex) {
+        throw new IOException(ex.getMessage() + "\nGanesha log:\n" + readText(contractDir.resolve("ganesha.log"))
+            + "\nrpc.gssd log:\n" + readText(contractDir.resolve("rpc.gssd.log")), ex);
+      }
       mounted = true;
 
       String name = "mounted-secure-contract-" + UUID.randomUUID();
@@ -732,8 +738,18 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       throw new IOException("Command timed out: " + Arrays.toString(command));
     }
     outputReader.join(TimeUnit.SECONDS.toMillis(5));
-    assertEquals(0, process.exitValue(), "Command failed: " + Arrays.toString(command) + "\n"
-        + new String(output.toByteArray(), StandardCharsets.UTF_8));
+    if (process.exitValue() != 0) {
+      throw new IOException("Command failed: " + Arrays.toString(command) + "\n"
+          + new String(output.toByteArray(), StandardCharsets.UTF_8));
+    }
+  }
+
+  private static String readText(Path file) {
+    try {
+      return Files.exists(file) ? new String(Files.readAllBytes(file), StandardCharsets.UTF_8) : "log unavailable";
+    } catch (IOException ex) {
+      return ex.toString();
+    }
   }
 
   private static void copyOutput(Process process, java.io.ByteArrayOutputStream output) {
