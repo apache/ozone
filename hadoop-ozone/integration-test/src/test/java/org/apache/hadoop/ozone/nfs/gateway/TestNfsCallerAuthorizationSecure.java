@@ -643,11 +643,9 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     try {
       runCommand("env", "KRB5_CONFIG=" + contractKrb5, "kinit", "-kt",
           getTestUserKeytab().getAbsolutePath(), getTestUserPrincipal());
-      runCommand("sudo", "env", "KRB5_CONFIG=" + contractKrb5, "KRB5CCNAME=FILE:/tmp/krb5cc_0",
-          "kinit", "-kt", getTestUserKeytab().getAbsolutePath(), getTestUserPrincipal());
       verifyMountedKerberosCredentials(contractKrb5, clientKeytab, clientPrincipal, nfsPrincipal);
       ProcessBuilder gssdBuilder = new ProcessBuilder("sudo", "env", "KRB5_CONFIG=" + contractKrb5,
-          "rpc.gssd", "-f", "-n", "-k", clientKeytab.getAbsolutePath(), "-v");
+          "rpc.gssd", "-f", "-k", clientKeytab.getAbsolutePath(), "-v");
       gssdBuilder.redirectErrorStream(true);
       gssdBuilder.redirectOutput(contractDir.resolve("rpc.gssd.log").toFile());
       gssd = gssdBuilder.start();
@@ -714,7 +712,6 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         }
       }
       new ProcessBuilder("sudo", "pkill", "-TERM", "-x", "rpc.gssd").start().waitFor(10, TimeUnit.SECONDS);
-      new ProcessBuilder("sudo", "kdestroy", "-c", "FILE:/tmp/krb5cc_0").start().waitFor(10, TimeUnit.SECONDS);
       new ProcessBuilder("sudo", "kdestroy", "-c", "FILE:/tmp/krb5cc_machine").start().waitFor(10, TimeUnit.SECONDS);
       new ProcessBuilder("kdestroy").start().waitFor(10, TimeUnit.SECONDS);
     }
