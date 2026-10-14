@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode.M
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -169,7 +170,13 @@ public class TestFileChecksumHelper {
 
     FakeChecksumComputer(OmKeyInfo keyInfo, List<byte[]> blockChecksums,
         OzoneClientConfig.ChecksumCombineMode mode, RpcClient rpcClient) throws IOException {
-      super("vol1", "bucket", keyInfo.getKeyName(), Long.MAX_VALUE, mode, rpcClient, keyInfo);
+      this(keyInfo, blockChecksums, mode, rpcClient, Long.MAX_VALUE);
+    }
+
+    FakeChecksumComputer(OmKeyInfo keyInfo, List<byte[]> blockChecksums,
+        OzoneClientConfig.ChecksumCombineMode mode, RpcClient rpcClient, long requestLength)
+        throws IOException {
+      super("vol1", "bucket", keyInfo.getKeyName(), requestLength, mode, rpcClient, keyInfo);
       this.blockChecksums = blockChecksums;
     }
 
@@ -332,6 +339,23 @@ public class TestFileChecksumHelper {
       throws IOException {
     assertEquals(compositeChecksum(helperType),
         compositeChecksum(helperType, EMPTY_BLOCK));
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"EC", "RATIS"})
+  public void testCompositeCrcPartialLengthAcrossTwoBlocks(ReplicationType helperType)
+      throws IOException {
+    byte[] a = randomBytes(10, 11);
+    byte[] b = randomBytes(10, 12);
+    List<OmKeyLocationInfo> located = locationsFor(a, b);
+    FakeChecksumComputer computer = new FakeChecksumComputer(
+        omKeyInfo(helperType, noCachedChecksum, located, a.length + b.length),
+        compositeBlockChecksums(a, b), COMPOSITE_CRC, mockRpcClientForChecksumHelper(), 5);
+    computer.compute();
+    assertNotNull(computer.getFileChecksum());
+    assertInstanceOf(CompositeCrcFileChecksum.class, computer.getFileChecksum());
+    // Block lengths in makeCompositeCrcResult still reflect full block sizes.
+    assertEquals(expectedComposite(a, b), computer.getFileChecksum());
   }
 
   @ParameterizedTest
