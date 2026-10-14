@@ -40,8 +40,10 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.ZonedDateTime;
@@ -209,6 +211,11 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           new DefaultReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE)));
       OzoneBucket stagingBucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
       grantReadOnlyUser(client, bucket);
+      boolean mountedContract = Boolean.getBoolean("ozone.nfs.mounted.contract");
+      if (mountedContract) {
+        grantMountedContractUser(client, bucket);
+        getConf().set("hadoop.proxyuser.scm.users", "scm,reader,test");
+      }
       byte[] expected = "secure NFS gateway read".getBytes(StandardCharsets.UTF_8);
       try (OzoneOutputStream output = bucket.createKey("nfs-file", expected.length)) {
         output.write(expected);
@@ -349,6 +356,9 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           assertEquals(NfsStatus.ACCESS.getCode(), readerCreate.getResult().getNfsStatus());
           assertSecureGatewayWrite(stub, context, readerContext, exportId, volumeId, bucketId, metadata, bucket,
               stagingBucket, client.getObjectStore());
+          if (mountedContract) {
+            assertMountedGaneshaContract(tempDir, server.getPort(), exportId, volumeId, bucketId, bucket);
+          }
         } finally {
           channel.shutdownNow();
         }
@@ -544,6 +554,197 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           IAccessAuthorizer.ACLType.READ, IAccessAuthorizer.ACLType.LIST));
       bucket.addAcl(OzoneAcl.of(ACLIdentityType.USER, "reader", scope,
           IAccessAuthorizer.ACLType.READ, IAccessAuthorizer.ACLType.LIST));
+    }
+  }
+
+  private void grantMountedContractUser(OzoneClient client, OzoneBucket bucket) throws IOException {
+    OzoneVolume volume = client.getObjectStore().getVolume(bucket.getVolumeName());
+    for (OzoneAcl.AclScope scope : new OzoneAcl.AclScope[] {
+        OzoneAcl.AclScope.ACCESS, OzoneAcl.AclScope.DEFAULT}) {
+      OzoneAcl testUserAcl = OzoneAcl.of(ACLIdentityType.USER, "test", scope,
+          IAccessAuthorizer.ACLType.READ, IAccessAuthorizer.ACLType.WRITE, IAccessAuthorizer.ACLType.LIST,
+          IAccessAuthorizer.ACLType.CREATE, IAccessAuthorizer.ACLType.DELETE);
+      volume.addAcl(testUserAcl);
+      bucket.addAcl(testUserAcl);
+    }
+  }
+
+  private void assertMountedGaneshaContract(Path tempDir, int gatewayPort, UUID exportId, long volumeId,
+      long bucketId, OzoneBucket bucket) throws Exception {
+    String image = System.getenv("OZONE_NFS_GANESHA_IMAGE");
+    assertNotNull(image, "OZONE_NFS_GANESHA_IMAGE is required for the mounted contract");
+    String krb5Config = System.getProperty("java.security.krb5.conf");
+    assertNotNull(krb5Config, "MiniKdc must expose its krb5.conf to the mounted contract");
+
+    File nfsKeytab = tempDir.resolve("nfs.keytab").toFile();
+    String nfsPrincipal = "nfs/ozone-ci@" + getRealm();
+    createPrincipal(nfsKeytab, nfsPrincipal);
+    Path contractDir = tempDir.resolve("mounted-nfs-contract");
+    Files.createDirectories(contractDir);
+    Files.copy(nfsKeytab.toPath(), contractDir.resolve("nfs.keytab"));
+    Path contractKrb5 = contractDir.resolve("krb5.conf");
+    Files.copy(new File(krb5Config).toPath(), contractKrb5);
+    Path ganeshaConfig = contractDir.resolve("ganesha.conf");
+    String config = String.format("NFS_CORE_PARAM {\n"
+        + "    Protocols = 4;\n"
+        + "    Enable_UDP = false;\n"
+        + "    Enable_RQUOTA = false;\n"
+        + "    NFS_Port = 2049;\n"
+        + "}\n"
+        + "NFS_KRB5 {\n"
+        + "    Active_krb5 = true;\n"
+        + "    PrincipalName = \"%s\";\n"
+        + "    KeytabPath = \"/contract/nfs.keytab\";\n"
+        + "}\n"
+        + "NFSv4 {\n"
+        + "    Minor_Versions = 1;\n"
+        + "    RecoveryBackend = fs_ng;\n"
+        + "    RecoveryRoot = \"/var/lib/nfs/ganesha\";\n"
+        + "    RecoveryDir = \"ozone-v4recov\";\n"
+        + "}\n"
+        + "EXPORT {\n"
+        + "    Export_Id = 1;\n"
+        + "    Path = \"/\";\n"
+        + "    Pseudo = \"/ozone/data\";\n"
+        + "    Access_Type = RW;\n"
+        + "    Protocols = 4;\n"
+        + "    Transports = TCP;\n"
+        + "    SecType = krb5p;\n"
+        + "    Squash = Root_Squash;\n"
+        + "    Attr_Expiration_Time = 0;\n"
+        + "    FSAL {\n"
+        + "        Name = OZONE;\n"
+        + "        Endpoint = \"localhost:%d\";\n"
+        + "        Export_UUID = \"%s\";\n"
+        + "        Volume_ID = %s;\n"
+        + "        Bucket_ID = %s;\n"
+        + "        Trusted_CA_File = \"/contract/nfs-gateway.crt\";\n"
+        + "        Client_Certificate_File = \"/contract/nfs-gateway.crt\";\n"
+        + "        Client_Key_File = \"/contract/nfs-gateway.key\";\n"
+        + "        Timeout_Millis = 5000;\n"
+        + "    }\n"
+        + "}\n", nfsPrincipal, gatewayPort, exportId, Long.toUnsignedString(volumeId),
+        Long.toUnsignedString(bucketId));
+    Files.write(ganeshaConfig, config.getBytes(StandardCharsets.UTF_8));
+
+    File certificate = tempDir.resolve("nfs-gateway.crt").toFile();
+    File privateKey = tempDir.resolve("nfs-gateway.key").toFile();
+    Files.copy(tempDir.resolve("nfs-gateway.crt"), contractDir.resolve(certificate.getName()));
+    Files.copy(tempDir.resolve("nfs-gateway.key"), contractDir.resolve(privateKey.getName()));
+    Path mount = contractDir.resolve("mount");
+    Files.createDirectories(mount);
+    String container = "ozone-nfs-mounted-contract-" + UUID.randomUUID().toString().substring(0, 8);
+    Process gssd = null;
+    boolean mounted = false;
+    try {
+      runCommand("env", "KRB5_CONFIG=" + contractKrb5, "kinit", "-kt",
+          getTestUserKeytab().getAbsolutePath(), getTestUserPrincipal());
+      runCommand("sudo", "env", "KRB5_CONFIG=" + contractKrb5, "KRB5CCNAME=FILE:/tmp/krb5cc_0",
+          "kinit", "-kt", getTestUserKeytab().getAbsolutePath(), getTestUserPrincipal());
+      ProcessBuilder gssdBuilder = new ProcessBuilder("sudo", "env", "KRB5_CONFIG=" + contractKrb5,
+          "rpc.gssd", "-f", "-n", "-v");
+      gssdBuilder.redirectErrorStream(true);
+      gssdBuilder.redirectOutput(contractDir.resolve("rpc.gssd.log").toFile());
+      gssd = gssdBuilder.start();
+      Thread.sleep(500);
+      assertTrue(gssd.isAlive(), "rpc.gssd failed to start: "
+          + Files.readString(contractDir.resolve("rpc.gssd.log")));
+      runCommand("docker", "run", "--detach", "--rm", "--name", container, "--network", "host",
+          "--mount", "type=bind,source=" + contractDir + ",target=/contract",
+          image, "sh", "-c", "exec ganesha.nfsd -F -p /contract/ganesha.pid -f /contract/ganesha.conf"
+              + " > /contract/ganesha.log 2>&1");
+      waitForNfsPort(contractDir.resolve("ganesha.log"));
+      Thread.sleep(1000);
+      runCommand("sudo", "mount", "-t", "nfs4", "-o", "vers=4.1,sec=krb5p,actimeo=0",
+          "ozone-ci:/ozone/data", mount.toString());
+      mounted = true;
+
+      String name = "mounted-secure-contract-" + UUID.randomUUID();
+      byte[] expected = "mounted NFS write published to Ozone".getBytes(StandardCharsets.UTF_8);
+      Path mountedFile = mount.resolve(name);
+      try (FileChannel channel = FileChannel.open(mountedFile, java.nio.file.StandardOpenOption.CREATE_NEW,
+          java.nio.file.StandardOpenOption.WRITE)) {
+        ByteBuffer data = ByteBuffer.wrap(expected);
+        while (data.hasRemaining()) {
+          channel.write(data);
+        }
+        channel.force(true);
+      }
+      assertArrayEquals(expected, Files.readAllBytes(mountedFile));
+      long inode = (Long) Files.getAttribute(mountedFile, "unix:ino");
+      assertEquals(name, bucket.getKey(name).getName());
+      try (org.apache.hadoop.ozone.client.io.OzoneInputStream input = bucket.readKey(name)) {
+        byte[] actual = new byte[expected.length];
+        assertEquals(expected.length, input.read(actual));
+        assertArrayEquals(expected, actual);
+        assertEquals(-1, input.read());
+      }
+      String renamed = name + "-renamed";
+      Files.move(mountedFile, mount.resolve(renamed));
+      assertEquals(inode, (Long) Files.getAttribute(mount.resolve(renamed), "unix:ino"));
+      assertEquals(renamed, bucket.getKey(renamed).getName());
+      assertThrows(IOException.class, () -> bucket.getKey(name));
+      try (org.apache.hadoop.ozone.client.io.OzoneInputStream input = bucket.readKey(renamed)) {
+        byte[] actual = new byte[expected.length];
+        assertEquals(expected.length, input.read(actual));
+        assertArrayEquals(expected, actual);
+      }
+      Files.delete(mount.resolve(renamed));
+      assertThrows(IOException.class, () -> bucket.getKey(renamed));
+    } finally {
+      if (mounted) {
+        runCommand("sudo", "umount", mount.toString());
+      }
+      new ProcessBuilder("docker", "rm", "--force", container).start().waitFor(10, TimeUnit.SECONDS);
+      if (gssd != null) {
+        gssd.destroy();
+        if (!gssd.waitFor(5, TimeUnit.SECONDS)) {
+          gssd.destroyForcibly();
+        }
+      }
+      new ProcessBuilder("sudo", "pkill", "-TERM", "-x", "rpc.gssd").start().waitFor(10, TimeUnit.SECONDS);
+      new ProcessBuilder("sudo", "kdestroy", "-c", "FILE:/tmp/krb5cc_0").start().waitFor(10, TimeUnit.SECONDS);
+      new ProcessBuilder("kdestroy").start().waitFor(10, TimeUnit.SECONDS);
+    }
+  }
+
+  private static void waitForNfsPort(Path log) throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+    while (System.nanoTime() < deadline) {
+      try (java.net.Socket socket = new java.net.Socket("127.0.0.1", 2049)) {
+        return;
+      } catch (IOException ex) {
+        Thread.sleep(100);
+      }
+    }
+    throw new IOException("Ganesha did not listen on port 2049: "
+          + (Files.exists(log) ? new String(Files.readAllBytes(log), StandardCharsets.UTF_8) : "no Ganesha log"));
+  }
+
+  private static void runCommand(String... command) throws Exception {
+    Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
+    java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
+    Thread outputReader = new Thread(() -> copyOutput(process, output), "nfs-contract-command-output");
+    outputReader.setDaemon(true);
+    outputReader.start();
+    if (!process.waitFor(60, TimeUnit.SECONDS)) {
+      process.destroyForcibly();
+      throw new IOException("Command timed out: " + Arrays.toString(command));
+    }
+    outputReader.join(TimeUnit.SECONDS.toMillis(5));
+    assertEquals(0, process.exitValue(), "Command failed: " + Arrays.toString(command) + "\n"
+        + new String(output.toByteArray(), StandardCharsets.UTF_8));
+  }
+
+  private static void copyOutput(Process process, java.io.ByteArrayOutputStream output) {
+    try (InputStream input = process.getInputStream()) {
+      byte[] buffer = new byte[4096];
+      int count;
+      while ((count = input.read(buffer)) >= 0) {
+        output.write(buffer, 0, count);
+      }
+    } catch (IOException ignored) {
+      // The command result includes its exit status and any output captured before termination.
     }
   }
 

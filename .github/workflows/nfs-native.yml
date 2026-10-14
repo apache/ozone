@@ -84,13 +84,28 @@ jobs:
           sudo hostname ozone-ci
           printf '127.0.0.1 ozone-ci\n' | sudo tee -a /etc/hosts
 
+      - name: Prepare Linux NFSv4 Kerberos client
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y nfs-common krb5-user
+          sudo systemctl stop rpc-gssd.service || true
+
+      - name: Build pinned Ganesha V5.7 with FSAL_OZONE
+        run: |
+          docker build \
+            -f hadoop-ozone/nfs-gateway/src/main/ganesha/Dockerfile \
+            -t ozone-nfs-ganesha:ci hadoop-ozone
+          docker run --rm ozone-nfs-ganesha:ci ganesha.nfsd -v
+
       - name: Run secure NFS and FSO integration contracts
         env:
           LANG: C.UTF-8
+          OZONE_NFS_GANESHA_IMAGE: ozone-nfs-ganesha:ci
         run: >-
           mvn --batch-mode --settings dev-support/ci/maven-settings.xml
           -pl :ozone-integration-test -am
           -Dtest=TestNfsCallerAuthorizationSecure,TestOzoneIntegrationNonHA -Dgroups=nfs -DfailIfNoTests=false
+          -Dozone.nfs.mounted.contract=true
           -Dmaven-surefire-plugin.argLineAccessArgs="--add-opens=java.base/java.lang=ALL-UNNAMED"
           verify -DskipShade -DskipRecon -DskipDocs
 
@@ -138,13 +153,6 @@ jobs:
 
       - name: Test mounted Ozone contract runner
         run: python3 hadoop-ozone/nfs-gateway/src/test/nfs/test_ganesha_ozone_runner.py
-
-      - name: Build pinned Ganesha V5.7 with FSAL_OZONE
-        run: |
-          docker build \
-            -f hadoop-ozone/nfs-gateway/src/main/ganesha/Dockerfile \
-            -t ozone-nfs-ganesha:ci hadoop-ozone
-          docker run --rm ozone-nfs-ganesha:ci ganesha.nfsd -v
 
       - name: Start FSAL_OZONE export and verify mutual-TLS handshake
         run: |
