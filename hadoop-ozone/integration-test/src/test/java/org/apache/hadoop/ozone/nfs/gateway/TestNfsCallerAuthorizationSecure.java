@@ -577,7 +577,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     assertNotNull(krb5Config, "MiniKdc must expose its krb5.conf to the mounted contract");
 
     File nfsKeytab = tempDir.resolve("nfs.keytab").toFile();
-    // A dotted server name prevents rpc.gssd from reverse-resolving ozone-ci to localhost.
+    // Keep Kerberos bound to the explicit NFS server name instead of the runner's cloud PTR record.
     String nfsPrincipal = "nfs/ozone-ci.example.test@" + getRealm();
     createPrincipal(nfsKeytab, nfsPrincipal);
     File clientKeytab = tempDir.resolve("nfs-client.keytab").toFile();
@@ -588,6 +588,10 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     Files.copy(nfsKeytab.toPath(), contractDir.resolve("nfs.keytab"));
     Path contractKrb5 = contractDir.resolve("krb5.conf");
     Files.copy(new File(krb5Config).toPath(), contractKrb5);
+    String contractKrb5Contents = Files.readString(contractKrb5)
+        .replaceFirst("(?m)^\\[libdefaults\\]\\s*$", "[libdefaults]\nrdns = false");
+    assertTrue(contractKrb5Contents.contains("rdns = false"), "MiniKdc krb5.conf must have a libdefaults section");
+    Files.writeString(contractKrb5, contractKrb5Contents);
     Path ganeshaConfig = contractDir.resolve("ganesha.conf");
     String config = String.format("NFS_CORE_PARAM {\n"
         + "    Protocols = 4;\n"
