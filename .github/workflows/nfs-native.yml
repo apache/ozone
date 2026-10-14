@@ -114,10 +114,12 @@ jobs:
           verify -DskipShade -DskipRecon -DskipDocs
 
       - name: Run S3/NFS writer lease integration test
+        timeout-minutes: 20
         run: >-
           mvn --batch-mode --settings dev-support/ci/maven-settings.xml
           -pl :ozone-integration-test-s3 -am
           -Dtest=TestS3SDK -Dgroups=nfs -Dsurefire.failIfNoSpecifiedTests=false
+          -Dmaven.test.redirectTestOutputToFile=false
           test -DskipShade -DskipRecon -DskipDocs
 
       - name: Copy Java contract dependencies
