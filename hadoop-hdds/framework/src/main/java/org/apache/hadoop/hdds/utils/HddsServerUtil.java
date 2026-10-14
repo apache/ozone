@@ -31,6 +31,8 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getScmServiceId;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddress;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedHost;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -80,6 +82,8 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -138,6 +142,8 @@ public final class HddsServerUtil {
   private static final Logger LOG = LoggerFactory.getLogger(HddsServerUtil.class);
 
   private static final int SHUTDOWN_HOOK_PRIORITY = 0;
+
+  private static final Pattern KERBEROS_PRINCIPAL = Pattern.compile("([^/@]+)(/[^/@]+)?(@[^/@]+)?");
 
   public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
       "OZONE_RATIS_SNAPSHOT_COMPLETE";
@@ -774,6 +780,20 @@ public final class HddsServerUtil {
   }
 
   /**
+   * @return true if {@code user} is a service user of the Kerberos {@code principal}: not a proxy user, with the same
+   * service name, with the same realm if the principal has one, and with a host if the principal has one. The host is
+   * not compared, as _HOST in the principal stands for the host of any instance of the service.
+   */
+  public static boolean isServiceUser(UserGroupInformation user, String principal) {
+    final Matcher expected = KERBEROS_PRINCIPAL.matcher(principal);
+    final Matcher actual = KERBEROS_PRINCIPAL.matcher(user.getUserName());
+    return user.getRealUser() == null && expected.matches() && actual.matches()
+        && expected.group(1).equals(actual.group(1))
+        && (expected.group(2) == null) == (actual.group(2) == null)
+        && (expected.group(3) == null || expected.group(3).equals(actual.group(3)));
+  }
+
+  /**
    * Add exception classes which server won't log at all.
    * @param server
    */
@@ -893,6 +913,7 @@ public final class HddsServerUtil {
 
       final Collection<HostAndPort> addresses = new HashSet<>(names.size());
       for (String address : names) {
+        validateAdvertisedAddress(OZONE_SCM_NAMES, address);
         Optional<String> hostname = getHostName(address);
         if (!hostname.isPresent()) {
           throw new IllegalArgumentException("Invalid hostname for SCM: "
@@ -931,6 +952,7 @@ public final class HddsServerUtil {
         LOG.warn("The SCM address configuration {} is not defined, return nothing", addressKey);
         return null;
       }
+      validateAdvertisedHost(addressKey, scmAddress);
 
       int scmDatanodePort = SCMNodeInfo.getPort(conf, scmServiceId, scmNodeId,
           OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
@@ -953,6 +975,7 @@ public final class HddsServerUtil {
     if (StringUtils.isEmpty(name)) {
       return null;
     }
+    validateAdvertisedAddress(OZONE_RECON_ADDRESS_KEY, name);
     Optional<String> hostname = getHostName(name);
     if (!hostname.isPresent()) {
       throw new IllegalArgumentException("Invalid hostname for Recon: "

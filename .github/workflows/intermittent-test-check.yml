@@ -57,7 +57,7 @@ on:
         default: '25'
         required: true
 env:
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Daether.connector.http.retryHandler.count=10
+  MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   TEST_CLASS: ${{ github.event.inputs.test-class}}
   TEST_METHOD: ${{ github.event.inputs.test-name }}
   ITERATIONS: ${{ github.event.inputs.iterations }}
@@ -213,7 +213,7 @@ jobs:
             hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS#$TEST_METHOD,Abstract*Test*\$*"
           fi
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
           repo_path: ${{ steps.download-ozone-repo.outputs.download-path }}
           ratis_args: ${{ needs.ratis.outputs.build-args }}
       - name: Summary of failures

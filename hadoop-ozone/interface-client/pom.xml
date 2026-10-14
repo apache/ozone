@@ -101,23 +101,26 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.xolstice.maven.plugins</groupId>
+        <groupId>io.github.ascopes</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
         <executions>
           <execution>
             <id>compile-proto-${protobuf.version}</id>
             <goals>
-              <goal>compile</goal>
-              <goal>test-compile</goal>
-              <goal>compile-custom</goal>
-              <goal>test-compile-custom</goal>
+              <goal>generate</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <protoc kind="binary-maven">
+                <version>${protobuf.version}</version>
+              </protoc>
               <outputDirectory>target/generated-sources/proto-java-protobuf-${protobuf.version}</outputDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
-              <pluginId>grpc-java</pluginId>
-              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+              <plugins>
+                <plugin kind="binary-maven">
+                  <groupId>io.grpc</groupId>
+                  <artifactId>protoc-gen-grpc-java</artifactId>
+                  <version>${io.grpc.version}</version>
+                </plugin>
+              </plugins>
             </configuration>
           </execution>
         </executions>

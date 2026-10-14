@@ -279,7 +279,7 @@ public class RatisPipelineProvider
       final CommandForDatanode<?> datanodeCommand =
           new CommandForDatanode<>(node, closeCommand);
       LOG.info("Send pipeline:{} close command to datanode {}",
-          pipeline.getId(), datanodeCommand.getDatanodeId());
+          pipeline.getId(), node);
       eventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND, datanodeCommand);
     });
   }

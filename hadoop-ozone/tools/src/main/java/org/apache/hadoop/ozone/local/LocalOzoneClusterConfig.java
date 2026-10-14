@@ -43,6 +43,7 @@ public final class LocalOzoneClusterConfig {
   static final String DEFAULT_DATANODES_VALUE = "1";
   static final String DEFAULT_PORT_VALUE = "0";
   static final String DEFAULT_S3G_ENABLED_VALUE = "true";
+  static final String DEFAULT_RECON_ENABLED_VALUE = "false";
   static final String DEFAULT_EPHEMERAL_VALUE = "false";
   static final String DEFAULT_STARTUP_TIMEOUT_VALUE = "PT2M";
 
@@ -56,17 +57,20 @@ public final class LocalOzoneClusterConfig {
   static final int DEFAULT_DATANODES =
       Integer.parseInt(DEFAULT_DATANODES_VALUE);
   static final String DEFAULT_HOST = "127.0.0.1";
-  static final String DEFAULT_BIND_HOST = "0.0.0.0";
+  static final String WILDCARD_HOST = "0.0.0.0";
   static final int DEFAULT_PORT = Integer.parseInt(DEFAULT_PORT_VALUE);
   static final boolean DEFAULT_S3G_ENABLED =
       Boolean.parseBoolean(DEFAULT_S3G_ENABLED_VALUE);
+  static final boolean DEFAULT_RECON_ENABLED =
+      Boolean.parseBoolean(DEFAULT_RECON_ENABLED_VALUE);
   static final boolean DEFAULT_EPHEMERAL =
       Boolean.parseBoolean(DEFAULT_EPHEMERAL_VALUE);
   static final Duration DEFAULT_STARTUP_TIMEOUT =
       Duration.parse(DEFAULT_STARTUP_TIMEOUT_VALUE);
-  static final String DEFAULT_S3_ACCESS_KEY = "admin";
-  static final String DEFAULT_S3_SECRET_KEY = "admin123";
-  static final String DEFAULT_S3_REGION = "us-east-1";
+  // Printed for S3 clients; not checked while security is off.
+  static final String LOCAL_S3_ACCESS_KEY = "admin";
+  static final String LOCAL_S3_SECRET_KEY = "admin123";
+  static final String LOCAL_S3_REGION = "us-east-1";
 
   private final Path dataDir;
   private final FormatMode formatMode;
@@ -77,11 +81,10 @@ public final class LocalOzoneClusterConfig {
   private final int omPort;
   private final int s3gPort;
   private final boolean s3gEnabled;
+  private final int reconPort;
+  private final boolean reconEnabled;
   private final boolean ephemeral;
   private final Duration startupTimeout;
-  private final String s3AccessKey;
-  private final String s3SecretKey;
-  private final String s3Region;
 
   private LocalOzoneClusterConfig(Builder builder) {
     dataDir = Objects.requireNonNull(builder.dataDir, "dataDir")
@@ -90,17 +93,17 @@ public final class LocalOzoneClusterConfig {
     formatMode = Objects.requireNonNull(builder.formatMode, "formatMode");
     datanodes = builder.datanodes;
     host = Objects.requireNonNull(builder.host, "host");
-    bindHost = Objects.requireNonNull(builder.bindHost, "bindHost");
+    // Defaults to host rather than WILDCARD_HOST: the local runtime runs without security by default.
+    bindHost = builder.bindHost != null ? builder.bindHost : host;
     scmPort = builder.scmPort;
     omPort = builder.omPort;
     s3gPort = builder.s3gPort;
     s3gEnabled = builder.s3gEnabled;
+    reconPort = builder.reconPort;
+    reconEnabled = builder.reconEnabled;
     ephemeral = builder.ephemeral;
     startupTimeout = Objects.requireNonNull(builder.startupTimeout,
         "startupTimeout");
-    s3AccessKey = Objects.requireNonNull(builder.s3AccessKey, "s3AccessKey");
-    s3SecretKey = Objects.requireNonNull(builder.s3SecretKey, "s3SecretKey");
-    s3Region = Objects.requireNonNull(builder.s3Region, "s3Region");
   }
 
   public Path getDataDir() {
@@ -155,6 +158,18 @@ public final class LocalOzoneClusterConfig {
   }
 
   /**
+   * Returns the Recon HTTP port. Port {@code 0} asks the runtime to choose an
+   * available local port.
+   */
+  public int getReconPort() {
+    return reconPort;
+  }
+
+  public boolean isReconEnabled() {
+    return reconEnabled;
+  }
+
+  /**
    * Returns whether the local runtime should remove its data directory when it
    * shuts down.
    */
@@ -168,27 +183,6 @@ public final class LocalOzoneClusterConfig {
    */
   public Duration getStartupTimeout() {
     return startupTimeout;
-  }
-
-  /**
-   * Returns the suggested local-only S3 access key printed for client setup.
-   */
-  public String getS3AccessKey() {
-    return s3AccessKey;
-  }
-
-  /**
-   * Returns the suggested local-only S3 secret key printed for client setup.
-   */
-  public String getS3SecretKey() {
-    return s3SecretKey;
-  }
-
-  /**
-   * Returns the suggested local-only S3 region printed for client setup.
-   */
-  public String getS3Region() {
-    return s3Region;
   }
 
   public static Builder builder() {
@@ -240,16 +234,15 @@ public final class LocalOzoneClusterConfig {
     private FormatMode formatMode = DEFAULT_FORMAT_MODE;
     private int datanodes = DEFAULT_DATANODES;
     private String host = DEFAULT_HOST;
-    private String bindHost = DEFAULT_BIND_HOST;
+    private String bindHost;
     private int scmPort = DEFAULT_PORT;
     private int omPort = DEFAULT_PORT;
     private int s3gPort = DEFAULT_PORT;
     private boolean s3gEnabled = DEFAULT_S3G_ENABLED;
+    private int reconPort = DEFAULT_PORT;
+    private boolean reconEnabled = DEFAULT_RECON_ENABLED;
     private boolean ephemeral = DEFAULT_EPHEMERAL;
     private Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
-    private String s3AccessKey = DEFAULT_S3_ACCESS_KEY;
-    private String s3SecretKey = DEFAULT_S3_SECRET_KEY;
-    private String s3Region = DEFAULT_S3_REGION;
 
     private Builder(Path dataDir) {
       this.dataDir = dataDir;
@@ -295,6 +288,16 @@ public final class LocalOzoneClusterConfig {
       return this;
     }
 
+    public Builder setReconPort(int value) {
+      reconPort = value;
+      return this;
+    }
+
+    public Builder setReconEnabled(boolean value) {
+      reconEnabled = value;
+      return this;
+    }
+
     public Builder setEphemeral(boolean value) {
       ephemeral = value;
       return this;
@@ -302,21 +305,6 @@ public final class LocalOzoneClusterConfig {
 
     public Builder setStartupTimeout(Duration value) {
       startupTimeout = value;
-      return this;
-    }
-
-    public Builder setS3AccessKey(String value) {
-      s3AccessKey = value;
-      return this;
-    }
-
-    public Builder setS3SecretKey(String value) {
-      s3SecretKey = value;
-      return this;
-    }
-
-    public Builder setS3Region(String value) {
-      s3Region = value;
       return this;
     }
 

@@ -223,10 +223,10 @@ public class TestSCMFollowerCatchupWithContainerReport {
   }
 
   /**
-   * Edge case for removing the background polling loop: on an otherwise idle
+   * Edge case for the fallback retry: on an otherwise idle
    * cluster a restarted follower must still start its datanode server (exit safe
-   * mode) and serve replicas after promotion, driven by Ratis heartbeats /
-   * notifyLeaderChanged rather than a steady stream of new transactions.
+   * mode) and serve replicas after promotion without a steady stream of new
+   * transactions.
    */
   @Test
   void testFollowerCatchupOnIdleCluster() throws Exception {
