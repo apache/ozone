@@ -520,7 +520,6 @@ public class TestBlockDeletion {
 
     // Delete key
     writeClient.deleteKey(keyArgs);
-    Thread.sleep(10000);
 
     GenericTestUtils.waitFor(() -> {
       try {
@@ -531,7 +530,7 @@ public class TestBlockDeletion {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 100, 10 * 1000);
+    }, 100, 20 * 1000);
 
     // Container state should be empty now as key got deleted
     assertTrue(getContainerFromDN(
