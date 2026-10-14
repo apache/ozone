@@ -851,6 +851,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       }
       new ProcessBuilder("docker", "rm", "--force", container).start().waitFor(10, TimeUnit.SECONDS);
       new ProcessBuilder("docker", "rm", "--force", replacementContainer).start().waitFor(10, TimeUnit.SECONDS);
+      runCommand("sudo", "rm", "-rf", recoveryRoot.toString());
       if (gssd != null) {
         gssd.destroy();
         if (!gssd.waitFor(5, TimeUnit.SECONDS)) {
