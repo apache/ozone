@@ -55,8 +55,10 @@ final class NfsExportLeaseManager implements Closeable {
   private final long leaseDurationMillis;
   private final ConcurrentMap<ByteString, LeaseState> leases = new ConcurrentHashMap<>();
   private final ConcurrentMap<FileLeaseKey, FileLeaseState> fileLeases = new ConcurrentHashMap<>();
-  private final ScheduledExecutorService renewer = Executors.newSingleThreadScheduledExecutor(
+  private final ScheduledExecutorService exportLeaseRenewer = Executors.newSingleThreadScheduledExecutor(
       new ThreadFactoryBuilder().setNameFormat("NfsExportLease-%d").setDaemon(true).build());
+  private final ScheduledExecutorService fileLeaseRenewer = Executors.newSingleThreadScheduledExecutor(
+      new ThreadFactoryBuilder().setNameFormat("NfsFileLease-%d").setDaemon(true).build());
 
   NfsExportLeaseManager(Map<ByteString, NfsObjectReader> readers, String gatewayId, long leaseDurationMillis) {
     if (readers == null || readers.isEmpty() || gatewayId == null || gatewayId.isEmpty()
@@ -77,11 +79,14 @@ final class NfsExportLeaseManager implements Closeable {
       }
       leases.putAll(acquired);
       long renewalPeriodMillis = Math.max(500, leaseDurationMillis / 3);
-      renewer.scheduleAtFixedRate(this::renewAll, renewalPeriodMillis, renewalPeriodMillis,
+      exportLeaseRenewer.scheduleAtFixedRate(this::renewExportLeases, renewalPeriodMillis, renewalPeriodMillis,
+          TimeUnit.MILLISECONDS);
+      fileLeaseRenewer.scheduleAtFixedRate(this::renewFileLeases, renewalPeriodMillis, renewalPeriodMillis,
           TimeUnit.MILLISECONDS);
     } catch (IOException | RuntimeException ex) {
       acquired.forEach((key, state) -> release(key, state));
-      renewer.shutdownNow();
+      exportLeaseRenewer.shutdownNow();
+      fileLeaseRenewer.shutdownNow();
       if (ex instanceof IOException) {
         throw (IOException) ex;
       }
@@ -448,7 +453,7 @@ final class NfsExportLeaseManager implements Closeable {
     return new java.util.UUID(bytes.getLong(), bytes.getLong()).toString();
   }
 
-  private synchronized void renewAll() {
+  private void renewExportLeases() {
     for (Map.Entry<ByteString, NfsObjectReader> entry : readers.entrySet()) {
       LeaseState current = leases.get(entry.getKey());
       if (current == null) {
@@ -463,6 +468,9 @@ final class NfsExportLeaseManager implements Closeable {
         LOG.error("Lost NFS export lease for gateway {} and export {}", gatewayId, entry.getKey(), ex);
       }
     }
+  }
+
+  private void renewFileLeases() {
     for (Map.Entry<FileLeaseKey, FileLeaseState> entry : fileLeases.entrySet()) {
       renewFileLease(entry.getKey(), entry.getValue());
     }
@@ -510,9 +518,11 @@ final class NfsExportLeaseManager implements Closeable {
 
   @Override
   public void close() {
-    renewer.shutdownNow();
+    exportLeaseRenewer.shutdownNow();
+    fileLeaseRenewer.shutdownNow();
     try {
-      if (!renewer.awaitTermination(5, TimeUnit.SECONDS)) {
+      if (!exportLeaseRenewer.awaitTermination(5, TimeUnit.SECONDS)
+          || !fileLeaseRenewer.awaitTermination(5, TimeUnit.SECONDS)) {
         LOG.warn("NFS export lease renewer did not stop; leases will expire without release");
         return;
       }

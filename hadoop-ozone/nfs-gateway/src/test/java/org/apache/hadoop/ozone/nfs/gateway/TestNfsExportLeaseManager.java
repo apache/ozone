@@ -362,6 +362,41 @@ class TestNfsExportLeaseManager {
   }
 
   @Test
+  void delayedFileLeaseRenewalDoesNotExpireExportLease() throws Exception {
+    NfsObjectReader reader = org.mockito.Mockito.mock(NfsObjectReader.class);
+    when(reader.updateExportLease(eq(ACQUIRE), eq("gateway-a"), eq(3000L), any(), any()))
+        .thenReturn(leaseResponse());
+    when(reader.updateExportLease(eq(RENEW), eq("gateway-a"), eq(3000L), eq(2L), eq(3L)))
+        .thenReturn(leaseResponse());
+    when(reader.updateExportLease(eq(RELEASE), eq("gateway-a"), eq(0L), eq(2L), eq(3L)))
+        .thenReturn(leaseResponse());
+    CountDownLatch renewalStarted = new CountDownLatch(1);
+    CountDownLatch completeRenewal = new CountDownLatch(1);
+    NfsFileLeaseResponse fileLease = NfsFileLeaseResponse.newBuilder().setGeneration(1)
+        .setExpiresAtMillis(System.currentTimeMillis() + 2000).build();
+    when(reader.updateFileLease(eq(NfsFileLeaseRequest.Operation.RENEW), eq("gateway-a"), eq(2L), eq(101L),
+        eq("transfer-a"), eq(1L), eq(ByteString.copyFromUtf8("owner")), eq(2000L)))
+        .thenReturn(fileLease)
+        .thenAnswer(invocation -> {
+          renewalStarted.countDown();
+          assertTrue(completeRenewal.await(6, TimeUnit.SECONDS));
+          return fileLease;
+        });
+    NfsExportLeaseManager manager = new NfsExportLeaseManager(Map.of(EXPORT_UUID, reader), "gateway-a", 3000);
+    manager.start();
+    manager.registerFileLease(EXPORT_UUID, "transfer-a", "alice@EXAMPLE.COM", fileLeaseResponse());
+
+    try {
+      assertTrue(renewalStarted.await(5, TimeUnit.SECONDS));
+      Thread.sleep(3500);
+      assertTrue(manager.isActive(EXPORT_UUID));
+    } finally {
+      completeRenewal.countDown();
+      manager.close();
+    }
+  }
+
+  @Test
   void storesRangeBeforeRecordingItsManifest() throws Exception {
     NfsObjectReader reader = org.mockito.Mockito.mock(NfsObjectReader.class);
     when(reader.updateExportLease(eq(ACQUIRE), eq("gateway-a"), eq(3000L), any(), any()))
