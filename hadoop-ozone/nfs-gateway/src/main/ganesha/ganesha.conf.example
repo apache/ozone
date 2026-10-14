@@ -56,6 +56,6 @@ EXPORT {
         Trusted_CA_File = "/etc/ozone/ganesha-client-ca.crt";
         Client_Certificate_File = "/etc/ozone/ganesha-client.crt";
         Client_Key_File = "/etc/ozone/ganesha-client.key";
-        Timeout_Millis = 5000;
+        Timeout_Millis = 30000;
     }
 }

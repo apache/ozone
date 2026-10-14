@@ -62,7 +62,7 @@ static struct config_item ozone_export_params[] = {
 		       ozone_export_config, client_certificate_file),
 	CONF_MAND_STR("Client_Key_File", 1, 4096, NULL,
 		       ozone_export_config, client_key_file),
-	CONF_ITEM_UI32("Timeout_Millis", 1, 60000, 5000,
+	CONF_ITEM_UI32("Timeout_Millis", 1, 60000, 30000,
 		       ozone_export_config, timeout_millis),
 	CONFIG_EOL
 };

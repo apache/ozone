@@ -654,7 +654,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         + "        Trusted_CA_File = \"/contract/nfs-gateway.crt\";\n"
         + "        Client_Certificate_File = \"/contract/nfs-gateway.crt\";\n"
         + "        Client_Key_File = \"/contract/nfs-gateway.key\";\n"
-        + "        Timeout_Millis = 5000;\n"
+        + "        Timeout_Millis = 60000;\n"
         + "    }\n"
         + "}\n", nfsPrincipal, gatewayPort, exportId, Long.toUnsignedString(volumeId),
         Long.toUnsignedString(bucketId));
