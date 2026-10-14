@@ -218,14 +218,14 @@ jobs:
           repo_path: ${{ steps.download-ozone-repo.outputs.download-path }}
           ratis_args: ${{ needs.ratis.outputs.build-args }}
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/flaky/summary.txt
         if: ${{ failure() }}
       - name: Archive build results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ failure() }}
         with:
           name: result-${{ github.run_number }}-${{ github.run_id }}-split-${{ matrix.split }}
-          path: target/unit
+          path: target/flaky
   count-failures:
     if: ${{ failure() }}
     needs: run-test
