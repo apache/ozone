@@ -46,6 +46,7 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.AccessController;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.ZonedDateTime;
@@ -56,6 +57,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import javax.security.auth.Subject;
+import javax.security.auth.kerberos.KerberosTicket;
 import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderFactory;
@@ -177,6 +180,41 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         () -> authorizer.authorizeCaller(caller("other@" + getRealm(), Caller.Protection.PRIVACY), peer));
     assertCode(Status.Code.PERMISSION_DENIED, () -> authorizer.authorizeCaller(
         caller("test@" + getRealm(), Caller.Protection.PRIVACY), InetAddress.getByName("127.0.0.2")));
+  }
+
+  @Test
+  void scheduledGatewayReloginRenewsTgtFromKeytab() throws Exception {
+    UserGroupInformation gatewayUser = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+        getOzonePrincipal(), getOzoneKeytab().getAbsolutePath());
+    KerberosTicket originalTgt = findTgt(gatewayUser);
+    assertNotNull(originalTgt, "Keytab login should acquire a TGT");
+    UserGroupInformation.setShouldRenewImmediatelyForTests(true);
+    try {
+      try (NfsGatewayKerberosRelogin ignored = new NfsGatewayKerberosRelogin(gatewayUser, 10)) {
+        GenericTestUtils.waitFor(() -> {
+          try {
+            return findTgt(gatewayUser) != originalTgt;
+          } catch (Exception ex) {
+            throw new RuntimeException(ex);
+          }
+        }, 10, 10_000);
+      }
+    } finally {
+      UserGroupInformation.setShouldRenewImmediatelyForTests(false);
+    }
+    assertTrue(findTgt(gatewayUser) != originalTgt, "Scheduled keytab relogin should replace the gateway TGT");
+  }
+
+  private static KerberosTicket findTgt(UserGroupInformation user) throws Exception {
+    return user.doAs((java.security.PrivilegedExceptionAction<KerberosTicket>) () -> {
+      for (KerberosTicket ticket : Subject.getSubject(AccessController.getContext())
+          .getPrivateCredentials(KerberosTicket.class)) {
+        if (ticket.getServer().getName().startsWith("krbtgt/")) {
+          return ticket;
+        }
+      }
+      return null;
+    });
   }
 
   @Test

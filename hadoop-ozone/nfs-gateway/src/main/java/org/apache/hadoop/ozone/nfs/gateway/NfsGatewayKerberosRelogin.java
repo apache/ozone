@@ -35,7 +35,11 @@ final class NfsGatewayKerberosRelogin implements Closeable {
       new ThreadFactoryBuilder().setNameFormat("NfsGatewayKerberosRelogin-%d").setDaemon(true).build());
 
   NfsGatewayKerberosRelogin(UserGroupInformation loginUser) {
-    this(() -> check(loginUser), CHECK_INTERVAL_MILLIS);
+    this(loginUser, CHECK_INTERVAL_MILLIS);
+  }
+
+  NfsGatewayKerberosRelogin(UserGroupInformation loginUser, long intervalMillis) {
+    this(() -> check(loginUser), intervalMillis);
   }
 
   NfsGatewayKerberosRelogin(Runnable relogin, long intervalMillis) {
