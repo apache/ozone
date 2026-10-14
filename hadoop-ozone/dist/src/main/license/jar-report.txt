@@ -175,6 +175,7 @@ share/ozone/lib/jooq.jar
 share/ozone/lib/jsch.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jspecify.jar
+share/ozone/lib/jsr305.jar
 share/ozone/lib/jsr311-api.jar
 share/ozone/lib/jts-core.jar
 share/ozone/lib/jul-to-slf4j.jar
@@ -259,6 +260,7 @@ share/ozone/lib/ozone-interface-client.jar
 share/ozone/lib/ozone-interface-storage.jar
 share/ozone/lib/ozone-manager.jar
 share/ozone/lib/ozone-multitenancy-ranger.jar
+share/ozone/lib/ozone-nfs-gateway.jar
 share/ozone/lib/ozone-recon.jar
 share/ozone/lib/ozone-reconcodegen.jar
 share/ozone/lib/ozone-s3-secret-store.jar
