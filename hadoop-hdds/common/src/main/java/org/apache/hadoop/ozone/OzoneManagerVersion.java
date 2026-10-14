@@ -72,9 +72,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
       "OzoneManager version that rejects lookupFile on OBJECT_STORE buckets "
           + "server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check for getFileChecksum"),
-  S3_BUCKET_INFO_WITH_VOLUME_CONTEXT(16,
-      "OzoneManager version that resolves the S3 volume in InfoBucket when assumeS3Context is set"),
   ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
+  S3_BUCKET_INFO_WITH_VOLUME_CONTEXT(101,
+      "OzoneManager version that resolves the S3 volume in InfoBucket when assumeS3Context is set"),
 
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
