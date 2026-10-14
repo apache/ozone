@@ -53,7 +53,8 @@ server-side handling, client translation code, and integration tests.
 
 ## Local Environment
 
-- Use a JDK 21 runtime locally. Before using Java 9+ language features or APIs, check that the module does not target Java 8.
+- Use a JDK 21 runtime locally. Before using Java 9+ syntax or standard-library APIs, check the module's
+  `maven.compiler.release` in its `pom.xml`; Maven `--release` governs both language level and API surface.
 - Ozone formatting conventions are shared through `.editorconfig`.
 - If Maven behaves unexpectedly, check `java -version` and `mvn -version` first.
 
