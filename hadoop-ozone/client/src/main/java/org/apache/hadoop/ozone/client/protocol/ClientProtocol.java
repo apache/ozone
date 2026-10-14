@@ -1680,15 +1680,9 @@ public interface ClientProtocol {
   Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName)
       throws IOException;
 
-  default Map<String, String> getObjectTagging(String volumeName,
+  Map<String, String> getObjectTagging(String volumeName,
       String bucketName, String keyName, boolean assumeS3Context)
-      throws IOException {
-    if (assumeS3Context) {
-      throw new UnsupportedOperationException(
-          "S3 context-aware object tagging is not supported");
-    }
-    return getObjectTagging(volumeName, bucketName, keyName);
-  }
+      throws IOException;
 
   /**
    * Sets the tags to an existing key.

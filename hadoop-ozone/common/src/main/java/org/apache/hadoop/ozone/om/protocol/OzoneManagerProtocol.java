@@ -1262,14 +1262,8 @@ public interface OzoneManagerProtocol
   @Override
   Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException;
 
-  default Map<String, String> getObjectTagging(OmKeyArgs args,
-      boolean assumeS3Context) throws IOException {
-    if (assumeS3Context) {
-      throw new UnsupportedOperationException(
-          "S3 context-aware object tagging is not supported");
-    }
-    return getObjectTagging(args);
-  }
+  Map<String, String> getObjectTagging(OmKeyArgs args,
+      boolean assumeS3Context) throws IOException;
 
   /**
    * Sets the tags to an existing key.
