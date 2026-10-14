@@ -579,6 +579,8 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     File nfsKeytab = tempDir.resolve("nfs.keytab").toFile();
     String nfsPrincipal = "nfs/ozone-ci@" + getRealm();
     createPrincipal(nfsKeytab, nfsPrincipal);
+    File clientKeytab = tempDir.resolve("nfs-client.keytab").toFile();
+    createPrincipal(clientKeytab, "host/ozone-ci@" + getRealm());
     Path contractDir = tempDir.resolve("mounted-nfs-contract");
     Files.createDirectories(contractDir);
     Files.copy(nfsKeytab.toPath(), contractDir.resolve("nfs.keytab"));
@@ -642,7 +644,8 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       runCommand("sudo", "env", "KRB5_CONFIG=" + contractKrb5, "KRB5CCNAME=FILE:/tmp/krb5cc_0",
           "kinit", "-kt", getTestUserKeytab().getAbsolutePath(), getTestUserPrincipal());
       ProcessBuilder gssdBuilder = new ProcessBuilder("sudo", "env", "KRB5_CONFIG=" + contractKrb5,
-          "KRB5CCNAME=FILE:/tmp/krb5cc_0", "rpc.gssd", "-f", "-n", "-v");
+          "KRB5CCNAME=FILE:/tmp/krb5cc_0", "rpc.gssd", "-f", "-n", "-k",
+          clientKeytab.getAbsolutePath(), "-v");
       gssdBuilder.redirectErrorStream(true);
       gssdBuilder.redirectOutput(contractDir.resolve("rpc.gssd.log").toFile());
       gssd = gssdBuilder.start();
