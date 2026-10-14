@@ -581,7 +581,8 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     String nfsPrincipal = "nfs/ozone-ci.example.test@" + getRealm();
     createPrincipal(nfsKeytab, nfsPrincipal);
     File clientKeytab = tempDir.resolve("nfs-client.keytab").toFile();
-    createPrincipal(clientKeytab, "host/ozone-ci@" + getRealm());
+    String clientPrincipal = "host/ozone-ci.example.test@" + getRealm();
+    createPrincipal(clientKeytab, "host/ozone-ci@" + getRealm(), clientPrincipal);
     Path contractDir = tempDir.resolve("mounted-nfs-contract");
     Files.createDirectories(contractDir);
     Files.copy(nfsKeytab.toPath(), contractDir.resolve("nfs.keytab"));
@@ -644,9 +645,9 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           getTestUserKeytab().getAbsolutePath(), getTestUserPrincipal());
       runCommand("sudo", "env", "KRB5_CONFIG=" + contractKrb5, "KRB5CCNAME=FILE:/tmp/krb5cc_0",
           "kinit", "-kt", getTestUserKeytab().getAbsolutePath(), getTestUserPrincipal());
+      verifyMountedKerberosCredentials(contractKrb5, clientKeytab, clientPrincipal, nfsPrincipal);
       ProcessBuilder gssdBuilder = new ProcessBuilder("sudo", "env", "KRB5_CONFIG=" + contractKrb5,
-          "KRB5CCNAME=FILE:/tmp/krb5cc_0", "rpc.gssd", "-f", "-n", "-k",
-          clientKeytab.getAbsolutePath(), "-v");
+          "rpc.gssd", "-f", "-n", "-k", clientKeytab.getAbsolutePath(), "-v");
       gssdBuilder.redirectErrorStream(true);
       gssdBuilder.redirectOutput(contractDir.resolve("rpc.gssd.log").toFile());
       gssd = gssdBuilder.start();
@@ -714,8 +715,17 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       }
       new ProcessBuilder("sudo", "pkill", "-TERM", "-x", "rpc.gssd").start().waitFor(10, TimeUnit.SECONDS);
       new ProcessBuilder("sudo", "kdestroy", "-c", "FILE:/tmp/krb5cc_0").start().waitFor(10, TimeUnit.SECONDS);
+      new ProcessBuilder("sudo", "kdestroy", "-c", "FILE:/tmp/krb5cc_machine").start().waitFor(10, TimeUnit.SECONDS);
       new ProcessBuilder("kdestroy").start().waitFor(10, TimeUnit.SECONDS);
     }
+  }
+
+  private void verifyMountedKerberosCredentials(Path krb5Config, File clientKeytab, String clientPrincipal,
+      String nfsPrincipal) throws Exception {
+    String machineCache = "KRB5CCNAME=FILE:/tmp/krb5cc_machine";
+    runCommand("sudo", "env", "KRB5_CONFIG=" + krb5Config, machineCache,
+        "kinit", "-kt", clientKeytab.getAbsolutePath(), clientPrincipal);
+    runCommand("sudo", "env", "KRB5_CONFIG=" + krb5Config, machineCache, "kvno", nfsPrincipal);
   }
 
   private static void waitForNfsPort(Path log) throws Exception {
