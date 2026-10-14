@@ -155,8 +155,10 @@ jobs:
                 --native-client /tmp/nfs-build/test_ozone_grpc_tls -v
             '
 
-      - name: Test mounted Ozone contract runner
-        run: python3 hadoop-ozone/nfs-gateway/src/test/nfs/test_ganesha_ozone_runner.py
+      - name: Test mounted Ozone and reclaim contract runners
+        run: |
+          python3 hadoop-ozone/nfs-gateway/src/test/nfs/test_ganesha_ozone_runner.py
+          python3 hadoop-ozone/nfs-gateway/src/test/nfs/test_ganesha_reclaim_runner.py
 
       - name: Start FSAL_OZONE export and verify mutual-TLS handshake
         run: |

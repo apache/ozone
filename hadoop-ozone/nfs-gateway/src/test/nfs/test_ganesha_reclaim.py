@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Verify NFSv4 open state across a Ganesha process restart or instance replacement."""
+"""Verify NFSv4 open state across Ganesha restarts or bidirectional instance takeover."""
 
 import argparse
 import os
@@ -28,14 +28,12 @@ from test_ganesha_write import require_nfs41_krb5p_mount
 
 class GaneshaReclaimContract(unittest.TestCase):
     mount = None
-    restart_command = None
+    restart_commands = []
     restart_timeout_seconds = 90
 
     def test_open_state_survives_server_restart(self):
         path = self.mount / ("reclaim-contract-" + uuid.uuid4().hex)
         initial = b"stable data before Ganesha restart"
-        appended = b"; write after reclaim"
-
         def cleanup():
             try:
                 path.unlink()
@@ -48,19 +46,20 @@ class GaneshaReclaimContract(unittest.TestCase):
             stream.flush()
             os.fsync(stream.fileno())
 
-            subprocess.run(
-                self.restart_command,
-                check=True,
-                timeout=self.restart_timeout_seconds)
+            expected = initial
+            for index, command in enumerate(self.restart_commands, start=1):
+                subprocess.run(command, check=True, timeout=self.restart_timeout_seconds)
 
-            stream.seek(0)
-            self.assertEqual(initial, stream.read())
-            stream.seek(0, 2)
-            self.assertEqual(len(appended), stream.write(appended))
-            stream.flush()
-            os.fsync(stream.fileno())
+                stream.seek(0)
+                self.assertEqual(expected, stream.read())
+                appended = f"; write after reclaim {index}".encode()
+                stream.seek(0, 2)
+                self.assertEqual(len(appended), stream.write(appended))
+                stream.flush()
+                os.fsync(stream.fileno())
+                expected += appended
 
-        self.assertEqual(initial + appended, path.read_bytes())
+        self.assertEqual(expected, path.read_bytes())
 
 
 if __name__ == "__main__":
@@ -68,13 +67,14 @@ if __name__ == "__main__":
     parser.add_argument("--mount", type=Path, required=True)
     parser.add_argument(
         "--restart-command",
+        action="append",
         required=True,
-        help="Ganesha restart command, split into arguments without a shell")
+        help="Ganesha restart/takeover command; repeat for each direction, split into arguments without a shell")
     parser.add_argument("--restart-timeout-seconds", type=int, default=90)
     arguments = parser.parse_args()
     GaneshaReclaimContract.mount = require_nfs41_krb5p_mount(arguments.mount)
-    GaneshaReclaimContract.restart_command = shlex.split(arguments.restart_command)
+    GaneshaReclaimContract.restart_commands = [shlex.split(command) for command in arguments.restart_command]
     GaneshaReclaimContract.restart_timeout_seconds = arguments.restart_timeout_seconds
-    if not GaneshaReclaimContract.restart_command:
+    if any(not command for command in GaneshaReclaimContract.restart_commands):
         parser.error("--restart-command must not be empty")
     unittest.main(argv=[__file__], verbosity=2)
