@@ -133,7 +133,9 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
 
   @BeforeAll
   void startKdc() throws Exception {
+    LOG.info("Starting MiniKdc for secure NFS integration test");
     initKerberos();
+    LOG.info("MiniKdc is ready for secure NFS integration test");
     UserGroupInformation.setConfiguration(getConf());
     originalLoginUser = UserGroupInformation.getLoginUser();
     originalRules = KerberosName.getRules();

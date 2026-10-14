@@ -107,6 +107,7 @@ jobs:
           -pl :ozone-integration-test -am
           -Dtest=TestNfsCallerAuthorizationSecure,TestOzoneIntegrationNonHA -Dgroups=nfs -DfailIfNoTests=false
           -Dozone.nfs.mounted.contract=true
+          -Dmaven.test.redirectTestOutputToFile=false
           -Dmaven-surefire-plugin.argLineAccessArgs="--add-opens=java.base/java.lang=ALL-UNNAMED"
           verify -DskipShade -DskipRecon -DskipDocs
 
