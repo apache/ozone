@@ -55,7 +55,7 @@ if [[ -f hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh ]]; then
   ozone_java_setup
 fi
 
-if [[ ${CHECK} != "flaky" ]]; then
+if [[ ${CI:-} != "true" ]]; then
   # Local run, remove leftover artifacts from all modules
   mvn ${MAVEN_OPTIONS} -Dscan=false clean
 fi
