@@ -177,6 +177,8 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         getOzonePrincipal(), getOzoneKeytab().getAbsolutePath());
     UserGroupInformation.setLoginUser(gatewayUser);
     getConf().setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
+    getConf().set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
+        OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
     getConf().set(OzoneConfigKeys.OZONE_ADMINISTRATORS, "scm");
     getConf().set("hadoop.proxyuser.scm.users", "scm");
     getConf().set("hadoop.proxyuser.scm.hosts", "127.0.0.1," + InetAddress.getLocalHost().getHostAddress());
@@ -338,6 +340,13 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
               .setDirectoryHandle(bucketHandle).setMaxEntries(16).build());
           assertEquals(NfsStatus.OK.getCode(), listing.getResult().getNfsStatus());
           assertTrue(listing.getEntriesList().stream().anyMatch(entry -> "nfs-file".equals(entry.getName())));
+          ReadResponse readerRead = stub.read(ReadRequest.newBuilder().setContext(readerContext)
+              .setHandle(ByteString.copyFrom(handle.toBytes())).setOffset(0).setCount(expected.length).build());
+          assertEquals(NfsStatus.OK.getCode(), readerRead.getResult().getNfsStatus());
+          assertEquals(ByteString.copyFrom(expected), readerRead.getData());
+          CreateResponse readerCreate = stub.create(CreateRequest.newBuilder().setContext(readerContext)
+              .setParentHandle(bucketHandle).setName("reader-must-not-create").build());
+          assertEquals(NfsStatus.ACCESS.getCode(), readerCreate.getResult().getNfsStatus());
           assertSecureGatewayWrite(stub, context, readerContext, exportId, volumeId, bucketId, metadata, bucket,
               stagingBucket, client.getObjectStore());
         } finally {
