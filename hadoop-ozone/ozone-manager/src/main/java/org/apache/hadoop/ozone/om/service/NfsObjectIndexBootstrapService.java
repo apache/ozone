@@ -58,7 +58,7 @@ public class NfsObjectIndexBootstrapService extends BackgroundService {
   private Map<String, OmBucketInfo> buckets;
 
   public NfsObjectIndexBootstrapService(long interval, TimeUnit unit, OzoneManager ozoneManager) {
-    super("NfsObjectIndexBootstrapService", interval, unit, 1, 0, ozoneManager.getThreadNamePrefix());
+    super("NfsObjectIndexBootstrapService", interval, unit, 1, interval, ozoneManager.getThreadNamePrefix());
     this.ozoneManager = ozoneManager;
   }
 
