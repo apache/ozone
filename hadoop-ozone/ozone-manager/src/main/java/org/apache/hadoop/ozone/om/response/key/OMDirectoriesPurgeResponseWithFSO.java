@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -141,6 +142,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
 
         keySpaceOmMetadataManager.getDirectoryTable().deleteWithBatch(keySpaceBatchOperation,
             ozoneDbKey);
+        OMFileRequest.deleteNfsObjectFromDB(keySpaceOmMetadataManager, keySpaceBatchOperation, volumeId, bucketId,
+            keyInfo.getObjectID());
 
         if (LOG.isDebugEnabled()) {
           LOG.debug("markDeletedDirList KeyName: {}, DBKey: {}",
@@ -155,6 +158,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
             bucketId, keyInfo.getParentObjectID(), keyInfo.getFileName());
         keySpaceOmMetadataManager.getKeyTable(getBucketLayout())
             .deleteWithBatch(keySpaceBatchOperation, ozoneDbKey);
+        OMFileRequest.deleteNfsObjectFromDB(keySpaceOmMetadataManager, keySpaceBatchOperation, volumeId, bucketId,
+            keyInfo.getObjectID());
 
         if (LOG.isDebugEnabled()) {
           LOG.info("Move keyName:{} to DeletedTable DBKey: {}",

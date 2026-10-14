@@ -18,10 +18,16 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -30,17 +36,49 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmNfsObjectInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedNfsObjectInfo;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests S3 Multipart Upload Complete request.
  */
 public class TestS3MultipartUploadCompleteRequestWithFSO
     extends TestS3MultipartUploadCompleteRequest {
+
+  @Test
+  public void testMultipartOverwritePreservesNfsIdentity() throws Exception {
+    omMetadataManager = spy(omMetadataManager);
+    doReturn(true).when(omMetadataManager).isNfsObjectIndexEnabled();
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    addVolumeAndBucket(volumeName, bucketName);
+    checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName,
+        Collections.emptyMap(), Collections.emptyMap());
+    String fileKey = getOzoneDBKey(volumeName, bucketName, keyName);
+    OmKeyInfo original = omMetadataManager.getKeyTable(getBucketLayout()).getSkipCache(fileKey);
+    assertNotNull(original);
+    String indexKey = omMetadataManager.getNfsObjectKey(omMetadataManager.getVolumeId(volumeName),
+        omMetadataManager.getBucketId(volumeName, bucketName), original.getObjectID());
+    OmNfsObjectInfo pointer = new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.FILE,
+        original.getParentObjectID(), original.getFileName());
+    assertEquals(pointer, omMetadataManager.getNfsObjectTable().get(indexKey));
+    assertEquals(pointer, omMetadataManager.getNfsObjectTable().getSkipCache(indexKey));
+    checkValidateAndUpdateCacheSuccess(volumeName, bucketName, keyName,
+        Collections.singletonMap("replacement", "true"), Collections.emptyMap());
+    OmKeyInfo replacement = omMetadataManager.getKeyTable(getBucketLayout()).getSkipCache(fileKey);
+    assertEquals(original.getObjectID(), replacement.getObjectID());
+    assertEquals("true", replacement.getMetadata().get("replacement"));
+    assertEquals(pointer, omMetadataManager.getNfsObjectTable().get(indexKey));
+    assertEquals(pointer, omMetadataManager.getNfsObjectTable().getSkipCache(indexKey));
+  }
 
   @Override
   protected String getKeyName() {

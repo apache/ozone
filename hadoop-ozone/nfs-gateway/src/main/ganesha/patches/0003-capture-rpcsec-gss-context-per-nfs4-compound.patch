@@ -1,0 +1,127 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to you under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+diff --git a/src/libntirpc/src/svc_auth_gss.c b/src/libntirpc/src/svc_auth_gss.c
+index cca0bad1..21b68a6c 100644
+--- a/src/libntirpc/src/svc_auth_gss.c
++++ b/src/libntirpc/src/svc_auth_gss.c
+@@ -186,7 +186,7 @@ svcauth_gss_accept_sec_context(struct svc_req *req,
+ {
+ 	struct rpc_gss_cred *gc;
+ 	gss_buffer_desc recv_tok, seqbuf, checksum;
+-	gss_OID mech;
++	gss_OID mech, name_type;
+ 	OM_uint32 maj_stat = 0, min_stat = 0, ret_flags, seq;
+ #define INDEF_EXPIRE 60*60*24	/* from mit k5 src/lib/rpc/svc_auth_gssapi.c */
+ 	OM_uint32 time_rec;
+@@ -245,7 +245,7 @@ svcauth_gss_accept_sec_context(struct svc_req *req,
+ 	if (gr->gr_major == GSS_S_COMPLETE) {
+ 		maj_stat =
+ 		    gss_display_name(&min_stat, gd->client_name, &gd->cname,
+-				     &gd->sec.mech);
++				     &name_type);
+ 		if (maj_stat != GSS_S_COMPLETE) {
+ 			__warnx(TIRPC_DEBUG_FLAG_AUTH,
+ 				"%s: display_name major=%u minor=%u", __func__,
+diff --git a/src/Protocols/NFS/nfs4_Compound.c b/src/Protocols/NFS/nfs4_Compound.c
+index f26bef3..ec2ed40 100644
+--- a/src/Protocols/NFS/nfs4_Compound.c
++++ b/src/Protocols/NFS/nfs4_Compound.c
+@@ -1214,6 +1214,11 @@ int nfs4_Compound(nfs_arg_t *arg, struct svc_req *req, nfs_res_t *res)
+ 	data->argarray = arg->arg_compound4.argarray.argarray_val;
+ 	data->res = res;
+ 	reqdata->proc_data = data;
++	if (nfs_capture_rpcsec_gss_context(req) != NFS4_OK) {
++		res_compound4->status = NFS4ERR_ACCESS;
++		res_compound4->resarray.resarray_len = 0;
++		goto out;
++	}
+ 
+ 	/* Minor version related stuff */
+ 	op_ctx->nfs_minorvers = compound4_minor;
+diff --git a/src/include/nfs_creds.h b/src/include/nfs_creds.h
+index a7b5d6c..8c701ca 100644
+--- a/src/include/nfs_creds.h
++++ b/src/include/nfs_creds.h
+@@ -50,6 +50,8 @@ void squash_setattr(struct fsal_attrlist *attr);
+ 
+ nfsstat4 nfs_req_creds(struct svc_req *req);
+ 
++nfsstat4 nfs_capture_rpcsec_gss_context(struct svc_req *req);
++
+ nfsstat4 nfs4_export_check_access(struct svc_req *req);
+ 
+ fsal_status_t nfs_access_op(struct fsal_obj_handle *hdl,
+diff --git a/src/support/nfs_creds.c b/src/support/nfs_creds.c
+index 22ff12d..a2a6e33 100644
+--- a/src/support/nfs_creds.c
++++ b/src/support/nfs_creds.c
+@@ -254,6 +254,56 @@ int nfs_rpc_req2client_cred(struct svc_req *req, nfs_client_cred_t *pcred)
+  * @return NFS4_OK if successful, NFS4ERR_ACCESS otherwise.
+  *
+  */
++nfsstat4 nfs_capture_rpcsec_gss_context(struct svc_req *req)
++{
++#ifdef _HAVE_GSSAPI
++	struct svc_rpc_gss_data *gd;
++
++	if (op_ctx == NULL)
++		return NFS4ERR_ACCESS;
++	op_ctx->client_auth_flavor = req->rq_msg.cb_cred.oa_flavor;
++	op_ctx->client_rpcsec_gss_service = 0;
++	op_ctx->client_rpcsec_gss_mech_len = 0;
++	memset(op_ctx->client_rpcsec_gss_mech, 0,
++	       sizeof(op_ctx->client_rpcsec_gss_mech));
++	op_ctx->client_rpcsec_gss_principal_len = 0;
++	memset(op_ctx->client_rpcsec_gss_principal, 0,
++	       sizeof(op_ctx->client_rpcsec_gss_principal));
++	if (req->rq_msg.cb_cred.oa_flavor != RPCSEC_GSS)
++		return NFS4_OK;
++	gd = SVCAUTH_PRIVATE(req->rq_auth);
++	if (gd == NULL || gd->cname.value == NULL || gd->cname.length == 0 ||
++	    gd->cname.length > sizeof(op_ctx->client_rpcsec_gss_principal) ||
++	    gd->sec.mech == NULL || gd->sec.mech->elements == NULL ||
++	    gd->sec.mech->length == 0 ||
++	    gd->sec.mech->length > sizeof(op_ctx->client_rpcsec_gss_mech))
++		return NFS4ERR_ACCESS;
++	op_ctx->client_rpcsec_gss_mech_len = gd->sec.mech->length;
++	memcpy(op_ctx->client_rpcsec_gss_mech, gd->sec.mech->elements,
++	       gd->sec.mech->length);
++	switch (gd->sec.svc) {
++	case RPCSEC_GSS_SVC_INTEGRITY:
++		op_ctx->client_rpcsec_gss_service =
++			FSAL_RPCSEC_GSS_PROTECTION_INTEGRITY;
++		break;
++	case RPCSEC_GSS_SVC_PRIVACY:
++		op_ctx->client_rpcsec_gss_service =
++			FSAL_RPCSEC_GSS_PROTECTION_PRIVACY;
++		break;
++	case RPCSEC_GSS_SVC_NONE:
++		op_ctx->client_rpcsec_gss_service =
++			FSAL_RPCSEC_GSS_PROTECTION_NONE;
++		break;
++	default:
++		return NFS4ERR_ACCESS;
++	}
++	op_ctx->client_rpcsec_gss_principal_len = gd->cname.length;
++	memcpy(op_ctx->client_rpcsec_gss_principal, gd->cname.value,
++	       gd->cname.length);
++#endif
++	return NFS4_OK;
++}
++
+ nfsstat4 nfs_req_creds(struct svc_req *req)
+ {
+ 	unsigned int i;

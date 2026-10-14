@@ -260,6 +260,8 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.nfs.NfsChildrenPage;
+import org.apache.hadoop.ozone.nfs.NfsFileHandle;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
@@ -4569,6 +4571,37 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     try (UncheckedAutoCloseableSupplier<IOmMetadataReader> rcReader =
         getReader(args)) {
       return rcReader.get().getFileStatus(args);
+    }
+  }
+
+  @Override
+  public OzoneFileStatus lookupNfsObject(OmKeyArgs args, long volumeId, long bucketId, long objectId,
+      NfsFileHandle.Kind kind) throws IOException {
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> reader =
+             getReader(args.getVolumeName(), args.getBucketName(), "")) {
+      return reader.get().lookupNfsObject(args, volumeId, bucketId, objectId, kind);
+    }
+  }
+
+  @Override
+  public NfsChildrenPage lookupNfsChildren(OmKeyArgs args, long volumeId, long bucketId, long parentObjectId,
+      NfsFileHandle.Kind parentKind, String name, Integer maxEntries, Long startAfterObjectId, Long verifier)
+      throws IOException {
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> reader =
+             getReader(args.getVolumeName(), args.getBucketName(), "")) {
+      return reader.get().lookupNfsChildren(args, volumeId, bucketId, parentObjectId, parentKind, name,
+          maxEntries, startAfterObjectId, verifier);
+    }
+  }
+
+  @Override
+  public org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsTransferRangesResponse
+      lookupNfsTransferRanges(OmKeyArgs args,
+          org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsTransferRangesRequest request)
+          throws IOException {
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> reader =
+             getReader(args.getVolumeName(), args.getBucketName(), "")) {
+      return reader.get().lookupNfsTransferRanges(args, request);
     }
   }
 

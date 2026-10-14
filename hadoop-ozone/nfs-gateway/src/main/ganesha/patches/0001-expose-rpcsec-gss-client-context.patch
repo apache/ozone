@@ -1,0 +1,107 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+diff --git a/src/include/fsal_api.h b/src/include/fsal_api.h
+index c53b6d4..928799f 100644
+--- a/src/include/fsal_api.h
++++ b/src/include/fsal_api.h
+@@ -354,7 +354,13 @@ extern struct gsh_refstr *no_export;
+  * rules), increment the minor version
+  */
+ 
+-#define FSAL_MINOR_VERSION 0
++#define FSAL_MINOR_VERSION 1
++
++#define FSAL_RPCSEC_GSS_PRINCIPAL_MAX 1024
++#define FSAL_RPCSEC_GSS_MECH_MAX 128
++#define FSAL_RPCSEC_GSS_PROTECTION_NONE 0
++#define FSAL_RPCSEC_GSS_PROTECTION_INTEGRITY 1
++#define FSAL_RPCSEC_GSS_PROTECTION_PRIVACY 2
+ 
+ /* Forward references for object methods */
+ 
+@@ -494,6 +500,12 @@ struct req_op_context {
+ 	struct fsal_module *fsal_module;	/*< current fsal module */
+ 	struct fsal_pnfs_ds *ctx_pnfs_ds;	/*< current pNFS DS */
+ 	uint32_t op_id;
++	uint32_t client_auth_flavor;
++	uint32_t client_rpcsec_gss_service;
++	uint32_t client_rpcsec_gss_mech_len;
++	uint8_t client_rpcsec_gss_mech[FSAL_RPCSEC_GSS_MECH_MAX];
++	uint32_t client_rpcsec_gss_principal_len;
++	char client_rpcsec_gss_principal[FSAL_RPCSEC_GSS_PRINCIPAL_MAX];
+ 	struct {
+ 		bool pseudo_fsal_internal_lookup;
+ 	} flags;
+diff --git a/src/support/nfs_creds.c b/src/support/nfs_creds.c
+index 322b906..22ff12d 100644
+--- a/src/support/nfs_creds.c
++++ b/src/support/nfs_creds.c
+@@ -268,6 +268,14 @@ nfsstat4 nfs_req_creds(struct svc_req *req)
+ 	 * CREDS_ANON.
+ 	 */
+ 	op_ctx->cred_flags &= CREDS_LOADED | CREDS_ANON;
++	op_ctx->client_auth_flavor = req->rq_msg.cb_cred.oa_flavor;
++	op_ctx->client_rpcsec_gss_service = 0;
++	op_ctx->client_rpcsec_gss_mech_len = 0;
++	memset(op_ctx->client_rpcsec_gss_mech, 0,
++	       sizeof(op_ctx->client_rpcsec_gss_mech));
++	op_ctx->client_rpcsec_gss_principal_len = 0;
++	memset(op_ctx->client_rpcsec_gss_principal, 0,
++	       sizeof(op_ctx->client_rpcsec_gss_principal));
+ 
+ 	switch (req->rq_msg.cb_cred.oa_flavor) {
+ 	case AUTH_NONE:
+@@ -304,10 +312,38 @@ nfsstat4 nfs_req_creds(struct svc_req *req)
+ 
+ #ifdef _HAVE_GSSAPI
+ 	case RPCSEC_GSS:
++		gd = SVCAUTH_PRIVATE(req->rq_auth);
++		if (gd == NULL || gd->cname.value == NULL || gd->cname.length == 0 ||
++		    gd->cname.length > sizeof(op_ctx->client_rpcsec_gss_principal) ||
++		    gd->sec.mech == NULL || gd->sec.mech->elements == NULL ||
++		    gd->sec.mech->length == 0 ||
++		    gd->sec.mech->length > sizeof(op_ctx->client_rpcsec_gss_mech)) {
++			return NFS4ERR_ACCESS;
++		}
++		op_ctx->client_rpcsec_gss_mech_len = gd->sec.mech->length;
++		memcpy(op_ctx->client_rpcsec_gss_mech, gd->sec.mech->elements,
++		       gd->sec.mech->length);
++		switch (gd->sec.svc) {
++		case RPCSEC_GSS_SVC_INTEGRITY:
++			op_ctx->client_rpcsec_gss_service =
++				FSAL_RPCSEC_GSS_PROTECTION_INTEGRITY;
++			break;
++		case RPCSEC_GSS_SVC_PRIVACY:
++			op_ctx->client_rpcsec_gss_service =
++				FSAL_RPCSEC_GSS_PROTECTION_PRIVACY;
++			break;
++		case RPCSEC_GSS_SVC_NONE:
++			op_ctx->client_rpcsec_gss_service =
++				FSAL_RPCSEC_GSS_PROTECTION_NONE;
++			break;
++		default:
++			return NFS4ERR_ACCESS;
++		}
++		op_ctx->client_rpcsec_gss_principal_len = gd->cname.length;
++		memcpy(op_ctx->client_rpcsec_gss_principal, gd->cname.value,
++		       gd->cname.length);
+ 		if ((op_ctx->cred_flags & CREDS_LOADED) == 0) {
+ 			/* Get the gss data to process them */
+-			gd = SVCAUTH_PRIVATE(req->rq_auth);
+-
+ 			memcpy(principal, gd->cname.value, gd->cname.length);
+ 			principal[gd->cname.length] = 0;
+ 

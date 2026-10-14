@@ -1,0 +1,58 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to you under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 6312252..5a0f0d1 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -289,6 +289,7 @@ goption(USE_FSAL_GLUSTER "build GLUSTER FSAL shared library" ON)
+ goption(USE_FSAL_NULL "build NULL FSAL shared library" ON)
+ goption(USE_FSAL_RGW "build RGW FSAL shared library" ON)
+ goption(USE_FSAL_MEM "build Memory FSAL shared library" ON)
++goption(USE_FSAL_OZONE "build OZONE FSAL shared library" OFF)
+ 
+ # Internal capability required by some FSALs
+ option(GSH_CAN_HOST_LOCAL_FS "Ganesha supports hosting local filesystems" ON)
+@@ -918,6 +919,11 @@ endif(USE_FSAL_RGW)
+ gopt_test(USE_FSAL_MEM)
+ # MEM has no dependencies
+ 
++gopt_test(USE_FSAL_OZONE)
++if(USE_FSAL_OZONE AND NOT OZONE_NFS_GATEWAY_SOURCE)
++  message(FATAL_ERROR "OZONE_NFS_GATEWAY_SOURCE is required for FSAL_OZONE")
++endif()
++
+ # sort out which allocator to use
+ if(${ALLOCATOR} STREQUAL "jemalloc")
+   find_package(JeMalloc)
+@@ -1317,6 +1323,7 @@ message(STATUS "USE_FSAL_GPFS = ${USE_FSAL_GPFS}")
+ message(STATUS "USE_FSAL_GLUSTER = ${USE_FSAL_GLUSTER}")
+ message(STATUS "USE_FSAL_NULL = ${USE_FSAL_NULL}")
+ message(STATUS "USE_FSAL_MEM = ${USE_FSAL_MEM}")
++message(STATUS "USE_FSAL_OZONE = ${USE_FSAL_OZONE}")
+ message(STATUS "GSH_CAN_HOST_LOCAL_FS = ${GSH_CAN_HOST_LOCAL_FS}")
+ message(STATUS "USE_SYSTEM_NTIRPC = ${USE_SYSTEM_NTIRPC}")
+ message(STATUS "USE_DBUS = ${USE_DBUS}")
+diff --git a/src/FSAL/CMakeLists.txt b/src/FSAL/CMakeLists.txt
+index b423742..53942f5 100644
+--- a/src/FSAL/CMakeLists.txt
++++ b/src/FSAL/CMakeLists.txt
+@@ -66,3 +66,6 @@ endif(USE_FSAL_KVSFS)
+ if(USE_FSAL_MEM)
+   add_subdirectory(FSAL_MEM)
+ endif(USE_FSAL_MEM)
++if(USE_FSAL_OZONE)
++  add_subdirectory(FSAL_OZONE)
++endif(USE_FSAL_OZONE)

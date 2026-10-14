@@ -218,8 +218,12 @@ public final class OmUtils {
    * @param omRequest OMRequest proto
    * @return True if its readOnly, false otherwise.
    */
+  @SuppressWarnings("checkstyle:MethodLength")
   public static boolean isReadOnly(OMRequest omRequest) {
     OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
+    if (isNfsReadOnly(cmdType)) {
+      return true;
+    }
     switch (cmdType) {
     case CheckVolumeAccess:
     case InfoVolume:
@@ -343,6 +347,10 @@ public final class OmUtils {
     case SetTimes:
     case AbortExpiredMultiPartUploads:
     case SetSnapshotProperty:
+    case BootstrapNfsObjectIndex:
+    case NfsExportLease:
+    case NfsFileLease:
+    case NfsTransferRange:
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
@@ -362,6 +370,12 @@ public final class OmUtils {
       LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
       return false;
     }
+  }
+
+  private static boolean isNfsReadOnly(OzoneManagerProtocolProtos.Type cmdType) {
+    return cmdType == OzoneManagerProtocolProtos.Type.LookupNfsObject
+        || cmdType == OzoneManagerProtocolProtos.Type.LookupNfsChildren
+        || cmdType == OzoneManagerProtocolProtos.Type.LookupNfsTransferRanges;
   }
 
   /**
@@ -475,6 +489,13 @@ public final class OmUtils {
     case SetTimes:
     case AbortExpiredMultiPartUploads:
     case SetSnapshotProperty:
+    case BootstrapNfsObjectIndex:
+    case NfsExportLease:
+    case NfsFileLease:
+    case NfsTransferRange:
+    case LookupNfsObject:
+    case LookupNfsChildren:
+    case LookupNfsTransferRanges:
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:

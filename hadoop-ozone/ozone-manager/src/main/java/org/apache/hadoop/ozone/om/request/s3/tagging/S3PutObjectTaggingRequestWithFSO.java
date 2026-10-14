@@ -108,6 +108,7 @@ public class S3PutObjectTaggingRequestWithFSO extends S3PutObjectTaggingRequest 
       }
 
       OmKeyInfo omKeyInfo = keyStatus.getKeyInfo();
+      OMFileRequest.validateNfsFileLeaseInactive(omMetadataManager, omKeyInfo);
       // Reverting back the full path to key name
       // Eg: a/b/c/d/e/file1 -> file1
       omKeyInfo.setKeyName(OzoneFSUtils.getFileName(keyName));

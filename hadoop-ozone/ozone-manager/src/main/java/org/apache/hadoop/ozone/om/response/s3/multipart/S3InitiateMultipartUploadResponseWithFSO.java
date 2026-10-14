@@ -76,11 +76,7 @@ public class S3InitiateMultipartUploadResponseWithFSO extends
      */
     if (parentDirInfos != null) {
       for (OmDirectoryInfo parentDirInfo : parentDirInfos) {
-        final String parentKey = omMetadataManager.getOzonePathKey(
-                volumeId, bucketId, parentDirInfo.getParentObjectID(),
-                parentDirInfo.getName());
-        omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
-                parentKey, parentDirInfo);
+        OMFileRequest.addToDirectoryTable(omMetadataManager, batchOperation, parentDirInfo, volumeId, bucketId);
       }
 
       // namespace quota changes for parent directory

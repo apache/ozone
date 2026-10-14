@@ -24,8 +24,10 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -36,6 +38,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -52,6 +55,9 @@ import org.slf4j.LoggerFactory;
 public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
   private static final Logger LOG = LoggerFactory.getLogger(OmKeysDeleteRequestWithFSO.class);
+  private final List<OmDirectoryInfo> nfsParentDirectoryUpdates = new ArrayList<>();
+  private boolean nfsBucketRootChanged;
+  private long nfsVerifierTransactionIndex;
 
   public OmKeysDeleteRequestWithFSO(
       OzoneManagerProtocolProtos.OMRequest omRequest,
@@ -94,6 +100,9 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap) throws IOException {
     long quotaReleased = 0L;
     int emptyKeys = 0;
+    nfsParentDirectoryUpdates.clear();
+    nfsBucketRootChanged = false;
+    nfsVerifierTransactionIndex = trxnLogIndex;
     // Mark all keys which can be deleted, in cache as deleted.
     for (int i = 0; i < omKeyInfoList.size(); i++) {
       final OmKeyInfo omKeyInfo = omKeyInfoList.get(i);
@@ -102,6 +111,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
               omKeyInfo.getVolumeName());
       final long bucketId = omMetadataManager.getBucketId(
               omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
+      OMFileRequest.validateNfsFileLeaseInactive(omMetadataManager, omKeyInfo);
       final long parentId = omKeyInfo.getParentObjectID();
       final String fileName = omKeyInfo.getFileName();
       final String dbKey = omMetadataManager.getOzonePathKey(
@@ -109,6 +119,8 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       omMetadataManager.getKeyTable(getBucketLayout())
           .addCacheEntry(new CacheKey<>(dbKey),
               CacheValue.get(trxnLogIndex));
+      OMFileRequest.deleteNfsObjectCacheEntry(omMetadataManager,
+          omMetadataManager.getNfsObjectKey(volumeId, bucketId, omKeyInfo.getObjectID()), trxnLogIndex);
       emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;
       final OmKeyInfo updatedOmKeyInfo = omKeyInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
@@ -141,7 +153,9 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       final long volumeId = omMetadataManager.getVolumeId(
               dirInfo.getVolumeName());
       final long bucketId = omMetadataManager.getBucketId(
-              dirInfo.getVolumeName(), dirInfo.getBucketName());
+          dirInfo.getVolumeName(), dirInfo.getBucketName());
+      OMFileRequest.validateNfsDirectoryLeasesInactive(omMetadataManager, volumeId, bucketId,
+          dirInfo.getObjectID());
       final long parentId = dirInfo.getParentObjectID();
       final String dirName = dirInfo.getFileName();
 
@@ -151,11 +165,43 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
           .addCacheEntry(new CacheKey<>(dbDirKey),
             CacheValue.get(trxnLogIndex));
 
+      OMFileRequest.deleteNfsObjectCacheEntry(omMetadataManager,
+          omMetadataManager.getNfsObjectKey(volumeId, bucketId, dirInfo.getObjectID()), trxnLogIndex);
+
       final OmKeyInfo updatedDirInfo = dirInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
           .build();
       quotaReleased += sumBlockLengths(updatedDirInfo);
       dirList.set(i, updatedDirInfo);
+    }
+
+    if (omMetadataManager.isNfsObjectIndexEnabled() && omMetadataManager.isNfsObjectIndexReady()
+        && (!omKeyInfoList.isEmpty() || !dirList.isEmpty())) {
+      OmKeyInfo first = !omKeyInfoList.isEmpty() ? omKeyInfoList.get(0) : dirList.get(0);
+      long volumeId = omMetadataManager.getVolumeId(first.getVolumeName());
+      long bucketId = omMetadataManager.getBucketId(first.getVolumeName(), first.getBucketName());
+      Set<Long> deletedDirectoryIds = new HashSet<>();
+      for (OmKeyInfo directory : dirList) {
+        deletedDirectoryIds.add(directory.getObjectID());
+      }
+      Set<Long> changedParentIds = new HashSet<>();
+      for (OmKeyInfo key : omKeyInfoList) {
+        changedParentIds.add(key.getParentObjectID());
+      }
+      for (OmKeyInfo directory : dirList) {
+        changedParentIds.add(directory.getParentObjectID());
+      }
+      for (long parentId : changedParentIds) {
+        if (parentId == bucketId) {
+          nfsBucketRootChanged = true;
+        } else if (!deletedDirectoryIds.contains(parentId)) {
+          OmDirectoryInfo updatedParent = OMFileRequest.updateNfsDirectoryVerifierCacheEntry(
+              omMetadataManager, volumeId, bucketId, parentId, trxnLogIndex);
+          if (updatedParent != null) {
+            nfsParentDirectoryUpdates.add(updatedParent);
+          }
+        }
+      }
     }
     return Pair.of(quotaReleased, emptyKeys);
   }
@@ -168,6 +214,13 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       Map<String, ErrorInfo> keyToErrors,
       boolean deleteStatus, OmBucketInfo omBucketInfo, long volumeId, Map<String,
       OmKeyInfo> openKeyInfoMap, OmLifecycleScanState state) {
+    if (nfsBucketRootChanged) {
+      omBucketInfo = omBucketInfo.toBuilder().setUpdateID(nfsVerifierTransactionIndex).build();
+      String bucketKey = ozoneManager.getMetadataManager().getBucketKey(
+          omBucketInfo.getVolumeName(), omBucketInfo.getBucketName());
+      ozoneManager.getMetadataManager().getBucketTable().addCacheEntry(
+          bucketKey, omBucketInfo, nfsVerifierTransactionIndex);
+    }
     OMClientResponse omClientResponse;
     List<OzoneManagerProtocolProtos.DeleteKeyError> deleteKeyErrors = new ArrayList<>();
     for (Map.Entry<String, ErrorInfo>  key : keyToErrors.entrySet()) {
@@ -181,7 +234,7 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
                 .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList, dirList,
-        omBucketInfo.copyObject(), volumeId, openKeyInfoMap, state);
+        omBucketInfo.copyObject(), volumeId, openKeyInfoMap, state, nfsParentDirectoryUpdates);
     return omClientResponse;
   }
 }

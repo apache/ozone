@@ -27,6 +27,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
@@ -37,15 +38,29 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
 
   private List<OmDirectoryInfo> parentDirInfos;
   private long volumeId;
+  private String nfsFileLeaseKey;
+  private OmNfsLeaseInfo nfsFileLease;
 
   public OMFileCreateResponseWithFSO(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmDirectoryInfo> parentDirInfos, long openKeySessionID,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volumeId) {
+    this(omResponse, omKeyInfo, parentDirInfos, openKeySessionID, omBucketInfo,
+        volumeId, null, null);
+  }
+
+  @SuppressWarnings("checkstyle:parameternumber")
+  public OMFileCreateResponseWithFSO(@Nonnull OMResponse omResponse,
+      @Nonnull OmKeyInfo omKeyInfo,
+      @Nonnull List<OmDirectoryInfo> parentDirInfos, long openKeySessionID,
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volumeId, String nfsFileLeaseKey,
+      OmNfsLeaseInfo nfsFileLease) {
     super(omResponse, omKeyInfo, new ArrayList<>(), openKeySessionID,
         omBucketInfo);
     this.parentDirInfos = parentDirInfos;
     this.volumeId = volumeId;
+    this.nfsFileLeaseKey = nfsFileLeaseKey;
+    this.nfsFileLease = nfsFileLease;
   }
 
   /**
@@ -75,8 +90,8 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
           LOG.debug("putWithBatch adding parent : key {} info : {}", parentKey,
                   parentDirInfo);
         }
-        omMetadataMgr.getDirectoryTable().putWithBatch(batchOp, parentKey,
-                parentDirInfo);
+        OMFileRequest.addToDirectoryTable(omMetadataMgr, batchOp, parentDirInfo, volumeId,
+            getOmBucketInfo().getObjectID());
       }
 
       String bucketKey = omMetadataMgr.getBucketKey(
@@ -88,6 +103,9 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
 
     OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),
         getOpenKeySessionID(), volumeId, getOmBucketInfo().getObjectID());
+    if (nfsFileLease != null) {
+      omMetadataMgr.getNfsFileLeaseTable().putWithBatch(batchOp, nfsFileLeaseKey, nfsFileLease);
+    }
   }
 
   @Override

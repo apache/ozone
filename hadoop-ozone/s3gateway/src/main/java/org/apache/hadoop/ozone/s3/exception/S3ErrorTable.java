@@ -265,6 +265,7 @@ public enum S3ErrorTable {
     case REVOKED_TOKEN:
       return ACCESS_DENIED;
     case ATOMIC_WRITE_CONFLICT:
+    case NFS_LEASE_CONFLICT:
       return CONDITIONAL_REQUEST_CONFLICT;
     case BUCKET_ALREADY_EXISTS:
       return BUCKET_ALREADY_EXISTS;

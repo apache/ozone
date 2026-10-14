@@ -130,6 +130,8 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.nfs.NfsChildrenPage;
+import org.apache.hadoop.ozone.nfs.NfsFileHandle;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
@@ -177,6 +179,9 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCreateRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -2463,6 +2468,41 @@ public class RpcClient implements ClientProtocol {
     return getInputStreamWithRetryFunction(keyInfo);
   }
 
+  /** Read a native FSO file by persistent identity, including pipeline refresh after a failed block read. */
+  public LengthInputStream readNfsFile(String volumeName, String bucketName, long volumeId, long bucketId,
+      long objectId) throws IOException {
+    OmKeyArgs args = new OmKeyArgs.Builder().setVolumeName(volumeName).setBucketName(bucketName).setKeyName("")
+        .setSortDatanodesInPipeline(topologyAwareReadEnabled).setLatestVersionLocation(true).build();
+    OmKeyInfo keyInfo = lookupNfsFile(args, volumeId, bucketId, objectId);
+    OzoneInputStream input = createInputStream(keyInfo, ignored -> {
+      try {
+        return lookupNfsFile(args, volumeId, bucketId, objectId);
+      } catch (IOException e) {
+        LOG.error("Unable to refresh NFS file identity {} on retry.", objectId, e);
+        return null;
+      }
+    });
+    return new LengthInputStream(input, keyInfo.getDataSize());
+  }
+
+  private OmKeyInfo lookupNfsFile(OmKeyArgs args, long volumeId, long bucketId, long objectId) throws IOException {
+    OzoneFileStatus status = ozoneManagerClient.lookupNfsObject(args, volumeId, bucketId, objectId,
+        NfsFileHandle.Kind.FILE);
+    if (!status.isFile() || status.getKeyInfo() == null || status.getKeyInfo().getObjectID() != objectId) {
+      throw new OMException("NFS file response does not match its identity", OMException.ResultCodes.FILE_NOT_FOUND);
+    }
+    return status.getKeyInfo();
+  }
+
+  /** Resolve a direct FSO child or return one bounded, verifier-protected directory page. */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public NfsChildrenPage lookupNfsChildren(OmKeyArgs args, long volumeId, long bucketId, long parentObjectId,
+      NfsFileHandle.Kind parentKind, String name, Integer maxEntries, Long startAfterObjectId, Long verifier)
+      throws IOException {
+    return ozoneManagerClient.lookupNfsChildren(args, volumeId, bucketId, parentObjectId, parentKind, name,
+        maxEntries, startAfterObjectId, verifier);
+  }
+
   @Override
   @Deprecated
   public OzoneOutputStream createFile(String volumeName, String bucketName,
@@ -2519,6 +2559,68 @@ public class RpcClient implements ClientProtocol {
     OpenKeySession keySession =
         ozoneManagerClient.createFile(keyArgs, overWrite, recursive);
     return createOutputStream(keySession);
+  }
+
+  /** Create a new NFS-owned file and return an output stream fenced by its OM lease. */
+  public OzoneOutputStream createNfsFile(String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, NfsFileCreateRequest nfsFileCreateRequest) throws IOException {
+    return createNfsFileWithLease(volumeName, bucketName, keyName, size, replicationConfig, nfsFileCreateRequest)
+        .getOutputStream();
+  }
+
+  /** Create a new NFS-owned file and return its stream together with the OM-issued lease. */
+  public NfsFileOutput createNfsFileWithLease(String volumeName, String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, NfsFileCreateRequest nfsFileCreateRequest) throws IOException {
+    String ownerName = getRealUserInfo().getShortUserName();
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setReplicationConfig(replicationConfig)
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setOwnerName(ownerName)
+        .build();
+    OpenKeySession session = ozoneManagerClient.createNfsFile(keyArgs, nfsFileCreateRequest);
+    NfsFileCreateResponse lease = session.getNfsFileCreateResponse();
+    if (lease == null) {
+      throw new IOException("OM did not return the NFS file lease");
+    }
+    return new NfsFileOutput(createOutputStream(session), lease);
+  }
+
+  /** Open an existing NFS-owned file for publication under its current OM lease. */
+  public OzoneOutputStream openNfsFileWithLease(String volumeName, String bucketName, String keyName,
+      ReplicationConfig replicationConfig, NfsFileCommitRequest nfsFileCommitRequest) throws IOException {
+    String ownerName = getRealUserInfo().getShortUserName();
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setReplicationConfig(replicationConfig)
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setOwnerName(ownerName)
+        .build();
+    return createOutputStream(ozoneManagerClient.openKey(keyArgs, nfsFileCommitRequest));
+  }
+
+  /** Output stream and OM-issued writer lease for a newly created NFS file. */
+  public static final class NfsFileOutput {
+    private final OzoneOutputStream outputStream;
+    private final NfsFileCreateResponse lease;
+
+    private NfsFileOutput(OzoneOutputStream outputStream, NfsFileCreateResponse lease) {
+      this.outputStream = outputStream;
+      this.lease = lease;
+    }
+
+    public OzoneOutputStream getOutputStream() {
+      return outputStream;
+    }
+
+    public NfsFileCreateResponse getLease() {
+      return lease;
+    }
   }
 
   private OmKeyArgs prepareOmKeyArgs(String volumeName, String bucketName,
@@ -2829,6 +2931,7 @@ public class RpcClient implements ClientProtocol {
     return builder.setHandler(openKey)
         .setXceiverClientManager(xceiverClientManager)
         .setOmClient(ozoneManagerClient)
+        .setNfsFileCommitRequest(openKey.getNfsFileCommitRequest())
         .enableUnsafeByteBufferConversion(unsafeByteBufferConversion)
         .setConfig(clientConfig)
         .setClientMetrics(clientMetrics)

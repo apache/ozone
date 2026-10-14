@@ -26,6 +26,67 @@
 
   <!--Container Settings used by Datanode-->
   <property>
+    <name>ozone.nfs.gateway.address</name>
+    <value>127.0.0.1</value>
+    <tag>OZONE,SECURITY</tag>
+    <description>Loopback address used by the standalone NFS gateway backend.</description>
+  </property>
+  <property>
+    <name>ozone.nfs.gateway.port</name>
+    <value>9878</value>
+    <tag>OZONE,SECURITY</tag>
+    <description>TCP port used by the standalone NFS gateway backend.</description>
+  </property>
+  <property>
+    <name>ozone.nfs.gateway.server.certificate.file</name>
+    <value></value>
+    <tag>OZONE,SECURITY</tag>
+    <description>PEM certificate chain presented by the NFS gateway backend.</description>
+  </property>
+  <property>
+    <name>ozone.nfs.gateway.server.private.key.file</name>
+    <value></value>
+    <tag>OZONE,SECURITY</tag>
+    <description>PEM private key for the NFS gateway backend server certificate.</description>
+  </property>
+  <property>
+    <name>ozone.nfs.gateway.trusted.ca.file</name>
+    <value></value>
+    <tag>OZONE,SECURITY</tag>
+    <description>CA bundle used to verify mutual-TLS Ganesha client certificates.</description>
+  </property>
+  <property>
+    <name>ozone.nfs.gateway.ganesha.cert.sha256</name>
+    <value></value>
+    <tag>OZONE,SECURITY</tag>
+    <description>Comma-separated SHA-256 fingerprints of Ganesha client certificates allowed to use the configured
+      NFS exports.</description>
+  </property>
+  <property>
+    <name>ozone.nfs.gateway.kerberos.principal</name>
+    <value></value>
+    <tag>OZONE,SECURITY</tag>
+    <description>Kerberos principal used by the NFS gateway service.</description>
+  </property>
+  <property>
+    <name>ozone.nfs.gateway.kerberos.keytab.file</name>
+    <value></value>
+    <tag>OZONE,SECURITY</tag>
+    <description>Keytab used by the NFS gateway service.</description>
+  </property>
+  <property>
+    <name>ozone.nfs.gateway.staging.volume</name>
+    <value></value>
+    <tag>OZONE,SECURITY</tag>
+    <description>Private FSO volume used to store durable NFS write ranges outside exported buckets.</description>
+  </property>
+  <property>
+    <name>ozone.nfs.gateway.staging.bucket</name>
+    <value></value>
+    <tag>OZONE,SECURITY</tag>
+    <description>Private FSO bucket used to store durable NFS write ranges outside exported buckets.</description>
+  </property>
+  <property>
     <name>ozone.container.cache.size</name>
     <value>1024</value>
     <tag>PERFORMANCE, CONTAINER, STORAGE</tag>
@@ -1512,6 +1573,25 @@
       for deletion by one run of the open key cleanup service on the OM.
       This property is used to throttle the actual number of open key deletions
       on the OM.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.nfs.object.index.bootstrap.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Enable background backfill of the native FSO object identity index after its layout feature is finalized.
+      Bootstrap runs on the ready OM leader and persists progress through Ratis. This does not enable NFS exports.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.om.nfs.object.index.bootstrap.interval</name>
+    <value>1s</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Interval between NFS object index bootstrap batches. Each batch scans at most 500 records from one bucket.
     </description>
   </property>
 

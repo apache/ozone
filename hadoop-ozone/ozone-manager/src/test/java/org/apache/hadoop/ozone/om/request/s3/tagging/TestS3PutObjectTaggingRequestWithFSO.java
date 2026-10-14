@@ -20,13 +20,17 @@ package org.apache.hadoop.ozone.om.request.s3.tagging;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.protobuf.ByteString;
+import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -54,6 +58,31 @@ public class TestS3PutObjectTaggingRequestWithFSO extends TestS3PutObjectTagging
 
     assertEquals(OzoneManagerProtocolProtos.Status.NOT_SUPPORTED_OPERATION,
         omClientResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testPutObjectTaggingRejectsActiveNfsFileLease() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String tableKey = addKeyToTable();
+    OmKeyInfo keyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(tableKey);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    long now = Time.now();
+    String exportUuid = UUID.randomUUID().toString();
+    OmNfsLeaseInfo exportLease = OmNfsLeaseInfo.createExportLease(exportUuid, volumeId, bucketId,
+        1, now + 60_000, "gateway", 1);
+    OmNfsLeaseInfo fileLease = OmNfsLeaseInfo.acquireFileLease(null, exportLease, keyInfo.getObjectID(),
+        "transfer", "nfs-user@EXAMPLE.COM", ByteString.copyFromUtf8("owner-token"), now, 10_000);
+    omMetadataManager.getNfsExportLeaseTable().put(omMetadataManager.getNfsExportLeaseKey(exportUuid), exportLease);
+    omMetadataManager.getNfsFileLeaseTable().put(
+        omMetadataManager.getNfsFileLeaseKey(volumeId, bucketId, keyInfo.getObjectID()), fileLease);
+
+    OMRequest modifiedOmRequest = doPreExecute(volumeName, bucketName, FILE_KEY, getTags(2));
+    OMClientResponse response = getPutObjectTaggingRequest(modifiedOmRequest)
+        .validateAndUpdateCache(ozoneManager, 2L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.NFS_LEASE_CONFLICT, response.getOMResponse().getStatus());
+    assertEquals(keyInfo.getTags(), omMetadataManager.getKeyTable(getBucketLayout()).get(tableKey).getTags());
   }
 
   @Override

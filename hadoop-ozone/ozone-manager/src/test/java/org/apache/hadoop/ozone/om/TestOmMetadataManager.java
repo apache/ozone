@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.OzoneConsts.NFS_OBJECT_INDEX_PROGRESS_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.NFS_OBJECT_INDEX_READY_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_EXPIRE_THRESHOLD;
@@ -37,6 +39,10 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_SCAN_STA
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_PARTS_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.NFS_EXPORT_LEASE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.NFS_FILE_LEASE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.NFS_OBJECT_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.NFS_TRANSFER_RANGE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
@@ -61,21 +67,33 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
+import com.google.protobuf.ByteString;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -84,15 +102,19 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.nfs.NfsFileHandle;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -100,19 +122,42 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsObjectInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsTransferRangeInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMNfsObjectIndexBootstrapRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponseWithFSO;
+import org.apache.hadoop.ozone.om.response.key.OMKeyDeleteResponseWithFSO;
+import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseWithFSO;
+import org.apache.hadoop.ozone.om.response.key.OMKeysDeleteResponseWithFSO;
+import org.apache.hadoop.ozone.om.service.NfsObjectIndexBootstrapService;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BootstrapNfsObjectIndexRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BootstrapNfsObjectIndexRequest.Phase;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedNfsLeaseInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedNfsObjectInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.MockClock;
+import org.apache.ratis.protocol.ClientId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -120,6 +165,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests OzoneManager MetadataManager.
@@ -140,6 +186,10 @@ public class TestOmMetadataManager {
       PREFIX_TABLE,
       TRANSACTION_INFO_TABLE,
       DIRECTORY_TABLE,
+      NFS_EXPORT_LEASE_TABLE,
+      NFS_FILE_LEASE_TABLE,
+      NFS_OBJECT_TABLE,
+      NFS_TRANSFER_RANGE_TABLE,
       FILE_TABLE,
       DELETED_DIR_TABLE,
       OPEN_FILE_TABLE,
@@ -166,6 +216,783 @@ public class TestOmMetadataManager {
     ozoneConfiguration.set(OZONE_OM_DB_DIRS,
         folder.getAbsolutePath());
     omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+  }
+
+  private OMVersionManager versionManagerForLayout(int version) throws IOException {
+    Path dbDir = Files.createTempDirectory(folder.toPath(), "om-version-");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_DB_DIRS, dbDir.toString());
+    OMStorage storage = new OMStorage(conf);
+    storage.setClusterId("test-cluster");
+    storage.setApparentVersion(version);
+    storage.setOmId(UUID.randomUUID().toString());
+    storage.initialize();
+    storage.persistCurrentState();
+    return new OMVersionManager(storage, mock(OzoneManager.class), HashMap::new);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {11, 12, 13, 14})
+  public void testNfsIndexLayoutGate(int version) throws Exception {
+    assertFalse(omMetadataManager.isNfsObjectIndexEnabled());
+    omMetadataManager.stop();
+    OzoneManager om = mock(OzoneManager.class);
+    when(om.getVersionManager()).thenReturn(versionManagerForLayout(version));
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, om);
+    assertEquals(version >= 12, omMetadataManager.isNfsObjectIndexEnabled());
+    assertEquals(version >= 13, omMetadataManager.isNfsWriterLeaseEnabled());
+    assertEquals(version >= 14, omMetadataManager.isNfsDurableWriteRangesEnabled());
+    assertNotNull(omMetadataManager.getNfsTransferRangeTable());
+    omMetadataManager.stop();
+  }
+
+  @Test
+  public void testNfsLeaseTablesAndKeys() throws Exception {
+    String exportUuid = "a7ad8fd1-c88d-4f1b-bf58-38406e931adc";
+    assertNotNull(omMetadataManager.getNfsExportLeaseTable());
+    assertNotNull(omMetadataManager.getNfsFileLeaseTable());
+    assertEquals(exportUuid, omMetadataManager.getNfsExportLeaseKey(exportUuid));
+    assertEquals(omMetadataManager.getNfsObjectKey(-512, -256, -1),
+        omMetadataManager.getNfsFileLeaseKey(-512, -256, -1));
+    assertNotNull(omMetadataManager.getTable(NFS_EXPORT_LEASE_TABLE));
+    assertNotNull(omMetadataManager.getTable(NFS_FILE_LEASE_TABLE));
+    assertNotNull(omMetadataManager.getTable(NFS_TRANSFER_RANGE_TABLE));
+
+    OmNfsLeaseInfo exportLease = OmNfsLeaseInfo.createExportLease(exportUuid, -512, -256, 1, 1000,
+        "gateway-1", 2);
+    omMetadataManager.getNfsExportLeaseTable().put(exportUuid, exportLease);
+    assertEquals(exportLease, omMetadataManager.getNfsExportLeaseTable().get(exportUuid));
+    OmNfsLeaseInfo fileLease = OmNfsLeaseInfo.getFromProtobuf(PersistedNfsLeaseInfo.newBuilder()
+        .setKind(PersistedNfsLeaseInfo.Kind.FILE)
+        .setExportUUID(exportUuid)
+        .setVolumeID(-512)
+        .setBucketID(-256)
+        .setObjectID(-1)
+        .setGeneration(3)
+        .setExpiresAtMillis(1000)
+        .setGatewayID("gateway-1")
+        .setGatewayGeneration(2)
+        .setTransferID("transfer-1")
+        .setOwnerToken(ByteString.copyFromUtf8("owner-token"))
+        .build());
+    String fileLeaseKey = omMetadataManager.getNfsFileLeaseKey(-512, -256, -1);
+    omMetadataManager.getNfsFileLeaseTable().put(fileLeaseKey, fileLease);
+    assertEquals(fileLease, omMetadataManager.getNfsFileLeaseTable().get(fileLeaseKey));
+
+    OmNfsTransferRangeInfo range = new OmNfsTransferRangeInfo(exportUuid, 512, 256, 1, 3,
+        9, 12, "transfer-1", ".nfs-staging/transfer-1/9", ByteString.copyFrom(new byte[32]));
+    String rangeKey = omMetadataManager.getNfsTransferRangeKey(exportUuid, 512, 256, 1, 3, 9,
+        ".nfs-staging/transfer-1/9");
+    omMetadataManager.getNfsTransferRangeTable().put(rangeKey, range);
+    assertEquals(range, omMetadataManager.getNfsTransferRangeTable().get(rangeKey));
+    assertTrue(omMetadataManager.getNfsTransferRangeKey(exportUuid, 512, 256, 1, 3, 9)
+        .compareTo(omMetadataManager.getNfsTransferRangeKey(exportUuid, 512, 256, 1, 3, 10)) < 0);
+    assertNotEquals(rangeKey, omMetadataManager.getNfsTransferRangeKey(exportUuid, 512, 256, 1, 3, 9,
+        ".nfs-staging/transfer-1/9/rewrite"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"live", "renamed", "deleted", "recreated", "missing-parent", "wrong-kind",
+      "wrong-bucket", "wrong-volume", "missing-volume", "missing-bucket", "bucket-link", "obs",
+      "snapshot-file", "snapshot-directory", "root-wrong-id", "file-root", "cycle", "not-ready", "not-finalized"})
+  public void testNfsIdentityLookup(String scenario) throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(!scenario.equals("not-finalized")).when(manager).isNfsObjectIndexEnabled();
+    manager.getMetaTable().put(NFS_OBJECT_INDEX_READY_KEY, "12");
+    OMRequestTestUtils.addVolumeToDB("volume", manager);
+    OmBucketInfo bucket = OMRequestTestUtils.addBucketToDB("volume", "bucket", manager,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    long volumeId = manager.getVolumeId("volume");
+    long bucketId = bucket.getObjectID();
+    String directoryName = scenario.startsWith("snapshot-") ? OzoneConsts.OM_SNAPSHOT_INDICATOR
+        : scenario.equals("renamed") ? "moved" : "dir";
+    long parentId = scenario.equals("cycle") ? 999 : bucketId;
+    String directoryKey = manager.getOzonePathKey(volumeId, bucketId, parentId, directoryName);
+    manager.getDirectoryTable().put(directoryKey, OmDirectoryInfo.newBuilder().setName(directoryName)
+        .setObjectID(999).setParentObjectID(parentId).build());
+    manager.getNfsObjectTable().put(manager.getNfsObjectKey(volumeId, bucketId, 999),
+        new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.DIRECTORY, parentId, directoryName));
+    String fileKey = manager.getOzonePathKey(volumeId, bucketId, 999, "file");
+    OmKeyInfo file = new OmKeyInfo.Builder().setVolumeName("volume").setBucketName("bucket")
+        .setKeyName("file").setObjectID(scenario.equals("recreated") ? 1001 : 1000)
+        .setParentObjectID(999).setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+        .setOmKeyLocationInfos(Collections.emptyList()).build();
+    manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(fileKey, file);
+    manager.getNfsObjectTable().put(manager.getNfsObjectKey(volumeId, bucketId, 1000),
+        new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.FILE, 999, "file"));
+    if (scenario.equals("deleted")) {
+      manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).delete(fileKey);
+    } else if (scenario.equals("missing-parent")) {
+      manager.getDirectoryTable().delete(directoryKey);
+    } else if (scenario.equals("not-ready")) {
+      manager.getMetaTable().delete(NFS_OBJECT_INDEX_READY_KEY);
+    }
+    if (scenario.equals("missing-volume")) {
+      manager.getVolumeTable().addCacheEntry(manager.getVolumeKey("volume"), 1);
+    } else if (scenario.equals("missing-bucket")) {
+      manager.getBucketTable().addCacheEntry(manager.getBucketKey("volume", "bucket"), 1);
+    } else if (scenario.equals("bucket-link")) {
+      manager.getBucketTable().addCacheEntry(manager.getBucketKey("volume", "bucket"),
+          bucket.toBuilder().setSourceVolume("source-volume").setSourceBucket("source-bucket").build(), 1);
+    } else if (scenario.equals("obs")) {
+      manager.getBucketTable().addCacheEntry(manager.getBucketKey("volume", "bucket"),
+          bucket.toBuilder().setBucketLayout(BucketLayout.OBJECT_STORE).build(), 1);
+    }
+    NfsFileHandle.Kind kind = scenario.equals("wrong-kind") || scenario.equals("snapshot-directory")
+        ? NfsFileHandle.Kind.DIRECTORY : scenario.equals("root-wrong-id")
+        ? NfsFileHandle.Kind.BUCKET : NfsFileHandle.Kind.FILE;
+    long objectId = scenario.equals("snapshot-directory") ? 999 : scenario.equals("file-root") ? bucketId : 1000;
+    long expectedVolumeId = scenario.equals("wrong-volume") ? volumeId + 1 : volumeId;
+    long expectedBucketId = scenario.equals("wrong-bucket") ? bucketId + 1 : bucketId;
+    manager.getLock().acquireReadLock(org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK,
+        "volume", "bucket");
+    try {
+      if (scenario.equals("live") || scenario.equals("renamed")) {
+        assertEquals(directoryName + "/file", OMFileRequest.getNfsObjectPath(manager, "volume", "bucket",
+            volumeId, bucketId, 1000, kind));
+        assertEquals(directoryName, OMFileRequest.getNfsObjectPath(manager, "volume", "bucket",
+            volumeId, bucketId, 999, NfsFileHandle.Kind.DIRECTORY));
+        assertEquals("", OMFileRequest.getNfsObjectPath(manager, "volume", "bucket", volumeId, bucketId,
+            bucketId, NfsFileHandle.Kind.BUCKET));
+      } else {
+        ResultCodes expected = scenario.equals("not-ready") ? ResultCodes.OM_NOT_INITIALIZED
+            : scenario.equals("not-finalized") || scenario.equals("bucket-link") || scenario.equals("obs")
+            || scenario.startsWith("snapshot-") ? ResultCodes.NOT_SUPPORTED_OPERATION : ResultCodes.FILE_NOT_FOUND;
+        assertEquals(expected, assertThrows(OMException.class, () -> OMFileRequest.getNfsObjectPath(manager,
+            "volume", "bucket", expectedVolumeId, expectedBucketId, objectId, kind)).getResult());
+      }
+    } finally {
+      manager.getLock().releaseReadLock(org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK,
+          "volume", "bucket");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {11, 12})
+  public void testNfsIndexReadiness(int version) throws Exception {
+    assertFalse(omMetadataManager.isNfsObjectIndexReady());
+    omMetadataManager.stop();
+    OzoneManager om = mock(OzoneManager.class);
+    when(om.getVersionManager()).thenReturn(versionManagerForLayout(version));
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, om);
+    assertFalse(omMetadataManager.isNfsObjectIndexReady());
+    for (String invalid : Arrays.asList("", "true", "11", "13", "012")) {
+      omMetadataManager.getMetaTable().put(NFS_OBJECT_INDEX_READY_KEY, invalid);
+      assertFalse(omMetadataManager.isNfsObjectIndexReady());
+    }
+    omMetadataManager.getMetaTable().delete(NFS_OBJECT_INDEX_READY_KEY);
+    omMetadataManager.getMetaTable().addCacheEntry(NFS_OBJECT_INDEX_READY_KEY, "12", 1);
+    assertFalse(omMetadataManager.isNfsObjectIndexReady(), "Cache-only completion must not enable lookup");
+    try (BatchOperation batch = omMetadataManager.getStore().initBatchOperation()) {
+      omMetadataManager.getMetaTable().putWithBatch(batch, NFS_OBJECT_INDEX_READY_KEY, "12");
+    }
+    assertFalse(omMetadataManager.isNfsObjectIndexReady(), "An aborted completion batch must not enable lookup");
+    try (BatchOperation batch = omMetadataManager.getStore().initBatchOperation()) {
+      omMetadataManager.getMetaTable().putWithBatch(batch, NFS_OBJECT_INDEX_READY_KEY, "12");
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
+    assertEquals(version >= 12, omMetadataManager.isNfsObjectIndexReady());
+    omMetadataManager.stop();
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, om);
+    assertEquals(version >= 12, omMetadataManager.isNfsObjectIndexReady());
+    omMetadataManager.stop();
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    assertFalse(omMetadataManager.isNfsObjectIndexReady(), "A standalone metadata reader is not a live OM");
+    omMetadataManager.stop();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"live", "renamed", "deleted", "recreated", "bucket-recreated"})
+  public void testNfsBootstrapRevalidatesCanonicalIdentity(String scenario) throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(true).when(manager).isNfsObjectIndexEnabled();
+    manager.getMetaTable().put(NFS_OBJECT_INDEX_PROGRESS_KEY, "1:");
+    OzoneManager om = mock(OzoneManager.class);
+    when(om.getMetadataManager()).thenReturn(manager);
+    OMRequestTestUtils.addVolumeToDB("volume", manager);
+    OmBucketInfo bucket = OMRequestTestUtils.addBucketToDB("volume", "bucket", manager,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    long volumeId = manager.getVolumeId("volume");
+    long bucketId = bucket.getObjectID();
+    for (boolean directory : new boolean[] {true, false}) {
+      long objectId = directory ? 999 : 1000;
+      String fileKey = manager.getOzonePathKey(volumeId, bucketId, bucketId, "file");
+      String indexKey = manager.getNfsObjectKey(volumeId, bucketId, objectId);
+      PersistedNfsObjectInfo.Kind kind = directory ? PersistedNfsObjectInfo.Kind.DIRECTORY
+          : PersistedNfsObjectInfo.Kind.FILE;
+      OmNfsObjectInfo expected = new OmNfsObjectInfo(kind, bucketId, "file");
+      if (directory) {
+        manager.getDirectoryTable().put(fileKey,
+            OmDirectoryInfo.newBuilder().setName("file").setObjectID(objectId).setParentObjectID(bucketId).build());
+        if (!scenario.equals("live") && !scenario.equals("bucket-recreated")) {
+          OmDirectoryInfo replacement = scenario.equals("recreated")
+              ? OmDirectoryInfo.newBuilder().setName("file").setObjectID(objectId + 10)
+                  .setParentObjectID(bucketId).build() : null;
+          if (replacement == null) {
+            manager.getDirectoryTable().addCacheEntry(fileKey, 1);
+          } else {
+            manager.getDirectoryTable().addCacheEntry(fileKey, replacement, 1);
+          }
+        }
+      } else {
+        OmKeyInfo file = new OmKeyInfo.Builder().setVolumeName("volume").setBucketName("bucket")
+            .setKeyName("file").setObjectID(objectId).setParentObjectID(bucketId)
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+            .setOmKeyLocationInfos(Collections.emptyList()).build();
+        manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(fileKey, file);
+        if (!scenario.equals("live") && !scenario.equals("bucket-recreated")) {
+          if (scenario.equals("recreated")) {
+            OmKeyInfo replacement = new OmKeyInfo.Builder().setVolumeName("volume").setBucketName("bucket")
+                .setKeyName("file").setObjectID(objectId + 10).setParentObjectID(bucketId)
+                .setReplicationConfig(file.getReplicationConfig())
+                .setOmKeyLocationInfos(Collections.emptyList()).build();
+            manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).addCacheEntry(fileKey, replacement, 1);
+          } else {
+            manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).addCacheEntry(fileKey, 1);
+          }
+        }
+        manager.getMetaTable().put(NFS_OBJECT_INDEX_PROGRESS_KEY, "2:");
+        manager.getMetaTable().addCacheEntry(NFS_OBJECT_INDEX_PROGRESS_KEY, "2:", 1);
+      }
+      if (scenario.equals("renamed")) {
+        expected = new OmNfsObjectInfo(kind, bucketId, "renamed");
+        manager.getNfsObjectTable().put(indexKey, expected);
+      } else if (!scenario.equals("live")) {
+        expected = null;
+      }
+      BootstrapNfsObjectIndexRequest request = BootstrapNfsObjectIndexRequest.newBuilder()
+          .setPhase(directory ? Phase.DIRECTORIES : Phase.FILES).setExpectedCursor("").setNextCursor(fileKey)
+          .setFinished(true).setVolumeID(volumeId)
+          .setBucketID(scenario.equals("bucket-recreated") ? bucketId + 1 : bucketId)
+          .setVolumeName("volume").setBucketName("bucket")
+          .addObjects(BootstrapNfsObjectIndexRequest.Object.newBuilder()
+              .setDbKey(scenario.equals("bucket-recreated")
+                  ? manager.getOzonePathKey(volumeId, bucketId + 1, bucketId, "file") : fileKey).setObjectID(objectId))
+          .build();
+      if (scenario.equals("bucket-recreated")) {
+        request = request.toBuilder().setNextCursor(request.getObjects(0).getDbKey()).build();
+      }
+      OMNfsObjectIndexBootstrapRequest operation = nfsBootstrapRequest(request);
+      OMClientResponse response = operation.validateAndUpdateCache(om, directory ? 2 : 3);
+      assertEquals(Status.OK, response.getOMResponse().getStatus());
+      assertEquals(expected, manager.getNfsObjectTable().get(indexKey));
+      assertFalse(manager.isNfsObjectIndexReady());
+      try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+        response.checkAndUpdateDB(manager, batch);
+      }
+      assertEquals(scenario.equals("renamed") ? expected : null, manager.getNfsObjectTable().getSkipCache(indexKey));
+      assertFalse(manager.isNfsObjectIndexReady());
+      try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+        response.checkAndUpdateDB(manager, batch);
+        manager.getStore().commitBatchOperation(batch);
+      }
+      assertEquals(expected, manager.getNfsObjectTable().getSkipCache(indexKey));
+      assertEquals(directory ? "2:" : "DONE", manager.getMetaTable().getSkipCache(NFS_OBJECT_INDEX_PROGRESS_KEY));
+      assertEquals(!directory, manager.isNfsObjectIndexReady());
+    }
+    manager.stop();
+  }
+
+  @Test
+  public void testNfsBootstrapRejectsExternalAndUnfinalizedRequests() throws Exception {
+    BootstrapNfsObjectIndexRequest request = BootstrapNfsObjectIndexRequest.newBuilder()
+        .setPhase(Phase.DIRECTORIES).setExpectedCursor("").setNextCursor("").setFinished(true)
+        .setVolumeID(0).setBucketID(0).build();
+    OzoneManager om = mock(OzoneManager.class);
+    when(om.getMetadataManager()).thenReturn(omMetadataManager);
+    OMNfsObjectIndexBootstrapRequest operation = nfsBootstrapRequest(request);
+    assertEquals(OMException.ResultCodes.ACCESS_DENIED,
+        assertThrows(OMException.class, () -> operation.preExecute(om)).getResult());
+    assertEquals(Status.NOT_SUPPORTED_OPERATION, operation.validateAndUpdateCache(om, 1).getOMResponse().getStatus());
+    assertNull(omMetadataManager.getMetaTable().get(NFS_OBJECT_INDEX_PROGRESS_KEY));
+    omMetadataManager.stop();
+  }
+
+  @Test
+  public void testNfsBootstrapUsesPersistedKeyOrdering() throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(true).when(manager).isNfsObjectIndexEnabled();
+    manager.getMetaTable().put(NFS_OBJECT_INDEX_PROGRESS_KEY, "1:");
+    OzoneManager om = mock(OzoneManager.class);
+    when(om.getMetadataManager()).thenReturn(manager);
+    OMRequestTestUtils.addVolumeToDB("volume", manager);
+    OmBucketInfo bucket = OMRequestTestUtils.addBucketToDB("volume", "bucket", manager,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    long volumeId = manager.getVolumeId("volume");
+    long bucketId = bucket.getObjectID();
+    BootstrapNfsObjectIndexRequest.Builder request = BootstrapNfsObjectIndexRequest.newBuilder()
+        .setPhase(Phase.DIRECTORIES).setExpectedCursor("").setFinished(false)
+        .setVolumeID(volumeId).setBucketID(bucketId).setVolumeName("volume").setBucketName("bucket");
+    long id = 999;
+    for (String name : Arrays.asList("\uE000", "\uD83D\uDE00")) {
+      OmDirectoryInfo directory = OmDirectoryInfo.newBuilder().setName(name).setObjectID(id++)
+          .setParentObjectID(bucketId).build();
+      String key = manager.getOzonePathKey(volumeId, bucketId, directory);
+      manager.getDirectoryTable().put(key, directory);
+      request.addObjects(BootstrapNfsObjectIndexRequest.Object.newBuilder().setDbKey(key)
+          .setObjectID(directory.getObjectID())).setNextCursor(key);
+    }
+    OMClientResponse response = nfsBootstrapRequest(request.build()).validateAndUpdateCache(om, 1);
+    assertEquals(Status.OK, response.getOMResponse().getStatus());
+    assertNotNull(manager.getNfsObjectTable().get(manager.getNfsObjectKey(volumeId, bucketId, 999)));
+    assertNotNull(manager.getNfsObjectTable().get(manager.getNfsObjectKey(volumeId, bucketId, 1000)));
+    assertEquals(Status.INVALID_REQUEST,
+        nfsBootstrapRequest(request.build()).validateAndUpdateCache(om, 2).getOMResponse().getStatus());
+    manager.stop();
+  }
+
+  @Test
+  public void testNfsBootstrapRejectsInvalidBatchBounds() throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(true).when(manager).isNfsObjectIndexEnabled();
+    manager.getMetaTable().put(NFS_OBJECT_INDEX_PROGRESS_KEY, "1:");
+    OzoneManager om = mock(OzoneManager.class);
+    when(om.getMetadataManager()).thenReturn(manager);
+    BootstrapNfsObjectIndexRequest base = BootstrapNfsObjectIndexRequest.newBuilder()
+        .setPhase(Phase.DIRECTORIES).setExpectedCursor("").setNextCursor("/1/2/2/b").setFinished(false)
+        .setVolumeID(1).setBucketID(2).setVolumeName("volume").setBucketName("bucket").build();
+    BootstrapNfsObjectIndexRequest.Object first = BootstrapNfsObjectIndexRequest.Object.newBuilder()
+        .setDbKey("/1/2/2/a").setObjectID(3).build();
+    BootstrapNfsObjectIndexRequest.Object second = first.toBuilder().setDbKey("/1/2/2/b").setObjectID(4).build();
+    List<BootstrapNfsObjectIndexRequest> invalid = new ArrayList<>();
+    invalid.add(base.toBuilder().setPhase(Phase.FILES).build());
+    invalid.add(base.toBuilder().setExpectedCursor("/1/2/2/z").build());
+    invalid.add(base.toBuilder().setNextCursor("").build());
+    invalid.add(base.toBuilder().addObjects(first.toBuilder().setDbKey("/1/3/2/a")).build());
+    invalid.add(base.toBuilder().addObjects(second).addObjects(first).build());
+    invalid.add(base.toBuilder().addObjects(first).addObjects(first).build());
+    invalid.add(base.toBuilder().setNextCursor("/1/2/2/a").addObjects(second).build());
+    invalid.add(base.toBuilder().clearVolumeName().addObjects(first).build());
+    BootstrapNfsObjectIndexRequest.Builder oversized = base.toBuilder();
+    for (int i = 0; i <= OMNfsObjectIndexBootstrapRequest.MAX_OBJECTS; i++) {
+      oversized.addObjects(first);
+    }
+    invalid.add(oversized.build());
+    for (BootstrapNfsObjectIndexRequest request : invalid) {
+      assertEquals(Status.INVALID_REQUEST,
+          nfsBootstrapRequest(request).validateAndUpdateCache(om, 1).getOMResponse().getStatus());
+      assertEquals("1:", manager.getMetaTable().get(NFS_OBJECT_INDEX_PROGRESS_KEY));
+      assertNull(manager.getNfsObjectTable().get(manager.getNfsObjectKey(1, 2, 3)));
+      assertFalse(manager.isNfsObjectIndexReady());
+    }
+    manager.stop();
+  }
+
+  @Test
+  public void testNfsBootstrapResumesAfterReopen() throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(true).when(manager).isNfsObjectIndexEnabled();
+    OzoneManager om = mock(OzoneManager.class);
+    when(om.getMetadataManager()).thenReturn(manager);
+    BootstrapNfsObjectIndexRequest directories = BootstrapNfsObjectIndexRequest.newBuilder()
+        .setPhase(Phase.DIRECTORIES).setExpectedCursor("").setNextCursor("").setFinished(true)
+        .setVolumeID(0).setBucketID(0).build();
+    OMClientResponse initialization = nfsBootstrapRequest(directories.toBuilder()
+        .setFinished(false).setInitialize(true).build()).validateAndUpdateCache(om, 1);
+    assertEquals(Status.OK, initialization.getOMResponse().getStatus());
+    try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+      initialization.checkAndUpdateDB(manager, batch);
+      manager.getStore().commitBatchOperation(batch);
+    }
+    OMClientResponse response = nfsBootstrapRequest(directories).validateAndUpdateCache(om, 2);
+    assertEquals(Status.OK, response.getOMResponse().getStatus());
+    try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(manager, batch);
+      manager.getStore().commitBatchOperation(batch);
+    }
+    manager.stop();
+    manager = spy(new OmMetadataManagerImpl(ozoneConfiguration, null));
+    doReturn(true).when(manager).isNfsObjectIndexEnabled();
+    when(om.getMetadataManager()).thenReturn(manager);
+    assertEquals("2:", manager.getMetaTable().get(NFS_OBJECT_INDEX_PROGRESS_KEY));
+    assertFalse(manager.isNfsObjectIndexReady());
+    assertEquals(Status.INVALID_REQUEST,
+        nfsBootstrapRequest(directories).validateAndUpdateCache(om, 2).getOMResponse().getStatus());
+    response = nfsBootstrapRequest(directories.toBuilder().setPhase(Phase.FILES).build()).validateAndUpdateCache(om, 3);
+    assertEquals(Status.OK, response.getOMResponse().getStatus());
+    assertFalse(manager.isNfsObjectIndexReady());
+    try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(manager, batch);
+      manager.getStore().commitBatchOperation(batch);
+    }
+    assertTrue(manager.isNfsObjectIndexReady());
+    manager.stop();
+    manager = spy(new OmMetadataManagerImpl(ozoneConfiguration, null));
+    doReturn(true).when(manager).isNfsObjectIndexEnabled();
+    assertEquals("DONE", manager.getMetaTable().get(NFS_OBJECT_INDEX_PROGRESS_KEY));
+    assertTrue(manager.isNfsObjectIndexReady());
+    manager.stop();
+  }
+
+  @Test
+  public void testNfsBootstrapScannerBarrierAndResume() throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(true).when(manager).isNfsObjectIndexEnabled();
+    OzoneManager om = mock(OzoneManager.class);
+    when(om.getMetadataManager()).thenReturn(manager);
+    when(om.getThreadNamePrefix()).thenReturn("test");
+    OmVolumeArgs volume = OmVolumeArgs.newBuilder().setVolume("volume").setObjectID(1)
+        .setAdminName("owner").setOwnerName("owner").build();
+    manager.getVolumeTable().put(manager.getVolumeKey("volume"), volume);
+    manager.getVolumeTable().addCacheEntry(manager.getVolumeKey("volume"), volume, 1);
+    for (long bucketId : new long[] {2, 3}) {
+      OmBucketInfo bucket = OmBucketInfo.newBuilder().setVolumeName("volume").setBucketName("bucket" + bucketId)
+          .setObjectID(bucketId).setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED).build();
+      manager.getBucketTable().put(manager.getBucketKey("volume", bucket.getBucketName()), bucket);
+      manager.getBucketTable().addCacheEntry(manager.getBucketKey("volume", bucket.getBucketName()), bucket, 1);
+    }
+    Map<String, OmNfsObjectInfo> expected = new HashMap<>();
+    long directoryId = 1000;
+    for (String name : Arrays.asList("\uE000", "\uD83D\uDE00")) {
+      OmDirectoryInfo directory = OmDirectoryInfo.newBuilder().setName(name).setObjectID(directoryId++)
+          .setParentObjectID(2).build();
+      manager.getDirectoryTable().put(manager.getOzonePathKey(1, 2, directory), directory);
+      expected.put(manager.getNfsObjectKey(1, 2, directory.getObjectID()),
+          new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.DIRECTORY, 2, name));
+    }
+    for (int i = 0; i < OMNfsObjectIndexBootstrapRequest.MAX_OBJECTS + 1; i++) {
+      String name = String.format("file%04d", i);
+      OmKeyInfo file = new OmKeyInfo.Builder().setVolumeName("volume").setBucketName("bucket2")
+          .setKeyName(name).setObjectID(2000 + i).setParentObjectID(2)
+          .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+          .setOmKeyLocationInfos(Collections.emptyList()).build();
+      manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(manager.getOzonePathKey(1, 2, 2, name), file);
+      expected.put(manager.getNfsObjectKey(1, 2, file.getObjectID()),
+          new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.FILE, 2, name));
+    }
+    OmKeyInfo other = new OmKeyInfo.Builder().setVolumeName("volume").setBucketName("bucket3")
+        .setKeyName("other").setObjectID(3000).setParentObjectID(3)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+        .setOmKeyLocationInfos(Collections.emptyList()).build();
+    manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(manager.getOzonePathKey(1, 3, 3, "other"), other);
+    expected.put(manager.getNfsObjectKey(1, 3, 3000),
+        new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.FILE, 3, "other"));
+    manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .put(manager.getOzonePathKey(1, 4, 4, "orphan"), other);
+    OzoneManagerRatisServer ratis = mock(OzoneManagerRatisServer.class);
+    when(om.getOmRatisServer()).thenReturn(ratis);
+    List<OMClientResponse> pending = new ArrayList<>();
+    List<BootstrapNfsObjectIndexRequest> submitted = new ArrayList<>();
+    AtomicLong transactionIndex = new AtomicLong(100);
+    when(ratis.submitRequest(any(OMRequest.class), any(ClientId.class), anyLong())).thenAnswer(invocation -> {
+      OMRequest command = invocation.getArgument(0);
+      submitted.add(command.getBootstrapNfsObjectIndexRequest());
+      OMClientResponse response = OzoneManagerRatisUtils.createClientRequest(command, om)
+          .validateAndUpdateCache(om, transactionIndex.incrementAndGet());
+      assertEquals(Status.OK, response.getOMResponse().getStatus());
+      pending.add(response);
+      return response.getOMResponse();
+    });
+    NfsObjectIndexBootstrapService service = new NfsObjectIndexBootstrapService(1, TimeUnit.SECONDS, om);
+    try {
+      service.runPeriodicalTaskNow();
+      assertTrue(submitted.isEmpty(), "Followers must not bootstrap");
+      when(om.isLeaderReady()).thenReturn(true);
+      doReturn(false).when(manager).isNfsObjectIndexEnabled();
+      service.runPeriodicalTaskNow();
+      assertTrue(submitted.isEmpty(), "Pre-finalization OM must not bootstrap");
+      doReturn(true).when(manager).isNfsObjectIndexEnabled();
+      service.runPeriodicalTaskNow();
+      assertEquals(1, submitted.size());
+      assertTrue(submitted.get(0).getInitialize());
+      assertNull(manager.getMetaTable().getSkipCache(NFS_OBJECT_INDEX_PROGRESS_KEY));
+      service.runPeriodicalTaskNow();
+      assertEquals(1, submitted.size(), "Scanning must wait for the initialization batch to reach RocksDB");
+      flushNfsBootstrapResponses(manager, pending);
+      boolean replaced = false;
+      for (int i = 0; i < 20 && !manager.isNfsObjectIndexReady(); i++) {
+        service.runPeriodicalTaskNow();
+        assertEquals(1, pending.size());
+        flushNfsBootstrapResponses(manager, pending);
+        if (!replaced && submitted.get(submitted.size() - 1).getObjectsCount()
+            == OMNfsObjectIndexBootstrapRequest.MAX_OBJECTS) {
+          service.shutdown();
+          service = new NfsObjectIndexBootstrapService(1, TimeUnit.SECONDS, om);
+          replaced = true;
+        }
+      }
+      assertTrue(replaced, "The scan must cross a batch boundary and resume with a replacement service");
+      assertTrue(manager.isNfsObjectIndexReady());
+      for (Map.Entry<String, OmNfsObjectInfo> object : expected.entrySet()) {
+        assertEquals(object.getValue(), manager.getNfsObjectTable().getSkipCache(object.getKey()), object.getKey());
+      }
+      assertNull(manager.getNfsObjectTable().getSkipCache(manager.getNfsObjectKey(1, 4, 3000)));
+      assertEquals("DONE", manager.getMetaTable().getSkipCache(NFS_OBJECT_INDEX_PROGRESS_KEY));
+      int count = submitted.size();
+      service.runPeriodicalTaskNow();
+      assertEquals(count, submitted.size(), "Completed bootstrap must not submit further requests");
+    } finally {
+      service.shutdown();
+      manager.stop();
+    }
+  }
+
+  private void flushNfsBootstrapResponses(OMMetadataManager manager, List<OMClientResponse> pending)
+      throws IOException {
+    try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+      for (OMClientResponse response : pending) {
+        response.checkAndUpdateDB(manager, batch);
+      }
+      manager.getStore().commitBatchOperation(batch);
+    }
+    pending.clear();
+  }
+
+  private OMNfsObjectIndexBootstrapRequest nfsBootstrapRequest(BootstrapNfsObjectIndexRequest request)
+      throws IOException {
+    OMRequest omRequest = OMRequest.newBuilder().setCmdType(Type.BootstrapNfsObjectIndex)
+        .setClientId(UUID.randomUUID().toString()).setBootstrapNfsObjectIndexRequest(request).build();
+    return (OMNfsObjectIndexBootstrapRequest) OzoneManagerRatisUtils.createClientRequest(omRequest, null);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testNfsFileCommitIndex(boolean enabled) throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(enabled).when(manager).isNfsObjectIndexEnabled();
+    OMRequestTestUtils.addVolumeToDB("volume", manager);
+    OmBucketInfo bucket = OMRequestTestUtils.addBucketToDB("volume", "bucket", manager,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    long volumeId = manager.getVolumeId("volume");
+    long bucketId = bucket.getObjectID();
+    OmKeyInfo key = new OmKeyInfo.Builder().setVolumeName("volume").setBucketName("bucket")
+        .setKeyName("file").setObjectID(999).setParentObjectID(bucketId)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+        .setOmKeyLocationInfos(Collections.emptyList()).build();
+    String fileKey = manager.getOzonePathKey(volumeId, bucketId, bucketId, "file");
+    String indexKey = manager.getNfsObjectKey(volumeId, bucketId, 999);
+    OmNfsObjectInfo expected = new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.FILE, bucketId, "file");
+    OMFileRequest.addFileTableCacheEntry(manager, fileKey, key, "file", 1);
+    assertEquals(enabled ? expected : null, manager.getNfsObjectTable().get(indexKey));
+    assertNull(manager.getNfsObjectTable().getSkipCache(indexKey));
+    try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+      OMFileRequest.addToFileTable(manager, batch, key, volumeId, bucketId);
+    }
+    assertNull(manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).getSkipCache(fileKey));
+    assertNull(manager.getNfsObjectTable().getSkipCache(indexKey));
+    try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+      OMFileRequest.addToFileTable(manager, batch, key, volumeId, bucketId);
+      manager.getStore().commitBatchOperation(batch);
+    }
+    assertEquals(key.getObjectID(), manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .getSkipCache(fileKey).getObjectID());
+    assertEquals(enabled ? expected : null, manager.getNfsObjectTable().getSkipCache(indexKey));
+    manager.stop();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testNfsOverwriteIndexBatch(boolean enabled) throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(enabled).when(manager).isNfsObjectIndexEnabled();
+    OMRequestTestUtils.addVolumeToDB("volume", manager);
+    OmBucketInfo bucket = OMRequestTestUtils.addBucketToDB("volume", "bucket", manager,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    long volumeId = manager.getVolumeId("volume");
+    long bucketId = bucket.getObjectID();
+    String fileKey = manager.getOzonePathKey(volumeId, bucketId, bucketId, "file");
+    OmNfsObjectInfo pointer = new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.FILE, bucketId, "file");
+    String oldIndexKey = manager.getNfsObjectKey(volumeId, bucketId, 998);
+    manager.getNfsObjectTable().put(oldIndexKey, pointer);
+    OMKeyCommitResponseWithFSO[] responses = new OMKeyCommitResponseWithFSO[2];
+    for (int i = 0; i < responses.length; i++) {
+      OmKeyInfo key = new OmKeyInfo.Builder().setVolumeName("volume").setBucketName("bucket")
+          .setKeyName("file").setObjectID(999 + i).setParentObjectID(bucketId)
+          .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+          .setOmKeyLocationInfos(Collections.emptyList()).build();
+      responses[i] = new OMKeyCommitResponseWithFSO(
+          OMResponse.newBuilder().setCmdType(Type.CommitKey).setStatus(Status.OK).build(),
+          key, fileKey, "open-file", bucket, null, volumeId, false, null, null, null, 998L + i);
+    }
+    try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+      for (OMKeyCommitResponseWithFSO response : responses) {
+        response.addToDBBatch(manager, batch);
+      }
+    }
+    assertEquals(pointer, manager.getNfsObjectTable().getSkipCache(oldIndexKey));
+    assertNull(manager.getNfsObjectTable().getSkipCache(manager.getNfsObjectKey(volumeId, bucketId, 999)));
+    try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+      for (OMKeyCommitResponseWithFSO response : responses) {
+        response.addToDBBatch(manager, batch);
+      }
+      manager.getStore().commitBatchOperation(batch);
+    }
+    assertEquals(enabled ? null : pointer, manager.getNfsObjectTable().getSkipCache(oldIndexKey));
+    assertNull(manager.getNfsObjectTable().getSkipCache(manager.getNfsObjectKey(volumeId, bucketId, 999)));
+    assertEquals(enabled ? pointer : null,
+        manager.getNfsObjectTable().getSkipCache(manager.getNfsObjectKey(volumeId, bucketId, 1000)));
+    assertEquals(1000, manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).getSkipCache(fileKey).getObjectID());
+    manager.stop();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testNfsDirectoryCreateIndex(boolean enabled) throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(enabled).when(manager).isNfsObjectIndexEnabled();
+    OmDirectoryInfo parent = OmDirectoryInfo.newBuilder().setName("parent").setObjectID(3)
+        .setParentObjectID(2).build();
+    OmDirectoryInfo child = OmDirectoryInfo.newBuilder().setName("child").setObjectID(4)
+        .setParentObjectID(3).build();
+    String parentKey = manager.getNfsObjectKey(1, 2, 3);
+    String childKey = manager.getNfsObjectKey(1, 2, 4);
+    OmNfsObjectInfo parentPointer = new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.DIRECTORY, 2, "parent");
+    OmNfsObjectInfo childPointer = new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.DIRECTORY, 3, "child");
+    OMFileRequest.addDirectoryTableCacheEntries(manager, 1, 2, 1, Collections.singletonList(parent), null);
+    assertEquals(enabled ? parentPointer : null, manager.getNfsObjectTable().get(parentKey));
+    assertNull(manager.getNfsObjectTable().get(childKey));
+    OMFileRequest.addDirectoryTableCacheEntries(manager, 1, 2, 2, Collections.singletonList(parent), child);
+    assertEquals(enabled ? childPointer : null, manager.getNfsObjectTable().get(childKey));
+    assertNull(manager.getNfsObjectTable().getSkipCache(parentKey));
+    assertNull(manager.getNfsObjectTable().getSkipCache(childKey));
+    try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+      OMFileRequest.addToDirectoryTable(manager, batch, parent, 1, 2);
+      OMFileRequest.addToDirectoryTable(manager, batch, child, 1, 2);
+    }
+    assertNull(manager.getDirectoryTable().getSkipCache(manager.getOzonePathKey(1, 2, parent)));
+    assertNull(manager.getDirectoryTable().getSkipCache(manager.getOzonePathKey(1, 2, child)));
+    assertNull(manager.getNfsObjectTable().getSkipCache(parentKey));
+    assertNull(manager.getNfsObjectTable().getSkipCache(childKey));
+    try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+      OMFileRequest.addToDirectoryTable(manager, batch, parent, 1, 2);
+      OMFileRequest.addToDirectoryTable(manager, batch, child, 1, 2);
+      manager.getStore().commitBatchOperation(batch);
+    }
+    assertEquals(parent, manager.getDirectoryTable().getSkipCache(manager.getOzonePathKey(1, 2, parent)));
+    assertEquals(child, manager.getDirectoryTable().getSkipCache(manager.getOzonePathKey(1, 2, child)));
+    assertEquals(enabled ? parentPointer : null, manager.getNfsObjectTable().getSkipCache(parentKey));
+    assertEquals(enabled ? childPointer : null, manager.getNfsObjectTable().getSkipCache(childKey));
+    manager.stop();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testNfsRenameIndex(boolean enabled) throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(enabled).when(manager).isNfsObjectIndexEnabled();
+    OMRequestTestUtils.addVolumeToDB("volume", manager);
+    OmBucketInfo bucket = OMRequestTestUtils.addBucketToDB("volume", "bucket", manager,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    long volumeId = manager.getVolumeId("volume");
+    long bucketId = bucket.getObjectID();
+    for (boolean directory : new boolean[] {false, true}) {
+      PersistedNfsObjectInfo.Kind kind = directory ? PersistedNfsObjectInfo.Kind.DIRECTORY
+          : PersistedNfsObjectInfo.Kind.FILE;
+      long objectId = directory ? 1000 : 999;
+      OmKeyInfo source = new OmKeyInfo.Builder().setVolumeName("volume").setBucketName("bucket")
+          .setKeyName("source" + kind).setObjectID(objectId).setParentObjectID(bucketId)
+          .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+          .setOmKeyLocationInfos(Collections.emptyList()).build();
+      OmKeyInfo target = source.toBuilder().setKeyName("target" + kind).setParentObjectID(88).build();
+      String fromKey = manager.getOzonePathKey(volumeId, bucketId, bucketId, source.getFileName());
+      String toKey = manager.getOzonePathKey(volumeId, bucketId, 88, target.getFileName());
+      String indexKey = manager.getNfsObjectKey(volumeId, bucketId, objectId);
+      OmNfsObjectInfo original = new OmNfsObjectInfo(kind, bucketId, source.getFileName());
+      manager.getNfsObjectTable().put(indexKey, original);
+      if (directory) {
+        manager.getDirectoryTable().put(fromKey, OMFileRequest.getDirectoryInfo(source));
+      } else {
+        manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(fromKey, source);
+      }
+      OMKeyRenameResponseWithFSO response = new OMKeyRenameResponseWithFSO(
+          OMResponse.newBuilder().setCmdType(Type.RenameKey).setStatus(Status.OK).build(), fromKey, toKey,
+          null, null, target, bucket, directory, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+      try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+        response.addToDBBatch(manager, batch);
+      }
+      assertEquals(original, manager.getNfsObjectTable().getSkipCache(indexKey));
+      assertNotNull(directory ? manager.getDirectoryTable().getSkipCache(fromKey)
+          : manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).getSkipCache(fromKey));
+      try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+        response.addToDBBatch(manager, batch);
+        manager.getStore().commitBatchOperation(batch);
+      }
+      assertNull(directory ? manager.getDirectoryTable().getSkipCache(fromKey)
+          : manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).getSkipCache(fromKey));
+      assertNotNull(directory ? manager.getDirectoryTable().getSkipCache(toKey)
+          : manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).getSkipCache(toKey));
+      assertEquals(enabled ? new OmNfsObjectInfo(kind, 88, target.getFileName()) : original,
+          manager.getNfsObjectTable().getSkipCache(indexKey));
+    }
+    manager.stop();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testNfsDeleteIndex(boolean enabled) throws Exception {
+    OMMetadataManager manager = spy(omMetadataManager);
+    doReturn(enabled).when(manager).isNfsObjectIndexEnabled();
+    OMRequestTestUtils.addVolumeToDB("volume", manager);
+    OmBucketInfo bucket = OMRequestTestUtils.addBucketToDB("volume", "bucket", manager,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    long volumeId = manager.getVolumeId("volume");
+    long bucketId = bucket.getObjectID();
+    long objectId = 999;
+    for (boolean bulk : new boolean[] {false, true}) {
+      for (boolean directory : new boolean[] {false, true}) {
+        PersistedNfsObjectInfo.Kind kind = directory ? PersistedNfsObjectInfo.Kind.DIRECTORY
+            : PersistedNfsObjectInfo.Kind.FILE;
+        OmKeyInfo key = new OmKeyInfo.Builder().setVolumeName("volume").setBucketName("bucket")
+            .setKeyName("object" + objectId).setObjectID(objectId).setParentObjectID(bucketId)
+            .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
+            .setOmKeyLocationInfos(Collections.emptyList()).build();
+        String canonicalKey = manager.getOzonePathKey(volumeId, bucketId, bucketId, key.getFileName());
+        String indexKey = manager.getNfsObjectKey(volumeId, bucketId, objectId++);
+        OmNfsObjectInfo pointer = new OmNfsObjectInfo(kind, bucketId, key.getFileName());
+        manager.getNfsObjectTable().put(indexKey, pointer);
+        if (directory) {
+          manager.getDirectoryTable().put(canonicalKey, OMFileRequest.getDirectoryInfo(key));
+        } else {
+          manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).put(canonicalKey, key);
+        }
+        OMFileRequest.deleteNfsObjectCacheEntry(manager, indexKey, 1);
+        assertEquals(enabled ? null : pointer, manager.getNfsObjectTable().get(indexKey));
+        assertEquals(pointer, manager.getNfsObjectTable().getSkipCache(indexKey));
+        OMClientResponse response;
+        if (bulk) {
+          response = new OMKeysDeleteResponseWithFSO(
+              OMResponse.newBuilder().setCmdType(Type.DeleteKeys).setStatus(Status.OK).build(),
+              directory ? Collections.emptyList() : Collections.singletonList(key),
+              directory ? Collections.singletonList(key) : Collections.emptyList(), bucket, volumeId,
+              Collections.emptyMap(), null);
+        } else {
+          response = new OMKeyDeleteResponseWithFSO(
+              OMResponse.newBuilder().setCmdType(Type.DeleteKey).setStatus(Status.OK).build(), key.getKeyName(),
+              key, bucket, directory, volumeId, null);
+        }
+        try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+          response.checkAndUpdateDB(manager, batch);
+        }
+        assertEquals(pointer, manager.getNfsObjectTable().getSkipCache(indexKey));
+        assertNotNull(directory ? manager.getDirectoryTable().getSkipCache(canonicalKey)
+            : manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).getSkipCache(canonicalKey));
+        try (BatchOperation batch = manager.getStore().initBatchOperation()) {
+          response.checkAndUpdateDB(manager, batch);
+          manager.getStore().commitBatchOperation(batch);
+        }
+        assertNull(directory ? manager.getDirectoryTable().getSkipCache(canonicalKey)
+            : manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).getSkipCache(canonicalKey));
+        assertEquals(enabled ? null : pointer, manager.getNfsObjectTable().getSkipCache(indexKey));
+      }
+    }
+    manager.stop();
+  }
+
+  @Test
+  public void testNfsObjectIndexPersistence() throws Exception {
+    String key = omMetadataManager.getNfsObjectKey(Long.MIN_VALUE, 2, -1);
+    assertEquals("/-9223372036854775808/2/-1", key);
+    assertNotEquals(key, omMetadataManager.getNfsObjectKey(Long.MIN_VALUE, 3, -1));
+    assertNotEquals(key, omMetadataManager.getNfsObjectKey(Long.MIN_VALUE, 2, 1));
+    OmNfsObjectInfo value = new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.FILE, 42, "file");
+    omMetadataManager.getNfsObjectTable().put(key, value);
+    assertEquals(value, omMetadataManager.getNfsObjectTable().get(key));
+    omMetadataManager.stop();
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    assertEquals(value, omMetadataManager.getNfsObjectTable().get(key));
+    omMetadataManager.getNfsObjectTable().delete(key);
+    assertNull(omMetadataManager.getNfsObjectTable().get(key));
+    omMetadataManager.stop();
   }
 
   @Test

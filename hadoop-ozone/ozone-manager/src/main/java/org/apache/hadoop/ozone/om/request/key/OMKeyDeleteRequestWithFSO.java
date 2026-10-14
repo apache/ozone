@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
@@ -188,6 +189,12 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
     final long volumeId = omMetadataManager.getVolumeId(volumeName);
     final long bucketId = omMetadataManager.getBucketId(volumeName,
             bucketName);
+    if (keyStatus.isFile()) {
+      OMFileRequest.validateNfsFileLeaseInactive(omMetadataManager, omKeyInfo);
+    } else {
+      OMFileRequest.validateNfsDirectoryLeasesInactive(omMetadataManager, volumeId, bucketId,
+          omKeyInfo.getObjectID());
+    }
     String ozonePathKey = omMetadataManager.getOzonePathKey(volumeId,
             bucketId, omKeyInfo.getParentObjectID(),
             omKeyInfo.getFileName());
@@ -263,6 +270,20 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
 
     OmBucketInfo omBucketInfo =
         getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
+    OMFileRequest.deleteNfsObjectCacheEntry(omMetadataManager,
+        omMetadataManager.getNfsObjectKey(prepared.volumeId, omBucketInfo.getObjectID(),
+            prepared.omKeyInfo.getObjectID()), trxnLogIndex);
+    OmDirectoryInfo nfsParentDirectoryInfo = null;
+    if (omMetadataManager.isNfsObjectIndexEnabled() && omMetadataManager.isNfsObjectIndexReady()) {
+      if (prepared.omKeyInfo.getParentObjectID() == omBucketInfo.getObjectID()) {
+        omBucketInfo = OMFileRequest.updateNfsBucketVerifierCacheEntry(
+            omMetadataManager, omBucketInfo, trxnLogIndex);
+      } else {
+        nfsParentDirectoryInfo = OMFileRequest.updateNfsDirectoryVerifierCacheEntry(
+            omMetadataManager, prepared.volumeId, omBucketInfo.getObjectID(),
+            prepared.omKeyInfo.getParentObjectID(), trxnLogIndex);
+      }
+    }
 
     // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
     boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(prepared.omKeyInfo);
@@ -281,7 +302,7 @@ public class OMKeyDeleteRequestWithFSO extends OMKeyDeleteRequest {
         .setDeleteKeyResponse(DeleteKeyResponse.newBuilder()).build(),
         keyName, prepared.omKeyInfo,
         omBucketInfo.copyObject(), prepared.isDirectory, prepared.volumeId,
-        prepared.deletedOpenKeyInfo);
+        prepared.deletedOpenKeyInfo, nfsParentDirectoryInfo);
   }
 
   /**

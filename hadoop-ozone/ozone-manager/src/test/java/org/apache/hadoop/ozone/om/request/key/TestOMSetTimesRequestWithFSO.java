@@ -22,13 +22,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.protobuf.ByteString;
+import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -104,6 +109,40 @@ public class TestOMSetTimesRequestWithFSO extends TestOMSetTimesRequest {
     assertTrue(keyStatus.isFile());
     keyMtime = keyStatus.getKeyInfo().getModificationTime();
     assertEquals(mtime, keyMtime);
+  }
+
+  @Test
+  public void testSetTimesRejectsActiveNfsFileLease() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    String tableKey = addKeyToTable();
+    OmKeyInfo keyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(tableKey);
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    long now = Time.now();
+    String exportUuid = UUID.randomUUID().toString();
+    OmNfsLeaseInfo exportLease = OmNfsLeaseInfo.createExportLease(exportUuid, volumeId, bucketId,
+        1, now + 60_000, "gateway", 1);
+    OmNfsLeaseInfo fileLease = OmNfsLeaseInfo.acquireFileLease(null, exportLease, keyInfo.getObjectID(),
+        "transfer", "nfs-user@EXAMPLE.COM", ByteString.copyFromUtf8("owner-token"), now, 10_000);
+    omMetadataManager.getNfsExportLeaseTable().put(omMetadataManager.getNfsExportLeaseKey(exportUuid), exportLease);
+    omMetadataManager.getNfsFileLeaseTable().put(
+        omMetadataManager.getNfsFileLeaseKey(volumeId, bucketId, keyInfo.getObjectID()), fileLease);
+
+    OzoneManagerProtocolProtos.SetTimesRequest setTimes = OzoneManagerProtocolProtos.SetTimesRequest.newBuilder()
+        .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+            .setVolumeName(volumeName).setBucketName(bucketName).setKeyName(keyName))
+        .setMtime(3000).setAtime(2000).build();
+    OMKeySetTimesRequest request = getOmKeySetTimesRequest(OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetTimes).setSetTimesRequest(setTimes).build());
+    request = getOmKeySetTimesRequest(request.preExecute(ozoneManager));
+    OzoneManagerProtocolProtos.OMResponse response = request
+        .validateAndUpdateCache(ozoneManager, 101L).getOMResponse();
+
+    assertEquals(OzoneManagerProtocolProtos.Status.NFS_LEASE_CONFLICT, response.getStatus());
+    assertEquals(keyInfo.getModificationTime(),
+        omMetadataManager.getKeyTable(getBucketLayout()).get(tableKey).getModificationTime());
   }
 
   @Override

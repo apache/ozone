@@ -58,6 +58,8 @@ import org.apache.hadoop.ipc_.CallerContext;
 import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.nfs.NfsChildrenPage;
+import org.apache.hadoop.ozone.nfs.NfsFileHandle;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
@@ -189,6 +191,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupF
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsChildrenRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsChildrenResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsObjectRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsTransferRangesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsTransferRangesResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartCommitUploadPartRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartCommitUploadPartResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateRequest;
@@ -198,6 +205,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadCompleteResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadListPartsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadListPartsResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsExportLeaseRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsExportLeaseResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCreateRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCreateResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileLeaseRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileLeaseResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsTransferRangeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsTransferRangeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
@@ -731,6 +747,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   @Override
   public OpenKeySession openKey(OmKeyArgs args) throws IOException {
+    return openKey(args, null);
+  }
+
+  @Override
+  public OpenKeySession openKey(OmKeyArgs args, NfsFileCommitRequest nfsFileCommitRequest) throws IOException {
     CreateKeyRequest.Builder req = CreateKeyRequest.newBuilder();
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
@@ -793,6 +814,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     req.setKeyArgs(keyArgs.build());
     req.setDerivedKeyPiggyBacking(args.isDerivedKeyPiggyBacking());
+    if (nfsFileCommitRequest != null) {
+      req.setNfsFileCommitRequest(nfsFileCommitRequest);
+    }
 
     OMRequest omRequest = createOMRequest(Type.CreateKey)
         .setCreateKeyRequest(req)
@@ -804,6 +828,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         keyResponse.getOpenVersion());
     if (keyResponse.hasDerivedKey()) {
       openKeySession.setDerivedKey(keyResponse.getDerivedKey().asReadOnlyByteBuffer());
+    }
+    if (nfsFileCommitRequest != null) {
+      openKeySession.setNfsFileCommitRequest(nfsFileCommitRequest);
     }
     return openKeySession;
   }
@@ -858,9 +885,21 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
+  public void hsyncKey(OmKeyArgs args, long clientId, NfsFileCommitRequest nfsFileCommitRequest)
+      throws IOException {
+    updateKeyAndGetModificationTime(args, clientId, true, false, nfsFileCommitRequest);
+  }
+
+  @Override
   public long commitKey(OmKeyArgs args, long clientId)
           throws IOException {
     return updateKeyAndGetModificationTime(args, clientId, false, false);
+  }
+
+  @Override
+  public long commitKey(OmKeyArgs args, long clientId, NfsFileCommitRequest nfsFileCommitRequest)
+      throws IOException {
+    return updateKeyAndGetModificationTime(args, clientId, false, false, nfsFileCommitRequest);
   }
 
   @Override
@@ -890,6 +929,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   private long updateKeyAndGetModificationTime(OmKeyArgs args, long clientId, boolean hsync, boolean recovery)
       throws IOException {
+    return updateKeyAndGetModificationTime(args, clientId, hsync, recovery, null);
+  }
+
+  private long updateKeyAndGetModificationTime(OmKeyArgs args, long clientId, boolean hsync, boolean recovery,
+      NfsFileCommitRequest nfsFileCommitRequest) throws IOException {
     CommitKeyRequest.Builder req = CommitKeyRequest.newBuilder();
     List<OmKeyLocationInfo> locationInfoList = args.getLocationInfoList();
     Objects.requireNonNull(locationInfoList, "locationInfoList == null");
@@ -909,6 +953,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     req.setClientID(clientId);
     req.setHsync(hsync);
     req.setRecovery(recovery);
+    if (nfsFileCommitRequest != null) {
+      req.setNfsFileCommitRequest(nfsFileCommitRequest);
+    }
 
     OMRequest omRequest = createOMRequest(Type.CommitKey)
         .setCommitKeyRequest(req)
@@ -2377,6 +2424,120 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     return ReadConsistency.fromProto(hint.getReadConsistency());
   }
 
+  @Override
+  public OzoneFileStatus lookupNfsObject(OmKeyArgs args, long volumeId, long bucketId, long objectId,
+      NfsFileHandle.Kind kind) throws IOException {
+    if (kind == null || (args.getKeyName() != null && !args.getKeyName().isEmpty())) {
+      throw new OMException("NFS lookup requires an identity without a path", OMException.ResultCodes.INVALID_REQUEST);
+    }
+    LookupNfsObjectRequest.Kind wireKind;
+    switch (kind) {
+    case BUCKET:
+      wireKind = LookupNfsObjectRequest.Kind.BUCKET;
+      break;
+    case DIRECTORY:
+      wireKind = LookupNfsObjectRequest.Kind.DIRECTORY;
+      break;
+    case FILE:
+      wireKind = LookupNfsObjectRequest.Kind.FILE;
+      break;
+    default:
+      throw new OMException("Unsupported NFS object kind", OMException.ResultCodes.INVALID_REQUEST);
+    }
+    LookupNfsObjectRequest request = LookupNfsObjectRequest.newBuilder().setVolumeName(args.getVolumeName())
+        .setBucketName(args.getBucketName()).setVolumeID(volumeId).setBucketID(bucketId).setObjectID(objectId)
+        .setKind(wireKind).setHeadOp(args.isHeadOp()).setSortDatanodes(args.getSortDatanodes())
+        .setLatestVersionLocation(args.getLatestVersionLocation()).build();
+    OMResponse response = handleError(submitRequest(createOMRequest(Type.LookupNfsObject)
+        .setLookupNfsObjectRequest(request).build()));
+    if (!response.hasLookupNfsObjectResponse()) {
+      throw new OMException("OM does not support NFS identity lookup", OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+    return OzoneFileStatus.getFromProtobuf(response.getLookupNfsObjectResponse().getStatus());
+  }
+
+  @Override
+  public NfsChildrenPage lookupNfsChildren(OmKeyArgs args, long volumeId, long bucketId, long parentObjectId,
+      NfsFileHandle.Kind parentKind, String name, Integer maxEntries, Long startAfterObjectId, Long verifier)
+      throws IOException {
+    if (parentKind == null || parentKind == NfsFileHandle.Kind.FILE
+        || (args.getKeyName() != null && !args.getKeyName().isEmpty())) {
+      throw new OMException("NFS child lookup requires a directory identity without a path",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
+    LookupNfsChildrenRequest.ParentKind wireKind = parentKind == NfsFileHandle.Kind.BUCKET
+        ? LookupNfsChildrenRequest.ParentKind.BUCKET : LookupNfsChildrenRequest.ParentKind.DIRECTORY;
+    LookupNfsChildrenRequest.Builder request = LookupNfsChildrenRequest.newBuilder()
+        .setVolumeName(args.getVolumeName()).setBucketName(args.getBucketName()).setVolumeID(volumeId)
+        .setBucketID(bucketId).setParentObjectID(parentObjectId).setParentKind(wireKind);
+    if (name != null) {
+      request.setName(name);
+    }
+    if (maxEntries != null) {
+      request.setMaxEntries(maxEntries);
+    }
+    if (startAfterObjectId != null) {
+      request.setStartAfterObjectID(startAfterObjectId);
+    }
+    if (verifier != null) {
+      request.setVerifier(verifier);
+    }
+    OMResponse response = handleError(submitRequest(createOMRequest(Type.LookupNfsChildren)
+        .setLookupNfsChildrenRequest(request).build()));
+    if (!response.hasLookupNfsChildrenResponse()) {
+      throw new OMException("OM does not support NFS child lookup", OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+    LookupNfsChildrenResponse page = response.getLookupNfsChildrenResponse();
+    List<OzoneFileStatus> children = new ArrayList<>(page.getChildrenCount());
+    for (OzoneFileStatusProto child : page.getChildrenList()) {
+      children.add(OzoneFileStatus.getFromProtobuf(child));
+    }
+    return new NfsChildrenPage(children, page.getVerifier(), page.getEof());
+  }
+
+  @Override
+  public NfsExportLeaseResponse updateNfsExportLease(NfsExportLeaseRequest request) throws IOException {
+    OMResponse response = handleError(submitRequest(createOMRequest(Type.NfsExportLease)
+        .setNfsExportLeaseRequest(request.toBuilder().clearLeaderTimeMillis()).build()));
+    if (!response.hasNfsExportLeaseResponse()) {
+      throw new OMException("OM does not support NFS export leases", OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+    return response.getNfsExportLeaseResponse();
+  }
+
+  @Override
+  public NfsFileLeaseResponse updateNfsFileLease(NfsFileLeaseRequest request) throws IOException {
+    OMResponse response = handleError(submitRequest(createOMRequest(Type.NfsFileLease)
+        .setNfsFileLeaseRequest(request.toBuilder().clearLeaderTimeMillis()).build()));
+    if (!response.hasNfsFileLeaseResponse()) {
+      throw new OMException("OM does not support NFS file leases", OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+    return response.getNfsFileLeaseResponse();
+  }
+
+  @Override
+  public NfsTransferRangeResponse updateNfsTransferRange(NfsTransferRangeRequest request) throws IOException {
+    OMResponse response = handleError(submitRequest(createOMRequest(Type.NfsTransferRange)
+        .setNfsTransferRangeRequest(request.toBuilder().clearLeaderTimeMillis()).build()));
+    if (!response.hasNfsTransferRangeResponse()) {
+      throw new OMException("OM does not support NFS durable write ranges",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+    return response.getNfsTransferRangeResponse();
+  }
+
+  @Override
+  public LookupNfsTransferRangesResponse lookupNfsTransferRanges(LookupNfsTransferRangesRequest request)
+      throws IOException {
+    OMResponse response = handleError(submitRequest(createOMRequest(Type.LookupNfsTransferRanges)
+        .setLookupNfsTransferRangesRequest(request).build()));
+    if (!response.hasLookupNfsTransferRangesResponse()) {
+      throw new OMException("OM does not support NFS range lookup",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+    return response.getLookupNfsTransferRangesResponse();
+  }
+
   /**
    * Get File Status for an Ozone key.
    *
@@ -2577,6 +2738,17 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public OpenKeySession createFile(OmKeyArgs args,
       boolean overWrite, boolean recursive) throws IOException {
+    return createFile(args, overWrite, recursive, null);
+  }
+
+  @Override
+  public OpenKeySession createNfsFile(OmKeyArgs args, NfsFileCreateRequest nfsFileCreateRequest)
+      throws IOException {
+    return createFile(args, false, true, nfsFileCreateRequest);
+  }
+
+  private OpenKeySession createFile(OmKeyArgs args, boolean overWrite, boolean recursive,
+      NfsFileCreateRequest nfsFileCreateRequest) throws IOException {
     KeyArgs.Builder keyArgsBuilder = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
@@ -2597,18 +2769,38 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       }
       keyArgsBuilder.setType(args.getReplicationConfig().getReplicationType());
     }
-    CreateFileRequest createFileRequest = CreateFileRequest.newBuilder()
+    CreateFileRequest.Builder createFileRequestBuilder = CreateFileRequest.newBuilder()
             .setKeyArgs(keyArgsBuilder.build())
             .setIsOverwrite(overWrite)
-            .setIsRecursive(recursive)
-            .build();
+            .setIsRecursive(recursive);
+    if (nfsFileCreateRequest != null) {
+      createFileRequestBuilder.setNfsFileCreateRequest(nfsFileCreateRequest);
+    }
+    CreateFileRequest createFileRequest = createFileRequestBuilder.build();
     OMRequest omRequest = createOMRequest(Type.CreateFile)
         .setCreateFileRequest(createFileRequest)
         .build();
     CreateFileResponse resp = handleSubmitRequestAndSCMSafeModeRetry(omRequest).getCreateFileResponse();
 
-    return new OpenKeySession(resp.getID(),
+    OpenKeySession session = new OpenKeySession(resp.getID(),
         OmKeyInfo.getFromProtobuf(resp.getKeyInfo()), resp.getOpenVersion());
+    if (nfsFileCreateRequest != null) {
+      if (!resp.hasNfsFileCreateResponse()) {
+        throw new OMException("OM did not return the NFS file lease",
+            OMException.ResultCodes.NFS_LEASE_CONFLICT);
+      }
+      NfsFileCreateResponse lease = resp.getNfsFileCreateResponse();
+      session.setNfsFileCreateResponse(lease);
+      session.setNfsFileCommitRequest(NfsFileCommitRequest.newBuilder()
+          .setExportUUID(nfsFileCreateRequest.getExportUUID())
+          .setGatewayID(nfsFileCreateRequest.getGatewayID())
+          .setGatewayGeneration(lease.getGatewayGeneration())
+          .setTransferID(nfsFileCreateRequest.getTransferID())
+          .setFileGeneration(lease.getGeneration())
+          .setOwnerToken(lease.getOwnerToken())
+          .build());
+    }
+    return session;
   }
 
   @Nonnull

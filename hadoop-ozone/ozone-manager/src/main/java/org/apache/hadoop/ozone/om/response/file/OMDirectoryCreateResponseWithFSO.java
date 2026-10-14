@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.slf4j.Logger;
@@ -83,15 +84,11 @@ public class OMDirectoryCreateResponseWithFSO extends OmKeyResponse {
                           parentDirInfo.getName());
           LOG.debug("putWithBatch parent : dir {} info : {}", parentKey,
                   parentDirInfo);
-          omMetadataManager.getDirectoryTable()
-                  .putWithBatch(batchOperation, parentKey, parentDirInfo);
+          OMFileRequest.addToDirectoryTable(omMetadataManager, batchOperation, parentDirInfo, volumeId, bucketId);
         }
       }
 
-      String dirKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
-              dirInfo.getParentObjectID(), dirInfo.getName());
-      omMetadataManager.getDirectoryTable().putWithBatch(batchOperation, dirKey,
-              dirInfo);
+      OMFileRequest.addToDirectoryTable(omMetadataManager, batchOperation, dirInfo, volumeId, bucketId);
       String bucketKey = omMetadataManager.getBucketKey(
           bucketInfo.getVolumeName(), bucketInfo.getBucketName());
       omMetadataManager.getBucketTable().putWithBatch(batchOperation,

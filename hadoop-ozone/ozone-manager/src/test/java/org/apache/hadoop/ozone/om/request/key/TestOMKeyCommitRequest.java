@@ -984,7 +984,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
    * @return OMRequest - modified request returned from preExecute.
    * @throws Exception
    */
-  private OMRequest doPreExecute(OMRequest originalOMRequest) throws Exception {
+  protected OMRequest doPreExecute(OMRequest originalOMRequest) throws Exception {
 
     OMKeyCommitRequest omKeyCommitRequest =
             getOmKeyCommitRequest(originalOMRequest);
@@ -1027,7 +1027,7 @@ public class TestOMKeyCommitRequest extends OMKeyRequestTests {
         modifiedKeyArgs.getFactor());
   }
 
-  private OMRequest createCommitKeyRequest() {
+  protected OMRequest createCommitKeyRequest() {
     return createCommitKeyRequest(false);
   }
 

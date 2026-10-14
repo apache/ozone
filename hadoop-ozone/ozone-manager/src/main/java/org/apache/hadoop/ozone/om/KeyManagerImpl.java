@@ -60,6 +60,10 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MPU_CLEANUP_SERVICE_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_TIMEOUT;
@@ -182,6 +186,7 @@ import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
 import org.apache.hadoop.ozone.om.service.MultipartUploadCleanupService;
+import org.apache.hadoop.ozone.om.service.NfsObjectIndexBootstrapService;
 import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
@@ -226,6 +231,7 @@ public class KeyManagerImpl implements KeyManager {
 
   private BackgroundService openKeyCleanupService;
   private BackgroundService multipartUploadCleanupService;
+  private BackgroundService nfsObjectIndexBootstrapService;
   private DNSToSwitchMapping dnsToSwitchMapping;
   private CompactionService compactionService;
   private KeyLifecycleService keyLifecycleService;
@@ -363,6 +369,15 @@ public class KeyManagerImpl implements KeyManager {
           serviceInterval, TimeUnit.MILLISECONDS, serviceTimeout,
           ozoneManager, configuration);
       multipartUploadCleanupService.start();
+    }
+
+    if (nfsObjectIndexBootstrapService == null && configuration.getBoolean(
+        OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_ENABLED, OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_ENABLED_DEFAULT)) {
+      long interval = configuration.getTimeDuration(OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_INTERVAL,
+          OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
+      nfsObjectIndexBootstrapService = new NfsObjectIndexBootstrapService(
+          interval, TimeUnit.MILLISECONDS, ozoneManager);
+      nfsObjectIndexBootstrapService.start();
     }
 
     if (keyLifecycleService == null) {
@@ -531,6 +546,10 @@ public class KeyManagerImpl implements KeyManager {
     if (compactionService != null) {
       compactionService.shutdown();
       compactionService = null;
+    }
+    if (nfsObjectIndexBootstrapService != null) {
+      nfsObjectIndexBootstrapService.shutdown();
+      nfsObjectIndexBootstrapService = null;
     }
     if (keyLifecycleService != null) {
       keyLifecycleService.shutdown();

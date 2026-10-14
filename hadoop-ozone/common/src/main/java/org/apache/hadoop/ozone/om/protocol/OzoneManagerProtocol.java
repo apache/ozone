@@ -69,6 +69,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetLifecycleServiceStatusResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsTransferRangesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsTransferRangesResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsExportLeaseRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsExportLeaseResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCreateRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileLeaseRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileLeaseResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsTransferRangeRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsTransferRangeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
@@ -92,6 +102,31 @@ import org.apache.hadoop.security.token.TokenInfo;
 @TokenInfo(OzoneDelegationTokenSelector.class)
 public interface OzoneManagerProtocol
     extends IOmMetadataReader, OzoneManagerSecurityProtocol, Closeable {
+
+  /** Apply an OM-owned NFS export lease transition through the replicated write path. */
+  default NfsExportLeaseResponse updateNfsExportLease(NfsExportLeaseRequest request) throws IOException {
+    throw new OMException("NFS export leases require the OM RPC transport",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+  }
+
+  /** Renew or release an NFS file writer lease through the OM replicated write path. */
+  default NfsFileLeaseResponse updateNfsFileLease(NfsFileLeaseRequest request) throws IOException {
+    throw new OMException("NFS file leases require the OM RPC transport",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+  }
+
+  /** Records or removes a durable NFS write range through the OM replicated write path. */
+  default NfsTransferRangeResponse updateNfsTransferRange(NfsTransferRangeRequest request) throws IOException {
+    throw new OMException("NFS durable write ranges require the OM RPC transport",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+  }
+
+  /** Reads a bounded durable NFS range-manifest page for the current file lease owner. */
+  default LookupNfsTransferRangesResponse lookupNfsTransferRanges(LookupNfsTransferRangesRequest request)
+      throws IOException {
+    throw new OMException("NFS durable write ranges require the OM RPC transport",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+  }
 
   @SuppressWarnings("checkstyle:ConstantName")
   /**
@@ -243,6 +278,12 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
+  /** Open an NFS-owned file for publication under its active OM lease. */
+  default OpenKeySession openKey(OmKeyArgs args, NfsFileCommitRequest nfsFileCommitRequest)
+      throws IOException {
+    throw new UnsupportedOperationException("NFS file publication is not supported");
+  }
+
   /**
    * Commit a key. This will make the change from the client visible. The client
    * is identified by the clientID.
@@ -258,6 +299,13 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
+  /** Commit a key owned by an NFS gateway using its current file lease. */
+  default long commitKey(OmKeyArgs args, long clientID, NfsFileCommitRequest nfsFileCommitRequest)
+      throws IOException {
+    throw new OMException("NFS file commits require the OM RPC transport",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+  }
+
   /**
    * Synchronize the key length. This will make the change from the client
    * visible. The client is identified by the clientID.
@@ -270,6 +318,13 @@ public interface OzoneManagerProtocol
           throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
             "this to be implemented, as write requests use a new approach.");
+  }
+
+  /** Synchronize a key owned by an NFS gateway using its current file lease. */
+  default void hsyncKey(OmKeyArgs args, long clientID, NfsFileCommitRequest nfsFileCommitRequest)
+      throws IOException {
+    throw new OMException("NFS file sync requires the OM RPC transport",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
   }
 
   /**
@@ -1045,6 +1100,12 @@ public interface OzoneManagerProtocol
       boolean recursive) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
+  }
+
+  /** Create a new file and acquire its OM-owned NFS writer lease atomically. */
+  default OpenKeySession createNfsFile(OmKeyArgs keyArgs, NfsFileCreateRequest request) throws IOException {
+    throw new OMException("NFS file creation requires the OM RPC transport",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
   }
 
   /**

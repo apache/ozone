@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.nfs.NfsChildrenPage;
+import org.apache.hadoop.ozone.nfs.NfsFileHandle;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
@@ -30,12 +32,37 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsTransferRangesRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsTransferRangesResponse;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 
 /**
  * Protocol for OmMetadataReader's.
  */
 public interface IOmMetadataReader {
+  /** Resolve and authorize a live native FSO object; snapshot readers do not support NFS handles. */
+  default OzoneFileStatus lookupNfsObject(OmKeyArgs args, long volumeId, long bucketId, long objectId,
+      NfsFileHandle.Kind kind) throws IOException {
+    throw new OMException("NFS identity lookup requires the live namespace",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+  }
+
+  /** Resolve one direct child or return a verifier-protected page from a live FSO directory. */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  default NfsChildrenPage lookupNfsChildren(OmKeyArgs args, long volumeId, long bucketId, long parentObjectId,
+      NfsFileHandle.Kind parentKind, String name, Integer maxEntries, Long startAfterObjectId, Long verifier)
+      throws IOException {
+    throw new OMException("NFS child lookup requires the live namespace",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+  }
+
+  /** Return a bounded page of staged ranges after verifying the current file lease owner. */
+  default LookupNfsTransferRangesResponse lookupNfsTransferRanges(OmKeyArgs args,
+      LookupNfsTransferRangesRequest request) throws IOException {
+    throw new OMException("NFS range lookup requires the live namespace",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+  }
+
   /**
    * Look up for the container of an existing key.
    *

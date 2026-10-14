@@ -45,6 +45,14 @@ public class TestOzoneFsUtils {
     assertFalse(OzoneFSUtils.isValidName("/a//b"));
   }
 
+  @Test
+  public void testGetFileName() {
+    assertEquals("file", OzoneFSUtils.getFileName("dir/file"));
+    assertEquals("café 文件", OzoneFSUtils.getFileName("dir/café 文件"));
+    assertEquals("dir", OzoneFSUtils.getFileName("dir/"));
+    assertEquals("/", OzoneFSUtils.getFileName("/"));
+  }
+
   /**
    * In these scenarios below, OzoneFSUtils.canEnableHsync() should return false:
    * 1. ozone.hbase.enhancements.allowed = false, ozone.fs.hsync.enabled = false

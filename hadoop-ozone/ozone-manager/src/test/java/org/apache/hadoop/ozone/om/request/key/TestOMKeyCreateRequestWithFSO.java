@@ -21,9 +21,12 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -32,18 +35,26 @@ import java.util.Collection;
 import java.util.Iterator;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -91,6 +102,45 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
                 .getCreateKeyResponse().getKeyInfo().getKeyName(),
           "Incorrect keyName");
     }
+  }
+
+  @Test
+  public void testNfsLeaseFencesOpenForPublication() throws Exception {
+    String exportUuid = "00000000-0000-0000-0000-000000000001";
+    ByteString ownerToken = ByteString.copyFromUtf8("owner-token");
+    long now = System.currentTimeMillis();
+    OmNfsLeaseInfo exportLease = OmNfsLeaseInfo.createExportLease(exportUuid, 1, 2, 1, now + 60_000,
+        "gateway", 3);
+    OmNfsLeaseInfo fileLease = OmNfsLeaseInfo.acquireFileLease(null, exportLease, 9, "transfer",
+        "alice@EXAMPLE.COM", ownerToken, now, 30_000);
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    @SuppressWarnings("unchecked")
+    Table<String, OmNfsLeaseInfo> fileLeaseTable = mock(Table.class);
+    @SuppressWarnings("unchecked")
+    Table<String, OmNfsLeaseInfo> exportLeaseTable = mock(Table.class);
+    OmKeyInfo existingFile = mock(OmKeyInfo.class);
+    when(existingFile.getObjectID()).thenReturn(9L);
+    when(metadataManager.getNfsFileLeaseKey(1, 2, 9)).thenReturn("file-lease");
+    when(metadataManager.getNfsFileLeaseTable()).thenReturn(fileLeaseTable);
+    when(fileLeaseTable.get("file-lease")).thenReturn(fileLease);
+    when(metadataManager.getNfsExportLeaseKey(exportUuid)).thenReturn("export-lease");
+    when(metadataManager.getNfsExportLeaseTable()).thenReturn(exportLeaseTable);
+    when(exportLeaseTable.get("export-lease")).thenReturn(exportLease);
+
+    CreateKeyRequest baseRequest = CreateKeyRequest.newBuilder().setKeyArgs(KeyArgs.newBuilder()
+        .setVolumeName("volume").setBucketName("bucket").setKeyName("file")).build();
+    assertThrows(OMException.class, () -> OMKeyCreateRequestWithFSO.validateNfsFileOpen(metadataManager,
+        baseRequest, 1, 2, existingFile));
+
+    NfsFileCommitRequest fence = NfsFileCommitRequest.newBuilder().setExportUUID(exportUuid)
+        .setGatewayID("gateway").setGatewayGeneration(3).setTransferID("transfer").setFileGeneration(1)
+        .setOwnerToken(ownerToken).build();
+    OMKeyCreateRequestWithFSO.validateNfsFileOpen(metadataManager,
+        baseRequest.toBuilder().setNfsFileCommitRequest(fence).build(), 1, 2, existingFile);
+
+    NfsFileCommitRequest staleFence = fence.toBuilder().setOwnerToken(ByteString.copyFromUtf8("stale-token")).build();
+    assertThrows(OMException.class, () -> OMKeyCreateRequestWithFSO.validateNfsFileOpen(metadataManager,
+        baseRequest.toBuilder().setNfsFileCommitRequest(staleFence).build(), 1, 2, existingFile));
   }
 
   @Override

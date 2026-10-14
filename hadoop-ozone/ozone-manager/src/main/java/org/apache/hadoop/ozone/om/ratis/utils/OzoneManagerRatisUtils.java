@@ -69,6 +69,9 @@ import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationDele
 import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleConfigurationSetRequest;
 import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSaveScanStateRequest;
 import org.apache.hadoop.ozone.om.request.lifecycle.OMLifecycleSetServiceStatusRequest;
+import org.apache.hadoop.ozone.om.request.nfs.OMNfsExportLeaseRequest;
+import org.apache.hadoop.ozone.om.request.nfs.OMNfsFileLeaseRequest;
+import org.apache.hadoop.ozone.om.request.nfs.OMNfsTransferRangeRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3AssumeRoleRequest;
@@ -96,6 +99,7 @@ import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotPurgeRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotRenameRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotSetPropertyRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMCompleteFinalizeUpgradeRequest;
+import org.apache.hadoop.ozone.om.request.upgrade.OMNfsObjectIndexBootstrapRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequest;
 import org.apache.hadoop.ozone.om.request.upgrade.OMStartFinalizeUpgradeRequestLegacy;
 import org.apache.hadoop.ozone.om.request.util.OMEchoRPCWriteRequest;
@@ -352,6 +356,14 @@ public final class OzoneManagerRatisUtils {
       return new S3ExpiredMultipartUploadsAbortRequest(omRequest);
     case QuotaRepair:
       return new OMQuotaRepairRequest(omRequest);
+    case BootstrapNfsObjectIndex:
+      return new OMNfsObjectIndexBootstrapRequest(omRequest);
+    case NfsExportLease:
+      return new OMNfsExportLeaseRequest(omRequest);
+    case NfsFileLease:
+      return new OMNfsFileLeaseRequest(omRequest);
+    case NfsTransferRange:
+      return new OMNfsTransferRangeRequest(omRequest);
     case PutObjectTagging:
       keyArgs = omRequest.getPutObjectTaggingRequest().getKeyArgs();
       volumeName = keyArgs.getVolumeName();

@@ -9,6 +9,7 @@
 *.suo
 *.vcxproj.user
 *.patch
+!hadoop-ozone/nfs-gateway/src/main/ganesha/patches/*.patch
 .idea
 .vscode
 .svn

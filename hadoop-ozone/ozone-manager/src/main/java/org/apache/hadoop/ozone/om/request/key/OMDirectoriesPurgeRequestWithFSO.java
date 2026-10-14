@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMDirectoriesPurgeResponseWithFSO;
@@ -353,6 +354,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       if (null != omBucketInfo && omBucketInfo.getObjectID() == entry.bucketId) {
         omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(processed.pathKey),
             CacheValue.get(trxnLogIndex));
+        OMFileRequest.deleteNfsObjectCacheEntry(omMetadataManager, processed.nfsObjectKey, trxnLogIndex);
         result.volBucketInfoMap.putIfAbsent(processed.volBucketPair, omBucketInfo);
         quotaDeltas.computeIfAbsent(processed.volBucketPair, k -> new QuotaDelta(omBucketInfo)).usedNamespace += 1L;
       }
@@ -389,6 +391,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       if (null != omBucketInfo && omBucketInfo.getObjectID() == entry.bucketId) {
         omMetadataManager.getFileTable().addCacheEntry(new CacheKey<>(processed.pathKey),
             CacheValue.get(trxnLogIndex));
+        OMFileRequest.deleteNfsObjectCacheEntry(omMetadataManager, processed.nfsObjectKey, trxnLogIndex);
         result.volBucketInfoMap.putIfAbsent(processed.volBucketPair, omBucketInfo);
         QuotaDelta quotaDelta = quotaDeltas.computeIfAbsent(processed.volBucketPair, k -> new QuotaDelta(omBucketInfo));
         quotaDelta.usedBytes += entry.replicatedSize;
@@ -455,6 +458,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
    */
   private static class ProcessedKeyInfo {
     private final String deleteKey;
+    private final String nfsObjectKey;
     private final String pathKey;
     private final String volumeName;
     private final String bucketName;
@@ -463,8 +467,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     private final Pair<String, String> volBucketPair;
 
     ProcessedKeyInfo(String deleteKey, String pathKey, String volumeName,
-                     String bucketName, long parentObjectID, String fileName) {
+                     String bucketName, long parentObjectID, String fileName, String nfsObjectKey) {
       this.deleteKey = deleteKey;
+      this.nfsObjectKey = nfsObjectKey;
       this.pathKey = pathKey;
       this.volumeName = volumeName;
       this.bucketName = bucketName;
@@ -544,7 +549,8 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
     String deleteKey = omMetadataManager.getOzoneDeletePathKey(objectID, pathKey);
 
     return new ProcessedKeyInfo(deleteKey, pathKey, key.getVolumeName(), key.getBucketName(),
-        parentObjectID, fileName);
+        parentObjectID, fileName,
+        omMetadataManager.getNfsObjectKey(path.getVolumeId(), path.getBucketId(), objectID));
   }
 
   /**

@@ -26,11 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.ConnectException;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -53,6 +55,7 @@ import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
@@ -63,12 +66,19 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsObjectInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
+import org.apache.hadoop.ozone.om.service.NfsObjectIndexBootstrapService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedNfsObjectInfo.Kind;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
@@ -119,6 +129,123 @@ public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
     if (cluster != null) {
       cluster.restartOzoneManager();
     }
+  }
+
+  @Test
+  void testNfsBootstrapResumesAfterLeaderLoss() throws Exception {
+    OzoneBucket existing = setupBucket();
+    String volumeName = existing.getVolumeName();
+    String bucketName = UUID.randomUUID().toString();
+    getObjectStore().getVolume(volumeName).createBucket(bucketName,
+        BucketArgs.newBuilder().setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED).build());
+    OzoneBucket bucket = getObjectStore().getVolume(volumeName).getBucket(bucketName);
+    for (int i = 0; i < 501; i++) {
+      bucket.createDirectory(String.format("d%04d", i));
+    }
+    testCreateFile(bucket, "source/file", "source data", true, false);
+    testCreateFile(bucket, "delete/file", "deleted data", true, false);
+    testCreateFile(bucket, "recreate/file", "old data", true, false);
+    OzoneManager originalLeader = getCluster().getOMLeader();
+    OMMetadataManager metadata = originalLeader.getMetadataManager();
+    long volumeId = metadata.getVolumeId(volumeName);
+    long bucketId = metadata.getBucketId(volumeName, bucketName);
+    OmKeyArgs.Builder args = new OmKeyArgs.Builder().setVolumeName(volumeName).setBucketName(bucketName);
+    OmKeyInfo source = originalLeader.lookupFile(args.setKeyName("source/file").build());
+    OmKeyInfo deleted = originalLeader.lookupFile(args.setKeyName("delete/file").build());
+    OmKeyInfo oldFile = originalLeader.lookupFile(args.setKeyName("recreate/file").build());
+    Map<String, OmNfsObjectInfo> expected = new HashMap<>();
+    for (int i = 0; i < 501; i++) {
+      String name = String.format("d%04d", i);
+      OmDirectoryInfo directory = metadata.getDirectoryTable().get(
+          metadata.getOzonePathKey(volumeId, bucketId, bucketId, name));
+      expected.put(metadata.getNfsObjectKey(volumeId, bucketId, directory.getObjectID()),
+          new OmNfsObjectInfo(Kind.DIRECTORY, bucketId, name));
+    }
+    for (String name : new String[] {"source", "delete", "recreate"}) {
+      OmDirectoryInfo directory = metadata.getDirectoryTable().get(
+          metadata.getOzonePathKey(volumeId, bucketId, bucketId, name));
+      expected.put(metadata.getNfsObjectKey(volumeId, bucketId, directory.getObjectID()),
+          new OmNfsObjectInfo(Kind.DIRECTORY, bucketId, name));
+    }
+    NfsObjectIndexBootstrapService initial = new NfsObjectIndexBootstrapService(
+        1, TimeUnit.SECONDS, originalLeader);
+    String partial;
+    try {
+      initial.runPeriodicalTaskNow();
+      waitForNfsBootstrapProgress(originalLeader, "1:");
+      initial.runPeriodicalTaskNow();
+      GenericTestUtils.waitFor(() -> {
+        try {
+          String progress = metadata.getMetaTable().getSkipCache(OzoneConsts.NFS_OBJECT_INDEX_PROGRESS_KEY);
+          return progress != null && progress.startsWith("1:/");
+        } catch (IOException ex) {
+          throw new UncheckedIOException(ex);
+        }
+      }, 20, 30000);
+      partial = metadata.getMetaTable().getSkipCache(OzoneConsts.NFS_OBJECT_INDEX_PROGRESS_KEY);
+      assertFalse(metadata.isNfsObjectIndexReady());
+      for (OzoneManager node : getCluster().getOzoneManagersList()) {
+        waitForNfsBootstrapProgress(node, partial);
+        assertFalse(node.getMetadataManager().isNfsObjectIndexReady());
+      }
+    } finally {
+      initial.shutdown();
+    }
+    getCluster().stopOzoneManager(originalLeader.getOMNodeId());
+    waitForLeaderToBeReady();
+    OzoneManager leader = getCluster().getOMLeader();
+    assertNotEquals(originalLeader.getOMNodeId(), leader.getOMNodeId());
+    waitForNfsBootstrapProgress(leader, partial);
+    assertFalse(leader.getMetadataManager().isNfsObjectIndexReady());
+    bucket.renameKey("source", "moved");
+    bucket.deleteKey("delete/file");
+    bucket.deleteKey("recreate/file");
+    testCreateFile(bucket, "recreate/file", "new data", true, false);
+    OmKeyInfo replacement = leader.lookupFile(args.setKeyName("recreate/file").build());
+    assertNotEquals(oldFile.getObjectID(), replacement.getObjectID());
+    assertEquals(source.getObjectID(), leader.lookupFile(args.setKeyName("moved/file").build()).getObjectID());
+    expected.put(metadata.getNfsObjectKey(volumeId, bucketId, source.getParentObjectID()),
+        new OmNfsObjectInfo(Kind.DIRECTORY, bucketId, "moved"));
+    expected.put(metadata.getNfsObjectKey(volumeId, bucketId, source.getObjectID()),
+        new OmNfsObjectInfo(Kind.FILE, source.getParentObjectID(), "file"));
+    expected.put(metadata.getNfsObjectKey(volumeId, bucketId, replacement.getObjectID()),
+        new OmNfsObjectInfo(Kind.FILE, replacement.getParentObjectID(), "file"));
+    NfsObjectIndexBootstrapService resumed = new NfsObjectIndexBootstrapService(20, TimeUnit.MILLISECONDS, leader);
+    try {
+      resumed.start();
+      waitForNfsBootstrapProgress(leader, "DONE");
+      assertTrue(leader.getMetadataManager().isNfsObjectIndexReady());
+    } finally {
+      resumed.shutdown();
+    }
+    getCluster().restartOzoneManager(originalLeader, true);
+    for (OzoneManager node : getCluster().getOzoneManagersList()) {
+      waitForNfsBootstrapProgress(node, "DONE");
+      OMMetadataManager current = node.getMetadataManager();
+      assertTrue(current.isNfsObjectIndexReady());
+      assertNull(current.getNfsObjectTable().getSkipCache(
+          current.getNfsObjectKey(volumeId, bucketId, deleted.getObjectID())));
+      assertNull(current.getNfsObjectTable().getSkipCache(
+          current.getNfsObjectKey(volumeId, bucketId, oldFile.getObjectID())));
+      String prefix = current.getBucketKeyPrefixFSO(volumeName, bucketName);
+      Map<String, OmNfsObjectInfo> actual = new HashMap<>();
+      for (Table.KeyValue<String, OmNfsObjectInfo> entry : current.getNfsObjectTable()
+          .getRangeKVs(null, expected.size() + 1, prefix)) {
+        actual.put(entry.getKey(), entry.getValue());
+      }
+      assertEquals(expected, actual, node.getOMNodeId());
+    }
+  }
+
+  private void waitForNfsBootstrapProgress(OzoneManager om, String expected) throws Exception {
+    GenericTestUtils.waitFor(() -> {
+      try {
+        return expected.equals(om.getMetadataManager().getMetaTable().getSkipCache(
+            OzoneConsts.NFS_OBJECT_INDEX_PROGRESS_KEY));
+      } catch (IOException ex) {
+        throw new UncheckedIOException(ex);
+      }
+    }, 20, 30000);
   }
 
   /**

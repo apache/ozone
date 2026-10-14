@@ -44,12 +44,14 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
@@ -122,6 +124,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
         dbFileInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
                 omMetadataManager, dbFileKey, keyName);
       }
+      validateNfsFileOpen(omMetadataManager, createKeyRequest, volumeId, bucketId, dbFileInfo);
       validateAtomicRewrite(dbFileInfo, keyArgs);
       keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(
           keyArgs, dbFileInfo);
@@ -200,6 +203,19 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
               volumeId, bucketId, trxnLogIndex,
               missingParentInfos, null);
+      if (!missingParentInfos.isEmpty()) {
+        long parentObjectId = missingParentInfos.get(0).getParentObjectID();
+        if (parentObjectId == bucketId) {
+          omBucketInfo = OMFileRequest.updateNfsBucketVerifierCacheEntry(
+              omMetadataManager, omBucketInfo, trxnLogIndex);
+        } else {
+          OmDirectoryInfo parent = OMFileRequest.updateNfsDirectoryVerifierCacheEntry(
+              omMetadataManager, volumeId, bucketId, parentObjectId, trxnLogIndex);
+          if (parent != null) {
+            missingParentInfos.add(0, parent);
+          }
+        }
+      }
 
       omMetadataManager.getBucketTable().addCacheEntry(
           omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
@@ -252,6 +268,42 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
             numKeysCreated);
 
     return omClientResponse;
+  }
+
+  static void validateNfsFileOpen(OMMetadataManager metadataManager,
+      OzoneManagerProtocolProtos.CreateKeyRequest request, long volumeId, long bucketId,
+      OmKeyInfo existingFile) throws IOException {
+    NfsFileCommitRequest nfsCommit = request.hasNfsFileCommitRequest()
+        ? request.getNfsFileCommitRequest() : null;
+    if (existingFile == null) {
+      if (nfsCommit != null) {
+        throw new OMException("NFS publication requires an existing leased file",
+            OMException.ResultCodes.NFS_LEASE_CONFLICT);
+      }
+      return;
+    }
+    String fileLeaseKey = metadataManager.getNfsFileLeaseKey(volumeId, bucketId, existingFile.getObjectID());
+    OmNfsLeaseInfo fileLease = metadataManager.getNfsFileLeaseTable().get(fileLeaseKey);
+    if (fileLease == null) {
+      if (nfsCommit != null) {
+        throw new OMException("NFS publication lease is no longer active",
+            OMException.ResultCodes.NFS_LEASE_CONFLICT);
+      }
+      return;
+    }
+    if (nfsCommit == null) {
+      throw new OMException("NFS file lease prevents open by another writer",
+          OMException.ResultCodes.NFS_LEASE_CONFLICT);
+    }
+    String exportLeaseKey = metadataManager.getNfsExportLeaseKey(nfsCommit.getExportUUID());
+    OmNfsLeaseInfo exportLease = metadataManager.getNfsExportLeaseTable().get(exportLeaseKey);
+    try {
+      fileLease.validateFileCommit(exportLease, nfsCommit.getExportUUID(), nfsCommit.getGatewayID(),
+          nfsCommit.getGatewayGeneration(), nfsCommit.getTransferID(), nfsCommit.getFileGeneration(),
+          nfsCommit.getOwnerToken(), Time.now());
+    } catch (IllegalStateException | IllegalArgumentException e) {
+      throw new OMException("NFS file lease owner is stale", OMException.ResultCodes.NFS_LEASE_CONFLICT);
+    }
   }
 
   /**

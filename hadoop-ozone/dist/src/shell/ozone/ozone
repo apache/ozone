@@ -58,6 +58,7 @@ function ozone_usage
   ozone_add_subcommand "genconf" client "generate minimally required ozone configs and output to ozone-site.xml in specified path"
   ozone_add_subcommand "getconf" client "get ozone config values from configuration"
   ozone_add_subcommand "om" daemon "Ozone Manager"
+  ozone_add_subcommand "nfs" daemon "run the NFS gateway backend"
   ozone_add_subcommand "scm" daemon "run the Storage Container Manager service"
   ozone_add_subcommand "s3g" daemon "run the S3 compatible REST gateway"
   ozone_add_subcommand "httpfs" daemon "run the HTTPFS compatible REST gateway"
@@ -158,6 +159,11 @@ function ozonecmd_case
       ozone_deprecate_envvar HDFS_OM_OPTS OZONE_OM_OPTS
       OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/om-audit-log4j2.properties -Dlog4j.configuration=file:${OZONE_CONF_DIR}/log4j.properties"
       OZONE_RUN_ARTIFACT_NAME="ozone-manager"
+    ;;
+    nfs)
+      OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.nfs.gateway.NfsGatewayDaemon
+      OZONE_RUN_ARTIFACT_NAME="ozone-nfs-gateway"
     ;;
     sh)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneShell

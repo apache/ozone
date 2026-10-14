@@ -132,7 +132,7 @@ public class TestS3MultipartUploadCompleteRequest
         rangeKVs.get(0).getValue().getOmKeyInfoList().size());
   }
 
-  private String checkValidateAndUpdateCacheSuccess(String volumeName,
+  protected String checkValidateAndUpdateCacheSuccess(String volumeName,
       String bucketName, String keyName, Map<String, String> metadata, Map<String, String> tags) throws Exception {
 
     OMRequest initiateMPURequest = doPreExecuteInitiateMPU(volumeName,

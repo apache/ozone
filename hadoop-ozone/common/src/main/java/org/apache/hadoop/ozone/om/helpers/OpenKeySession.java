@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.nio.ByteBuffer;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCreateResponse;
 
 /**
  * This class represents a open key "session". A session here means a key is
@@ -34,6 +36,8 @@ public class OpenKeySession {
   // be committed only when this open session is closed.
   private long openVersion;
   private ByteBuffer derivedKey;
+  private NfsFileCommitRequest nfsFileCommitRequest;
+  private NfsFileCreateResponse nfsFileCreateResponse;
 
   public OpenKeySession(long id, OmKeyInfo info, long version) {
     this.id = id;
@@ -59,5 +63,21 @@ public class OpenKeySession {
 
   public long getId() {
     return id;
+  }
+
+  public NfsFileCommitRequest getNfsFileCommitRequest() {
+    return nfsFileCommitRequest;
+  }
+
+  public void setNfsFileCommitRequest(NfsFileCommitRequest request) {
+    this.nfsFileCommitRequest = request;
+  }
+
+  public NfsFileCreateResponse getNfsFileCreateResponse() {
+    return nfsFileCreateResponse;
+  }
+
+  public void setNfsFileCreateResponse(NfsFileCreateResponse response) {
+    this.nfsFileCreateResponse = response;
   }
 }

@@ -20,19 +20,27 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.protobuf.ByteString;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class tests OMKeyCommitRequest with prefix layout.
@@ -118,5 +126,75 @@ public class TestOMKeyCommitRequestWithFSO extends TestOMKeyCommitRequest {
     String fileName = OzoneFSUtils.getFileName(keyName);
     assertEquals(fileName, omKeyInfo.getFileName(), "Incorrect FileName");
     assertEquals(fileName, omKeyInfo.getKeyName(), "Incorrect KeyName");
+  }
+
+  @Test
+  public void testNfsFileLeaseFencesCommitWithoutNfsIdentity() throws Exception {
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
+    OMKeyCommitRequest omKeyCommitRequest = getOmKeyCommitRequest(modifiedOmRequest);
+    List<OmKeyLocationInfo> allocatedLocationList = modifiedOmRequest.getCommitKeyRequest().getKeyArgs()
+        .getKeyLocationsList().stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(java.util.stream.Collectors.toList());
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, omKeyCommitRequest.getBucketLayout());
+    addKeyToOpenKeyTable(allocatedLocationList);
+
+    long now = Time.now();
+    long volumeId = getVolumeID();
+    long bucketId = getBucketID();
+    String exportUuid = UUID.randomUUID().toString();
+    OmNfsLeaseInfo exportLease = OmNfsLeaseInfo.createExportLease(exportUuid, volumeId, bucketId,
+        1, now + 60_000, "gateway", 1);
+    OmNfsLeaseInfo fileLease = OmNfsLeaseInfo.acquireFileLease(null, exportLease, 100,
+        "transfer", "nfs-user@EXAMPLE.COM", ByteString.copyFromUtf8("owner-token"), now, 10_000);
+    String fileLeaseKey = omMetadataManager.getNfsFileLeaseKey(volumeId, bucketId, 100);
+    omMetadataManager.getNfsFileLeaseTable().put(fileLeaseKey, fileLease);
+    omMetadataManager.getNfsExportLeaseTable().put(
+        omMetadataManager.getNfsExportLeaseKey(exportUuid), exportLease);
+
+    OMClientResponse response = omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 101L);
+
+    assertEquals(org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NFS_LEASE_CONFLICT,
+        response.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testNfsCommitPersistsPublishedContentMarker() throws Exception {
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest());
+    List<OmKeyLocationInfo> allocatedLocationList = modifiedOmRequest.getCommitKeyRequest().getKeyArgs()
+        .getKeyLocationsList().stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(java.util.stream.Collectors.toList());
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    addKeyToOpenKeyTable(allocatedLocationList);
+
+    long now = Time.now();
+    long volumeId = getVolumeID();
+    long bucketId = getBucketID();
+    String exportUuid = UUID.randomUUID().toString();
+    ByteString ownerToken = ByteString.copyFromUtf8("owner-token");
+    OmNfsLeaseInfo exportLease = OmNfsLeaseInfo.createExportLease(exportUuid, volumeId, bucketId,
+        1, now + 60_000, "gateway", 1);
+    OmNfsLeaseInfo fileLease = OmNfsLeaseInfo.acquireFileLease(null, exportLease, 100,
+        "transfer", "nfs-user@EXAMPLE.COM", ownerToken, now, 10_000);
+    String fileLeaseKey = omMetadataManager.getNfsFileLeaseKey(volumeId, bucketId, 100);
+    omMetadataManager.getNfsFileLeaseTable().put(fileLeaseKey, fileLease);
+    omMetadataManager.getNfsExportLeaseTable().put(
+        omMetadataManager.getNfsExportLeaseKey(exportUuid), exportLease);
+    NfsFileCommitRequest fence = NfsFileCommitRequest.newBuilder().setExportUUID(exportUuid).setGatewayID("gateway")
+        .setGatewayGeneration(1).setTransferID("transfer").setFileGeneration(1).setOwnerToken(ownerToken).build();
+    modifiedOmRequest = modifiedOmRequest.toBuilder().setCommitKeyRequest(
+        modifiedOmRequest.getCommitKeyRequest().toBuilder().setNfsFileCommitRequest(fence)).build();
+
+    OMClientResponse response = getOmKeyCommitRequest(modifiedOmRequest).validateAndUpdateCache(ozoneManager, 101L);
+
+    assertEquals(org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK,
+        response.getOMResponse().getStatus());
+    assertEquals(true, omMetadataManager.getNfsFileLeaseTable().get(fileLeaseKey).getProtobuf().getContentPublished());
+    try (BatchOperation batch = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batch);
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
+    assertEquals(true, omMetadataManager.getNfsFileLeaseTable().get(fileLeaseKey).getProtobuf().getContentPublished());
   }
 }

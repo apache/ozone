@@ -1,0 +1,155 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+name: nfs-native
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/nfs-native.yml'
+      - 'hadoop-hdds/common/**'
+      - 'hadoop-ozone/client/**'
+      - 'hadoop-ozone/common/**'
+      - 'hadoop-ozone/dist/**'
+      - 'hadoop-ozone/interface-client/**'
+      - 'hadoop-ozone/interface-storage/**'
+      - 'hadoop-ozone/ozone-manager/**'
+      - 'hadoop-ozone/s3gateway/**'
+      - 'hadoop-ozone/nfs-gateway/**'
+      - 'hadoop-ozone/integration-test/**'
+      - 'hadoop-ozone/integration-test-s3/**'
+      - 'hadoop-ozone/pom.xml'
+      - 'pom.xml'
+  push:
+    paths:
+      - '.github/workflows/nfs-native.yml'
+      - 'hadoop-hdds/common/**'
+      - 'hadoop-ozone/client/**'
+      - 'hadoop-ozone/common/**'
+      - 'hadoop-ozone/dist/**'
+      - 'hadoop-ozone/interface-client/**'
+      - 'hadoop-ozone/interface-storage/**'
+      - 'hadoop-ozone/ozone-manager/**'
+      - 'hadoop-ozone/s3gateway/**'
+      - 'hadoop-ozone/nfs-gateway/**'
+      - 'hadoop-ozone/integration-test/**'
+      - 'hadoop-ozone/integration-test-s3/**'
+      - 'hadoop-ozone/pom.xml'
+      - 'pom.xml'
+
+permissions: { }
+
+jobs:
+  linux-native:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 21
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+
+      - name: Build Java gateway and contract fixture
+        run: |
+          mvn --batch-mode --settings dev-support/ci/maven-settings.xml \
+            -pl :ozone-nfs-gateway -am install -DskipTests -DskipShade -DskipRecon -DskipDocs
+
+      - name: Run NFS gateway unit tests
+        run: >-
+          mvn --batch-mode --settings dev-support/ci/maven-settings.xml
+          -pl :ozone-nfs-gateway test -DskipShade -DskipRecon -DskipDocs
+
+      - name: Run secure NFS and FSO integration contracts
+        env:
+          LANG: C.UTF-8
+        run: >-
+          mvn --batch-mode --settings dev-support/ci/maven-settings.xml
+          -pl :ozone-integration-test -am
+          -Dtest=TestNfsCallerAuthorizationSecure,TestOzoneIntegrationNonHA -Dgroups=nfs -DfailIfNoTests=false
+          -Dmaven-surefire-plugin.argLineAccessArgs="--add-opens=java.base/java.lang=ALL-UNNAMED"
+          verify -DskipShade -DskipRecon -DskipDocs
+
+      - name: Run S3/NFS writer lease integration test
+        run: >-
+          mvn --batch-mode --settings dev-support/ci/maven-settings.xml
+          -pl :ozone-integration-test-s3 -am
+          -Dtest=TestS3SDK -Dgroups=nfs -Dsurefire.failIfNoSpecifiedTests=false
+          test -DskipShade -DskipRecon -DskipDocs
+
+      - name: Copy Java contract dependencies
+        run: >-
+          mvn --batch-mode --settings dev-support/ci/maven-settings.xml
+          -pl :ozone-nfs-gateway dependency:copy-dependencies -DincludeScope=test
+          -DskipShade -DskipRecon -DskipDocs
+
+      - name: Build and test native file handles
+        run: |
+          cmake -S hadoop-ozone/nfs-gateway -B target/nfs-native \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build target/nfs-native --parallel 2
+          ctest --test-dir target/nfs-native --output-on-failure
+
+      - name: Build and run C++ to Java mutual-TLS contract
+        run: |
+          docker build \
+            -f hadoop-ozone/nfs-gateway/src/test/native/Dockerfile.grpc \
+            -t ozone-nfs-grpc:ci hadoop-ozone/nfs-gateway
+          docker run --rm \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/workspace,readonly" \
+            ozone-nfs-grpc:ci sh -c '
+              cmake -S /workspace/hadoop-ozone/nfs-gateway -B /tmp/nfs-build \
+                -DOZONE_NFS_GRPC=ON -DCMAKE_BUILD_TYPE=Release &&
+              cmake --build /tmp/nfs-build --parallel 2 &&
+              ctest --test-dir /tmp/nfs-build --output-on-failure &&
+              classpath="/workspace/hadoop-ozone/nfs-gateway/target/classes" &&
+              classpath="$classpath:/workspace/hadoop-ozone/nfs-gateway/target/test-classes" &&
+              classpath="$classpath:/workspace/hadoop-ozone/interface-client/target/classes" &&
+              classpath="$classpath:/workspace/hadoop-ozone/common/target/classes" &&
+              classpath="$classpath:/workspace/hadoop-ozone/nfs-gateway/target/dependency/*" &&
+              python3 /workspace/hadoop-ozone/nfs-gateway/src/test/native/test_grpc_tls.py \
+                --java-classpath "$classpath" \
+                --native-client /tmp/nfs-build/test_ozone_grpc_tls -v
+            '
+
+      - name: Test mounted Ozone contract runner
+        run: python3 hadoop-ozone/nfs-gateway/src/test/nfs/test_ganesha_ozone_runner.py
+
+      - name: Build pinned Ganesha V5.7 with FSAL_OZONE
+        run: |
+          docker build \
+            -f hadoop-ozone/nfs-gateway/src/main/ganesha/Dockerfile \
+            -t ozone-nfs-ganesha:ci hadoop-ozone
+          docker run --rm ozone-nfs-ganesha:ci ganesha.nfsd -v
+
+      - name: Start FSAL_OZONE export and verify mutual-TLS handshake
+        run: |
+          classpath="hadoop-ozone/nfs-gateway/target/classes"
+          classpath="$classpath:hadoop-ozone/nfs-gateway/target/test-classes"
+          classpath="$classpath:hadoop-ozone/interface-client/target/classes"
+          classpath="$classpath:hadoop-ozone/common/target/classes"
+          classpath="$classpath:hadoop-ozone/nfs-gateway/target/dependency/*"
+          python3 hadoop-ozone/nfs-gateway/src/test/native/test_grpc_tls.py \
+            --java-classpath "$classpath" \
+            --native-client unused \
+            --ganesha-image ozone-nfs-ganesha:ci \
+            GrpcTlsContract.test_ganesha_loads_ozone_export_and_completes_capability_handshake

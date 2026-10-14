@@ -63,7 +63,7 @@ public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
       OmBucketInfo bucketInfo, OMResponse response) throws IOException {
 
     return new OMFileCreateResponseWithFSO(response, keyInfo,
-        new ArrayList<>(), clientID, bucketInfo, getVolumeId());
+        new ArrayList<>(), clientID, bucketInfo, getVolumeId(), null, null);
   }
 
   @Override

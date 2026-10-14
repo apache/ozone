@@ -22,28 +22,79 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /**
  * Tests OMFileCreateRequest - prefix layout.
  */
 public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
+
+  @Test
+  public void testNfsFileCreateAcquiresLeaseInCreateTransaction() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    Mockito.doReturn(true).when(omMetadataManager).isNfsWriterLeaseEnabled();
+    Mockito.doReturn(true).when(omMetadataManager).isNfsObjectIndexReady();
+    String exportUuid = UUID.randomUUID().toString();
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    OmNfsLeaseInfo exportLease = OmNfsLeaseInfo.acquireExportLease(null, exportUuid, volumeId, bucketId,
+        "nfs-gateway", System.currentTimeMillis(), 60_000);
+    omMetadataManager.getNfsExportLeaseTable().put(exportUuid, exportLease);
+
+    OMRequest request = createFileRequest(volumeName, bucketName, "nfs/lease-file",
+        HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS, false, true);
+    request = request.toBuilder().setUserInfo(OzoneManagerProtocolProtos.UserInfo.newBuilder()
+        .setUserName("nfs-user@EXAMPLE.COM")).build();
+    NfsFileCreateRequest nfsCreate = NfsFileCreateRequest.newBuilder().setExportUUID(exportUuid)
+        .setGatewayID("nfs-gateway").setGatewayGeneration(1).setTransferID("transfer-1")
+        .setLeaseDurationMillis(30_000).build();
+    request = request.toBuilder().setCreateFileRequest(request.getCreateFileRequest().toBuilder()
+        .setNfsFileCreateRequest(nfsCreate)).build();
+
+    OMFileCreateRequest createRequest = getOMFileCreateRequest(request);
+    OMRequest replicatedRequest = createRequest.preExecute(ozoneManager);
+    NfsFileCreateRequest replicatedLease = replicatedRequest.getCreateFileRequest().getNfsFileCreateRequest();
+    assertTrue(replicatedLease.hasLeaderTimeMillis());
+    assertEquals(16, replicatedLease.getOwnerToken().size());
+    OMClientResponse response = getOMFileCreateRequest(replicatedRequest)
+        .validateAndUpdateCache(ozoneManager, 1234L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertTrue(response.getOMResponse().getCreateFileResponse().hasNfsFileCreateResponse());
+    long objectId = response.getOMResponse().getCreateFileResponse().getNfsFileCreateResponse().getObjectID();
+    String leaseKey = omMetadataManager.getNfsFileLeaseKey(volumeId, bucketId, objectId);
+    OmNfsLeaseInfo cachedLease = omMetadataManager.getNfsFileLeaseTable().get(leaseKey);
+    assertEquals(replicatedLease.getOwnerToken(), cachedLease.getProtobuf().getOwnerToken());
+    assertEquals(objectId, cachedLease.getProtobuf().getObjectID());
+    assertEquals(replicatedRequest.getUserInfo().getUserName(), cachedLease.getOwnerPrincipal());
+
+    try (BatchOperation batch = omMetadataManager.getStore().initBatchOperation()) {
+      response.checkAndUpdateDB(omMetadataManager, batch);
+      omMetadataManager.getStore().commitBatchOperation(batch);
+    }
+    assertEquals(cachedLease, omMetadataManager.getNfsFileLeaseTable().getSkipCache(leaseKey));
+  }
 
   @Override
   @Test

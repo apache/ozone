@@ -447,6 +447,8 @@ public final class OzoneConsts {
   // Key written into the Meta table when finalization is needed and a finalization command has been received
   // to trigger the process
   public static final String FINALIZATION_IN_PROGRESS_KEY = "#FINALIZATION_IN_PROGRESS";
+  public static final String NFS_OBJECT_INDEX_READY_KEY = "#NFSOBJECTINDEXREADY";
+  public static final String NFS_OBJECT_INDEX_PROGRESS_KEY = "#NFSOBJECTINDEXPROGRESS";
 
   // Kerberos constants
   public static final String KERBEROS_CONFIG_VALUE = "kerberos";

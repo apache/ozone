@@ -24,7 +24,12 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -196,6 +201,14 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
     // source existed
     OmKeyInfo fromKeyValue = fromKeyFileStatus.getKeyInfo();
+    if (fromKeyFileStatus.isFile()) {
+      OMFileRequest.validateNfsFileLeaseInactive(omMetadataManager, fromKeyValue);
+    } else {
+      long volumeId = omMetadataManager.getVolumeId(volumeName);
+      long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+      OMFileRequest.validateNfsDirectoryLeasesInactive(omMetadataManager, volumeId, bucketId,
+          fromKeyValue.getObjectID());
+    }
     boolean isRenameDirectory = fromKeyFileStatus.isDirectory();
 
     // case-2) Cannot rename a directory to its own subdirectory
@@ -214,6 +227,9 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     if (toKeyFileStatus != null) {
       // Destination exists and following are different cases:
       OmKeyInfo toKeyValue = toKeyFileStatus.getKeyInfo();
+      if (toKeyFileStatus.isFile()) {
+        OMFileRequest.validateNfsFileLeaseInactive(omMetadataManager, toKeyValue);
+      }
 
       if (fromKeyValue.getKeyName().equals(toKeyValue.getKeyName())) {
         // case-3) If src == destin then check source and destin of same type
@@ -351,6 +367,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     } else {
       toKeyFileName = OzoneFSUtils.getFileName(toKeyName);
     }
+    List<OmDirectoryInfo> nfsParentDirectoryUpdates = new ArrayList<>();
     OMMetadataManager metadataMgr = ozoneManager.getMetadataManager();
     Table<String, OmDirectoryInfo> dirTable = metadataMgr.getDirectoryTable();
     String bucketKey = metadataMgr.getBucketKey(
@@ -391,6 +408,26 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     omBucketInfo = setModificationTime(ommm, omBucketInfo, fromKeyParent, volumeId,
         bucketId, modificationTime, dirTable, trxnLogIndex);
 
+    if (metadataMgr.isNfsObjectIndexEnabled() && metadataMgr.isNfsObjectIndexReady()) {
+      Set<Long> parentObjectIds = new HashSet<>();
+      parentObjectIds.add(prepared.fromKeyValue.getParentObjectID());
+      if (toKeyParent != null) {
+        parentObjectIds.add(toKeyParent.getObjectID());
+      }
+      for (long parentObjectId : parentObjectIds) {
+        if (parentObjectId == bucketId) {
+          omBucketInfo = OMFileRequest.updateNfsBucketVerifierCacheEntry(
+              metadataMgr, omBucketInfo, trxnLogIndex);
+        } else {
+          OmDirectoryInfo updatedParent = OMFileRequest.updateNfsDirectoryVerifierCacheEntry(
+              metadataMgr, volumeId, bucketId, parentObjectId, trxnLogIndex);
+          if (updatedParent != null) {
+            nfsParentDirectoryUpdates.add(updatedParent);
+          }
+        }
+      }
+    }
+
     // destination dbKeyName
     String dbToKey = ommm.getOzonePathKey(volumeId, bucketId,
             fromKeyValue.getParentObjectID(), toKeyFileName);
@@ -403,9 +440,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       dirTable.addCacheEntry(new CacheKey<>(dbFromKey),
               CacheValue.get(trxnLogIndex));
 
-      dirTable.addCacheEntry(new CacheKey<>(dbToKey),
-          CacheValue.get(trxnLogIndex,
-              OMFileRequest.getDirectoryInfo(fromKeyValue)));
+      OMFileRequest.addDirectoryTableCacheEntries(metadataMgr, volumeId, bucketId, trxnLogIndex,
+          Collections.emptyList(), OMFileRequest.getDirectoryInfo(fromKeyValue));
     } else {
       Table<String, OmKeyInfo> keyTable =
           metadataMgr.getKeyTable(getBucketLayout());
@@ -413,14 +449,13 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       keyTable.addCacheEntry(new CacheKey<>(dbFromKey),
               CacheValue.get(trxnLogIndex));
 
-      keyTable.addCacheEntry(new CacheKey<>(dbToKey),
-              CacheValue.get(trxnLogIndex, fromKeyValue));
+      OMFileRequest.addFileTableCacheEntry(metadataMgr, dbToKey, fromKeyValue, toKeyFileName, trxnLogIndex);
     }
 
     OMClientResponse omClientResponse = new OMKeyRenameResponseWithFSO(
         omResponse.setRenameKeyResponse(RenameKeyResponse.newBuilder()).build(),
         dbFromKey, dbToKey, fromKeyParent, toKeyParent, fromKeyValue,
-        omBucketInfo, isRenameDirectory, getBucketLayout());
+        omBucketInfo, isRenameDirectory, getBucketLayout(), nfsParentDirectoryUpdates);
     return omClientResponse;
   }
 

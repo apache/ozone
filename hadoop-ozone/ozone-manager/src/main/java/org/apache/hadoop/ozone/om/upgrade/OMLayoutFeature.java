@@ -54,7 +54,10 @@ public enum OMLayoutFeature implements ComponentVersion {
   DELEGATION_TOKEN_SYMMETRIC_SIGN(8, "Delegation token signed by symmetric key"),
   SNAPSHOT_DEFRAG(9, "Supporting defragmentation of snapshot"),
   S3_LIFECYCLE_SUPPORT(10, "S3 bucket lifecycle configuration support"),
-  MPU_PARTS_TABLE_SPLIT(11, "Split multipart table into separate table for parts and key");
+  MPU_PARTS_TABLE_SPLIT(11, "Split multipart table into separate table for parts and key"),
+  NFS_OBJECT_INDEX(12, "Live FSO object identity index for NFS"),
+  NFS_WRITER_LEASES(13, "OM-owned writer leases for NFS"),
+  NFS_DURABLE_WRITE_RANGES(14, "Durable staged write ranges for NFS");
 
   // ALL NEW VERSIONS SHOULD NOW BE ADDED TO OzoneManagerVersion
 

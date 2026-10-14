@@ -139,6 +139,13 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_OPEN_KEY_CLEANUP_LIMIT_PER_TASK_DEFAULT =
       1000;
 
+  public static final String OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_ENABLED =
+      "ozone.om.nfs.object.index.bootstrap.enabled";
+  public static final boolean OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_ENABLED_DEFAULT = false;
+  public static final String OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_INTERVAL =
+      "ozone.om.nfs.object.index.bootstrap.interval";
+  public static final String OZONE_OM_NFS_OBJECT_INDEX_BOOTSTRAP_INTERVAL_DEFAULT = "1s";
+
   public static final String OZONE_OM_MPU_CLEANUP_SERVICE_INTERVAL =
       "ozone.om.open.mpu.cleanup.service.interval";
   public static final String

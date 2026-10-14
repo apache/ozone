@@ -269,12 +269,15 @@ public final class OzoneFSUtils {
    * name 'file1'.
    */
   public static String getFileName(@Nonnull String keyName) {
-    java.nio.file.Path fileName = Paths.get(keyName).getFileName();
-    if (fileName != null) {
-      return fileName.toString();
+    int end = keyName.length();
+    while (end > 1 && keyName.charAt(end - 1) == '/') {
+      end--;
     }
-    // failed to converts a path key
-    return keyName;
+    if (end == 1 && keyName.charAt(0) == '/') {
+      return keyName;
+    }
+    int separator = keyName.lastIndexOf('/', end - 1);
+    return separator >= 0 ? keyName.substring(separator + 1, end) : keyName.substring(0, end);
   }
 
   /**

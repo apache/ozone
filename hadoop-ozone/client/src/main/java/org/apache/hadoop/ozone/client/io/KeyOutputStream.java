@@ -59,6 +59,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest;
 import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
@@ -696,6 +697,7 @@ public class KeyOutputStream extends OutputStream
     private StreamBufferArgs streamBufferArgs;
     private Supplier<ExecutorService> executorServiceSupplier;
     private OzoneManagerVersion ozoneManagerVersion;
+    private NfsFileCommitRequest nfsFileCommitRequest;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -739,6 +741,15 @@ public class KeyOutputStream extends OutputStream
 
     public Builder setOmClient(OzoneManagerProtocol client) {
       this.omClient = client;
+      return this;
+    }
+
+    public NfsFileCommitRequest getNfsFileCommitRequest() {
+      return nfsFileCommitRequest;
+    }
+
+    public Builder setNfsFileCommitRequest(NfsFileCommitRequest request) {
+      this.nfsFileCommitRequest = request;
       return this;
     }
 

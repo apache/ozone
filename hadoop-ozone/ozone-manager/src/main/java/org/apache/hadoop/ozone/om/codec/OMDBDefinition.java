@@ -39,6 +39,9 @@ import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsObjectInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsTransferRangeInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -275,6 +278,34 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           StringCodec.get(),
           OmDirectoryInfo.getCodec());
 
+  public static final String NFS_OBJECT_TABLE = "nfsObjectTable";
+  /** nfsObjectTable: /volumeId/bucketId/objectId :- canonical FSO parent/name pointer. */
+  public static final DBColumnFamilyDefinition<String, OmNfsObjectInfo> NFS_OBJECT_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(NFS_OBJECT_TABLE,
+          StringCodec.get(),
+          OmNfsObjectInfo.getCodec());
+
+  public static final String NFS_EXPORT_LEASE_TABLE = "nfsExportLeaseTable";
+  /** nfsExportLeaseTable: export UUID :- active gateway generation and expiry. */
+  public static final DBColumnFamilyDefinition<String, OmNfsLeaseInfo> NFS_EXPORT_LEASE_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(NFS_EXPORT_LEASE_TABLE,
+          StringCodec.get(),
+          OmNfsLeaseInfo.getCodec());
+
+  public static final String NFS_FILE_LEASE_TABLE = "nfsFileLeaseTable";
+  /** nfsFileLeaseTable: /volumeId/bucketId/objectId :- active NFS writer lease. */
+  public static final DBColumnFamilyDefinition<String, OmNfsLeaseInfo> NFS_FILE_LEASE_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(NFS_FILE_LEASE_TABLE,
+          StringCodec.get(),
+          OmNfsLeaseInfo.getCodec());
+
+  public static final String NFS_TRANSFER_RANGE_TABLE = "nfsTransferRangeTable";
+  /** nfsTransferRangeTable: file identity/lease generation/offset :- durable staged byte range. */
+  public static final DBColumnFamilyDefinition<String, OmNfsTransferRangeInfo> NFS_TRANSFER_RANGE_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(NFS_TRANSFER_RANGE_TABLE,
+          StringCodec.get(),
+          OmNfsTransferRangeInfo.getCodec());
+
   public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
   /**
    * deletedDirectoryTable: /volumeId/bucketId/parentId/dirName/objectId :- KeyInfo
@@ -365,6 +396,10 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           DIRECTORY_TABLE_DEF,
           DELEGATION_TOKEN_TABLE_DEF,
           FILE_TABLE_DEF,
+          NFS_EXPORT_LEASE_TABLE_DEF,
+          NFS_FILE_LEASE_TABLE_DEF,
+          NFS_OBJECT_TABLE_DEF,
+          NFS_TRANSFER_RANGE_TABLE_DEF,
           KEY_TABLE_DEF,
           META_TABLE_DEF,
           MULTIPART_INFO_TABLE_DEF,

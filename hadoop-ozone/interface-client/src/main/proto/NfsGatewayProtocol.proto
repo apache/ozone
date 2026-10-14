@@ -1,0 +1,225 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+syntax = "proto2";
+package ozone.nfs.v1;
+option java_package = "org.apache.hadoop.ozone.nfs.protocol.proto";
+option java_outer_classname = "NfsGatewayProtocolProtos";
+
+// A TLS peer is authorized separately from the caller identity it asserts.
+message Caller {
+  enum Protection {
+    INTEGRITY = 1;
+    PRIVACY = 2;
+  }
+  required string kerberos_principal = 1;
+  required Protection protection = 2;
+}
+
+message RequestContext {
+  required uint32 version = 1;
+  required bytes export_uuid = 2;
+  required Caller caller = 3;
+}
+
+message Result {
+  // Explicit NFSv4 status, with 0 reserved for successful backend operations.
+  required uint32 nfs_status = 1;
+}
+
+message CapabilityRequest {
+  required uint32 version = 1;
+  required bytes export_uuid = 2;
+}
+
+message CapabilityResponse {
+  enum Operation {
+    GETATTR = 1;
+    LOOKUP = 2;
+    READDIR = 3;
+    READ = 4;
+    CREATE = 5;
+    MKDIR = 6;
+    REMOVE = 7;
+    RENAME = 8;
+  }
+  required Result result = 1;
+  required uint32 version = 2;
+  repeated Operation operations = 3;
+  optional bytes root_handle = 4;
+  optional uint32 max_read_bytes = 5;
+  optional uint32 max_directory_entries = 6;
+}
+
+message Attributes {
+  required bytes handle = 1;
+  required bool directory = 2;
+  required uint64 object_id = 3;
+  required uint64 change_id = 4;
+  required uint64 size = 5;
+  required uint64 modification_time_millis = 6;
+  required uint64 creation_time_millis = 7;
+  optional string owner = 8;
+}
+
+message GetattrRequest {
+  required RequestContext context = 1;
+  required bytes handle = 2;
+}
+
+message GetattrResponse {
+  required Result result = 1;
+  optional Attributes attributes = 2;
+}
+
+message LookupRequest {
+  required RequestContext context = 1;
+  required bytes parent_handle = 2;
+  required string name = 3;
+}
+
+message LookupResponse {
+  required Result result = 1;
+  optional Attributes attributes = 2;
+}
+
+message CreateRequest {
+  required RequestContext context = 1;
+  required bytes parent_handle = 2;
+  required string name = 3;
+}
+
+message CreateResponse {
+  required Result result = 1;
+  optional Attributes attributes = 2;
+  optional string transfer_id = 3;
+}
+
+message MkdirRequest {
+  required RequestContext context = 1;
+  required bytes parent_handle = 2;
+  required string name = 3;
+}
+
+message MkdirResponse {
+  required Result result = 1;
+  optional Attributes attributes = 2;
+}
+
+message RemoveRequest {
+  required RequestContext context = 1;
+  required bytes parent_handle = 2;
+  required bytes object_handle = 3;
+  required string name = 4;
+}
+
+message RemoveResponse {
+  required Result result = 1;
+}
+
+message RenameRequest {
+  required RequestContext context = 1;
+  required bytes object_handle = 2;
+  required bytes old_parent_handle = 3;
+  required string old_name = 4;
+  required bytes new_parent_handle = 5;
+  required string new_name = 6;
+}
+
+message RenameResponse {
+  required Result result = 1;
+}
+
+message ReaddirRequest {
+  required RequestContext context = 1;
+  required bytes directory_handle = 2;
+  required uint32 max_entries = 3;
+  // An 8-byte object-ID cookie plus three; values 0, 1, and 2 are reserved by NFS.
+  optional bytes cookie = 4;
+  optional bytes verifier = 5;
+}
+
+message DirectoryEntry {
+  required string name = 1;
+  required Attributes attributes = 2;
+  // An 8-byte object-ID cookie plus three; values 0, 1, and 2 are reserved by NFS.
+  required bytes cookie = 3;
+}
+
+message ReaddirResponse {
+  required Result result = 1;
+  repeated DirectoryEntry entries = 2;
+  optional bytes verifier = 3;
+  optional bool eof = 4;
+}
+
+message ReadRequest {
+  required RequestContext context = 1;
+  required bytes handle = 2;
+  required uint64 offset = 3;
+  required uint32 count = 4;
+}
+
+message ReadResponse {
+  required Result result = 1;
+  optional bytes data = 2;
+  optional bool eof = 3;
+}
+
+message WriteRequest {
+  required RequestContext context = 1;
+  required bytes handle = 2;
+  required string transfer_id = 3;
+  required uint64 offset = 4;
+  required bytes data = 5;
+}
+
+message WriteResponse {
+  enum Stability {
+    UNSTABLE = 0;
+    DATA_SYNC = 1;
+    FILE_SYNC = 2;
+  }
+  required Result result = 1;
+  optional uint32 count = 2;
+  optional Stability committed = 3;
+}
+
+message CommitRequest {
+  required RequestContext context = 1;
+  required bytes handle = 2;
+  required bool finalize = 3;
+}
+
+message CommitResponse {
+  required Result result = 1;
+}
+
+service NfsGateway {
+  rpc Capabilities(CapabilityRequest) returns (CapabilityResponse);
+  rpc Getattr(GetattrRequest) returns (GetattrResponse);
+  rpc Lookup(LookupRequest) returns (LookupResponse);
+  rpc Create(CreateRequest) returns (CreateResponse);
+  rpc Mkdir(MkdirRequest) returns (MkdirResponse);
+  rpc Remove(RemoveRequest) returns (RemoveResponse);
+  rpc Rename(RenameRequest) returns (RenameResponse);
+  rpc Readdir(ReaddirRequest) returns (ReaddirResponse);
+  rpc Read(ReadRequest) returns (ReadResponse);
+  rpc Write(WriteRequest) returns (WriteResponse);
+  rpc Commit(CommitRequest) returns (CommitResponse);
+}

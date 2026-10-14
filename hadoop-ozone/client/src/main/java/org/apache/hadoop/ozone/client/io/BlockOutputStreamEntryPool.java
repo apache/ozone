@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest;
 import org.apache.hadoop.ozone.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,6 +86,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
   private long modificationTime;
   private final long openID;
+  private final NfsFileCommitRequest nfsFileCommitRequest;
   private final ExcludeList excludeList;
   private final ContainerClientMetrics clientMetrics;
   private final StreamBufferArgs streamBufferArgs;
@@ -106,6 +108,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
         .setMultipartUploadID(b.getMultipartUploadID())
         .setMultipartUploadPartNumber(b.getMultipartNumber());
     this.openID = b.getOpenHandler().getId();
+    this.nfsFileCommitRequest = b.getNfsFileCommitRequest();
     this.excludeList = createExcludeList();
 
     this.streamBufferArgs = b.getStreamBufferArgs();
@@ -332,7 +335,9 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             omClient.commitMultipartUploadPart(buildKeyArgs(), openID);
         modificationTime = commitUploadPartInfo.getModificationTime();
       } else {
-        modificationTime = omClient.commitKey(buildKeyArgs(), openID);
+        modificationTime = nfsFileCommitRequest == null
+            ? omClient.commitKey(buildKeyArgs(), openID)
+            : omClient.commitKey(buildKeyArgs(), openID, nfsFileCommitRequest);
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");
@@ -352,19 +357,27 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       } else {
         if (keyArgs.getLocationInfoList().isEmpty()) {
           MetricUtil.captureLatencyNs(clientMetrics::addOMHsyncLatency,
-              () -> omClient.hsyncKey(buildKeyArgs(), openID));
+                () -> hsyncKey());
         } else {
           ContainerBlockID lastBLockId = keyArgs.getLocationInfoList().get(keyArgs.getLocationInfoList().size() - 1)
               .getBlockID().getContainerBlockID();
           if (!lastUpdatedBlockId.equals(lastBLockId)) {
             MetricUtil.captureLatencyNs(clientMetrics::addOMHsyncLatency,
-                () -> omClient.hsyncKey(buildKeyArgs(), openID));
+                () -> hsyncKey());
             lastUpdatedBlockId = lastBLockId;
           }
         }
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");
+    }
+  }
+
+  private void hsyncKey() throws IOException {
+    if (nfsFileCommitRequest == null) {
+      omClient.hsyncKey(buildKeyArgs(), openID);
+    } else {
+      omClient.hsyncKey(buildKeyArgs(), openID, nfsFileCommitRequest);
     }
   }
 

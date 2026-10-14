@@ -421,6 +421,18 @@ public class TestOmUtils {
    * follower routing must also be classified as read-only.
    */
   @Test
+  public void testNfsLookupRequiresLeaderRead() {
+    for (OzoneManagerProtocolProtos.Type cmdType : asList(OzoneManagerProtocolProtos.Type.LookupNfsObject,
+        OzoneManagerProtocolProtos.Type.LookupNfsChildren,
+        OzoneManagerProtocolProtos.Type.LookupNfsTransferRanges)) {
+      OMRequest request = OMRequest.newBuilder().setCmdType(cmdType)
+          .setClientId(UUID.randomUUID().toString()).build();
+      assertTrue(OmUtils.isReadOnly(request));
+      Assertions.assertFalse(OmUtils.shouldSendToFollower(request));
+    }
+  }
+
+  @Test
   public void testShouldSendToFollowerImpliesIsReadOnly() {
     String clientId = UUID.randomUUID().toString();
 

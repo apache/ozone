@@ -79,3 +79,50 @@ message SnapDiffObjectInfo {
   optional uint64 objectID = 1;
   optional string keyName = 2;
 }
+
+// Reverse lookup value for a live FSO object. Identity is carried by the table key.
+message PersistedNfsObjectInfo {
+  enum Kind {
+    DIRECTORY = 1;
+    FILE = 2;
+  }
+  required Kind kind = 1;
+  required uint64 parentObjectID = 2;
+  required string name = 3;
+}
+
+// OM-owned lease state used to fence NFS gateway writers across Ozone clients.
+message PersistedNfsLeaseInfo {
+  enum Kind {
+    EXPORT = 1;
+    FILE = 2;
+  }
+  required Kind kind = 1;
+  required string exportUUID = 2;
+  required uint64 generation = 3;
+  required uint64 expiresAtMillis = 4;
+  optional string gatewayID = 5;
+  optional uint64 gatewayGeneration = 6;
+  optional uint64 volumeID = 7;
+  optional uint64 bucketID = 8;
+  optional uint64 objectID = 9;
+  optional string transferID = 10;
+  optional bytes ownerToken = 11;
+  optional string ownerPrincipal = 12;
+  optional bool contentPublished = 13;
+}
+
+// A durable staged byte range owned by one NFS file lease generation.
+message PersistedNfsTransferRangeInfo {
+  required string exportUUID = 1;
+  required uint64 volumeID = 2;
+  required uint64 bucketID = 3;
+  required uint64 objectID = 4;
+  required uint64 leaseGeneration = 5;
+  required uint64 offset = 6;
+  required uint64 length = 7;
+  required string transferID = 8;
+  required string stagingKey = 9;
+  required bytes sha256 = 10;
+  optional uint64 transactionIndex = 11;
+}

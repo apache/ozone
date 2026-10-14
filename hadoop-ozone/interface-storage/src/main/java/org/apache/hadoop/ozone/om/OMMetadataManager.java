@@ -53,6 +53,9 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsObjectInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsTransferRangeInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
@@ -572,6 +575,51 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return Table.
    */
   Table<String, OmDirectoryInfo> getDirectoryTable();
+
+  /** Returns the live FSO identity index; an index row is not an authorization decision. */
+  Table<String, OmNfsObjectInfo> getNfsObjectTable();
+
+  /** Returns the OM-owned lease for each configured NFS export. */
+  Table<String, OmNfsLeaseInfo> getNfsExportLeaseTable();
+
+  /** Returns the exclusive NFS writer lease for each live FSO file identity. */
+  Table<String, OmNfsLeaseInfo> getNfsFileLeaseTable();
+
+  /** Returns durable staged byte ranges for active and recoverable NFS writes. */
+  Table<String, OmNfsTransferRangeInfo> getNfsTransferRangeTable();
+
+  /** Whether the OM layout permits index maintenance; does not imply bootstrap readiness. */
+  boolean isNfsObjectIndexEnabled();
+
+  /** Whether the OM layout permits NFS writer lease requests. */
+  boolean isNfsWriterLeaseEnabled();
+
+  /** Whether the OM layout permits durable NFS write-range mutations. */
+  boolean isNfsDurableWriteRangesEnabled();
+
+  /** Whether index maintenance is enabled and bootstrap completion has been persisted. */
+  boolean isNfsObjectIndexReady() throws IOException;
+
+  /** Returns the identity index key, independent of the object's path and parent. */
+  String getNfsObjectKey(long volumeId, long bucketId, long objectId);
+
+  /** Returns the key for an export lease. */
+  String getNfsExportLeaseKey(String exportUuid);
+
+  /** Returns the key for a file writer lease. */
+  String getNfsFileLeaseKey(long volumeId, long bucketId, long objectId);
+
+  /** Returns the range-manifest key ordered by file identity and byte offset. */
+  String getNfsTransferRangeKey(String exportUUID, long volumeId, long bucketId,
+      long objectId, long leaseGeneration, long offset);
+
+  /** Returns the range key including its immutable staging object identity. */
+  String getNfsTransferRangeKey(String exportUUID, long volumeId, long bucketId,
+      long objectId, long leaseGeneration, long offset, String stagingKey);
+
+  /** Returns the range-manifest key prefix for one file lease generation. */
+  String getNfsTransferRangePrefix(String exportUUID, long volumeId, long bucketId,
+      long objectId, long leaseGeneration);
 
   /**
    * Return table mapped to the specified table name.

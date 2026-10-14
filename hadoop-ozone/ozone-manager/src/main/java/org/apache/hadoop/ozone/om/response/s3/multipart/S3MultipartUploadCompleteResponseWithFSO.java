@@ -46,6 +46,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
   private long bucketId;
 
   private List<OmDirectoryInfo> missingParentInfos;
+  private OmDirectoryInfo nfsParentDirectoryInfo;
 
   private OmMultipartKeyInfo multipartKeyInfo;
 
@@ -62,6 +63,24 @@ public class S3MultipartUploadCompleteResponseWithFSO
       List<OmDirectoryInfo> missingParentInfos,
       OmMultipartKeyInfo multipartKeyInfo,
       List<OmMultipartPartKey> multipartPartKeysToDelete) {
+    this(omResponse, multipartKey, multipartOpenKey, omKeyInfo, allKeyInfoToRemove, bucketLayout,
+        omBucketInfo, volumeId, bucketId, missingParentInfos, multipartKeyInfo, multipartPartKeysToDelete, null);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public S3MultipartUploadCompleteResponseWithFSO(
+      @Nonnull OMResponse omResponse,
+      @Nonnull String multipartKey,
+      @Nonnull String multipartOpenKey,
+      @Nonnull OmKeyInfo omKeyInfo,
+      @Nonnull List<OmKeyInfo> allKeyInfoToRemove,
+      @Nonnull BucketLayout bucketLayout,
+      OmBucketInfo omBucketInfo,
+      @Nonnull long volumeId, @Nonnull long bucketId,
+      List<OmDirectoryInfo> missingParentInfos,
+      OmMultipartKeyInfo multipartKeyInfo,
+      List<OmMultipartPartKey> multipartPartKeysToDelete,
+      OmDirectoryInfo nfsParentDirectoryInfo) {
     super(omResponse, multipartKey, multipartOpenKey, omKeyInfo,
         allKeyInfoToRemove, bucketLayout, omBucketInfo, bucketId,
         multipartPartKeysToDelete);
@@ -69,6 +88,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
     this.bucketId = bucketId;
     this.missingParentInfos = missingParentInfos;
     this.multipartKeyInfo = multipartKeyInfo;
+    this.nfsParentDirectoryInfo = nfsParentDirectoryInfo;
   }
 
   /**
@@ -87,11 +107,7 @@ public class S3MultipartUploadCompleteResponseWithFSO
     if (missingParentInfos != null) {
       // Create missing parent directory entries.
       for (OmDirectoryInfo parentDirInfo : missingParentInfos) {
-        final String parentKey = omMetadataManager.getOzonePathKey(
-            volumeId, bucketId, parentDirInfo.getParentObjectID(),
-            parentDirInfo.getName());
-        omMetadataManager.getDirectoryTable().putWithBatch(batchOperation,
-            parentKey, parentDirInfo);
+        OMFileRequest.addToDirectoryTable(omMetadataManager, batchOperation, parentDirInfo, volumeId, bucketId);
       }
 
       // namespace quota changes for parent directory
@@ -114,6 +130,10 @@ public class S3MultipartUploadCompleteResponseWithFSO
             bucketId);
       }
     }
+
+    if (nfsParentDirectoryInfo != null) {
+      OMFileRequest.addToDirectoryTable(omMetadataManager, batchOperation, nfsParentDirectoryInfo, volumeId, bucketId);
+    }
     super.addToDBBatch(omMetadataManager, batchOperation);
   }
 
@@ -134,4 +154,3 @@ public class S3MultipartUploadCompleteResponseWithFSO
   }
 
 }
-

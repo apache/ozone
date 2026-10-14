@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -44,18 +45,25 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.nfs.NfsChildrenPage;
+import org.apache.hadoop.ozone.nfs.NfsFileHandle;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -66,6 +74,8 @@ import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.slf4j.Logger;
@@ -85,6 +95,131 @@ public class TestOMMetadataReader {
   public void clearOmThreadLocals() {
     OzoneManager.setStsTokenIdentifier(null);
     OzoneManager.setS3Auth(null);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"alice", "bob"})
+  public void testNfsLookupAuthorizesResolvedIdentity(String userName) throws Exception {
+    boolean allowed = userName.equals("alice");
+    UserGroupInformation caller = UserGroupInformation.createProxyUser(userName,
+        UserGroupInformation.createRemoteUser("nfs-gateway"));
+    IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
+    KeyManager keyManager = mock(KeyManager.class);
+    OMMetadataManager manager = mock(OMMetadataManager.class);
+    IOzoneManagerLock lock = mock(IOzoneManagerLock.class);
+    AtomicBoolean bucketLockHeld = new AtomicBoolean();
+    when(manager.getLock()).thenReturn(lock);
+    doAnswer(invocation -> {
+      bucketLockHeld.set(true);
+      return null;
+    }).when(lock).acquireReadLock(any(), anyString(), anyString());
+    doAnswer(invocation -> {
+      bucketLockHeld.set(false);
+      return null;
+    }).when(lock).releaseReadLock(any(), anyString(), anyString());
+    when(authorizer.checkAccess(any(OzoneObj.class), any(RequestContext.class))).thenAnswer(invocation -> {
+      assertFalse(bucketLockHeld.get(), "NFS ACL checks must not hold the bucket lock");
+      OzoneObj object = invocation.getArgument(0);
+      RequestContext context = invocation.getArgument(1);
+      return object.getResourceType() != KEY || "alice".equals(context.getClientUgi().getUserName());
+    });
+    Table<String, OmBucketInfo> bucketTable = mock(Table.class);
+    when(manager.getBucketTable()).thenReturn(bucketTable);
+    when(manager.getBucketKey(VOLUME_NAME, BUCKET_NAME)).thenReturn("bucket-key");
+    when(bucketTable.get("bucket-key")).thenReturn(new OmBucketInfo.Builder().setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME).setOwner("bucket-owner").build());
+    when(keyManager.getMetadataManager()).thenReturn(manager);
+    OmKeyInfo file = new OmKeyInfo.Builder().setVolumeName(VOLUME_NAME).setBucketName(BUCKET_NAME)
+        .setKeyName("moved/file").setObjectID(42).build();
+    when(keyManager.getFileStatus(any(), anyString())).thenAnswer(invocation -> {
+      assertTrue(bucketLockHeld.get(), "NFS metadata must be revalidated while holding the bucket lock");
+      return new OzoneFileStatus(file, 1024, false);
+    });
+    when(keyManager.lookupFile(any(), anyString())).thenReturn(file);
+    OmMetadataReader reader = createMetadataReader(authorizer, keyManager);
+    OmKeyArgs args = new OmKeyArgs.Builder().setVolumeName(VOLUME_NAME).setBucketName(BUCKET_NAME)
+        .setKeyName("").build();
+    try (MockedStatic<OMFileRequest> paths = mockStatic(OMFileRequest.class);
+         MockedStatic<Server> server = mockStatic(Server.class)) {
+      server.when(Server::getRemoteUser).thenReturn(caller);
+      paths.when(() -> OMFileRequest.getNfsObjectPath(manager, VOLUME_NAME, BUCKET_NAME, 1, 2, 42,
+          NfsFileHandle.Kind.FILE)).thenReturn("moved/file");
+      if (allowed) {
+        assertEquals(42, reader.lookupNfsObject(args, 1, 2, 42, NfsFileHandle.Kind.FILE).getKeyInfo().getObjectID());
+        ArgumentCaptor<OmKeyArgs> resolved = ArgumentCaptor.forClass(OmKeyArgs.class);
+        verify(keyManager).lookupFile(resolved.capture(), anyString());
+        assertEquals("moved/file", resolved.getValue().getKeyName());
+      } else {
+        assertEquals(ResultCodes.PERMISSION_DENIED, assertThrows(OMException.class,
+            () -> reader.lookupNfsObject(args, 1, 2, 42, NfsFileHandle.Kind.FILE)).getResult());
+        verify(keyManager, never()).getFileStatus(any(), anyString());
+        verify(keyManager, never()).lookupFile(any(), anyString());
+      }
+      ArgumentCaptor<OzoneObj> objects = ArgumentCaptor.forClass(OzoneObj.class);
+      ArgumentCaptor<RequestContext> contexts = ArgumentCaptor.forClass(RequestContext.class);
+      verify(authorizer, org.mockito.Mockito.atLeastOnce()).checkAccess(objects.capture(), contexts.capture());
+      for (RequestContext context : contexts.getAllValues()) {
+        assertEquals(userName, context.getClientUgi().getUserName());
+        assertEquals("nfs-gateway", context.getClientUgi().getRealUser().getUserName());
+      }
+      if (allowed) {
+        assertTrue(objects.getAllValues().stream().anyMatch(obj -> "moved/file".equals(obj.getKeyName())));
+      }
+    }
+  }
+
+  @Test
+  public void testNfsChildrenChecksAclsWithoutBucketLock() throws Exception {
+    UserGroupInformation caller = UserGroupInformation.createProxyUser("alice",
+        UserGroupInformation.createRemoteUser("nfs-gateway"));
+    IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
+    KeyManager keyManager = mock(KeyManager.class);
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    OMMetadataManager manager = mock(OMMetadataManager.class);
+    IOzoneManagerLock lock = mock(IOzoneManagerLock.class);
+    AtomicBoolean bucketLockHeld = new AtomicBoolean();
+    when(manager.getLock()).thenReturn(lock);
+    doAnswer(invocation -> {
+      bucketLockHeld.set(true);
+      return null;
+    }).when(lock).acquireReadLock(any(), anyString(), anyString());
+    doAnswer(invocation -> {
+      bucketLockHeld.set(false);
+      return null;
+    }).when(lock).releaseReadLock(any(), anyString(), anyString());
+    when(authorizer.checkAccess(any(OzoneObj.class), any(RequestContext.class))).thenAnswer(invocation -> {
+      assertFalse(bucketLockHeld.get(), "NFS ACL checks must not hold the bucket lock");
+      return true;
+    });
+    Table<String, OmBucketInfo> bucketTable = mock(Table.class);
+    when(manager.getBucketTable()).thenReturn(bucketTable);
+    when(manager.getBucketKey(VOLUME_NAME, BUCKET_NAME)).thenReturn("bucket-key");
+    when(bucketTable.get("bucket-key")).thenReturn(new OmBucketInfo.Builder().setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME).setOwner("bucket-owner").build());
+    when(keyManager.getMetadataManager()).thenReturn(manager);
+    doAnswer(invocation -> {
+      assertFalse(bucketLockHeld.get(), "NFS bucket-link resolution must not hold the bucket lock");
+      return new ResolvedBucket(VOLUME_NAME, BUCKET_NAME, VOLUME_NAME, BUCKET_NAME, "bucket-owner",
+          FILE_SYSTEM_OPTIMIZED);
+    }).when(ozoneManager).resolveBucketLink(any(OmKeyArgs.class));
+    when(keyManager.listStatus(any(), eq(false), any(), any(long.class), anyString(), eq(false), eq(false)))
+        .thenReturn(Collections.emptyList());
+    OmMetadataReader reader = createMetadataReader(authorizer, keyManager, true, ozoneManager);
+    OmKeyArgs args = new OmKeyArgs.Builder().setVolumeName(VOLUME_NAME).setBucketName(BUCKET_NAME)
+        .setKeyName("").build();
+    try (MockedStatic<OMFileRequest> paths = mockStatic(OMFileRequest.class);
+         MockedStatic<Server> server = mockStatic(Server.class)) {
+      server.when(Server::getRemoteUser).thenReturn(caller);
+      paths.when(() -> OMFileRequest.getNfsObjectPath(manager, VOLUME_NAME, BUCKET_NAME, 1, 2, 2,
+          NfsFileHandle.Kind.BUCKET)).thenReturn("");
+
+      NfsChildrenPage page = reader.lookupNfsChildren(args, 1, 2, 2, NfsFileHandle.Kind.BUCKET,
+          null, 16, null, null);
+
+      assertTrue(page.getChildren().isEmpty());
+      verify(keyManager).listStatus(any(), eq(false), any(), eq(17L), anyString(), eq(false), eq(false));
+      assertFalse(bucketLockHeld.get());
+    }
   }
 
   @Test
@@ -560,7 +695,11 @@ public class TestOMMetadataReader {
 
   private OmMetadataReader createMetadataReader(IAccessAuthorizer accessAuthorizer, KeyManager keyManager,
       boolean isS3StsEnabled) throws IOException {
-    final OzoneManager ozoneManager = mock(OzoneManager.class);
+    return createMetadataReader(accessAuthorizer, keyManager, isS3StsEnabled, mock(OzoneManager.class));
+  }
+
+  private OmMetadataReader createMetadataReader(IAccessAuthorizer accessAuthorizer, KeyManager keyManager,
+      boolean isS3StsEnabled, OzoneManager ozoneManager) throws IOException {
     when(ozoneManager.getBucketManager()).thenReturn(mock(BucketManager.class));
     when(ozoneManager.getVolumeManager()).thenReturn(mock(VolumeManager.class));
     when(ozoneManager.getConfiguration()).thenReturn(new OzoneConfiguration());

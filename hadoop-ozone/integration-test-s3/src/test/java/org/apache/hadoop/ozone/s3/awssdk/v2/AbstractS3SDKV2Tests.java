@@ -64,17 +64,20 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -84,11 +87,19 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.service.KeyLifecycleService;
+import org.apache.hadoop.ozone.om.service.NfsObjectIndexBootstrapService;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsExportLeaseRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsExportLeaseRequest.Operation;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCreateRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCreateResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileLeaseRequest;
 import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
@@ -354,6 +365,114 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     assertEquals(400, exception.statusCode());
     assertEquals("InvalidArgument", exception.awsErrorDetails().errorCode());
+  }
+
+  @Test
+  @org.junit.jupiter.api.Tag("nfs")
+  public void testPutObjectConflictsWithNfsWriterLease() throws Exception {
+    String bucketName = getBucketName("nfs-lease");
+    String keyName = "leased-object";
+    String volumeName;
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
+      volumeName = volume.getName();
+      volume.createBucket(bucketName, BucketArgs.newBuilder()
+          .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED).build());
+    }
+
+    OzoneManager om = cluster.getOzoneManager();
+    OMMetadataManager metadata = om.getMetadataManager();
+    NfsObjectIndexBootstrapService bootstrap = new NfsObjectIndexBootstrapService(
+        20, TimeUnit.MILLISECONDS, om);
+    bootstrap.start();
+    try {
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return metadata.isNfsObjectIndexReady();
+        } catch (IOException ex) {
+          throw new RuntimeException(ex);
+        }
+      }, 20, 30000);
+      if (!metadata.isNfsWriterLeaseEnabled() || !metadata.isNfsDurableWriteRangesEnabled()) {
+        om.finalizeUpgrade();
+      }
+    } finally {
+      bootstrap.shutdown();
+    }
+
+    UUID exportId = UUID.randomUUID();
+    String gatewayId = "s3-nfs-conflict-test";
+    NfsExportLeaseRequest acquire = NfsExportLeaseRequest.newBuilder()
+        .setOperation(Operation.ACQUIRE).setExportUUID(exportId.toString())
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setGatewayID(gatewayId).setLeaseDurationMillis(60_000).build();
+    OzoneManagerProtocol rpc = null;
+    org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsExportLeaseResponse exportLease = null;
+    NfsFileCreateResponse fileLease = null;
+    String transferId = UUID.randomUUID().toString();
+    String uploadId = null;
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      RpcClient rpcClient = (RpcClient) ozoneClient.getObjectStore().getClientProxy();
+      rpc = rpcClient.getOzoneManagerClient();
+      exportLease = rpc.updateNfsExportLease(acquire);
+      NfsFileCreateRequest createRequest = NfsFileCreateRequest.newBuilder()
+          .setExportUUID(exportId.toString()).setGatewayID(gatewayId)
+          .setGatewayGeneration(exportLease.getGatewayGeneration())
+          .setTransferID(transferId).setLeaseDurationMillis(20_000).build();
+      RpcClient.NfsFileOutput nfsOutput = rpcClient.createNfsFileWithLease(volumeName, bucketName,
+          keyName, 12, RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE), createRequest);
+      fileLease = nfsOutput.getLease();
+      try (OzoneOutputStream output = nfsOutput.getOutputStream()) {
+        output.write("NFS original".getBytes(StandardCharsets.UTF_8));
+      }
+
+      S3Exception exception = assertThrows(S3Exception.class,
+          () -> s3Client.putObject(b -> b.bucket(bucketName).key(keyName), fromString("S3 replacement")));
+      assertEquals(409, exception.statusCode());
+      assertEquals(S3ErrorTable.CONDITIONAL_REQUEST_CONFLICT.getCode(),
+          exception.awsErrorDetails().errorCode());
+      assertEquals("NFS original", s3Client.getObjectAsBytes(
+          b -> b.bucket(bucketName).key(keyName)).asUtf8String());
+      S3Exception deleteException = assertThrows(S3Exception.class,
+          () -> s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName)));
+      assertEquals(409, deleteException.statusCode());
+      assertEquals(S3ErrorTable.CONDITIONAL_REQUEST_CONFLICT.getCode(),
+          deleteException.awsErrorDetails().errorCode());
+      assertEquals("NFS original", s3Client.getObjectAsBytes(
+          b -> b.bucket(bucketName).key(keyName)).asUtf8String());
+
+      String multipartUploadId = s3Client.createMultipartUpload(b -> b.bucket(bucketName).key(keyName)).uploadId();
+      uploadId = multipartUploadId;
+      S3Exception partException = assertThrows(S3Exception.class, () -> s3Client.uploadPart(b -> b
+          .bucket(bucketName).key(keyName).uploadId(multipartUploadId).partNumber(1),
+          fromString("multipart replacement")));
+      assertEquals(409, partException.statusCode());
+      assertEquals(S3ErrorTable.CONDITIONAL_REQUEST_CONFLICT.getCode(),
+          partException.awsErrorDetails().errorCode());
+      assertEquals("NFS original", s3Client.getObjectAsBytes(
+          b -> b.bucket(bucketName).key(keyName)).asUtf8String());
+
+    } finally {
+      if (uploadId != null) {
+        String cleanupUploadId = uploadId;
+        s3Client.abortMultipartUpload(b -> b.bucket(bucketName).key(keyName).uploadId(cleanupUploadId));
+      }
+      if (rpc != null && exportLease != null) {
+        if (fileLease != null) {
+          rpc.updateNfsFileLease(NfsFileLeaseRequest.newBuilder()
+              .setOperation(NfsFileLeaseRequest.Operation.RELEASE).setExportUUID(exportId.toString())
+              .setVolumeName(volumeName).setBucketName(bucketName).setObjectID(fileLease.getObjectID())
+              .setGatewayID(gatewayId).setGatewayGeneration(exportLease.getGatewayGeneration())
+              .setTransferID(transferId).setGeneration(fileLease.getGeneration())
+              .setOwnerToken(fileLease.getOwnerToken()).build());
+        }
+        rpc.updateNfsExportLease(acquire.toBuilder().setOperation(Operation.RELEASE)
+            .setGatewayGeneration(exportLease.getGatewayGeneration()).setGeneration(exportLease.getGeneration())
+            .clearLeaseDurationMillis().build());
+      }
+      s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName));
+      s3Client.deleteBucket(b -> b.bucket(bucketName));
+    }
   }
 
   @Test

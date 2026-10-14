@@ -255,6 +255,18 @@ public class OMDirectoryCreateRequestWithFSO extends OMDirectoryCreateRequest {
         prepared.volumeId, prepared.bucketId, trxnLogIndex,
         prepared.missingParentInfos, prepared.dirInfo);
 
+    long parentObjectId = prepared.dirInfo.getParentObjectID();
+    if (parentObjectId == prepared.bucketId) {
+      omBucketInfo = OMFileRequest.updateNfsBucketVerifierCacheEntry(
+          omMetadataManager, omBucketInfo, trxnLogIndex);
+    } else if (prepared.missingParentInfos.stream().noneMatch(parent -> parent.getObjectID() == parentObjectId)) {
+      OmDirectoryInfo parent = OMFileRequest.updateNfsDirectoryVerifierCacheEntry(
+          omMetadataManager, prepared.volumeId, prepared.bucketId, parentObjectId, trxnLogIndex);
+      if (parent != null) {
+        prepared.missingParentInfos.add(parent);
+      }
+    }
+
     omMetadataManager.getBucketTable().addCacheEntry(
         omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 

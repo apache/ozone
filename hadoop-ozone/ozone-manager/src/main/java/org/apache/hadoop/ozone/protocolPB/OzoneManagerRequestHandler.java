@@ -31,6 +31,12 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileRequest;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupFileResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsChildrenRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsChildrenResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsObjectRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsObjectResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsTransferRangesRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LookupNfsTransferRangesResponse;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartInfo;
@@ -63,6 +69,8 @@ import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.nfs.NfsChildrenPage;
+import org.apache.hadoop.ozone.nfs.NfsFileHandle;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -298,6 +306,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         GetFileStatusResponse getFileStatusResponse = getOzoneFileStatus(
             request.getGetFileStatusRequest(), clientVersion);
         responseBuilder.setGetFileStatusResponse(getFileStatusResponse);
+        break;
+      case LookupNfsObject:
+        responseBuilder.setLookupNfsObjectResponse(
+            lookupNfsObject(request.getLookupNfsObjectRequest(), clientVersion));
+        break;
+      case LookupNfsChildren:
+        responseBuilder.setLookupNfsChildrenResponse(
+            lookupNfsChildren(request.getLookupNfsChildrenRequest(), clientVersion));
+        break;
+      case LookupNfsTransferRanges:
+        responseBuilder.setLookupNfsTransferRangesResponse(
+            lookupNfsTransferRanges(request.getLookupNfsTransferRangesRequest()));
         break;
       case LookupFile:
         LookupFileResponse lookupFileResponse =
@@ -1246,6 +1266,73 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           .build();
     }
     return resp;
+  }
+
+  private LookupNfsObjectResponse lookupNfsObject(LookupNfsObjectRequest request, ClientVersion clientVersion)
+      throws IOException {
+    NfsFileHandle.Kind kind;
+    switch (request.getKind()) {
+    case BUCKET:
+      kind = NfsFileHandle.Kind.BUCKET;
+      break;
+    case DIRECTORY:
+      kind = NfsFileHandle.Kind.DIRECTORY;
+      break;
+    case FILE:
+      kind = NfsFileHandle.Kind.FILE;
+      break;
+    default:
+      throw new OMException("Unsupported NFS object kind", OMException.ResultCodes.INVALID_REQUEST);
+    }
+    OmKeyArgs args = new OmKeyArgs.Builder().setVolumeName(request.getVolumeName())
+        .setBucketName(request.getBucketName()).setKeyName("").setHeadOp(request.getHeadOp())
+        .setSortDatanodesInPipeline(request.getSortDatanodes())
+        .setLatestVersionLocation(request.getLatestVersionLocation()).build();
+    OzoneFileStatusProto status = impl.lookupNfsObject(args, request.getVolumeID(), request.getBucketID(),
+        request.getObjectID(), kind).getProtobuf(clientVersion);
+    if (request.getHeadOp() && status.hasKeyInfo()) {
+      status = status.toBuilder().setKeyInfo(status.getKeyInfo().toBuilder().clearKeyLocationList()).build();
+    }
+    return LookupNfsObjectResponse.newBuilder().setStatus(status).build();
+  }
+
+  private LookupNfsChildrenResponse lookupNfsChildren(LookupNfsChildrenRequest request, ClientVersion clientVersion)
+      throws IOException {
+    NfsFileHandle.Kind parentKind;
+    switch (request.getParentKind()) {
+    case BUCKET:
+      parentKind = NfsFileHandle.Kind.BUCKET;
+      break;
+    case DIRECTORY:
+      parentKind = NfsFileHandle.Kind.DIRECTORY;
+      break;
+    default:
+      throw new OMException("Unsupported NFS parent kind", OMException.ResultCodes.INVALID_REQUEST);
+    }
+    OmKeyArgs args = new OmKeyArgs.Builder().setVolumeName(request.getVolumeName())
+        .setBucketName(request.getBucketName()).setKeyName("").build();
+    NfsChildrenPage page = impl.lookupNfsChildren(args, request.getVolumeID(), request.getBucketID(),
+        request.getParentObjectID(), parentKind, request.hasName() ? request.getName() : null,
+        request.hasMaxEntries() ? request.getMaxEntries() : null,
+        request.hasStartAfterObjectID() ? request.getStartAfterObjectID() : null,
+        request.hasVerifier() ? request.getVerifier() : null);
+    LookupNfsChildrenResponse.Builder response = LookupNfsChildrenResponse.newBuilder()
+        .setVerifier(page.getVerifier()).setEof(page.isEof());
+    for (OzoneFileStatus child : page.getChildren()) {
+      OzoneFileStatusProto status = child.getProtobuf(clientVersion);
+      if (status.hasKeyInfo()) {
+        status = status.toBuilder().setKeyInfo(status.getKeyInfo().toBuilder().clearKeyLocationList()).build();
+      }
+      response.addChildren(status);
+    }
+    return response.build();
+  }
+
+  private LookupNfsTransferRangesResponse lookupNfsTransferRanges(LookupNfsTransferRangesRequest request)
+      throws IOException {
+    OmKeyArgs args = new OmKeyArgs.Builder().setVolumeName(request.getVolumeName())
+        .setBucketName(request.getBucketName()).setKeyName("").build();
+    return impl.lookupNfsTransferRanges(args, request);
   }
 
   private LookupFileResponse lookupFile(LookupFileRequest request,

@@ -26,8 +26,10 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleScanState;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
@@ -36,6 +38,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
 
   private List<OmKeyInfo> dirsList;
+  private List<OmDirectoryInfo> nfsParentDirectoryUpdates;
   private long volumeId;
 
   public OMKeysDeleteResponseWithFSO(
@@ -45,9 +48,21 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volId,
       @Nonnull Map<String, OmKeyInfo> openKeyInfoMap,
       OmLifecycleScanState scanState) {
+    this(omResponse, keyDeleteList, dirDeleteList, omBucketInfo, volId, openKeyInfoMap, scanState, null);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OMKeysDeleteResponseWithFSO(
+      @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
+      @Nonnull List<OmKeyInfo> keyDeleteList,
+      @Nonnull List<OmKeyInfo> dirDeleteList,
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volId,
+      @Nonnull Map<String, OmKeyInfo> openKeyInfoMap,
+      OmLifecycleScanState scanState, List<OmDirectoryInfo> nfsParentDirectoryUpdates) {
     super(omResponse, keyDeleteList, omBucketInfo, openKeyInfoMap, scanState);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;
+    this.nfsParentDirectoryUpdates = nfsParentDirectoryUpdates;
   }
 
   @Override
@@ -63,6 +78,8 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
           omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
       omMetadataManager.getDirectoryTable().deleteWithBatch(batchOperation,
           ozoneDbKey);
+      OMFileRequest.deleteNfsObjectFromDB(omMetadataManager, batchOperation, volumeId, bucketId,
+          omKeyInfo.getObjectID());
       String ozoneDeleteKey = omMetadataManager.getOzoneDeletePathKey(
           omKeyInfo.getObjectID(), ozoneDbKey);
       omMetadataManager.getDeletedDirTable().putWithBatch(
@@ -80,6 +97,14 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
           omKeyInfo.getObjectID(), deletedKey);
       addDeletionToBatch(omMetadataManager, batchOperation, keyTable,
           ozoneDbKey, deletedKey, omKeyInfo, bucketId, true);
+      OMFileRequest.deleteNfsObjectFromDB(omMetadataManager, batchOperation, volumeId, bucketId,
+          omKeyInfo.getObjectID());
+    }
+
+    if (nfsParentDirectoryUpdates != null) {
+      for (OmDirectoryInfo parent : nfsParentDirectoryUpdates) {
+        OMFileRequest.addToDirectoryTable(omMetadataManager, batchOperation, parent, volumeId, bucketId);
+      }
     }
 
     // update bucket usedBytes.

@@ -45,7 +45,12 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
  * Handle Multipart upload complete request.
  */
 public class S3MultipartUploadCompleteRequestWithFSO
-        extends S3MultipartUploadCompleteRequest {
+    extends S3MultipartUploadCompleteRequest {
+
+  private OmDirectoryInfo nfsParentDirectoryInfo;
+  private boolean nfsBucketRootChanged;
+  private long nfsVerifierTransactionIndex;
+  private OMMetadataManager nfsMetadataManager;
 
   public S3MultipartUploadCompleteRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -119,9 +124,25 @@ public class S3MultipartUploadCompleteRequestWithFSO
       String ozoneKey, OmKeyInfo omKeyInfo, long transactionLogIndex)
       throws IOException {
 
+    OmKeyInfo existing = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
+
     // Add key entry to file table.
     OMFileRequest.addFileTableCacheEntry(omMetadataManager, ozoneKey, omKeyInfo,
         omKeyInfo.getFileName(), transactionLogIndex);
+
+    if ((existing == null || existing.getObjectID() != omKeyInfo.getObjectID())
+        && omMetadataManager.isNfsObjectIndexEnabled() && omMetadataManager.isNfsObjectIndexReady()) {
+      nfsVerifierTransactionIndex = transactionLogIndex;
+      nfsMetadataManager = omMetadataManager;
+      long volumeId = omMetadataManager.getVolumeId(omKeyInfo.getVolumeName());
+      long bucketId = omMetadataManager.getBucketId(omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
+      if (omKeyInfo.getParentObjectID() == bucketId) {
+        nfsBucketRootChanged = true;
+      } else {
+        nfsParentDirectoryInfo = OMFileRequest.updateNfsDirectoryVerifierCacheEntry(
+            omMetadataManager, volumeId, bucketId, omKeyInfo.getParentObjectID(), transactionLogIndex);
+      }
+    }
   }
 
   @Override
@@ -167,12 +188,22 @@ public class S3MultipartUploadCompleteRequestWithFSO
       List<OmKeyInfo> allKeyInfoToRemove, OmBucketInfo omBucketInfo,
       long volumeId, long bucketId, List<OmDirectoryInfo> missingParentInfos,
       OmMultipartKeyInfo multipartKeyInfo,
-      List<OmMultipartPartKey> multipartPartKeysToDelete) {
+      List<OmMultipartPartKey> multipartPartKeysToDelete) throws IOException {
+
+    if (nfsBucketRootChanged) {
+      String bucketKey = nfsMetadataManager.getBucketKey(
+          omKeyInfo.getVolumeName(), omKeyInfo.getBucketName());
+      if (omBucketInfo == null) {
+        omBucketInfo = nfsMetadataManager.getBucketTable().get(bucketKey);
+      }
+      omBucketInfo = OMFileRequest.updateNfsBucketVerifierCacheEntry(
+          nfsMetadataManager, omBucketInfo, nfsVerifierTransactionIndex);
+    }
 
     return new S3MultipartUploadCompleteResponseWithFSO(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,
         getBucketLayout(), omBucketInfo, volumeId, bucketId,
-        missingParentInfos, multipartKeyInfo, multipartPartKeysToDelete);
+        missingParentInfos, multipartKeyInfo, multipartPartKeysToDelete, nfsParentDirectoryInfo);
   }
 
   @Override
@@ -180,4 +211,3 @@ public class S3MultipartUploadCompleteRequestWithFSO
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
   }
 }
-

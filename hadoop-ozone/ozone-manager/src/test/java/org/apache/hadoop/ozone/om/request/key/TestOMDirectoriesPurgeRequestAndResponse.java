@@ -24,11 +24,13 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getOmKeyInfo
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -39,7 +41,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -65,6 +69,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmNfsObjectInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -75,6 +80,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketNameInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgePathRequest;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedNfsObjectInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -364,6 +370,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends OMKeyRequestTests 
       "false,false,10", "false,true,10", "true,false,10", "true,true,10"})
   public void testDirectoryPurge(boolean fromSnapshot, boolean purgeDirectory, int numberOfSubEntries)
       throws Exception {
+    doReturn(true).when(omMetadataManager).isNfsObjectIndexEnabled();
     when(ozoneManager.getDefaultReplicationConfig())
         .thenReturn(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     String bucket = "bucket" + RandomUtils.secure().randomInt();
@@ -426,6 +433,20 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends OMKeyRequestTests 
       assertTrue(omMetadataManager.getFileTable().isExist(subFileKey));
     }
     assertFalse(omMetadataManager.getDirectoryTable().isExist(dirKey));
+    Map<String, OmNfsObjectInfo> indexPointers = new HashMap<>();
+    long volumeId = omMetadataManager.getVolumeId(volumeName);
+    for (OmKeyInfo file : subFiles) {
+      indexPointers.put(omMetadataManager.getNfsObjectKey(volumeId, bucketInfo.getObjectID(), file.getObjectID()),
+          new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.FILE, file.getParentObjectID(), file.getFileName()));
+    }
+    for (OmKeyInfo directory : subDirs) {
+      indexPointers.put(omMetadataManager.getNfsObjectKey(volumeId, bucketInfo.getObjectID(), directory.getObjectID()),
+          new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.DIRECTORY, directory.getParentObjectID(),
+              directory.getFileName()));
+    }
+    for (Map.Entry<String, OmNfsObjectInfo> entry : indexPointers.entrySet()) {
+      omMetadataManager.getNfsObjectTable().put(entry.getKey(), entry.getValue());
+    }
     SnapshotInfo snapshotInfo = null;
     if (fromSnapshot) {
       snapshotInfo = createSnapshot(volumeName, bucket, "snapshot");
@@ -437,6 +458,11 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends OMKeyRequestTests 
     OMDirectoriesPurgeRequestWithFSO omKeyPurgeRequest = new OMDirectoriesPurgeRequestWithFSO(preExecutedRequest);
     OMDirectoriesPurgeResponseWithFSO omClientResponse = (OMDirectoriesPurgeResponseWithFSO) omKeyPurgeRequest
         .validateAndUpdateCache(ozoneManager, 100L);
+
+    for (Map.Entry<String, OmNfsObjectInfo> entry : indexPointers.entrySet()) {
+      assertNull(omMetadataManager.getNfsObjectTable().get(entry.getKey()));
+      assertEquals(entry.getValue(), omMetadataManager.getNfsObjectTable().getSkipCache(entry.getKey()));
+    }
 
     IOzoneManagerLock lock = spy(omMetadataManager.getLock());
     when(omMetadataManager.getLock()).thenReturn(lock);
@@ -455,6 +481,9 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends OMKeyRequestTests 
 
     performBatchOperationCommit(omClientResponse);
     assertEquals(snapshotIds, locks);
+    for (Map.Entry<String, OmNfsObjectInfo> entry : indexPointers.entrySet()) {
+      assertNull(omMetadataManager.getNfsObjectTable().getSkipCache(entry.getKey()));
+    }
     OmBucketInfo updatedBucketInfo = purgeDirectory || numberOfSubEntries > 0 ?
         omMetadataManager.getBucketTable().getSkipCache(bucketKey) : omMetadataManager.getBucketTable().get(bucketKey);
     long currentSnapshotUsedNamespace = updatedBucketInfo.getSnapshotUsedNamespace();
@@ -466,6 +495,11 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends OMKeyRequestTests 
       OMMetadataManager metadataManager = fromSnapshot ? snapshot.get().getMetadataManager() :
           ozoneManager.getMetadataManager();
       validateDeletedKeys(metadataManager, deletedSubFiles);
+      if (fromSnapshot) {
+        for (Map.Entry<String, OmNfsObjectInfo> entry : indexPointers.entrySet()) {
+          assertEquals(entry.getValue(), metadataManager.getNfsObjectTable().getSkipCache(entry.getKey()));
+        }
+      }
       List<String> deletedDirs = new ArrayList<>(deletedSubDirKeys);
       if (!purgeDirectory) {
         deletedDirs.add(deletedDirKey);

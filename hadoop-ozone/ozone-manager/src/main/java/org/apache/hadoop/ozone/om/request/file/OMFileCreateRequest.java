@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryR
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.CreateFile;
 
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
@@ -30,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -59,6 +61,7 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCreateRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -83,9 +86,18 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    final CreateFileRequest createFileRequest = super.preExecute(ozoneManager)
-        .getCreateFileRequest();
+    final OMRequest preExecutedRequest = super.preExecute(ozoneManager);
+    CreateFileRequest createFileRequest = preExecutedRequest.getCreateFileRequest();
     Objects.requireNonNull(createFileRequest, "createFileRequest == null");
+    if (createFileRequest.hasNfsFileCreateRequest()) {
+      NfsFileCreateRequest leaseRequest = createFileRequest.getNfsFileCreateRequest();
+      validateNfsFileCreateRequest(leaseRequest);
+      UUID ownerToken = UUID.randomUUID();
+      ByteString token = ByteString.copyFrom(java.nio.ByteBuffer.allocate(16)
+          .putLong(ownerToken.getMostSignificantBits()).putLong(ownerToken.getLeastSignificantBits()).array());
+      createFileRequest = createFileRequest.toBuilder().setNfsFileCreateRequest(leaseRequest.toBuilder()
+          .clearLeaderTimeMillis().clearOwnerToken().setLeaderTimeMillis(Time.now()).setOwnerToken(token)).build();
+    }
 
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
 
@@ -99,7 +111,7 @@ public class OMFileCreateRequest extends OMKeyRequest {
       // Check if this is the root of the filesystem.
       // Not throwing exception here, as need to throw exception after
       // checking volume/bucket exists.
-      return getOmRequest().toBuilder().setUserInfo(userInfo).build();
+      return getOmRequest().toBuilder().setCreateFileRequest(createFileRequest).setUserInfo(userInfo).build();
     }
 
     // NOTE size of a key is not a hard limit on anything, it is a value that
@@ -151,6 +163,19 @@ public class OMFileCreateRequest extends OMKeyRequest {
     return getOmRequest().toBuilder()
         .setCreateFileRequest(newCreateFileRequest).setUserInfo(userInfo)
         .build();
+  }
+
+  private static void validateNfsFileCreateRequest(NfsFileCreateRequest request) throws OMException {
+    if (!request.isInitialized() || request.getExportUUID().isEmpty() || request.getGatewayID().isEmpty()
+        || request.getGatewayGeneration() == 0 || request.getTransferID().isEmpty()
+        || request.getLeaseDurationMillis() == 0 || request.getLeaseDurationMillis() > 60_000) {
+      throw new OMException("Invalid NFS file create lease", OMException.ResultCodes.INVALID_REQUEST);
+    }
+    try {
+      UUID.fromString(request.getExportUUID());
+    } catch (IllegalArgumentException ex) {
+      throw new OMException("Invalid NFS export UUID", OMException.ResultCodes.INVALID_REQUEST);
+    }
   }
 
   @Override

@@ -175,6 +175,13 @@ enum Type {
   StartFinalizeUpgrade = 159;
   QueryUpgradeStatus = 160;
   CompleteFinalizeUpgrade = 161;
+  BootstrapNfsObjectIndex = 162;
+  LookupNfsObject = 163;
+  LookupNfsChildren = 164;
+  NfsExportLease = 165;
+  NfsFileLease = 166;
+  NfsTransferRange = 167;
+  LookupNfsTransferRanges = 168;
 }
 
 enum SafeMode {
@@ -345,6 +352,13 @@ message OMRequest {
   optional StartFinalizeUpgradeRequest      startFinalizeUpgradeRequest     = 161;
   optional QueryUpgradeStatusRequest        queryUpgradeStatusRequest       = 162;
   optional CompleteFinalizeUpgradeRequest   completeFinalizeUpgradeRequest  = 163;
+  optional BootstrapNfsObjectIndexRequest bootstrapNfsObjectIndexRequest = 164;
+  optional LookupNfsObjectRequest lookupNfsObjectRequest = 165;
+  optional LookupNfsChildrenRequest lookupNfsChildrenRequest = 166;
+  optional NfsExportLeaseRequest nfsExportLeaseRequest = 167;
+  optional NfsFileLeaseRequest nfsFileLeaseRequest = 168;
+  optional NfsTransferRangeRequest nfsTransferRangeRequest = 169;
+  optional LookupNfsTransferRangesRequest lookupNfsTransferRangesRequest = 170;
 }
 
 message OMResponse {
@@ -498,6 +512,13 @@ message OMResponse {
   optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 159;
   optional QueryUpgradeStatusResponse        queryUpgradeStatusResponse    = 160;
   optional CompleteFinalizeUpgradeResponse   completeFinalizeUpgradeResponse = 161;
+  optional BootstrapNfsObjectIndexResponse bootstrapNfsObjectIndexResponse = 162;
+  optional LookupNfsObjectResponse lookupNfsObjectResponse = 163;
+  optional LookupNfsChildrenResponse lookupNfsChildrenResponse = 164;
+  optional NfsExportLeaseResponse nfsExportLeaseResponse = 165;
+  optional NfsFileLeaseResponse nfsFileLeaseResponse = 166;
+  optional NfsTransferRangeResponse nfsTransferRangeResponse = 167;
+  optional LookupNfsTransferRangesResponse lookupNfsTransferRangesResponse = 168;
 }
 
 enum Status {
@@ -639,6 +660,7 @@ enum Status {
     UPDATE_ID_NOT_MATCH = 103;
     REVOKED_TOKEN = 104;
     MALFORMED_POLICY_DOCUMENT = 105;
+    NFS_LEASE_CONFLICT = 106;
 }
 
 /**
@@ -1351,6 +1373,8 @@ message CreateFileRequest {
     // Set in OM HA during preExecute step. This way all OM's use same ID in
     // OM HA.
     optional uint64 clientID = 4;
+    // Present only when OM must create the file and its NFS writer lease atomically.
+    optional NfsFileCreateRequest nfsFileCreateRequest = 5;
 }
 
 message CreateFileResponse {
@@ -1360,6 +1384,26 @@ message CreateFileResponse {
     // (similar to a cookie).
     optional uint64 ID = 2;
     optional uint64 openVersion = 3;
+    optional NfsFileCreateResponse nfsFileCreateResponse = 4;
+}
+
+message NfsFileCreateRequest {
+  required string exportUUID = 1;
+  required string gatewayID = 2;
+  required uint64 gatewayGeneration = 3;
+  required string transferID = 4;
+  required uint64 leaseDurationMillis = 5;
+  // Set by OM preExecute and replicated with the create operation.
+  optional uint64 leaderTimeMillis = 6;
+  optional bytes ownerToken = 7;
+}
+
+message NfsFileCreateResponse {
+  required uint64 objectID = 1;
+  required uint64 gatewayGeneration = 2;
+  required uint64 generation = 3;
+  required uint64 expiresAtMillis = 4;
+  required bytes ownerToken = 5;
 }
 
 message LookupFileRequest {
@@ -1395,6 +1439,7 @@ message CreateKeyRequest {
     // OM HA.
     optional uint64 clientID = 2;
     optional bool derivedKeyPiggyBacking = 3;
+    optional NfsFileCommitRequest nfsFileCommitRequest = 4;
 }
 
 message CreateKeyResponse {
@@ -1653,6 +1698,16 @@ message CommitKeyRequest {
     required uint64 clientID = 2;
     optional bool hsync = 3;
     optional bool recovery = 4;
+    optional NfsFileCommitRequest nfsFileCommitRequest = 5;
+}
+
+message NfsFileCommitRequest {
+    required string exportUUID = 1;
+    required string gatewayID = 2;
+    required uint64 gatewayGeneration = 3;
+    required string transferID = 4;
+    required uint64 fileGeneration = 5;
+    required bytes ownerToken = 6;
 }
 
 message CommitKeyResponse {
@@ -2905,4 +2960,201 @@ message DeleteBucketTaggingRequest {
 }
 
 message DeleteBucketTaggingResponse {
+}
+
+// Internal OM bootstrap batches. Clients cannot submit this operation through preExecute.
+message BootstrapNfsObjectIndexRequest {
+  enum Phase {
+    DIRECTORIES = 1;
+    FILES = 2;
+  }
+  message Object {
+    required string dbKey = 1;
+    required uint64 objectID = 2;
+  }
+  required Phase phase = 1;
+  required string expectedCursor = 2;
+  required string nextCursor = 3;
+  required bool finished = 4;
+  required uint64 volumeID = 5;
+  required uint64 bucketID = 6;
+  optional string volumeName = 7;
+  optional string bucketName = 8;
+  repeated Object objects = 9;
+  optional bool initialize = 10 [default = false];
+}
+
+message BootstrapNfsObjectIndexResponse {
+}
+
+// Live native FSO identity lookup. Export identity is validated by the gateway.
+message LookupNfsObjectRequest {
+  enum Kind {
+    BUCKET = 1;
+    DIRECTORY = 2;
+    FILE = 3;
+  }
+  required string volumeName = 1;
+  required string bucketName = 2;
+  required uint64 volumeID = 3;
+  required uint64 bucketID = 4;
+  required uint64 objectID = 5;
+  required Kind kind = 6;
+  optional bool headOp = 7 [default = false];
+  optional bool sortDatanodes = 8 [default = false];
+  optional bool latestVersionLocation = 9 [default = false];
+}
+
+message LookupNfsObjectResponse {
+  required OzoneFileStatusProto status = 1;
+}
+
+// Resolve one child or enumerate a bounded, verifier-protected FSO directory page.
+message LookupNfsChildrenRequest {
+  enum ParentKind {
+    BUCKET = 1;
+    DIRECTORY = 2;
+  }
+  required string volumeName = 1;
+  required string bucketName = 2;
+  required uint64 volumeID = 3;
+  required uint64 bucketID = 4;
+  required uint64 parentObjectID = 5;
+  required ParentKind parentKind = 6;
+  optional string name = 7;
+  optional uint32 maxEntries = 8;
+  reserved 9;
+  optional uint64 startAfterObjectID = 11;
+  optional uint64 verifier = 10;
+}
+
+message LookupNfsChildrenResponse {
+  repeated OzoneFileStatusProto children = 1;
+  required uint64 verifier = 2;
+  required bool eof = 3;
+}
+
+// Mutates the OM-owned active gateway lease for one NFS export.
+message NfsExportLeaseRequest {
+  enum Operation {
+    ACQUIRE = 1;
+    RENEW = 2;
+    RELEASE = 3;
+  }
+  required Operation operation = 1;
+  required string exportUUID = 2;
+  required string volumeName = 3;
+  required string bucketName = 4;
+  required string gatewayID = 5;
+  optional uint64 gatewayGeneration = 6;
+  optional uint64 generation = 7;
+  optional uint64 leaseDurationMillis = 8;
+  // Set by the OM leader in preExecute before this request is replicated.
+  optional uint64 leaderTimeMillis = 9;
+}
+
+message NfsExportLeaseResponse {
+  required string exportUUID = 1;
+  required uint64 volumeID = 2;
+  required uint64 bucketID = 3;
+  required string gatewayID = 4;
+  required uint64 gatewayGeneration = 5;
+  required uint64 generation = 6;
+  required uint64 expiresAtMillis = 7;
+}
+
+// Renews or releases the writer lease acquired atomically with NFS file creation.
+message NfsFileLeaseRequest {
+  enum Operation {
+    RENEW = 1;
+    RELEASE = 2;
+    RECOVER = 3;
+  }
+  required Operation operation = 1;
+  required string exportUUID = 2;
+  required string volumeName = 3;
+  required string bucketName = 4;
+  required uint64 objectID = 5;
+  required string gatewayID = 6;
+  required uint64 gatewayGeneration = 7;
+  required string transferID = 8;
+  required uint64 generation = 9;
+  required bytes ownerToken = 10;
+  optional uint64 leaseDurationMillis = 11;
+  // Set by the OM leader in preExecute before this request is replicated.
+  optional uint64 leaderTimeMillis = 12;
+  // Asserted by the authenticated NFS gateway after validating the RPCSEC_GSS caller.
+  optional string requesterPrincipal = 13;
+}
+
+message NfsFileLeaseResponse {
+  required uint64 generation = 1;
+  required uint64 expiresAtMillis = 2;
+  optional string transferID = 3;
+  optional bytes ownerToken = 4;
+  optional string ownerPrincipal = 5;
+  optional bool contentPublished = 6;
+}
+
+// Adds or removes one durable byte range under the current NFS writer lease.
+message NfsTransferRangeRequest {
+  enum Operation {
+    UPSERT = 1;
+    DELETE = 2;
+  }
+  required Operation operation = 1;
+  required string volumeName = 2;
+  required string bucketName = 3;
+  required string exportUUID = 4;
+  required uint64 objectID = 5;
+  required string gatewayID = 6;
+  required uint64 gatewayGeneration = 7;
+  required string transferID = 8;
+  required uint64 leaseGeneration = 9;
+  required bytes ownerToken = 10;
+  required uint64 offset = 11;
+  required uint64 length = 12;
+  required string stagingKey = 13;
+  required bytes sha256 = 14;
+  // Set by the OM leader in preExecute before this request is replicated.
+  optional uint64 leaderTimeMillis = 15;
+}
+
+message NfsTransferRangeResponse {
+  required bool recorded = 1;
+  optional uint64 transactionIndex = 2;
+}
+
+// Returns a bounded page of durable staged ranges owned by the current file lease.
+message LookupNfsTransferRangesRequest {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  required uint64 volumeID = 3;
+  required uint64 bucketID = 4;
+  required uint64 objectID = 5;
+  required string exportUUID = 6;
+  required string gatewayID = 7;
+  required uint64 gatewayGeneration = 8;
+  required string transferID = 9;
+  required uint64 leaseGeneration = 10;
+  required bytes ownerToken = 11;
+  required string requesterPrincipal = 12;
+  optional uint32 maxEntries = 13;
+  optional string startAfterKey = 14;
+}
+
+message LookupNfsTransferRangesResponse {
+  repeated NfsTransferRangeEntry ranges = 1;
+  optional string nextMarker = 2;
+  required bool eof = 3;
+}
+
+message NfsTransferRangeEntry {
+  required uint64 leaseGeneration = 1;
+  required uint64 offset = 2;
+  required uint64 length = 3;
+  required string transferID = 4;
+  required string stagingKey = 5;
+  required bytes sha256 = 6;
+  required uint64 transactionIndex = 7;
 }

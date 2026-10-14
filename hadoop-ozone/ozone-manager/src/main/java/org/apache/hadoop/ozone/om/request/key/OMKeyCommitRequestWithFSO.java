@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_CLOSED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NFS_LEASE_CONFLICT;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -39,9 +40,11 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.KeyValueUtil;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.WithMetadata;
@@ -53,6 +56,7 @@ import org.apache.hadoop.ozone.om.response.key.OMKeyCommitResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NfsFileCommitRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.util.Time;
@@ -242,6 +246,27 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       }
     }
 
+    long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+    prepared.nfsFileLeaseKey = omMetadataManager.getNfsFileLeaseKey(
+        prepared.volumeId, bucketId, prepared.omKeyInfo.getObjectID());
+    OmNfsLeaseInfo nfsFileLease = omMetadataManager.getNfsFileLeaseTable().get(prepared.nfsFileLeaseKey);
+    if (nfsFileLease != null) {
+      if (!commitKeyRequest.hasNfsFileCommitRequest()) {
+        throw new OMException("NFS file lease prevents commit by another writer", NFS_LEASE_CONFLICT);
+      }
+      NfsFileCommitRequest nfsCommit = commitKeyRequest.getNfsFileCommitRequest();
+      String exportLeaseKey = omMetadataManager.getNfsExportLeaseKey(nfsCommit.getExportUUID());
+      OmNfsLeaseInfo exportLease = omMetadataManager.getNfsExportLeaseTable().get(exportLeaseKey);
+      try {
+        nfsFileLease.validateFileCommit(exportLease, nfsCommit.getExportUUID(), nfsCommit.getGatewayID(),
+            nfsCommit.getGatewayGeneration(), nfsCommit.getTransferID(), nfsCommit.getFileGeneration(),
+            nfsCommit.getOwnerToken(), Time.now());
+        prepared.nfsFileLeaseToUpdate = nfsFileLease.withContentPublished(true);
+      } catch (IllegalStateException | IllegalArgumentException e) {
+        throw new OMException("NFS file lease owner is stale", NFS_LEASE_CONFLICT);
+      }
+    }
+
     if (prepared.isOverwrittenHsyncKey) {
       // find the overwritten openKey and add OVERWRITTEN_HSYNC_KEY to it.
       prepared.dbOpenKeyToDeleteKey = fsoFile.getOpenFileName(
@@ -361,8 +386,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       if (null == state.oldKeyVersionsToDeleteMap) {
         state.oldKeyVersionsToDeleteMap = new HashMap<>();
       }
+      long bucketObjectId = omBucketInfo.getObjectID();
       state.oldKeyVersionsToDeleteMap.computeIfAbsent(delKeyName,
-          key -> new RepeatedOmKeyInfo(omBucketInfo.getObjectID())).addOmKeyInfo(pseudoKeyInfo);
+          key -> new RepeatedOmKeyInfo(bucketObjectId)).addOmKeyInfo(pseudoKeyInfo);
     }
 
     // Add to cache of open key table and key table.
@@ -389,10 +415,33 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     OMFileRequest.addFileTableCacheEntry(omMetadataManager, prepared.dbFileKey,
             prepared.omKeyInfo, prepared.fileName, trxnLogIndex);
 
+    if (prepared.keyToDelete != null && prepared.keyToDelete.getObjectID() != prepared.omKeyInfo.getObjectID()) {
+      OMFileRequest.deleteNfsObjectCacheEntry(omMetadataManager,
+          omMetadataManager.getNfsObjectKey(prepared.volumeId, omBucketInfo.getObjectID(),
+              prepared.keyToDelete.getObjectID()), trxnLogIndex);
+    }
+    OmDirectoryInfo nfsParentDirectoryInfo = null;
+    if (omMetadataManager.isNfsObjectIndexEnabled() && omMetadataManager.isNfsObjectIndexReady()
+        && (prepared.keyToDelete == null || prepared.keyToDelete.getObjectID() != prepared.omKeyInfo.getObjectID())) {
+      if (prepared.omKeyInfo.getParentObjectID() == omBucketInfo.getObjectID()) {
+        omBucketInfo = OMFileRequest.updateNfsBucketVerifierCacheEntry(
+            omMetadataManager, omBucketInfo, trxnLogIndex);
+      } else {
+        nfsParentDirectoryInfo = OMFileRequest.updateNfsDirectoryVerifierCacheEntry(
+            omMetadataManager, prepared.volumeId, omBucketInfo.getObjectID(),
+            prepared.omKeyInfo.getParentObjectID(), trxnLogIndex);
+      }
+    }
+
     omBucketInfo.incrUsedBytes(state.correctedSpace);
 
     omMetadataManager.getBucketTable().addCacheEntry(
         omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
+    if (prepared.nfsFileLeaseToUpdate != null) {
+      omMetadataManager.getNfsFileLeaseTable().addCacheEntry(
+          prepared.nfsFileLeaseKey, prepared.nfsFileLeaseToUpdate, trxnLogIndex);
+    }
 
     omResponse.setCommitKeyResponse(CommitKeyResponse.newBuilder()
         .setModificationTime(commitKeyArgs.getModificationTime())
@@ -401,7 +450,9 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     return new OMKeyCommitResponseWithFSO(omResponse.build(),
         prepared.omKeyInfo, prepared.dbFileKey, prepared.dbOpenFileKey, omBucketInfo.copyObject(),
         state.oldKeyVersionsToDeleteMap, prepared.volumeId, isHSync, prepared.newOpenKeyInfo,
-        prepared.dbOpenKeyToDeleteKey, prepared.openKeyToDelete);
+        prepared.dbOpenKeyToDeleteKey, prepared.openKeyToDelete,
+        prepared.keyToDelete == null ? null : prepared.keyToDelete.getObjectID(), nfsParentDirectoryInfo,
+        prepared.nfsFileLeaseKey, prepared.nfsFileLeaseToUpdate);
   }
 
   /**
@@ -500,6 +551,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
     private OmKeyInfo newOpenKeyInfo;
     private List<OmKeyLocationInfo> uncommitted;
     private OmKeyInfo omKeyInfo;
+    private String nfsFileLeaseKey;
+    private OmNfsLeaseInfo nfsFileLeaseToUpdate;
   }
 
   /**

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
+import static org.apache.hadoop.ozone.OzoneConsts.NFS_OBJECT_INDEX_READY_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
@@ -35,6 +36,9 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.MULTIPART_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.NFS_FILE_LEASE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.NFS_OBJECT_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.NFS_TRANSFER_RANGE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
@@ -115,6 +119,9 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsObjectInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsTransferRangeInfo;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
@@ -134,6 +141,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -170,6 +178,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, RepeatedOmKeyInfo> deletedTable;
 
   private Table<String, OmDirectoryInfo> dirTable;
+  private Table<String, OmNfsObjectInfo> nfsObjectTable;
+  private Table<String, OmNfsLeaseInfo> nfsExportLeaseTable;
+  private Table<String, OmNfsLeaseInfo> nfsFileLeaseTable;
+  private Table<String, OmNfsTransferRangeInfo> nfsTransferRangeTable;
   private Table<String, OmKeyInfo> fileTable;
   private Table<String, OmKeyInfo> openFileTable;
   private Table<String, OmKeyInfo> deletedDirTable;
@@ -418,6 +430,100 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
+  public Table<String, OmNfsObjectInfo> getNfsObjectTable() {
+    return nfsObjectTable;
+  }
+
+  @Override
+  public Table<String, OmNfsLeaseInfo> getNfsExportLeaseTable() {
+    return nfsExportLeaseTable;
+  }
+
+  @Override
+  public Table<String, OmNfsLeaseInfo> getNfsFileLeaseTable() {
+    return nfsFileLeaseTable;
+  }
+
+  @Override
+  public Table<String, OmNfsTransferRangeInfo> getNfsTransferRangeTable() {
+    return nfsTransferRangeTable;
+  }
+
+  @Override
+  public boolean isNfsObjectIndexEnabled() {
+    return ozoneManager != null && ozoneManager.getVersionManager() != null
+        && ozoneManager.getVersionManager().isAllowed(
+            OMLayoutFeature.NFS_OBJECT_INDEX);
+  }
+
+  @Override
+  public boolean isNfsWriterLeaseEnabled() {
+    return ozoneManager != null && ozoneManager.getVersionManager() != null
+        && ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.NFS_WRITER_LEASES);
+  }
+
+  @Override
+  public boolean isNfsDurableWriteRangesEnabled() {
+    return ozoneManager != null && ozoneManager.getVersionManager() != null
+        && ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.NFS_DURABLE_WRITE_RANGES);
+  }
+
+  @Override
+  public boolean isNfsObjectIndexReady() throws IOException {
+    // A cache entry can precede the double-buffer batch that persists the final bootstrap rows.
+    return isNfsObjectIndexEnabled()
+        && Integer.toString(OMLayoutFeature.NFS_OBJECT_INDEX.serialize())
+            .equals(metaTable.getSkipCache(NFS_OBJECT_INDEX_READY_KEY));
+  }
+
+  @Override
+  public String getNfsObjectKey(long volumeId, long bucketId, long objectId) {
+    return OM_KEY_PREFIX + volumeId + OM_KEY_PREFIX + bucketId + OM_KEY_PREFIX + objectId;
+  }
+
+  @Override
+  public String getNfsTransferRangeKey(String exportUUID, long volumeId, long bucketId, long objectId,
+      long leaseGeneration, long offset) {
+    if (offset < 0) {
+      throw new IllegalArgumentException("NFS transfer range key is invalid");
+    }
+    return getNfsTransferRangePrefix(exportUUID, volumeId, bucketId, objectId, leaseGeneration)
+        + String.format(java.util.Locale.ROOT, "%020d", offset);
+  }
+
+  @Override
+  public String getNfsTransferRangeKey(String exportUUID, long volumeId, long bucketId, long objectId,
+      long leaseGeneration, long offset, String stagingKey) {
+    if (stagingKey == null || stagingKey.isEmpty()) {
+      throw new IllegalArgumentException("NFS transfer range staging key is invalid");
+    }
+    return getNfsTransferRangeKey(exportUUID, volumeId, bucketId, objectId, leaseGeneration, offset)
+        + "/" + java.util.Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(stagingKey.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+  }
+
+  @Override
+  public String getNfsTransferRangePrefix(String exportUUID, long volumeId, long bucketId, long objectId,
+      long leaseGeneration) {
+    if (exportUUID == null || exportUUID.isEmpty() || volumeId == 0 || bucketId == 0 || objectId == 0
+        || leaseGeneration == 0) {
+      throw new IllegalArgumentException("NFS transfer range key is invalid");
+    }
+    return String.format(java.util.Locale.ROOT, "%s/%s/%020d/",
+        getNfsObjectKey(volumeId, bucketId, objectId), exportUUID, leaseGeneration);
+  }
+
+  @Override
+  public String getNfsExportLeaseKey(String exportUuid) {
+    return exportUuid;
+  }
+
+  @Override
+  public String getNfsFileLeaseKey(long volumeId, long bucketId, long objectId) {
+    return getNfsObjectKey(volumeId, bucketId, objectId);
+  }
+
+  @Override
   public Table<String, OmMultipartKeyInfo> getMultipartInfoTable() {
     return multipartInfoTable;
   }
@@ -509,6 +615,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     deletedTable = initializer.get(OMDBDefinition.DELETED_TABLE_DEF);
 
     dirTable = initializer.get(OMDBDefinition.DIRECTORY_TABLE_DEF);
+    nfsObjectTable = initializer.get(OMDBDefinition.NFS_OBJECT_TABLE_DEF);
+    nfsExportLeaseTable = initializer.get(OMDBDefinition.NFS_EXPORT_LEASE_TABLE_DEF);
+    nfsFileLeaseTable = initializer.get(OMDBDefinition.NFS_FILE_LEASE_TABLE_DEF);
+    nfsTransferRangeTable = initializer.get(OMDBDefinition.NFS_TRANSFER_RANGE_TABLE_DEF);
     fileTable = initializer.get(OMDBDefinition.FILE_TABLE_DEF);
     openFileTable = initializer.get(OMDBDefinition.OPEN_FILE_TABLE_DEF);
     deletedDirTable = initializer.get(OMDBDefinition.DELETED_DIR_TABLE_DEF);
@@ -2037,8 +2147,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   public TablePrefixInfo getTableBucketPrefix(String volume, String bucket) throws IOException {
     String keyPrefix = getBucketKeyPrefix(volume, bucket);
     String keyPrefixFso = getBucketKeyPrefixFSO(volume, bucket);
-    // Set value to 12 to avoid creating too big a HashTable unnecessarily.
-    Map<String, String> tablePrefixMap = new HashMap<>(12, 1.0f);
+    // Set value to 13 to avoid creating too big a HashTable unnecessarily.
+    Map<String, String> tablePrefixMap = new HashMap<>(13, 1.0f);
 
     tablePrefixMap.put(VOLUME_TABLE, getVolumeKey(volume));
     tablePrefixMap.put(BUCKET_TABLE, getBucketKey(volume, bucket));
@@ -2052,6 +2162,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     tablePrefixMap.put(FILE_TABLE, keyPrefixFso);
     tablePrefixMap.put(DIRECTORY_TABLE, keyPrefixFso);
+    tablePrefixMap.put(NFS_OBJECT_TABLE, keyPrefixFso);
+    tablePrefixMap.put(NFS_FILE_LEASE_TABLE, keyPrefixFso);
+    tablePrefixMap.put(NFS_TRANSFER_RANGE_TABLE, keyPrefixFso);
     tablePrefixMap.put(DELETED_DIR_TABLE, keyPrefixFso);
     tablePrefixMap.put(OPEN_FILE_TABLE, keyPrefixFso);
 
@@ -2074,6 +2187,9 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
       return getBucketKeyPrefix(volume, bucket);
     case FILE_TABLE:
     case DIRECTORY_TABLE:
+    case NFS_OBJECT_TABLE:
+    case NFS_FILE_LEASE_TABLE:
+    case NFS_TRANSFER_RANGE_TABLE:
     case DELETED_DIR_TABLE:
     case OPEN_FILE_TABLE:
       return getBucketKeyPrefixFSO(volume, bucket);

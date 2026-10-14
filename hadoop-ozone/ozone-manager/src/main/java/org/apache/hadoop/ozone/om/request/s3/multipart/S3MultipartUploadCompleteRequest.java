@@ -426,7 +426,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmBucketInfo omBucketInfo,
       long volumeId, long bucketId, List<OmDirectoryInfo> missingParentInfos,
       OmMultipartKeyInfo multipartKeyInfo,
-      List<OmMultipartPartKey> multipartPartKeysToDelete) {
+      List<OmMultipartPartKey> multipartPartKeysToDelete) throws IOException {
 
     return new S3MultipartUploadCompleteResponse(omResponse.build(),
         multipartKey, dbMultipartOpenKey, omKeyInfo, allKeyInfoToRemove,

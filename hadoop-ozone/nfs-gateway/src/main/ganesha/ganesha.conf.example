@@ -1,0 +1,61 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Example for one active gateway using the optional FSAL_OZONE module.
+# For fenced active/passive replacement, use a shared RecoveryRoot and the
+# same Ganesha node ID on both instances. Never run both instances at once.
+NFS_CORE_PARAM {
+    Protocols = 4;
+    Enable_UDP = false;
+    Clustered = true;
+}
+
+NFSv4 {
+    Minor_Versions = 1;
+    Server_Scope = "ozone-nfs";
+    Server_Owner = "ozone-nfs";
+    Graceless = false;
+    Lease_Lifetime = 60;
+    Grace_Period = 90;
+    Delegations = false;
+    RecoveryBackend = fs_ng;
+    RecoveryRoot = "/var/lib/nfs/ganesha";
+    RecoveryDir = "ozone-v4recov";
+}
+
+EXPORT {
+    Export_Id = 1;
+    Path = "/";
+    Pseudo = "/ozone/data";
+    Access_Type = RW;
+    Protocols = 4;
+    Transports = TCP;
+    SecType = krb5p;
+    Squash = Root_Squash;
+    # Disable the server attribute cache while validating Ozone close-to-open behavior.
+    Attr_Expiration_Time = 0;
+
+    FSAL {
+        Name = OZONE;
+        Endpoint = "127.0.0.1:9878";
+        Export_UUID = "00112233-4455-6677-8899-aabbccddeeff";
+        Volume_ID = 123;
+        Bucket_ID = 456;
+        Trusted_CA_File = "/etc/ozone/ganesha-client-ca.crt";
+        Client_Certificate_File = "/etc/ozone/ganesha-client.crt";
+        Client_Key_File = "/etc/ozone/ganesha-client.key";
+        Timeout_Millis = 5000;
+    }
+}

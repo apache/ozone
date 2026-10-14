@@ -28,22 +28,29 @@ import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.nfs.NfsFileHandle;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -51,9 +58,15 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsLeaseInfo;
+import org.apache.hadoop.ozone.om.helpers.OmNfsObjectInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.snapshot.diff.SnapshotDiffValueParser;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedNfsLeaseInfo;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedNfsObjectInfo;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +74,164 @@ import org.slf4j.LoggerFactory;
  * Base class for file requests.
  */
 public final class OMFileRequest {
+
+  static List<String> getKeyPathComponents(String keyName) {
+    String[] components = StringUtils.split(keyName, PATH_SEPARATOR_STR);
+    return components == null ? new ArrayList<>() : Arrays.asList(components);
+  }
+
+  /**
+   * Resolve a live native FSO identity. The caller must hold the bucket read lock through authorization and lookup.
+   */
+  public static String getNfsObjectPath(OMMetadataManager manager, String volumeName, String bucketName,
+      long volumeId, long bucketId, long objectId, NfsFileHandle.Kind kind) throws IOException {
+    if (kind == null) {
+      throw new OMException("Missing NFS object kind", OMException.ResultCodes.INVALID_REQUEST);
+    }
+    if (!manager.isNfsObjectIndexEnabled()) {
+      throw new OMException("NFS object index layout is not finalized",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+    if (!manager.isNfsObjectIndexReady()) {
+      throw new OMException("NFS object index bootstrap is incomplete", OMException.ResultCodes.OM_NOT_INITIALIZED);
+    }
+    OmVolumeArgs volume = manager.getVolumeTable().get(manager.getVolumeKey(volumeName));
+    OmBucketInfo bucket = manager.getBucketTable().get(manager.getBucketKey(volumeName, bucketName));
+    if (volume == null || bucket == null || volume.getObjectID() != volumeId || bucket.getObjectID() != bucketId) {
+      throw new OMException("NFS volume or bucket incarnation is stale", OMException.ResultCodes.FILE_NOT_FOUND);
+    }
+    if (bucket.isLink() || bucket.getBucketLayout() != BucketLayout.FILE_SYSTEM_OPTIMIZED) {
+      throw new OMException("NFS requires a native FSO bucket", OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+    if (kind == NfsFileHandle.Kind.BUCKET) {
+      if (objectId != bucketId) {
+        throw new OMException("NFS bucket identity is stale", OMException.ResultCodes.FILE_NOT_FOUND);
+      }
+      return "";
+    }
+    if (objectId == bucketId) {
+      throw new OMException("NFS object kind does not match bucket root", OMException.ResultCodes.FILE_NOT_FOUND);
+    }
+    PersistedNfsObjectInfo.Kind expected = kind == NfsFileHandle.Kind.FILE
+        ? PersistedNfsObjectInfo.Kind.FILE : PersistedNfsObjectInfo.Kind.DIRECTORY;
+    Set<Long> visited = new HashSet<>();
+    Deque<String> components = new ArrayDeque<>();
+    long current = objectId;
+    while (current != bucketId) {
+      OmNfsObjectInfo pointer = manager.getNfsObjectTable().get(manager.getNfsObjectKey(volumeId, bucketId, current));
+      if (!visited.add(current) || pointer == null || pointer.getKind() != expected) {
+        throw new OMException("NFS object or ancestor identity is stale", OMException.ResultCodes.FILE_NOT_FOUND);
+      }
+      String key = manager.getOzonePathKey(volumeId, bucketId, pointer.getParentObjectID(), pointer.getName());
+      boolean matches;
+      if (expected == PersistedNfsObjectInfo.Kind.DIRECTORY) {
+        OmDirectoryInfo directory = manager.getDirectoryTable().get(key);
+        matches = directory != null && directory.getObjectID() == current
+            && directory.getParentObjectID() == pointer.getParentObjectID()
+            && directory.getName().equals(pointer.getName());
+      } else {
+        OmKeyInfo file = manager.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED).get(key);
+        matches = file != null && file.getObjectID() == current
+            && file.getParentObjectID() == pointer.getParentObjectID()
+            && file.getFileName().equals(pointer.getName()) && volumeName.equals(file.getVolumeName())
+            && bucketName.equals(file.getBucketName());
+      }
+      if (!matches) {
+        throw new OMException("NFS index does not match canonical identity", OMException.ResultCodes.FILE_NOT_FOUND);
+      }
+      components.addFirst(pointer.getName());
+      current = pointer.getParentObjectID();
+      expected = PersistedNfsObjectInfo.Kind.DIRECTORY;
+    }
+    String path = String.join("/", components);
+    if (path.equals(OzoneConsts.OM_SNAPSHOT_INDICATOR)
+        || path.startsWith(OzoneConsts.OM_SNAPSHOT_INDICATOR + "/")) {
+      throw new OMException("NFS snapshot paths are unsupported", OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+    return path;
+  }
+
+  /** Reject a mutation that would invalidate a file with a live NFS writer. */
+  public static void validateNfsFileLeaseInactive(OMMetadataManager manager, OmKeyInfo keyInfo)
+      throws IOException {
+    long volumeId = manager.getVolumeId(keyInfo.getVolumeName());
+    long bucketId = manager.getBucketId(keyInfo.getVolumeName(), keyInfo.getBucketName());
+    String leaseKey = manager.getNfsFileLeaseKey(volumeId, bucketId, keyInfo.getObjectID());
+    OmNfsLeaseInfo lease = manager.getNfsFileLeaseTable().get(leaseKey);
+    if (lease != null && lease.getProtobuf().getExpiresAtMillis() > Time.now()) {
+      throw new OMException("File has an active NFS writer lease", OMException.ResultCodes.NFS_LEASE_CONFLICT);
+    }
+  }
+
+  /** Reject a directory mutation while any descendant file has a live NFS writer lease. */
+  public static void validateNfsDirectoryLeasesInactive(OMMetadataManager manager, long volumeId, long bucketId,
+      long directoryObjectId) throws IOException {
+    if (!manager.isNfsObjectIndexEnabled() || !manager.isNfsObjectIndexReady()) {
+      return;
+    }
+    String objectPrefix = manager.getNfsObjectKey(volumeId, bucketId, 0);
+    objectPrefix = objectPrefix.substring(0, objectPrefix.lastIndexOf('/') + 1);
+    Map<Long, OmNfsLeaseInfo> leases = new HashMap<>();
+    Table<String, OmNfsLeaseInfo> leaseTable = manager.getNfsFileLeaseTable();
+    try (KeyValueIterator<String, OmNfsLeaseInfo> iterator = leaseTable.iterator(objectPrefix)) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmNfsLeaseInfo> entry = iterator.next();
+        if (entry != null) {
+          OmNfsLeaseInfo lease = entry.getValue();
+          leases.put(lease.getProtobuf().getObjectID(), lease);
+        }
+      }
+    }
+    Iterator<Map.Entry<CacheKey<String>, CacheValue<OmNfsLeaseInfo>>> cacheIterator = leaseTable.cacheIterator();
+    while (cacheIterator.hasNext()) {
+      Map.Entry<CacheKey<String>, CacheValue<OmNfsLeaseInfo>> entry = cacheIterator.next();
+      String key = entry.getKey().getCacheKey();
+      if (!key.startsWith(objectPrefix)) {
+        continue;
+      }
+      OmNfsLeaseInfo lease = entry.getValue().getCacheValue();
+      long objectId = parseNfsObjectId(key);
+      if (lease == null) {
+        leases.remove(objectId);
+      } else {
+        leases.put(objectId, lease);
+      }
+    }
+    long now = Time.now();
+    for (OmNfsLeaseInfo lease : leases.values()) {
+      if (lease.getProtobuf().getKind() == PersistedNfsLeaseInfo.Kind.FILE
+          && lease.getProtobuf().getExpiresAtMillis() > now
+          && isNfsDescendant(manager, volumeId, bucketId, lease.getProtobuf().getObjectID(), directoryObjectId)) {
+        throw new OMException("Directory contains a file with an active NFS writer lease",
+            OMException.ResultCodes.NFS_LEASE_CONFLICT);
+      }
+    }
+  }
+
+  private static long parseNfsObjectId(String key) {
+    return Long.parseLong(key.substring(key.lastIndexOf('/') + 1));
+  }
+
+  private static boolean isNfsDescendant(OMMetadataManager manager, long volumeId, long bucketId, long objectId,
+      long directoryObjectId) throws IOException {
+    Set<Long> visited = new HashSet<>();
+    long current = objectId;
+    while (current != bucketId) {
+      if (!visited.add(current)) {
+        throw new OMException("NFS object index contains a parent cycle", OMException.ResultCodes.NFS_LEASE_CONFLICT);
+      }
+      OmNfsObjectInfo info = manager.getNfsObjectTable().get(manager.getNfsObjectKey(volumeId, bucketId, current));
+      if (info == null) {
+        throw new OMException("NFS object index is incomplete while checking writer leases",
+            OMException.ResultCodes.NFS_LEASE_CONFLICT);
+      }
+      if (info.getParentObjectID() == directoryObjectId) {
+        return true;
+      }
+      current = info.getParentObjectID();
+    }
+    return false;
+  }
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMFileRequest.class);
@@ -188,13 +359,31 @@ public final class OMFileRequest {
           @Nonnull String bucketName, @Nonnull String keyName,
           @Nonnull Path keyPath) throws IOException {
 
-    String leafNodeName = OzoneFSUtils.getFileName(keyName);
+    List<String> components = new ArrayList<>();
+    keyPath.forEach(component -> components.add(component.toString()));
+    return verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName, keyName, components);
+  }
+
+  /** Verify an Ozone key name without interpreting it as a local filesystem path. */
+  public static OMPathInfoWithFSO verifyDirectoryKeysInPath(
+      @Nonnull OMMetadataManager omMetadataManager, @Nonnull String volumeName,
+      @Nonnull String bucketName, @Nonnull String keyName) throws IOException {
+    return verifyDirectoryKeysInPath(omMetadataManager, volumeName, bucketName, keyName,
+        getKeyPathComponents(keyName));
+  }
+
+  private static OMPathInfoWithFSO verifyDirectoryKeysInPath(
+      OMMetadataManager omMetadataManager, String volumeName, String bucketName,
+      String keyName, List<String> keyPathComponents) throws IOException {
+
+    String leafNodeName = keyPathComponents.isEmpty() ? keyName
+        : keyPathComponents.get(keyPathComponents.size() - 1);
     List<String> missing = new ArrayList<>();
 
     // Found no files/ directories in the given path.
     OMDirectoryResult result = OMDirectoryResult.NONE;
 
-    Iterator<Path> elements = keyPath.iterator();
+    Iterator<String> elements = keyPathComponents.iterator();
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
@@ -215,7 +404,7 @@ public final class OMFileRequest {
     // for better logging
     StringBuilder fullKeyPath = new StringBuilder(bucketKey);
     while (elements.hasNext()) {
-      String fileName = elements.next().toString();
+      String fileName = elements.next();
       fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX)
           .append(fileName);
       if (!missing.isEmpty()) {
@@ -466,18 +655,88 @@ public final class OMFileRequest {
           List<OmDirectoryInfo> missingParentInfos,
           OmDirectoryInfo dirInfo) {
 
-    final Table<String, OmDirectoryInfo> table
-        = omMetadataManager.getDirectoryTable();
     for (OmDirectoryInfo subDirInfo : missingParentInfos) {
-      table.addCacheEntry(omMetadataManager.getOzonePathKey(
-          volumeId, bucketId, subDirInfo),
-          subDirInfo, trxnLogIndex);
+      addDirectoryTableCacheEntry(omMetadataManager, volumeId, bucketId, trxnLogIndex, subDirInfo);
     }
-
     if (dirInfo != null) {
-      table.addCacheEntry(omMetadataManager.getOzonePathKey(
-          volumeId, bucketId, dirInfo),
-          dirInfo, trxnLogIndex);
+      addDirectoryTableCacheEntry(omMetadataManager, volumeId, bucketId, trxnLogIndex, dirInfo);
+    }
+  }
+
+  private static void addDirectoryTableCacheEntry(OMMetadataManager metadataManager, long volumeId, long bucketId,
+      long transactionIndex, OmDirectoryInfo directory) {
+    metadataManager.getDirectoryTable().addCacheEntry(metadataManager.getOzonePathKey(volumeId, bucketId, directory),
+        directory, transactionIndex);
+    if (metadataManager.isNfsObjectIndexEnabled()) {
+      metadataManager.getNfsObjectTable().addCacheEntry(
+          metadataManager.getNfsObjectKey(volumeId, bucketId, directory.getObjectID()),
+          new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.DIRECTORY, directory.getParentObjectID(),
+              directory.getName()),
+          transactionIndex);
+    }
+  }
+
+  /** Advance the bucket-root directory verifier in the namespace mutation cache transaction. */
+  public static OmBucketInfo updateNfsBucketVerifierCacheEntry(OMMetadataManager metadataManager,
+      OmBucketInfo bucketInfo, long transactionIndex) throws IOException {
+    if (!metadataManager.isNfsObjectIndexEnabled() || !metadataManager.isNfsObjectIndexReady()) {
+      return bucketInfo;
+    }
+    String bucketKey = metadataManager.getBucketKey(bucketInfo.getVolumeName(), bucketInfo.getBucketName());
+    OmBucketInfo updated = bucketInfo.toBuilder().setUpdateID(transactionIndex).build();
+    metadataManager.getBucketTable().addCacheEntry(bucketKey, updated, transactionIndex);
+    return updated;
+  }
+
+  /** Advance a directory's direct-child verifier in the namespace mutation cache transaction. */
+  public static OmDirectoryInfo updateNfsDirectoryVerifierCacheEntry(OMMetadataManager metadataManager,
+      long volumeId, long bucketId, long directoryObjectId, long transactionIndex) throws IOException {
+    if (!metadataManager.isNfsObjectIndexEnabled() || !metadataManager.isNfsObjectIndexReady()) {
+      return null;
+    }
+    OmNfsObjectInfo pointer = metadataManager.getNfsObjectTable().get(
+        metadataManager.getNfsObjectKey(volumeId, bucketId, directoryObjectId));
+    if (pointer == null || pointer.getKind() != PersistedNfsObjectInfo.Kind.DIRECTORY) {
+      throw new OMException("NFS directory verifier parent is missing", OMException.ResultCodes.INTERNAL_ERROR);
+    }
+    String directoryKey = metadataManager.getOzonePathKey(volumeId, bucketId,
+        pointer.getParentObjectID(), pointer.getName());
+    OmDirectoryInfo directory = metadataManager.getDirectoryTable().get(directoryKey);
+    if (directory == null || directory.getObjectID() != directoryObjectId) {
+      throw new OMException("NFS directory verifier parent is stale", OMException.ResultCodes.INTERNAL_ERROR);
+    }
+    OmDirectoryInfo updated = directory.toBuilder().setUpdateID(transactionIndex).build();
+    metadataManager.getDirectoryTable().addCacheEntry(directoryKey, updated, transactionIndex);
+    return updated;
+  }
+
+  /** Adds the canonical directory and its identity pointer to the same database batch. */
+  public static void addToDirectoryTable(OMMetadataManager metadataManager, BatchOperation batch,
+      OmDirectoryInfo directory, long volumeId, long bucketId) throws IOException {
+    metadataManager.getDirectoryTable().putWithBatch(batch,
+        metadataManager.getOzonePathKey(volumeId, bucketId, directory), directory);
+    if (metadataManager.isNfsObjectIndexEnabled()) {
+      metadataManager.getNfsObjectTable().putWithBatch(batch,
+          metadataManager.getNfsObjectKey(volumeId, bucketId, directory.getObjectID()),
+          new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.DIRECTORY, directory.getParentObjectID(),
+              directory.getName()));
+    }
+  }
+
+  /** Tombstones an identity pointer in the canonical mutation's cache transaction. */
+  public static void deleteNfsObjectCacheEntry(OMMetadataManager metadataManager, String indexKey,
+      long transactionIndex) {
+    if (metadataManager.isNfsObjectIndexEnabled()) {
+      metadataManager.getNfsObjectTable().addCacheEntry(indexKey, transactionIndex);
+    }
+  }
+
+  /** Removes an identity pointer in the canonical mutation's database batch. */
+  public static void deleteNfsObjectFromDB(OMMetadataManager metadataManager, BatchOperation batch,
+      long volumeId, long bucketId, long objectId) throws IOException {
+    if (metadataManager.isNfsObjectIndexEnabled()) {
+      metadataManager.getNfsObjectTable().deleteWithBatch(batch,
+          metadataManager.getNfsObjectKey(volumeId, bucketId, objectId));
     }
   }
 
@@ -532,6 +791,14 @@ public final class OMFileRequest {
 
     omMetadataManager.getKeyTable(bucketLayout)
         .addCacheEntry(dbFileKey, omFileInfo, trxnLogIndex);
+    if (omMetadataManager.isNfsObjectIndexEnabled()) {
+      long volumeId = omMetadataManager.getVolumeId(omFileInfo.getVolumeName());
+      long bucketId = omMetadataManager.getBucketId(omFileInfo.getVolumeName(), omFileInfo.getBucketName());
+      omMetadataManager.getNfsObjectTable().addCacheEntry(
+          omMetadataManager.getNfsObjectKey(volumeId, bucketId, omFileInfo.getObjectID()),
+          new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.FILE, omFileInfo.getParentObjectID(), fileName),
+          trxnLogIndex);
+    }
   }
 
   /**
@@ -598,6 +865,12 @@ public final class OMFileRequest {
 
     omMetadataMgr.getKeyTable(BucketLayout.FILE_SYSTEM_OPTIMIZED)
         .putWithBatch(batchOp, dbFileKey, omFileInfo);
+    if (omMetadataMgr.isNfsObjectIndexEnabled()) {
+      omMetadataMgr.getNfsObjectTable().putWithBatch(batchOp,
+          omMetadataMgr.getNfsObjectKey(volumeId, bucketId, omFileInfo.getObjectID()),
+          new OmNfsObjectInfo(PersistedNfsObjectInfo.Kind.FILE, omFileInfo.getParentObjectID(),
+              omFileInfo.getFileName()));
+    }
     return dbFileKey;
   }
 
@@ -684,8 +957,7 @@ public final class OMFileRequest {
       OMFileRequest.validateBucket(omMetadataMgr, volumeName, bucketName);
     }
 
-    Path keyPath = Paths.get(keyName);
-    Iterator<Path> elements = keyPath.iterator();
+    Iterator<String> elements = getKeyPathComponents(keyName).iterator();
     final long volumeId = omMetadataMgr.getVolumeId(volumeName);
     String bucketKey = omMetadataMgr.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
@@ -694,7 +966,7 @@ public final class OMFileRequest {
     long lastKnownParentId = omBucketInfo.getObjectID();
     OmDirectoryInfo omDirInfo = null;
     while (elements.hasNext()) {
-      String fileName = elements.next().toString();
+      String fileName = elements.next();
 
       // For example, /vol1/buck1/a/b/c/d/e/file1.txt
       // 1. Do lookup path component on directoryTable starting from bucket
@@ -827,15 +1099,15 @@ public final class OMFileRequest {
     if (!isDir) {
       return;
     }
-    Path dstParent = Paths.get(toKeyName).getParent();
-    while (dstParent != null) {
-      if (Paths.get(fromKeyName).equals(dstParent)) {
+    List<String> fromComponents = getKeyPathComponents(fromKeyName);
+    List<String> toComponents = getKeyPathComponents(toKeyName);
+    for (int parentDepth = toComponents.size() - 1; parentDepth > 0; parentDepth--) {
+      if (fromComponents.equals(toComponents.subList(0, parentDepth))) {
         throw new OMException("Cannot rename a directory to its own " +
                 "subdirectory", OMException.ResultCodes.KEY_RENAME_ERROR);
         // TODO: Existing rename throws java.lang.IllegalArgumentException.
         //       Should we throw same exception ?
       }
-      dstParent = dstParent.getParent();
     }
   }
 
@@ -1044,7 +1316,7 @@ public final class OMFileRequest {
       throws IOException {
 
     long lastKnownParentId = bucketId;
-    Iterator<Path> pathComponents = Paths.get(keyName).iterator();
+    Iterator<String> pathComponents = getKeyPathComponents(keyName).iterator();
 
     // If no sub-dirs then bucketID is the root/parent.
     if (!pathComponents.hasNext()) {
@@ -1054,7 +1326,7 @@ public final class OMFileRequest {
       errMsg = "Failed to find parent directory of " + keyName;
     }
     while (pathComponents.hasNext()) {
-      String nodeName = pathComponents.next().toString();
+      String nodeName = pathComponents.next();
       boolean reachedLastPathComponent = !pathComponents.hasNext();
       String dbNodeName =
               omMetadataManager.getOzonePathKey(volumeId, bucketId,
