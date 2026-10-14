@@ -659,8 +659,8 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       runCommand("docker", "run", "--detach", "--rm", "--name", container, "--network", "host",
           "--env", "KRB5_CONFIG=/contract/krb5.conf",
           "--mount", "type=bind,source=" + contractDir + ",target=/contract",
-          image, "sh", "-c", "exec ganesha.nfsd -F -p /contract/ganesha.pid -f /contract/ganesha.conf"
-              + " > /contract/ganesha.log 2>&1");
+          image, "sh", "-c", "exec ganesha.nfsd -F -p /contract/ganesha.pid -L /contract/ganesha.log"
+              + " -N NIV_DEBUG -f /contract/ganesha.conf");
       waitForNfsPort(contractDir.resolve("ganesha.log"));
       Thread.sleep(1000);
       try {
