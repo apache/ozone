@@ -268,21 +268,20 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     StringBuilder builder = new StringBuilder();
     for (ContainerBalancerStorageTypeStatusInfoProto type : types) {
       builder.append(System.lineSeparator()).append("Storage type: ")
-          .append(type.hasStorageType() ? type.getStorageType().name() : "UNKNOWN").append(System.lineSeparator());
-      builder.append(String.format("%-50s %s%n", "Size scheduled to move", byteDesc(type.getSizeScheduledForMove())));
-      builder.append(String.format("%-50s %s%n", "Moved data size", byteDesc(type.getDataSizeMoved())));
-      builder.append(String.format("%-50s %d%n", "Scheduled to move containers", type.getContainerMovesScheduled()));
-      builder.append(String.format("%-50s %d%n", "Already moved containers", type.getContainerMovesCompleted()));
-      builder.append(String.format("%-50s %d%n", "Failed to move containers", type.getContainerMovesFailed()));
-      builder.append(String.format("%-50s %d%n", "Failed to move containers by timeout",
-          type.getContainerMovesTimeout()));
-      builder.append(String.format("%-50s %d%n", "Unique datanodes involved", type.getNumDatanodesInvolved()));
-      builder.append(String.format("%-50s %d%n", "Unbalanced datanodes", type.getNumDatanodesUnbalanced()));
-      builder.append(String.format("%-50s %s%n", "Imbalance data size", byteDesc(type.getDataSizeUnbalanced())));
-      builder.append(String.format("%-50s %n%s", "Entered data to nodes",
-          formatNodeTraffic(type.getSizeEnteringNodesList(), " <- ")));
-      builder.append(String.format("%-50s %n%s", "Exited data from nodes",
-          formatNodeTraffic(type.getSizeLeavingNodesList(), " -> ")));
+          .append(type.hasStorageType() ? type.getStorageType().name() : "UNKNOWN").append(System.lineSeparator())
+          .append(String.format("%-50s %s%n", "Size scheduled to move", byteDesc(type.getSizeScheduledForMove())))
+          .append(String.format("%-50s %s%n", "Moved data size", byteDesc(type.getDataSizeMoved())))
+          .append(String.format("%-50s %d%n", "Scheduled to move containers", type.getContainerMovesScheduled()))
+          .append(String.format("%-50s %d%n", "Already moved containers", type.getContainerMovesCompleted()))
+          .append(String.format("%-50s %d%n", "Failed to move containers", type.getContainerMovesFailed()))
+          .append(String.format("%-50s %d%n", "Failed to move containers by timeout", type.getContainerMovesTimeout()))
+          .append(String.format("%-50s %d%n", "Unique datanodes involved", type.getNumDatanodesInvolved()))
+          .append(String.format("%-50s %d%n", "Unbalanced datanodes", type.getNumDatanodesUnbalanced()))
+          .append(String.format("%-50s %s%n", "Imbalance data size", byteDesc(type.getDataSizeUnbalanced())))
+          .append(String.format("%-50s %n%s", "Entered data to nodes",
+              formatNodeTraffic(type.getSizeEnteringNodesList(), " <- ")))
+          .append(String.format("%-50s %n%s", "Exited data from nodes",
+              formatNodeTraffic(type.getSizeLeavingNodesList(), " -> ")));
     }
     return builder.toString();
   }
