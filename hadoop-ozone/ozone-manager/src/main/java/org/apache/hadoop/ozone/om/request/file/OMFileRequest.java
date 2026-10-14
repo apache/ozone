@@ -75,6 +75,8 @@ import org.slf4j.LoggerFactory;
  */
 public final class OMFileRequest {
 
+  private static final Logger LOG = LoggerFactory.getLogger(OMFileRequest.class);
+
   static List<String> getKeyPathComponents(String keyName) {
     String[] components = StringUtils.split(keyName, PATH_SEPARATOR_STR);
     return components == null ? new ArrayList<>() : Arrays.asList(components);
@@ -232,9 +234,6 @@ public final class OMFileRequest {
     }
     return false;
   }
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMFileRequest.class);
 
   private OMFileRequest() {
   }

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.nfs;
 
 import java.util.Objects;
 import java.util.UUID;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
@@ -72,7 +73,7 @@ public final class NfsExportBinding {
 
   private static String requireName(String value, String name) {
     Objects.requireNonNull(value, name);
-    if (value.trim().isEmpty()) {
+    if (StringUtils.isBlank(value)) {
       throw new IllegalArgumentException(name + " must not be empty");
     }
     return value;

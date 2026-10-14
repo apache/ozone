@@ -573,7 +573,8 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
   private void grantMountedContractMachineUser(OzoneClient client, OzoneBucket bucket) throws IOException {
     OzoneVolume volume = client.getObjectStore().getVolume(bucket.getVolumeName());
     OzoneAcl machineUserAcl = OzoneAcl.of(ACLIdentityType.USER, "host", OzoneAcl.AclScope.ACCESS,
-        IAccessAuthorizer.ACLType.READ, IAccessAuthorizer.ACLType.LIST);
+        IAccessAuthorizer.ACLType.READ, IAccessAuthorizer.ACLType.WRITE, IAccessAuthorizer.ACLType.LIST,
+        IAccessAuthorizer.ACLType.CREATE, IAccessAuthorizer.ACLType.DELETE);
     volume.addAcl(machineUserAcl);
     bucket.addAcl(machineUserAcl);
   }

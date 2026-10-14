@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.protobuf.ByteString;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedNfsLeaseInfo;
@@ -140,7 +142,7 @@ class TestOmNfsLeaseInfo {
     OmNfsLeaseInfo renewed = publishedFile.renewFileLease(renewedExport, 1, "transfer-1", token, 200, 500);
     assertEquals(700, renewed.getProtobuf().getExpiresAtMillis());
     assertEquals("nfs-user@EXAMPLE.COM", renewed.getOwnerPrincipal());
-    assertEquals(true, renewed.getProtobuf().getContentPublished());
+    assertTrue(renewed.getProtobuf().getContentPublished());
     assertThrows(IllegalStateException.class,
         () -> renewed.renewFileLease(renewedExport, 2, "transfer-1", token, 201, 500));
     OmNfsLeaseInfo replacement = OmNfsLeaseInfo.acquireExportLease(renewedExport, "export-1", 10, 20,
@@ -176,7 +178,7 @@ class TestOmNfsLeaseInfo {
     assertEquals("transfer-1", recovered.getProtobuf().getTransferID());
     assertEquals(principal, recovered.getOwnerPrincipal());
     assertEquals(replacementToken, recovered.getProtobuf().getOwnerToken());
-    assertEquals(false, recovered.getProtobuf().getContentPublished());
+    assertFalse(recovered.getProtobuf().getContentPublished());
     assertThrows(IllegalStateException.class,
         () -> file.recoverFileLease(newExport, "other-user@EXAMPLE.COM", replacementToken, 201, 500));
   }
@@ -191,7 +193,7 @@ class TestOmNfsLeaseInfo {
     OmNfsLeaseInfo recovered = file.recoverFileLease(export, "nfs-user@EXAMPLE.COM",
         ByteString.copyFromUtf8("replacement-token"), 200, 500);
 
-    assertEquals(true, recovered.getProtobuf().getContentPublished());
-    assertEquals(false, recovered.withContentPublished(false).getProtobuf().getContentPublished());
+    assertTrue(recovered.getProtobuf().getContentPublished());
+    assertFalse(recovered.withContentPublished(false).getProtobuf().getContentPublished());
   }
 }

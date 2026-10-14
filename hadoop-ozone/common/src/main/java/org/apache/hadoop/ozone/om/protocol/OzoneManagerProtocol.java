@@ -103,6 +103,12 @@ import org.apache.hadoop.security.token.TokenInfo;
 public interface OzoneManagerProtocol
     extends IOmMetadataReader, OzoneManagerSecurityProtocol, Closeable {
 
+  @SuppressWarnings("checkstyle:ConstantName")
+  /**
+   * Version 1: Initial version.
+   */
+  long versionID = 1L;
+
   /** Apply an OM-owned NFS export lease transition through the replicated write path. */
   default NfsExportLeaseResponse updateNfsExportLease(NfsExportLeaseRequest request) throws IOException {
     throw new OMException("NFS export leases require the OM RPC transport",
@@ -127,12 +133,6 @@ public interface OzoneManagerProtocol
     throw new OMException("NFS durable write ranges require the OM RPC transport",
         OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
   }
-
-  @SuppressWarnings("checkstyle:ConstantName")
-  /**
-   * Version 1: Initial version.
-   */
-  long versionID = 1L;
 
   /**
    * Creates a volume.
