@@ -116,7 +116,7 @@ public class OzoneBlacklist {
   public boolean isBlacklisted(UserGroupInformation user) {
     return user != null
         && (blacklistUsernames.contains(user.getShortUserName())
-        || hasBlacklistGroup(user.getGroups()));
+        || (!blacklistGroups.isEmpty() && hasBlacklistGroup(user.getGroups())));
   }
 
   public Collection<String> getBlacklistGroups() {

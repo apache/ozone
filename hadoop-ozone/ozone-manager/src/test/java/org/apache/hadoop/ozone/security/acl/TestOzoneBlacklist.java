@@ -21,6 +21,10 @@ import static java.util.Arrays.asList;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import org.apache.hadoop.hdds.server.OzoneAdmins;
@@ -55,6 +59,15 @@ public class TestOzoneBlacklist {
     } finally {
       UserGroupInformation.reset();
     }
+  }
+
+  @Test
+  public void testEmptyGroupBlacklistDoesNotResolveUserGroups() {
+    UserGroupInformation user = mock(UserGroupInformation.class);
+    when(user.getShortUserName()).thenReturn("testuser");
+
+    assertFalse(new OzoneBlacklist(null, Collections.emptyList()).isBlacklisted(user));
+    verify(user, never()).getGroups();
   }
 
   @Test
