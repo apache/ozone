@@ -80,6 +80,8 @@ class TestNfsExportLeaseManager {
 
       assertEquals(2, request.getGatewayGeneration());
       assertEquals(4, request.getFileGeneration());
+      verify(reader, times(1)).updateFileLease(NfsFileLeaseRequest.Operation.RECOVER, "gateway-a", 2L, 101L,
+          "", 0L, ByteString.EMPTY, 2000L, "alice");
     } finally {
       manager.close();
     }
