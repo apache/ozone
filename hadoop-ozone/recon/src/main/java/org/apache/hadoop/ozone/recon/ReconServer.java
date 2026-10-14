@@ -209,6 +209,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
     } catch (Exception e) {
       LOG.error("Error during initializing Recon server.", e);
       updateAndLogReconHealthStatus();
+      throw e;
     }
 
     ShutdownHookManager.get().addShutdownHook(() -> {
