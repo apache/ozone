@@ -100,6 +100,9 @@ public class BlockOutputStream extends OutputStream {
   private AtomicReference<BlockID> blockID;
   // planned block full size
   private long blockSize;
+  // Storage type the block should be written to, from the key's storage policy.
+  // Null leaves the datanode free to pick any volume.
+  private final StorageType storageType;
   private AtomicBoolean eofSent = new AtomicBoolean(false);
   private final AtomicReference<ChunkInfo> previousChunkInfo
       = new AtomicReference<>();
@@ -179,19 +182,23 @@ public class BlockOutputStream extends OutputStream {
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
-      Supplier<ExecutorService> blockOutputStreamResourceProvider
+      Supplier<ExecutorService> blockOutputStreamResourceProvider,
+      StorageType storageType
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.blockID = new AtomicReference<>(blockID);
     this.blockSize = blockSize;
+    this.storageType = storageType;
     replicationIndex = pipeline.getReplicaIndex(pipeline.getClosestNode());
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
 
+    // Send the storage type SCM chose for this block so the datanode places it on a volume of
+    // that type. Null leaves the datanode free to pick any volume.
     this.containerBlockData = BlockData.newBuilder()
         .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicationIndex,
-            StorageTypeUtils.getID(StorageType.DISK)))
+            storageType == null ? null : StorageTypeUtils.getID(storageType)))
         .addMetadata(keyValue);
     this.pipeline = pipeline;
     // tell DataNode I will send incremental chunk list
@@ -959,12 +966,10 @@ public class BlockOutputStream extends OutputStream {
         byteBufferList = null;
       }
 
-      // TODO: Pass the requested storage type from allocation/storage policy
-      // once that context is wired through BlockOutputStream. Null preserves
-      // the current any-volume behavior.
       asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
           blockID.get(), data, tokenString, replicationIndex, blockData, close,
-          null, containerAutoCreate());
+          storageType == null ? null : StorageTypeUtils.getStorageTypeProto(storageType),
+          containerAutoCreate());
       CompletableFuture<ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       validateFuture = respFuture.thenApplyAsync(e -> {

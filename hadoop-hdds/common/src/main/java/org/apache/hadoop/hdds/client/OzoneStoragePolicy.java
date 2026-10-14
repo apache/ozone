@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.client;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StoragePolicyProto;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Enum defining different storage policies using StorageTier.
@@ -117,6 +118,7 @@ public enum OzoneStoragePolicy implements StoragePolicy {
   }
 
   public static void setDefaultPolicy(OzoneStoragePolicy storagePolicy) {
+    Preconditions.assertNotNull(storagePolicy, "storagePolicy == null");
     defaultPolicy = storagePolicy;
   }
 

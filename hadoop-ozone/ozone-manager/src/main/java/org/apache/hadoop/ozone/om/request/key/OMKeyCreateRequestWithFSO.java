@@ -52,11 +52,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles CreateKey request layout version1.
  */
 public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMKeyCreateRequestWithFSO.class);
 
   public OMKeyCreateRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -139,6 +144,13 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
               omMetadataManager.getBucketKey(volumeName, bucketName));
+
+      if (!keyArgs.getIsMultipartKey() && !keyArgs.hasStoragePolicy()) {
+        // preExecute always sets a storage policy, so a missing one means this request
+        // was journaled by an older OM and is being replayed during an upgrade.
+        LOG.warn("Key {} has no StoragePolicy. This is expected only while replaying " +
+            "journals written by an OM without storage policy support.", keyArgs.getKeyName());
+      }
 
       // add all missing parents to dir table
       missingParentInfos = getAllMissingParentDirInfo(
