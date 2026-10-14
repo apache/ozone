@@ -51,7 +51,6 @@ public final class LatestVersionedKWayMergeIterator implements
   public static final int ROCKS_TYPE_VALUE = 1;
   private static final int DEFAULT_READ_AHEAD_SIZE = 2 * 1024 * 1024;
 
-  private final ManagedOptions options;
   private final List<ClosableIterator<? extends MergeHead>> iterators;
   private final Long exclusiveMinSequenceNumber;
 
@@ -63,13 +62,14 @@ public final class LatestVersionedKWayMergeIterator implements
   /**
    * Opens one iterator per SST file and merges them within an optional user-key range.
    *
+   * <p>Caller contract: {@code fromUserKeyInclusive} and {@code toUserKeyExclusive} are wrapped by
+   * native {@link org.apache.hadoop.hdds.utils.db.managed.ManagedSlice} objects without copying.
+   * Callers must not mutate either array until the returned iterator is closed.
+   *
    * @param exclusiveMinSequenceNumber when non-null, each source skips entries with
    *        sequence {@code <=} this value while advancing; when null, no entries are skipped
    * @param fromUserKeyInclusive when non-null and non-empty, each source seeks to this lower bound
    * @param toUserKeyExclusive when non-null and non-empty, each source stops before this upper bound
-   * @apiNote {@code fromUserKeyInclusive} and {@code toUserKeyExclusive} are wrapped by native
-   *          {@link org.apache.hadoop.hdds.utils.db.managed.ManagedSlice} objects without copying.
-   *          Callers must not mutate either array until the returned iterator is closed.
    */
   public static LatestVersionedKWayMergeIterator overRawSstFiles(Collection<Path> sstFiles,
       int readAheadSizePerFile, Long exclusiveMinSequenceNumber,
@@ -81,16 +81,18 @@ public final class LatestVersionedKWayMergeIterator implements
         sources.add(new RawSstIterator(options, file, readAheadSizePerFile, fromUserKeyInclusive,
             toUserKeyExclusive));
       }
-      return new LatestVersionedKWayMergeIterator(options, sources, exclusiveMinSequenceNumber);
     } catch (RuntimeException e) {
       IOUtils.closeQuietly(sources);
       throw e;
     }
+    return new LatestVersionedKWayMergeIterator(sources, exclusiveMinSequenceNumber);
   }
 
   /**
-   * @apiNote Bound arrays must stay unchanged until the returned iterator is closed; see
-   *          {@link #overRawSstFiles(Collection, int, Long, byte[], byte[])}.
+   * Opens one iterator per SST file, skipping entries at or below {@code exclusiveMinSequenceNumber}.
+   *
+   * <p>Bound arrays must stay unchanged until the returned iterator is closed; see
+   * {@link #overRawSstFiles(Collection, int, Long, byte[], byte[])}.
    */
   public static LatestVersionedKWayMergeIterator overRawSstFilesFromSequence(Collection<Path> sstFiles,
       long exclusiveMinSequenceNumber, byte[] fromUserKeyInclusive, byte[] toUserKeyExclusive) {
@@ -103,14 +105,12 @@ public final class LatestVersionedKWayMergeIterator implements
       List<ClosableIterator<MergedKeyValue>> iterators, Long exclusiveMinSequenceNumber) {
     List<ClosableIterator<? extends MergeHead>> sources = new ArrayList<>(iterators.size());
     sources.addAll(iterators);
-    return new LatestVersionedKWayMergeIterator(null, sources, exclusiveMinSequenceNumber);
+    return new LatestVersionedKWayMergeIterator(sources, exclusiveMinSequenceNumber);
   }
 
   private LatestVersionedKWayMergeIterator(
-      ManagedOptions options,
       List<ClosableIterator<? extends MergeHead>> iterators,
       Long exclusiveMinSequenceNumber) {
-    this.options = options;
     this.iterators = new ArrayList<>(Objects.requireNonNull(iterators, "iterators cannot be null"));
     this.exclusiveMinSequenceNumber = exclusiveMinSequenceNumber;
     this.sourceHeads = new PriorityQueue<>(Math.max(this.iterators.size(), 1));
@@ -220,9 +220,6 @@ public final class LatestVersionedKWayMergeIterator implements
   @Override
   public void close() {
     IOUtils.closeQuietly(iterators);
-    if (options != null) {
-      options.close();
-    }
   }
 
   private static int compareUserKeys(byte[] left, byte[] right) {
