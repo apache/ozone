@@ -167,9 +167,13 @@ final class ObjectEndpointStreaming {
       boolean derivedKeyPiggyBacking) throws IOException {
     // Only signed multi-chunk uploads ask OM to piggyback the derived key; every
     // other stream PUT passes false.
-    if (writeConditions.hasIfNoneMatch()) {
+    if (writeConditions.isCreateIfAbsent()) {
       return bucket.createStreamKeyIfNotExists(keyPath, length, replicationConfig, keyMetadata, tags,
           derivedKeyPiggyBacking);
+    }
+    if (writeConditions.hasIfNoneMatch()) {
+      return bucket.createStreamKeyIfNoneMatch(keyPath, length, writeConditions.getExcludedETag(), replicationConfig,
+          keyMetadata, tags, derivedKeyPiggyBacking);
     }
     if (writeConditions.hasIfMatch()) {
       return bucket.rewriteStreamKeyIfMatch(keyPath, length, writeConditions.getExpectedETag(),

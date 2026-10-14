@@ -72,6 +72,8 @@ public enum OzoneManagerVersion implements ComponentVersion {
       "OzoneManager version that rejects lookupFile on OBJECT_STORE buckets "
           + "server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check for getFileChecksum"),
+  S3_IF_NONE_MATCH_ETAG(16,
+      "OzoneManager version that supports If-None-Match entity ETags for writes"),
   ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
   LIST_STATUS_REJECTS_OBS(101,
       "OzoneManager version that rejects listStatus on OBJECT_STORE buckets "

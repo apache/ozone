@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -123,6 +124,9 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         super.preExecute(ozoneManager).getCompleteMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartUploadCompleteRequest.getKeyArgs();
+    if (keyArgs.hasExcludedETag()) {
+      ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
+    }
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
@@ -279,6 +283,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       OmKeyInfo existingKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(dbOzoneKey);
       validateAtomicRewrite(existingKeyInfo, keyArgs);
       validateIfMatchETag(keyArgs, existingKeyInfo);
+      validateIfNoneMatchETag(keyArgs, existingKeyInfo);
 
       if (!partsList.isEmpty()) {
         SortedMap<Integer, OmMultipartPartInfo> multipartPartInfoMap =

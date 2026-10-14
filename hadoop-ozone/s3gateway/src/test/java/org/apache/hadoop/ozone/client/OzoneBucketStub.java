@@ -253,6 +253,29 @@ public final class OzoneBucketStub extends OzoneBucket {
   }
 
   @Override
+  public OzoneOutputStream createKeyIfNoneMatch(String keyName, long size, String excludedETag,
+      ReplicationConfig rConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    validateIfNoneMatch(keyName, excludedETag);
+    return addDerivedKey(createKey(keyName, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  @Override
+  public OzoneDataStreamOutput createStreamKeyIfNoneMatch(String keyName, long size, String excludedETag,
+      ReplicationConfig rConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    validateIfNoneMatch(keyName, excludedETag);
+    return addDerivedKey(createStreamKey(keyName, size, rConfig, metadata, tags), derivedKeyPiggyBacking);
+  }
+
+  private void validateIfNoneMatch(String keyName, String excludedETag) throws OMException {
+    OzoneKeyDetails existing = keyDetails.get(keyName);
+    if (excludedETag != null && existing != null && existing.isEtagEquals(excludedETag)) {
+      throw new OMException("ETag matches If-None-Match", ResultCodes.KEY_ALREADY_EXISTS);
+    }
+  }
+
+  @Override
   public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size,
       String expectedETag, ReplicationConfig rConfig,
       Map<String, String> metadata, Map<String, String> tags)
@@ -771,6 +794,14 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     return new OmMultipartUploadCompleteInfo(getVolumeName(), getName(), key,
         DigestUtils.sha256Hex(key));
+  }
+
+  @Override
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key, String uploadID,
+      Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag, String excludedETag)
+      throws IOException {
+    validateIfNoneMatch(key, excludedETag);
+    return completeMultipartUpload(key, uploadID, partsMap, expectedDataGeneration, expectedETag);
   }
 
   @Override

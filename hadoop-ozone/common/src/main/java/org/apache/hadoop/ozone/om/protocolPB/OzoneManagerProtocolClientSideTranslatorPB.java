@@ -790,6 +790,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (args.getExpectedETag() != null) {
       keyArgs.setExpectedETag(args.getExpectedETag());
     }
+    if (args.getExcludedETag() != null) {
+      keyArgs.setExcludedETag(args.getExcludedETag());
+    }
 
     req.setKeyArgs(keyArgs.build());
     req.setDerivedKeyPiggyBacking(args.isDerivedKeyPiggyBacking());
@@ -1900,6 +1903,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     }
     if (omKeyArgs.getExpectedETag() != null) {
       keyArgs.setExpectedETag(omKeyArgs.getExpectedETag());
+    }
+    if (omKeyArgs.getExcludedETag() != null) {
+      keyArgs.setExcludedETag(omKeyArgs.getExcludedETag());
     }
 
     multipartUploadCompleteRequest.setKeyArgs(keyArgs.build());

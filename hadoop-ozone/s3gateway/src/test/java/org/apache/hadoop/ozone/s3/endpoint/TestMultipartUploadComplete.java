@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.util.Collections.singletonList;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
@@ -106,6 +107,29 @@ public class TestMultipartUploadComplete {
     partsList.add(uploadPart(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 2, uploadID, "Multipart Upload 2"));
 
     completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, partsList);
+  }
+
+  @Test
+  public void testMultipartIfNoneMatchETag() throws Exception {
+    String key = OzoneConsts.KEY;
+    String uploadID = initiateMultipartUpload(key);
+    Part part = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "original-content");
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part));
+    String etag = client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET).getKey(key)
+        .getMetadata().get(OzoneConsts.ETAG);
+
+    String replacementUploadID = initiateMultipartUpload(key);
+    Part replacementPart = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, replacementUploadID, "new-content");
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"" + etag + "\"");
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, replacementUploadID,
+            singletonList(replacementPart)));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key, "original-content");
+
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, replacementUploadID, singletonList(replacementPart));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key, "new-content");
   }
 
   @Test
