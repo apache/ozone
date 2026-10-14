@@ -253,6 +253,7 @@ public final class NfsGatewayService extends NfsGatewayGrpc.NfsGatewayImplBase {
       }
       response = CommitResponse.newBuilder().setResult(result(NfsStatus.OK)).build();
     } catch (StatusRuntimeException e) {
+      LOG.warn("NFS file commit request rejected: {}", e.getStatus());
       observer.onError(e);
       return;
     } catch (OMException e) {
@@ -264,6 +265,7 @@ public final class NfsGatewayService extends NfsGatewayGrpc.NfsGatewayImplBase {
       LOG.error("NFS file commit failed", e);
       response = CommitResponse.newBuilder().setResult(result(NfsStatus.fromIOException(e))).build();
     } catch (RuntimeException e) {
+      LOG.error("NFS backend commit failed", e);
       observer.onError(Status.INTERNAL.withDescription("NFS backend commit failed").asRuntimeException());
       return;
     }
