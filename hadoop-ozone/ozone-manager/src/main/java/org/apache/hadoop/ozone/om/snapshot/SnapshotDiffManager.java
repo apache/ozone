@@ -1493,7 +1493,6 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     }
 
     for (int i = 0; i < batchSize; i++) {
-      // if hasDeletedAncestor == true only ??
       for (Long ancestor : ancestorPaths.get(i)) {
         ancestorMemo.put(ancestor, hasDeletedAncestor[i]);
       }
@@ -1502,7 +1501,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
   }
 
   /**
-   * Tests membership of a directory object id in a snap diff set.
+   * Checks membership of a directory object id in a snap diff set.
    */
   @FunctionalInterface
   public interface DirectoryIdCheck {

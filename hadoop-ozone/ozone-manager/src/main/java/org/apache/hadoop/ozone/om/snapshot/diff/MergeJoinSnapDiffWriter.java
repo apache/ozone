@@ -63,10 +63,13 @@ public final class MergeJoinSnapDiffWriter {
       boolean dependencyOrderingEnabled) throws IOException {
     store.beginReportWrite();
     if (isFso) {
-      // Classified CFs hold only objectId + (parentId, name). Paths are always resolved before emission.
+      // Classified CFs hold only objectId + (parentId, name). Path resolution is deferred.
       classifyMergeJoin(store, true);
       store.dropListColumnFamilies();
 
+      // Deleted entries are filtered to include top-level deletes only and emitted straight to the report table,
+      // if dependency ordering is disabled.
+      // Otherwise, entries are emitted into {jobId}-dependency-nodes for ordering.
       SnapDiffPathResolver fromResolver = store.newFromPathResolver(bucketObjectId);
       boolean[] dependencyOrderingEnabledRef = {dependencyOrderingEnabled};
       int nodeCount = filterAndResolveTopLevelDeletes(manager, store, bucketObjectId,
@@ -95,7 +98,6 @@ public final class MergeJoinSnapDiffWriter {
 
     } else {
       classifyMergeJoin(store, false);
-      // check if dependency graph is required.
       store.dropListColumnFamilies();
     }
     return store.finishReportWrite();
@@ -180,8 +182,6 @@ public final class MergeJoinSnapDiffWriter {
         store.putClassified(RENAME, oldEntry.getKey(), SnapDiffJobStore.encodeClassifiedRename(
             oldValue.getParentId(), nameBytes(oldValue.getName()),
             newValue.getParentId(), nameBytes(newValue.getName())));
-        // Check should be on oldId so that it is read as this entry from old snapshot has been renamed.
-        // Even in top-level deletes the ID here is checked against old snapshot namespace.
         if (oldValue.isDir()) {
           store.addRenamedDirectoryId(oldEntry.getKey());
         }
