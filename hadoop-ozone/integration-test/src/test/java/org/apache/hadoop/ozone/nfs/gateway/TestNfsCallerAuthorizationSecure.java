@@ -32,10 +32,12 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.URI;
@@ -666,6 +668,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     Files.createDirectories(mount);
     String container = "ozone-nfs-mounted-contract-" + UUID.randomUUID().toString().substring(0, 8);
     Process gssd = null;
+    Process ganeshaLogTail = null;
     boolean mounted = false;
     try {
       LOG.info("Obtaining Kerberos credentials for mounted NFS contract");
@@ -687,6 +690,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           image, "sh", "-c", "exec ganesha.nfsd -F -p /contract/ganesha.pid -L /contract/ganesha.log"
               + " -N NIV_DEBUG -f /contract/ganesha.conf");
       waitForNfsPort(contractDir.resolve("ganesha.log"));
+      ganeshaLogTail = streamGaneshaLog(contractDir.resolve("ganesha.log"));
       Thread.sleep(1000);
       LOG.info("Ganesha is listening; mounting secure NFS export");
       try {
@@ -702,13 +706,17 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       String name = "mounted-secure-contract-" + UUID.randomUUID();
       byte[] expected = "mounted NFS write published to Ozone".getBytes(StandardCharsets.UTF_8);
       Path mountedFile = mount.resolve(name);
+      LOG.info("Creating mounted NFS file {}", name);
       try (FileChannel channel = FileChannel.open(mountedFile, java.nio.file.StandardOpenOption.CREATE_NEW,
           java.nio.file.StandardOpenOption.WRITE)) {
+        LOG.info("Mounted NFS file {} was opened", name);
         ByteBuffer data = ByteBuffer.wrap(expected);
         while (data.hasRemaining()) {
           channel.write(data);
         }
+        LOG.info("Mounted NFS file {} was written; syncing", name);
         channel.force(true);
+        LOG.info("Mounted NFS file {} was synced", name);
       }
       LOG.info("Mounted NFS file was written and synced");
       assertArrayEquals(expected, Files.readAllBytes(mountedFile));
@@ -738,6 +746,12 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       if (mounted) {
         runCommand("sudo", "umount", mount.toString());
       }
+      if (ganeshaLogTail != null) {
+        ganeshaLogTail.destroy();
+        if (!ganeshaLogTail.waitFor(5, TimeUnit.SECONDS)) {
+          ganeshaLogTail.destroyForcibly();
+        }
+      }
       new ProcessBuilder("docker", "rm", "--force", container).start().waitFor(10, TimeUnit.SECONDS);
       if (gssd != null) {
         gssd.destroy();
@@ -749,6 +763,30 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       new ProcessBuilder("sudo", "kdestroy", "-c", "FILE:/tmp/krb5cc_machine").start().waitFor(10, TimeUnit.SECONDS);
       new ProcessBuilder("kdestroy").start().waitFor(10, TimeUnit.SECONDS);
     }
+  }
+
+  private Process streamGaneshaLog(Path logFile) throws IOException {
+    Process process = new ProcessBuilder("tail", "-n", "0", "-F", logFile.toString())
+        .redirectErrorStream(true).start();
+    Thread reader = new Thread(() -> {
+      try (BufferedReader lines = new BufferedReader(new InputStreamReader(process.getInputStream(),
+          StandardCharsets.UTF_8))) {
+        String line;
+        while ((line = lines.readLine()) != null) {
+          String lower = line.toLowerCase(java.util.Locale.ROOT);
+          if (lower.contains("nfs4err") || lower.contains("err_fsal") || lower.contains("error")
+              || lower.contains("warn") || lower.contains("create") || lower.contains("open")
+              || lower.contains("delay")) {
+            LOG.info("Ganesha: {}", line);
+          }
+        }
+      } catch (IOException ignored) {
+        // The tail process is stopped when the mounted contract finishes.
+      }
+    }, "nfs-ganesha-log-reader");
+    reader.setDaemon(true);
+    reader.start();
+    return process;
   }
 
   private void verifyMountedKerberosCredentials(Path krb5Config, File clientKeytab, String clientPrincipal,
