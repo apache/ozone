@@ -60,7 +60,7 @@ ozone.nfs.gateway.trusted.ca.file=/etc/ozone/ganesha-client-ca.crt
 ozone.nfs.gateway.ganesha.cert.sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 ```
 
-The gateway registers an `NfsGatewayMetrics` source with Ozone Metrics2. For each backend RPC it reports request count, average latency in nanoseconds, NFS error responses, and gRPC failures using metric names such as `ReadRequests`, `ReadLatencyNs`, `ReadNfsErrors`, and `ReadRpcErrors`. Metrics are per operation and do not include caller or export identifiers.
+The gateway registers an `NfsGatewayMetrics` source with Ozone Metrics2. For each backend RPC it reports request count, average latency in nanoseconds, NFS error responses, and gRPC failures using metric names such as `ReadRequests`, `ReadLatencyNsNumOps`, `ReadLatencyNsAvgTime`, `ReadNfsErrors`, and `ReadRpcErrors`. Metrics are per operation and do not include caller or export identifiers.
 
 The gateway service principal needs proxy-user rules for NFS callers and permissions for export lease operations. Create the private staging bucket and configure its volume and bucket separately before enabling writes. Mounted writes, Ozone publication, same-gateway restart/reclaim, and changed-hostname replacement-container reclaim using persisted Ganesha recovery state pass against a real Ozone export. Separate physical hosts and remote shared-storage recovery remain production gates.
 
