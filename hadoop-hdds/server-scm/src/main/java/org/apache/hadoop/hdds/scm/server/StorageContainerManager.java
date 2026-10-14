@@ -1913,6 +1913,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     checkAdminAccess(getRemoteUser(), false);
   }
 
+  /**
+   * Return true if admin authorization checks should be enforced.
+   */
+  public boolean isAdminAuthorizationEnabled() {
+    return securityConfig != null && securityConfig.isSecurityEnabled();
+  }
+
   public void checkAdminAccess(UserGroupInformation remoteUser, boolean isRead)
       throws IOException {
     if (remoteUser != null && !scmAdmins.isAdmin(remoteUser)) {
