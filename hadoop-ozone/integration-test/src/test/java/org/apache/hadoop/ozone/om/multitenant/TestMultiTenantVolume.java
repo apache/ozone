@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
@@ -159,6 +160,7 @@ public class TestMultiTenantVolume {
     store.createS3Bucket(bucketName);
     assertEquals(s3VolumeName,
         store.getS3Bucket(bucketName).getVolumeName());
+    assertEquals(s3VolumeName, store.getClientProxy().getS3BucketDetails(bucketName).getVolumeName());
 
     // Delete bucket.
     store.deleteS3Bucket(bucketName);
@@ -181,10 +183,18 @@ public class TestMultiTenantVolume {
     OzoneBucket bucket = store.getS3Bucket(BUCKET_NAME);
     assertEquals(TENANT_ID, bucket.getVolumeName());
 
+    // OM resolves the tenant volume and the user principal in the same InfoBucket call.
+    ClientProtocol proxy = store.getClientProxy();
+    proxy.setThreadLocalS3Auth(new S3Auth("unused1", "unused2", ACCESS_ID, ACCESS_ID));
+    assertEquals(TENANT_ID, proxy.getS3BucketDetails(BUCKET_NAME).getVolumeName());
+    assertEquals(USER_PRINCIPAL, proxy.getThreadLocalS3Auth().getUserPrincipal());
+
     // A different user should not see bucket, since they will be directed to
     // the s3 volume.
     ObjectStore store2 = getStoreForAccessID(UUID.randomUUID().toString());
     assertS3BucketNotFound(store2, BUCKET_NAME);
+    OMException e = assertThrows(OMException.class, () -> store2.getClientProxy().getS3BucketDetails(BUCKET_NAME));
+    assertEquals(OMException.ResultCodes.BUCKET_NOT_FOUND, e.getResult());
 
     // Delete bucket.
     store.deleteS3Bucket(BUCKET_NAME);

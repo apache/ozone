@@ -199,6 +199,7 @@ message OMRequest {
   optional LayoutVersion layoutVersion = 6;
 
   optional ReadConsistencyHint readConsistencyHint = 7;
+  optional bool assumeS3Context = 8;
 
   optional CreateVolumeRequest              createVolumeRequest            = 11;
   optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
@@ -498,6 +499,7 @@ message OMResponse {
   optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 159;
   optional QueryUpgradeStatusResponse        queryUpgradeStatusResponse    = 160;
   optional CompleteFinalizeUpgradeResponse   completeFinalizeUpgradeResponse = 161;
+  optional string userPrincipal = 162;
 }
 
 enum Status {

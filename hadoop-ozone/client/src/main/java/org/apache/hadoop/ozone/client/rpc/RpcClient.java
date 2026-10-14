@@ -135,6 +135,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -1329,6 +1330,27 @@ public class RpcClient implements ClientProtocol {
     verifyBucketName(bucketName);
     OmBucketInfo bucketInfo =
         ozoneManagerClient.getBucketInfo(volumeName, bucketName);
+    return buildOzoneBucket(bucketInfo);
+  }
+
+  @Override
+  public OzoneBucket getS3BucketDetails(String bucketName) throws IOException {
+    verifyBucketName(bucketName);
+    if (!OzoneManagerVersion.S3_BUCKET_INFO_WITH_VOLUME_CONTEXT.isSupportedBy(omVersion)) {
+      // Older OM ignores assumeS3Context and would look up the bucket in the default S3 volume,
+      // so resolve the S3 volume with a separate call.
+      String volumeName = getS3VolumeContext().getOmVolumeArgs().getVolume();
+      return getBucketDetails(volumeName, bucketName);
+    }
+    // Volume name is not important, as we call InfoBucket with
+    // assumeS3Context = true, OM will infer the correct s3 volume.
+    BucketInfoWithVolumeContext bucketInfo =
+        ozoneManagerClient.getBucketInfo(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT, bucketName, true);
+    bucketInfo.getUserPrincipal().ifPresent(this::updateS3Principal);
+    return buildOzoneBucket(bucketInfo.getBucketInfo());
+  }
+
+  private OzoneBucket buildOzoneBucket(OmBucketInfo bucketInfo) {
     return OzoneBucket.newBuilder(conf, this)
         .setVolumeName(bucketInfo.getVolumeName())
         .setName(bucketInfo.getBucketName())

@@ -28,25 +28,25 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Tests bucket reuse within a request. */
 class TestS3RequestContext {
   private EndpointBase endpoint;
-  private OzoneVolume volume;
+  private ClientProtocol proxy;
   private OzoneBucket bucket;
   private S3RequestContext context;
 
   @BeforeEach
   void setup() throws IOException {
     endpoint = mock(EndpointBase.class);
-    volume = mock(OzoneVolume.class);
+    proxy = mock(ClientProtocol.class);
     bucket = mock(OzoneBucket.class);
     when(bucket.getName()).thenReturn("bucket1");
-    when(endpoint.getVolume()).thenReturn(volume);
-    when(volume.getBucket("bucket1")).thenReturn(bucket);
+    when(endpoint.getClientProtocol()).thenReturn(proxy);
+    when(proxy.getS3BucketDetails("bucket1")).thenReturn(bucket);
     context = new S3RequestContext(endpoint, S3GAction.PUT_BUCKET_LIFECYCLE);
   }
 
@@ -54,26 +54,26 @@ class TestS3RequestContext {
   void reusesBucketWithinRequest() throws IOException {
     assertThat(context.getBucket("bucket1")).isSameAs(bucket);
     assertThat(context.getBucket("bucket1")).isSameAs(bucket);
-    verify(volume).getBucket("bucket1");
-    verify(endpoint).getVolume();
+    verify(proxy).getS3BucketDetails("bucket1");
+    verify(endpoint, never()).getVolume();
   }
 
   @Test
   void rejectsDifferentBucket() throws IOException {
     context.getBucket("bucket1");
     assertThrows(IllegalStateException.class, () -> context.getBucket("bucket2"));
-    verify(volume, never()).getBucket("bucket2");
+    verify(proxy, never()).getS3BucketDetails("bucket2");
     assertThat(context.getBucket("bucket1")).isSameAs(bucket);
-    verify(volume).getBucket("bucket1");
+    verify(proxy).getS3BucketDetails("bucket1");
   }
 
   @Test
   void retriesFailedLookup() throws IOException {
-    when(volume.getBucket("bucket1")).thenThrow(new IOException("Lookup failed")).thenReturn(bucket);
+    when(proxy.getS3BucketDetails("bucket1")).thenThrow(new IOException("Lookup failed")).thenReturn(bucket);
     assertThrows(IOException.class, () -> context.getBucket("bucket1"));
     assertThat(context.getBucket("bucket1")).isSameAs(bucket);
     assertThat(context.getBucket("bucket1")).isSameAs(bucket);
-    verify(volume, times(2)).getBucket("bucket1");
+    verify(proxy, times(2)).getS3BucketDetails("bucket1");
   }
 
   @Test
@@ -81,6 +81,6 @@ class TestS3RequestContext {
     S3RequestContext second = new S3RequestContext(endpoint, S3GAction.PUT_BUCKET_LIFECYCLE);
     assertThat(context.getBucket("bucket1")).isSameAs(bucket);
     assertThat(second.getBucket("bucket1")).isSameAs(bucket);
-    verify(volume, times(2)).getBucket("bucket1");
+    verify(proxy, times(2)).getS3BucketDetails("bucket1");
   }
 }

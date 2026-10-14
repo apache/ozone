@@ -179,7 +179,7 @@ public class TestS3LifecycleConfigurationGet {
       assertThat(((S3LifecycleConfiguration) response.getEntity()).getRules()).isEmpty();
     }
 
-    verify(proxy, times(bucketLookups)).getBucketDetails("volume1", "bucket1");
+    verify(proxy, times(bucketLookups)).getS3BucketDetails("bucket1");
     verify(proxy).getLifecycleConfiguration("volume1", "bucket1");
   }
 
@@ -192,7 +192,7 @@ public class TestS3LifecycleConfigurationGet {
 
     assertErrorResponse(ACCESS_DENIED, () -> endpoint.get("bucket1"));
 
-    verify(proxy).getBucketDetails("volume1", "bucket1");
+    verify(proxy).getS3BucketDetails("bucket1");
     verify(proxy, never()).getLifecycleConfiguration("volume1", "bucket1");
   }
 
@@ -211,7 +211,7 @@ public class TestS3LifecycleConfigurationGet {
 
     assertErrorResponse(expectedError, () -> endpoint.get("bucket1"));
 
-    verify(proxy, never()).getBucketDetails("volume1", "bucket1");
+    verify(proxy, never()).getS3BucketDetails("bucket1");
     verify(proxy).getLifecycleConfiguration("volume1", "bucket1");
   }
 
@@ -221,7 +221,7 @@ public class TestS3LifecycleConfigurationGet {
         .setName("volume1").setAcls(Collections.emptyList()).build();
     OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
         .setVolumeName("volume1").setName("bucket1").setOwner("owner").build();
-    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    when(proxy.getS3BucketDetails("bucket1")).thenReturn(bucket);
     ObjectStore objectStore = mock(ObjectStore.class);
     when(objectStore.getS3Volume()).thenReturn(volume);
     when(objectStore.getClientProxy()).thenReturn(proxy);

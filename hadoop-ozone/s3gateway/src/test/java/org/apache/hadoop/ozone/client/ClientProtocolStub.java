@@ -329,6 +329,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneBucket getS3BucketDetails(String bucketName) throws IOException {
+    return objectStoreStub.getS3Volume().getBucket(bucketName);
+  }
+
+  @Override
   public OzoneDataStreamOutput createStreamKeyIfNotExists(String volumeName,
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata,

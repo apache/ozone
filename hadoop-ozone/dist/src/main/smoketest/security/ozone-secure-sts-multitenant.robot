@@ -269,7 +269,7 @@ Verify Limited-Scoped Token Accesses
     Get Object Should Fail        ${TENANT_ONE_LINKED_BUCKET}   ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
     Put Object Should Fail        ${TENANT_ONE_LINKED_BUCKET}   ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
     Get Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket
-    Put Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
+    Put Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket
 
     Configure STS Profile         ${USER_A_T2_STS_ACCESS_KEY_ID}  ${USER_A_T2_STS_SECRET_KEY}  ${USER_A_T2_STS_SESSION_TOKEN}
 

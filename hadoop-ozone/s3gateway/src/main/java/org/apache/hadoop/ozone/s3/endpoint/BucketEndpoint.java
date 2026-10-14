@@ -140,7 +140,7 @@ public class BucketEndpoint extends BucketOperationHandler {
       boolean shallow = listKeysShallowEnabled
           && OZONE_URI_DELIMITER.equals(delimiter);
 
-      bucket = context.getVolume().getBucket(bucketName);
+      bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
 
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
@@ -318,7 +318,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     S3RequestContext context = new S3RequestContext(this, S3GAction.HEAD_BUCKET);
     long startNanos = context.getStartNanos();
     try {
-      OzoneBucket bucket = getVolume().getBucket(bucketName);
+      OzoneBucket bucket = context.getBucket(bucketName);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       auditReadSuccess(context.getAction());
       getMetrics().updateHeadBucketSuccessStats(startNanos);
@@ -382,7 +382,7 @@ public class BucketEndpoint extends BucketOperationHandler {
 
     final OzoneBucket bucket;
     try {
-      bucket = getVolume().getBucket(bucketName);
+      bucket = context.getBucket(bucketName);
     } catch (OMException ex) {
       throw newError(bucketName, ex);
     } catch (IOException ex) {

@@ -62,6 +62,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -164,7 +165,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3Se
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBucketResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -628,6 +628,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public OmBucketInfo getBucketInfo(String volume, String bucket)
       throws IOException {
+    return getBucketInfo(volume, bucket, false).getBucketInfo();
+  }
+
+  @Override
+  public BucketInfoWithVolumeContext getBucketInfo(String volume, String bucket, boolean assumeS3Context)
+      throws IOException {
     InfoBucketRequest.Builder req =
         InfoBucketRequest.newBuilder();
     req.setVolumeName(volume);
@@ -635,12 +641,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.InfoBucket)
         .setInfoBucketRequest(req)
+        .setAssumeS3Context(assumeS3Context)
         .build();
 
-    InfoBucketResponse resp =
-        handleError(submitRequest(omRequest)).getInfoBucketResponse();
+    OMResponse resp = handleError(submitRequest(omRequest));
 
-    return OmBucketInfo.getFromProtobuf(resp.getBucketInfo());
+    return BucketInfoWithVolumeContext.fromProtobuf(resp);
   }
 
   /**

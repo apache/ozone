@@ -767,8 +767,8 @@ class TestObjectPut {
   void testStreamingCopyReusesDestinationBucket() throws Exception {
     assertSucceeds(() -> putObject(CONTENT));
     objectEndpoint.init();
-    OzoneVolume volume = spy(objectEndpoint.getVolume());
-    doReturn(volume).when(objectEndpoint).getVolume();
+    ClientProtocol protocol = spy(objectEndpoint.getClientProtocol());
+    doReturn(protocol).when(objectEndpoint).getClientProtocol();
     doReturn(true).when(objectEndpoint).isDatastreamEnabled();
     doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
@@ -779,7 +779,7 @@ class TestObjectPut {
     }
     assertKeyContent(destBucket, DEST_KEY, CONTENT);
     assertThat(destBucket.getKey(DEST_KEY).getMetadata().get(OzoneConsts.ETAG)).isEqualTo(contentMd5Hex());
-    verify(volume).getBucket(DEST_BUCKET_NAME);
+    verify(protocol).getS3BucketDetails(DEST_BUCKET_NAME);
   }
 
   @Test
