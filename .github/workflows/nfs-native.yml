@@ -79,6 +79,11 @@ jobs:
           mvn --batch-mode --settings dev-support/ci/maven-settings.xml
           -pl :ozone-nfs-gateway test -DskipShade -DskipRecon -DskipDocs
 
+      - name: Set short hostname for secure integration certificates
+        run: |
+          sudo hostname ozone-ci
+          printf '127.0.0.1 ozone-ci\n' | sudo tee -a /etc/hosts
+
       - name: Run secure NFS and FSO integration contracts
         env:
           LANG: C.UTF-8
