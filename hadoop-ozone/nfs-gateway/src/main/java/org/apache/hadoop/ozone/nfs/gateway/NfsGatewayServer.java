@@ -37,6 +37,7 @@ import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /** Loopback-only backend listener; mutual TLS is mandatory even on the local host. */
 public final class NfsGatewayServer implements Closeable {
@@ -45,6 +46,7 @@ public final class NfsGatewayServer implements Closeable {
   private final ThreadPoolExecutor executor;
   private final NfsExportLeaseManager leaseManager;
   private final NfsGatewayMetrics metrics;
+  private NfsGatewayKerberosRelogin kerberosRelogin;
 
   public NfsGatewayServer(InetSocketAddress address, File certificate, File key, File trustedCa,
       Map<String, Set<UUID>> allowedPeers, BindableService service) throws IOException {
@@ -77,6 +79,10 @@ public final class NfsGatewayServer implements Closeable {
     }
   }
 
+  void startKerberosRelogin(UserGroupInformation loginUser) {
+    kerberosRelogin = new NfsGatewayKerberosRelogin(loginUser);
+  }
+
   public int getPort() {
     return server.getPort();
   }
@@ -97,6 +103,9 @@ public final class NfsGatewayServer implements Closeable {
       Thread.currentThread().interrupt();
     } finally {
       executor.shutdownNow();
+      if (kerberosRelogin != null) {
+        kerberosRelogin.close();
+      }
       NfsGatewayMetrics.unregister();
       if (leaseManager != null) {
         leaseManager.close();

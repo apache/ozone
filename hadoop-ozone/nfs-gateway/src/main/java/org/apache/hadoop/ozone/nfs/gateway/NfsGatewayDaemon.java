@@ -115,8 +115,10 @@ public final class NfsGatewayDaemon {
     NfsExportLeaseManager leaseManager = new NfsExportLeaseManager(readers, gatewayId, leaseDurationMillis);
     leaseManager.start();
     try {
-      return new NfsGatewayServer(new InetSocketAddress(address, port), certificate, key, trustedCa,
-          allowedPeers, new NfsGatewayService(readers, leaseManager), leaseManager);
+      NfsGatewayServer server = new NfsGatewayServer(new InetSocketAddress(address, port), certificate, key,
+          trustedCa, allowedPeers, new NfsGatewayService(readers, leaseManager), leaseManager);
+      server.startKerberosRelogin(gatewayUser);
+      return server;
     } catch (IOException | RuntimeException ex) {
       leaseManager.close();
       throw ex;
