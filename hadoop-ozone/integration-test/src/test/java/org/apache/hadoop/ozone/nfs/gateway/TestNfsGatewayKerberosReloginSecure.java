@@ -82,6 +82,7 @@ class TestNfsGatewayKerberosReloginSecure {
         PRINCIPAL + "@" + miniKdc.getRealm(), keytab.getAbsolutePath());
     KerberosTicket originalTgt = findTgt(gatewayUser);
     assertNotNull(originalTgt, "Keytab login should acquire a TGT");
+    Date originalStartTime = originalTgt.getStartTime();
     Date originalEndTime = originalTgt.getEndTime();
     AtomicReference<Date> renewalTime = new AtomicReference<>();
     assertTrue(originalTgt.getEndTime().getTime() - System.currentTimeMillis()
@@ -107,6 +108,10 @@ class TestNfsGatewayKerberosReloginSecure {
 
     KerberosTicket renewedTgt = findTgt(gatewayUser);
     assertNotNull(renewedTgt);
+    long renewalWindowStart = originalStartTime.getTime()
+        + (long) ((originalEndTime.getTime() - originalStartTime.getTime()) * 0.75);
+    assertTrue(renewalTime.get().getTime() >= renewalWindowStart,
+        "TGT should not renew well before Hadoop's normal 80% refresh threshold");
     assertTrue(renewalTime.get().before(originalEndTime), "TGT should renew before the original expires");
     assertTrue(renewedTgt.getEndTime().after(originalEndTime),
         "Scheduled renewal should replace the TGT before the original expires");
