@@ -285,6 +285,31 @@ class TestNfsExportLeaseManager {
   }
 
   @Test
+  void stopsServingAfterExpiredRenewalResponse() throws Exception {
+    NfsObjectReader reader = org.mockito.Mockito.mock(NfsObjectReader.class);
+    when(reader.updateExportLease(eq(ACQUIRE), eq("gateway-a"), eq(3000L), any(), any()))
+        .thenReturn(leaseResponse());
+    when(reader.updateExportLease(eq(RENEW), eq("gateway-a"), eq(3000L), eq(2L), eq(3L)))
+        .thenReturn(NfsExportLeaseResponse.newBuilder().setExportUUID(EXPORT_UUID.toStringUtf8()).setVolumeID(1)
+            .setBucketID(2).setGatewayID("gateway-a").setGatewayGeneration(2).setGeneration(3)
+            .setExpiresAtMillis(System.currentTimeMillis() - 1).build());
+    NfsExportLeaseManager manager = new NfsExportLeaseManager(Map.of(EXPORT_UUID, reader), "gateway-a", 3000);
+    manager.start();
+
+    try {
+      assertTrue(manager.isActive(EXPORT_UUID));
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+      while (manager.isActive(EXPORT_UUID) && System.nanoTime() < deadline) {
+        Thread.sleep(20);
+      }
+      assertFalse(manager.isActive(EXPORT_UUID));
+      verify(reader).updateExportLease(RENEW, "gateway-a", 3000, 2L, 3L);
+    } finally {
+      manager.close();
+    }
+  }
+
+  @Test
   void doesNotOutliveTheOmExportLeaseExpiry() throws Exception {
     NfsObjectReader reader = org.mockito.Mockito.mock(NfsObjectReader.class);
     NfsExportLeaseResponse shortLease = NfsExportLeaseResponse.newBuilder()

@@ -99,6 +99,7 @@ jobs:
           docker run --rm ozone-nfs-ganesha:ci ganesha.nfsd -v
 
       - name: Run secure NFS and FSO integration contracts
+        timeout-minutes: 30
         env:
           LANG: C.UTF-8
           OZONE_NFS_GANESHA_IMAGE: ozone-nfs-ganesha:ci
