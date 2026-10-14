@@ -102,6 +102,12 @@ public final class NodeSchemaManager {
     return allSchema.get(level - NetConstants.ROOT_LEVEL).getCost();
   }
 
+  public String getDefaultName(int level) {
+    Preconditions.checkArgument(level <= maxLevel &&
+        level >= (NetConstants.ROOT_LEVEL));
+    return allSchema.get(level - NetConstants.ROOT_LEVEL).getDefaultName();
+  }
+
   /**
    * Given a incomplete network path, return its complete network path if
    * possible. E.g. input is 'node1', output is '/rack-default/node1' if this

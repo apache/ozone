@@ -969,22 +969,53 @@ class TestNetworkTopologyImpl {
     // Minimum cost of the pipeline client -> dn -> ... -> dn with racks kept together:
     // each hop costs 2 within a rack and 4 across racks.
     // /r1: 2 + 2, then 5 rack crossings: 5 * 4, then within /r2, /r3, /r4, /r6: (3 + 1 + 2 + 1) * 2.
-    final int minPipelineCost = 38;
+    assertSortByDistanceCostGroupByRack(newCluster, client, nodeList, 1, 38, sortGroupByRack);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testSortByDistanceCostGroupByRackWithNodeGroup(boolean sortGroupByRack) {
+    NodeSchemaManager manager = NodeSchemaManager.getInstance();
+    manager.init(new NodeSchema[] {ROOT_SCHEMA, RACK_SCHEMA, NODEGROUP_SCHEMA, LEAF_SCHEMA}, true);
+    NetworkTopology newCluster = new NetworkTopologyImpl(manager, mockedShuffleOperation, sortGroupByRack);
+    Node client = createDatanode("0.0.0.0", "/r3/ng1");
+    newCluster.add(client);
+    // One datanode per nodegroup, with racks /r1 and /r2 each spanning multiple nodegroups.
+    List<Node> nodeList = Stream.of(
+        createDatanode("1.1.1.1", "/r1/ng1"),
+        createDatanode("2.2.2.1", "/r2/ng1"),
+        createDatanode("1.1.1.2", "/r1/ng2"),
+        createDatanode("2.2.2.2", "/r2/ng2"),
+        createDatanode("3.3.3.2", "/r3/ng2"),
+        createDatanode("2.2.2.3", "/r2/ng3"))
+        .collect(Collectors.toList());
+    nodeList.forEach(newCluster::add);
+
+    // Minimum cost of the pipeline client -> dn -> ... -> dn with racks kept together:
+    // each hop costs 4 across nodegroups in a rack and 6 across racks.
+    // /r3/ng2: 4, then 2 rack crossings: 2 * 6, then within /r1 and /r2: (1 + 2) * 4.
+    assertSortByDistanceCostGroupByRack(newCluster, client, nodeList, 2, 28, sortGroupByRack);
+  }
+
+  private static void assertSortByDistanceCostGroupByRack(NetworkTopology cluster, Node client, List<Node> nodeList,
+      int rackGeneration, int minPipelineCost, boolean sortGroupByRack) {
     boolean sameRackSplit = false;
     boolean pipelineCostIncreased = false;
     for (int i = 0; i < 100; i++) {
-      List<Node> ret = newCluster.sortByDistanceCost(client, nodeList, nodeList.size());
+      List<Node> ret = cluster.sortByDistanceCost(client, nodeList, nodeList.size());
       assertThat(ret).containsExactlyInAnyOrderElementsOf(nodeList);
-      int pipelineCost = newCluster.getDistanceCost(client, ret.get(0));
+      int pipelineCost = cluster.getDistanceCost(client, ret.get(0));
       for (int j = 1; j < ret.size(); j++) {
-        pipelineCost += newCluster.getDistanceCost(ret.get(j - 1), ret.get(j));
+        pipelineCost += cluster.getDistanceCost(ret.get(j - 1), ret.get(j));
       }
       if (sortGroupByRack) {
         assertEquals(minPipelineCost, pipelineCost, "Unexpected pipeline cost: " + ret);
       }
       assertThat(pipelineCost).isGreaterThanOrEqualTo(minPipelineCost);
       pipelineCostIncreased |= pipelineCost > minPipelineCost;
-      List<String> racks = ret.stream().map(Node::getNetworkLocation).collect(Collectors.toList());
+      List<String> racks = ret.stream()
+          .map(node -> cluster.getAncestor(node, rackGeneration).getNetworkFullPath())
+          .collect(Collectors.toList());
       long rackRuns = 1;
       for (int j = 1; j < racks.size(); j++) {
         if (!racks.get(j).equals(racks.get(j - 1))) {

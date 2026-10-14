@@ -67,6 +67,8 @@ public class NetworkTopologyImpl implements NetworkTopology {
   private final Consumer<List<? extends Node>> shuffleOperation;
   /** Whether sortByDistanceCost keeps nodes in the same rack next to each other. */
   private final boolean sortGroupByRack;
+  /** Level of the rack layer in the schema. */
+  private final int rackLevel;
   /** Lock to coordinate cluster tree access. */
   private final ReadWriteLock netlock = new ReentrantReadWriteLock(true);
 
@@ -77,6 +79,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     sortGroupByRack = conf.getBoolean(OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_KEY,
         OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_DEFAULT);
     maxLevel = schemaManager.getMaxLevel();
+    rackLevel = getRackLevel(schemaManager);
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
         NetConstants.ROOT_LEVEL,
@@ -89,6 +92,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     maxLevel = schemaManager.getMaxLevel();
     shuffleOperation = Collections::shuffle;
     this.sortGroupByRack = sortGroupByRack;
+    rackLevel = getRackLevel(schemaManager);
     factory = InnerNodeImpl.FACTORY;
     this.clusterTree = clusterTree;
   }
@@ -106,6 +110,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
     this.shuffleOperation = shuffleOperation;
     this.sortGroupByRack = sortGroupByRack;
     maxLevel = schemaManager.getMaxLevel();
+    rackLevel = getRackLevel(schemaManager);
     factory = InnerNodeImpl.FACTORY;
     clusterTree = factory.newInnerNode(ROOT, null, null,
         NetConstants.ROOT_LEVEL,
@@ -833,7 +838,7 @@ public class NetworkTopologyImpl implements NetworkTopology {
         if (sortGroupByRack) {
           Map<String, List<N>> racks = new LinkedHashMap<>();
           for (N node : list) {
-            racks.computeIfAbsent(node.getNetworkLocation(), k -> new ArrayList<>()).add(node);
+            racks.computeIfAbsent(getRackPath(node), k -> new ArrayList<>()).add(node);
           }
           racks.values().forEach(ret::addAll);
         } else {
@@ -848,6 +853,33 @@ public class NetworkTopologyImpl implements NetworkTopology {
       LOG.debug("Sorted datanodes {} for client {}, result: {}", nodes, reader, ret);
     }
     return ret;
+  }
+
+  /**
+   * @return the level of the schema layer whose default name is {@link NetConstants#DEFAULT_RACK},
+   * or the level of the leaves' parent if there is no such layer.
+   */
+  private static int getRackLevel(NodeSchemaManager manager) {
+    final int leafLevel = manager.getMaxLevel();
+    for (int level = NetConstants.ROOT_LEVEL; level < leafLevel; level++) {
+      if (NetConstants.DEFAULT_RACK.equals(manager.getDefaultName(level))) {
+        return level;
+      }
+    }
+    return leafLevel - 1;
+  }
+
+  /**
+   * @return the path of the rack containing the given leaf node, e.g. /r1 for a node at /r1/ng1/node1
+   * when the schema has a nodegroup layer under the rack layer.
+   */
+  private String getRackPath(Node node) {
+    final String location = node.getNetworkLocation();
+    int index = 0;
+    for (int level = NetConstants.ROOT_LEVEL; level < rackLevel && index >= 0; level++) {
+      index = location.indexOf(NetConstants.PATH_SEPARATOR, index + 1);
+    }
+    return index <= 0 ? location : location.substring(0, index);
   }
 
   /**
