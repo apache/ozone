@@ -29,6 +29,7 @@ import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpc
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.isServiceUser;
 
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
@@ -85,6 +86,7 @@ import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.common.DeletedBlock;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -102,12 +104,16 @@ public class SCMBlockProtocolServer implements
   private static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.SCMLOGGER);
 
+  // TODO: move OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY to hdds-common.
+  static final String OM_KERBEROS_PRINCIPAL_KEY = "ozone.om.kerberos.principal";
+
   private final StorageContainerManager scm;
   private final RPC.Server blockRpcServer;
   private final InetSocketAddress blockRpcAddress;
   private final ProtocolMessageMetrics<ScmBlockLocationProtocolProtos.Type>
       protocolMessageMetrics;
   private final SCMPerformanceMetrics perfMetrics;
+  private final String omPrincipal;
 
   /**
    * The RPC server that listens to requests from block service clients.
@@ -116,6 +122,7 @@ public class SCMBlockProtocolServer implements
       StorageContainerManager scm) throws IOException {
     this.scm = scm;
     this.perfMetrics = scm.getPerfMetrics();
+    this.omPrincipal = conf.get(OM_KERBEROS_PRINCIPAL_KEY, "");
     final int handlerCount = conf.getInt(OZONE_SCM_BLOCK_HANDLER_COUNT_KEY,
         OZONE_SCM_HANDLER_COUNT_KEY, OZONE_SCM_HANDLER_COUNT_DEFAULT,
             LOG::info);
@@ -191,6 +198,21 @@ public class SCMBlockProtocolServer implements
     getBlockRpcServer().join();
   }
 
+  /**
+   * Blocks are allocated and deleted on behalf of OM only.
+   */
+  private void checkOmOrAdminAccess() throws IOException {
+    final UserGroupInformation user = getRemoteUser();
+    if (scm.isAdminAuthorizationEnabled() && !isServiceUser(user, omPrincipal)) {
+      try {
+        scm.checkAdminAccess(user, false);
+      } catch (AccessControlException e) {
+        throw new AccessControlException(e.getMessage() + " Only SCM admins and the OM service user ("
+            + OM_KERBEROS_PRINCIPAL_KEY + " in the configuration of SCM) can allocate or delete blocks.");
+      }
+    }
+  }
+
   @Override
   public List<AllocatedBlock> allocateBlock(
       long size, int num,
@@ -198,6 +220,7 @@ public class SCMBlockProtocolServer implements
       String owner, ExcludeList excludeList,
       String clientMachine
   ) throws IOException {
+    checkOmOrAdminAccess();
     long startNanos = Time.monotonicNowNanos();
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("size", String.valueOf(size));
@@ -272,6 +295,7 @@ public class SCMBlockProtocolServer implements
   @Override
   public List<DeleteBlockGroupResult> deleteKeyBlocks(
       List<BlockGroup> keyBlocksInfoList) throws IOException {
+    checkOmOrAdminAccess();
     long totalBlocks = 0;
     for (BlockGroup bg : keyBlocksInfoList) {
       totalBlocks += bg.getDeletedBlocks().size();

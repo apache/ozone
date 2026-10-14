@@ -833,7 +833,7 @@ public final class RocksDatabase implements Closeable {
 
   public void delete(ColumnFamily family, byte[] key) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
-      db.get().delete(family.getHandle(), key);
+      db.get().delete(family.getHandle(), writeOptions, key);
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "delete " + bytes2String(key) + " from " + family;
@@ -854,7 +854,7 @@ public final class RocksDatabase implements Closeable {
   public void deleteRange(ColumnFamily family, byte[] beginKey, byte[] endKey)
       throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
-      db.get().deleteRange(family.getHandle(), beginKey, endKey);
+      db.get().deleteRange(family.getHandle(), writeOptions, beginKey, endKey);
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "delete range " + bytes2String(beginKey) +

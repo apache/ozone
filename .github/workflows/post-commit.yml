@@ -29,6 +29,6 @@ jobs:
       || (github.repository != 'apache/ozone' && github.ref_name != 'master')
     uses: $/.github/workflows/ci.yml
     secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
       OZONE_WEBSITE_BUILD: ${{ secrets.OZONE_WEBSITE_BUILD }}
       SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
