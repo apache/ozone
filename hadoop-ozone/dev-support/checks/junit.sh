@@ -55,21 +55,26 @@ if [[ -f hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh ]]; then
   ozone_java_setup
 fi
 
-CLEAN="clean"
-
-if [[ ${ITERATIONS} -gt 1 ]]; then
-  CHECK=flaky
-
-  if [[ ${OZONE_REPO_CACHED} == "false" ]]; then
-    # Need to clean and build for local run.
-    # In flaky-test-check the jars come from separate workflow job.
-    mvn ${MAVEN_OPTIONS} -DskipTests "$@" clean install
-    CLEAN=""
-  fi
+if [[ ${CHECK} != "flaky" ]]; then
+  # Local run, remove leftover artifacts from all modules
+  mvn ${MAVEN_OPTIONS} -Dscan=false clean
 fi
 
-if [[ ${CHECK} == "flaky" ]]; then
-  # repeated runs must execute the test, not load it from the build cache
+CLEAN="clean"
+
+if [[ ${ITERATIONS} -gt 1 ]] || [[ ${CHECK} == "flaky" ]]; then
+  if [[ ${OZONE_REPO_CACHED} == "false" ]]; then
+    # Need to build for local run.  In flaky-test-check the jars come from separate workflow job.
+    # Test may be limited to specific modules, also build dependencies.
+    # `clean` is included for cacheability.
+    mvn ${MAVEN_OPTIONS} -DskipTests --also-make "$@" clean install
+  fi
+
+  # Keep outputs from previous iterations
+  CLEAN=""
+
+  # Repeated runs must execute the test, not load it from the build cache
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Ddevelocity.cache.local.enabled=false"
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Ddevelocity.cache.remote.enabled=false"
 fi
 
