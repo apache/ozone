@@ -55,6 +55,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderFactory;
@@ -715,7 +716,25 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           channel.write(data);
         }
         LOG.info("Mounted NFS file {} was written; syncing", name);
-        channel.force(true);
+        AtomicBoolean syncCompleted = new AtomicBoolean();
+        Thread syncWatchdog = new Thread(() -> {
+          try {
+            Thread.sleep(TimeUnit.SECONDS.toMillis(15));
+            if (!syncCompleted.get()) {
+              logMountedSyncThreadDump();
+            }
+          } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+          }
+        }, "nfs-mounted-sync-watchdog");
+        syncWatchdog.setDaemon(true);
+        syncWatchdog.start();
+        try {
+          channel.force(true);
+        } finally {
+          syncCompleted.set(true);
+          syncWatchdog.interrupt();
+        }
         LOG.info("Mounted NFS file {} was synced", name);
       }
       LOG.info("Mounted NFS file was written and synced");
@@ -763,6 +782,17 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       new ProcessBuilder("sudo", "kdestroy", "-c", "FILE:/tmp/krb5cc_machine").start().waitFor(10, TimeUnit.SECONDS);
       new ProcessBuilder("kdestroy").start().waitFor(10, TimeUnit.SECONDS);
     }
+  }
+
+  private static void logMountedSyncThreadDump() {
+    LOG.warn("Mounted NFS fsync is still blocked after 15 seconds; dumping NFS and OM threads");
+    Thread.getAllStackTraces().forEach((thread, stack) -> {
+      String name = thread.getName();
+      if (name.contains("Nfs") || name.contains("OMStateMachineApplyTransactionThread")
+          || name.contains("IPC Server handler") || name.contains("ForkJoinPool-1-worker")) {
+        LOG.warn("Thread {} is {}: {}", name, thread.getState(), Arrays.toString(stack));
+      }
+    });
   }
 
   private Process streamGaneshaLog(Path logFile) throws IOException {
