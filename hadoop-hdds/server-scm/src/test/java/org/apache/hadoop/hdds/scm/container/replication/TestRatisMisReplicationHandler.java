@@ -27,6 +27,7 @@ import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.nullable;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -102,7 +103,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
                     anyInt())).thenReturn(mockedContainerPlacementStatus);
     when(placementPolicy.chooseDatanodes(
                     any(), any(), any(),
-                    anyInt(), anyLong(), anyLong(), any(StorageType.class)))
+                    anyInt(), anyLong(), anyLong(), nullable(StorageType.class)))
             .thenThrow(new SCMException("No nodes found", SCMException.ResultCodes.NO_SUCH_DATANODE));
     assertThrows(SCMException.class, () -> testMisReplication(
             availableReplicas, placementPolicy, Collections.emptyList(),

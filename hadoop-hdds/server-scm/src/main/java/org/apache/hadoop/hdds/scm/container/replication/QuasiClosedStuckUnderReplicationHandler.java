@@ -105,9 +105,14 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
     List<ContainerReplicaOp> mutablePendingOps = new ArrayList<>(pendingOps);
     for (QuasiClosedStuckReplicaCount.MisReplicatedOrigin origin : misReplicatedOrigins) {
       totalRequiredReplicas += origin.getReplicaDelta();
+      StorageType targetStorageType = origin.getSources().stream()
+          .map(ContainerReplica::getTargetStorageTypeForCopy)
+          .filter(Objects::nonNull)
+          .findFirst()
+          .orElse(null);
       List<DatanodeDetails> targets;
       try {
-        targets = getTargets(containerInfo, replicas, origin.getReplicaDelta(), mutablePendingOps);
+        targets = getTargets(containerInfo, replicas, origin.getReplicaDelta(), mutablePendingOps, targetStorageType);
       } catch (SCMException e) {
         if (firstException == null) {
           firstException = e;
@@ -119,12 +124,6 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
       List<DatanodeDetails> sourceDatanodes = origin.getSources().stream()
           .map(ContainerReplica::getDatanodeDetails)
           .collect(Collectors.toList());
-      // Keep the new copies on the same tier as the replicas being copied.
-      StorageType targetStorageType = origin.getSources().stream()
-          .map(ContainerReplica::getTargetStorageTypeForCopy)
-          .filter(Objects::nonNull)
-          .findFirst()
-          .orElse(null);
       for (DatanodeDetails target : targets) {
         try {
           replicationManager.sendThrottledReplicationCommand(
@@ -159,7 +158,8 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
   }
 
   private List<DatanodeDetails> getTargets(ContainerInfo containerInfo,
-      Set<ContainerReplica> replicas, int additionalRequired, List<ContainerReplicaOp> pendingOps) throws IOException {
+      Set<ContainerReplica> replicas, int additionalRequired, List<ContainerReplicaOp> pendingOps,
+      StorageType targetStorageType) throws IOException {
     LOG.debug("Need {} target datanodes for container {}. Current replicas: {}.",
         additionalRequired, containerInfo, replicas);
 
@@ -172,9 +172,8 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
 
     LOG.debug("UsedList: {}, size {}. ExcludeList: {}, size: {}. ",
         used, used.size(), excluded, excluded.size());
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
     return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
-        additionalRequired, used, excluded, currentContainerSize, containerInfo, StorageType.DEFAULT);
+        additionalRequired, used, excluded, currentContainerSize, containerInfo, targetStorageType);
   }
 
 }

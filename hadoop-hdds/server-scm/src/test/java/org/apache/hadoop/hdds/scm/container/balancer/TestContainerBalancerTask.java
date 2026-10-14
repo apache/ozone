@@ -38,8 +38,12 @@ import static org.mockito.Mockito.when;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,6 +57,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -62,6 +67,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto;
+import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -82,9 +89,11 @@ import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,6 +101,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -763,6 +773,263 @@ public class TestContainerBalancerTask {
         .setSequenceId(1000L)
         .setBytesUsed(usedBytes)
         .build();
+  }
+
+  @Test
+  public void testStorageTypesTakeTurnsWithinIteration() throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80, 80, 80);
+    DatanodeUsageInfo target = storageTypeNode(20, 20, 20);
+    List<StorageType> order = new ArrayList<>();
+    for (StorageType type : Arrays.asList(StorageType.SSD, StorageType.DISK, StorageType.ARCHIVE)) {
+      addStorageTypeContainer(source, 1000L + type.ordinal() * 10, type, 10 * STORAGE_UNIT);
+      addStorageTypeContainer(source, 1001L + type.ordinal() * 10, type, 10 * STORAGE_UNIT);
+    }
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, order);
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).containsExactly(StorageType.SSD, StorageType.DISK, StorageType.ARCHIVE,
+        StorageType.SSD, StorageType.DISK, StorageType.ARCHIVE);
+    assertEquals(2, containerBalancerTask.getMetrics().getNumDatanodesInvolvedInLatestIteration());
+    ContainerBalancerTaskIterationStatusInfo iteration = containerBalancerTask.getCurrentIterationsStatistic().get(0);
+    assertEquals(3, iteration.getStorageTypeStatusInfo().size());
+    iteration.getStorageTypeStatusInfo().forEach(type -> {
+      assertEquals(2, type.getContainerMovesScheduled());
+      assertEquals(2, type.getContainerMovesCompleted());
+      assertEquals(20 * STORAGE_UNIT, type.getDataSizeMoved());
+      assertEquals(20 * STORAGE_UNIT, type.getSizeScheduledForMove());
+      assertEquals(2, type.getNumDatanodesInvolved());
+      assertEquals(2, type.getNumDatanodesUnbalanced());
+      assertEquals(20 * STORAGE_UNIT, type.getSizeEnteringNodes(0).getDataVolume());
+      assertEquals(20 * STORAGE_UNIT, type.getSizeLeavingNodes(0).getDataVolume());
+    });
+    assertEquals(iteration.getDataSizeMoved(), iteration.getStorageTypeStatusInfo().stream()
+        .mapToLong(type -> type.getDataSizeMoved()).sum());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testMoveResultsKeepScheduledStorageTypeAfterSwitchingTurns(boolean exceptional) throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80, 80);
+    DatanodeUsageInfo target = storageTypeNode(20, 20);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, 10 * STORAGE_UNIT);
+    addStorageTypeContainer(source, 1001, StorageType.DISK, 20 * STORAGE_UNIT);
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, new ArrayList<>());
+    CompletableFuture<MoveManager.MoveResult> ssdFuture = new CompletableFuture<>();
+    when(moveManager.move(any(), any(), any())).thenAnswer(invocation -> {
+      if (ContainerID.valueOf(1000).equals(invocation.getArgument(0))) {
+        return ssdFuture;
+      }
+      // Complete SSD while the task is scheduling DISK, not during the SSD turn.
+      if (exceptional) {
+        ssdFuture.completeExceptionally(new IOException("SSD move failed"));
+      } else {
+        ssdFuture.complete(MoveManager.MoveResult.COMPLETED);
+      }
+      return CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
+    });
+    startBalancer(balancerConfiguration);
+
+    ContainerBalancerTaskIterationStatusInfo iteration = containerBalancerTask.getCurrentIterationsStatistic().get(0);
+    ContainerBalancerStorageTypeStatusInfoProto ssd = iteration.getStorageTypeStatusInfo().stream()
+        .filter(type -> type.getStorageType() == HddsProtos.StorageTypeProto.SSD).findFirst().get();
+    ContainerBalancerStorageTypeStatusInfoProto disk = iteration.getStorageTypeStatusInfo().stream()
+        .filter(type -> type.getStorageType() == HddsProtos.StorageTypeProto.DISK).findFirst().get();
+    assertEquals(exceptional ? 1 : 0, ssd.getContainerMovesFailed());
+    assertEquals(exceptional ? 0 : 1, ssd.getContainerMovesCompleted());
+    assertEquals(exceptional ? 0 : 10 * STORAGE_UNIT, ssd.getDataSizeMoved());
+    assertEquals(1, disk.getContainerMovesCompleted());
+    assertEquals(20 * STORAGE_UNIT, disk.getDataSizeMoved());
+    assertEquals(0, disk.getContainerMovesFailed());
+  }
+
+  @Test
+  public void testTimedOutStorageTypeMoveDoesNotAlsoRecordLateSuccess() throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80, 80);
+    DatanodeUsageInfo target = storageTypeNode(20, 20);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, 10 * STORAGE_UNIT);
+    addStorageTypeContainer(source, 1001, StorageType.DISK, 20 * STORAGE_UNIT);
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, new ArrayList<>());
+    balancerConfiguration.setMoveTimeout(Duration.ofMillis(50));
+    CompletableFuture<MoveManager.MoveResult> ssdFuture = new CompletableFuture<>();
+    when(moveManager.move(any(), any(), any())).thenAnswer(invocation ->
+        ContainerID.valueOf(1000).equals(invocation.getArgument(0)) ? ssdFuture
+            : CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
+    startBalancer(balancerConfiguration);
+    ContainerBalancerTaskIterationStatusInfo iteration = containerBalancerTask.getCurrentIterationsStatistic().get(0);
+    ContainerBalancerStorageTypeStatusInfoProto ssd = iteration.getStorageTypeStatusInfo().stream()
+        .filter(type -> type.getStorageType() == HddsProtos.StorageTypeProto.SSD).findFirst().get();
+    assertEquals(1, ssd.getContainerMovesTimeout());
+    assertEquals(0, ssd.getContainerMovesCompleted());
+    long completed = containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration();
+    long moved = containerBalancerTask.getMetrics().getDataSizeMovedInLatestIteration();
+    ssdFuture.complete(MoveManager.MoveResult.COMPLETED);
+    ContainerBalancerStorageTypeStatusInfoProto current = containerBalancerTask.getMetrics().getStorageTypeStatusInfo()
+        .stream().filter(type -> type.getStorageType() == HddsProtos.StorageTypeProto.SSD).findFirst().get();
+    assertEquals(ssd, current);
+    assertEquals(completed, containerBalancerTask.getMetrics().getNumContainerMovesCompletedInLatestIteration());
+    assertEquals(moved, containerBalancerTask.getMetrics().getDataSizeMovedInLatestIteration());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 1})
+  public void testFirstStorageTypeRotatesWithSmallSharedLimit(int iteration) throws Exception {
+    DatanodeUsageInfo ssdSource = storageTypeNode(80, -1);
+    DatanodeUsageInfo ssdTarget = storageTypeNode(20, -1);
+    DatanodeUsageInfo diskSource = storageTypeNode(-1, 80);
+    DatanodeUsageInfo diskTarget = storageTypeNode(-1, 20);
+    addStorageTypeContainer(ssdSource, 1000, StorageType.SSD, STORAGE_UNIT);
+    addStorageTypeContainer(diskSource, 1001, StorageType.DISK, STORAGE_UNIT);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(ssdSource, ssdTarget, diskSource, diskTarget), iteration, order);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(50);
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).containsExactly(iteration == 0 ? StorageType.SSD : StorageType.DISK);
+    assertEquals(2, containerBalancerTask.getMetrics().getNumDatanodesInvolvedInLatestIteration());
+  }
+
+  @Test
+  public void testTierImbalanceIsNotHiddenByBalancedWholeNodeUsage() throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(95, 0);
+    DatanodeUsageInfo target = storageTypeNode(20, 75);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, 10 * STORAGE_UNIT);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, order);
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).containsExactly(StorageType.SSD);
+    assertEquals(target.getDatanodeDetails(),
+        containerBalancerTask.getContainerToTargetMap().get(ContainerID.valueOf(1000)));
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(Arrays.asList(
+        source.toProto(ClientVersion.CURRENT_VERSION), target.toProto(ClientVersion.CURRENT_VERSION)),
+        balancerConfiguration.getThresholdAsRatio(), Collections.emptySet(), Collections.emptySet());
+    assertEquals(snapshot.getSourceDatanodes(), containerBalancerTask.getOverUtilizedNodes().stream()
+        .map(node -> node.getDatanodeID().toString()).collect(Collectors.toSet()));
+    assertEquals(snapshot.getTargetDatanodes(), containerBalancerTask.getUnderUtilizedNodes().stream()
+        .map(node -> node.getDatanodeID().toString()).collect(Collectors.toSet()));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {2, 3, 4})
+  public void testNodeLimitDoesNotRestoreTargetsFromAnotherStorageType(int maxNodes) throws Exception {
+    DatanodeUsageInfo ssdSource = storageTypeNode(80, -1);
+    DatanodeUsageInfo ssdTarget = storageTypeNode(20, -1);
+    DatanodeUsageInfo diskSource = storageTypeNode(-1, 80);
+    DatanodeUsageInfo diskTarget = storageTypeNode(-1, 20);
+    addStorageTypeContainer(ssdSource, 1000, StorageType.SSD, STORAGE_UNIT);
+    addStorageTypeContainer(diskSource, 1001, StorageType.DISK, STORAGE_UNIT);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(ssdSource, ssdTarget, diskSource, diskTarget), 0, order);
+    balancerConfiguration.setMaxDatanodesPercentageToInvolvePerIteration(maxNodes * 25);
+    startBalancer(balancerConfiguration);
+
+    if (maxNodes < 4) {
+      assertThat(order).containsExactly(StorageType.SSD);
+    } else {
+      assertThat(order).containsExactly(StorageType.SSD, StorageType.DISK);
+      assertEquals(diskTarget.getDatanodeDetails(),
+          containerBalancerTask.getContainerToTargetMap().get(ContainerID.valueOf(1001)));
+    }
+    assertEquals(ssdTarget.getDatanodeDetails(),
+        containerBalancerTask.getContainerToTargetMap().get(ContainerID.valueOf(1000)));
+    assertThat(containerBalancerTask.getMetrics().getNumDatanodesInvolvedInLatestIteration())
+        .isLessThanOrEqualTo(maxNodes);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testTrafficLimitIsSharedAcrossStorageTypes(boolean limitEntering) throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80, 80);
+    DatanodeUsageInfo target = storageTypeNode(20, 20);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, 60);
+    addStorageTypeContainer(source, 1001, StorageType.DISK, 60);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, order);
+    if (limitEntering) {
+      balancerConfiguration.setMaxSizeEnteringTarget(100);
+    } else {
+      balancerConfiguration.setMaxSizeLeavingSource(100);
+    }
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).containsExactly(StorageType.SSD);
+    assertEquals(60, containerBalancerTask.getSizeScheduledForMoveInLatestIteration());
+  }
+
+  @Test
+  public void testDatanodeParticipatingInBothRolesIsCountedOnce() throws Exception {
+    DatanodeUsageInfo first = storageTypeNode(80, 20);
+    DatanodeUsageInfo second = storageTypeNode(20, 80);
+    addStorageTypeContainer(first, 1000, StorageType.SSD, STORAGE_UNIT);
+    addStorageTypeContainer(second, 1001, StorageType.DISK, STORAGE_UNIT);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(first, second), 0, order);
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).containsExactly(StorageType.SSD, StorageType.DISK);
+    assertEquals(2, containerBalancerTask.getMetrics().getNumDatanodesInvolvedInLatestIteration());
+  }
+
+  private DatanodeUsageInfo storageTypeNode(long... usedPercentages) {
+    StorageType[] types = {StorageType.SSD, StorageType.DISK, StorageType.ARCHIVE};
+    Map<StorageType, Long> capacity = new EnumMap<>(StorageType.class);
+    Map<StorageType, Long> used = new EnumMap<>(StorageType.class);
+    Map<StorageType, Long> remaining = new EnumMap<>(StorageType.class);
+    for (int i = 0; i < usedPercentages.length; i++) {
+      if (usedPercentages[i] >= 0) {
+        capacity.put(types[i], 100 * STORAGE_UNIT);
+        used.put(types[i], usedPercentages[i] * STORAGE_UNIT);
+        remaining.put(types[i], (100 - usedPercentages[i]) * STORAGE_UNIT);
+      }
+    }
+    return new DatanodeUsageInfo(MockDatanodeDetails.randomDatanodeDetails(), new SCMNodeStat(capacity, used, remaining,
+        Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap()));
+  }
+
+  private void addStorageTypeContainer(DatanodeUsageInfo source, long id, StorageType type, long size) {
+    ContainerInfo container = createContainer(id, 1);
+    container.setUsedBytes(size);
+    cidToInfoMap.put(container.containerID(), container);
+    ContainerReplica replica = ContainerReplica.newBuilder().setContainerID(container.containerID())
+        .setContainerState(ContainerReplicaProto.State.CLOSED).setDatanodeDetails(source.getDatanodeDetails())
+        .setStorageType(type).setVolumeStorageType(type).setBytesUsed(size).setSequenceId(1000L).build();
+    cidToReplicasMap.put(container.containerID(), Collections.singleton(replica));
+  }
+
+  private void configureStorageTypeCluster(List<DatanodeUsageInfo> nodes, int iteration, List<StorageType> order)
+      throws Exception {
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.getMostOrLeastUsedDatanodes(true)).thenAnswer(invocation -> new ArrayList<>(nodes));
+    when(nodeManager.getUsageInfo(any(DatanodeDetails.class))).thenAnswer(invocation -> nodes.stream()
+        .filter(node -> node.getDatanodeDetails().equals(invocation.getArgument(0))).findFirst().get());
+    when(nodeManager.isNodeRegistered(any(DatanodeDetails.class))).thenReturn(true);
+    when(nodeManager.getContainers(any(DatanodeDetails.class))).thenAnswer(invocation -> {
+      Set<ContainerID> containers = new HashSet<>();
+      cidToReplicasMap.forEach((id, replicas) -> {
+        if (replicas.stream().anyMatch(replica -> replica.getDatanodeDetails().equals(invocation.getArgument(0)))) {
+          containers.add(id);
+        }
+      });
+      return containers;
+    });
+    when(scm.getScmNodeManager()).thenReturn(nodeManager);
+    PlacementPolicyValidateProxy placement = mock(PlacementPolicyValidateProxy.class);
+    ContainerPlacementStatus status = mock(ContainerPlacementStatus.class);
+    when(status.isPolicySatisfied()).thenReturn(true);
+    when(placement.validateContainerPlacement(any(), any())).thenReturn(status);
+    when(scm.getPlacementPolicyValidateProxy()).thenReturn(placement);
+    when(moveManager.move(any(), any(), any())).thenAnswer(invocation -> {
+      ContainerID id = invocation.getArgument(0);
+      order.add(cidToReplicasMap.get(id).iterator().next().getTargetStorageTypeForCopy());
+      return CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
+    });
+    balancerConfiguration.setIterations(iteration + 1);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeEnteringTarget(100 * STORAGE_UNIT);
+    balancerConfiguration.setMaxSizeLeavingSource(100 * STORAGE_UNIT);
+    ContainerBalancer balancer = new ContainerBalancer(scm);
+    containerBalancerTask = new ContainerBalancerTask(scm, iteration, balancer, balancer.getMetrics(),
+        balancerConfiguration, false);
   }
 
   private void startBalancer(ContainerBalancerConfiguration config)

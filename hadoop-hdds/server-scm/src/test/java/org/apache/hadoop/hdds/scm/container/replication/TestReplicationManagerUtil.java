@@ -28,15 +28,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.nullable;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.fs.StorageType;
@@ -46,11 +53,13 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -71,6 +80,62 @@ public class TestReplicationManagerUtil {
     replicationManager = mock(ReplicationManager.class);
     ContainerReplicaPendingOps pendingOpsMock = mock(ContainerReplicaPendingOps.class);
     when(replicationManager.getContainerReplicaPendingOps()).thenReturn(pendingOpsMock);
+  }
+
+  @Test
+  public void testCopyTargetsMatchEachReplicaStorageType() throws Exception {
+    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    List<ContainerReplica> replicas = new ArrayList<>();
+    Map<StorageType, DatanodeDetails> targets = new HashMap<>();
+    for (StorageType type : Arrays.asList(StorageType.SSD, StorageType.ARCHIVE, null)) {
+      replicas.add(ContainerReplica.newBuilder().setContainerID(container.containerID())
+          .setContainerState(ContainerReplicaProto.State.CLOSED)
+          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails()).setVolumeStorageType(type).build());
+      targets.put(type, MockDatanodeDetails.randomDatanodeDetails());
+    }
+    PlacementPolicy policy = mock(PlacementPolicy.class);
+    List<DatanodeDetails> previouslySelected = new ArrayList<>();
+    when(policy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong(), nullable(StorageType.class)))
+        .thenAnswer(invocation -> {
+          assertEquals(1, invocation.getArgument(3, Integer.class).intValue());
+          assertThat(invocation.<List<DatanodeDetails>>getArgument(0)).containsExactlyElementsOf(previouslySelected);
+          DatanodeDetails target = targets.get(invocation.<StorageType>getArgument(6));
+          previouslySelected.add(target);
+          return Collections.singletonList(target);
+        });
+
+    Map<ContainerReplica, DatanodeDetails> selected = ReplicationManagerUtil.getTargetDatanodesForReplicas(
+        policy, replicas, Collections.emptyList(), Collections.emptyList(), 1, container);
+    assertEquals(3, selected.size());
+    replicas.forEach(replica ->
+        assertEquals(targets.get(replica.getTargetStorageTypeForCopy()), selected.get(replica)));
+  }
+
+  @Test
+  public void testUnavailableStorageTypeDoesNotPreventOtherCopies() throws Exception {
+    ContainerInfo container = createContainer(HddsProtos.LifeCycleState.CLOSED,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+    ContainerReplica ssd = ContainerReplica.newBuilder().setContainerID(container.containerID())
+        .setContainerState(ContainerReplicaProto.State.CLOSED)
+        .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails()).setVolumeStorageType(StorageType.SSD).build();
+    ContainerReplica disk = ContainerReplica.newBuilder().setContainerID(container.containerID())
+        .setContainerState(ContainerReplicaProto.State.CLOSED)
+        .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails()).setVolumeStorageType(StorageType.DISK).build();
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    PlacementPolicy policy = mock(PlacementPolicy.class);
+    when(policy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong(), nullable(StorageType.class)))
+        .thenAnswer(invocation -> {
+          if (invocation.getArgument(6) == StorageType.SSD) {
+            throw new SCMException("No SSD target", SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+          }
+          return Collections.singletonList(target);
+        });
+
+    Map<ContainerReplica, DatanodeDetails> selected = ReplicationManagerUtil.getTargetDatanodesForReplicas(
+        policy, Arrays.asList(ssd, disk), Collections.emptyList(), Collections.emptyList(), 1, container);
+    assertThat(selected).containsOnlyKeys(disk);
+    assertEquals(target, selected.get(disk));
   }
 
   @Test

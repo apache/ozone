@@ -17,11 +17,27 @@
 
 package org.apache.hadoop.hdds.scm.container.balancer;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeTransferInfoProto;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.Interns;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
  * Metrics related to Container Balancer running in SCM.
@@ -33,6 +49,10 @@ public final class ContainerBalancerMetrics {
       ContainerBalancerMetrics.class.getSimpleName();
 
   private final MetricsSystem ms;
+  // Keep the existing record name so aggregate metrics and dashboards remain compatible.
+  private final MetricsRegistry registry = new MetricsRegistry(Interns.info(
+      "ContainerBalancer Metrics", "Metrics related to Container Balancer running in SCM"));
+  private final Map<String, StorageTypeMetrics> storageTypeMetrics = new ConcurrentHashMap<>();
 
   @Metric(about = "Amount of Gigabytes that Container Balancer moved" +
       " in the latest iteration.")
@@ -375,5 +395,178 @@ public final class ContainerBalancerMetrics {
 
   public void incrementNumIterationLimitsSkipped() {
     numIterationLimitsSkipped.incr();
+  }
+
+  StorageTypeMetrics forStorageType(StorageType storageType) {
+    String name = storageType == null ? "UNKNOWN" : storageType.name();
+    return storageTypeMetrics.computeIfAbsent(name, ignored -> new StorageTypeMetrics(storageType, name));
+  }
+
+  void resetStorageTypeMetrics() {
+    storageTypeMetrics.values().forEach(StorageTypeMetrics::reset);
+  }
+
+  void finishStorageTypeIteration() {
+    storageTypeMetrics.values().forEach(StorageTypeMetrics::finishIteration);
+  }
+
+  List<ContainerBalancerStorageTypeStatusInfoProto> getStorageTypeStatusInfo() {
+    List<ContainerBalancerStorageTypeStatusInfoProto> result = new ArrayList<>();
+    storageTypeMetrics.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+      ContainerBalancerStorageTypeStatusInfoProto snapshot = entry.getValue().snapshot();
+      if (snapshot != null) {
+        result.add(snapshot);
+      }
+    });
+    return Collections.unmodifiableList(result);
+  }
+
+  /** Per-type counters supplement, but never reset or replace, the shared iteration budgets. */
+  final class StorageTypeMetrics {
+    private final StorageType storageType;
+    private final MutableGaugeLong scheduledBytes;
+    private final MutableGaugeLong movedBytes;
+    private final MutableGaugeLong scheduled;
+    private final MutableGaugeLong completed;
+    private final MutableGaugeLong failed;
+    private final MutableGaugeLong timeout;
+    private final MutableGaugeLong involved;
+    private final MutableGaugeLong unbalanced;
+    private final MutableGaugeLong unbalancedBytes;
+    private final MutableCounterLong totalScheduled;
+    private final MutableCounterLong totalCompleted;
+    private final MutableCounterLong totalFailed;
+    private final MutableCounterLong totalTimeout;
+    private final MutableCounterLong totalMovedBytes;
+    private final Map<DatanodeID, Long> entering = new HashMap<>();
+    private final Map<DatanodeID, Long> leaving = new HashMap<>();
+    private final Set<DatanodeID> involvedNodes = new HashSet<>();
+    private long generation;
+    private boolean active;
+    private boolean finalized;
+
+    private StorageTypeMetrics(StorageType storageType, String name) {
+      this.storageType = storageType;
+      scheduledBytes = registry.newGauge("DataSizeScheduledBytesInLatestIteration" + name,
+          "Bytes selected for moving in the latest iteration on " + name, 0L);
+      movedBytes = registry.newGauge("DataSizeMovedBytesInLatestIteration" + name,
+          "Bytes moved in the latest iteration on " + name, 0L);
+      scheduled = registry.newGauge("NumContainerMovesScheduledInLatestIteration" + name,
+          "Moves scheduled in the latest iteration on " + name, 0L);
+      completed = registry.newGauge("NumContainerMovesCompletedInLatestIteration" + name,
+          "Moves completed in the latest iteration on " + name, 0L);
+      failed = registry.newGauge("NumContainerMovesFailedInLatestIteration" + name,
+          "Moves failed in the latest iteration on " + name, 0L);
+      timeout = registry.newGauge("NumContainerMovesTimeoutInLatestIteration" + name,
+          "Moves timed out in the latest iteration on " + name, 0L);
+      involved = registry.newGauge("NumDatanodesInvolvedInLatestIteration" + name,
+          "Unique datanodes involved in the latest iteration on " + name, 0L);
+      unbalanced = registry.newGauge("NumDatanodesUnbalanced" + name, "Unbalanced datanodes on " + name, 0L);
+      unbalancedBytes = registry.newGauge("DataSizeUnbalancedBytes" + name, "Imbalance bytes on " + name, 0L);
+      totalScheduled = registry.newCounter("NumContainerMovesScheduled" + name, "Moves scheduled on " + name, 0L);
+      totalCompleted = registry.newCounter("NumContainerMovesCompleted" + name, "Moves completed on " + name, 0L);
+      totalFailed = registry.newCounter("NumContainerMovesFailed" + name, "Moves failed on " + name, 0L);
+      totalTimeout = registry.newCounter("NumContainerMovesTimeout" + name, "Moves timed out on " + name, 0L);
+      totalMovedBytes = registry.newCounter("DataSizeMovedBytes" + name, "Bytes moved on " + name, 0L);
+    }
+
+    synchronized void initialize(ContainerBalancerClusterSnapshot snapshot) {
+      active = true;
+      Set<String> nodes = new HashSet<>(snapshot.getSourceDatanodes());
+      nodes.addAll(snapshot.getTargetDatanodes());
+      unbalanced.set(nodes.size());
+      unbalancedBytes.set(Math.max(snapshot.getTotalOverUtilizedBytes(), snapshot.getTotalUnderUtilizedBytes()));
+    }
+
+    synchronized long getGeneration() {
+      return generation;
+    }
+
+    synchronized void recordScheduled() {
+      active = true;
+      scheduled.incr();
+    }
+
+    synchronized boolean recordResult(MoveManager.MoveResult result, long bytes, long moveGeneration) {
+      // A timed-out move may finish after a later iteration has reset these gauges.
+      if (moveGeneration != generation || result == null) {
+        return false;
+      }
+      active = true;
+      switch (result) {
+      case COMPLETED:
+        completed.incr();
+        movedBytes.incr(bytes);
+        break;
+      case REPLICATION_FAIL_TIME_OUT:
+      case DELETION_FAIL_TIME_OUT:
+        timeout.incr();
+        break;
+      default:
+        failed.incr();
+        break;
+      }
+      return true;
+    }
+
+    synchronized void recordTraffic(DatanodeID source, DatanodeID target, long bytes) {
+      active = true;
+      scheduledBytes.incr(bytes);
+      leaving.merge(source, bytes, Long::sum);
+      entering.merge(target, bytes, Long::sum);
+      involvedNodes.add(source);
+      involvedNodes.add(target);
+      involved.set(involvedNodes.size());
+    }
+
+    private synchronized void reset() {
+      generation++;
+      active = false;
+      finalized = false;
+      scheduledBytes.set(0);
+      movedBytes.set(0);
+      scheduled.set(0);
+      completed.set(0);
+      failed.set(0);
+      timeout.set(0);
+      involved.set(0);
+      unbalanced.set(0);
+      unbalancedBytes.set(0);
+      entering.clear();
+      leaving.clear();
+      involvedNodes.clear();
+    }
+
+    private synchronized void finishIteration() {
+      if (active && !finalized) {
+        totalScheduled.incr(scheduled.value());
+        totalCompleted.incr(completed.value());
+        totalFailed.incr(failed.value());
+        totalTimeout.incr(timeout.value());
+        totalMovedBytes.incr(movedBytes.value());
+        finalized = true;
+      }
+    }
+
+    private synchronized ContainerBalancerStorageTypeStatusInfoProto snapshot() {
+      if (!active) {
+        return null;
+      }
+      ContainerBalancerStorageTypeStatusInfoProto.Builder builder =
+          ContainerBalancerStorageTypeStatusInfoProto.newBuilder()
+              .setSizeScheduledForMove(scheduledBytes.value()).setDataSizeMoved(movedBytes.value())
+              .setContainerMovesScheduled(scheduled.value()).setContainerMovesCompleted(completed.value())
+              .setContainerMovesFailed(failed.value()).setContainerMovesTimeout(timeout.value())
+              .setNumDatanodesInvolved(involved.value()).setNumDatanodesUnbalanced(unbalanced.value())
+              .setDataSizeUnbalanced(unbalancedBytes.value());
+      if (storageType != null) {
+        builder.setStorageType(StorageTypeUtils.getStorageTypeProto(storageType));
+      }
+      entering.forEach((id, bytes) -> builder.addSizeEnteringNodes(
+          NodeTransferInfoProto.newBuilder().setUuid(id.toString()).setDataVolume(bytes)));
+      leaving.forEach((id, bytes) -> builder.addSizeLeavingNodes(
+          NodeTransferInfoProto.newBuilder().setUuid(id.toString()).setDataVolume(bytes)));
+      return builder.build();
+    }
   }
 }

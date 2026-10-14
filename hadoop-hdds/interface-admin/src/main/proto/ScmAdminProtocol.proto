@@ -677,6 +677,23 @@ message ContainerBalancerTaskIterationStatusInfoProto {
   repeated NodeTransferInfoProto sizeLeavingNodes = 10;
   optional int64 iterationDuration = 11;
   repeated ContainerMoveFailureDetailProto containerMoveFailures = 12;
+  repeated ContainerBalancerStorageTypeStatusInfoProto storageTypeStatusInfo = 13;
+}
+
+// Supplements the existing iteration totals; absent storageType means legacy type-agnostic balancing.
+message ContainerBalancerStorageTypeStatusInfoProto {
+  optional StorageTypeProto storageType = 1;
+  optional int64 sizeScheduledForMove = 2;
+  optional int64 dataSizeMoved = 3;
+  optional int64 containerMovesScheduled = 4;
+  optional int64 containerMovesCompleted = 5;
+  optional int64 containerMovesFailed = 6;
+  optional int64 containerMovesTimeout = 7;
+  optional int64 numDatanodesInvolved = 8;
+  optional int64 numDatanodesUnbalanced = 9;
+  optional int64 dataSizeUnbalanced = 10;
+  repeated NodeTransferInfoProto sizeEnteringNodes = 11;
+  repeated NodeTransferInfoProto sizeLeavingNodes = 12;
 }
 
 message ContainerMoveFailureDetailProto {

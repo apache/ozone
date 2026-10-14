@@ -133,9 +133,10 @@ public class RatisUnderReplicationHandler
     }
 
     List<DatanodeDetails> targetDatanodes;
+    StorageType targetStorageType = targetStorageTypeFor(replicaCount.getReplicas());
     try {
       // find targets to send replicas to
-      targetDatanodes = getTargets(replicaCount, pendingOps);
+      targetDatanodes = getTargets(replicaCount, pendingOps, targetStorageType);
     } catch (SCMException e) {
       SCMException.ResultCodes code = e.getResult();
       if (code != SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE) {
@@ -151,7 +152,7 @@ public class RatisUnderReplicationHandler
     // Keep new replicas on the same tier as the existing ones.
     int commandsSent = sendReplicationCommands(
         containerInfo, sourceDatanodes, targetDatanodes,
-        targetStorageTypeFor(replicaCount.getReplicas()));
+        targetStorageType);
 
     if (targetDatanodes.size() < replicaCount.additionalReplicaNeeded()) {
       // The placement policy failed to find enough targets to satisfy fix
@@ -241,10 +242,10 @@ public class RatisUnderReplicationHandler
     int numCommandsSent = 0;
     for (ContainerReplica replica : sources) {
       // find a target for each source and send replicate command
-      // TODO StoragePolicy replace this StorageType with container actual StorageType
       final List<DatanodeDetails> target =
           ReplicationManagerUtil.getTargetDatanodes(placementPolicy, 1, excludedAndUsedNodes.getUsedNodes(),
-              excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container, StorageType.DEFAULT);
+              excludedAndUsedNodes.getExcludedNodes(), currentContainerSize, container,
+              replica.getTargetStorageTypeForCopy());
       int count = 0;
       try {
         count = sendReplicationCommands(container, ImmutableList.of(replica.getDatanodeDetails()), target,
@@ -450,7 +451,7 @@ public class RatisUnderReplicationHandler
 
   private List<DatanodeDetails> getTargets(
       RatisContainerReplicaCount replicaCount,
-      List<ContainerReplicaOp> pendingOps) throws IOException {
+      List<ContainerReplicaOp> pendingOps, StorageType targetStorageType) throws IOException {
     LOG.debug("Need {} target datanodes for container {}. Current " +
             "replicas: {}.", replicaCount.additionalReplicaNeeded(),
         replicaCount.getContainer().containerID(), replicaCount.getReplicas());
@@ -465,10 +466,9 @@ public class RatisUnderReplicationHandler
 
     LOG.debug("UsedList: {}, size {}. ExcludeList: {}, size: {}. ",
         used, used.size(), excluded, excluded.size());
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
     return ReplicationManagerUtil.getTargetDatanodes(placementPolicy,
         replicaCount.additionalReplicaNeeded(), used, excluded,
-        currentContainerSize, replicaCount.getContainer(), StorageType.DEFAULT);
+        currentContainerSize, replicaCount.getContainer(), targetStorageType);
   }
 
   /**

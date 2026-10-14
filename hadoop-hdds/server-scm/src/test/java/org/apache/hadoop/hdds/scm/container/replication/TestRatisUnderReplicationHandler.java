@@ -36,6 +36,7 @@ import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.nullable;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -68,11 +69,15 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.InsufficientDatanodesException;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -126,6 +131,32 @@ public class TestRatisUnderReplicationHandler {
         commandsSent);
     ReplicationTestUtil.mockRMSendDeleteCommand(replicationManager,
         commandsSent);
+  }
+
+  @ParameterizedTest
+  @EnumSource(StorageType.class)
+  @NullSource
+  public void testPlacementAndReplicationUseSameStorageType(StorageType storageType) throws Exception {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (int i = 0; i < 2; i++) {
+      replicas.add(ContainerReplica.newBuilder().setContainerID(container.containerID())
+          .setContainerState(State.CLOSED).setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setSequenceId(container.getSequenceId()).setVolumeStorageType(storageType).build());
+    }
+    PlacementPolicy placement = mock(PlacementPolicy.class);
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    when(placement.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong(), nullable(StorageType.class)))
+        .thenAnswer(invocation -> {
+          assertEquals(storageType, invocation.getArgument(6));
+          return Collections.singletonList(target);
+        });
+    RatisUnderReplicationHandler handler = new RatisUnderReplicationHandler(placement, conf, replicationManager);
+    assertEquals(1, handler.processAndSendCommands(replicas, Collections.emptyList(),
+        getUnderReplicatedHealthResult(), 2));
+    assertEquals(1, commandsSent.size());
+    ReplicateContainerCommand command = (ReplicateContainerCommand) commandsSent.iterator().next().getRight();
+    assertEquals(storageType, command.getTargetVolumeStorageType());
+    assertEquals(target, command.getTargetDatanode());
   }
 
   /**
@@ -468,7 +499,7 @@ public class TestRatisUnderReplicationHandler {
   public void testCorrectUsedAndExcludedNodesPassed() throws IOException {
     PlacementPolicy mockPolicy = mock(PlacementPolicy.class);
     when(mockPolicy.chooseDatanodes(any(), any(), any(),
-        anyInt(), anyLong(), anyLong(), any(StorageType.class)))
+        anyInt(), anyLong(), anyLong(), nullable(StorageType.class)))
         .thenReturn(Collections.singletonList(
             MockDatanodeDetails.randomDatanodeDetails()));
 
@@ -513,7 +544,7 @@ public class TestRatisUnderReplicationHandler {
 
     verify(mockPolicy, times(1)).chooseDatanodes(
         usedNodesCaptor.capture(), excludedNodesCaptor.capture(), any(),
-        anyInt(), anyLong(), anyLong(), any(StorageType.class));
+        anyInt(), anyLong(), anyLong(), nullable(StorageType.class));
 
     List<DatanodeDetails> usedNodes = usedNodesCaptor.getValue();
     List<DatanodeDetails> excludedNodes = excludedNodesCaptor.getValue();

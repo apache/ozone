@@ -27,11 +27,43 @@ import java.util.Map;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.junit.jupiter.api.Test;
 
 class TestDatanodeUsageInfo {
+
+  @Test
+  void testToProtoReportsStorageTypesWithoutChangingAggregateUsage() throws Exception {
+    DatanodeUsageInfo info = new DatanodeUsageInfo(randomDatanodeDetails(), twoTierStat());
+    DatanodeUsageInfoProto proto = DatanodeUsageInfoProto.parseFrom(
+        info.toProto(ClientVersion.CURRENT_VERSION).toByteArray());
+
+    assertThat(proto.getCapacity()).isEqualTo(200);
+    assertThat(proto.getUsed()).isEqualTo(110);
+    assertThat(proto.getRemaining()).isEqualTo(90);
+    assertThat(proto.getStorageTypeUsageCount()).isEqualTo(2);
+    for (StorageTypeUsageInfoProto usage : proto.getStorageTypeUsageList()) {
+      assertThat(usage.getCapacity()).isEqualTo(100);
+      assertThat(usage.getCommitted()).isZero();
+      assertThat(usage.getFreeSpaceToSpare()).isZero();
+      assertThat(usage.getReserved()).isZero();
+      if (usage.getStorageType() == StorageTypeProto.SSD) {
+        assertThat(usage.getUsed()).isEqualTo(90);
+        assertThat(usage.getRemaining()).isEqualTo(10);
+      } else {
+        assertThat(usage.getStorageType()).isEqualTo(StorageTypeProto.DISK);
+        assertThat(usage.getUsed()).isEqualTo(20);
+        assertThat(usage.getRemaining()).isEqualTo(80);
+      }
+    }
+    DatanodeUsageInfoProto legacy = proto.toBuilder().clearStorageTypeUsage().build();
+    assertThat(legacy.getCapacity()).isEqualTo(proto.getCapacity());
+    assertThat(legacy.getUsed()).isEqualTo(proto.getUsed());
+    assertThat(legacy.getRemaining()).isEqualTo(proto.getRemaining());
+  }
 
   @Test
   void testToProtoDoesNotIncludeFilesystemFieldsByDefault() {

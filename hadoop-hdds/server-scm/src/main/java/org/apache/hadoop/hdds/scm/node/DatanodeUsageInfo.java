@@ -22,9 +22,11 @@ import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.Set;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 
 /**
@@ -290,6 +292,16 @@ public class DatanodeUsageInfo {
       builder.setRemaining(scmNodeStat.getRemaining().get());
       builder.setCommitted(scmNodeStat.getCommitted().get());
       builder.setFreeSpaceToSpare(scmNodeStat.getFreeSpaceToSpare().get());
+      for (StorageType type : getStorageTypes()) {
+        builder.addStorageTypeUsage(StorageTypeUsageInfoProto.newBuilder()
+            .setStorageType(StorageTypeUtils.getStorageTypeProto(type))
+            .setCapacity(scmNodeStat.getCapacity(type).get())
+            .setUsed(scmNodeStat.getScmUsed(type).get())
+            .setRemaining(scmNodeStat.getRemaining(type).get())
+            .setCommitted(scmNodeStat.getCommitted(type).get())
+            .setFreeSpaceToSpare(scmNodeStat.getFreeSpaceToSpare(type).get())
+            .setReserved(scmNodeStat.getReserved(type).get()));
+      }
     }
 
     builder.setContainerCount(containerCount);

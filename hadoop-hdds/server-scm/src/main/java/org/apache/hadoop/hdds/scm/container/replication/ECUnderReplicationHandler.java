@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -433,9 +432,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     if (!decomIndexes.isEmpty()) {
       LOG.debug("Processing decommissioning indexes {} for container {}.",
           decomIndexes, container.containerID());
-      // TODO StoragePolicy replace this StorageType with container actual StorageType
-      final List<DatanodeDetails> selectedDatanodes = getTargetDatanodes(
-          container, decomIndexes.size(), usedNodes, excludedNodes, StorageType.DEFAULT);
+      List<ContainerReplica> replicasToCopy = decomIndexes.stream().filter(sources::containsKey)
+          .map(index -> sources.get(index).getLeft()).collect(Collectors.toList());
+      Map<ContainerReplica, DatanodeDetails> targets = ReplicationManagerUtil.getTargetDatanodesForReplicas(
+          containerPlacement, replicasToCopy, usedNodes, excludedNodes, currentContainerSize, container);
+      List<DatanodeDetails> selectedDatanodes = new ArrayList<>(targets.values());
 
       ContainerPlacementStatus placementStatusWithSelectedTargets =
           validatePlacement(container, availableSourceNodes, selectedDatanodes);
@@ -450,7 +451,6 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       }
 
       usedNodes.addAll(selectedDatanodes);
-      Iterator<DatanodeDetails> iterator = selectedDatanodes.iterator();
       // In this case we need to do one to one copy.
       CommandTargetOverloadedException overloadedException = null;
       for (Integer decomIndex : decomIndexes) {
@@ -461,18 +461,18 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
           continue;
         }
         ContainerReplica sourceReplica = source.getLeft();
-        if (!iterator.hasNext()) {
+        if (!targets.containsKey(sourceReplica)) {
           LOG.warn("Couldn't find enough targets. Available source"
               + " nodes: {}, the target nodes: {}, excluded nodes: {},"
               + " usedNodes: {}, and the decommission indexes: {}",
               sources.values().stream()
                   .map(Pair::getLeft).collect(Collectors.toSet()),
               selectedDatanodes, excludedNodes, usedNodes, decomIndexes);
-          break;
+          continue;
         }
         try {
           createReplicateCommand(
-              container, iterator, sourceReplica, replicaCount);
+              container, targets.get(sourceReplica), sourceReplica, replicaCount);
           commandsSent++;
         } catch (CommandTargetOverloadedException e) {
           LOG.debug("Unable to send Replicate command for container {}" +
@@ -531,12 +531,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     LOG.debug("Number of maintenance replicas of container {} that need " +
             "additional copies: {}.", container.containerID(),
         additionalMaintenanceCopiesNeeded);
-    // TODO StoragePolicy replace this StorageType with container actual StorageType
-    List<DatanodeDetails> targets = getTargetDatanodes(
-        container, maintIndexes.size(), usedNodes, excludedNodes, StorageType.DEFAULT);
-    usedNodes.addAll(targets);
-
-    Iterator<DatanodeDetails> iterator = targets.iterator();
+    List<ContainerReplica> replicasToCopy = maintIndexes.stream().filter(sources::containsKey)
+        .map(index -> sources.get(index).getLeft()).collect(Collectors.toList());
+    Map<ContainerReplica, DatanodeDetails> targets = ReplicationManagerUtil.getTargetDatanodesForReplicas(
+        containerPlacement, replicasToCopy, usedNodes, excludedNodes, currentContainerSize, container);
+    usedNodes.addAll(targets.values());
     int commandsSent = 0;
     // copy replica from source maintenance DN to a target DN
 
@@ -552,7 +551,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
         continue;
       }
       ContainerReplica sourceReplica = source.getLeft();
-      if (!iterator.hasNext()) {
+      if (!targets.containsKey(sourceReplica)) {
         LOG.warn("Couldn't find enough targets. Available source"
                 + " nodes: {}, target nodes: {}, excluded nodes: {},"
                 + " usedNodes: {} and"
@@ -560,11 +559,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             sources.values().stream()
                 .map(Pair::getLeft).collect(Collectors.toSet()),
             targets, excludedNodes, usedNodes, maintIndexes);
-        break;
+        continue;
       }
       try {
         createReplicateCommand(
-            container, iterator, sourceReplica, replicaCount);
+            container, targets.get(sourceReplica), sourceReplica, replicaCount);
         commandsSent++;
         additionalMaintenanceCopiesNeeded -= 1;
       } catch (CommandTargetOverloadedException e) {
@@ -593,11 +592,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
   }
 
   private void createReplicateCommand(
-      ContainerInfo container, Iterator<DatanodeDetails> iterator,
+      ContainerInfo container, DatanodeDetails target,
       ContainerReplica replica, ECContainerReplicaCount replicaCount)
       throws CommandTargetOverloadedException, NotLeaderException {
     DatanodeDetails source = replica.getDatanodeDetails();
-    DatanodeDetails target = iterator.next();
     // Place the new replica on the same storage type as the one being copied.
     replicationManager.sendThrottledReplicationCommand(
         container, Collections.singletonList(source), target,

@@ -21,8 +21,10 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManage
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -118,6 +120,37 @@ public final class ReplicationManagerUtil {
             "Excluded Nodes: %s.", policy.getClass(), requiredNodes, dataSizeRequired, container,
         formatDatanodeDetails(usedNodes), formatDatanodeDetails(excludedNodes)),
         SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
+  }
+
+  /** Selects targets using the storage type of each replica, including containers with mixed replica types. */
+  public static Map<ContainerReplica, DatanodeDetails> getTargetDatanodesForReplicas(PlacementPolicy policy,
+      Collection<ContainerReplica> replicas, List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes,
+      long defaultContainerSize, ContainerInfo container) throws SCMException {
+    Map<StorageType, List<ContainerReplica>> byType = new LinkedHashMap<>();
+    for (ContainerReplica replica : replicas) {
+      byType.computeIfAbsent(replica.getTargetStorageTypeForCopy(), ignored -> new ArrayList<>()).add(replica);
+    }
+    Map<ContainerReplica, DatanodeDetails> result = new LinkedHashMap<>();
+    List<DatanodeDetails> used = new ArrayList<>(usedNodes);
+    SCMException firstException = null;
+    for (Map.Entry<StorageType, List<ContainerReplica>> entry : byType.entrySet()) {
+      try {
+        List<DatanodeDetails> targets = getTargetDatanodes(policy, entry.getValue().size(), used, excludedNodes,
+            defaultContainerSize, container, entry.getKey());
+        for (int i = 0; i < targets.size(); i++) {
+          result.put(entry.getValue().get(i), targets.get(i));
+        }
+        used.addAll(targets);
+      } catch (SCMException e) {
+        if (firstException == null) {
+          firstException = e;
+        }
+      }
+    }
+    if (result.isEmpty() && firstException != null) {
+      throw firstException;
+    }
+    return result;
   }
 
   /**

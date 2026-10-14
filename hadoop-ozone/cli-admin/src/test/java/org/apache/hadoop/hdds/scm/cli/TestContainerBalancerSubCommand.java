@@ -48,6 +48,8 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import picocli.CommandLine;
 
 /**
@@ -388,6 +390,66 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
+  void testContainerBalancerStatusShowsStorageTypeBreakdownForCurrentIteration() throws IOException {
+    assertStorageTypeStatusOutput(true);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testContainerBalancerStatusShowsStorageTypeBreakdownForLastIterationAndHistory(boolean history)
+      throws IOException {
+    new CommandLine(statusCmd).parseArgs(history ? new String[]{"--history"} : new String[0]);
+    assertStorageTypeStatusOutput(false);
+  }
+
+  private void assertStorageTypeStatusOutput(boolean running) throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto iteration =
+        StorageContainerLocationProtocolProtos.ContainerBalancerTaskIterationStatusInfoProto.newBuilder()
+            .setIterationNumber(1).setIterationResult(running ? "" : "ITERATION_COMPLETED")
+            .setDataSizeMoved(50L * GB)
+            .addStorageTypeStatusInfo(
+                StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto.newBuilder()
+                    .setStorageType(HddsProtos.StorageTypeProto.SSD).setDataSizeMoved(30L * GB)
+                    .setContainerMovesCompleted(3).setContainerMovesFailed(1).setContainerMovesTimeout(2)
+                    .setNumDatanodesInvolved(2).setNumDatanodesUnbalanced(2).setDataSizeUnbalanced(40L * GB)
+                    .addSizeEnteringNodes(StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
+                        .setUuid("ssd-target").setDataVolume(30L * GB)))
+            .addStorageTypeStatusInfo(
+                StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto.newBuilder()
+                    .setStorageType(HddsProtos.StorageTypeProto.DISK).setDataSizeMoved(20L * GB)
+                    .setContainerMovesCompleted(2)
+                    .addSizeLeavingNodes(StorageContainerLocationProtocolProtos.NodeTransferInfoProto.newBuilder()
+                        .setUuid("disk-source").setDataVolume(20L * GB)))
+            .addStorageTypeStatusInfo(
+                StorageContainerLocationProtocolProtos.ContainerBalancerStorageTypeStatusInfoProto.newBuilder()
+                    .setContainerMovesFailed(1))
+            .build();
+    ContainerBalancerStatusInfoProto.Builder status = ContainerBalancerStatusInfoProto.newBuilder()
+        .setStartedAt(OffsetDateTime.now().minusMinutes(10).toEpochSecond())
+        .setConfiguration(getContainerBalancerConfiguration().toProtobufBuilder())
+        .addIterationsStatusInfo(iteration);
+    if (!running) {
+      // Two iterations ensure --history exercises a frozen entry as well as the last one.
+      status.addIterationsStatusInfo(iteration.toBuilder().setIterationNumber(2));
+    }
+    when(scmClient.getContainerBalancerStatusInfo()).thenReturn(ContainerBalancerStatusInfoResponseProto.newBuilder()
+        .setIsRunning(running).setContainerBalancerStatusInfo(status).build());
+    verbose.set(true);
+    statusCmd.execute(scmClient);
+
+    assertThat(out.get()).contains("Storage type: SSD", "Storage type: DISK", "Storage type: UNKNOWN",
+        "Moved data size                                    50 GB",
+        "Moved data size                                    30 GB",
+        "Moved data size                                    20 GB",
+        "Failed to move containers                          1",
+        "Failed to move containers by timeout               2",
+        "Unique datanodes involved                           2",
+        "Imbalance data size                                40 GB",
+        "ssd-target <- 30 GB", "disk-source -> 20 GB");
+  }
+
+  @Test
   void testContainerBalancerStatusInfoSubcommandRunningWithoutFlags()
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
@@ -421,6 +483,7 @@ class TestContainerBalancerSubCommand {
         "7bd99815-47e7-4015-bc61-ca6ef6dfd130 -> 18 GB";
 
     assertThat(out.get()).containsPattern(IS_RUNNING)
+        .doesNotContain("Storage type:")
         .doesNotContain(BALANCER_CONFIG_OUTPUT)
         .doesNotContain(currentIterationOutput)
         .doesNotContain("Completed iteration history:");
@@ -485,6 +548,7 @@ class TestContainerBalancerSubCommand {
         .containsPattern(DURATION)
         .contains(BALANCER_CONFIG_OUTPUT)
         .contains("Completed iteration history:")
+        .doesNotContain("Storage type:")
         .contains(firstHistoryIterationOutput)
         .contains(secondHistoryIterationOutput);
   }
@@ -832,6 +896,30 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
+  void testContainerBalancerEstimateUsesPerStorageTypeUsage() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE)).thenReturn(Arrays.asList(
+        typedDatanodeUsageProto("first", 5, 95), typedDatanodeUsageProto("second", 95, 5)));
+
+    parseSubcommand(estimateCmd, "-d", "100");
+    estimateCmd.execute(scmClient);
+
+    assertThat(out.get()).contains("Bytes to move:", byteDesc(70L * GB),
+        "Per iteration (estimate): ~" + byteDesc(26L * GB)).doesNotContain("Estimation failed:");
+  }
+
+  @Test
+  void testContainerBalancerEstimateRejectsPartialStorageTypeUsage() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE)).thenReturn(Arrays.asList(
+        typedDatanodeUsageProto("new", 5, 95), datanodeUsageProto("legacy", 200L * GB, 100L * GB)));
+
+    parseSubcommand(estimateCmd, "-d", "100");
+    IOException ex = assertThrows(IOException.class, () -> estimateCmd.execute(scmClient));
+    assertThat(ex).hasMessageContaining("missing or incomplete storage-type usage");
+  }
+
+  @Test
   void testContainerBalancerEstimateSubcommandDefaultShowsMediumProfile() throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.getDatanodeUsageInfo(true, Integer.MAX_VALUE))
@@ -1052,6 +1140,16 @@ class TestContainerBalancerSubCommand {
       nodes.add(datanodeUsageProto("over-" + i, capacity, (long) (capacity * 0.35)));
     }
     return nodes;
+  }
+
+  private static HddsProtos.DatanodeUsageInfoProto typedDatanodeUsageProto(
+      String hostname, long ssdRemaining, long diskRemaining) {
+    return datanodeUsageProto(hostname, 200L * GB, (ssdRemaining + diskRemaining) * GB).toBuilder()
+        .addStorageTypeUsage(HddsProtos.StorageTypeUsageInfoProto.newBuilder()
+            .setStorageType(HddsProtos.StorageTypeProto.SSD).setCapacity(100L * GB).setRemaining(ssdRemaining * GB))
+        .addStorageTypeUsage(HddsProtos.StorageTypeUsageInfoProto.newBuilder()
+            .setStorageType(HddsProtos.StorageTypeProto.DISK).setCapacity(100L * GB).setRemaining(diskRemaining * GB))
+        .build();
   }
 
   private static HddsProtos.DatanodeUsageInfoProto datanodeUsageProto(
