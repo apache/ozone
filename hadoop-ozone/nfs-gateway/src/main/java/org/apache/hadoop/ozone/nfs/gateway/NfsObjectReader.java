@@ -585,4 +585,12 @@ public final class NfsObjectReader {
         configuration, () -> new RpcClient(configuration, omServiceId));
     store.delete(stagingKey);
   }
+
+  void deleteStagedTransfer(String transferId) throws IOException {
+    String stagingVolume = configuration.getTrimmed(NfsGatewayConfigKeys.STAGING_VOLUME);
+    String stagingBucket = configuration.getTrimmed(NfsGatewayConfigKeys.STAGING_BUCKET);
+    NfsStagingStore store = new NfsStagingStore(stagingVolume, stagingBucket, authorizer.getGatewayUser(),
+        configuration, () -> new RpcClient(configuration, omServiceId));
+    store.deleteTransfer(binding.getExportId().toString(), transferId);
+  }
 }

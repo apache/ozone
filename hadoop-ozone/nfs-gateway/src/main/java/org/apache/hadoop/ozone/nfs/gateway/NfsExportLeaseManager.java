@@ -340,6 +340,7 @@ final class NfsExportLeaseManager implements Closeable {
       readers.get(exportUuid).deleteStagedRange(range.getQualifiedKey());
       fileLease.ranges.remove(entry.getKey(), range);
     }
+    readers.get(exportUuid).deleteStagedTransfer(transferId);
   }
 
   NfsTransferRangeResponse updateTransferRange(ByteString exportUuid, String transferId,

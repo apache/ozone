@@ -168,6 +168,36 @@ final class NfsStagingStore {
     }
   }
 
+  void deleteTransfer(String exportUuid, String transferId) throws IOException {
+    if (volumeName == null || volumeName.isEmpty() || bucketName == null || bucketName.isEmpty()) {
+      throw new IOException("NFS durable write staging bucket is not configured");
+    }
+    UUID.fromString(exportUuid);
+    UUID.fromString(transferId);
+    String key = exportUuid + "/" + transferId;
+    try {
+      gatewayUser.doAs((PrivilegedExceptionAction<Void>) () -> {
+        RpcClient client = clientFactory.create();
+        try {
+          OzoneBucket bucket = client.getBucketDetails(volumeName, bucketName);
+          try {
+            bucket.deleteDirectory(key, true);
+          } catch (OMException e) {
+            if (e.getResult() != OMException.ResultCodes.KEY_NOT_FOUND) {
+              throw e;
+            }
+          }
+        } finally {
+          client.close();
+        }
+        return null;
+      });
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Interrupted while deleting an NFS staged transfer", e);
+    }
+  }
+
   private static byte[] sha256(byte[] data) throws IOException {
     try {
       return MessageDigest.getInstance("SHA-256").digest(data);

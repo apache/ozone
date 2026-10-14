@@ -119,6 +119,20 @@ class TestNfsStagingStore {
   }
 
   @Test
+  void deletesStagedTransferDirectoryRecursively() throws Exception {
+    RpcClient client = mock(RpcClient.class);
+    OzoneBucket stagingBucket = stagingBucket();
+    when(client.getBucketDetails("nfs-system", "staging")).thenReturn(stagingBucket);
+    NfsStagingStore store = new NfsStagingStore("nfs-system", "staging",
+        UserGroupInformation.createRemoteUser("nfs-gateway"), configuration, () -> client);
+
+    store.deleteTransfer(EXPORT_UUID, TRANSFER_ID);
+
+    verify(stagingBucket).deleteDirectory(EXPORT_UUID + "/" + TRANSFER_ID, true);
+    verify(client).close();
+  }
+
+  @Test
   void rejectsEcStagingReplication() throws Exception {
     RpcClient client = mock(RpcClient.class);
     OzoneBucket stagingBucket = stagingBucket();

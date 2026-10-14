@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.nfs.gateway;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -31,8 +32,10 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NettyChannelBuilder;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.URI;
@@ -42,6 +45,10 @@ import java.nio.file.Files;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
@@ -63,6 +70,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.nfs.NfsFileHandle;
@@ -331,7 +339,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           assertEquals(NfsStatus.OK.getCode(), listing.getResult().getNfsStatus());
           assertTrue(listing.getEntriesList().stream().anyMatch(entry -> "nfs-file".equals(entry.getName())));
           assertSecureGatewayWrite(stub, context, readerContext, exportId, volumeId, bucketId, metadata, bucket,
-              client.getObjectStore());
+              stagingBucket, client.getObjectStore());
         } finally {
           channel.shutdownNow();
         }
@@ -372,7 +380,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
   @SuppressWarnings("checkstyle:ParameterNumber")
   private static void assertSecureGatewayWrite(NfsGatewayGrpc.NfsGatewayBlockingStub stub, RequestContext context,
       RequestContext readerContext, UUID exportId, long volumeId, long bucketId, OMMetadataManager metadata,
-      OzoneBucket bucket, ObjectStore objectStore) throws Exception {
+      OzoneBucket bucket, OzoneBucket stagingBucket, ObjectStore objectStore) throws Exception {
     ByteString bucketHandle = ByteString.copyFrom(new NfsFileHandle(exportId, volumeId, bucketId, bucketId,
         NfsFileHandle.Kind.BUCKET).toBytes());
     CreateResponse create = stub.create(CreateRequest.newBuilder().setContext(context)
@@ -399,6 +407,10 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         .setHandle(createdHandle).setTransferId(create.getTransferId()).setOffset(0)
         .setData(ByteString.copyFrom(writeData, 0, split)).build());
     assertEquals(NfsStatus.OK.getCode(), firstHalf.getResult().getNfsStatus());
+    String stagedPrefix = exportId + "/" + create.getTransferId() + "/";
+    assertEquals(Arrays.asList(ByteString.copyFrom(writeData, 0, split),
+        ByteString.copyFrom(writeData, split, writeData.length - split)),
+        readStagedRanges(stagingBucket, stagedPrefix));
     assertEquals(OMException.ResultCodes.NFS_LEASE_CONFLICT, assertThrows(OMException.class,
         () -> bucket.renameKey("secure-nfs-write", "secure-nfs-write-renamed")).getResult());
     assertEquals(OMException.ResultCodes.NFS_LEASE_CONFLICT, assertThrows(OMException.class,
@@ -411,6 +423,8 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     CommitResponse commit = stub.commit(CommitRequest.newBuilder().setContext(context)
         .setHandle(createdHandle).setFinalize(true).build());
     assertEquals(NfsStatus.OK.getCode(), commit.getResult().getNfsStatus());
+    assertFalse(stagingBucket.listKeys(stagedPrefix).hasNext(),
+        "Final COMMIT must remove its durable NFS range objects");
     try (org.apache.hadoop.ozone.client.io.OzoneInputStream input = bucket.readKey("secure-nfs-write")) {
       byte[] published = new byte[writeData.length];
       assertEquals(writeData.length, input.read(published));
@@ -419,6 +433,25 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     }
     assertEquals(bucket.getKey("nfs-file").getReplicationConfig().getRequiredNodes(),
         bucket.getKey("secure-nfs-write").getReplicationConfig().getRequiredNodes());
+  }
+
+  private static List<ByteString> readStagedRanges(OzoneBucket stagingBucket, String prefix) throws IOException {
+    List<ByteString> stagedData = new ArrayList<>();
+    Iterator<? extends OzoneKey> keys = stagingBucket.listKeys(prefix);
+    while (keys.hasNext()) {
+      try (InputStream input = stagingBucket.readKey(keys.next().getName());
+           ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+        byte[] buffer = new byte[1024];
+        int count;
+        while ((count = input.read(buffer)) >= 0) {
+          output.write(buffer, 0, count);
+        }
+        if (output.size() > 0) {
+          stagedData.add(ByteString.copyFrom(output.toByteArray()));
+        }
+      }
+    }
+    return stagedData;
   }
 
   private static ByteString stageGatewayRecoveryWrite(NfsGatewayGrpc.NfsGatewayBlockingStub stub,
