@@ -117,11 +117,15 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Verify NFS caller mapping with service credentials issued by a real MiniKdc. */
 @Tag("nfs")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TestNfsCallerAuthorizationSecure extends KerberosTests {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TestNfsCallerAuthorizationSecure.class);
 
   private String originalRules;
   private String originalRuleMechanism;
@@ -203,9 +207,11 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     MiniOzoneCluster cluster = null;
     OzoneClient client = null;
     try {
+      LOG.info("Starting secure NFS MiniOzoneCluster");
       cluster = MiniOzoneCluster.newHABuilder(getConf()).setSCMServiceId("NfsSecureIT")
           .setNumOfStorageContainerManagers(3).setNumOfOzoneManagers(1).setNumDatanodes(5).build();
       cluster.waitForClusterToBeReady();
+      LOG.info("Secure NFS MiniOzoneCluster is ready");
       client = cluster.newClient();
       OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
           new DefaultReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE)));
@@ -297,7 +303,9 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
               .setProtection(Caller.Protection.PRIVACY)).build();
 
       ByteString recoveryHandle;
+      LOG.info("Starting secure NFS gateway");
       try (NfsGatewayServer server = NfsGatewayDaemon.start(getConf())) {
+        LOG.info("Secure NFS gateway is listening on port {}", server.getPort());
         ManagedChannel channel = NettyChannelBuilder.forAddress("127.0.0.1", server.getPort())
             .overrideAuthority("localhost")
             .sslContext(GrpcSslContexts.forClient().keyManager(certificateFile, privateKeyFile)
@@ -358,7 +366,9 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
           assertSecureGatewayWrite(stub, context, readerContext, exportId, volumeId, bucketId, metadata, bucket,
               stagingBucket, client.getObjectStore());
           if (mountedContract) {
+            LOG.info("Starting mounted Ganesha contract");
             assertMountedGaneshaContract(tempDir, server.getPort(), exportId, volumeId, bucketId, bucket);
+            LOG.info("Mounted Ganesha contract completed");
           }
         } finally {
           channel.shutdownNow();
@@ -579,6 +589,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     bucket.addAcl(machineUserAcl);
   }
 
+  @SuppressWarnings("checkstyle:MethodLength")
   private void assertMountedGaneshaContract(Path tempDir, int gatewayPort, UUID exportId, long volumeId,
       long bucketId, OzoneBucket bucket) throws Exception {
     String image = System.getenv("OZONE_NFS_GANESHA_IMAGE");
@@ -655,9 +666,11 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     Process gssd = null;
     boolean mounted = false;
     try {
+      LOG.info("Obtaining Kerberos credentials for mounted NFS contract");
       runCommand("env", "KRB5_CONFIG=" + contractKrb5, "kinit", "-kt",
           getTestUserKeytab().getAbsolutePath(), getTestUserPrincipal());
       verifyMountedKerberosCredentials(contractKrb5, clientKeytab, clientPrincipal, nfsPrincipal);
+      LOG.info("Kerberos credentials are ready for mounted NFS contract");
       ProcessBuilder gssdBuilder = new ProcessBuilder("sudo", "env", "KRB5_CONFIG=" + contractKrb5,
           "KRB5_TRACE=/dev/stderr", "rpc.gssd", "-f", "-k", clientKeytab.getAbsolutePath(), "-v");
       gssdBuilder.redirectErrorStream(true);
@@ -673,6 +686,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
               + " -N NIV_DEBUG -f /contract/ganesha.conf");
       waitForNfsPort(contractDir.resolve("ganesha.log"));
       Thread.sleep(1000);
+      LOG.info("Ganesha is listening; mounting secure NFS export");
       try {
         runCommand("sudo", "mount", "-t", "nfs4", "-o", "vers=4.1,sec=krb5p,actimeo=0",
             "ozone-ci.example.test:/ozone/data", mount.toString());
@@ -681,6 +695,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
             + "\nrpc.gssd log and Kerberos trace:\n" + readText(contractDir.resolve("rpc.gssd.log")), ex);
       }
       mounted = true;
+      LOG.info("Secure NFS export is mounted");
 
       String name = "mounted-secure-contract-" + UUID.randomUUID();
       byte[] expected = "mounted NFS write published to Ozone".getBytes(StandardCharsets.UTF_8);
@@ -693,6 +708,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         }
         channel.force(true);
       }
+      LOG.info("Mounted NFS file was written and synced");
       assertArrayEquals(expected, Files.readAllBytes(mountedFile));
       long inode = (Long) Files.getAttribute(mountedFile, "unix:ino");
       assertEquals(name, bucket.getKey(name).getName());
@@ -704,6 +720,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       }
       String renamed = name + "-renamed";
       Files.move(mountedFile, mount.resolve(renamed));
+      LOG.info("Mounted NFS file was renamed");
       assertEquals(inode, (Long) Files.getAttribute(mount.resolve(renamed), "unix:ino"));
       assertEquals(renamed, bucket.getKey(renamed).getName());
       assertThrows(IOException.class, () -> bucket.getKey(name));
@@ -713,6 +730,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
         assertArrayEquals(expected, actual);
       }
       Files.delete(mount.resolve(renamed));
+      LOG.info("Mounted NFS file was removed");
       assertThrows(IOException.class, () -> bucket.getKey(renamed));
     } finally {
       if (mounted) {
