@@ -82,7 +82,7 @@ jobs:
       - name: Set short hostname for secure integration certificates
         run: |
           sudo hostname ozone-ci
-          printf '127.0.0.1 ozone-ci\n' | sudo tee -a /etc/hosts
+          printf '127.0.0.1 ozone-ci ozone-ci.example.test\n' | sudo tee -a /etc/hosts
 
       - name: Prepare Linux NFSv4 Kerberos client
         run: |

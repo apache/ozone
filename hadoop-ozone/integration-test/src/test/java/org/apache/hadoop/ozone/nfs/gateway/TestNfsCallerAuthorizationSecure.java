@@ -577,7 +577,8 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
     assertNotNull(krb5Config, "MiniKdc must expose its krb5.conf to the mounted contract");
 
     File nfsKeytab = tempDir.resolve("nfs.keytab").toFile();
-    String nfsPrincipal = "nfs/ozone-ci@" + getRealm();
+    // A dotted server name prevents rpc.gssd from reverse-resolving ozone-ci to localhost.
+    String nfsPrincipal = "nfs/ozone-ci.example.test@" + getRealm();
     createPrincipal(nfsKeytab, nfsPrincipal);
     File clientKeytab = tempDir.resolve("nfs-client.keytab").toFile();
     createPrincipal(clientKeytab, "host/ozone-ci@" + getRealm());
@@ -661,7 +662,7 @@ class TestNfsCallerAuthorizationSecure extends KerberosTests {
       Thread.sleep(1000);
       try {
         runCommand("sudo", "mount", "-t", "nfs4", "-o", "vers=4.1,sec=krb5p,actimeo=0",
-            "ozone-ci:/ozone/data", mount.toString());
+            "ozone-ci.example.test:/ozone/data", mount.toString());
       } catch (IOException ex) {
         throw new IOException(ex.getMessage() + "\nGanesha log:\n" + readText(contractDir.resolve("ganesha.log"))
             + "\nrpc.gssd log:\n" + readText(contractDir.resolve("rpc.gssd.log")), ex);
