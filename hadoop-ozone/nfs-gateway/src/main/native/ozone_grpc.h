@@ -61,7 +61,7 @@ struct ozone_grpc_client *ozone_grpc_client_create(const char *address,
     const char *client_key_pem, uint32_t timeout_millis);
 void ozone_grpc_client_destroy(struct ozone_grpc_client *client);
 
-/* Return a gRPC transport status separately from the explicit NFS result. */
+/* Return gRPC transport failures separately; map PERMISSION_DENIED to NFS ACCESS. */
 int ozone_grpc_capabilities(struct ozone_grpc_client *client,
     const uint8_t export_uuid[16], uint32_t version,
     uint32_t *nfs_status, uint64_t *operations);

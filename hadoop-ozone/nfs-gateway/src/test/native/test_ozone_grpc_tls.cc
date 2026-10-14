@@ -282,8 +282,9 @@ int main(int argc, char **argv) {
           0, 0, 0, 0, 0, 0, 0, 2,
           0, 0, 0, 0, 0, 0, 0, 3};
       const std::string principal = mode == "read-unauthenticated" ? "mallory@EXAMPLE.COM" :
+          (mode == "read-auth-denied" ? "carol@EXAMPLE.COM" :
           (mode == "read-embedded-nul" ? std::string("alice\0@EXAMPLE.COM", 18) :
-           (mode == "read-denied" ? "bob@EXAMPLE.COM" : "alice@EXAMPLE.COM"));
+           (mode == "read-denied" ? "bob@EXAMPLE.COM" : "alice@EXAMPLE.COM")));
       uint64_t offset = mode == "read-eof" ? UINT64_MAX : (mode == "read-full" ? 0 : 1);
       uint32_t count = mode == "read-full" ? 64 : 4;
       if (mode == "read-stale") handle[47] = 5;

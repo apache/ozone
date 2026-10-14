@@ -28,6 +28,14 @@ struct ozone_grpc_client {
   uint32_t timeout_millis;
 };
 
+static int grpc_status(const grpc::Status &status, uint32_t *nfs_status) {
+  if (status.error_code() == grpc::StatusCode::PERMISSION_DENIED) {
+    *nfs_status = 13;  // NFS4ERR_ACCESS
+    return grpc::StatusCode::OK;
+  }
+  return status.error_code();
+}
+
 static bool valid_caller(const char *principal, size_t principal_size, uint32_t protection) {
   return principal && principal_size && principal_size <= OZONE_NFS_MAX_OWNER_BYTES
       && (protection == 1 || protection == 2);
@@ -114,7 +122,7 @@ extern "C" int ozone_grpc_capabilities(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Capabilities(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized() || response.version() != version) {
       return grpc::StatusCode::FAILED_PRECONDITION;
     }
@@ -155,7 +163,7 @@ extern "C" int ozone_grpc_read(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Read(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized()) return grpc::StatusCode::FAILED_PRECONDITION;
     *nfs_status = response.result().nfs_status();
     if (*nfs_status != 0) {
@@ -203,7 +211,7 @@ extern "C" int ozone_grpc_getattr(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Getattr(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized()) return grpc::StatusCode::FAILED_PRECONDITION;
     *nfs_status = response.result().nfs_status();
     if (*nfs_status != 0) {
@@ -243,7 +251,7 @@ extern "C" int ozone_grpc_lookup(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Lookup(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized()) return grpc::StatusCode::FAILED_PRECONDITION;
     *nfs_status = response.result().nfs_status();
     if (*nfs_status != 0) {
@@ -288,7 +296,7 @@ extern "C" int ozone_grpc_create(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Create(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized()) return grpc::StatusCode::FAILED_PRECONDITION;
     *nfs_status = response.result().nfs_status();
     if (*nfs_status != 0) {
@@ -337,7 +345,7 @@ extern "C" int ozone_grpc_mkdir(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Mkdir(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized()) return grpc::StatusCode::FAILED_PRECONDITION;
     *nfs_status = response.result().nfs_status();
     if (*nfs_status != 0) {
@@ -381,7 +389,7 @@ extern "C" int ozone_grpc_remove(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Remove(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized()) return grpc::StatusCode::FAILED_PRECONDITION;
     *nfs_status = response.result().nfs_status();
     return grpc::StatusCode::OK;
@@ -422,7 +430,7 @@ extern "C" int ozone_grpc_rename(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Rename(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized()) return grpc::StatusCode::FAILED_PRECONDITION;
     *nfs_status = response.result().nfs_status();
     return grpc::StatusCode::OK;
@@ -464,7 +472,7 @@ extern "C" int ozone_grpc_write(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Write(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized()) return grpc::StatusCode::FAILED_PRECONDITION;
     *nfs_status = response.result().nfs_status();
     if (*nfs_status != 0) {
@@ -507,7 +515,7 @@ extern "C" int ozone_grpc_commit(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Commit(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized()) return grpc::StatusCode::FAILED_PRECONDITION;
     *nfs_status = response.result().nfs_status();
     return grpc::StatusCode::OK;
@@ -559,7 +567,7 @@ extern "C" int ozone_grpc_readdir(struct ozone_grpc_client *client,
     context.set_deadline(std::chrono::system_clock::now() +
         std::chrono::milliseconds(client->timeout_millis));
     grpc::Status status = client->stub->Readdir(&context, request, &response);
-    if (!status.ok()) return status.error_code();
+    if (!status.ok()) return grpc_status(status, nfs_status);
     if (!response.IsInitialized()) return grpc::StatusCode::FAILED_PRECONDITION;
     *nfs_status = response.result().nfs_status();
     if (*nfs_status != 0) {

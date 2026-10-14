@@ -75,7 +75,8 @@ public final class NfsTlsContractServer {
               invocation.getArgument(0);
           String principal = context.getCaller().getKerberosPrincipal();
           if (!"alice@EXAMPLE.COM".equals(principal)
-              && !"bob@EXAMPLE.COM".equals(principal)) {
+              && !"bob@EXAMPLE.COM".equals(principal)
+              && !"carol@EXAMPLE.COM".equals(principal)) {
             throw Status.UNAUTHENTICATED.withDescription("Test requires an authenticated Kerberos caller")
                 .asRuntimeException();
           }
@@ -87,6 +88,9 @@ public final class NfsTlsContractServer {
           if ("bob@EXAMPLE.COM".equals(principal)) {
             throw new org.apache.hadoop.ozone.om.exceptions.OMException("Permission denied",
                 org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED);
+          }
+          if ("carol@EXAMPLE.COM".equals(principal)) {
+            throw Status.PERMISSION_DENIED.withDescription("Caller authorization denied").asRuntimeException();
           }
           ByteString encodedHandle = invocation.getArgument(1);
           NfsFileHandle handle = NfsFileHandle.fromBytes(encodedHandle.toByteArray());

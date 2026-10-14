@@ -161,8 +161,9 @@ class GrpcTlsContract(unittest.TestCase):
         self.check_call(0, 70, mode="read-stale")
         self.check_call(0, 10001, mode="read-badhandle")
         self.check_call(16, 5, mode="read-unauthenticated")
+        self.check_call(0, 13, mode="read-auth-denied")
         self.check_call(16, 5, mode="read-embedded-nul")
-        self.check_call(7, 5, mode="read-wrong-export")
+        self.check_call(0, 13, mode="read-wrong-export")
 
     def test_native_getattr_and_lookup_return_verified_attributes(self):
         self.check_call(0, 0, mode="getattr")
@@ -216,10 +217,10 @@ class GrpcTlsContract(unittest.TestCase):
         self.check_call(0, 0)
 
     def test_peer_cannot_access_another_export(self):
-        self.check_call(7, 5, mode="wrong-export")
+        self.check_call(0, 13, mode="wrong-export")
 
     def test_ca_trust_does_not_authorize_unlisted_peer(self):
-        self.check_call(7, 5, client="unlisted")
+        self.check_call(0, 13, client="unlisted")
 
     def test_untrusted_server_is_rejected(self):
         self.check_call(14, 5, ca="other-ca")
