@@ -94,12 +94,13 @@ for i in $(seq 1 ${ITERATIONS}); do
     REPORT_DIR="${original_report_dir}/iteration${i}"
   fi
 
+  log=$(mktemp)
   mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" ${CLEAN} "${PHASE}" \
-      | tee output.log
+      | tee "${log}"
   irc=$?
 
   mkdir -p "${REPORT_DIR}"
-  mv -f output.log "${REPORT_DIR}"/
+  mv -f "${log}" "${REPORT_DIR}"/output.log
 
   # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
   source "${DIR}/_mvn_unit_report.sh"
