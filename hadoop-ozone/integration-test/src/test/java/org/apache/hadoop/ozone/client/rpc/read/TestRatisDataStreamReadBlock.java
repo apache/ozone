@@ -81,6 +81,14 @@ public class TestRatisDataStreamReadBlock {
               assertRatisStreams(in);
           assertEquals(0, streams.get(0).read(ByteBuffer.allocate(0)));
           assertEquals(expectedMd5, readMd5(in));
+
+          // A positioned read across a chunk boundary is served over Ratis too.
+          final long position = 4 * BUFFER_SIZE.getSize() - 100;
+          final ByteBuffer range = ByteBuffer.allocate(4096);
+          in.readFully(position, range);
+          for (int i = 0; i < range.capacity(); i++) {
+            assertEquals((byte) (position + i), range.get(i));
+          }
         }
       }
     }

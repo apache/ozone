@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -359,6 +360,27 @@ class TestRatisDataStreamBlockInputStream {
       assertEquals(255, in.read());
       assertEquals(-1, in.read());
     }
+  }
+
+  /** A positioned read goes through the Ratis stream, requests exactly its range and keeps the position. */
+  @Test
+  void positionedReadKeepsThePosition() throws Exception {
+    final byte[] block = block(256);
+    final Streams streams = new Streams(block);
+    final XceiverClientFactory factory = factory(invocation -> streams.client(invocation.getArgument(0)));
+
+    try (RatisDataStreamBlockInputStream in = newStream(pipeline(dn1, dn2, dn3), factory, block.length, 16)) {
+      in.seek(10);
+      final ByteBuffer range = ByteBuffer.allocate(20);
+      assertEquals(range.capacity(), in.read(100, range));
+      assertArrayEquals(Arrays.copyOfRange(block, 100, 120), range.array());
+      assertEquals(10, in.getPos());
+      assertEquals(10, in.read());
+      assertEquals(-1, in.read(block.length, ByteBuffer.allocate(1)));
+    }
+
+    assertEquals(Arrays.asList("100+20", "10+1"), streams.ranges());
+    verify(factory, never()).acquireClientForReadData(any(Pipeline.class));
   }
 
   /**

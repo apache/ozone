@@ -175,6 +175,28 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
   }
 
   /**
+   * Reads at {@code blockOffset} through this stream: seeks there, reads what {@code dst} has room for and seeks back.
+   * The positioned read of {@link StreamBlockInputStream} needs a gRPC client, which the RATIS pipeline does not give.
+   */
+  @Override
+  public synchronized int readPositioned(long blockOffset, ByteBuffer dst) throws IOException {
+    checkOpen();
+    if (!dst.hasRemaining()) {
+      return 0;
+    }
+    if (blockOffset < 0 || blockOffset >= getLength()) {
+      return ExtendedInputStream.EOF;
+    }
+    final long position = getPos();
+    try {
+      seek(blockOffset);
+      return readFully(dst, false);
+    } finally {
+      seek(position);
+    }
+  }
+
+  /**
    * A seek within the buffered reply keeps reading from it: a reply starts and ends at checksum boundaries around the
    * requested range, so a reader stepping back a little often finds its data there. Any other seek closes the requests
    * in flight, so the first read after it requests exactly what the reader asks for.
