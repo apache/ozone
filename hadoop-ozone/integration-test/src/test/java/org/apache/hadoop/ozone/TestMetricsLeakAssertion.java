@@ -101,6 +101,7 @@ class TestMetricsLeakAssertion {
   @Test
   void testInvalidSourcesFieldFails() {
     DefaultMetricsSystem.setInstance(new MetricsSystemImpl() {
+      @SuppressWarnings("PMD.UnusedPrivateField") // Accessed reflectively by MetricsLeakAssertion.
       private final String allSources = "not a map";
     });
 
