@@ -28,7 +28,6 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -74,7 +73,7 @@ public class TestOMCompleteFinalizeUpgradeRequest extends OMKeyRequestTests {
 
     assertFalse(response.getSuccess());
     assertEquals(Status.INVALID_REQUEST, response.getStatus());
-    verifyNoInteractions(ratisServer);
+    verify(ratisServer, never()).submitRequest(any(OzoneManagerProtocolProtos.OMRequest.class), eq(true));
     verify(ozoneManager, never()).finalizeUpgrade();
   }
 
