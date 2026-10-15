@@ -409,11 +409,14 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       if (metricsLeakAssertEnabled) {
         MetricsLeakAssertion.assertNoLeaks();
       }
-      DefaultMetricsSystem.shutdown();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
     } finally {
-      resetStaticMappingIfConfigured(conf);
+      try {
+        DefaultMetricsSystem.shutdown();
+      } finally {
+        resetStaticMappingIfConfigured(conf);
+      }
     }
   }
 

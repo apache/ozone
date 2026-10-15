@@ -2128,6 +2128,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRpcAddress));
 
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
+    omSnapshotIntMetrics.register();
 
     instantiateServices(false);
 

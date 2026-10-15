@@ -143,15 +143,14 @@ public final class MetricsLeakAssertion {
    * missing check fails loudly instead of going unnoticed.
    */
   public static void assertNoLeaks() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    Field field = findAllSourcesField(ms.getClass());
-    if (field == null) {
-      throw new AssertionError("Cannot check for metrics leaks: '" + ALL_SOURCES_FIELD +
-          "' field not found on " + ms.getClass().getName() +
-          ". The metrics system implementation may have changed.");
-    }
-    final Map<String, MetricsSource> allSources;
     try {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      Field field = findAllSourcesField(ms.getClass());
+      if (field == null) {
+        throw new AssertionError("Cannot check for metrics leaks: '" + ALL_SOURCES_FIELD +
+            "' field not found on " + ms.getClass().getName() +
+            ". The metrics system implementation may have changed.");
+      }
       field.setAccessible(true);
       Object value = field.get(ms);
       if (!(value instanceof Map)) {
@@ -160,16 +159,15 @@ public final class MetricsLeakAssertion {
       }
       @SuppressWarnings("unchecked")
       Map<String, MetricsSource> sources = (Map<String, MetricsSource>) value;
-      allSources = sources;
-    } catch (IllegalAccessException e) {
-      throw new AssertionError("Cannot check for metrics leaks: unable to access '" +
-          ALL_SOURCES_FIELD + "' on " + ms.getClass().getName() + ".", e);
-    }
-    Set<String> leaked = new TreeSet<>(allSources.keySet());
-    leaked.removeIf(MetricsLeakAssertion::isExpectedLeftover);
-    if (!leaked.isEmpty()) {
-      throw new AssertionError("Found " + leaked.size() +
-          " metrics source(s) still registered after cluster shutdown: " + leaked);
+      Set<String> leaked = new TreeSet<>(sources.keySet());
+      leaked.removeIf(MetricsLeakAssertion::isExpectedLeftover);
+      if (!leaked.isEmpty()) {
+        throw new AssertionError("Found " + leaked.size() +
+            " metrics source(s) still registered after cluster shutdown: " + leaked);
+      }
+    } catch (IllegalAccessException | RuntimeException e) {
+      throw new AssertionError("Cannot check for metrics leaks: unable to inspect '" +
+          ALL_SOURCES_FIELD + "' in the default metrics system.", e);
     }
   }
 
@@ -204,7 +202,7 @@ public final class MetricsLeakAssertion {
         if (name.startsWith(entry.substring(0, entry.length() - 1))) {
           return true;
         }
-      } else if (name.equals(entry) || name.startsWith(entry + "-")) {
+      } else if (name.equals(entry) || stripNumericSuffix(name).equals(entry)) {
         return true;
       }
     }
