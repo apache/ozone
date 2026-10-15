@@ -36,6 +36,11 @@ public abstract class RatisBasedVersionManager extends ComponentVersionManager {
     super(apparentVersion, softwareVersion);
   }
 
+  protected RatisBasedVersionManager(ComponentVersion apparentVersion, ComponentVersion softwareVersion,
+      String metricsSourceComponent) {
+    super(apparentVersion, softwareVersion, metricsSourceComponent);
+  }
+
   public void validateDBVersion(Table<String, String> finalizationStore) throws IOException {
     ComponentVersion dbVersion = getApparentVersionInDB(finalizationStore);
     ComponentVersion apparentVersion = getApparentVersion();

@@ -190,6 +190,7 @@ class TestOzoneLocal {
     assertTrue(runtime.closed);
   }
 
+  /** The marker preserves the original cause for the root command's error handling. */
   @Test
   void runCommandPreservesStartupFailureAsTheCause() throws Exception {
     ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -208,7 +209,12 @@ class TestOzoneLocal {
     assertTrue(runtime.closed);
   }
 
-  /** Preemptive timeout: execute() otherwise blocks in awaitShutdown() until a JVM shutdown hook fires. */
+  /**
+   * Drives the whole path a user hits: the cluster rejects the value and OzoneLocal prints the
+   * rejection before a hint on the next line.
+   * The timeout is preemptive because execute() otherwise blocks in awaitShutdown() until a JVM
+   * shutdown hook fires, so a check that stopped rejecting would hang the fork instead of failing.
+   */
   @Test
   void conflictingConfigReachesStderrThroughGenericCli(@TempDir Path dataDir) throws Exception {
     ByteArrayOutputStream err = new ByteArrayOutputStream();
@@ -254,6 +260,11 @@ class TestOzoneLocal {
     assertTrue(error.getMessage().contains(source), error.getMessage());
   }
 
+  /**
+   * A --conf value carrying a scheme is a Hadoop fs.Path resource, not a local file name;
+   * absolutizing it through java.nio mangles it into a CWD-relative literal path that
+   * Configuration then skips silently, ignoring the user's file.
+   */
   @Test
   void fileUriConfigPathLoadsTheNamedFile(@TempDir Path tempDir) throws Exception {
     Path customConfig = tempDir.resolve("my-ozone-site.xml").toAbsolutePath();
@@ -266,6 +277,11 @@ class TestOzoneLocal {
     assertEquals("THREE", ozoneLocal.getOzoneConf().get(OZONE_REPLICATION));
   }
 
+  /**
+   * An empty --conf (an unset shell variable, say) has to fail at option parse the way
+   * fs.Path rejects it, not resolve to the working directory and die later with an
+   * unrelated resource error.
+   */
   @Test
   void emptyConfigPathIsRejectedAtParse() {
     OzoneLocal ozoneLocal = new OzoneLocal();
@@ -428,6 +444,10 @@ class TestOzoneLocal {
     assertConfigError("--datanodes", "0", "--datanodes");
   }
 
+  /**
+   * Pins the value echo: picocli's wrapper already names the option, so asserting on the
+   * option alone would pass even if the converter dropped the value from its message.
+   */
   @Test
   void resolveConfigRejectsInvalidDuration() {
     assertParseError("--startup-timeout", "forever", "Invalid duration 'forever'");
@@ -438,7 +458,11 @@ class TestOzoneLocal {
     assertConfigError("--startup-timeout", "0s", "--startup-timeout");
   }
 
-  /** Without the unit check "120" parsed as 120 milliseconds; the quotes are asserted because "120s" is in the hint. */
+  /**
+   * Without the unit check this parses as 120 milliseconds, so the run dies with an unrelated
+   * timeout instead of telling the user the value was misread. Asserts the quoted value: the
+   * bare digits also occur in the static "like 120s" hint, which would mask a dropped echo.
+   */
   @Test
   void resolveConfigRejectsDurationWithoutTimeUnit() {
     assertParseError("--startup-timeout", "120", "Missing time unit in '120'");

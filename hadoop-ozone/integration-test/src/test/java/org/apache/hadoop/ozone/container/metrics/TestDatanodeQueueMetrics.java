@@ -25,7 +25,6 @@ import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -49,6 +48,7 @@ public abstract class TestDatanodeQueueMetrics implements NonHATests.TestCase {
 
   private long getGauge(String metricName) {
     return getLongGauge(metricName,
-        getMetrics(DatanodeQueueMetrics.METRICS_SOURCE_NAME));
+        getMetrics(cluster().getHddsDatanodes().get(0)
+            .getDatanodeStateMachine().getQueueMetrics()));
   }
 }
