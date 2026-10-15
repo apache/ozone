@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -1273,6 +1274,24 @@ public interface ClientProtocol {
    */
   List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
       throws IOException;
+
+  /**
+   * Like {@link #listStatus(ListStatusLightOptions)}, but also returns whether OM reported that no entries
+   * follow this page.
+   */
+  default ListStatusResult<OzoneFileStatus> listStatusPage(ListStatusLightOptions options)
+      throws IOException {
+    return ListStatusResult.unknown(listStatus(options));
+  }
+
+  /**
+   * Like {@link #listStatusLight(ListStatusLightOptions)}, but also returns whether OM reported that no
+   * entries follow this page.
+   */
+  default ListStatusResult<OzoneFileStatusLight> listStatusLightPage(ListStatusLightOptions options)
+      throws IOException {
+    return ListStatusResult.unknown(listStatusLight(options));
+  }
 
   /**
    * Lightweight listStatus API (convenience overload without listPrefix).
