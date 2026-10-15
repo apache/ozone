@@ -53,10 +53,10 @@ public class TestOzoneFileSystemListStatusPages {
 
   private static final String DIR = "/vol/bucket/dir";
 
+  private OzoneClientAdapter adapter;
+
   /** The file system under test, with its listed directory. */
   enum Fs { OFS, O3FS }
-
-  private OzoneClientAdapter adapter;
 
   private FileSystem create(Fs type) throws IOException {
     FileSystem fs;
