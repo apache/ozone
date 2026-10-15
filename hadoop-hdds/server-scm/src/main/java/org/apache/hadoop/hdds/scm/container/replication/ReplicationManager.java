@@ -743,7 +743,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
       long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
-      StorageType storageType = getStorageType(containerInfo);
+      StorageType storageType = rcc.getTargetVolumeStorageType();
+      if (storageType == null) {
+        storageType = getStorageType(containerInfo);
+      }
 
       containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), rcc.getTargetDatanode(),
           rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize,
