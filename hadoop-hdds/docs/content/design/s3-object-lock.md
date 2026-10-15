@@ -242,13 +242,27 @@ In both modes OM always checks the base access type (`READ_ACL` / `WRITE_ACL`), 
 | Request source                  | `ozone.s3g.sts.http.enabled` | `enableActionMatcherInPoliciesCondition` | Mode                                                                    |
 |:--------------------------------|:-----------------------------|:-----------------------------------------|:------------------------------------------------------------------------|
 | S3 Gateway                      | `true`                       | `true`                                   | [Fine-Grained Mode](#3-prerequisite-for-s3-fine-grained-authorization)  |
-| S3 Gateway                      | `false`                      | `true`                                   | [Base Permission Mode](#4-fallback-base-permission-mode)                |
+| S3 Gateway                      | `false`                      | `true`                                   | [Base Permission Mode](#4-fallback-base-permission-mode); denied by policy items with an action condition (see below) |
 | S3 Gateway                      | `false`                      | `false`                                  | [Base Permission Mode](#4-fallback-base-permission-mode)                |
 | S3 Gateway                      | `true`                       | `false`                                  | [Base Permission Mode](#4-fallback-base-permission-mode) (not recommended, see below) |
-| Native Java API / CLI           | any                          | any                                      | [Base Permission Mode](#4-fallback-base-permission-mode)                |
+| Native Java API / CLI           | any                          | any                                      | [Base Permission Mode](#4-fallback-base-permission-mode); with the Ranger flag enabled, denied by policy items with an action condition |
 
 * **Fine-Grained Mode**: Ranger checks the S3 action (for example `PutObjectLegalHold`) and its base access type in the [mapping below](#6-action-to-ranger-access-type-mapping).
 * **Base Permission Mode**: Ranger checks only the base access type.
+
+**Requests without an action when the Ranger flag is enabled**:
+
+When `enableActionMatcherInPoliciesCondition=true`, the result for a request without an S3 action (S3 Gateway with the STS flag disabled, or a native client) depends on the matching Ranger policy item:
+
+| Matching policy item                          | Request with an S3 action                          | Request without an S3 action                         |
+|:----------------------------------------------|:---------------------------------------------------|:-----------------------------------------------------|
+| Has an action condition (e.g. `PutObjectLegalHold`) | Granted only if the action is listed and the access type matches | **Denied**: the action condition cannot be satisfied |
+| Has no action condition                       | Granted if the access type matches                 | Granted if the access type matches (Base Permission Mode) |
+
+* If the principal is granted Object Lock access only through policy items with an action condition, every Object Lock request without an action is denied,
+  including the requests that the same principal could send through S3 Gateway with both flags enabled.
+* If the principal is granted the access type through a policy item without an action condition, the request falls back to Base Permission Mode.
+* When `enableActionMatcherInPoliciesCondition=false`, action conditions are not evaluated at all, so every request is in Base Permission Mode.
 
 ---
 
@@ -269,7 +283,8 @@ ranger.servicedef.ozone.enableActionMatcherInPoliciesCondition=true
 * `ozone.s3g.sts.http.enabled` decides whether the S3 action reaches Ranger at all. Today S3 Gateway sets `S3Authentication.s3Action` and OM copies it into the `RequestContext` only when this flag is `true`
   (`EndpointBase.applyS3Action`, `OmMetadataReader.maybeAddToContextFromThreadLocal`). The action was originally only needed for STS, which is why it is tied to this flag.
 * `enableActionMatcherInPoliciesCondition` decides whether Ranger uses the action. When it is `false`, Ranger's `RangerActionMatcher` ignores the action and only checks the access type.
-* If only the Ranger flag is enabled, S3 Gateway sends no action, so every request falls back to Base Permission Mode.
+* If only the Ranger flag is enabled, S3 Gateway sends no action. Requests are denied by policy items with an action condition, and fall back to Base Permission Mode only through policy items without one
+  (see [Requests without an action when the Ranger flag is enabled](#2-ranger-authorization-modes)). S3 users granted Object Lock permissions by action would therefore be denied, so this combination is not recommended either.
 * If only the STS flag is enabled, Ranger ignores the action, so requests also fall back to Base Permission Mode.
   This combination is not recommended: STS session policies restrict temporary credentials by S3 action (see [AWS STS Design for Ozone S3](ozone-sts.md)),
   so without the Ranger flag those restrictions would not be enforced. This is also why the STS flag is not enabled by default.
@@ -282,7 +297,7 @@ ranger.servicedef.ozone.enableActionMatcherInPoliciesCondition=true
 
 **Operator guidance**:
 * Clusters that expose Object Lock to S3 users with different roles (for example, data writers, compliance officers and administrators) should enable both flags before enabling Object Lock on any bucket.
-* The flags only affect S3 Gateway requests. Native clients are always authorized in Base Permission Mode, even when both flags are enabled, and are not limited by action conditions (see [below](#4-fallback-base-permission-mode)).
+* The STS flag only affects S3 Gateway requests. Native clients never carry an action, so they are denied by policy items with an action condition and are granted only through policy items without one (see [below](#4-fallback-base-permission-mode)).
 * The user documentation of this feature will describe both flags and the difference between the two modes.
 
 ---
@@ -292,6 +307,8 @@ ranger.servicedef.ozone.enableActionMatcherInPoliciesCondition=true
 Base Permission Mode is used for every request without an S3 action:
 requests from the native Java API or CLI, and S3 Gateway requests when either flag in the [previous section](#3-prerequisite-for-s3-fine-grained-authorization) is disabled.
 OM does not set an S3 action for these requests, so that the S3 action mapping stays in `S3GActionIamMapper` only.
+When the Ranger flag is enabled, these requests are granted only through policy items without an action condition
+(see [Requests without an action when the Ranger flag is enabled](#2-ranger-authorization-modes)).
 
 **Checks**:
 
@@ -318,10 +335,11 @@ OM does not set an S3 action for these requests, so that the S3 action mapping s
 * Compliance retention is not affected: it cannot be removed in either mode.
 
 **Native clients when both flags are enabled**:
-* Native clients carry no S3 action, so they are checked only against the base access type, even on a cluster that uses Fine-Grained Mode for S3.
-* When a request carries no action, Ranger skips the action condition of a policy item and only checks the access type.
-  A principal whose `WRITE_ACL` is limited to `PutObjectLegalHold` through S3 Gateway can therefore also set retention on the same key through a native client, and bypass Governance retention if it also has `WRITE` and `DELETE`.
-* Action-level separation is thus only enforced for S3 Gateway requests. Deployments that rely on it should not give those principals native client access to the locked buckets.
+* Native clients carry no S3 action. A policy item with an action condition cannot be satisfied by a request without an action, so it does not grant the request.
+* A principal whose `WRITE_ACL` is limited to `PutObjectLegalHold` through S3 Gateway is therefore denied all Object Lock operations through a native client;
+  it cannot use a native client to get around the action-level restrictions.
+* To let a principal manage Object Lock through a native client, grant the access type through a policy item without an action condition.
+  That item applies to S3 Gateway requests as well, so the principal gets every Object Lock operation allowed by the access type, without action-level separation.
 
 ---
 
