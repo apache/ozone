@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -653,15 +652,16 @@ class TestSnapshotCache {
   @Test
   @DisplayName("get() surfaces a retriable load TIMEOUT as OMException, not IllegalStateException")
   void testGetPropagatesLoadTimeout() throws Exception {
+    clearInvocations(lock);
     final UUID snapshotId = UUID.randomUUID();
     when(cacheLoader.load(eq(snapshotId)))
         .thenThrow(new OMException("snapshot has not been flushed yet", OMException.ResultCodes.TIMEOUT));
 
-    // The loader raises TIMEOUT while a snapshot's create transaction is still waiting to be flushed. The
-    // caller has to see the result code to know the call is worth retrying, so it must not be flattened.
     final OMException thrown = assertThrows(OMException.class, () -> snapshotCache.get(snapshotId));
-    assertThat(thrown.getResult()).isEqualTo(OMException.ResultCodes.TIMEOUT);
-    assertThat(snapshotCache.getDbMap()).doesNotContainKey(snapshotId);
+    assertEquals(OMException.ResultCodes.TIMEOUT, thrown.getResult());
+    assertFalse(snapshotCache.getDbMap().containsKey(snapshotId));
+    verify(lock, times(1)).acquireReadLock(eq(SNAPSHOT_DB_LOCK), eq(snapshotId.toString()));
+    verify(lock, times(1)).releaseReadLock(eq(SNAPSHOT_DB_LOCK), eq(snapshotId.toString()));
   }
 
   @Test

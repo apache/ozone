@@ -221,9 +221,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     }
     // The dbMap.compute lambda cannot throw a checked exception, so a typed load failure is parked here and
     // rethrown below. Flattening it into an IllegalStateException loses the result code, and callers cannot
-    // map that back to a retriable condition such as TIMEOUT, which the loader raises while a snapshot's
-    // create transaction is still waiting to be flushed.
-    final AtomicReference<OMException> loadFailure = new AtomicReference<>();
+    // map that back to a retriable condition such as TIMEOUT.
+    AtomicReference<OMException> loadFailure = new AtomicReference<>();
     try {
       // Atomic operation to initialize the OmSnapshot instance (once) if the key
       // does not exist, and increment the reference count on the instance.
@@ -252,7 +251,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
         }
         return v;
       });
-      final OMException loadException = loadFailure.get();
+      OMException loadException = loadFailure.get();
       if (loadException != null) {
         throw loadException;
       }
