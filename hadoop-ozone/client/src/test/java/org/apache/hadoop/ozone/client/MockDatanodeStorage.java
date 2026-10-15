@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.collections4.map.HashedMap;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -52,9 +54,30 @@ public class MockDatanodeStorage {
   private final Map<String, ByteString> data = new HashMap<>();
 
   private IOException exception = null;
+  private final AtomicInteger getBlockFailures = new AtomicInteger();
+  private final List<String> failedGetBlockThreads = new CopyOnWriteArrayList<>();
 
   public void setStorageFailed(IOException reason) {
     this.exception = reason;
+  }
+
+  /** Makes the next {@code count} GetBlock calls fail with CONTAINER_NOT_FOUND, as after a container move. */
+  public void failNextGetBlocks(int count) {
+    getBlockFailures.set(count);
+  }
+
+  /** Returns true, and records the calling thread, if this GetBlock call should fail. */
+  boolean consumeGetBlockFailure() {
+    if (getBlockFailures.getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0) {
+      failedGetBlockThreads.add(Thread.currentThread().getName());
+      return true;
+    }
+    return false;
+  }
+
+  /** Names of the threads whose GetBlock call failed. */
+  public List<String> getFailedGetBlockThreads() {
+    return failedGetBlockThreads;
   }
 
   private boolean isIncrementalChunkList(BlockData blockData) {

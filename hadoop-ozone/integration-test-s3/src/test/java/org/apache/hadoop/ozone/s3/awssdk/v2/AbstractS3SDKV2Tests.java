@@ -27,6 +27,7 @@ import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.http.HttpStatus.SC_OK;
 import static org.apache.http.HttpStatus.SC_REQUESTED_RANGE_NOT_SATISFIABLE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -64,12 +65,15 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -336,6 +340,47 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             }));
 
     assertEquals(content, objectBytes.asUtf8String());
+  }
+
+  /**
+   * Gets an object of an EC bucket that spans several cells, so the gateway reads it with the request's S3
+   * authentication and read-consistency hint on the request thread, and in parallel when
+   * {@code ozone.client.ec.parallel.read.enabled} is set.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"follower-stale", "follower-linearizable", "leader-only"})
+  public void testGetMultiCellEcObjectWithReadConsistencyHeader(String readConsistency) throws IOException {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    ECReplicationConfig ecConfig = new ECReplicationConfig("rs-3-2-1024k");
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName, BucketArgs.newBuilder()
+          .setDefaultReplicationConfig(new DefaultReplicationConfig(ecConfig)).build());
+    }
+    // Two full stripes and a partial one.
+    final byte[] content = new byte[7 * (int) OzoneConsts.MB + 100];
+    ThreadLocalRandom.current().nextBytes(content);
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromBytes(content));
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      assertEquals(ecConfig, ozoneClient.getObjectStore().getS3Bucket(bucketName).getKey(keyName)
+          .getReplicationConfig());
+    }
+
+    ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName)
+            .key(keyName)
+            .overrideConfiguration(c -> {
+              c.putHeader(READ_CONSISTENCY_HEADER, readConsistency);
+              if ("follower-stale".equals(readConsistency)) {
+                c.putHeader(LOCAL_LEASE_LOG_LIMIT_HEADER, "10");
+              }
+            }));
+
+    assertArrayEquals(content, objectBytes.asByteArray());
+    if (cluster.getConf().getBoolean("ozone.client.ec.parallel.read.enabled", false)) {
+      assertTrue(Thread.getAllStackTraces().keySet().stream()
+          .anyMatch(t -> t.getName().startsWith("ec-parallel-reader-")));
+    }
   }
 
   @Test

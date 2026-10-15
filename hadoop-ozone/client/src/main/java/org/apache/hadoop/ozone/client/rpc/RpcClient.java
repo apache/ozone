@@ -44,6 +44,7 @@ import java.net.URI;
 import java.security.InvalidKeyException;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -262,8 +263,10 @@ public class RpcClient implements ClientProtocol {
     this.ecReconstructExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
         EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE, clientConfig.getEcReconstructStripeReadPoolLimit(),
         "ec-reconstruct-reader-TID-%d"));
-    this.ecParallelReadExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
-        EC_PARALLEL_READ_POOL_MIN_SIZE, clientConfig.getEcParallelReadPoolLimit(), "ec-parallel-reader-TID-%d"));
+    // Created on first use, after ozoneManagerClient, which holds the thread-local request context.
+    this.ecParallelReadExecutor = MemoizedSupplier.valueOf(() -> createRequestContextPropagatingExecutor(
+        EC_PARALLEL_READ_POOL_MIN_SIZE, clientConfig.getEcParallelReadPoolLimit(), "ec-parallel-reader-TID-%d",
+        requestContext()));
     this.writeExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
         WRITE_POOL_MIN_SIZE, Integer.MAX_VALUE, "client-write-TID-%d"));
 
@@ -3192,5 +3195,69 @@ public class RpcClient implements ClientProtocol {
             60, TimeUnit.SECONDS, new SynchronousQueue<>(),
                new ThreadFactoryBuilder().setNameFormat(threadNameFormat).setDaemon(true).build(),
                new ThreadPoolExecutor.CallerRunsPolicy());
+  }
+
+  /** The thread-locals that hold the request context sent with every OM request. */
+  private List<ThreadLocal<?>> requestContext() {
+    return Arrays.asList(ozoneManagerClient.getS3CredentialsProvider(),
+        ozoneManagerClient.getReadConsistencyHintProvider());
+  }
+
+  /**
+   * Like {@link #createThreadPoolExecutor}, but every task runs with the request context of the thread that submitted
+   * it: the given thread-locals, here the S3 authentication and the read consistency hint. A task can call OM, for
+   * example to refresh the locations of a block it reads; with the S3 auth check enabled that call fails without the
+   * request's authentication, and without the hint it uses the default read consistency instead of the request's.
+   */
+  private static ExecutorService createRequestContextPropagatingExecutor(int corePoolSize, int maximumPoolSize,
+      String threadNameFormat, List<ThreadLocal<?>> context) {
+    return new ThreadPoolExecutor(corePoolSize, maximumPoolSize, 60, TimeUnit.SECONDS, new SynchronousQueue<>(),
+        new ThreadFactoryBuilder().setNameFormat(threadNameFormat).setDaemon(true).build(),
+        new ThreadPoolExecutor.CallerRunsPolicy()) {
+      @Override
+      public void execute(Runnable command) {
+        super.execute(withSubmitterContext(command, context));
+      }
+    };
+  }
+
+  /**
+   * Wraps the task to run with the submitting thread's values of the given thread-locals, or with none where it has
+   * none, and to restore the running thread's own values afterwards, so a pooled thread never keeps another request's
+   * context.
+   */
+  @VisibleForTesting
+  static Runnable withSubmitterContext(Runnable task, List<ThreadLocal<?>> context) {
+    final List<Object> submitterValues = currentValues(context);
+    return () -> {
+      final List<Object> previousValues = currentValues(context);
+      setOrRemove(context, submitterValues);
+      try {
+        task.run();
+      } finally {
+        setOrRemove(context, previousValues);
+      }
+    };
+  }
+
+  private static List<Object> currentValues(List<ThreadLocal<?>> threadLocals) {
+    List<Object> values = new ArrayList<>(threadLocals.size());
+    for (ThreadLocal<?> threadLocal : threadLocals) {
+      values.add(threadLocal.get());
+    }
+    return values;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static void setOrRemove(List<ThreadLocal<?>> threadLocals, List<Object> values) {
+    for (int i = 0; i < threadLocals.size(); i++) {
+      ThreadLocal<Object> threadLocal = (ThreadLocal<Object>) threadLocals.get(i);
+      Object value = values.get(i);
+      if (value == null) {
+        threadLocal.remove();
+      } else {
+        threadLocal.set(value);
+      }
+    }
   }
 }
