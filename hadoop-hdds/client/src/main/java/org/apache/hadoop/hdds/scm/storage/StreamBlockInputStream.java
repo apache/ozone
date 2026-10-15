@@ -326,7 +326,6 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (pos < 0) {
       throw new IOException("Cannot seek to negative offset");
     }
-    updateBlockLength();
     if (pos > blockLength) {
       throw new EOFException("Failed to seek to position " + pos + " > block length = " + blockLength);
     }
