@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.local;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.HttpURLConnection;
@@ -65,6 +66,30 @@ class TestLocalOzoneRecon {
 
       assertTrue(cluster.getReconPort() > 0);
       assertHttpEndpointResponds(cluster.getReconEndpoint() + "/api/v1/clusterState");
+    }
+  }
+
+  @Test
+  void reconVersionMetricsUnregisterOnCloseAndRebindOnSecondStart() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            tempDir.resolve("local-ozone-recon-restart"))
+        .setS3gEnabled(false)
+        .setReconEnabled(true)
+        .setStartupTimeout(Duration.ofMinutes(2))
+        .build();
+    String reconSource = ComponentVersionManagerMetrics.METRICS_SOURCE_NAME + ".ReconSCM";
+    MetricsSource firstRecon;
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
+      cluster.start();
+      firstRecon = DefaultMetricsSystem.instance().getSource(reconSource);
+      assertNotNull(firstRecon);
+    }
+    assertNull(DefaultMetricsSystem.instance().getSource(reconSource));
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
+      cluster.start();
+      MetricsSource secondRecon = DefaultMetricsSystem.instance().getSource(reconSource);
+      assertNotNull(secondRecon);
+      assertNotSame(firstRecon, secondRecon);
     }
   }
 

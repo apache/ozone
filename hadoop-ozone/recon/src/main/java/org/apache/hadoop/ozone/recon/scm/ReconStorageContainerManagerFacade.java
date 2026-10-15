@@ -680,6 +680,7 @@ public class ReconStorageContainerManagerFacade
     LOG.info("Flushing container replica history to DB.");
     containerManager.flushReplicaHistoryMapToDB(true);
     containerSyncMetrics.unRegister();
+    scmVersionManager.close();
     scmSnapshotExecutor.shutdownNow();
     IOUtils.close(LOG, dbStore);
   }
