@@ -178,6 +178,7 @@ public class BucketEndpoint extends BucketOperationHandler {
     response.setContinueToken(continueToken);
     response.setStartAfter(EncodingTypeObject.createNullable(startAfter, encodingType));
 
+    final String keyMarker = isListObjectVersions() ? marker : null;
     String prevDir = decodedToken != null ? decodedToken.getLastDir() : null;
     String lastKey = null;
     int count = 0;
@@ -202,9 +203,13 @@ public class BucketEndpoint extends BucketOperationHandler {
               // delimiter /) also hit this branch and become a common prefix.
               String dirName = relativeKeyName.substring(0, delimiterIndex);
               if (!dirName.equals(prevDir)) {
-                response.addPrefix(EncodingTypeObject.createNullable(
-                    prefix + dirName + delimiter, encodingType));
                 prevDir = dirName;
+                String commonPrefix = prefix + dirName + delimiter;
+                // ListObjectVersions excludes common prefixes at or before key-marker.
+                if (StringUtils.startsWith(keyMarker, commonPrefix)) {
+                  continue;
+                }
+                response.addPrefix(EncodingTypeObject.createNullable(commonPrefix, encodingType));
                 count++;
               }
             } else {

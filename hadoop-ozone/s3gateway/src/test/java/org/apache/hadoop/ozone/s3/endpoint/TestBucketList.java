@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.List;
 import java.util.stream.IntStream;
 import javax.xml.bind.JAXB;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -45,6 +46,8 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 /**
  * Testing basic object list browsing.
@@ -784,6 +787,51 @@ public class TestBucketList {
     assertThat(second.getKeyMarker().getName()).isEqualTo("file+1");
     assertThat(second.getVersionIdMarker()).isEqualTo(NULL_VERSION_ID);
     assertThat(second.getVersions()).extracting(v -> v.getKey().getName()).containsExactly("file2", "file3");
+  }
+
+  @Test
+  public void listObjectVersionsPaginatesCommonPrefixes() throws Exception {
+    setup("dir:a", "dir:b", "file");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, ":");
+    bucketEndpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, 1);
+    ListVersionsResult first = (ListVersionsResult) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertThat(first.getCommonPrefixes()).extracting(p -> p.getPrefix().getName()).containsExactly("dir:");
+    assertThat(first.getVersions()).isEmpty();
+    assertThat(first.isTruncated()).isTrue();
+    assertThat(first.getNextKeyMarker().getName()).isEqualTo("dir:a");
+    assertThat(first.getNextVersionIdMarker()).isEqualTo(NULL_VERSION_ID);
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.KEY_MARKER, first.getNextKeyMarker().getName());
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSION_ID_MARKER, first.getNextVersionIdMarker());
+    ListVersionsResult second = (ListVersionsResult) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertThat(second.getCommonPrefixes()).isEmpty();
+    assertThat(second.getVersions()).extracting(v -> v.getKey().getName()).containsExactly("file");
+    assertThat(second.isTruncated()).isFalse();
+    assertThat(second.getNextKeyMarker()).isNull();
+    assertThat(second.getNextVersionIdMarker()).isNull();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"p:di, true", "p:dir:, false", "p:dir:a, false"})
+  public void listObjectVersionsFiltersCommonPrefixesByKeyMarker(String keyMarker, boolean includeMarkerPrefix)
+      throws Exception {
+    setup("p:dir:a", "p:dir:b", "p:dira:c", "p:file");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.PREFIX, "p:");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, ":");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.KEY_MARKER, keyMarker);
+    ListVersionsResult result = (ListVersionsResult) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    List<String> expectedPrefixes = includeMarkerPrefix ? List.of("p:dir:", "p:dira:") : List.of("p:dira:");
+    assertThat(result.getCommonPrefixes()).extracting(p -> p.getPrefix().getName())
+        .containsExactlyElementsOf(expectedPrefixes);
+    assertThat(result.getVersions()).extracting(v -> v.getKey().getName()).containsExactly("p:file");
+    assertThat(result.isTruncated()).isFalse();
   }
 
   @Test

@@ -129,6 +129,7 @@ import software.amazon.awssdk.services.s3.model.AbortIncompleteMultipartUpload;
 import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.Bucket;
 import software.amazon.awssdk.services.s3.model.BucketLifecycleConfiguration;
+import software.amazon.awssdk.services.s3.model.CommonPrefix;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
@@ -1003,6 +1004,21 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertThat(remaining.versions()).isEmpty();
     assertThat(remaining.deleteMarkers()).isEmpty();
     assertThat(remaining.isTruncated()).isFalse();
+  }
+
+  @Test
+  public void testListObjectVersionsFiltersCommonPrefixesByKeyMarker() {
+    final String bucketName = getBucketName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    Arrays.asList("dir/a", "dir/b", "dira/c", "file")
+        .forEach(key -> s3Client.putObject(b -> b.bucket(bucketName).key(key), RequestBody.fromString("bar")));
+
+    final ListObjectVersionsResponse result = s3Client.listObjectVersions(
+        b -> b.bucket(bucketName).delimiter("/").keyMarker("dir/a"));
+
+    assertThat(result.commonPrefixes()).extracting(CommonPrefix::prefix).containsExactly("dira/");
+    assertThat(result.versions()).extracting(ObjectVersion::key).containsExactly("file");
+    assertThat(result.isTruncated()).isFalse();
   }
 
   @Test
