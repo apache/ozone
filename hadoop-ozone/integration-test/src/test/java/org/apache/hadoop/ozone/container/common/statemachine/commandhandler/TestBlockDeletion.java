@@ -648,7 +648,6 @@ public class TestBlockDeletion {
 
     // Delete key
     writeClient.deleteKey(keyArgs);
-    Thread.sleep(5000);
 
     // Ensure isEmpty are true for all replica after delete key
     GenericTestUtils.waitFor(() -> {
@@ -660,7 +659,7 @@ public class TestBlockDeletion {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 500, 5 * 2000);
+    }, 500, 15 * 1000);
 
     // Update container replica by making invalid keyCount in one replica
     ContainerReplica replicaOne = ContainerReplica.newBuilder()
