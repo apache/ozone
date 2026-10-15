@@ -60,7 +60,7 @@ public class TestOmKeyInfo {
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
 
     OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
-        key.getProtobuf(ClientVersion.CURRENT_VERSION));
+        key.getProtobuf(ClientVersion.CURRENT));
 
     assertNotNull(keyAfterSerialization);
     assertEquals(key, keyAfterSerialization);
@@ -78,7 +78,7 @@ public class TestOmKeyInfo {
     OmKeyInfo key = createOmKeyInfo(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     OzoneManagerProtocolProtos.KeyInfo omKeyProto =
-        key.getProtobuf(ClientVersion.CURRENT_VERSION);
+        key.getProtobuf(ClientVersion.CURRENT);
 
     // No EC Config
     assertFalse(omKeyProto.hasEcReplicationConfig());
@@ -95,7 +95,7 @@ public class TestOmKeyInfo {
     // EC Config
     key = createOmKeyInfo(new ECReplicationConfig(3, 2));
     assertFalse(key.isHsync());
-    omKeyProto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
+    omKeyProto = key.getProtobuf(ClientVersion.CURRENT);
 
     assertEquals(3,
         omKeyProto.getEcReplicationConfig().getData());
@@ -179,12 +179,12 @@ public class TestOmKeyInfo {
       assertEquals(orig.isMultipartKey(), clone.isMultipartKey());
       assertEquals(orig.getVersion(), clone.getVersion());
 
-      assertEquals(orig.getLocationList().size(),
-          clone.getLocationList().size());
+      assertEquals(orig.createLocationList().size(),
+          clone.createLocationList().size());
 
-      for (int j = 0; j < orig.getLocationList().size(); j++) {
-        OmKeyLocationInfo origLocationInfo = orig.getLocationList().get(j);
-        OmKeyLocationInfo cloneLocationInfo = clone.getLocationList().get(j);
+      for (int j = 0; j < orig.createLocationList().size(); j++) {
+        OmKeyLocationInfo origLocationInfo = orig.createLocationList().get(j);
+        OmKeyLocationInfo cloneLocationInfo = clone.createLocationList().get(j);
         assertEquals(origLocationInfo, cloneLocationInfo);
       }
     }

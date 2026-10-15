@@ -342,7 +342,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
   private void assertTokenIsNull(OmKeyInfo value) {
     value.getKeyLocationVersions()
         .forEach(
-            keyLocationInfoGroup -> keyLocationInfoGroup.getLocationList()
+            keyLocationInfoGroup -> keyLocationInfoGroup.createLocationList()
                 .forEach(
                     keyLocationInfo -> assertNull(keyLocationInfo
                         .getToken())));
@@ -376,7 +376,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
 
     OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setClientId(UUID.randomUUID().toString())
         .setCreateVolumeRequest(CreateVolumeRequest.newBuilder().
             setVolumeInfo(VolumeInfo.newBuilder().setVolume(volumeName)
@@ -398,7 +398,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     // Read Request
     OMRequest readRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.InfoVolume)
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setClientId(UUID.randomUUID().toString())
         .setInfoVolumeRequest(InfoVolumeRequest.newBuilder()
             .setVolumeName(volumeName).build())

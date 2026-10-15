@@ -39,6 +39,7 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
   private final ByteBufferStreamOutput byteBufferStreamOutput;
   private boolean enableHsync;
   private final Syncable syncable;
+  private ByteBuffer derivedKey;
 
   /**
    * Constructs an instance with a {@link Syncable} {@link OutputStream}.
@@ -102,12 +103,20 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
   }
 
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
+    final KeyCommitOutput keyCommitOutput = getKeyCommitOutput();
     if (keyCommitOutput != null) {
       return keyCommitOutput.getCommitUploadPartInfo();
     }
     // Otherwise return null.
     return null;
+  }
+
+  public long getModificationTime() {
+    final KeyDataStreamOutput keyDataStreamOutput = getKeyDataStreamOutput();
+    if (keyDataStreamOutput != null) {
+      return keyDataStreamOutput.getModificationTime();
+    }
+    throw new IllegalStateException("OutputStream is not a KeyDataStreamOutput: " + byteBufferStreamOutput.getClass());
   }
 
   public KeyDataStreamOutput getKeyDataStreamOutput() {
@@ -195,4 +204,11 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
     return ((KeyMetadataAware)this.byteBufferStreamOutput).getMetadata();
   }
 
+  public ByteBuffer getDerivedKey() {
+    return derivedKey;
+  }
+
+  public void setDerivedKey(ByteBuffer derivedKey) {
+    this.derivedKey = derivedKey;
+  }
 }

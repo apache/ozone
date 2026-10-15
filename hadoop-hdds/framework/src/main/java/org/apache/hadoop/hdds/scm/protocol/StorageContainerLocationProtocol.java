@@ -27,7 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -35,10 +35,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransaction
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -46,24 +46,15 @@ import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
-import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.token.Token;
 
 /**
  * ContainerLocationProtocol is used by an HDFS node to find the set of nodes
  * that currently host a container.
  */
-@KerberosInfo(serverPrincipal = ScmConfig.ConfigStrings
-      .HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 public interface StorageContainerLocationProtocol extends Closeable {
-
-  // Accessed and checked via reflection in Hadoop RPC - changing it is incompatible
-  @SuppressWarnings({"checkstyle:ConstantName", "unused"})
-  /**
-   * Version 1: Initial version.
-   */
-  long versionID = 1L;
 
   /**
    * Admin command should take effect on all SCM instance.
@@ -79,7 +70,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   Set<Type> FOLLOWER_READABLE_COMMAND_TYPES = Collections.unmodifiableSet(EnumSet.of(
       Type.InSafeMode,
-      Type.GetSafeModeRuleStatuses));
+      Type.GetSafeModeRuleStatuses,
+      Type.GetPeerUpgradeStatus));
   
   /**
    * Asks SCM where a container should be allocated. SCM responds with the
@@ -122,7 +114,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
-      long containerId, int clientVersion) throws IOException;
+      long containerId, ClientVersion clientVersion) throws IOException;
 
   /**
    * Ask SCM the location of a batch of containers. SCM responds with a group of
@@ -281,7 +273,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   List<HddsProtos.Node> queryNode(HddsProtos.NodeOperationalState opState,
       HddsProtos.NodeState state, HddsProtos.QueryScope queryScope,
-      String poolName, int clientVersion) throws IOException;
+      String poolName, ClientVersion clientVersion) throws IOException;
 
   HddsProtos.Node queryNode(UUID uuid) throws IOException;
 
@@ -411,8 +403,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    */
   boolean inSafeMode() throws IOException;
 
-  Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
-      throws IOException;
+  List<SafeModeRuleStatusProto> getSafeModeRuleStatuses() throws IOException;
 
   /**
    * Force SCM out of Safe mode.
@@ -495,7 +486,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String address, String uuid, int clientVersion) throws IOException;
+      String address, String uuid, ClientVersion clientVersion) throws IOException;
 
   /**
    * Get usage information of most or least used datanodes.
@@ -509,14 +500,25 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @see org.apache.hadoop.ozone.ClientVersion
    */
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count, int clientVersion) throws IOException;
+      boolean mostUsed, int count, ClientVersion clientVersion) throws IOException;
 
+  @Deprecated
   StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
       throws IOException;
 
+  @Deprecated
   StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
+
+  /**
+   * Returns the {@link HDDSVersion#SOFTWARE_VERSION} of the responding SCM binary. Intended for the
+   * SCM leader to verify that all peer SCMs run a matching software version before starting
+   * finalization. This is a node-local read (follower-readable): combined with a {@code ScmNodeTarget}
+   * it queries one specific SCM without a leader round-trip. A version not recognized by the calling
+   * binary deserializes to {@link HDDSVersion#UNKNOWN_VERSION}.
+   */
+  HDDSVersion getPeerUpgradeStatus() throws IOException;
 
   /**
    * Obtain a token which can be used to let datanodes verify authentication of

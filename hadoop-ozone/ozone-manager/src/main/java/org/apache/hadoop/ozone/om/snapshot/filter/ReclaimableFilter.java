@@ -216,10 +216,21 @@ public abstract class ReclaimableFilter<V>
     this.cleanup();
   }
 
-  private void cleanup() {
-    this.snapshotIdLocks.releaseLock();
+  /**
+   * Closes snapshot DB handles while retaining the snapshot GC locks.
+   *
+   * The GC locks must remain held until the corresponding OM request is
+   * applied, but a synchronous request must not retain snapshot DB read locks
+   * since the double buffer may need a snapshot DB write lock to flush it.
+   */
+  public void closeSnapshotDbHandles() {
     IOUtils.close(LOG, previousOmSnapshots);
     previousOmSnapshots.clear();
+  }
+
+  private void cleanup() {
+    this.snapshotIdLocks.releaseLock();
+    closeSnapshotDbHandles();
     previousSnapshotInfos.clear();
     lockedSnapshotIds.clear();
   }

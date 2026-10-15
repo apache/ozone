@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.base.Preconditions;
@@ -24,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
@@ -57,10 +60,25 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   private final AtomicInteger applyingTransactions = new AtomicInteger(0);
   private long lastSnapshotTimeMs = 0;
   private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
+  private final long flushPendingLimit;
 
   public SCMHADBTransactionBufferImpl(StorageContainerManager scm) throws RocksDatabaseException, CodecException {
     this.scm = scm;
+    this.flushPendingLimit = getFlushPendingLimit(scm.getConfiguration());
     init();
+  }
+
+  private static long getFlushPendingLimit(OzoneConfiguration conf) {
+    long limit = conf.getLong(
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT,
+        OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT_DEFAULT);
+    if (limit <= 0) {
+      LOG.warn("Invalid {}={} config value, using default {}",
+          OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT, limit,
+          OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT_DEFAULT);
+      limit = OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT_DEFAULT;
+    }
+    return limit;
   }
 
   private BatchOperation getCurrentBatchOperation() {
@@ -150,6 +168,29 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
     }
   }
 
+  /**
+   * Flushes the buffer if the number of pending DB operations has reached {@link #flushPendingLimit}.
+   *
+   * @return true if a flush was performed
+   */
+  @Override
+  public boolean flushIfPendingLimitReached() throws RocksDatabaseException, CodecException {
+    if (txFlushPending.get() < flushPendingLimit) {
+      return false;
+    }
+    rwLock.writeLock().lock();
+    try {
+      if (txFlushPending.get() < flushPendingLimit) {
+        return false;
+      }
+      LOG.debug("txFlushPending={} reached max limit={}, flushing", txFlushPending.get(), flushPendingLimit);
+      flushUnderWriteLock();
+      return true;
+    } finally {
+      rwLock.writeLock().unlock();
+    }
+  }
+
   private void flushUnderWriteLock()
       throws RocksDatabaseException, CodecException {
     // write latest trx info into trx table in the same batch
@@ -182,6 +223,16 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
   @Override
   public void endApplyingTransaction() {
     applyingTransactions.decrementAndGet();
+  }
+
+  @Override
+  public void lock() {
+    rwLock.readLock().lock();
+  }
+
+  @Override
+  public void unlock() {
+    rwLock.readLock().unlock();
   }
 
   @Override

@@ -29,6 +29,9 @@ import static org.apache.hadoop.hdds.scm.server.StorageContainerManager.startRpc
 import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_DONE_MSG;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.FINALIZATION_REQUIRED_MSG;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
@@ -49,8 +52,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -65,6 +68,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto.Builder;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolPB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
@@ -89,6 +93,7 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -109,6 +114,7 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -350,7 +356,7 @@ public class SCMClientProtocolServer implements
 
   @Override
   public List<HddsProtos.SCMContainerReplicaProto> getContainerReplicas(
-      long containerId, int clientVersion) throws IOException {
+      long containerId, ClientVersion clientVersion) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> results = new ArrayList<>();
     Map<String, String> auditMap = new HashMap<>();
     auditMap.put("containerId", String.valueOf(containerId));
@@ -673,7 +679,7 @@ public class SCMClientProtocolServer implements
   @Override
   public List<HddsProtos.Node> queryNode(
       HddsProtos.NodeOperationalState opState, HddsProtos.NodeState state,
-      HddsProtos.QueryScope queryScope, String poolName, int clientVersion)
+      HddsProtos.QueryScope queryScope, String poolName, ClientVersion clientVersion)
       throws IOException {
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("opState", String.valueOf(opState));
@@ -1002,7 +1008,7 @@ public class SCMClientProtocolServer implements
             .orElseThrow(() -> new IOException("Cannot" +
                 " find a new leader to transfer leadership."));
       } else {
-        targetPeerId = RaftPeerId.valueOf(newLeaderId);
+        targetPeerId = resolveTargetPeerId(newLeaderId, group);
       }
       final GrpcTlsConfig tlsConfig =
           createSCMRatisTLSConfig(new SecurityConfig(scm.getConfiguration()),
@@ -1017,6 +1023,27 @@ public class SCMClientProtocolServer implements
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
             SCMAction.TRANSFER_LEADERSHIP, auditMap));
+  }
+
+  /** Resolves the transfer target, which may be given as an SCM UUID or as a configured SCM node id. */
+  private RaftPeerId resolveTargetPeerId(String newLeaderId, RaftGroup group) {
+    final RaftPeerId peerId = RaftPeerId.valueOf(newLeaderId);
+    if (group.getPeer(peerId) != null) {
+      return peerId;
+    }
+    // Raft peer ids are SCM UUIDs, so a node id only matches through its configured Ratis address.
+    for (SCMNodeDetails node : scm.getSCMHANodeDetails().getAllNodeDetails()) {
+      if (!newLeaderId.equals(node.getNodeId())) {
+        continue;
+      }
+      for (RaftPeer peer : group.getPeers()) {
+        if (node.getRatisHostPortStr().equals(peer.getAddress())) {
+          return peer.getId();
+        }
+      }
+    }
+    // Leave an unmatched id to RatisHelper, which reports the group it did not match.
+    return peerId;
   }
 
   @Deprecated
@@ -1064,16 +1091,13 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
-  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
-      throws IOException {
+  public List<SafeModeRuleStatusProto> getSafeModeRuleStatuses() {
     try {
-      Map<String, Pair<Boolean, String>> result = scm.getRuleStatus();
-      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
-          SCMAction.GET_SAFE_MODE_RULE_STATUSES, null));
+      final List<SafeModeRuleStatusProto> result = scm.getRuleStatus();
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(SCMAction.GET_SAFE_MODE_RULE_STATUSES, null));
       return result;
     } catch (Exception ex) {
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          SCMAction.GET_SAFE_MODE_RULE_STATUSES, null, ex));
+      AUDIT.logReadFailure(buildAuditMessageForFailure(SCMAction.GET_SAFE_MODE_RULE_STATUSES, null, ex));
       throw ex;
     }
   }
@@ -1145,44 +1169,48 @@ public class SCMClientProtocolServer implements
     return scm.getReplicationManager().getContainerReport();
   }
 
+  /*
+   * This command is deprecated and is retained for backward compatibility. It no longer finalizes SCM
+   * as the process is driven from OM which will trigger the SCM finalize process.
+   */
   @Override
-  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) throws
-      IOException {
-    final Map<String, String> auditMap = Maps.newHashMap();
-    auditMap.put("upgradeClientID", upgradeClientID);
-    try {
-      // check admin authorization
-      getScm().checkAdminAccess(getRemoteUser(), false);
-      // TODO HDDS-6762: Return to the client once the FINALIZATION_STARTED
-      //  checkpoint has been crossed and continue finalizing asynchronously.
-      StatusAndMessages result = scm.getFinalizationManager().finalizeUpgrade(upgradeClientID);
-      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(
-          SCMAction.FINALIZE_SCM_UPGRADE, auditMap));
-      return result;
-    } catch (Exception ex) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(
-          SCMAction.FINALIZE_SCM_UPGRADE, auditMap, ex));
-      throw ex;
-    }
-
+  @Deprecated
+  public StatusAndMessages finalizeScmUpgrade(String upgradeClientID) {
+    // This command is kept only for legacy upgrade scripts which would have first finalized SCM and then
+    // made a call to OM to finalize it. The new flow, is that a single call to OM triggers the finalization process.
+    // The legacy OM command now calls the new one and correctly starts the flow, so this command has become a
+    // noop. Regardless of whether SCM is finalized or not, we return ALREADY_FINALIZED to allow any scripts to move
+    // on and call OM to start the process.
+    return new StatusAndMessages(ALREADY_FINALIZED, Collections.emptyList());
   }
 
   @Override
+  public HDDSVersion getPeerUpgradeStatus() throws IOException {
+    return HDDSVersion.SOFTWARE_VERSION;
+  }
+
+  @Override
+  @Deprecated
   public StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException {
+
+    // This method, we change to call the queryUpgradeStatus and create a StatusAndMessages object that reflects
+    // the state.
+
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("upgradeClientID", upgradeClientID);
     auditMap.put("force", String.valueOf(force));
     auditMap.put("readonly", String.valueOf(readonly));
 
     try {
-      // check admin authorization
-      if (!readonly) {
-        getScm().checkAdminAccess(getRemoteUser(), true);
+      getScm().checkAdminAccess(getRemoteUser(), true);
+      StatusAndMessages result;
+      if (scm.getVersionManager().needsFinalization()) {
+        result = FINALIZATION_REQUIRED_MSG;
+      } else {
+        result = FINALIZATION_DONE_MSG;
       }
-      StatusAndMessages result = scm.getFinalizationManager()
-          .queryUpgradeFinalizationProgress(upgradeClientID, force, readonly);
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.QUERY_UPGRADE_FINALIZATION_PROGRESS, auditMap));
       return result;
@@ -1400,7 +1428,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      String address, String uuid, int clientVersion) throws IOException {
+      String address, String uuid, ClientVersion clientVersion) throws IOException {
 
     final Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("address", address);
@@ -1445,7 +1473,7 @@ public class SCMClientProtocolServer implements
    * @return Usage info such as capacity, SCMUsed, and remaining space.
    */
   private HddsProtos.DatanodeUsageInfoProto getUsageInfoFromDatanodeDetails(
-      DatanodeDetails node, int clientVersion) {
+      DatanodeDetails node, ClientVersion clientVersion) {
     DatanodeUsageInfo usageInfo = scm.getScmNodeManager().getUsageInfo(node);
     return usageInfo.toProto(clientVersion);
   }
@@ -1464,7 +1492,7 @@ public class SCMClientProtocolServer implements
    */
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
-      boolean mostUsed, int count, int clientVersion)
+      boolean mostUsed, int count, ClientVersion clientVersion)
       throws IOException, IllegalArgumentException {
 
     final Map<String, String> auditMap = Maps.newHashMap();

@@ -39,7 +39,7 @@ public class TestResultCodes {
       assertTrue(sameName(codeValue.name(), protoBufValue.name()),
           String.format("Protobuf/Enum constant name mismatch %s %s", codeValue,
               protoBufValue));
-      ResultCodes converted = ResultCodes.values()[protoBufValue.ordinal()];
+      ResultCodes converted = ResultCodes.valueOf(protoBufValue.name());
       assertEquals(codeValue, converted);
     }
   }

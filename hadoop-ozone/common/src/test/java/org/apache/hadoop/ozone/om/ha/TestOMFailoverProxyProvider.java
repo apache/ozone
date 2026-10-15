@@ -49,7 +49,7 @@ import org.junit.jupiter.api.Test;
 public class TestOMFailoverProxyProvider {
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static final String NODE_ID_BASE_STR = "omNode-";
-  private static final String DUMMY_NODE_ADDR = "0.0.0.0:8080";
+  private static final String DUMMY_NODE_ADDR = "localhost:8080";
   private HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> provider;
   private long waitBetweenRetries;
   private int numNodes = 3;
@@ -174,6 +174,23 @@ public class TestOMFailoverProxyProvider {
       assertNotNull(providerWithListeners.getOMProxyMap().get(NODE_ID_BASE_STR + 1));
       assertNotNull(providerWithListeners.getOMProxyMap().get(NODE_ID_BASE_STR + 3));
       assertNull(providerWithListeners.getOMProxyMap().get(listenerNode));
+    }
+  }
+
+  @Test
+  public void testConfiguredIpv6Address() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_OM_ADDRESS_KEY, "[2001:db8::10]:9862");
+
+    try (HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> ipv6Provider =
+             new HadoopRpcOMFailoverProxyProvider<>(conf,
+                 UserGroupInformation.getCurrentUser(), null,
+                 OzoneManagerProtocolPB.class)) {
+      List<OMProxyInfo<OzoneManagerProtocolPB>> proxies =
+          ipv6Provider.getOMProxies();
+      assertEquals(1, proxies.size());
+      assertEquals("[2001:db8::10]:9862",
+          proxies.get(0).getAddressString());
     }
   }
 

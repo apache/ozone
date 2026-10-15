@@ -85,7 +85,7 @@ public class TestECBlockInputStream {
     }
 
     // EC-3-2, very large block, so all 3 data locations are needed
-    keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, 5000 * ONEMB);
+    keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, 5000L * ONEMB);
     try (ECBlockInputStream ecb = new ECBlockInputStream(repConfig,
         keyInfo, null, null, new TestBlockInputStreamFactory(),
         clientConfig)) {
@@ -657,6 +657,18 @@ public class TestECBlockInputStream {
 
     public void setSimulateZeroByteRead(boolean simulateZeroByteRead) {
       this.simulateZeroByteRead = simulateZeroByteRead;
+    }
+
+    @Override
+    protected int readPositioned(long offset, ByteBuffer buffer) {
+      if (offset >= length) {
+        return EOF;
+      }
+      int n = (int) Math.min(buffer.remaining(), length - offset);
+      for (int i = 0; i < n; i++) {
+        buffer.put(dataVal);
+      }
+      return n;
     }
 
     @Override
