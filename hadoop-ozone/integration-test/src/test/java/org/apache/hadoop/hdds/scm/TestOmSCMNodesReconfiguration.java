@@ -47,6 +47,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.Timeout;
 
 /**
@@ -56,17 +57,18 @@ import org.junit.jupiter.api.Timeout;
  * covered by {@link org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase}
  * unit tests; this verifies the OM-side registration and callbacks end to end.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Timeout(300)
 public class TestOmSCMNodesReconfiguration {
 
-  private static MiniOzoneHAClusterImpl cluster;
-  private static String scmServiceId;
-  private static String scmNodesConfigKey;
-  private static String initialScmNodes;
-  private static final Map<String, String> INITIAL_SCM_ADDRESSES = new HashMap<>();
+  private MiniOzoneHAClusterImpl cluster;
+  private String scmServiceId;
+  private String scmNodesKey;
+  private String initialScmNodes;
+  private final Map<String, String> INITIAL_SCM_ADDRESSES = new HashMap<>();
 
   @BeforeAll
-  public static void init() throws Exception {
+  public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     scmServiceId = "scm-service-test1";
     cluster = MiniOzoneCluster.newHABuilder(conf)
@@ -77,10 +79,9 @@ public class TestOmSCMNodesReconfiguration {
         .build();
     cluster.waitForClusterToBeReady();
 
-    scmNodesConfigKey =
-        ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
+    scmNodesKey = ConfUtils.addKeySuffixes(OZONE_SCM_NODES_KEY, scmServiceId);
     OzoneConfiguration omConf = cluster.getOzoneManager().getConfiguration();
-    initialScmNodes = omConf.get(scmNodesConfigKey);
+    initialScmNodes = omConf.get(scmNodesKey);
     for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
       String scmAddrKey = ConfUtils.addKeySuffixes(
           OZONE_SCM_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
@@ -96,11 +97,11 @@ public class TestOmSCMNodesReconfiguration {
       handler.reconfigureProperty(scmAddress.getKey(), scmAddress.getValue());
     }
 
-    handler.reconfigureProperty(scmNodesConfigKey, initialScmNodes);
+    handler.reconfigureProperty(scmNodesKey, initialScmNodes);
   }
 
   @AfterAll
-  public static void shutdown() {
+  public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
@@ -113,8 +114,8 @@ public class TestOmSCMNodesReconfiguration {
   void testScmNodesAndAddressReconfigurableOnOm() throws Exception {
     ReconfigurationHandler handler =
         cluster.getOzoneManager().getReconfigurationHandler();
-    assertTrue(handler.isPropertyReconfigurable(scmNodesConfigKey));
-    assertTrue(handler.listReconfigureProperties().contains(scmNodesConfigKey));
+    assertTrue(handler.isPropertyReconfigurable(scmNodesKey));
+    assertTrue(handler.listReconfigureProperties().contains(scmNodesKey));
 
     // Register address prefix so dynamically added nodes can be reconfigured.
     for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
@@ -132,7 +133,7 @@ public class TestOmSCMNodesReconfiguration {
     ReconfigurationHandler handler =
         cluster.getOzoneManager().getReconfigurationHandler();
     assertThrows(ReconfigurationException.class,
-        () -> handler.reconfigureProperty(scmNodesConfigKey, ""));
+        () -> handler.reconfigureProperty(scmNodesKey, ""));
   }
 
   /**
@@ -152,7 +153,7 @@ public class TestOmSCMNodesReconfiguration {
     List<String> remaining = new ArrayList<>(before.subList(0, before.size() - 1));
     Set<String> expected = new HashSet<>(remaining);
 
-    handler.reconfigureProperty(scmNodesConfigKey, String.join(",", remaining));
+    handler.reconfigureProperty(scmNodesKey, String.join(",", remaining));
 
     Set<String> afterContainer =
         new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
@@ -265,16 +266,16 @@ public class TestOmSCMNodesReconfiguration {
     OzoneConfiguration conf = om.getConfiguration();
     List<String> before =
         new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
-    String originalValue = conf.get(scmNodesConfigKey);
+    String originalValue = conf.get(scmNodesKey);
 
     List<String> withMissing = new ArrayList<>(before);
     withMissing.add("scm-no-address");
 
     assertThrows(ReconfigurationException.class, () ->
-        handler.reconfigureProperty(scmNodesConfigKey, String.join(",", withMissing)));
+        handler.reconfigureProperty(scmNodesKey, String.join(",", withMissing)));
 
     // The node list is rolled back and both providers keep their membership.
-    assertEquals(originalValue, conf.get(scmNodesConfigKey));
+    assertEquals(originalValue, conf.get(scmNodesKey));
     assertEquals(new HashSet<>(before),
         new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds()));
     assertEquals(new HashSet<>(before),
@@ -296,7 +297,7 @@ public class TestOmSCMNodesReconfiguration {
 
     List<String> before =
         new ArrayList<>(scmClient.getContainerProxyProvider().getSCMNodeIds());
-    String originalValue = conf.get(scmNodesConfigKey);
+    String originalValue = conf.get(scmNodesKey);
 
     // Addresses with existing ports form invalid authorities,
     // throwing IllegalArgumentException over ConfigurationException.
@@ -305,10 +306,10 @@ public class TestOmSCMNodesReconfiguration {
     withBadAddress.add(newNodeId);
 
     assertThrows(ReconfigurationException.class, () -> handler
-        .reconfigureProperty(scmNodesConfigKey, String.join(",", withBadAddress)));
+        .reconfigureProperty(scmNodesKey, String.join(",", withBadAddress)));
 
     // The node list is rolled back and both providers keep their membership.
-    assertEquals(originalValue, conf.get(scmNodesConfigKey));
+    assertEquals(originalValue, conf.get(scmNodesKey));
     assertEquals(new HashSet<>(before),
         new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds()));
     assertEquals(new HashSet<>(before),
@@ -335,7 +336,7 @@ public class TestOmSCMNodesReconfiguration {
 
     // 1. Unresolvable node list fails and rolls back when applied before the new address.
     assertThrows(ReconfigurationException.class,
-        () -> handler.reconfigureProperty(scmNodesConfigKey, requested));
+        () -> handler.reconfigureProperty(scmNodesKey, requested));
     assertFalse(new HashSet<>(
         scmClient.getContainerProxyProvider().getSCMNodeIds()).contains(newNodeId));
 
@@ -343,7 +344,7 @@ public class TestOmSCMNodesReconfiguration {
     handler.reconfigureProperty(newAddrKey, "127.0.0.1");
 
     // 3. Reapplying the node list now resolves the new SCM, so it is added.
-    handler.reconfigureProperty(scmNodesConfigKey, requested);
+    handler.reconfigureProperty(scmNodesKey, requested);
     Set<String> expected = new HashSet<>(after);
     assertEquals(expected,
         new HashSet<>(scmClient.getContainerProxyProvider().getSCMNodeIds()));
