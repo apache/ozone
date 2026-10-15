@@ -3147,7 +3147,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public Map<String, String> getBucketTagging(String volumeName, String bucketName)
       throws IOException {
-    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+    if (!OzoneManagerVersion.S3_BUCKET_TAGGING_API.isSupportedBy(omVersion)) {
       throw new IOException("OzoneManager does not support S3 bucket tagging API");
     }
 
@@ -3163,7 +3163,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void putBucketTagging(String volumeName, String bucketName,
       Map<String, String> tags) throws IOException {
-    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+    if (!OzoneManagerVersion.S3_BUCKET_TAGGING_API.isSupportedBy(omVersion)) {
       throw new IOException("OzoneManager does not support S3 bucket tagging API");
     }
 
@@ -3180,7 +3180,7 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void deleteBucketTagging(String volumeName, String bucketName)
       throws IOException {
-    if (omVersion.compareTo(OzoneManagerVersion.S3_BUCKET_TAGGING_API) < 0) {
+    if (!OzoneManagerVersion.S3_BUCKET_TAGGING_API.isSupportedBy(omVersion)) {
       throw new IOException("OzoneManager does not support S3 bucket tagging API");
     }
 
