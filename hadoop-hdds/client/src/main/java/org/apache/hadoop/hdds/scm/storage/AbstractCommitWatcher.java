@@ -191,7 +191,7 @@ abstract class AbstractCommitWatcher<BUFFER> {
     return ioException;
   }
 
-  void cleanup() {
+  synchronized void cleanup() {
     commitIndexMap.clear();
     replies.clear();
   }
