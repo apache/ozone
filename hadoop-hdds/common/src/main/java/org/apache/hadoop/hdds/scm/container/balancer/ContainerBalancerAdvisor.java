@@ -154,6 +154,15 @@ public final class ContainerBalancerAdvisor {
           maxSizeLeavingSource,
           maxSizeEnteringTarget,
           involved);
+      if (!snapshot.getStorageTypeSnapshots().isEmpty()) {
+        long storageTypeCapacity = 0;
+        for (ContainerBalancerClusterSnapshot type : snapshot.getStorageTypeSnapshots().values()) {
+          storageTypeCapacity += Math.min(type.getBytesToMove(), Math.min(
+              type.getSourceCount() * maxSizeLeavingSource, type.getTargetCount() * maxSizeEnteringTarget));
+        }
+        // The shared datanode/traffic caps above still apply across all types; do not grant each type a new budget.
+        perIterationBytes = Math.min(perIterationBytes, storageTypeCapacity);
+      }
       long estimatedIterations = computeEstimatedIterations(perIterationBytes, bytesToMove);
       long cycleTimeMillis = computeCycleTimeMillis(moveTimeoutMillis, balancingIntervalMillis);
       long estimatedDurationMillis = estimatedIterations * cycleTimeMillis;
@@ -246,6 +255,10 @@ public final class ContainerBalancerAdvisor {
   }
 
   private static void validateSnapshotForEstimation(ContainerBalancerClusterSnapshot snapshot) {
+    if (snapshot.hasIncompleteStorageTypeUsage()) {
+      throw new IllegalArgumentException("Per-storage-type estimates require storage-type usage from all eligible "
+          + "datanodes. Some datanodes report missing or incomplete storage-type usage.");
+    }
     if (snapshot.getSourceCount() < 1) {
       throw new IllegalArgumentException("No over-utilized datanodes (sources) found.");
     }

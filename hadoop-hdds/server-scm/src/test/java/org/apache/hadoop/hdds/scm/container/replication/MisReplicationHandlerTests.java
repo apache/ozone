@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.replicateContainerCommand;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.LEAF_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
@@ -32,13 +33,16 @@ import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.nullable;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -64,6 +68,9 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
 
 /**
  * Tests the MisReplicationHandling functionalities to test implementations.
@@ -77,6 +84,21 @@ public abstract class MisReplicationHandlerTests {
   private final AtomicBoolean throwThrottledException =
       new AtomicBoolean(false);
   private ReplicationManagerMetrics metrics;
+
+  @ParameterizedTest
+  @EnumSource(StorageType.class)
+  @NullSource
+  public void testMisReplicationPreservesStorageType(StorageType storageType) throws IOException {
+    Set<ContainerReplica> replicas = new HashSet<>();
+    boolean ec = container.getReplicationType() == HddsProtos.ReplicationType.EC;
+    for (int i = 0; i < container.getReplicationConfig().getRequiredNodes(); i++) {
+      replicas.add(ContainerReplica.newBuilder().setContainerID(container.containerID())
+          .setContainerState(CLOSED)
+          .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails()).setReplicaIndex(ec ? i + 1 : 0)
+          .setVolumeStorageType(storageType).build());
+    }
+    testMisReplication(replicas, Collections.emptyList(), 0, 1, 1);
+  }
 
   protected void setup(ReplicationConfig repConfig, File testDir)
       throws NodeNotFoundException, CommandTargetOverloadedException,
@@ -205,8 +227,12 @@ public abstract class MisReplicationHandlerTests {
     if (expectedNumberOfNodes > 0) {
       when(mockedPlacementPolicy.chooseDatanodes(
                       any(), any(), any(),
-                      eq(copy.size()), anyLong(), anyLong(), any(StorageType.class)))
+                      eq(copy.size()), anyLong(), anyLong(), nullable(StorageType.class)))
               .thenAnswer(invocation -> {
+                StorageType requestedType = invocation.getArgument(6);
+                assertEquals(copy.stream().filter(replica -> Objects.equals(
+                    requestedType, replica.getTargetStorageTypeForCopy())).count(),
+                    invocation.getArgument(3, Integer.class).longValue());
                 List<DatanodeDetails> datanodeDetails =
                         invocation.getArgument(0);
                 assertThat(remainingReplicasAfterCopy)
@@ -227,6 +253,8 @@ public abstract class MisReplicationHandlerTests {
         assertSame(replicateContainerCommand, command.getType());
         ReplicateContainerCommand replicateContainerCommand =
             (ReplicateContainerCommand) command;
+        assertThat(copy).extracting(ContainerReplica::getTargetStorageTypeForCopy)
+            .contains(replicateContainerCommand.getTargetVolumeStorageType());
         assertEquals(replicateContainerCommand.getContainerID(),
             container.getContainerID());
         DatanodeDetails replicateSrcDn = pair.getKey();

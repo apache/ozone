@@ -30,8 +30,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerClusterSnapshot.NodeUtilization;
 import org.junit.jupiter.api.Test;
 
@@ -39,6 +42,102 @@ import org.junit.jupiter.api.Test;
 public final class TestContainerBalancerClusterAnalyzer {
 
   private static final double THRESHOLD = 0.10;
+
+  @Test
+  void testOppositeStorageTypeImbalancesAreNotHiddenByWholeNodeTotals() {
+    List<DatanodeUsageInfoProto> nodes = Arrays.asList(typedProto("first", 5, 95), typedProto("second", 95, 5));
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        nodes, THRESHOLD, Collections.emptySet(), Collections.emptySet());
+
+    assertEquals(0.5, snapshot.getClusterAvgUtilization());
+    assertEquals(400, snapshot.getClusterCapacityBytes());
+    assertEquals(2, snapshot.getSourceCount());
+    assertEquals(2, snapshot.getTargetCount());
+    assertEquals(snapshot.getSourceDatanodes(), snapshot.getTargetDatanodes());
+    assertEquals(70, snapshot.getBytesToMove());
+    assertFalse(snapshot.hasIncompleteStorageTypeUsage());
+    for (StorageType type : Arrays.asList(StorageType.SSD, StorageType.DISK)) {
+      ContainerBalancerClusterSnapshot tier = snapshot.getStorageTypeSnapshots().get(type);
+      assertEquals(0.5, tier.getClusterAvgUtilization());
+      assertEquals(1, tier.getSourceCount());
+      assertEquals(1, tier.getTargetCount());
+      assertEquals(35, tier.getBytesToMove());
+      assertEquals(type, tier.getTopSourceNodes().get(0).getStorageType());
+    }
+  }
+
+  @Test
+  void testSourcesAndTargetsOnDifferentStorageTypesCannotBePaired() {
+    // SSD has a source but no target below its lower limit; DISK has the opposite.
+    List<DatanodeUsageInfoProto> nodes = Arrays.asList(
+        typedProto("first", 0, 100), typedProto("second", 40, 60), typedProto("third", 40, 60));
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        nodes, 0.2, Collections.emptySet(), Collections.emptySet());
+
+    assertEquals(1, snapshot.getSourceCount());
+    assertEquals(1, snapshot.getTargetCount());
+    assertTrue(snapshot.getTotalOverUtilizedBytes() > 0);
+    assertEquals(0, snapshot.getBytesToMove());
+  }
+
+  @Test
+  void testStorageTypeWithOnlyOneDatanodeIsNotPairedWithAnotherType() {
+    DatanodeUsageInfoProto ssd = proto("ssd-only", 100, 5).toBuilder()
+        .addStorageTypeUsage(storageTypeUsage(StorageType.SSD, 5)).build();
+    DatanodeUsageInfoProto disk = proto("disk-only", 100, 95).toBuilder()
+        .addStorageTypeUsage(storageTypeUsage(StorageType.DISK, 95)).build();
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        Arrays.asList(ssd, disk), THRESHOLD, Collections.emptySet(), Collections.emptySet());
+
+    assertEquals(0, snapshot.getSourceCount());
+    assertEquals(0, snapshot.getTargetCount());
+    assertEquals(0, snapshot.getBytesToMove());
+    assertEquals(2, snapshot.getStorageTypeSnapshots().size());
+    assertFalse(snapshot.hasIncompleteStorageTypeUsage());
+  }
+
+  @Test
+  void testStorageTypeNodesExactlyAtLimitsAreNotUnbalanced() {
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        Arrays.asList(typedProto("first", 40, 60), typedProto("second", 60, 40)),
+        THRESHOLD, Collections.emptySet(), Collections.emptySet());
+    assertEquals(0, snapshot.getSourceCount());
+    assertEquals(0, snapshot.getTargetCount());
+    assertEquals(0, snapshot.getBytesToMove());
+  }
+
+  @Test
+  void testPartialReportingAndFiltersApplyBeforeStorageTypeAnalysis() {
+    List<DatanodeUsageInfoProto> nodes = Arrays.asList(
+        typedProto("first", 5, 95), typedProto("second", 95, 5), proto("legacy", 200, 100));
+    ContainerBalancerClusterSnapshot partial = ContainerBalancerClusterAnalyzer.analyze(
+        nodes, THRESHOLD, Collections.emptySet(), Collections.emptySet());
+    assertTrue(partial.hasIncompleteStorageTypeUsage());
+
+    ContainerBalancerClusterSnapshot filtered = ContainerBalancerClusterAnalyzer.analyze(
+        nodes, THRESHOLD, Collections.emptySet(), Collections.singleton("legacy"));
+    assertFalse(filtered.hasIncompleteStorageTypeUsage());
+    assertEquals(2, filtered.getTotalEligibleDatanodes());
+    assertEquals(70, filtered.getBytesToMove());
+  }
+
+  @Test
+  void testMissingStorageTypeCapacityIsReportedAsIncomplete() {
+    DatanodeUsageInfoProto partial = typedProto("partial", 5, 95).toBuilder().removeStorageTypeUsage(1).build();
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        Collections.singletonList(partial), THRESHOLD, Collections.emptySet(), Collections.emptySet());
+    assertTrue(snapshot.hasIncompleteStorageTypeUsage());
+  }
+
+  @Test
+  void testLegacyUsageRetainsAggregateAnalysis() {
+    ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
+        Arrays.asList(proto("source", 100, 10), proto("target", 100, 50)),
+        THRESHOLD, Collections.emptySet(), Collections.emptySet());
+    assertTrue(snapshot.getStorageTypeSnapshots().isEmpty());
+    assertFalse(snapshot.hasIncompleteStorageTypeUsage());
+    assertEquals(10, snapshot.getBytesToMove());
+  }
 
   @Test
   void testCalculateAvgUtilizationFromTotals() {
@@ -277,6 +376,17 @@ public final class TestContainerBalancerClusterAnalyzer {
         datanode, Collections.emptySet(), Collections.singleton("other")));
     assertFalse(ContainerBalancerClusterAnalyzer.shouldExcludeDatanode(
         datanode, Collections.emptySet(), Collections.singleton("dn-1")));
+  }
+
+  private static DatanodeUsageInfoProto typedProto(String hostname, long ssdRemaining, long diskRemaining) {
+    return proto(hostname, 200, ssdRemaining + diskRemaining).toBuilder()
+        .addStorageTypeUsage(storageTypeUsage(StorageType.SSD, ssdRemaining))
+        .addStorageTypeUsage(storageTypeUsage(StorageType.DISK, diskRemaining)).build();
+  }
+
+  private static StorageTypeUsageInfoProto storageTypeUsage(StorageType type, long remaining) {
+    return StorageTypeUsageInfoProto.newBuilder().setStorageType(StorageTypeUtils.getStorageTypeProto(type))
+        .setCapacity(100).setUsed(100 - remaining).setRemaining(remaining).build();
   }
 
   private static DatanodeUsageInfoProto proto(String hostname, long capacity, long remaining) {

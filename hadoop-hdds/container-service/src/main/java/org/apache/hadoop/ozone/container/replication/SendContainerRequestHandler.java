@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
@@ -90,7 +92,13 @@ class SendContainerRequestHandler
         spaceToReserve = importer.getSpaceToReserve(
             req.hasSize() ? req.getSize() : null);
 
-        volume = importer.chooseNextVolume(spaceToReserve);
+        // Keep the replica on the same storage type as its source. Absent for
+        // senders without storage type support, which allows any volume.
+        StorageType storageType = req.hasStorageTypeID()
+            ? StorageTypeUtils.getStorageTypeFromID(req.getStorageTypeID())
+            : null;
+
+        volume = importer.chooseNextVolume(spaceToReserve, storageType);
 
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);

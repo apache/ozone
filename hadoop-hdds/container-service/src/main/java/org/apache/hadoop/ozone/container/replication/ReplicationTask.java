@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import jakarta.annotation.Nullable;
 import java.util.Objects;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
@@ -77,6 +79,16 @@ public class ReplicationTask extends AbstractReplicationTask {
   @Override
   public long getContainerId() {
     return cmd.getContainerID();
+  }
+
+  /**
+   * StorageType the replica should land on at the target, as chosen by SCM. Null
+   * when the command carries no storage type, which lets the target pick any
+   * volume.
+   */
+  @Nullable
+  public StorageType getTargetVolumeStorageType() {
+    return cmd.getTargetVolumeStorageType();
   }
 
   @Override

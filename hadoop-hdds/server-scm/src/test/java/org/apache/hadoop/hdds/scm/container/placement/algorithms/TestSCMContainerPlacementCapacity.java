@@ -183,4 +183,102 @@ public class TestSCMContainerPlacementCapacity {
         singletonMap(StorageType.DEFAULT, freeSpaceToSpare),
         singletonMap(StorageType.DEFAULT, reserved));
   }
+
+  /**
+   * When a storage type is given, candidates must be ranked on their usage of
+   * that type. A node that is emptier overall but nearly full on the requested
+   * type must lose to one that has room there.
+   */
+  @Test
+  public void chooseNodeRanksOnRequestedStorageType() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    DatanodeDetails fullOnSsd = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails roomOnSsd = MockDatanodeDetails.randomDatanodeDetails();
+
+    // fullOnSsd is emptier overall (10 of 200 used) but its SSD tier is full.
+    // roomOnSsd is fuller overall (100 of 200) but its SSD tier is empty.
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.getNodeStat(fullOnSsd)).thenReturn(nodeMetric(
+        100L, 95L, 100L, 5L));
+    when(nodeManager.getNodeStat(roomOnSsd)).thenReturn(nodeMetric(
+        100L, 5L, 100L, 95L));
+
+    SCMContainerPlacementCapacity policy = new SCMContainerPlacementCapacity(
+        nodeManager, conf, null, true, mock(SCMContainerPlacementMetrics.class));
+
+    // chooseNode picks two candidates at random and keeps the less used one. With
+    // only two nodes it sometimes draws the same index twice and returns it
+    // without comparing, so count outcomes over many runs rather than asserting
+    // on a single call.
+    int roomOnSsdPicked = 0;
+    for (int i = 0; i < 2000; i++) {
+      List<DatanodeDetails> candidates =
+          new ArrayList<>(Arrays.asList(fullOnSsd, roomOnSsd));
+      if (roomOnSsd.equals(policy.chooseNode(candidates, StorageType.SSD))) {
+        roomOnSsdPicked++;
+      }
+    }
+
+    // Whenever the two differing indices are drawn the SSD comparison must pick
+    // roomOnSsd, so it wins clearly more often than an even split.
+    assertThat(roomOnSsdPicked)
+        .withFailMessage("SSD-constrained choice should favour the node with "
+            + "free SSD capacity, but it was picked %d of 2000 times",
+            roomOnSsdPicked)
+        .isGreaterThan(1200);
+  }
+
+  /**
+   * Without a storage type the ranking must stay on overall usage, so the node
+   * that is emptier overall wins even though its SSD tier is full.
+   */
+  @Test
+  public void chooseNodeWithoutStorageTypeRanksOnOverallUsage() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    DatanodeDetails fullOnSsd = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails roomOnSsd = MockDatanodeDetails.randomDatanodeDetails();
+
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.getNodeStat(fullOnSsd)).thenReturn(nodeMetric(
+        100L, 95L, 100L, 5L));
+    when(nodeManager.getNodeStat(roomOnSsd)).thenReturn(nodeMetric(
+        100L, 5L, 100L, 95L));
+
+    SCMContainerPlacementCapacity policy = new SCMContainerPlacementCapacity(
+        nodeManager, conf, null, true, mock(SCMContainerPlacementMetrics.class));
+
+    int fullOnSsdPicked = 0;
+    for (int i = 0; i < 2000; i++) {
+      List<DatanodeDetails> candidates =
+          new ArrayList<>(Arrays.asList(fullOnSsd, roomOnSsd));
+      if (fullOnSsd.equals(policy.chooseNode(candidates))) {
+        fullOnSsdPicked++;
+      }
+    }
+
+    // Both nodes use 100 of 200 overall, so neither should dominate.
+    assertThat(fullOnSsdPicked).isBetween(700, 1300);
+  }
+
+  /**
+   * Builds a metric for a node with one SSD and one DISK volume.
+   */
+  private static SCMNodeMetric nodeMetric(long ssdCapacity, long ssdUsed,
+      long diskCapacity, long diskUsed) {
+    Map<StorageType, Long> capacity = new HashMap<>();
+    capacity.put(StorageType.SSD, ssdCapacity);
+    capacity.put(StorageType.DISK, diskCapacity);
+    Map<StorageType, Long> used = new HashMap<>();
+    used.put(StorageType.SSD, ssdUsed);
+    used.put(StorageType.DISK, diskUsed);
+    Map<StorageType, Long> remaining = new HashMap<>();
+    remaining.put(StorageType.SSD, ssdCapacity - ssdUsed);
+    remaining.put(StorageType.DISK, diskCapacity - diskUsed);
+    Map<StorageType, Long> zeros = new HashMap<>();
+    zeros.put(StorageType.SSD, 0L);
+    zeros.put(StorageType.DISK, 0L);
+    return new SCMNodeMetric(capacity, used, remaining, zeros, zeros, zeros);
+  }
 }

@@ -18,12 +18,18 @@
 package org.apache.hadoop.hdds.scm.container.balancer;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
@@ -44,10 +50,14 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
   private ContainerManager containerManager;
   private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private Map<DatanodeDetails, Long> sizeEnteringNode;
+  private final Map<StorageType, Map<DatanodeDetails, Long>> sizeEnteringByStorageType =
+      new EnumMap<>(StorageType.class);
+  private StorageType storageType;
   private NodeManager nodeManager;
   private ContainerBalancerConfiguration config;
   private Double upperLimit;
   private Collection<DatanodeUsageInfo> potentialTargets;
+  private final Map<StorageType, Collection<DatanodeUsageInfo>> targetsByStorageType = new HashMap<>();
 
   protected AbstractFindTargetGreedy(
       ContainerManager containerManager,
@@ -73,9 +83,9 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
 
   protected int compareByUsage(DatanodeUsageInfo a, DatanodeUsageInfo b) {
     double currentUsageOfA = a.calculateUtilization(
-        sizeEnteringNode.get(a.getDatanodeDetails()));
+        sizeEnteringOnStorageType(a.getDatanodeDetails()), storageType);
     double currentUsageOfB = b.calculateUtilization(
-        sizeEnteringNode.get(b.getDatanodeDetails()));
+        sizeEnteringOnStorageType(b.getDatanodeDetails()), storageType);
     int ret = Double.compare(currentUsageOfA, currentUsageOfB);
     if (ret != 0) {
       return ret;
@@ -193,7 +203,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
         return false;
       }
       if (Double.compare(nodeManager.getUsageInfo(target)
-          .calculateUtilization(sizeEnteringAfterMove), upperLimit) > 0) {
+          .calculateUtilization(sizeEnteringOnStorageType(target) + size, storageType), upperLimit) > 0) {
         logger.debug("{} bytes cannot enter datanode {} because its " +
                 "utilization will exceed the upper limit of {}.", size,
             target, upperLimit);
@@ -214,6 +224,10 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
     if (sizeEnteringNode.containsKey(target)) {
       long totalEnteringSize = sizeEnteringNode.get(target) + size;
       sizeEnteringNode.put(target, totalEnteringSize);
+      if (storageType != null) {
+        sizeEnteringByStorageType.computeIfAbsent(storageType, ignored -> new ConcurrentHashMap<>())
+            .merge(target, size, Long::sum);
+      }
       potentialTargets.removeIf(
           c -> c.getDatanodeDetails().equals(target));
       if (totalEnteringSize < config.getMaxSizeEnteringTarget()) {
@@ -237,8 +251,27 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
                            Double upLimit) {
     setConfiguration(conf);
     setUpperLimit(upLimit);
-    sizeEnteringNode.clear();
+    storageType = null;
+    clearSizeEnteringNodes();
     resetTargets(potentialDataNodes);
+  }
+
+  @Override
+  public void setStorageType(StorageType type, double upLimit) {
+    targetsByStorageType.put(storageType, potentialTargets);
+    storageType = type;
+    potentialTargets = targetsByStorageType.computeIfAbsent(type, ignored ->
+        potentialTargets instanceof SortedSet
+            ? new TreeSet<>(((SortedSet<DatanodeUsageInfo>) potentialTargets).comparator()) : new ArrayList<>());
+    setUpperLimit(upLimit);
+  }
+
+  private long sizeEnteringOnStorageType(DatanodeDetails target) {
+    if (storageType == null) {
+      return sizeEnteringNode.getOrDefault(target, 0L);
+    }
+    Map<DatanodeDetails, Long> sizes = sizeEnteringByStorageType.get(storageType);
+    return sizes == null ? 0L : sizes.getOrDefault(target, 0L);
   }
 
   @VisibleForTesting
@@ -279,5 +312,7 @@ public abstract class AbstractFindTargetGreedy implements FindTargetStrategy {
   @Override
   public void clearSizeEnteringNodes() {
     sizeEnteringNode.clear();
+    sizeEnteringByStorageType.clear();
+    targetsByStorageType.clear();
   }
 }

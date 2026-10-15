@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.atLeastOnce;
@@ -50,6 +51,7 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -126,7 +128,7 @@ class TestContainerImporter {
     // second import should fail immediately
     StorageContainerException ex = assertThrows(StorageContainerException.class,
         () -> containerImporter.importContainer(containerId, tarFile.toPath(),
-            null, NO_COMPRESSION));
+            mock(HddsVolume.class), NO_COMPRESSION));
     assertEquals(ContainerProtos.Result.CONTAINER_EXISTS, ex.getResult());
     assertThat(ex.getMessage()).contains("Container already exists");
   }
@@ -145,7 +147,7 @@ class TestContainerImporter {
     CompletableFuture.runAsync(() -> {
       try {
         containerImporter.importContainer(containerId, tarFile.toPath(),
-            null, NO_COMPRESSION);
+            mock(HddsVolume.class), NO_COMPRESSION);
       } catch (Exception ex) {
         // do nothing
       }
@@ -156,7 +158,7 @@ class TestContainerImporter {
     StorageContainerException ex = assertThrows(
         StorageContainerException.class,
         () -> containerImporter.importContainer(containerId, tarFile.toPath(),
-            null, NO_COMPRESSION));
+            mock(HddsVolume.class), NO_COMPRESSION));
     assertEquals(ContainerProtos.Result.CONTAINER_EXISTS,
         ex.getResult());
     assertThat(ex.getMessage()).contains("import in progress");
@@ -188,7 +190,7 @@ class TestContainerImporter {
     StorageContainerException scException =
         assertThrows(StorageContainerException.class,
             () -> importer.importContainer(containerId,
-                tarFile.toPath(), null, NO_COMPRESSION));
+                tarFile.toPath(), mock(HddsVolume.class), NO_COMPRESSION));
     Assertions.assertTrue(scException.getMessage().
         contains("Container checksum error"));
   }
@@ -247,6 +249,26 @@ class TestContainerImporter {
         controllerMock, volumeSet, policy);
 
     assertEquals(expectedVolume, importer.chooseNextVolume(spaceToReserve));
+  }
+
+  /**
+   * A requested storage type must reach the volume choosing policy, so an
+   * imported replica lands on the same tier as its source.
+   */
+  @Test
+  public void testChooseNextVolumeHonoursRequestedStorageType() throws Exception {
+    VolumeChoosingPolicy policy = mock(VolumeChoosingPolicy.class);
+    HddsVolume ssdVolume = mock(HddsVolume.class);
+    long spaceToReserve = 100L;
+    when(policy.chooseVolume(anyList(), anyLong(), eq(StorageType.SSD)))
+        .thenReturn(ssdVolume);
+    ContainerImporter importer = new ContainerImporter(conf, containerSet,
+        controllerMock, volumeSet, policy);
+
+    assertEquals(ssdVolume,
+        importer.chooseNextVolume(spaceToReserve, StorageType.SSD));
+    verify(policy).chooseVolume(anyList(), eq(spaceToReserve),
+        eq(StorageType.SSD));
   }
 
   private File containerTarFile(long id, ContainerData data) throws IOException {

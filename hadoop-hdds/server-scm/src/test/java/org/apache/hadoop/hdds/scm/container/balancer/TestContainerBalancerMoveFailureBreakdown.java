@@ -239,6 +239,14 @@ class TestContainerBalancerMoveFailureBreakdown {
     assertEquals(1, iterations.size());
     ContainerBalancerTaskIterationStatusInfo iteration = iterations.get(0);
     assertEquals("ITERATION_COMPLETED", iteration.getIterationResult());
+    assertEquals(iteration.getContainerMovesScheduled(), iteration.getStorageTypeStatusInfo().stream()
+        .mapToLong(type -> type.getContainerMovesScheduled()).sum());
+    assertEquals(iteration.getContainerMovesCompleted(), iteration.getStorageTypeStatusInfo().stream()
+        .mapToLong(type -> type.getContainerMovesCompleted()).sum());
+    assertEquals(iteration.getContainerMovesFailed(), iteration.getStorageTypeStatusInfo().stream()
+        .mapToLong(type -> type.getContainerMovesFailed()).sum());
+    assertEquals(iteration.getContainerMovesTimeout(), iteration.getStorageTypeStatusInfo().stream()
+        .mapToLong(type -> type.getContainerMovesTimeout()).sum());
     return iteration;
   }
 

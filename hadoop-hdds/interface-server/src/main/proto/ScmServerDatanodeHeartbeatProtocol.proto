@@ -433,6 +433,10 @@ message ReplicateContainerCommandProto {
   optional int32 replicaIndex = 4;
   optional DatanodeDetailsProto target = 5;
   optional ReplicationCommandPriority priority = 6 [default = NORMAL];
+  // StorageType the replica should be written to on the target datanode, so the
+  // copy stays on the same tier as the source. Absent for commands from an SCM
+  // without storage type support, which leaves the target free to pick a volume.
+  optional StorageTypeProto volumeStorageType = 7;
 }
 
 /**

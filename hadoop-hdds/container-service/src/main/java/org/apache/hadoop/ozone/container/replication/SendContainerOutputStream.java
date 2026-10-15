@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import jakarta.annotation.Nullable;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
@@ -28,14 +31,27 @@ class SendContainerOutputStream extends GrpcOutputStream<SendContainerRequest> {
 
   private final CopyContainerCompression compression;
   private final Long size;
+  /**
+   * StorageType the target should place the container on. Sent alongside size on
+   * the first request. Null lets the target choose any volume.
+   */
+  private final StorageType targetVolumeStorageType;
 
   SendContainerOutputStream(
       CallStreamObserver<SendContainerRequest> streamObserver,
       long containerId, int bufferSize, CopyContainerCompression compression,
       Long size) {
+    this(streamObserver, containerId, bufferSize, compression, size, null);
+  }
+
+  SendContainerOutputStream(
+      CallStreamObserver<SendContainerRequest> streamObserver,
+      long containerId, int bufferSize, CopyContainerCompression compression,
+      Long size, @Nullable StorageType targetVolumeStorageType) {
     super(streamObserver, containerId, bufferSize);
     this.compression = compression;
     this.size = size;
+    this.targetVolumeStorageType = targetVolumeStorageType;
   }
 
   @Override
@@ -46,9 +62,15 @@ class SendContainerOutputStream extends GrpcOutputStream<SendContainerRequest> {
         .setOffset(getWrittenBytes())
         .setCompression(compression.toProto());
     
-    // Include container size in the first request
-    if (getWrittenBytes() == 0 && size != null) {
-      requestBuilder.setSize(size);
+    // Include container size and target storage type in the first request
+    if (getWrittenBytes() == 0) {
+      if (size != null) {
+        requestBuilder.setSize(size);
+      }
+      if (targetVolumeStorageType != null) {
+        requestBuilder.setStorageTypeID(
+            StorageTypeUtils.getID(targetVolumeStorageType));
+      }
     }
     getStreamObserver().onNext(requestBuilder.build());
   }

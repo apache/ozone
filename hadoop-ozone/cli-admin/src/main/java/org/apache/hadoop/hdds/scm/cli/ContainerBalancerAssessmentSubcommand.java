@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
@@ -124,6 +125,23 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
 
     System.out.println(getSummaryPrettyString(snapshot, thresholdRatio));
     System.out.println();
+    if (!snapshot.getStorageTypeSnapshots().isEmpty()) {
+      if (snapshot.hasIncompleteStorageTypeUsage()) {
+        System.out.println("WARNING: Missing or incomplete storage-type usage; storage-type assessment is partial.");
+      }
+      for (Map.Entry<StorageType, ContainerBalancerClusterSnapshot> entry
+          : snapshot.getStorageTypeSnapshots().entrySet()) {
+        ContainerBalancerClusterSnapshot type = entry.getValue();
+        System.out.println("Storage type: " + entry.getKey());
+        System.out.println(getSummaryPrettyString(type, thresholdRatio));
+        System.out.println(getSourceNodesPrettyString(type, nodeLimit));
+        System.out.println(getTargetNodesPrettyString(type, nodeLimit));
+        System.out.println(getMovementSummaryPrettyString(type));
+      }
+      System.out.println("All storage types (shared iteration limits):");
+      System.out.println(getMovementSummaryPrettyString(snapshot));
+      return;
+    }
     System.out.println(getSourceNodesPrettyString(snapshot, nodeLimit));
     System.out.println();
     System.out.println(getTargetNodesPrettyString(snapshot, nodeLimit));
@@ -153,13 +171,17 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
             "%-50s %s%n" +
             "%-50s %s%n", "Key", "Value",
         "Threshold", formatPercent(thresholdRatio),
-        "Upper utilization limit", formatPercent(snapshot.getUpperLimit()),
-        "Lower utilization limit", formatPercent(snapshot.getLowerLimit()),
-        "Drift", String.format(Locale.US, "%s (max utilization %s - min utilization %s)",
+        "Upper utilization limit", snapshot.getStorageTypeSnapshots().isEmpty()
+            ? formatPercent(snapshot.getUpperLimit()) : "See storage-type sections",
+        "Lower utilization limit", snapshot.getStorageTypeSnapshots().isEmpty()
+            ? formatPercent(snapshot.getLowerLimit()) : "See storage-type sections",
+        snapshot.getStorageTypeSnapshots().isEmpty() ? "Drift" : "Maximum storage-type drift",
+        String.format(Locale.US, "%s (max utilization %s - min utilization %s)",
             formatPercent(snapshot.getImbalance()),
             formatPercent(snapshot.getMaxUtilization()),
             formatPercent(snapshot.getMinUtilization())),
-        "Mean Utilization", formatPercent(snapshot.getClusterAvgUtilization()),
+        snapshot.getStorageTypeSnapshots().isEmpty() ? "Mean Utilization" : "Overall mean utilization",
+        formatPercent(snapshot.getClusterAvgUtilization()),
         "Eligible datanodes", snapshot.getTotalEligibleDatanodes() + " datanode"
             + (snapshot.getTotalEligibleDatanodes() == 1 ? "" : "s"),
         "Category", formatCategory(snapshot));
@@ -262,6 +284,10 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
 
   private static void printJsonReport(ContainerBalancerClusterSnapshot snapshot, double thresholdRatio)
       throws IOException {
+    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(jsonReport(snapshot, thresholdRatio)));
+  }
+
+  private static Map<String, Object> jsonReport(ContainerBalancerClusterSnapshot snapshot, double thresholdRatio) {
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("totalEligibleDatanodes", snapshot.getTotalEligibleDatanodes());
     result.put("thresholdPercentage", toJsonPercent(thresholdRatio));
@@ -279,6 +305,9 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
           Map<String, Object> nodeMap = new LinkedHashMap<>();
           nodeMap.put("hostname", node.getHostname());
           nodeMap.put("utilizationPercentage", toJsonPercent(node.getUtilization()));
+          if (node.getStorageType() != null) {
+            nodeMap.put("storageType", node.getStorageType().name());
+          }
           return nodeMap;
         })
         .collect(Collectors.toList()));
@@ -291,6 +320,9 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
           Map<String, Object> nodeMap = new LinkedHashMap<>();
           nodeMap.put("hostname", node.getHostname());
           nodeMap.put("utilizationPercentage", toJsonPercent(node.getUtilization()));
+          if (node.getStorageType() != null) {
+            nodeMap.put("storageType", node.getStorageType().name());
+          }
           return nodeMap;
         })
         .collect(Collectors.toList()));
@@ -301,7 +333,14 @@ public class ContainerBalancerAssessmentSubcommand extends ScmSubcommand {
     result.put("bytesToMove", snapshot.getBytesToMove());
     result.put("movementRatioPercentage", toJsonPercent(movementRatio));
 
-    System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(result));
+    if (!snapshot.getStorageTypeSnapshots().isEmpty()) {
+      Map<String, Object> storageTypes = new LinkedHashMap<>();
+      snapshot.getStorageTypeSnapshots().forEach((type, usage) ->
+          storageTypes.put(type.name(), jsonReport(usage, thresholdRatio)));
+      result.put("storageTypes", storageTypes);
+      result.put("incompleteStorageTypeUsage", snapshot.hasIncompleteStorageTypeUsage());
+    }
+    return result;
   }
 
   private static Set<String> parseNodeList(String commaSeparated) {
