@@ -496,6 +496,33 @@ public class TestStreamBlockInputStream {
     verify(client, times(1)).sendCommand(any(ContainerCommandRequestProto.class), any());
   }
 
+  /**
+   * Seeking beyond the stale length from OM before any read must use the length from the datanode,
+   * and the client used to get the block length is released afterwards.
+   */
+  @Test
+  public void testSeekUnderConstructionBlockBeforeRead() throws Exception {
+    byte[] data = {1, 2, 3, 4};
+    BlockLocationInfo blockInfo = new BlockLocationInfo.Builder().setBlockID(new BlockID(1L, 32L)).setLength(2).build();
+    blockInfo.setUnderConstruction(true);
+    Pipeline pipeline = mockStandalonePipeline();
+    XceiverClientGrpc client = mockGetBlockClient(data, pipeline);
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any(Pipeline.class))).thenReturn(client);
+    try (StreamBlockInputStream sbis = new StreamBlockInputStream(
+        blockInfo, pipeline, null, factory, NO_REFRESH, newStreamReadConfig())) {
+      sbis.seek(3);
+      assertEquals(data.length, sbis.getLength());
+      verify(client, times(1)).sendCommand(any(ContainerCommandRequestProto.class), any());
+      verify(factory, times(1)).releaseClientForReadData(client, false);
+
+      ByteBuffer buf = ByteBuffer.allocate(1);
+      assertEquals(1, sbis.read(buf));
+      assertEquals(data[3], buf.get(0));
+    }
+    verify(client, times(1)).sendCommand(any(ContainerCommandRequestProto.class), any());
+  }
+
   @Test
   public void testCompletedBlockDoesNotGetBlockFromDatanode() throws Exception {
     byte[] data = {1, 2, 3, 4};

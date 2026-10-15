@@ -462,6 +462,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         LOG.debug("{}: Updated block length to {} for block {}", name, blockLength, blockID);
       } catch (IOException ioe) {
         handleExceptions(ioe);
+      } finally {
+        releaseClient();
       }
     }
   }
