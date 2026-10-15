@@ -225,6 +225,8 @@ public class MultipartInputStream extends ExtendedInputStream {
     for (PartInputStream partInputStream : partStreams) {
       if (partInputStream instanceof BlockInputStream) {
         ((BlockInputStream) partInputStream).initialize();
+      } else if (partInputStream instanceof StreamBlockInputStream) {
+        ((StreamBlockInputStream) partInputStream).updateBlockLength();
       }
     }
 
