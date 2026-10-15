@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -53,7 +54,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
@@ -79,7 +79,6 @@ public class SCMDeletedBlockTransactionStatusManager {
   // The access to DeletedBlocksTXTable is protected by
   // DeletedBlockLogStateManager.
   private final DeletedBlockLogStateManager deletedBlockLogStateManager;
-  private final SCMHADBTransactionBuffer transactionBuffer;
   private final ContainerManager containerManager;
   private final ScmBlockDeletingServiceMetrics metrics;
   private final long scmCommandTimeoutMs;
@@ -96,10 +95,8 @@ public class SCMDeletedBlockTransactionStatusManager {
   private final AtomicLong totalBlockCount = new AtomicLong(0);
   private final AtomicLong totalBlocksSize = new AtomicLong(0);
   private final AtomicLong totalReplicatedBlocksSize = new AtomicLong(0);
-  // Guards the window between mutating the summary counters and snapshotting them with
-  // getSummary(), so a concurrent initDataDistributionData() reset cannot land in between
-  // and discard the just-applied update.
   private final Object summaryLock = new Object();
+  private final AtomicInteger inFlightOps = new AtomicInteger(0);
   private static boolean disableDataDistributionForTest;
 
   /**
@@ -114,13 +111,11 @@ public class SCMDeletedBlockTransactionStatusManager {
 
   public SCMDeletedBlockTransactionStatusManager(
       DeletedBlockLogStateManager deletedBlockLogStateManager,
-      SCMHADBTransactionBuffer transactionBuffer,
       Table<String, ByteString> statefulServiceConfigTable,
       ContainerManager containerManager,
       ScmBlockDeletingServiceMetrics metrics, long scmCommandTimeoutMs) throws IOException {
     // maps transaction to dns which have committed it.
     this.deletedBlockLogStateManager = deletedBlockLogStateManager;
-    this.transactionBuffer = transactionBuffer;
     this.statefulConfigTable = statefulServiceConfigTable;
     this.metrics = metrics;
     this.containerManager = containerManager;
@@ -469,7 +464,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
-      transactionBuffer.lock();
+      inFlightOps.incrementAndGet();
       try {
         DeletedBlocksTransactionSummary summary;
         synchronized (summaryLock) {
@@ -478,7 +473,6 @@ public class SCMDeletedBlockTransactionStatusManager {
               incrDeletedBlocksSummary(tx);
             }
           }
-          onSummaryUpdatedForTest();
           summary = getSummary();
         }
         try {
@@ -497,7 +491,7 @@ public class SCMDeletedBlockTransactionStatusManager {
           throw e;
         }
       } finally {
-        transactionBuffer.unlock();
+        inFlightOps.decrementAndGet();
       }
       return;
     }
@@ -542,7 +536,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
-      transactionBuffer.lock();
+      inFlightOps.incrementAndGet();
       try {
         List<TxBlockInfo> removedTxBlockInfos = new ArrayList<>();
         DeletedBlocksTransactionSummary summary;
@@ -554,7 +548,6 @@ public class SCMDeletedBlockTransactionStatusManager {
               removedTxBlockInfos.add(txBlockInfo);
             }
           }
-          onSummaryUpdatedForTest();
           summary = getSummary();
         }
         try {
@@ -572,7 +565,7 @@ public class SCMDeletedBlockTransactionStatusManager {
           throw e;
         }
       } finally {
-        transactionBuffer.unlock();
+        inFlightOps.decrementAndGet();
       }
       return;
     }
@@ -663,16 +656,6 @@ public class SCMDeletedBlockTransactionStatusManager {
         .setTotalBlockSize(totalBlocksSize.get())
         .setTotalBlockReplicatedSize(totalReplicatedBlocksSize.get())
         .build();
-  }
-
-  /**
-   * No-op in production. Invoked, while still holding {@link #summaryLock}, right after the
-   * summary counters are mutated and right before they are snapshotted via {@link #getSummary()}.
-   * Tests override this to force a concurrent {@link #initDataDistributionData()} reset to
-   * attempt to interleave in this window, proving {@link #summaryLock} blocks it.
-   */
-  @VisibleForTesting
-  protected void onSummaryUpdatedForTest() {
   }
 
   private void descDeletedBlocksSummary(TxBlockInfo txBlockInfo) {
@@ -776,13 +759,19 @@ public class SCMDeletedBlockTransactionStatusManager {
     DeletedBlocksTransactionSummary newSummary = loadDeletedBlocksSummary();
     if (newSummary != null) {
       synchronized (summaryLock) {
-        DeletedBlocksTransactionSummary currentSummary = getSummary();
-        totalTxCount.set(newSummary.getTotalTransactionCount());
-        totalBlockCount.set(newSummary.getTotalBlockCount());
-        totalBlocksSize.set(newSummary.getTotalBlockSize());
-        totalReplicatedBlocksSize.set(newSummary.getTotalBlockReplicatedSize());
-        if (!isSummaryEqual(currentSummary, newSummary)) {
-          LOG.info("Old summary {} is replaced.", summaryToString(currentSummary));
+        if (inFlightOps.get() > 0) {
+          LOG.info("Skipping storage space distribution reload with {}: an update is still in " +
+              "flight. Current in-memory summary {} is retained.",
+              summaryToString(newSummary), summaryToString(getSummary()));
+        } else {
+          DeletedBlocksTransactionSummary currentSummary = getSummary();
+          totalTxCount.set(newSummary.getTotalTransactionCount());
+          totalBlockCount.set(newSummary.getTotalBlockCount());
+          totalBlocksSize.set(newSummary.getTotalBlockSize());
+          totalReplicatedBlocksSize.set(newSummary.getTotalBlockReplicatedSize());
+          if (!isSummaryEqual(currentSummary, newSummary)) {
+            LOG.info("Old summary {} is replaced.", summaryToString(currentSummary));
+          }
         }
       }
     }

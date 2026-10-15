@@ -115,7 +115,7 @@ public class DeletedBlockLogImpl
     this.sequenceIdGen = scm.getSequenceIdGen();
     this.metrics = metrics;
     this.transactionStatusManager =
-        new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager, dbTxBuffer,
+        new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
             containerManager, metrics, scmCommandTimeoutMs);
     int limit = (int) conf.getStorageSize(
