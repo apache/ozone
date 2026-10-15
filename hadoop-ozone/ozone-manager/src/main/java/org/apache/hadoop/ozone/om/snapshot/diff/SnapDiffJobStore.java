@@ -18,12 +18,12 @@
 package org.apache.hadoop.ozone.om.snapshot.diff;
 
 import static org.apache.commons.lang3.StringUtils.leftPad;
-import static org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions.closeDeeply;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getReportKeyForIndex;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.UnsignedBytes;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -207,6 +207,11 @@ public final class SnapDiffJobStore implements AutoCloseable {
 
   int getWriteBatchSize() {
     return writeBatchSize;
+  }
+
+  @VisibleForTesting
+  ManagedColumnFamilyOptions getCopiedCfFamilyOptions() {
+    return tmpCfFamilyOptions;
   }
 
   /** Returns report entries written during a test run. */
@@ -781,7 +786,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     while (!temporaryColumnFamilies.isEmpty()) {
       dropAndClose(temporaryColumnFamilies.get(0));
     }
-    closeDeeply(tmpCfFamilyOptions);
+    tmpCfFamilyOptions.close();
   }
 
   private void closeQuietly() {

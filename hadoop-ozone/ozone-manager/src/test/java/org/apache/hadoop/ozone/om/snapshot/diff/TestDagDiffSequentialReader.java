@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.snapshot.diff;
 
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions.closeDeeply;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -25,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -46,8 +48,11 @@ import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator.MergedKeyValue;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBloomFilter;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedLRUCache;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -104,6 +109,46 @@ class TestDagDiffSequentialReader {
     }
     if (dbOptions != null) {
       dbOptions.close();
+    }
+  }
+
+  /**
+   * {@link SnapDiffJobStore#open} copies caller {@link ManagedColumnFamilyOptions} for temp CFs.
+   * Closing the store closes only the copy's native handle, not the shared table-format resources
+   * owned by the caller (as {@link org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager} will).
+   */
+  @Test
+  void callerOwnedTableConfigRemainsOpenAfterJobStoreClose() throws IOException {
+    ManagedLRUCache callerBlockCache = new ManagedLRUCache(16 * 1024 * 1024);
+    ManagedBloomFilter callerBloomFilter = new ManagedBloomFilter();
+    ManagedBlockBasedTableConfig callerTableConfig = new ManagedBlockBasedTableConfig();
+    callerTableConfig.setBlockCache(callerBlockCache)
+        .setFormatVersion(ManagedBlockBasedTableConfig.FORMAT_VERSION)
+        .setFilterPolicy(callerBloomFilter);
+    ManagedColumnFamilyOptions callerFamilyOptions = new ManagedColumnFamilyOptions();
+    callerFamilyOptions.setTableFormatConfig(callerTableConfig);
+    try {
+
+      SnapDiffJobStore store = SnapDiffJobStore.open(db, codecRegistry, callerFamilyOptions,
+          "job" + JOB_ID.incrementAndGet(), false, snapDiffReportCfh, null, null);
+      ManagedColumnFamilyOptions copiedFamilyOptions = store.getCopiedCfFamilyOptions();
+
+      assertSame(callerTableConfig, copiedFamilyOptions.tableFormatConfig());
+      assertTrue(callerFamilyOptions.isOwningHandle(),
+          "caller column family options native handle must be open");
+      assertTrue(copiedFamilyOptions.isOwningHandle(),
+          "copied column family options native handle must be open");
+      assertTableFormatResourcesOpen(callerTableConfig, callerBlockCache, callerBloomFilter);
+
+      store.close();
+
+      assertFalse(copiedFamilyOptions.isOwningHandle(),
+          "copied column family options native handle must be closed");
+      assertTrue(callerFamilyOptions.isOwningHandle(),
+          "caller column family options native handle must be open");
+      assertTableFormatResourcesOpen(callerTableConfig, callerBlockCache, callerBloomFilter);
+    } finally {
+      closeDeeply(callerFamilyOptions);
     }
   }
 
@@ -357,6 +402,13 @@ class TestDagDiffSequentialReader {
     Map<String, String> metadata = new LinkedHashMap<>();
     metadata.put(key, value);
     return metadata;
+  }
+
+  private static void assertTableFormatResourcesOpen(ManagedBlockBasedTableConfig tableConfig,
+      ManagedLRUCache blockCache, ManagedBloomFilter bloomFilter) {
+    assertFalse(tableConfig.isClosed(), "table format config must stay open");
+    assertTrue(blockCache.isOwningHandle(), "block cache native handle must be open");
+    assertTrue(bloomFilter.isOwningHandle(), "bloom filter native handle must be open");
   }
 
   private static final class DirectoryTables {
