@@ -328,7 +328,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
       // close the pipeline
       StorageContainerManager scm = cluster.getStorageContainerManager();
-      ContainerInfo container = closeLatestContainer(stream);
+      ContainerInfo container = closeContainerForLastBlock(stream);
       GenericTestUtils.waitFor(() -> {
         try {
           return scm.getPipelineManager().getPipeline(container.getPipelineID()).isClosed();
@@ -374,7 +374,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
         stream.flush();
 
         // close the pipeline and container
-        closeLatestContainer(stream);
+        closeContainerForLastBlock(stream);
         // pause getCommittedBlockLength handling on all DNs to make sure all getCommittedBlockLength will time out
         FaultInjectorImpl injector = new FaultInjectorImpl();
         injector.setType(ContainerProtos.Type.GetCommittedBlockLength);
@@ -422,7 +422,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
       stream.flush();
 
       // close the pipeline and container
-      ContainerInfo container = closeLatestContainer(stream);
+      ContainerInfo container = closeContainerForLastBlock(stream);
       // throw exception on first DN getCommittedBlockLength handling
       FaultInjectorImpl injector = new FaultInjectorImpl();
       KeyValueHandler.setInjector(injector);
@@ -540,7 +540,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
       StorageContainerManager scm = cluster.getStorageContainerManager();
       // Close container so that new data won't be written into the same block
       // block1 is partially filled
-      ContainerInfo container = closeLatestContainer(stream);
+      ContainerInfo container = closeContainerForLastBlock(stream);
       GenericTestUtils.waitFor(() -> {
         try {
           return scm.getPipelineManager().getPipeline(container.getPipelineID()).isClosed();
@@ -574,7 +574,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
   }
 
   /** Closes the container (and its pipeline) holding the last block written to {@code stream}. */
-  private ContainerInfo closeLatestContainer(FSDataOutputStream stream)
+  private ContainerInfo closeContainerForLastBlock(FSDataOutputStream stream)
       throws IOException, TimeoutException, InterruptedException {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     List<OmKeyLocationInfo> locations = ((OzoneFSOutputStream) stream.getWrappedStream())
