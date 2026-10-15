@@ -1419,7 +1419,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public UUID refetchSecretKey() throws IOException {
     checkAdminUserPrivilege("refetch secret key.");
-    secretKeyClient.refetchSecretKey();
+    try {
+      secretKeyClient.refetchSecretKey();
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
+    }
     return secretKeyClient.getCurrentSecretKey().getId();
   }
 
