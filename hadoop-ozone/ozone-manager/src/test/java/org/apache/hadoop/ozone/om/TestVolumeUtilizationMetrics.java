@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -26,13 +28,19 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Field;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.om.VolumeUtilizationMetrics.VolumeMetricsInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.junit.jupiter.api.Test;
@@ -93,6 +101,37 @@ public class TestVolumeUtilizationMetrics {
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeQuotaBytes, QUOTA_IN_BYTES_2);
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeQuotaNamespace, QUOTA_IN_NAMESPACE_2);
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeUsedNamespace, USED_NAMESPACE_2);
+  }
+
+  @Test
+  void testUnregisterWithMultipleInstances() throws Exception {
+    MetricsSystem metricsSystem = DefaultMetricsSystem.initialize("TestVolumeUtilizationMetrics");
+    Field field = metricsSystem.getClass().getDeclaredField("allSources");
+    field.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<String, MetricsSource> sources = (Map<String, MetricsSource>) field.get(metricsSystem);
+    Set<String> initialSources = new HashSet<>(sources.keySet());
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    try {
+      VolumeUtilizationMetrics first = VolumeUtilizationMetrics.create(mock(OMMetadataManager.class));
+      Set<String> firstSources = new HashSet<>(sources.keySet());
+      assertEquals(initialSources.size() + 1, firstSources.size());
+      VolumeUtilizationMetrics second = VolumeUtilizationMetrics.create(mock(OMMetadataManager.class));
+      assertNotSame(first, second);
+      assertEquals(initialSources.size() + 2, sources.size());
+
+      second.unRegister();
+      assertEquals(firstSources, sources.keySet());
+      first.unRegister();
+      assertEquals(initialSources, sources.keySet());
+    } finally {
+      Set<String> remainingSources = new HashSet<>(sources.keySet());
+      remainingSources.removeAll(initialSources);
+      remainingSources.forEach(metricsSystem::unregisterSource);
+      DefaultMetricsSystem.shutdown();
+      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+    }
   }
 
   private static Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> createMockEntry(

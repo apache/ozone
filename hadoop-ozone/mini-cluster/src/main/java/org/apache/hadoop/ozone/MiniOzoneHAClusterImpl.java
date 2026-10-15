@@ -992,7 +992,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    */
   public OzoneManager transferOMLeadershipToAnotherNode(OzoneManager currentLeader) throws Exception {
     // Get list of all OMs
-    List<OzoneManager> omList = getOzoneManagersList();
+    List<OzoneManager> omList = new ArrayList<>(getOzoneManagersList());
 
     // Remove current leader from list
     omList.remove(currentLeader);

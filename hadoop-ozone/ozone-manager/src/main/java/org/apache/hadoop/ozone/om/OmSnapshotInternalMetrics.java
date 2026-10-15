@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import java.util.UUID;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -81,7 +82,7 @@ public final class OmSnapshotInternalMetrics {
 
   public static OmSnapshotInternalMetrics create(String omNodeId) {
     String sourceName = DefaultMetricsSystem.inMiniClusterMode()
-        ? METRICS_SOURCE_NAME + '-' + omNodeId
+        ? METRICS_SOURCE_NAME + '-' + omNodeId + '-' + UUID.randomUUID()
         : METRICS_SOURCE_NAME;
     return DefaultMetricsSystem.instance().register(sourceName,
         "Metrics tracking the progress of snapshot internal operations",
