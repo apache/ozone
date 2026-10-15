@@ -916,7 +916,7 @@ public class ContainerBalancerTask implements Runnable {
   private ContainerMoveSelection matchSourceWithTarget(DatanodeDetails source,
       @Nullable StorageType storageType) {
     Set<ContainerID> sourceContainerIDSet =
-        selectionCriteria.getContainerIDSet(source);
+        selectionCriteria.getContainerIDSet(source, storageType);
 
     if (sourceContainerIDSet.isEmpty()) {
       if (LOG.isDebugEnabled()) {
@@ -936,10 +936,7 @@ public class ContainerBalancerTask implements Runnable {
     for (ContainerID containerId: sourceContainerIDSet) {
       if (selectionCriteria.shouldBeExcluded(containerId, source,
           sizeScheduledForMoveInLatestIteration, storageType)) {
-        // A different tier may still consider this container with its own utilization bounds.
-        if (storageType == null || containerToSourceMap.containsKey(containerId)) {
-          toRemoveContainerIds.add(containerId);
-        }
+        toRemoveContainerIds.add(containerId);
         continue;
       }
       moveSelection = findTargetStrategy.findTargetForContainerMove(source,

@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -102,6 +103,53 @@ public class TestContainerBalancerSelectionCriteria {
 
     criteria = new ContainerBalancerSelectionCriteria(balancerConfiguration, nodeManager, replicationManager,
         containerManager, findSourceStrategy, new HashMap<>());
+  }
+
+  @Test
+  public void shouldCacheCandidatesPerSourceAndStorageType() throws Exception {
+    when(nodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(nodeManager.getContainers(any())).thenAnswer(ignored -> new HashSet<>(Collections.singleton(containerID)));
+
+    Set<ContainerID> ssdCandidates = criteria.getContainerIDSet(source, StorageType.SSD);
+    ssdCandidates.remove(containerID);
+    assertSame(ssdCandidates, criteria.getContainerIDSet(source, StorageType.SSD));
+    assertThat(criteria.getContainerIDSet(source, StorageType.SSD)).isEmpty();
+    assertThat(criteria.getContainerIDSet(source, StorageType.DISK)).containsExactly(containerID);
+
+    Set<ContainerID> legacyCandidates = criteria.getContainerIDSet(source);
+    assertSame(legacyCandidates, criteria.getContainerIDSet(source, null));
+    assertThat(legacyCandidates).containsExactly(containerID);
+    legacyCandidates.remove(containerID);
+    assertThat(criteria.getContainerIDSet(source, StorageType.DISK)).containsExactly(containerID);
+
+    DatanodeDetails otherSource = MockDatanodeDetails.randomDatanodeDetails();
+    assertThat(criteria.getContainerIDSet(otherSource, StorageType.SSD)).containsExactly(containerID);
+    verify(nodeManager, times(3)).getContainers(source);
+    verify(nodeManager).getContainers(otherSource);
+  }
+
+  @Test
+  public void shouldNotReturnCachedCandidatesForUnregisteredSource() throws Exception {
+    when(nodeManager.isNodeRegistered(source)).thenReturn(true);
+    when(nodeManager.getContainers(source)).thenReturn(new HashSet<>(Collections.singleton(containerID)));
+    assertThat(criteria.getContainerIDSet(source, StorageType.SSD)).containsExactly(containerID);
+
+    when(nodeManager.isNodeRegistered(source)).thenReturn(false);
+    assertThat(criteria.getContainerIDSet(source, StorageType.SSD)).isEmpty();
+    assertThat(criteria.getContainerIDSet(source)).isEmpty();
+    verify(nodeManager).getContainers(source);
+  }
+
+  @Test
+  public void shouldReconsiderCandidatesInNextIteration() throws Exception {
+    when(nodeManager.isNodeRegistered(source)).thenReturn(true);
+    when(nodeManager.getContainers(source)).thenAnswer(ignored -> new HashSet<>(Collections.singleton(containerID)));
+    criteria.getContainerIDSet(source, StorageType.SSD).remove(containerID);
+
+    ContainerBalancerSelectionCriteria nextIteration = new ContainerBalancerSelectionCriteria(balancerConfiguration,
+        nodeManager, replicationManager, containerManager, findSourceStrategy, new HashMap<>());
+    assertThat(nextIteration.getContainerIDSet(source, StorageType.SSD)).containsExactly(containerID);
+    verify(nodeManager, times(2)).getContainers(source);
   }
 
   /**

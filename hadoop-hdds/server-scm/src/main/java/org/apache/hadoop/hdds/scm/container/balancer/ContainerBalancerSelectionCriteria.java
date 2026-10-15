@@ -67,7 +67,7 @@ public class ContainerBalancerSelectionCriteria {
   private final Set<ContainerID> excludeContainersNotFound;
   private final Map<ContainerID, ContainerHealthResult.HealthState> excludeContainersDueToHealth;
   private FindSourceStrategy findSourceStrategy;
-  private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
+  private Map<DatanodeDetails, Map<StorageType, NavigableSet<ContainerID>>> setMap;
 
   // Capped to avoid unbounded growth in long-running or unlimited-iteration runs.
   private static final int MAX_NOT_FOUND_CONTAINERS = 10_000;
@@ -124,12 +124,20 @@ public class ContainerBalancerSelectionCriteria {
    * @return cached Navigable ContainerID Set
    */
   public Set<ContainerID> getContainerIDSet(DatanodeDetails node) {
+    return getContainerIDSet(node, null);
+  }
+
+  /**
+   * Returns candidates cached separately for each source and storage type, so pruning one type cannot affect another.
+   * A null storage type retains the legacy candidate set for all storage types.
+   */
+  public Set<ContainerID> getContainerIDSet(DatanodeDetails node, @Nullable StorageType storageType) {
     // Check if the node is registered at the beginning
     if (!nodeManager.isNodeRegistered(node)) {
       return Collections.emptySet();
     }
-    Set<ContainerID> containers = setMap.computeIfAbsent(node,
-        this::getCandidateContainers);
+    Set<ContainerID> containers = setMap.computeIfAbsent(node, ignored -> new HashMap<>())
+        .computeIfAbsent(storageType, ignored -> getCandidateContainers(node));
     return containers != null ? containers : Collections.emptySet();
   }
 

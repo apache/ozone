@@ -32,6 +32,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -773,6 +774,72 @@ public class TestContainerBalancerTask {
         .setSequenceId(1000L)
         .setBytesUsed(usedBytes)
         .build();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testRejectedCandidatesAreNotRecheckedForStorageType(boolean differentStorageType) throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80, 80);
+    DatanodeUsageInfo target = storageTypeNode(20, 80);
+    StorageType rejectedType = differentStorageType ? StorageType.DISK : StorageType.SSD;
+    List<ContainerID> rejected = new ArrayList<>();
+    for (int i = 0; i < 200; i++) {
+      long id = 1000L + i;
+      addStorageTypeContainer(source, id, rejectedType, 2 * OzoneConsts.MB);
+      ContainerID containerID = ContainerID.valueOf(id);
+      if (!differentStorageType) {
+        cidToInfoMap.get(containerID).setState(HddsProtos.LifeCycleState.OPEN);
+      }
+      rejected.add(containerID);
+    }
+    for (int i = 0; i < 100; i++) {
+      addStorageTypeContainer(source, 2000L + i, StorageType.SSD, OzoneConsts.MB);
+    }
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, order);
+    balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.MB);
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).hasSize(100).containsOnly(StorageType.SSD);
+    for (ContainerID containerID : rejected) {
+      verify(scm.getContainerManager(), times(1)).getContainerReplicas(containerID);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testRejectedContainerRemainsAvailableForAnotherStorageType(boolean exceedsSsdLimit) throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80, 95);
+    DatanodeUsageInfo target = storageTypeNode(20, 5);
+    // The larger DISK container is rejected either by the SSD utilization limit or by its storage type.
+    addStorageTypeContainer(source, 1000, StorageType.DISK, (exceedsSsdLimit ? 50 : 20) * STORAGE_UNIT);
+    addStorageTypeContainer(source, 1001, StorageType.SSD, 10 * STORAGE_UNIT);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, order);
+    startBalancer(balancerConfiguration);
+
+    assertThat(order).containsExactly(StorageType.SSD, StorageType.DISK);
+    assertThat(containerBalancerTask.getContainerToSourceMap()).containsOnlyKeys(
+        ContainerID.valueOf(1000), ContainerID.valueOf(1001));
+  }
+
+  @Test
+  public void testContainerWithUnknownStorageTypeIsNotMovedTwiceAcrossTypes() throws Exception {
+    DatanodeUsageInfo source = storageTypeNode(80, 80);
+    DatanodeUsageInfo target = storageTypeNode(20, 20);
+    addStorageTypeContainer(source, 1000, StorageType.SSD, 10 * STORAGE_UNIT);
+    addStorageTypeContainer(source, 1001, StorageType.SSD, 9 * STORAGE_UNIT);
+    ContainerID unknownTypeContainer = ContainerID.valueOf(1001);
+    cidToReplicasMap.put(unknownTypeContainer,
+        Collections.singleton(createReplica(unknownTypeContainer, source.getDatanodeDetails(), 9 * STORAGE_UNIT)));
+    addStorageTypeContainer(source, 1002, StorageType.DISK, 8 * STORAGE_UNIT);
+    List<StorageType> order = new ArrayList<>();
+    configureStorageTypeCluster(Arrays.asList(source, target), 0, order);
+    startBalancer(balancerConfiguration);
+
+    assertThat(containerBalancerTask.getContainerToSourceMap()).hasSize(3);
+    assertThat(order).containsExactly(StorageType.SSD, null, StorageType.DISK);
+    verify(moveManager).move(unknownTypeContainer, source.getDatanodeDetails(), target.getDatanodeDetails());
   }
 
   @Test
