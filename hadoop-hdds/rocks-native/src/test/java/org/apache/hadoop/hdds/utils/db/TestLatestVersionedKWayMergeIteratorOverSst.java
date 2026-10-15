@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.LatestVersionedKWayMergeIterator.MergedKeyValue;
-import org.apache.hadoop.hdds.utils.db.TestRawSstFileRecords.SourceRecord;
+import org.apache.hadoop.hdds.utils.db.RawSstFileRecords.SourceRecord;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -111,7 +111,7 @@ class TestLatestVersionedKWayMergeIteratorOverSst {
       }
     }
 
-    List<List<SourceRecord>> perSource = TestRawSstFileRecords.readFiles(sstFiles);
+    List<List<SourceRecord>> perSource = RawSstFileRecords.readFiles(sstFiles);
     long k1VersionsAcrossFiles = perSource.stream()
         .flatMap(List::stream)
         .filter(record -> Arrays.equals(record.getUserKey(), keyBytes("k1")))

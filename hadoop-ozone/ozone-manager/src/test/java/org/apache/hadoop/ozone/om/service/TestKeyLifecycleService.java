@@ -62,6 +62,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -73,7 +74,6 @@ import java.lang.reflect.Field;
 import java.security.PrivilegedExceptionAction;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -592,7 +592,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       String rulePrefix = bucketLayout == FILE_SYSTEM_OPTIMIZED ? "" : "key";
       int testKeyCount = 3;
 
-      keyLifecycleService.setListMaxSize(1);
+      keyLifecycleService.setKeyDeleteBatchSize(1);
       FaultInjectorImpl taskStart = new FaultInjectorImpl();
       installInjectors(taskStart);
 
@@ -822,7 +822,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       long keyIterated = metrics.getNumKeyIterated().value();
       int testKeyCount = 8;
 
-      keyLifecycleService.setListMaxSize(maxSize);
+      keyLifecycleService.setKeyDeleteBatchSize(maxSize);
       // Suspend service so it doesn't process immediately after we create the policy
       keyLifecycleService.suspend();
 
@@ -997,7 +997,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       String prefix = "";
       long initialDeletedKeyCount = getDeletedKeyCount();
       long initialKeyCount = getKeyCount(BucketLayout.FILE_SYSTEM_OPTIMIZED);
-      keyLifecycleService.setListMaxSize(1);
+      keyLifecycleService.setKeyDeleteBatchSize(1);
       // Suspend service so it doesn't process immediately after we create the policy
       keyLifecycleService.suspend();
 
@@ -1152,6 +1152,65 @@ class TestKeyLifecycleService extends OzoneTestBase {
         assertTrue(logCapturer.getOutput().contains("Seek to key"));
       } else {
         assertFalse(logCapturer.getOutput().contains("Seek to key"));
+      }
+    }
+
+    @Test
+    void testCacheOnlyKeyNotSavedAsLastScannedKey() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+
+      keyLifecycleService.setKeyDeleteBatchSize(1);
+      keyLifecycleService.suspend();
+
+      createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+      createAndCommitKey(volumeName, bucketName, "dir1/key1", 1, null);
+      createAndCommitKey(volumeName, bucketName, "dir1/key2", 1, null);
+      GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == 2,
+          WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(FILE_SYSTEM_OPTIMIZED, volumeName, bucketName);
+
+      long volumeId = metadataManager.getVolumeTable().get(metadataManager.getVolumeKey(volumeName)).getObjectID();
+      long bucketId =
+          metadataManager.getBucketTable().get(metadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
+      long dir1Id = metadataManager.getDirectoryTable().get(
+          metadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "dir1")).getObjectID();
+
+      // key9 sorts after the table keys and only exists in the cache. The max epoch keeps the double buffer
+      // from evicting it before the scan.
+      Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(FILE_SYSTEM_OPTIMIZED);
+      OmKeyInfo key1Info = keyTable.get(metadataManager.getOzonePathKey(volumeId, bucketId, dir1Id, "key1"));
+      OmKeyInfo cacheOnlyKey = key1Info.toBuilder().setKeyName("key9").build();
+      String cacheOnlyDbKey = metadataManager.getOzonePathKey(volumeId, bucketId, dir1Id, "key9");
+      keyTable.addCacheEntry(new CacheKey<>(cacheOnlyDbKey), CacheValue.get(Long.MAX_VALUE, cacheOnlyKey));
+
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
+
+      Field tableField = OmMetadataManagerImpl.class.getDeclaredField("lifecycleScanStateTable");
+      tableField.setAccessible(true);
+      Table<String, OmLifecycleScanState> originalTable =
+          (Table<String, OmLifecycleScanState>) tableField.get(metadataManager);
+      Table<String, OmLifecycleScanState> spyTable = spy(originalTable);
+      tableField.set(metadataManager, spyTable);
+      try {
+        runSingleLifecycleScan(volumeName, bucketName);
+
+        GenericTestUtils.waitFor(() ->
+            (getDeletedKeyCount() - initialDeletedKeyCount) == 3, WAIT_CHECK_INTERVAL, 10000);
+        assertEquals(0, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+
+        String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+        // With a batch size of 1, the expired list fills right after the cache pass, so scan state is saved
+        // while the cache-only key is the last key evaluated.
+        verify(spyTable, atLeast(1)).addCacheEntry(argThat(k -> k.getCacheKey().equals(bucketKey)), any());
+        verify(spyTable, never()).addCacheEntry(argThat(k -> k.getCacheKey().equals(bucketKey)),
+            argThat(v -> v.getCacheValue() != null && cacheOnlyDbKey.equals(v.getCacheValue().getLastScannedKey())));
+      } finally {
+        tableField.set(metadataManager, originalTable);
       }
     }
 
@@ -1747,23 +1806,25 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
 
-      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
+      FaultInjectorImpl taskStart = new FaultInjectorImpl();
+      FaultInjectorImpl beforeDelete = new FaultInjectorImpl();
+      installInjectors(taskStart, beforeDelete);
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, rulePrefix, null, date.toString(), true);
       LOG.info("expiry date {}", date.toInstant().toEpochMilli());
 
-      GenericTestUtils.waitFor(() -> date.isBefore(ZonedDateTime.now(ZoneOffset.UTC)), WAIT_CHECK_INTERVAL, 10000);
+      taskStart.awaitPaused(10000);
 
       // rename a key under directory to change directory's Modification time
       writeClient.renameKey(keyList.get(0), keyList.get(0).getKeyName() + "-new");
       LOG.info("Dir {} refreshes its modification time", dirName);
 
-      // resume KeyLifecycleService bucket scan
-      KeyLifecycleService.getInjector(0).resume();
-      KeyLifecycleService.getInjector(1).resume();
+      taskStart.release();
+      beforeDelete.awaitPaused(10000);
+      beforeDelete.release();
 
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
@@ -2327,7 +2388,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
       final int keyCount = 100;
       final int maxListSize = 20;
-      keyLifecycleService.setListMaxSize(maxListSize);
+      keyLifecycleService.setKeyDeleteBatchSize(maxListSize);
       // create keys
       List<OmKeyArgs> keyList =
           createKeys(volumeName, bucketName, bucketLayout, keyCount, 1, keyPrefix, null);
@@ -2582,16 +2643,17 @@ class TestKeyLifecycleService extends OzoneTestBase {
       KeyInfoWithVolumeContext keyInfo = getDirectory(volumeName, bucketName, dirName);
       assertFalse(keyInfo.getKeyInfo().isFile());
 
-      installInjectors(new FaultInjectorImpl(), new FaultInjectorImpl());
+      FaultInjectorImpl taskStart = new FaultInjectorImpl();
+      FaultInjectorImpl beforeDelete = new FaultInjectorImpl();
+      installInjectors(taskStart, beforeDelete);
 
       // create Lifecycle configuration
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      ZonedDateTime date = now.plusSeconds(EXPIRE_SECONDS);
+      ZonedDateTime date = now;
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, rulePrefix, null, date.toString(), true);
       LOG.info("expiry date {}", date.toInstant());
 
-      ZonedDateTime endDate = date.plus(SERVICE_INTERVAL, ChronoUnit.MILLIS);
-      GenericTestUtils.waitFor(() -> endDate.isBefore(ZonedDateTime.now(ZoneOffset.UTC)), WAIT_CHECK_INTERVAL, 5000);
+      taskStart.awaitPaused(10000);
 
       // rename a key under directory to change directory's Modification time
       if (updateDirModificationTime) {
@@ -2602,9 +2664,9 @@ class TestKeyLifecycleService extends OzoneTestBase {
         awaitDirCacheDrained(volumeName, bucketName);
       }
 
-      // resume KeyLifecycleService bucket scan
-      KeyLifecycleService.getInjector(0).resume();
-      KeyLifecycleService.getInjector(1).resume();
+      taskStart.release();
+      beforeDelete.awaitPaused(10000);
+      beforeDelete.release();
 
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == expectedDeletedKeyCount, WAIT_CHECK_INTERVAL, 10000);
@@ -3520,7 +3582,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
         KeyLifecycleService.setInjectors(null);
         keyLifecycleService.setOzoneTrash(null);
         keyLifecycleService.setMoveToTrashEnabled(true);
-        keyLifecycleService.setListMaxSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
+        keyLifecycleService.setKeyDeleteBatchSize(conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE,
             OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT));
         keyLifecycleService.resume();
       }

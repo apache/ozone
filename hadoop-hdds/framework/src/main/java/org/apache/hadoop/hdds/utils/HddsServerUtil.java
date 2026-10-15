@@ -28,8 +28,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPort;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getScmServiceId;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddress;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedHost;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
@@ -65,6 +68,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -79,6 +83,8 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -138,6 +144,8 @@ public final class HddsServerUtil {
 
   private static final int SHUTDOWN_HOOK_PRIORITY = 0;
 
+  private static final Pattern KERBEROS_PRINCIPAL = Pattern.compile("([^/@]+)(/[^/@]+)?(@[^/@]+)?");
+
   public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
       "OZONE_RATIS_SNAPSHOT_COMPLETE";
 
@@ -181,7 +189,7 @@ public final class HddsServerUtil {
       if (ifc.isUp()) {
         Enumeration<InetAddress> enumAdds = ifc.getInetAddresses();
         while (enumAdds.hasMoreElements()) {
-          InetAddress addr = enumAdds.nextElement();
+          InetAddress addr = dropScopeUnlessLinkLocal(enumAdds.nextElement());
 
           if (isValidInetForCsr(addr)) {
             LOG.info("Adding ip:{},host:{}", addr.getHostAddress(), addr.getHostName());
@@ -194,6 +202,21 @@ public final class HddsServerUtil {
     }
 
     return hostIps;
+  }
+
+  /**
+   * A network interface returns every IPv6 address with the interface as scope, which
+   * {@link #isScopedOrMaskingIPv6Address(InetAddress)} rejects. Only a link-local address needs the scope, so it is
+   * dropped from any other address.
+   *
+   * @param addr the InetAddress as returned by a network interface
+   * @return the address without scope, or the same address if it is link-local or not an IPv6 address
+   */
+  public static InetAddress dropScopeUnlessLinkLocal(InetAddress addr) throws UnknownHostException {
+    if (addr instanceof Inet6Address && !addr.isLinkLocalAddress()) {
+      return InetAddress.getByAddress(addr.getAddress());
+    }
+    return addr;
   }
 
   /**
@@ -267,7 +290,7 @@ public final class HddsServerUtil {
         .orElse(conf.getInt(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY,
             ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT));
 
-    return NetUtils.createSocketAddr(host + ":" + port);
+    return NetUtils.createSocketAddr(getHostPortString(host, port));
   }
 
   /**
@@ -288,7 +311,7 @@ public final class HddsServerUtil {
         .orElse(conf.getInt(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_KEY,
             ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT));
 
-    return NetUtils.createSocketAddr(host + ":" + port);
+    return NetUtils.createSocketAddr(getHostPortString(host, port));
   }
 
   /**
@@ -307,12 +330,10 @@ public final class HddsServerUtil {
     final OptionalInt port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY);
 
-    return NetUtils.createSocketAddr(
-        host
-            + ":" + port
-            .orElse(conf.getInt(ScmConfigKeys
-                    .OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
-                ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT)));
+    return NetUtils.createSocketAddr(getHostPortString(host,
+        port.orElse(conf.getInt(
+            ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT))));
   }
 
   /**
@@ -330,10 +351,10 @@ public final class HddsServerUtil {
     final OptionalInt port = getPortNumberFromConfigKeys(conf,
         ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY);
 
-    return NetUtils.createSocketAddr(
-        host.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
-                ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT)));
+    return NetUtils.createSocketAddr(getHostPortString(
+        host.orElse(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_DEFAULT),
+        port.orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
+            ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT))));
   }
 
   /**
@@ -351,10 +372,9 @@ public final class HddsServerUtil {
     final OptionalInt port = getPortNumberFromConfigKeys(conf,
         ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY);
 
-    return NetUtils.createSocketAddr(
-        host.orElse(
-            ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_DEFAULT) + ":" +
-            port.orElse(ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT));
+    return NetUtils.createSocketAddr(getHostPortString(
+        host.orElse(ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_DEFAULT),
+        port.orElse(ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT)));
   }
 
   /**
@@ -776,6 +796,20 @@ public final class HddsServerUtil {
   }
 
   /**
+   * @return true if {@code user} is a service user of the Kerberos {@code principal}: not a proxy user, with the same
+   * service name, with the same realm if the principal has one, and with a host if the principal has one. The host is
+   * not compared, as _HOST in the principal stands for the host of any instance of the service.
+   */
+  public static boolean isServiceUser(UserGroupInformation user, String principal) {
+    final Matcher expected = KERBEROS_PRINCIPAL.matcher(principal);
+    final Matcher actual = KERBEROS_PRINCIPAL.matcher(user.getUserName());
+    return user.getRealUser() == null && expected.matches() && actual.matches()
+        && expected.group(1).equals(actual.group(1))
+        && (expected.group(2) == null) == (actual.group(2) == null)
+        && (expected.group(3) == null || expected.group(3).equals(actual.group(3)));
+  }
+
+  /**
    * Add exception classes which server won't log at all.
    * @param server
    */
@@ -895,6 +929,7 @@ public final class HddsServerUtil {
 
       final Collection<HostAndPort> addresses = new HashSet<>(names.size());
       for (String address : names) {
+        validateAdvertisedAddress(OZONE_SCM_NAMES, address);
         Optional<String> hostname = getHostName(address);
         if (!hostname.isPresent()) {
           throw new IllegalArgumentException("Invalid hostname for SCM: "
@@ -933,6 +968,7 @@ public final class HddsServerUtil {
         LOG.warn("The SCM address configuration {} is not defined, return nothing", addressKey);
         return null;
       }
+      validateAdvertisedHost(addressKey, scmAddress);
 
       int scmDatanodePort = SCMNodeInfo.getPort(conf, scmServiceId, scmNodeId,
           OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
@@ -955,6 +991,7 @@ public final class HddsServerUtil {
     if (StringUtils.isEmpty(name)) {
       return null;
     }
+    validateAdvertisedAddress(OZONE_RECON_ADDRESS_KEY, name);
     Optional<String> hostname = getHostName(name);
     if (!hostname.isPresent()) {
       throw new IllegalArgumentException("Invalid hostname for Recon: "
