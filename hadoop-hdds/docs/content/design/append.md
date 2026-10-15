@@ -47,6 +47,12 @@ OzoneFS currently rejects `FileSystem.append()`. Applications that reopen transa
 cannot use that operation through `ofs://` or `o3fs://`. Applications may have additional requirements such as `truncate()`;
 adding append alone does not establish compatibility with every HDFS application.
 
+The primary use cases are reopening transaction logs during recovery and resuming existing output files. Log writers can
+keep a stream open across many small writes and frequent `hflush()`/`hsync()` calls. In the inspected Solr 8.11.4 path, append
+reopens old tlogs during startup/recovery; it is not called per log record ([Appendix C](#appendix-c-solr-integration)).
+Repeated open/append/close cycles are also supported, with the small-block costs described under
+[Performance considerations](#performance-considerations).
+
 Reopen a closed file for one appender, keep its existing blocks immutable, and allocate new blocks for appended bytes.
 Successful close publishes the extended file. Supported replicated streams also provide their existing `hflush`/`hsync`
 behavior. EC append publishes on close and does not require implementing EC `hsync`.
@@ -111,6 +117,12 @@ where they delegate to the filesystem API. Unsupported append flags must fail ex
 `OzonePathCapabilities` currently reports `LEASE_RECOVERABLE` without checking the bucket layout, although server-side
 lease recovery is FSO-only. That existing mismatch is not evidence of LEGACY recovery support; append capability reporting
 must resolve the supported layout and server state rather than copying that unconditional result.
+
+Append opens a writer session; supporting replicated streams can call `hflush()`/`hsync()` within that same session.
+each advancing append hsync publishes the session's length and locations to OM before it succeeds. `HSYNC_CLIENT_ID` may
+describe publication visibility for such a stream, but append ownership and lease recovery use the append session fields.
+An ordinary create/hsync stream is not converted into an append session and cannot be taken over automatically by append.
+EC append remains close-only and does not gain hsync through this proposal.
 
 ### Bucket layouts
 
@@ -375,12 +387,18 @@ metadata derived from the old bytes. Attribute-only updates must not accidentall
 
 ### Namespace operations and competing writes
 
-Reject new create/overwrite while append owns the file. All commit paths, including previously opened writes and older
-clients without append fields, must honor the reservation and applicable generation checks. Existing ordinary hsync
+Reject new create/overwrite or atomic key rewrite while append owns the file. All commit paths, including previously opened
+writes and older clients without append fields, must honor the reservation and applicable generation checks. Existing ordinary hsync
 streams can be superseded by an overwrite commit, which marks the previous open key `OVERWRITTEN_HSYNC_KEY`.
 Append instead reserves the file until close, recovery, or
 deletion. This proposal preserves ordinary create/hsync overwrite behavior when no append reservation exists; sharing a
 stream class does not make those sessions exclusive append owners. Test both behaviors and their admission races.
+
+The existing conditional rewrite path, including `ozone sh key rewrite`, supplies the source key generation and OM validates
+that generation at open and commit. An already-open rewrite blocks append until it completes or is fenced by cleanup;
+append ownership blocks new rewrites. If a CLI reads a generation and append changes the file before rewrite opens, reject
+the stale generation. A fenced rewrite's delayed commit must also fail after a later append closes. Preserve these checks
+for replication conversion, such as RATIS to EC, and retain snapshot-referenced source blocks during rewrite cleanup.
 
 #### Rename while append is active
 
@@ -902,14 +920,20 @@ RPC, OM memory, serialized metadata, and read latency can impose earlier limits.
 The following costs require implementation review and measurement before activation. The numerical examples describe
 workloads, not measured capacity or supported limits. They do not change the ownership, snapshot, or recovery contracts.
 
-- **Small blocks across append sessions.** Every successful nonempty append session adds at least one new block or EC
-  block group. Writes and syncs within the same open session continue using its current block while capacity and pipeline
-  state permit; they do not each require a new block. Ten thousand separate 4 KiB append/close cycles add at least 10,000
+- **Small blocks across append sessions.** Every successful nonempty session opened by `FileSystem.append()` adds at least
+  one new block or EC block group. Individual `write()` calls on that open stream do not each allocate a new block: they
+  continue filling the current block while capacity and pipeline state permit. Calling `hsync()` does not by itself require
+  a new block either. Ten thousand separate 4 KiB reopen/write/close cycles add at least 10,000
   block locations for about 39 MiB of data. Allocation, block-token handling, replica metadata, lookup responses, and
   per-block read initialization can dominate the payload cost. New blocks do not require new containers or pipelines on
   every append, and a small EC append does not reserve a full block group's data capacity. Measure small-session workloads
   separately from small writes to a long-lived stream, including EC partial-group overhead. Keeping a stream open is
   guidance, not an enforced workload restriction.
+- **Small-block mitigation.** Compaction is separate follow-up work. A tool could reuse conditional rewrite to replace a
+  fragmented file while preserving append ownership checks, snapshots, quota accounting, and retry behavior. The current
+  `ozone sh key rewrite` skips unchanged replication; same-replication compaction would require extending it. Snapshots may
+  retain the old blocks even after the live file is compacted. HDDS-10392 covers the proposed Recon view, not a compaction
+  implementation. Activation requires the workload measurements above, but does not require compaction.
 - **Publication latency and OM load.** Each advancing replicated append hsync requires OM RPC, Ratis commit, and application
   work after datanode synchronization, including same-block syncs that currently skip OM. Unchanged-state syncs may skip
   publication as specified above. This does not require an independent synchronous RocksDB flush for each acknowledgement,
@@ -1063,6 +1087,7 @@ Extend `TestHSync`, `TestLeaseRecovery`, client stream tests, and snapshot/GC su
 | Concurrent readers | Read the prefix before first suffix publication; reopen after close and verify the suffix. Publish length L, then automatically flush more bytes to datanodes before another OM publication: live reads may exceed L within the published suffix block, file status may remain L, and a snapshot captured at L must remain bounded by L. Never expose private block allocations or infer a recovery guarantee from observing extra bytes. Check an already-open reader without requiring automatic tail discovery. |
 | Preconditions | Missing path, directory, snapshot path, permissions, OBS, feature disabled, unsupported options, and old OM. |
 | Ownership | Two clients and two streams in one client; duplicate admission RPC; an earlier overwrite blocks append before its first hsync; retry appends at the resulting EOF after overwrite completion or cleanup; abandoned non-hsynced overwrite remains a conflict until its existing cleanup threshold and scan; ordinary overwrite of an hsync-create stream retains current behavior; simultaneous overwrite/append admission; other APIs and older clients; a terminated overwrite's late commit fails during and after append; late allocation/sync/close after recovery. |
+| Conditional rewrite | Open rewrite blocks append; append owner blocks rewrite; stale source generation after append publication/close; rewrite commit after its open record is cleaned up and a later append closes. Cover both layouts, RATIS-to-EC conversion, snapshot retention of source blocks, and safe cleanup of failed rewrite allocations. |
 | Lease lifecycle | Lease before first allocation/sync; idle and slowly writing streams retain ownership beyond the timeout through successful background renewal; loss of renewal permits recovery and fences the old writer; unchanged-state hsync without OM traffic; EC renewal independent of hsync; renewal racing with recovery/close/delete/rename; client disconnect/reconnect; OM failover; release of ownership and session-index entry after completion. |
 | Replicated renewal | Leader failure after renewal acknowledgement and before DB flush; renewal applied while an expiry scan sees older DB state; lost renewal response and duplicate request; delayed renewal after fencing; batches containing completed or fenced sessions; renewal load with many idle streams. |
 | Metadata and retry boundaries | Open/committed codec round trips; protected state surviving rename and attribute updates; admission seeing unflushed ordinary writers and cache tombstones; late allocation or recovery results after fencing; missing open record after a lost close response; retry-cache retention boundaries and failover; deterministic timestamp replay. |
