@@ -22,6 +22,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -29,6 +31,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * SCM command to request reconstruction of EC containers.
@@ -40,6 +45,9 @@ public class ReconstructECContainersCommand
   private final List<DatanodeDetails> targetDatanodes;
   private final ByteString missingContainerIndexes;
   private final ECReplicationConfig ecReplicationConfig;
+  private ComponentVersion apparentVersion;
+
+  private static final Logger LOG = LoggerFactory.getLogger(ReconstructECContainersCommand.class);
 
   public ReconstructECContainersCommand(long containerID,
       List<DatanodeDetailsAndReplicaIndex> sources,
@@ -65,6 +73,19 @@ public class ReconstructECContainersCommand
     }
   }
 
+  public void setApparentVersion(ComponentVersion apparentVersion) {
+    this.apparentVersion = apparentVersion;
+  }
+
+  /**
+   * @return the apparent version that should be used to carry out this
+   *     reconstruction. SCM computes this as the lowest apparent version among
+   *     the nodes involved.
+   */
+  public ComponentVersion getApparentVersion() {
+    return apparentVersion;
+  }
+
   @Override
   public Type getType() {
     return Type.reconstructECContainersCommand;
@@ -83,6 +104,8 @@ public class ReconstructECContainersCommand
     }
     builder.setMissingContainerIndexes(missingContainerIndexes);
     builder.setEcReplicationConfig(ecReplicationConfig.toProto());
+    ComponentVersion version = apparentVersion != null ? apparentVersion : HDDSVersion.DEFAULT_VERSION;
+    builder.setApparentVersion(version.serialize());
     return builder.build();
   }
 
@@ -98,11 +121,22 @@ public class ReconstructECContainersCommand
         protoMessage.getTargetsList().stream()
             .map(DatanodeDetails::getFromProtoBuf).collect(Collectors.toList());
 
-    return new ReconstructECContainersCommand(protoMessage.getContainerID(),
+    ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
+        protoMessage.getContainerID(),
         srcDatanodeDetails, targetDatanodeDetails,
         protoMessage.getMissingContainerIndexes(),
         new ECReplicationConfig(protoMessage.getEcReplicationConfig()),
         protoMessage.getCmdId());
+    if (protoMessage.hasApparentVersion()) {
+      cmd.apparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+          protoMessage.getApparentVersion());
+    } else {
+      LOG.warn("Received EC reconstruction command for container {} with no apparent version. Falling back to {}",
+          cmd.getContainerID(), HDDSVersion.DEFAULT_VERSION);
+      cmd.apparentVersion = HDDSVersion.DEFAULT_VERSION;
+    }
+
+    return cmd;
   }
 
   public long getContainerID() {
@@ -141,7 +175,8 @@ public class ReconstructECContainersCommand
             .collect(Collectors.joining(", "))).append(']')
         .append(", targets: ").append(getTargetDatanodes())
         .append(", missingIndexes: ").append(
-            Arrays.toString(missingContainerIndexes.toByteArray()));
+            Arrays.toString(missingContainerIndexes.toByteArray()))
+        .append(", apparentVersion: ").append(apparentVersion);
     return sb.toString();
   }
 

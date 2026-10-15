@@ -51,6 +51,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -463,6 +465,32 @@ public final class OzoneTestHelper {
       MiniOzoneCluster cluster) throws TimeoutException, InterruptedException {
     GenericTestUtils.waitFor(() -> countReplicas(containerID, cluster) == count,
         200, 30000);
+  }
+
+  /**
+   * Like {@link #waitForReplicaCount(long, int, MiniOzoneCluster)}, but only returns once
+   * replication has quiesced: the container is healthy with {@code count} replicas and no pending
+   * add or delete ops. Checking the current replication health avoids treating an empty pending-op
+   * list as settled before ReplicationManager has evaluated the latest replica or node state.
+   */
+  public static void waitForStableReplicaCount(long containerID, int count, MiniOzoneCluster cluster)
+      throws TimeoutException, InterruptedException {
+    ContainerManager containerManager = cluster.getStorageContainerManager().getContainerManager();
+    ReplicationManager replicationManager = cluster.getStorageContainerManager()
+        .getReplicationManager();
+    ContainerID cid = ContainerID.valueOf(containerID);
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ContainerInfo container = containerManager.getContainer(cid);
+        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
+        return replicas.size() == count
+            && replicationManager.getPendingReplicationOps(cid).isEmpty()
+            && replicationManager.getContainerReplicationHealth(container, replicas).getHealthState()
+            == ContainerHealthResult.HealthState.HEALTHY;
+      } catch (ContainerNotFoundException e) {
+        return false;
+      }
+    }, 200, 30000);
   }
 
   /**

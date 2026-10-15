@@ -124,20 +124,12 @@ public abstract class Storage {
     }
   }
 
-  public int getLayoutVersion() {
-    return storageInfo.getLayoutVersion();
+  public int getApparentVersion() {
+    return storageInfo.getApparentVersion();
   }
 
-  public void setLayoutVersion(int version) {
-    storageInfo.setLayoutVersion(version);
-  }
-
-  public void setFirstUpgradeActionLayoutVersion(int version) {
-    storageInfo.setFirstUpgradeActionLayoutVersion(version);
-  }
-
-  public int getFirstUpgradeActionLayoutVersion() {
-    return storageInfo.getFirstUpgradeActionLayoutVersion();
+  public void setApparentVersion(int version) {
+    storageInfo.setApparentVersion(version);
   }
 
   /**
@@ -288,8 +280,7 @@ public abstract class Storage {
     storageInfo.writeTo(getVersionFile());
   }
 
-  protected static int getInitLayoutVersion(OzoneConfiguration conf,
-      String configKey,
+  protected static int getInitApparentVersion(OzoneConfiguration conf, String configKey,
       IntSupplier defaultLvSupplier) {
     int lV = conf.getInt(configKey, OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT);
     if (lV == OZONE_INIT_DEFAULT_LAYOUT_VERSION_DEFAULT) {

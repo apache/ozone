@@ -27,6 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DirectoryInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
@@ -170,6 +172,33 @@ public final class SnapshotDiffValueParser {
     }
 
     return new ParsedRequiredInfo(updateId, hasUpdateId, objectId, parentId, name);
+  }
+
+  /**
+   * Reads only the objectID of a serialized {@link DirectoryInfo}, skipping every other field. Used by
+   * the FSO path walk, which needs each parent directory's objectID but none of its other fields.
+   *
+   * @param value serialized {@link DirectoryInfo}
+   * @return the objectID, or 0 if the field is not set.
+   */
+  public static long parseDirectoryInfoObjectId(CodecBuffer value) throws CodecException {
+    try {
+      CodedInputStream input = CodedInputStream.newInstance(value.asReadOnlyByteBuffer());
+      long objectId = 0L;
+
+      int tag;
+      while ((tag = input.readTag()) != 0) {
+        if (WireFormat.getTagFieldNumber(tag) == DirectoryInfo.OBJECTID_FIELD_NUMBER) {
+          objectId = input.readUInt64();
+        } else {
+          input.skipField(tag);
+        }
+      }
+
+      return objectId;
+    } catch (IOException e) {
+      throw new CodecException("Failed to read the objectID of a DirectoryInfo", e);
+    }
   }
 
   public static byte[] computeDirectoryInfoCompareSignature(byte[] value) throws IOException {

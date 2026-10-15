@@ -542,11 +542,17 @@ public final class ScmInvokerCodeGenerator {
     println("@Override");
     printf(method.getSignature());
     try (UncheckedAutoCloseable ignored = printScope()) {
-      println("final Class<?> returnType;");
-      println("final Object returnValue;");
+      final boolean hasReturnValue = getMethods(false, null).stream()
+          .anyMatch(m -> m.getReturnType() != void.class);
+      if (hasReturnValue) {
+        println("final Class<?> returnType;");
+        println("final Object returnValue;");
+      }
       printSwitch(method);
-      println();
-      println("return SCMRatisResponse.encode(returnValue, returnType);");
+      if (hasReturnValue) {
+        println();
+        println("return SCMRatisResponse.encode(returnValue, returnType);");
+      }
     }
   }
 

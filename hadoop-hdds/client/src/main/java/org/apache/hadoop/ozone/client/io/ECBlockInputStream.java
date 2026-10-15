@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Function;
 import org.apache.hadoop.fs.FSExceptionMessages;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -298,6 +299,17 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
 
   protected long remaining() {
     return blockLength() - position;
+  }
+
+  @Override
+  protected int readPositioned(long offset, ByteBuffer buffer) {
+    throw new UnsupportedOperationException("Use ECBlockInputStreamProxy for positioned reads");
+  }
+
+  @Override
+  public boolean hasCapability(String capability) {
+    return !StreamCapabilities.PREADBYTEBUFFER.equalsIgnoreCase(capability)
+        && super.hasCapability(capability);
   }
 
   @Override
