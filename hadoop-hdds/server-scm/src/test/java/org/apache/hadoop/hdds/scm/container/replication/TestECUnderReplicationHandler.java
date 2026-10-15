@@ -483,6 +483,11 @@ public class TestECUnderReplicationHandler {
     }
     assertEquals(0, replicateCommand);
     assertEquals(1, reconstructCommand);
+    assertEquals(1, metrics.getEcReconstructionDecommissionTriggeredTotal());
+    assertEquals(0, metrics.getEcReconstructionGlobalLimitReachedTotal());
+    assertEquals(0, metrics.getEcDecommissionReconstructionFallbackInsufficientSourcesTotal());
+    assertEquals(0, metrics.getEcDecommissionReconstructionFallbackTargetOverloadedTotal());
+    assertEquals(0, metrics.getEcDecommissionReconstructionFallbackNoOpTotal());
   }
 
   @Test
@@ -514,6 +519,8 @@ public class TestECUnderReplicationHandler {
         .anyMatch(c -> c.getValue() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
         .noneMatch(c -> c.getValue() instanceof ReconstructECContainersCommand));
+    assertEquals(0, metrics.getEcReconstructionDecommissionTriggeredTotal());
+    assertEquals(1, metrics.getEcReconstructionGlobalLimitReachedTotal());
   }
 
   @Test
@@ -545,6 +552,7 @@ public class TestECUnderReplicationHandler {
         .anyMatch(c -> c.getValue() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
         .noneMatch(c -> c.getValue() instanceof ReconstructECContainersCommand));
+    assertEquals(1, metrics.getEcDecommissionReconstructionFallbackTargetOverloadedTotal());
   }
 
   @Test
@@ -582,6 +590,7 @@ public class TestECUnderReplicationHandler {
         .anyMatch(c -> c.getValue() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
         .noneMatch(c -> c.getValue() instanceof ReconstructECContainersCommand));
+    assertEquals(1, metrics.getEcDecommissionReconstructionFallbackTargetOverloadedTotal());
   }
 
   @Test
@@ -612,6 +621,7 @@ public class TestECUnderReplicationHandler {
         .anyMatch(c -> c.getValue() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
         .noneMatch(c -> c.getValue() instanceof ReconstructECContainersCommand));
+    assertEquals(1, metrics.getEcDecommissionReconstructionFallbackInsufficientSourcesTotal());
   }
 
   @Test
