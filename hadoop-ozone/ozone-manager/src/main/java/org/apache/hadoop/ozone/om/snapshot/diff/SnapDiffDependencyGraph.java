@@ -143,40 +143,24 @@ public final class SnapDiffDependencyGraph {
     // Work on a local copy of the in-degrees so the method is idempotent and
     // does not mutate the graph's shared state.
     int[] remainingInDegree = Arrays.copyOf(inDegree, nodeCount);
-    // Split the ready set into two ring buffers so that, among nodes whose
-    // dependencies are already satisfied, DELETEs are emitted before other
-    // types. This retains the baseline "deletes first" ordering wherever the
-    // dependency edges leave the order free. Each node is enqueued at most
-    // once, so buffers sized to the node count are large enough.
-    int[] deleteReady = new int[nodeCount];
-    int[] otherReady = new int[nodeCount];
-    int deleteHead = 0;
-    int deleteTail = 0;
-    int otherHead = 0;
-    int otherTail = 0;
+    // Among nodes whose dependencies are already satisfied, DELETEs are emitted
+    // before other types. This retains the baseline "deletes first" ordering
+    // wherever the dependency edges leave the order free.
+    ReadyQueues ready = new ReadyQueues(nodeCount);
     for (int nodeId = 0; nodeId < nodeCount; nodeId++) {
       if (remainingInDegree[nodeId] == 0) {
-        if (nodes.get(nodeId).isDelete()) {
-          deleteReady[deleteTail++] = nodeId;
-        } else {
-          otherReady[otherTail++] = nodeId;
-        }
+        ready.add(nodeId, nodes.get(nodeId).isDelete());
       }
     }
 
     List<Integer> orderedNodeIds = new ArrayList<>(nodeCount);
-    while (deleteHead < deleteTail || otherHead < otherTail) {
-      int nodeId = deleteHead < deleteTail
-          ? deleteReady[deleteHead++] : otherReady[otherHead++];
+    while (!ready.isEmpty()) {
+      int nodeId = ready.poll();
       orderedNodeIds.add(nodeId);
       for (int i = adjOffsets[nodeId]; i < adjOffsets[nodeId + 1]; i++) {
         int dependentNodeId = adjTargets[i];
         if (--remainingInDegree[dependentNodeId] == 0) {
-          if (nodes.get(dependentNodeId).isDelete()) {
-            deleteReady[deleteTail++] = dependentNodeId;
-          } else {
-            otherReady[otherTail++] = dependentNodeId;
-          }
+          ready.add(dependentNodeId, nodes.get(dependentNodeId).isDelete());
         }
       }
     }
@@ -788,6 +772,44 @@ public final class SnapDiffDependencyGraph {
           ? new DiffReportEntry(diffType, sourceBytes, null)
           : new DiffReportEntry(diffType, sourceBytes, targetBytes);
       return new SnapDiffDependencyEntry(objectId, sourceParentObjectId, targetParentObjectId, reportEntry);
+    }
+  }
+
+  /**
+   * FIFO ready set split into DELETE and non-DELETE array queues so that {@link #poll()}
+   * returns DELETE nodes before other nodes. Each node is added at most once,
+   * so buffers sized to the node count are large enough.
+   */
+  private static final class ReadyQueues {
+    private final int[] deleteReady;
+    private final int[] otherReady;
+    private int deleteHead;
+    private int deleteTail;
+    private int otherHead;
+    private int otherTail;
+
+    private ReadyQueues(int nodeCount) {
+      this.deleteReady = new int[nodeCount];
+      this.otherReady = new int[nodeCount];
+    }
+
+    private void add(int nodeId, boolean isDelete) {
+      if (isDelete) {
+        deleteReady[deleteTail++] = nodeId;
+      } else {
+        otherReady[otherTail++] = nodeId;
+      }
+    }
+
+    private boolean isEmpty() {
+      return deleteHead == deleteTail && otherHead == otherTail;
+    }
+
+    private int poll() {
+      if (deleteHead < deleteTail) {
+        return deleteReady[deleteHead++];
+      }
+      return otherReady[otherHead++];
     }
   }
 }
