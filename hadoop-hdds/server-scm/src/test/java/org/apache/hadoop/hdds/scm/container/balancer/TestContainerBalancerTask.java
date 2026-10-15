@@ -815,7 +815,7 @@ public class TestContainerBalancerTask {
     addStorageTypeContainer(source, 1001, StorageType.DISK, 20 * STORAGE_UNIT);
     configureStorageTypeCluster(Arrays.asList(source, target), 0, new ArrayList<>());
     CompletableFuture<MoveManager.MoveResult> ssdFuture = new CompletableFuture<>();
-    when(moveManager.move(any(), any(), any())).thenAnswer(invocation -> {
+    doAnswer(invocation -> {
       if (ContainerID.valueOf(1000).equals(invocation.getArgument(0))) {
         return ssdFuture;
       }
@@ -826,7 +826,7 @@ public class TestContainerBalancerTask {
         ssdFuture.complete(MoveManager.MoveResult.COMPLETED);
       }
       return CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED);
-    });
+    }).when(moveManager).move(any(), any(), any());
     startBalancer(balancerConfiguration);
 
     ContainerBalancerTaskIterationStatusInfo iteration = containerBalancerTask.getCurrentIterationsStatistic().get(0);
@@ -851,9 +851,10 @@ public class TestContainerBalancerTask {
     configureStorageTypeCluster(Arrays.asList(source, target), 0, new ArrayList<>());
     balancerConfiguration.setMoveTimeout(Duration.ofMillis(50));
     CompletableFuture<MoveManager.MoveResult> ssdFuture = new CompletableFuture<>();
-    when(moveManager.move(any(), any(), any())).thenAnswer(invocation ->
+    doAnswer(invocation ->
         ContainerID.valueOf(1000).equals(invocation.getArgument(0)) ? ssdFuture
-            : CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED));
+            : CompletableFuture.completedFuture(MoveManager.MoveResult.COMPLETED))
+        .when(moveManager).move(any(), any(), any());
     startBalancer(balancerConfiguration);
     ContainerBalancerTaskIterationStatusInfo iteration = containerBalancerTask.getCurrentIterationsStatistic().get(0);
     ContainerBalancerStorageTypeStatusInfoProto ssd = iteration.getStorageTypeStatusInfo().stream()

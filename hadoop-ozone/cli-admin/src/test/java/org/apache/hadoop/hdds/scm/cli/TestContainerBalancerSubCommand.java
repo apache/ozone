@@ -427,7 +427,7 @@ class TestContainerBalancerSubCommand {
             .build();
     ContainerBalancerStatusInfoProto.Builder status = ContainerBalancerStatusInfoProto.newBuilder()
         .setStartedAt(OffsetDateTime.now().minusMinutes(10).toEpochSecond())
-        .setConfiguration(getContainerBalancerConfiguration().toProtobufBuilder())
+        .setConfiguration(getContainerBalancerConfiguration().toProtobufBuilder().setShouldRun(running))
         .addIterationsStatusInfo(iteration);
     if (!running) {
       // Two iterations ensure --history exercises a frozen entry as well as the last one.
@@ -444,7 +444,7 @@ class TestContainerBalancerSubCommand {
         "Moved data size                                    20 GB",
         "Failed to move containers                          1",
         "Failed to move containers by timeout               2",
-        "Unique datanodes involved                           2",
+        "Unique datanodes involved                          2",
         "Imbalance data size                                40 GB",
         "ssd-target <- 30 GB", "disk-source -> 20 GB");
   }

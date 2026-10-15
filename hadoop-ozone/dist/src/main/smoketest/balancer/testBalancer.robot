@@ -91,6 +91,9 @@ Verify Balancer Iteration
 Verify Balancer Iteration History
     [arguments]       ${output}
     Should Contain                  ${output}             Completed iteration history:
+    ${output} =    Fetch From Right    ${output}    Completed iteration history:
+    # Storage-type tables repeat these labels; check the aggregate history table only.
+    ${output} =    Fetch From Left     ${output}    Storage type:
     Should Contain X Times          ${output}             Size scheduled to move                    1      collapse_spaces=True
     Should Contain X Times          ${output}             Moved data size                           1      collapse_spaces=True
     Should Contain X Times          ${output}             Scheduled to move containers              1      collapse_spaces=True

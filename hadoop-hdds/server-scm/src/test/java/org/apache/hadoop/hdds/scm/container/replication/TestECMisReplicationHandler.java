@@ -29,6 +29,8 @@ import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.nullable;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -174,8 +176,9 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
             pendingOp, 0, 1, 0);
   }
 
-  @Test
-  public void testAllSourcesOverloaded() throws IOException {
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2, 5})
+  public void testAllSourcesOverloaded(int misreplicationCount) throws IOException {
     ReplicationManager replicationManager = getReplicationManager();
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
@@ -186,11 +189,14 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
             Pair.of(IN_SERVICE, 5));
     assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
-            Collections.emptyList(), 0, 1, 1, 0));
+            Collections.emptyList(), 0, misreplicationCount, misreplicationCount, 0));
+    verify(replicationManager, times(misreplicationCount))
+        .sendThrottledReplicationCommand(any(), anyList(), any(), anyInt(), any());
   }
 
-  @Test
-  public void testFirstSourcesOverloaded() {
+  @ParameterizedTest
+  @ValueSource(ints = {2, 3, 5})
+  public void testFirstSourcesOverloaded(int misreplicationCount) throws IOException {
     setThrowThrottledException(true);
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -198,7 +204,9 @@ public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
             Pair.of(IN_SERVICE, 5));
     assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
-            Collections.emptyList(), 0, 2, 2, 1));
+            Collections.emptyList(), 0, misreplicationCount, misreplicationCount, misreplicationCount - 1));
+    verify(getReplicationManager(), times(misreplicationCount))
+        .sendThrottledReplicationCommand(any(), anyList(), any(), anyInt(), any());
   }
 
   @Test

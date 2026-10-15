@@ -28,6 +28,8 @@ import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.nullable;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -175,8 +177,9 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
             pendingOp, 0, 1, 0);
   }
 
-  @Test
-  public void testAllSourcesOverloaded() throws IOException {
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2, 3})
+  public void testAllSourcesOverloaded(int misreplicationCount) throws IOException {
     ReplicationManager replicationManager = getReplicationManager();
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(any(),
@@ -187,7 +190,9 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
             Pair.of(IN_SERVICE, 0));
     assertThrows(CommandTargetOverloadedException.class,
         () -> testMisReplication(availableReplicas, mockPlacementPolicy(),
-            Collections.emptyList(), 0, 1, 1, 0));
+            Collections.emptyList(), 0, misreplicationCount, misreplicationCount, 0));
+    verify(replicationManager, times(1))
+        .sendThrottledReplicationCommand(any(), anyList(), any(), anyInt(), any());
   }
 
   @Override

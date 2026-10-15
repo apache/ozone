@@ -164,9 +164,21 @@ public abstract class MisReplicationHandler implements
         .collect(Collectors.toList());
 
     int count = 0;
+    CommandTargetOverloadedException overloadedException = null;
     for (Map.Entry<ContainerReplica, DatanodeDetails> entry : targets.entrySet()) {
-      count += sendReplicateCommands(container, Collections.singleton(entry.getKey()),
-          availableSources, Collections.singletonList(entry.getValue()));
+      try {
+        count += sendReplicateCommands(container, Collections.singleton(entry.getKey()),
+            availableSources, Collections.singletonList(entry.getValue()));
+      } catch (CommandTargetOverloadedException e) {
+        // EC indexes have independent sources; an overloaded source must not block the other indexes.
+        if (container.getReplicationType() != HddsProtos.ReplicationType.EC) {
+          throw e;
+        }
+        overloadedException = e;
+      }
+    }
+    if (overloadedException != null) {
+      throw overloadedException;
     }
 
     int found = targets.size();
