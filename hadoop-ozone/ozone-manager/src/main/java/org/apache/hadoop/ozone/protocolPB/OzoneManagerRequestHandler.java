@@ -1332,6 +1332,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setKeyName(keyArgs.getKeyName())
         .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
         .setHeadOp(keyArgs.getHeadOp())
+        .setRequireFileSystemLayout(request.getRequireFileSystemLayout())
         .build();
     boolean allowPartialPrefixes =
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
@@ -1356,7 +1357,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setKeyName(keyArgs.getKeyName())
         .setSortDatanodesInPipeline(false)
         .setLatestVersionLocation(true)
-        .setHeadOp(keyArgs.getHeadOp());
+        .setHeadOp(keyArgs.getHeadOp())
+        .setRequireFileSystemLayout(request.getRequireFileSystemLayout());
     if (request.hasListPrefix() && !request.getListPrefix().isEmpty()) {
       omKeyArgsBuilder.setListPrefix(request.getListPrefix());
     }

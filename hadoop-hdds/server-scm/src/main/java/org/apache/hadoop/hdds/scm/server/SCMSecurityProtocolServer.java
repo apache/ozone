@@ -338,6 +338,10 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
    */
   private synchronized String getEncodedCertToString(String certSignReq,
       NodeType nodeType) throws IOException {
+    if (nodeType == NodeType.SCM) {
+      // SCM role certificates are CA certificates and are issued to SCM admins only, the check addSCM applies.
+      storageContainerManager.checkAdminAccess(getRpcRemoteUser(), false);
+    }
     Future<CertPath> future;
     PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
     if (nodeType == NodeType.SCM && rootCertificateServer != null) {
