@@ -530,6 +530,11 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                   + "{}, using 1-1 replication.",
               container.containerID(), e);
           metrics.incrEcDecommissionReconstructionFallbackTargetOverloadedTotal();
+        } catch (InsufficientDatanodesException e) {
+          LOG.debug("Reconstruction could not place targets for decommissioning "
+                  + "container {}, using 1-1 replication.",
+              container.containerID(), e);
+          metrics.incrEcDecommissionReconstructionFallbackNoOpTotal();
         }
         break;
       }

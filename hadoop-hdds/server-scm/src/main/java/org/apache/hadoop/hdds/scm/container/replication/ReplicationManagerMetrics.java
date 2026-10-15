@@ -88,7 +88,7 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       "Number of containers currently in the over replicated queue");
 
   private static final MetricsInfo INFLIGHT_EC_RECONSTRUCTION = Interns.info(
-      "InflightEcReconstructionCommands",
+      "InflightEcReconstruction",
       "Number of active EC reconstruction commands across the cluster.");
 
   private static final MetricsInfo EC_RECONSTRUCTION_GLOBAL_LIMIT = Interns.info(
