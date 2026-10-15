@@ -236,6 +236,49 @@ public class TestDefaultCAServer {
   }
 
   @Test
+  public void testBasicConstraintsAllowedForScmRoleOnly() throws Exception {
+    String scmId = RandomStringUtils.secure().nextAlphabetic(4);
+    String clusterId = RandomStringUtils.secure().nextAlphabetic(4);
+    KeyPair keyPair = new HDDSKeyGenerator(securityConfig).generateKey();
+    PKCS10CertificationRequest caCsr = new CertificateSignRequest.Builder()
+        .setCA(true)
+        .setClusterID(clusterId)
+        .setScmID(scmId)
+        .setSubject("Ozone Cluster")
+        .setConfiguration(securityConfig)
+        .setKey(keyPair)
+        .build()
+        .generateCSR();
+
+    CertificateServer testCA = new DefaultCAServer("testCA",
+        clusterId, scmId, caStore,
+        new DefaultCAProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    testCA.init(securityConfig, CAType.ROOT);
+
+    ExecutionException execution = assertThrows(ExecutionException.class,
+        () -> testCA.requestCertificate(caCsr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM,
+            String.valueOf(System.nanoTime())).get());
+    assertThat(execution.getCause().getMessage()).contains("allowed for the SCM role only, not for OM");
+    assertThat(caStore.getStoredCertificates()).isEmpty();
+
+    X509Certificate scmCert = CertificateCodec.firstCertificateFrom(testCA.requestCertificate(caCsr,
+        CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM, String.valueOf(System.nanoTime())).get());
+    assertThat(scmCert.getBasicConstraints()).isNotEqualTo(-1);
+    assertThat(caStore.getStoredCertificates()).containsExactly(scmCert);
+
+    // A CSR the profile rejects (CA constraint under the non CA profile) is neither signed nor stored.
+    CertificateServer plainCA = new DefaultCAServer("plainCA", clusterId, scmId, caStore, new DefaultProfile(),
+        Paths.get(SCM_CA_CERT_STORAGE_DIR, SCM_CA_PATH).toString());
+    plainCA.init(securityConfig, CAType.ROOT);
+    execution = assertThrows(ExecutionException.class,
+        () -> plainCA.requestCertificate(caCsr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, SCM,
+            String.valueOf(System.nanoTime())).get());
+    assertThat(execution.getCause().getMessage()).contains("Failed to verify the CSR");
+    assertThat(caStore.getStoredCertificates()).containsExactly(scmCert);
+  }
+
+  @Test
   public void testRequestCertificateWithInvalidSubjectFailure() throws Exception {
     KeyPair keyPair =
         new HDDSKeyGenerator(securityConfig).generateKey();

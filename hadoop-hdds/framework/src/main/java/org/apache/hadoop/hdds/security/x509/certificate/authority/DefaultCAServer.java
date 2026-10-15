@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
+import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getPkcs9Extensions;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
+import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.operator.OperatorCreationException;
 import org.bouncycastle.pkcs.PKCS10CertificationRequest;
 import org.slf4j.Logger;
@@ -216,8 +218,15 @@ public class DefaultCAServer implements CertificateServer {
       } catch (Exception e) {
         certPathPromise.completeExceptionally(new SCMSecurityException("Failed to verify the CSR.", e));
       }
+      return certPathPromise;
     }
     try {
+      // The basic constraints extension belongs to SCM sub CA certificates only, whatever the profile allows.
+      if (role != NodeType.SCM && getPkcs9Extensions(csr).getExtension(Extension.basicConstraints) != null) {
+        certPathPromise.completeExceptionally(
+            new SCMSecurityException("Basic constraints extension is allowed for the SCM role only, not for " + role));
+        return certPathPromise;
+      }
       switch (approverType) {
       case MANUAL:
         certPathPromise.completeExceptionally(new SCMSecurityException("Manual approval is not yet implemented."));
