@@ -65,7 +65,7 @@ public class TestOmSCMNodesReconfiguration {
   private String scmServiceId;
   private String scmNodesKey;
   private String initialScmNodes;
-  private final Map<String, String> INITIAL_SCM_ADDRESSES = new HashMap<>();
+  private final Map<String, String> initialScmAddresses = new HashMap<>();
 
   @BeforeAll
   public void init() throws Exception {
@@ -85,7 +85,7 @@ public class TestOmSCMNodesReconfiguration {
     for (StorageContainerManager scm : cluster.getStorageContainerManagers()) {
       String scmAddrKey = ConfUtils.addKeySuffixes(
           OZONE_SCM_ADDRESS_KEY, scmServiceId, scm.getSCMNodeId());
-      INITIAL_SCM_ADDRESSES.put(scmAddrKey, omConf.get(scmAddrKey));
+      initialScmAddresses.put(scmAddrKey, omConf.get(scmAddrKey));
     }
   }
 
@@ -93,7 +93,7 @@ public class TestOmSCMNodesReconfiguration {
   public void resetScmConfiguration() throws ReconfigurationException {
     ReconfigurationHandler handler = cluster.getOzoneManager().getReconfigurationHandler();
 
-    for (Map.Entry<String, String> scmAddress : INITIAL_SCM_ADDRESSES.entrySet()) {
+    for (Map.Entry<String, String> scmAddress : initialScmAddresses.entrySet()) {
       handler.reconfigureProperty(scmAddress.getKey(), scmAddress.getValue());
     }
 
