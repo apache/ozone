@@ -58,7 +58,6 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
@@ -122,6 +121,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
+import org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
@@ -866,10 +866,9 @@ public class KeyValueHandler extends Handler {
         }
       }
       final long numBytes = responseData.getSerializedSize();
+      metrics.incContainerBytesStats(Type.GetBlock, numBytes);
       if (shortCircuitGranted) {
         metrics.incContainerLocalBytesStats(Type.GetBlock, numBytes);
-      } else {
-        metrics.incContainerBytesStats(Type.GetBlock, numBytes);
       }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
@@ -1105,7 +1104,9 @@ public class KeyValueHandler extends Handler {
 
       ChunkBuffer data = null;
       if (dispatcherContext == null) {
-        dispatcherContext = DispatcherContext.getHandleWriteChunk();
+        dispatcherContext = DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_WRITE_CHUNK)
+            .setWriteVersion(ClientCommandsUtils.getWritePipelineVersion(request))
+            .build();
       }
       final boolean isWrite = dispatcherContext.getStage().isWrite();
       if (isWrite) {
@@ -1264,7 +1265,9 @@ public class KeyValueHandler extends Handler {
       ChunkBuffer data = ChunkBuffer.wrap(
           putSmallFileReq.getData().asReadOnlyByteBufferList());
       if (dispatcherContext == null) {
-        dispatcherContext = DispatcherContext.getHandlePutSmallFile();
+        dispatcherContext = DispatcherContext.newBuilder(DispatcherContext.Op.HANDLE_PUT_SMALL_FILE)
+            .setWriteVersion(ClientCommandsUtils.getWritePipelineVersion(request))
+            .build();
       }
 
       BlockID blockID = blockData.getBlockID();
@@ -2347,33 +2350,28 @@ public class KeyValueHandler extends Handler {
           "Requested offset " + readBlock.getOffset() + " is beyond the end of block " + blockID + " with size "
               + blockData.getSize()));
     }
-    if (readBlock.getOffset() < 0 || readBlock.getLength() < 0
-        || responseDataSize < 0 || responseDataSize > OZONE_SCM_CHUNK_MAX_SIZE) {
-      return rejectReadBlock(blockFile, streamObserver, Status.INVALID_ARGUMENT.withDescription(
-          "Invalid ReadBlock range or response size: " + readBlock));
-    }
     final BlockReadCursor cursor = new BlockReadCursor(readBlock.getOffset(), readBlock.getLength(),
         responseDataSize, blockData.getChunks());
-    blockFile.position(cursor.offset());
-    while (cursor.hasRemaining()) {
-      final int readLength = cursor.nextReadLength();
-      final List<ContainerProtos.ChunkInfo> chunks = cursor.chunksForRead(readLength);
+    long bytesRead = 0;
+    while (cursor.hasNext()) {
+      final BlockReadCursor.ReadRange range = cursor.next();
       final ContainerCommandResponseProto response =
-          getReadBlockResponse(request, chunks, ByteString.EMPTY, cursor.offset());
+          getReadBlockResponse(request, range.chunks(), ByteString.EMPTY, range.offset());
       // The observer provides the buffer, so it can have the data read straight into what it sends.
-      final ByteBuffer buffer = streamObserver.allocate(response, readLength);
+      final ByteBuffer buffer = streamObserver.allocate(response, range.length());
+      blockFile.position(range.offset());
       blockFile.read(buffer);
       if (buffer.hasRemaining()) {
-        throw new EOFException("Unexpected end of block " + blockID + " at " + cursor.offset());
+        throw new EOFException("Unexpected end of block " + blockID + " at " + range.offset());
       }
+      bytesRead += range.length();
       buffer.flip();
       if (validateChunkChecksumData) {
-        Checksum.validateChecksums(buffer, cursor.offset(), 0, chunks);
+        Checksum.validateChecksums(buffer, range.offset(), 0, range.chunks());
       }
       streamObserver.onNext(new ReadBlockResponse(response, buffer.asReadOnlyBuffer()));
-      cursor.advance(readLength);
     }
-    return cursor.bytesRead();
+    return bytesRead;
   }
 
   /**

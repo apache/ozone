@@ -214,7 +214,7 @@ public class RatisDataStreamBlockInputStream extends StreamBlockInputStream {
     // closed-container read only when the request names it, see ClosedContainerReadResolver.
     final ContainerCommandRequestProto request =
         ContainerProtocolCalls.buildReadBlockCommandProto(getBlockID(), offset,
-            length, getResponseDataSize(), getToken(), xceiverClient.getPipeline());
+            length, getResponseDataSize(), isVerifyChecksum(), getToken(), xceiverClient.getPipeline());
     final ContainerCommandRequestMessage message =
         ContainerCommandRequestMessage.toMessage(request,
             TracingUtil.exportCurrentSpan());

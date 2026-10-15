@@ -36,6 +36,7 @@ output.xml
 report.html
 
 .dev-tools
+dev-support/ci/__pycache__
 dev-support/ci/bats-assert
 dev-support/ci/bats-support
 

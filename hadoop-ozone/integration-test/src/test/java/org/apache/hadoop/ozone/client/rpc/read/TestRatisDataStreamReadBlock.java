@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -118,7 +117,6 @@ public class TestRatisDataStreamReadBlock {
 
   private static List<RatisDataStreamBlockInputStream> assertRatisStreams(
       KeyInputStream in) {
-    assertTrue(in.isStreamBlockInputStream());
     final List<RatisDataStreamBlockInputStream> streams = new ArrayList<>();
     for (BlockExtendedInputStream stream : in.getPartStreams()) {
       streams.add(assertInstanceOf(RatisDataStreamBlockInputStream.class,

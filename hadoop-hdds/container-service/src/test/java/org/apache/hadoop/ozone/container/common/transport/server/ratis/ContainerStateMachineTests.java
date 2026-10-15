@@ -22,9 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -32,6 +37,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -45,17 +51,21 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.ratis.ContainerCommandRequestMessage;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.keyvalue.impl.KeyValueStreamDataChannel;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientRequest;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.server.DivisionInfo;
 import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterAll;
@@ -65,6 +75,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.InOrder;
 
 /**
  * Test class to ContainerStateMachine class.
@@ -245,6 +256,73 @@ abstract class ContainerStateMachineTests {
     assertInstanceOf(StorageContainerException.class, catcher.getReceived().getCause());
     StorageContainerException sce = (StorageContainerException) catcher.getReceived().getCause();
     assertEquals(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR, sce.getResult());
+  }
+
+  @Test
+  public void testStreamCommandDrainsBuffersBeforePutBlock() throws Exception {
+    final KeyValueStreamDataChannel channel = mock(KeyValueStreamDataChannel.class);
+    final StateMachine.DataStream stream = setUpStream(channel);
+
+    stream.onCommand(newPutBlockCommand(), 0).get();
+
+    final InOrder inOrder = inOrder(channel, dispatcher);
+    inOrder.verify(channel).drainBuffers();
+    inOrder.verify(dispatcher).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
+        argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_COMMAND));
+  }
+
+  @Test
+  public void testStreamCommandNotDispatchedIfDrainFails() throws Exception {
+    final KeyValueStreamDataChannel channel = mock(KeyValueStreamDataChannel.class);
+    doThrow(new IOException("drain failed")).when(channel).drainBuffers();
+    final StateMachine.DataStream stream = setUpStream(channel);
+
+    final ExecutionException e = assertThrows(ExecutionException.class,
+        () -> stream.onCommand(newPutBlockCommand(), 0).get());
+    assertInstanceOf(IOException.class, e.getCause());
+    verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
+  }
+
+  @Test
+  public void testStreamCommandWithUnexpectedDataChannel() throws Exception {
+    final StateMachine.DataStream stream = setUpStream(mock(StateMachine.DataChannel.class));
+
+    final ExecutionException e = assertThrows(ExecutionException.class,
+        () -> stream.onCommand(newPutBlockCommand(), 0).get());
+    assertInstanceOf(IllegalStateException.class, e.getCause());
+    verify(dispatcher, never()).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock), any());
+  }
+
+  private StateMachine.DataStream setUpStream(StateMachine.DataChannel channel) throws Exception {
+    when(dispatcher.dispatch(any(), any())).thenReturn(ContainerProtos.ContainerCommandResponseProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.PutBlock).setResult(ContainerProtos.Result.SUCCESS).build());
+    when(dispatcher.getStreamDataChannel(any(), any())).thenReturn(channel);
+    final ContainerProtos.ContainerCommandRequestProto streamInit = ContainerProtos.ContainerCommandRequestProto
+        .newBuilder()
+        .setCmdType(ContainerProtos.Type.StreamInit)
+        .setWriteChunk(ContainerProtos.WriteChunkRequestProto.newBuilder().setBlockID(newBlockID()).build())
+        .setContainerID(1)
+        .setDatanodeUuid(UUID.randomUUID().toString())
+        .build();
+    final RaftClientRequest request = mock(RaftClientRequest.class);
+    when(request.getMessage()).thenReturn(ContainerCommandRequestMessage.toMessage(streamInit, null));
+    return stateMachine.stream(request).get();
+  }
+
+  private static ByteBuffer newPutBlockCommand() {
+    final ContainerProtos.ContainerCommandRequestProto putBlock = ContainerProtos.ContainerCommandRequestProto
+        .newBuilder()
+        .setCmdType(ContainerProtos.Type.PutBlock)
+        .setPutBlock(ContainerProtos.PutBlockRequestProto.newBuilder()
+            .setBlockData(ContainerProtos.BlockData.newBuilder().setBlockID(newBlockID()).build()))
+        .setContainerID(1)
+        .setDatanodeUuid(UUID.randomUUID().toString())
+        .build();
+    return ContainerCommandRequestMessage.toMessage(putBlock, null).getContent().asReadOnlyByteBuffer();
+  }
+
+  private static ContainerProtos.DatanodeBlockID newBlockID() {
+    return ContainerProtos.DatanodeBlockID.newBuilder().setContainerID(1).setLocalID(1).build();
   }
 
   private void setUpMockDispatcherReturn(boolean failWithException) {

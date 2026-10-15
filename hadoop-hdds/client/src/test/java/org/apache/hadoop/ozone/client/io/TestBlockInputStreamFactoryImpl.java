@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.client.io;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.RATIS_DATASTREAM_READ_BLOCK_SUPPORT;
-import static org.apache.hadoop.hdds.DatanodeVersion.STREAM_BLOCK_SUPPORT;
+import static org.apache.hadoop.hdds.HDDSVersion.RATIS_DATASTREAM_READ_BLOCK_SUPPORT;
+import static org.apache.hadoop.hdds.HDDSVersion.STREAM_BLOCK_SUPPORT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
@@ -96,7 +96,7 @@ public class TestBlockInputStreamFactoryImpl {
     BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
         1024 * 1024 * 10);
     blockInfo.getPipeline().getNodes().forEach(dn -> dn.setCurrentVersion(
-        RATIS_DATASTREAM_READ_BLOCK_SUPPORT.toProtoValue()));
+        RATIS_DATASTREAM_READ_BLOCK_SUPPORT));
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setRatisStreamReadBlock(true);
 
@@ -116,7 +116,7 @@ public class TestBlockInputStreamFactoryImpl {
     DatanodeDetails datanode = DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
         .setCurrentVersion(
-            RATIS_DATASTREAM_READ_BLOCK_SUPPORT.toProtoValue())
+            RATIS_DATASTREAM_READ_BLOCK_SUPPORT)
         .addPort(DatanodeDetails.newRatisPort(0))
         .build();
     BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig,
@@ -141,7 +141,7 @@ public class TestBlockInputStreamFactoryImpl {
     BlockLocationInfo blockInfo = createKeyLocationInfo(repConfig, 3,
         1024 * 1024 * 10);
     blockInfo.getPipeline().getNodes().get(0)
-        .setCurrentVersion(STREAM_BLOCK_SUPPORT.toProtoValue());
+        .setCurrentVersion(STREAM_BLOCK_SUPPORT);
     Pipeline pipeline = Mockito.spy(blockInfo.getPipeline());
     blockInfo.setPipeline(pipeline);
     Mockito.when(pipeline.getReplicaIndex(any(DatanodeDetails.class)))

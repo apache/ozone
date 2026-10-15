@@ -17,15 +17,15 @@
 
 package org.apache.hadoop.ozone.client.io;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.RATIS_DATASTREAM_READ_BLOCK_SUPPORT;
-import static org.apache.hadoop.hdds.DatanodeVersion.STREAM_BLOCK_SUPPORT;
+import static org.apache.hadoop.hdds.HDDSVersion.RATIS_DATASTREAM_READ_BLOCK_SUPPORT;
+import static org.apache.hadoop.hdds.HDDSVersion.STREAM_BLOCK_SUPPORT;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -114,11 +114,11 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
   }
 
   private boolean allDataNodesSupport(Pipeline pipeline,
-      DatanodeVersion requiredVersion) {
+      HDDSVersion requiredVersion) {
     // return true only if all DataNodes in the pipeline are on a version
     // that supports the requested read path.
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (dn.getCurrentVersion() < requiredVersion.toProtoValue()) {
+      if (!requiredVersion.isSupportedBy(dn.getCurrentVersion())) {
         return false;
       }
     }
