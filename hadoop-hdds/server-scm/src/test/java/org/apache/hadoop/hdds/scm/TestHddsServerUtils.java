@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -219,6 +220,25 @@ public class TestHddsServerUtils {
   public void testValidInetsIncludedInCsr() throws UnknownHostException {
     assertThat(HddsServerUtil.isValidInetForCsr(InetAddress.getByName("1.2.3.4"))).isTrue();
     assertThat(HddsServerUtil.isValidInetForCsr(InetAddress.getByName("2001:db8::1"))).isTrue();
+  }
+
+  /**
+   * A network interface reports every IPv6 address with a scope. Only a link-local address keeps it and stays excluded.
+   */
+  @Test
+  public void testScopeDroppedFromRoutableIPv6ForCsr() throws UnknownHostException {
+    InetAddress routable = Inet6Address.getByAddress(null, InetAddress.getByName("2001:db8::1").getAddress(), 1);
+    assertThat(HddsServerUtil.isValidInetForCsr(routable)).isFalse();
+    InetAddress dropped = HddsServerUtil.dropScopeUnlessLinkLocal(routable);
+    assertThat(dropped.getHostAddress()).isEqualTo("2001:db8:0:0:0:0:0:1");
+    assertThat(HddsServerUtil.isValidInetForCsr(dropped)).isTrue();
+
+    InetAddress linkLocal = Inet6Address.getByAddress(null, InetAddress.getByName("fe80::1").getAddress(), 1);
+    assertThat(HddsServerUtil.dropScopeUnlessLinkLocal(linkLocal)).isSameAs(linkLocal);
+    assertThat(HddsServerUtil.isValidInetForCsr(linkLocal)).isFalse();
+
+    InetAddress ipv4 = InetAddress.getByName("1.2.3.4");
+    assertThat(HddsServerUtil.dropScopeUnlessLinkLocal(ipv4)).isSameAs(ipv4);
   }
 
   @Test
