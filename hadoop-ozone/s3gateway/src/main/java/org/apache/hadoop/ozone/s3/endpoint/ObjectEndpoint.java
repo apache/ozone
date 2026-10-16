@@ -320,18 +320,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             output.addPreCommit(checkContentMD5Hook);
           }
 
-          // If sha256Digest exists, this request must validate x-amz-content-sha256
-          MessageDigest sha256Digest = multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH);
-          if (sha256Digest != null) {
-            final String actualSha256 = DatatypeConverter.printHexBinary(
-                sha256Digest.digest()).toLowerCase();
-            CheckedRunnable<IOException> checkSha256Hook = () -> {
-              if (!amzContentSha256Header.equals(actualSha256)) {
-                throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
-              }
-            };
-            output.addPreCommit(checkSha256Hook);
-          }
+          output.checkContentSha256(multiDigestInputStream, amzContentSha256Header);
         }
       }
       getMetrics().incPutKeySuccessLength(putLength);
@@ -1060,6 +1049,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             };
             writeGuard.addPreCommit(checkContentMD5Hook);
           }
+          writeGuard.checkContentSha256(multiDigestInputStream,
+              getHeaders().getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256));
           writeGuard.getMetadata().put(OzoneConsts.ETAG, md5Hash);
           writeGuard.addPreCommit(
               () -> requirePartETag(writeGuard.getMetadata()));
