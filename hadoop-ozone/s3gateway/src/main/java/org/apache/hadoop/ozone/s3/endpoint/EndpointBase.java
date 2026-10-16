@@ -894,7 +894,8 @@ public abstract class EndpointBase {
     if (hasMultiChunksPayload(amzContentSha256Header)) {
       validateMultiChunksUpload(getHeaders(), amzDecodedLength, keyPath);
       if (hasUnsignedPayload(amzContentSha256Header)) {
-        chunkInputStream = new UnsignedChunksInputStream(body);
+        chunkInputStream = new UnsignedChunksInputStream(body, keyPath,
+            TrailerHeader.fromHeader(getHeaders().getHeaderString(X_AMZ_TRAILER), keyPath));
       } else {
         TrailerHeader trailerHeader = STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header)
             ? TrailerHeader.fromHeader(getHeaders().getHeaderString(X_AMZ_TRAILER), keyPath) : TrailerHeader.NONE;
