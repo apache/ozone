@@ -412,7 +412,7 @@ public class TestRpcClient {
   }
 
   @ParameterizedTest
-  @CsvSource({"DEFAULT_VERSION, true", "LOOKUP_FILE_REJECTS_OBS, true", "ZDU, true",
+  @CsvSource({"DEFAULT_VERSION, true", "LOOKUP_FILE_REJECTS_OBS, true", "ZDU, true", "LIST_STATUS_REJECTS_OBS, true",
       "S3_BUCKET_INFO_CONTEXT, false", "UNKNOWN_VERSION, false"})
   public void testS3BucketContext(OzoneManagerVersion omVersion, boolean legacyOm) throws Exception {
     List<OMRequest> requests = new ArrayList<>();
@@ -478,43 +478,33 @@ public class TestRpcClient {
 
   private static RpcClient createS3BucketClient(OzoneManagerVersion omVersion, List<OMRequest> requests,
       InfoBucketResponse bucketResponse, Status status) throws IOException {
-    return new RpcClient(new OzoneConfiguration(), null) {
+    return createRpcClient(new MockOmTransport() {
       @Override
-      protected OmTransport createOmTransport(String omServiceId) {
-        return new MockOmTransport() {
-          @Override
-          public OMResponse submitRequest(OMRequest request) throws IOException {
-            OMResponse.Builder response = OMResponse.newBuilder().setCmdType(request.getCmdType())
-                .setStatus(Status.OK).setSuccess(true);
-            if (request.getCmdType() == Type.ServiceList) {
-              ServiceListResponse.Builder services = ServiceListResponse.newBuilder();
-              for (OzoneManagerVersion version : Arrays.asList(OzoneManagerVersion.SOFTWARE_VERSION, omVersion)) {
-                services.addServiceInfo(om(version).getProtobuf());
-              }
-              return response.setServiceListResponse(services).build();
-            }
-            requests.add(request);
-            if (request.getCmdType() == Type.GetS3VolumeContext) {
-              return response.setGetS3VolumeContextResponse(GetS3VolumeContextResponse.newBuilder()
-                  .setUserPrincipal("principal").setVolumeInfo(OmVolumeArgs.newBuilder()
-                      .setVolume("tenant-volume").setOwnerName("principal").setAdminName("admin").build()
-                      .getProtobuf()))
-                  .build();
-            }
-            if (request.getCmdType() == Type.InfoBucket) {
-              return response.setStatus(status).setSuccess(status == Status.OK)
-                  .setInfoBucketResponse(bucketResponse).build();
-            }
-            return super.submitRequest(request);
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        OMResponse.Builder response = OMResponse.newBuilder().setCmdType(request.getCmdType())
+            .setStatus(Status.OK).setSuccess(true);
+        if (request.getCmdType() == Type.ServiceList) {
+          ServiceListResponse.Builder services = ServiceListResponse.newBuilder();
+          for (OzoneManagerVersion version : Arrays.asList(OzoneManagerVersion.SOFTWARE_VERSION, omVersion)) {
+            services.addServiceInfo(om(version).getProtobuf());
           }
-        };
+          return response.setServiceListResponse(services).build();
+        }
+        requests.add(request);
+        if (request.getCmdType() == Type.GetS3VolumeContext) {
+          return response.setGetS3VolumeContextResponse(GetS3VolumeContextResponse.newBuilder()
+              .setUserPrincipal("principal").setVolumeInfo(OmVolumeArgs.newBuilder()
+                  .setVolume("tenant-volume").setOwnerName("principal").setAdminName("admin").build()
+                  .getProtobuf()))
+              .build();
+        }
+        if (request.getCmdType() == Type.InfoBucket) {
+          return response.setStatus(status).setSuccess(status == Status.OK)
+              .setInfoBucketResponse(bucketResponse).build();
+        }
+        return super.submitRequest(request);
       }
-
-      @Override
-      protected XceiverClientFactory createXceiverClientFactory(ServiceInfoEx serviceInfo) {
-        return new MockXceiverClientFactory();
-      }
-    };
+    });
   }
 
   private static RpcClient createRpcClient() throws IOException {
