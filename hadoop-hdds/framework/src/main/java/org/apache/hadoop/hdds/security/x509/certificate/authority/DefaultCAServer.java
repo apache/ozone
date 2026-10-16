@@ -212,6 +212,11 @@ public class DefaultCAServer implements CertificateServer {
 
     CompletableFuture<Void> csrInspection = approver.inspectCSR(csr);
     CompletableFuture<CertPath> certPathPromise = new CompletableFuture<>();
+    // An inspection that has not completed is not an approval.
+    if (!csrInspection.isDone()) {
+      certPathPromise.completeExceptionally(new SCMSecurityException("CSR inspection did not complete."));
+      return certPathPromise;
+    }
     if (csrInspection.isCompletedExceptionally()) {
       try {
         csrInspection.get();
