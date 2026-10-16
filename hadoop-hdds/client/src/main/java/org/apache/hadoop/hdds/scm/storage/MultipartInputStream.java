@@ -34,7 +34,7 @@ import org.apache.hadoop.fs.FSExceptionMessages;
 public class MultipartInputStream extends ExtendedInputStream {
 
   private final String key;
-  private volatile long length;
+  private long length;
 
   // List of PartInputStream, one for each part of the key
   private final List<? extends PartInputStream> partStreams;
