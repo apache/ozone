@@ -746,6 +746,34 @@ public class TestKeyValueContainer {
   }
 
   @ContainerTestVersionInfo.ContainerTest
+  public void testReservationKeptWhenMarkForCloseFails(ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    createContainer();
+    // Reserve the space as the volume choosing policy does on create.
+    HddsVolume volume = keyValueContainerData.getVolume();
+    volume.incCommittedBytes(keyValueContainerData.getMaxSize());
+
+    // The .container file cannot be updated, so marking for close fails and rolls back to OPEN.
+    File metadataDir = new File(keyValueContainerData.getMetadataPath());
+    assertThat(metadataDir.setWritable(false)).isTrue();
+    try {
+      StorageContainerException ex = assertThrows(StorageContainerException.class,
+          () -> keyValueContainer.markContainerForClose());
+      assertThat(ex.getResult()).isEqualTo(ContainerProtos.Result.CONTAINER_FILES_CREATE_ERROR);
+    } finally {
+      assertThat(metadataDir.setWritable(true)).isTrue();
+    }
+    assertThat(keyValueContainerData.getState()).isEqualTo(ContainerProtos.ContainerDataProto.State.OPEN);
+    assertThat(keyValueContainerData.isCommittedSpace()).isTrue();
+    assertThat(volume.getCommittedBytes()).isEqualTo(keyValueContainerData.getMaxSize());
+
+    // Once the file can be written, marking for close succeeds and releases the space.
+    keyValueContainer.markContainerForClose();
+    assertThat(keyValueContainerData.getState()).isEqualTo(ContainerProtos.ContainerDataProto.State.CLOSING);
+    assertThat(volume.getCommittedBytes()).isZero();
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
   public void testReportOfUnhealthyContainer(
       ContainerTestVersionInfo versionInfo) throws Exception {
     init(versionInfo);

@@ -490,6 +490,7 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
       throws StorageContainerException {
     Preconditions.checkState(hasWriteLock());
     final State oldState = containerData.getState();
+    final boolean committedSpace = containerData.isCommittedSpace();
     try {
       update.run();
       // update the new container data to .container File
@@ -500,6 +501,10 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
         // Failed to update .container file. Reset the state to old state only
         // if the current state is not unhealthy.
         containerData.setState(oldState);
+        // Leaving the old state may have released the reserved space, reserve it again.
+        if (committedSpace && !containerData.isCommittedSpace()) {
+          containerData.commitSpace();
+        }
       }
       throw ex;
     }
