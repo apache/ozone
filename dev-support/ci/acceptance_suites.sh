@@ -24,7 +24,28 @@ SUITES=$(grep --no-filename -r '^#suite:' hadoop-ozone/dist/src/main/compose \
 VERSIONS=$(grep '^old_versions=' hadoop-ozone/dist/src/main/compose/xcompat/lib.sh \
   | cut -f2 -d'"')
 
+MATRIX=$(
+  export SUITES
+  python3 <<'PY'
+import json
+import os
+
+parallel_s3 = {"HA-unsecure", "HA-secure", "secure", "EC"}
+matrix = []
+for suite in os.environ["SUITES"].split():
+    if suite in ("compat-old", "failing"):
+        continue
+    if suite in parallel_s3:
+        matrix.append({"suite": suite, "aws_cli": "aws", "split": f"{suite}-awscli-v1"})
+        matrix.append({"suite": suite, "aws_cli": "aws2", "split": f"{suite}-awscli-v2"})
+    else:
+        matrix.append({"suite": suite, "aws_cli": "", "split": suite})
+print(json.dumps(matrix))
+PY
+)
+
 initialization::ga_output suites \
     "$(initialization::parameters_to_json ${SUITES})"
 initialization::ga_output versions \
     "$(initialization::parameters_to_json ${VERSIONS})"
+initialization::ga_output matrix "${MATRIX}"

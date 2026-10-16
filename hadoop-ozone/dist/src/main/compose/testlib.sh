@@ -308,6 +308,7 @@ execute_robot_test(){
 ## @param        Name of the container in the docker-compose file
 ## @param        robot arguments (same as execute_robot_test, except the test path is always s3)
 ##               If -N PREFIX is given, result names use PREFIX-awscli-v1 and PREFIX-awscli-v2.
+##               When OZONE_AWS_CLI is aws or aws2, only that CLI runs (CI parallel jobs).
 execute_s3_smoketests(){
   local container="$1"
   shift
@@ -331,6 +332,14 @@ execute_s3_smoketests(){
     v2_args=("-N" "s3-awscli-v2" "${v2_args[@]}")
   fi
   local -i rc=0
+  if [[ -n "${OZONE_AWS_CLI:-}" ]]; then
+    if [[ "${OZONE_AWS_CLI}" == "aws2" ]]; then
+      execute_robot_test "$container" -v AWS_CLI:aws2 "${v2_args[@]}" s3 || rc=$?
+    else
+      execute_robot_test "$container" -v AWS_CLI:aws "${v1_args[@]}" s3 || rc=$?
+    fi
+    return ${rc}
+  fi
   execute_robot_test "$container" -v AWS_CLI:aws "${v1_args[@]}" s3 || rc=$?
   execute_robot_test "$container" -v AWS_CLI:aws2 "${v2_args[@]}" s3 || rc=$?
   return ${rc}

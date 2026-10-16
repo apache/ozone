@@ -56,6 +56,7 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
+      acceptance-matrix: ${{ steps.acceptance-suites.outputs.matrix }}
       acceptance-versions: ${{ steps.acceptance-suites.outputs.versions }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       integration-suites: ${{ steps.integration-suites.outputs.suites }}
@@ -321,16 +322,14 @@ jobs:
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: acceptance
-      script-args: ${{ matrix.suite }}
+      script-args: ${{ matrix.aws_cli != '' && format('{0} {1}', matrix.suite, matrix.aws_cli) || matrix.suite }}
       sha: ${{ needs.build-info.outputs.sha }}
-      split: ${{ matrix.suite }}
+      split: ${{ matrix.split }}
       timeout-minutes: 150
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     strategy:
       matrix:
-        suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
-        exclude:
-          - suite: compat-old
+        include: ${{ fromJson(needs.build-info.outputs.acceptance-matrix) }}
       fail-fast: false
 
   # acceptance (compat-old), split by old Ozone version

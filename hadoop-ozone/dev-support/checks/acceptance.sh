@@ -30,6 +30,8 @@ OZONE_ROOT=$(pwd -P)
 if [[ "${OZONE_ACCEPTANCE_SUITE}" == "compat-old" ]]; then
   : ${OZONE_OLD_VERSIONS:="${2:-}"}
   export OZONE_OLD_VERSIONS
+else
+  export OZONE_AWS_CLI="${2:-}"
 fi
 
 source "${DIR}/_lib.sh"
@@ -89,7 +91,7 @@ if [[ "${OZONE_ACCEPTANCE_SUITE}" == "s3a" ]]; then
   fi
 fi
 
-export OZONE_ACCEPTANCE_SUITE OZONE_ACCEPTANCE_TEST_TYPE
+export OZONE_ACCEPTANCE_SUITE OZONE_ACCEPTANCE_TEST_TYPE OZONE_AWS_CLI
 
 cd "$DIST_DIR/compose" || exit 1
 ./test-all.sh 2>&1 | tee "${REPORT_DIR}/output.log"
