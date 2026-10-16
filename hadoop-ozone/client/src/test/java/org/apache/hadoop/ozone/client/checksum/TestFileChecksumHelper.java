@@ -25,7 +25,6 @@ import static org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode.C
 import static org.apache.hadoop.hdds.scm.OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.any;
@@ -381,6 +380,14 @@ public class TestFileChecksumHelper {
 
   @ParameterizedTest
   @EnumSource(names = {"EC", "RATIS"})
+  public void testCompositeCrcSkipsLeadingEmptyBlock(ReplicationType helperType)
+      throws IOException {
+    byte[] a = randomBytes(1000, 6);
+    assertEquals(expectedComposite(a), compositeChecksum(helperType, EMPTY_BLOCK, a));
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"EC", "RATIS"})
   public void testCompositeCrcSkipsEmptyBlockInTheMiddle(ReplicationType helperType)
       throws IOException {
     byte[] a = randomBytes(1000, 4);
@@ -410,7 +417,7 @@ public class TestFileChecksumHelper {
     FakeChecksumComputer computer = new FakeChecksumComputer(
         omKeyInfo(ReplicationType.RATIS, noCachedChecksum, new ArrayList<>()),
         new ArrayList<>(), COMPOSITE_CRC, mockRpcClientForChecksumHelper());
-    assertNotEquals(null, computer.populateCompositeBlockChecksumForDebug(
+    assertNotNull(computer.populateCompositeBlockChecksumForDebug(
         ByteBuffer.allocate(0)));
     assertEquals(0, computer.getBlockChecksumBuf().getLength());
   }

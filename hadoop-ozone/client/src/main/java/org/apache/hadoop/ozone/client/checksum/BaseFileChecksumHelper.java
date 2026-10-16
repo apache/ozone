@@ -388,7 +388,13 @@ public abstract class BaseFileChecksumHelper {
       // blocks never set checksumType.
       return makeEmptyFileChecksum();
     }
-    long blockSizeHint = keyLocationInfos.get(0).getLength();
+    long blockSizeHint = 0;
+    for (OmKeyLocationInfo block : keyLocationInfos) {
+      if (block.getLength() > 0) {
+        blockSizeHint = block.getLength();
+        break;
+      }
+    }
     CrcComposer crcComposer =
         CrcComposer.newCrcComposer(toHadoopChecksumType(), blockSizeHint);
     byte[] blockChecksumBytes = blockChecksumBuf.getData();
