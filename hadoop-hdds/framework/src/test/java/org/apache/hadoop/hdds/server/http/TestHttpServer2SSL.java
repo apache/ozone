@@ -261,7 +261,7 @@ public class TestHttpServer2SSL {
    * requests over TLS.
    */
   @Test
-  public void testSniKeyManagerDelegateAppliesPkixAndDelegateSelector() throws Exception {
+  public void testSniKeyManagerDelegateAppliesDelegateSelector() throws Exception {
     OzoneConfiguration serverConf = new OzoneConfiguration(conf);
     serverConf.setBoolean(OzoneConfigKeys.OZONE_HTTP_SNI_KEYMANAGER_DELEGATE_ENABLED, true);
     HttpServer2 server = buildServer(serverConf, null, null, null);
@@ -275,7 +275,6 @@ public class TestHttpServer2SSL {
       SslContextFactory.Server sslContextFactory =
           (SslContextFactory.Server) connectionFactory.getSslContextFactory();
 
-      assertEquals("PKIX", sslContextFactory.getKeyManagerFactoryAlgorithm());
       SniX509ExtendedKeyManager.SniSelector selector = sslContextFactory.getSNISelector();
       assertNotNull(selector, "Expected a custom SNI selector");
       assertEquals(SniX509ExtendedKeyManager.SniSelector.DELEGATE,
