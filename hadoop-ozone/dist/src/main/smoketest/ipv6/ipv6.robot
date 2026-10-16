@@ -36,7 +36,7 @@ Address Overrides
 
 *** Test Cases ***
 Hosts have no IPv4 address
-    FOR    ${host}    IN    scm1    om1    recon    s3g
+    FOR    ${host}    IN    scm1    om1    recon    s3g    httpfs
         ${rc} =         Run And Return Rc   getent ahostsv4 ${host}
                         Should Not Be Equal As Integers         ${rc}               0
     END
@@ -51,7 +51,7 @@ Datanodes are reachable by IPv6 address
                         Should Contain X Times                  ${output}           Reconfigurable properties    3
 
 HTTP servers listen on IPv6
-    FOR    ${host}    ${port}    IN    scm1    9876    om1    9874    recon    9888    s3g    19878
+    FOR    ${host}    ${port}    IN    scm1    9876    om1    9874    recon    9888    s3g    19878    httpfs    14000
         ${literal} =    IPv6 Literal Of     ${host}
                         Execute             curl -g -sSf -o /dev/null 'http://${literal}:${port}/jmx'
     END

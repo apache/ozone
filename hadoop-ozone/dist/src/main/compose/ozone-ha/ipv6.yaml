@@ -21,6 +21,7 @@
 x-ipv6-config:
   &ipv6-config
   environment:
+    HTTPFS-SITE.XML_httpfs.http.hostname: "::"
     OZONE-SITE.XML_hdds.datanode.client.bind.host: "::"
     OZONE-SITE.XML_hdds.datanode.http-bind-host: "::"
     OZONE-SITE.XML_ozone.om.http-bind-host: "::"

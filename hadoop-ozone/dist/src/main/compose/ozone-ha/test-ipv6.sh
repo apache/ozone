@@ -32,6 +32,12 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 export COMPOSE_FILE=docker-compose.yaml:ipv6.yaml
 
+# JaCoCo reports to the IPv4 docker bridge gateway; that address is unreachable on
+# the IPv6-only compose network and prevents SCM from starting.
+if [[ "${OZONE_WITH_COVERAGE:-false}" == "true" ]]; then
+  export OZONE_OPTS=
+fi
+
 start_docker_env 3
 
 execute_robot_test ${SCM} ipv6
@@ -39,6 +45,8 @@ execute_robot_test ${SCM} ipv6
 execute_robot_test ${SCM} basic/ozone-shell-single.robot
 execute_robot_test ${SCM} -v SCHEME:ofs -v BUCKET_TYPE:bucket -N ozonefs-ofs-bucket ozonefs/ozonefs.robot
 execute_robot_test ${SCM} -v BUCKET:generated -v BUCKET_LAYOUT:OBJECT_STORE -N s3-OBJECT_STORE-generated s3/objectputget.robot
+
+execute_robot_test ${SCM} -v USERNAME:httpfs httpfs
 
 execute_robot_test ${SCM} admincli/datanode.robot
 execute_robot_test ${SCM} admincli/pipeline.robot
