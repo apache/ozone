@@ -52,11 +52,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateK
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles CreateKey request layout version1.
  */
 public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
+
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OMKeyCreateRequestWithFSO.class);
 
   public OMKeyCreateRequestWithFSO(OMRequest omRequest,
       BucketLayout bucketLayout) {
@@ -140,6 +145,13 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
               omMetadataManager.getBucketKey(volumeName, bucketName));
 
+      if (!keyArgs.getIsMultipartKey() && !keyArgs.hasStoragePolicy()) {
+        // preExecute always sets a storage policy, so a missing one means this request
+        // was journaled by an older OM and is being replayed during an upgrade.
+        LOG.warn("Key {} has no StoragePolicy. This is expected only while replaying " +
+            "journals written by an OM without storage policy support.", keyArgs.getKeyName());
+      }
+
       // add all missing parents to dir table
       missingParentInfos = getAllMissingParentDirInfo(
           ozoneManager, keyArgs, bucketInfo, pathInfoFSO, trxnLogIndex);
@@ -175,7 +187,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               .collect(Collectors.toList());
       omFileInfo.appendNewBlocks(newLocationList, false);
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
       long preAllocatedSpace =
           newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
@@ -184,8 +196,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
-      CreateKeyResponse.Builder createKeyResponseBuilder =
-          getResponseBuilderWithDerivedKey(getOmRequest(), ozoneManager, createKeyRequest);
+      CreateKeyResponse.Builder createKeyResponseBuilder = CreateKeyResponse.newBuilder();
       perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       omBucketInfo.incrUsedNamespace(numKeysCreated);
 
@@ -200,6 +211,9 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       OMFileRequest.addDirectoryTableCacheEntries(omMetadataManager,
               volumeId, bucketId, trxnLogIndex,
               missingParentInfos, null);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.

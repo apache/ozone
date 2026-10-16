@@ -108,8 +108,11 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     // To allocate atleast one block passing requested size and scmBlockSize
     // as same value. When allocating block requested size is same as
     // scmBlockSize.
+    final OmBucketInfo bucketInfo = ozoneManager
+        .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
     final List<OmKeyLocationInfo> omKeyLocationInfoList = allocateBlock(repConfig, excludeList,
-        ozoneManager.getScmBlockSize(), keyArgs.getSortDatanodes(), userInfo, ozoneManager);
+        ozoneManager.getScmBlockSize(), keyArgs.getSortDatanodes(), userInfo, ozoneManager,
+        getStoragePolicy(bucketInfo, keyArgs), getAllowFallbackStoragePolicy(bucketInfo));
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =

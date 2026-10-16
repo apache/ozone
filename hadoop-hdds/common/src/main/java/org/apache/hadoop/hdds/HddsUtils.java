@@ -403,7 +403,7 @@ public final class HddsUtils {
         .orElse(conf.getInt(HDDS_DATANODE_CLIENT_PORT_KEY,
             HDDS_DATANODE_CLIENT_PORT_DEFAULT));
 
-    return NetUtils.createSocketAddr(host + ":" + port);
+    return NetUtils.createSocketAddr(getHostPortString(host, port));
   }
 
   /**
@@ -507,7 +507,8 @@ public final class HddsUtils {
    * @param msg container command
    * @return block ID.
    */
-  public static BlockID getBlockID(ContainerCommandRequestProtoOrBuilder msg) {
+  public static BlockID getBlockID(ContainerCommandRequestProtoOrBuilder msg) throws
+      IllegalArgumentException {
     DatanodeBlockID blockID = null;
     switch (msg.getCmdType()) {
     case DeleteBlock:
@@ -561,6 +562,8 @@ public final class HddsUtils {
       }
       break;
     case WriteChunk:
+    case StreamInit:
+    case StreamInitWithPutBlock:
       if (msg.hasWriteChunk()) {
         blockID = msg.getWriteChunk().getBlockID();
       }

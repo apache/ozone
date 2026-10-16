@@ -108,7 +108,8 @@ public final class DispatcherContext {
     APPLY_TRANSACTION,
 
     STREAM_INIT,
-    STREAM_LINK;
+    STREAM_LINK,
+    STREAM_COMMAND;
 
     public boolean readFromTmpFile() {
       return this == READ_STATE_MACHINE_DATA;
@@ -120,6 +121,7 @@ public final class DispatcherContext {
       case WRITE_STATE_MACHINE_DATA:
       case READ_STATE_MACHINE_DATA:
       case STREAM_LINK:
+      case STREAM_COMMAND:
         return false;
       default:
         return true;

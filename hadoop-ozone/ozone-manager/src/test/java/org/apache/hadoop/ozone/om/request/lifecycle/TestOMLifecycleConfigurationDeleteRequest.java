@@ -57,7 +57,7 @@ import org.junit.jupiter.api.Test;
  * Test class for delete Lifecycle configuration request.
  */
 public class TestOMLifecycleConfigurationDeleteRequest extends
-    TestOMLifecycleConfigurationRequest {
+    OMLifecycleConfigurationRequestTestBase {
   @Test
   public void testPreExecute() throws Exception {
     OMRequest omRequest = createDeleteLifecycleConfigurationRequest(

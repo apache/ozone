@@ -25,6 +25,7 @@
   <name>Apache Ozone FileSystem Shaded</name>
 
   <properties>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
     <mdep.analyze.skip>true</mdep.analyze.skip>

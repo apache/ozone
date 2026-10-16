@@ -188,7 +188,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
     if (!badDnsWithReasons.isEmpty()) {
       String badDnSummary = badDnsWithReasons.entrySet().stream()
-          .map(entry -> String.format("DN %s: %s", entry.getKey().getID(), entry.getValue()))
+          .map(entry -> String.format("DN %s: %s", entry.getKey(), entry.getValue()))
           .collect(Collectors.joining("; "));
       LOG.warn("Below DNs reported by Pipeline: {} are either in bad health or un-registered with SCMs. Details: {}",
           pipeline.getId(), badDnSummary);
@@ -289,12 +289,12 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
         NodeStatus status = nodeManager.getNodeStatus(dn);
         if (!status.equals(NodeStatus.inServiceHealthy())) {
           LOG.debug("Pipeline {} is not healthy: DN {} has status - Health: {}, Operational State: {}",
-              pipeline.getId(), dn.getUuidString(), status.getHealth(), status.getOperationalState());
+              pipeline.getId(), dn, status.getHealth(), status.getOperationalState());
           return false;
         }
       } catch (NodeNotFoundException e) {
         LOG.warn("Pipeline {} is not healthy: DN {} not found in node manager",
-            pipeline.getId(), dn.getUuidString());
+            pipeline.getId(), dn);
         return false;
       }
     }

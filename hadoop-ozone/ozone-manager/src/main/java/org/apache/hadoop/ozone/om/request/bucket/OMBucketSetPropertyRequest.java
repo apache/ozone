@@ -79,14 +79,16 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager)
       throws IOException {
+    final OMRequest omRequest = super.preExecute(ozoneManager);
+
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.SetBucketPropertyRequest.Builder
-        setBucketPropertyRequestBuilder = getOmRequest()
+        setBucketPropertyRequestBuilder = omRequest
         .getSetBucketPropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
     BucketArgs bucketArgs =
-        getOmRequest().getSetBucketPropertyRequest().getBucketArgs();
+        omRequest.getSetBucketPropertyRequest().getBucketArgs();
 
     if (bucketArgs.hasBekInfo()) {
       KeyProviderCryptoExtension kmsProvider = ozoneManager.getKmsProvider();
@@ -97,9 +99,8 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       setBucketPropertyRequestBuilder.setBucketArgs(bucketArgsBuilder.build());
     }
 
-    return getOmRequest().toBuilder()
+    return omRequest.toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
-        .setUserInfo(getUserInfo())
         .build();
   }
 
@@ -166,9 +167,20 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
       //Check StoragePolicy to update
       StoragePolicy storagePolicy = omBucketArgs.getStoragePolicy();
+      Boolean unsetStoragePolicy = omBucketArgs.getUnsetStoragePolicy();
+      if (storagePolicy != null && Boolean.TRUE.equals(unsetStoragePolicy)) {
+        throw new OMException("Set storagePolicy and unset storagePolicy cannot "
+            + "be given at the same time",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+      }
       if (storagePolicy != null) {
         bucketInfoBuilder.setStoragePolicy(storagePolicy);
         LOG.debug("Updating bucket storage policy for bucket: {} in volume: {}",
+            bucketName, volumeName);
+      }
+      if (Boolean.TRUE.equals(unsetStoragePolicy)) {
+        bucketInfoBuilder.setStoragePolicy(null);
+        LOG.debug("Unsetting bucket storage policy for bucket: {} in volume: {}",
             bucketName, volumeName);
       }
 
@@ -381,6 +393,30 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             + " Storage support feature finalized yet, but the request contains"
             + " an Erasure Coded replication type. Rejecting the request,"
             + " please finalize the cluster upgrade and then try again.",
+            OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+      }
+    }
+    return req;
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.SetBucketProperty
+  )
+  public static OMRequest disallowSetBucketPropertyWithStoragePolicy(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)) {
+      SetBucketPropertyRequest propReq = req.getSetBucketPropertyRequest();
+      if (propReq.hasBucketArgs()
+          && (propReq.getBucketArgs().hasStoragePolicy()
+          || propReq.getBucketArgs().hasAllowFallbackStoragePolicy()
+          || propReq.getBucketArgs().hasUnsetStoragePolicy())) {
+        throw new OMException("Cluster does not have the bucket storage policy"
+            + " support feature finalized yet, but the request contains storage"
+            + " policy arguments. Rejecting the request, please finalize the"
+            + " cluster upgrade and then try again.",
             OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
       }
     }

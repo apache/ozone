@@ -241,9 +241,9 @@ public class MockNodeManager implements NodeManager {
     SCMNodeStat newStat = new SCMNodeStat();
     long remaining =
         NODES[x % NODES.length].capacity - NODES[x % NODES.length].used;
-    newStat.set(
+    newStat.add(
         (NODES[x % NODES.length].capacity),
-        (NODES[x % NODES.length].used), remaining, 0, 100000, 0);
+        (NODES[x % NODES.length].used), remaining, 0, 100000, 0, StorageType.DEFAULT);
     this.nodeMetricMap.put(datanodeDetails, newStat);
     aggregateStat.add(newStat);
 

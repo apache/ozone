@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Condition;
 import java.util.function.Supplier;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -70,6 +71,9 @@ public class BlockOutputStreamEntry extends OutputStream {
   private final ContainerClientMetrics clientMetrics;
   private final StreamBufferArgs streamBufferArgs;
   private final Supplier<ExecutorService> executorServiceSupplier;
+  // Storage type the block should be written to, derived from the key's storage
+  // tier. Null lets the datanode pick any volume.
+  private final StorageType storageType;
 
   /**
    * An indicator that this BlockOutputStream is created to handoff writes from another faulty BlockOutputStream.
@@ -97,6 +101,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.streamBufferArgs = b.streamBufferArgs;
     this.executorServiceSupplier = b.executorServiceSupplier;
     this.isHandlingRetry = b.forRetry;
+    this.storageType = b.storageType;
   }
 
   @Override
@@ -155,7 +160,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, length, xceiverClientManager,
         pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs,
-        executorServiceSupplier);
+        executorServiceSupplier, storageType);
   }
 
   ContainerClientMetrics getClientMetrics() {
@@ -415,6 +420,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     private StreamBufferArgs streamBufferArgs;
     private Supplier<ExecutorService> executorServiceSupplier;
     private boolean forRetry;
+    private StorageType storageType;
 
     public Pipeline getPipeline() {
       return pipeline;
@@ -482,6 +488,11 @@ public class BlockOutputStreamEntry extends OutputStream {
 
     public Builder setForRetry(boolean forRetry) {
       this.forRetry = forRetry;
+      return this;
+    }
+
+    public Builder setStorageType(StorageType storageType) {
+      this.storageType = storageType;
       return this;
     }
 

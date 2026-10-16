@@ -22,6 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -64,11 +68,13 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
 import org.apache.ozone.erasurecode.rawcoder.RawErasureEncoder;
+import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 /**
  * Real unit test for OzoneECClient.
@@ -602,6 +608,21 @@ public class TestOzoneECClient {
       assertEquals(inSize, is.read(fileContent));
       assertArrayEquals(partialChunk, Arrays.copyOf(fileContent, inSize));
     }
+  }
+
+  @Test
+  public void testEncoderReleasedOnClose() throws IOException {
+    // The ECKeyOutputStream must release its RawErasureEncoder on close so the
+    // encoder's native resources (e.g. ISA-L coder context) are not leaked.
+    RawErasureEncoder spyEncoder = spy(new RSRawErasureCoderFactory()
+        .createEncoder(new ECReplicationConfig(dataBlocks, parityBlocks)));
+    try (MockedStatic<CodecUtil> mocked = mockStatic(CodecUtil.class)) {
+      mocked.when(() -> CodecUtil.createRawEncoderWithFallback(any()))
+          .thenReturn(spyEncoder);
+      // Creates the ECKeyOutputStream (picks up the spy encoder) and closes it.
+      writeIntoECKey(inputChunks, keyName, null);
+    }
+    verify(spyEncoder).release();
   }
 
   @Test

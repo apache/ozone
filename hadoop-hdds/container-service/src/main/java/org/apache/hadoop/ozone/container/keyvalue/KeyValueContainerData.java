@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.yaml.snakeyaml.nodes.Tag;
@@ -287,6 +288,10 @@ public class KeyValueContainerData extends ContainerData {
         .setDataChecksum(getDataChecksum());
     if (getStorageType() != null) {
       builder.setStorageType(StorageTypeUtils.getStorageTypeProto(getStorageType()));
+    }
+    final HddsVolume volume = getVolume();
+    if (volume != null) {
+      builder.setVolumeStorageType(StorageTypeUtils.getStorageTypeProto(volume.getStorageType()));
     }
     return builder.build();
   }

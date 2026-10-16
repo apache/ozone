@@ -21,11 +21,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -61,8 +64,13 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
   private Long expectedDataGeneration = null;
+  // Original S3/list prefix when keyName is empty (root listing). Used for STS
+  // auth to check LIST on this prefix instead of "*".
+  private final String listPrefix;
   private final String expectedETag;
   private final boolean derivedKeyPiggyBacking;
+  // When null, OM resolves the policy from the bucket, then the cluster default.
+  private final StoragePolicy storagePolicy;
 
   private OmKeyArgs(Builder b) {
     super(b);
@@ -84,8 +92,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.listPrefix = b.listPrefix;
     this.expectedETag = b.expectedETag;
     this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
+    this.storagePolicy = b.storagePolicy;
   }
 
   public boolean getIsMultipartKey() {
@@ -168,12 +178,25 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return expectedDataGeneration;
   }
 
+  /**
+   * Original S3/list prefix when keyName is empty (root listing).
+   * Used for STS auth to check LIST on this prefix instead of "*".
+   */
+  public String getListPrefix() {
+    return listPrefix;
+  }
+
   public String getExpectedETag() {
     return expectedETag;
   }
 
   public boolean isDerivedKeyPiggyBacking() {
     return derivedKeyPiggyBacking;
+  }
+
+  @Nullable
+  public StoragePolicy getStoragePolicy() {
+    return storagePolicy;
   }
 
   @Override
@@ -224,6 +247,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     if (expectedETag != null) {
       builder.setExpectedETag(expectedETag);
     }
+    if (storagePolicy != null) {
+      builder.setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy));
+    }
     return builder.build();
   }
 
@@ -249,8 +275,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private boolean forceUpdateContainerCacheFromSCM;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
+    private String listPrefix = null;
     private String expectedETag;
     private boolean derivedKeyPiggyBacking;
+    private StoragePolicy storagePolicy;
 
     public Builder() {
       this(AclListBuilder.empty());
@@ -298,8 +326,10 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.expectedETag = obj.expectedETag;
       this.derivedKeyPiggyBacking = obj.derivedKeyPiggyBacking;
+      this.storagePolicy = obj.storagePolicy;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
+      this.listPrefix = obj.listPrefix;
     }
 
     public Builder setVolumeName(String volume) {
@@ -433,6 +463,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    public Builder setListPrefix(String prefix) {
+      this.listPrefix = prefix;
+      return this;
+    }
+
     public Builder setExpectedETag(String eTag) {
       this.expectedETag = eTag;
       return this;
@@ -440,6 +475,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setDerivedKeyPiggyBacking(boolean derivedKeyPiggyBacking) {
       this.derivedKeyPiggyBacking = derivedKeyPiggyBacking;
+      return this;
+    }
+
+    public Builder setStoragePolicy(StoragePolicy storagePolicy) {
+      this.storagePolicy = storagePolicy;
       return this;
     }
 

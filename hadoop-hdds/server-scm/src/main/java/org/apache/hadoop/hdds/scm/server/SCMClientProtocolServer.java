@@ -52,6 +52,7 @@ import java.util.stream.Stream;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StorageTier;
+import org.apache.hadoop.hdds.client.StorageTypeUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -90,6 +91,7 @@ import org.apache.hadoop.hdds.scm.container.reconciliation.ReconciliationEligibi
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -365,7 +367,7 @@ public class SCMClientProtocolServer implements
       Set<ContainerReplica> replicas = getScm().getContainerManager()
           .getContainerReplicas(ContainerID.valueOf(containerId));
       for (ContainerReplica r : replicas) {
-        results.add(
+        HddsProtos.SCMContainerReplicaProto.Builder builder =
             HddsProtos.SCMContainerReplicaProto.newBuilder()
                 .setContainerID(containerId)
                 .setState(r.getState().toString())
@@ -375,9 +377,14 @@ public class SCMClientProtocolServer implements
                 .setKeyCount(r.getKeyCount())
                 .setSequenceID(r.getSequenceId())
                 .setReplicaIndex(r.getReplicaIndex())
-                .setDataChecksum(r.getDataChecksum())
-                .build()
-        );
+                .setDataChecksum(r.getDataChecksum());
+        if (r.getStorageType() != null) {
+          builder.setStorageType(StorageTypeUtils.getStorageTypeProto(r.getStorageType()));
+        }
+        if (r.getVolumeStorageType() != null) {
+          builder.setVolumeStorageType(StorageTypeUtils.getStorageTypeProto(r.getVolumeStorageType()));
+        }
+        results.add(builder.build());
       }
       AUDIT.logReadSuccess(buildAuditMessageForSuccess(
           SCMAction.GET_CONTAINER_WITH_PIPELINE_BATCH,
@@ -1009,7 +1016,7 @@ public class SCMClientProtocolServer implements
             .orElseThrow(() -> new IOException("Cannot" +
                 " find a new leader to transfer leadership."));
       } else {
-        targetPeerId = RaftPeerId.valueOf(newLeaderId);
+        targetPeerId = resolveTargetPeerId(newLeaderId, group);
       }
       final GrpcTlsConfig tlsConfig =
           createSCMRatisTLSConfig(new SecurityConfig(scm.getConfiguration()),
@@ -1024,6 +1031,27 @@ public class SCMClientProtocolServer implements
     }
     AUDIT.logReadSuccess(buildAuditMessageForSuccess(
             SCMAction.TRANSFER_LEADERSHIP, auditMap));
+  }
+
+  /** Resolves the transfer target, which may be given as an SCM UUID or as a configured SCM node id. */
+  private RaftPeerId resolveTargetPeerId(String newLeaderId, RaftGroup group) {
+    final RaftPeerId peerId = RaftPeerId.valueOf(newLeaderId);
+    if (group.getPeer(peerId) != null) {
+      return peerId;
+    }
+    // Raft peer ids are SCM UUIDs, so a node id only matches through its configured Ratis address.
+    for (SCMNodeDetails node : scm.getSCMHANodeDetails().getAllNodeDetails()) {
+      if (!newLeaderId.equals(node.getNodeId())) {
+        continue;
+      }
+      for (RaftPeer peer : group.getPeers()) {
+        if (node.getRatisHostPortStr().equals(peer.getAddress())) {
+          return peer.getId();
+        }
+      }
+    }
+    // Leave an unmatched id to RatisHelper, which reports the group it did not match.
+    return peerId;
   }
 
   @Deprecated

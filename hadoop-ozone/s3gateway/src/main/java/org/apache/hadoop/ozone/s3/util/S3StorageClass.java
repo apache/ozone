@@ -18,39 +18,65 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import static org.apache.hadoop.hdds.client.OzoneStoragePolicy.COLD;
-import static org.apache.hadoop.hdds.client.OzoneStoragePolicy.HOT;
 import static org.apache.hadoop.hdds.client.OzoneStoragePolicy.WARM;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_GLACIER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_REDUCED_REDUNDANCY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_STORAGE_CLASS_STANDARD_IA;
 
 import java.util.Locale;
-import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
-import org.apache.hadoop.hdds.client.StoragePolicy;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 
 /**
- * Maps S3 storage class values to Ozone StoragePolicy.
+ * The S3 storage class names Ozone supports, each paired with its default
+ * {@link S3StorageClassSpec}.
+ *
+ * <p>This enum is the vocabulary only. The rules for mapping a class to Ozone settings and back are
+ * in {@link S3StorageClassResolver}.
+ *
+ * <p>{@code STANDARD} and {@code REDUCED_REDUNDANCY} have no storage policy here. The policy is set
+ * per deployment through a gateway setting and is unset by default, so writes inherit the bucket's
+ * policy.
  */
 public enum S3StorageClass {
 
-  STANDARD(S3_STORAGE_CLASS_STANDARD, HOT),
-  STANDARD_IA(S3_STORAGE_CLASS_STANDARD_IA, WARM),
-  GLACIER(S3_STORAGE_CLASS_GLACIER, COLD);
+  REDUCED_REDUNDANCY(S3_STORAGE_CLASS_REDUCED_REDUNDANCY, S3StorageClassSpec.newBuilder()
+      .setReplicationType(ReplicationType.RATIS)
+      .setReplicationFactor(ReplicationFactor.ONE)
+      .build()),
+  STANDARD(S3_STORAGE_CLASS_STANDARD, S3StorageClassSpec.newBuilder()
+      .setReplicationType(ReplicationType.RATIS)
+      .setReplicationFactor(ReplicationFactor.THREE)
+      .build()),
+  STANDARD_IA(S3_STORAGE_CLASS_STANDARD_IA, S3StorageClassSpec.newBuilder()
+      .setReplicationType(ReplicationType.EC)
+      .setStoragePolicy(WARM)
+      .build()),
+  GLACIER(S3_STORAGE_CLASS_GLACIER, S3StorageClassSpec.newBuilder()
+      .setReplicationType(ReplicationType.RATIS)
+      .setReplicationFactor(ReplicationFactor.THREE)
+      .setStoragePolicy(COLD)
+      .build());
 
   private final String s3StorageClass;
-  private final StoragePolicy storagePolicy;
+  private final S3StorageClassSpec spec;
 
-  S3StorageClass(String s3StorageClass, StoragePolicy storagePolicy) {
+  S3StorageClass(String s3StorageClass, S3StorageClassSpec spec) {
     this.s3StorageClass = s3StorageClass;
-    this.storagePolicy = storagePolicy;
-  }
-
-  public StoragePolicy getStoragePolicy() {
-    return storagePolicy;
+    this.spec = spec;
   }
 
   public String getS3StorageClass() {
     return s3StorageClass;
+  }
+
+  /**
+   * The class's default spec, before any gateway setting is applied. Use
+   * {@link S3StorageClassResolver#toSpec} to get the spec for a write.
+   */
+  public S3StorageClassSpec getSpec() {
+    return spec;
   }
 
   /**
@@ -70,32 +96,6 @@ public enum S3StorageClass {
     } catch (IllegalArgumentException e) {
       throw new IllegalArgumentException(
           "Not supported s3StorageClass: " + s3StorageClass);
-    }
-  }
-
-  /**
-   * Look up the S3StorageClass matching an Ozone StoragePolicy.
-   *
-   * @param storagePolicy the Ozone StoragePolicy.
-   * @return the matching S3StorageClass.
-   * @throws IllegalArgumentException if the policy is null or does not map to
-   *         a supported storage class.
-   */
-  public static S3StorageClass fromStoragePolicy(StoragePolicy storagePolicy) {
-    if (!(storagePolicy instanceof OzoneStoragePolicy)) {
-      throw new IllegalArgumentException(
-          "Not supported storagePolicy: " + storagePolicy);
-    }
-    switch ((OzoneStoragePolicy) storagePolicy) {
-    case HOT:
-      return STANDARD;
-    case WARM:
-      return STANDARD_IA;
-    case COLD:
-      return GLACIER;
-    default:
-      throw new IllegalArgumentException(
-          "Not supported storagePolicy: " + storagePolicy);
     }
   }
 }

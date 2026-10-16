@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto;
@@ -188,11 +189,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /** Allocate multiple blocks using one rpc to SCM. */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   protected List<OmKeyLocationInfo> allocateBlock(
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, boolean shouldSortDatanodes,
-      UserInfo userInfo, OzoneManager ozoneManager)
+      UserInfo userInfo, OzoneManager ozoneManager,
+      @Nonnull StoragePolicy storagePolicy, boolean allowFallbackStoragePolicy)
       throws IOException {
+    Objects.requireNonNull(storagePolicy, "storagePolicy == null");
     final long scmBlockSize = ozoneManager.getScmBlockSize();
     final KeyManager keyManager = ozoneManager.getKeyManager();
 
@@ -232,10 +236,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
     String remoteUser = getRemoteUser().getShortUserName();
     final List<AllocatedBlock> allocatedBlocks;
     try {
-      // TODO Use the actually passed `allowFallbackStoragePolicy` instead of `true`
       allocatedBlocks = ozoneManager.getScmClient().getBlockClient().allocateBlock(
           scmBlockSize, numBlocks, replicationConfig, ozoneManager.getOMServiceId(), excludeList, scmClientMachine,
-          OzoneStoragePolicy.getDefaultPolicy(), true);
+          storagePolicy, allowFallbackStoragePolicy);
     } catch (IOException ex) {
       ozoneManager.getMetrics().incNumBlockAllocateCallFails();
       if (ex instanceof SCMException) {
@@ -952,13 +955,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Return bucket info for the specified bucket.
+   * Return bucket info for the specified bucket, for read-only use.
    * <p>
    * The returned {@link OmBucketInfo} is the cached instance, returned by
-   * reference. A caller that mutates it (for example quota accounting) before a
-   * point where the request may still fail must first take a
-   * {@link OmBucketInfo#copyObject()} and publish that copy only on success,
-   * otherwise a failed request leaks the mutation into the cache.
+   * reference. Callers that mutate it must use
+   * {@link #getBucketInfoForUpdate(OMMetadataManager, String, String)} instead.
    */
   @Nullable
   public static OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
@@ -969,6 +970,51 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .getCacheValue(new CacheKey<>(bucketKey));
 
     return value != null ? value.getCacheValue() : null;
+  }
+
+  /**
+   * Return a copy of the cached bucket info for callers that mutate it.
+   * <p>
+   * Mutations stay invisible until the caller publishes the copy with
+   * {@code getBucketTable().addCacheEntry(...)}, after all fallible work and
+   * only on the path that persists the response. A caller that publishes must
+   * hold the bucket write lock for the whole read-modify-publish, not just the
+   * publish, or a concurrent writer can be lost. A caller under key path
+   * locking holds only the bucket read lock, so it must not publish.
+   */
+  @Nullable
+  public static OmBucketInfo getBucketInfoForUpdate(OMMetadataManager omMetadataManager,
+      String volume, String bucket) {
+    OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volume, bucket);
+
+    return omBucketInfo != null ? omBucketInfo.copyObject() : null;
+  }
+
+  /**
+   * Resolves the storage policy for a key: the policy explicitly requested on the
+   * key wins, otherwise the bucket's policy, otherwise the cluster default.
+   */
+  @Nonnull
+  protected StoragePolicy getStoragePolicy(OmBucketInfo bucketInfo, KeyArgs keyArgs) {
+    if (keyArgs.hasStoragePolicy()) {
+      return OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy());
+    }
+    if (bucketInfo != null && bucketInfo.getStoragePolicy() != null) {
+      return bucketInfo.getStoragePolicy();
+    }
+    return OzoneStoragePolicy.getDefaultPolicy();
+  }
+
+  /**
+   * Whether SCM may fall back to the policy's fallback tier when the creation tier
+   * has no space. Taken from the bucket; defaults to true when the bucket does not
+   * set it, matching the behaviour before storage policy support.
+   */
+  protected boolean getAllowFallbackStoragePolicy(OmBucketInfo bucketInfo) {
+    if (bucketInfo == null || bucketInfo.getAllowFallbackStoragePolicy() == null) {
+      return true;
+    }
+    return bucketInfo.getAllowFallbackStoragePolicy();
   }
 
   /**
@@ -1044,6 +1090,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
       if (keyArgs.hasExpectedDataGeneration()) {
         builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
       }
+      // The new blocks were allocated with the policy in keyArgs, so record that policy instead
+      // of the one copied from the overwritten key.
+      if (keyArgs.hasStoragePolicy()) {
+        builder.setStoragePolicy(OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()));
+      }
 
       return builder.build();
     }
@@ -1093,6 +1144,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
             .setFile(true);
     if (keyArgs.hasExpectedDataGeneration()) {
       builder.setExpectedDataGeneration(keyArgs.getExpectedDataGeneration());
+    }
+    if (keyArgs.hasStoragePolicy()) {
+      builder.setStoragePolicy(OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()));
     }
     if (omPathInfo instanceof OMFileRequest.OMPathInfoWithFSO) {
       // FileTable metadata format
@@ -1262,7 +1316,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // the referenceKey.
     Map<ContainerBlockID, OmKeyLocationInfo> cbIdSet = referenceKey.getKeyLocationVersions()
         .stream()
-        .flatMap(e -> e.createLocationList().stream())
+        .flatMap(group -> group.getLocationLists().stream())
+        .flatMap(List::stream)
         .collect(Collectors.toMap(omKeyLocationInfo -> omKeyLocationInfo.getBlockID().getContainerBlockID(),
             Function.identity()));
     Map<OmKeyInfo, List<OmKeyLocationInfo>> filteredOutBlocks = new HashMap<>();

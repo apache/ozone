@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
@@ -53,13 +55,13 @@ public class TestCapacityPipelineChoosePolicy {
     // used       0   10    20    30
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.getNodeStat(datanodes.get(0)))
-        .thenReturn(new SCMNodeMetric(100L, 0, 100L, 0, 0, 0));
+        .thenReturn(createSCMNodeMetric(100L, 0, 100L, 0, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(1)))
-        .thenReturn(new SCMNodeMetric(100L, 10L, 90L, 0, 0, 0));
+        .thenReturn(createSCMNodeMetric(100L, 10L, 90L, 0, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(100L, 20L, 80L, 0, 0, 0));
+        .thenReturn(createSCMNodeMetric(100L, 20L, 80L, 0, 0, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(100L, 30L, 70L, 0, 0, 0));
+        .thenReturn(createSCMNodeMetric(100L, 30L, 70L, 0, 0, 0));
 
     PipelineChoosePolicy policy = new CapacityPipelineChoosePolicy().init(mockNodeManager);
 
@@ -103,5 +105,16 @@ public class TestCapacityPipelineChoosePolicy {
     assertThat(selectedCount.get(pipelines.get(3))).isGreaterThan(selectedCount.get(pipelines.get(2)));
     assertThat(selectedCount.get(pipelines.get(2))).isGreaterThan(selectedCount.get(pipelines.get(1)));
     assertThat(selectedCount.get(pipelines.get(1))).isGreaterThan(selectedCount.get(pipelines.get(0)));
+  }
+
+  private static SCMNodeMetric createSCMNodeMetric(long capacity, long used, long remaining,
+      long committed, long freeSpaceToSpare, long reserved) {
+    return new SCMNodeMetric(
+        singletonMap(StorageType.DEFAULT, capacity),
+        singletonMap(StorageType.DEFAULT, used),
+        singletonMap(StorageType.DEFAULT, remaining),
+        singletonMap(StorageType.DEFAULT, committed),
+        singletonMap(StorageType.DEFAULT, freeSpaceToSpare),
+        singletonMap(StorageType.DEFAULT, reserved));
   }
 }

@@ -170,17 +170,17 @@ public class TestBlockDataStreamOutput {
 
   private static Stream<Arguments> streamWriteParameters() {
     return dataLengthParameters().flatMap(dataLength ->
-        Stream.of(true, false).map(putBlockOnCloseEnabled ->
-            Arguments.of(dataLength.get()[0], putBlockOnCloseEnabled)));
+        Stream.of(true, false).map(putBlockWithoutRaft ->
+            Arguments.of(dataLength.get()[0], putBlockWithoutRaft)));
   }
 
   static OzoneClientConfig newClientConfig(ConfigurationSource source,
                                            boolean flushDelay,
-                                           boolean putBlockOnCloseEnabled) {
+                                           boolean putBlockWithoutRaft) {
     OzoneClientConfig clientConfig = source.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.NONE);
     clientConfig.setStreamBufferFlushDelay(flushDelay);
-    clientConfig.setDatastreamPutBlockOnCloseEnabled(putBlockOnCloseEnabled);
+    clientConfig.setDatastreamPutBlockWithoutRaftEnabled(putBlockWithoutRaft);
     return clientConfig;
   }
 
@@ -210,13 +210,13 @@ public class TestBlockDataStreamOutput {
   @ParameterizedTest
   @MethodSource("streamWriteParameters")
   @Flaky("HDDS-12027")
-  public void testStreamWrite(int dataLength, boolean putBlockOnCloseEnabled) throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), false, putBlockOnCloseEnabled);
+  public void testStreamWrite(int dataLength, boolean putBlockWithoutRaft) throws Exception {
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), false, putBlockWithoutRaft);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       testWrite(client, dataLength);
       // Forced container close before stream close relies on async PutBlock recovery;
       // that path is not used when PutBlock is committed only on data stream close.
-      if (!putBlockOnCloseEnabled) {
+      if (!putBlockWithoutRaft) {
         testWriteWithFailure(client, dataLength);
       }
     }
@@ -267,9 +267,9 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testPutBlockAtBoundary(boolean flushDelay, boolean putBlockOnCloseEnabled)
+  public void testPutBlockAtBoundary(boolean flushDelay, boolean putBlockWithoutRaft)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockWithoutRaft);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       int dataLength = 500;
       XceiverClientMetrics metrics =
@@ -287,22 +287,30 @@ public class TestBlockDataStreamOutput {
       key.write(ByteBuffer.wrap(data));
       assertThat(metrics.getPendingContainerOpCountMetrics(ContainerProtos.Type.PutBlock))
           .isLessThanOrEqualTo(pendingPutBlockCount + 1);
+      BlockDataStreamOutputEntry entry =
+          ((KeyDataStreamOutput) key.getByteBufStreamOutput()).getStreamEntries().get(0);
       key.close();
       // Since data length is 500, first putBlock will be at 400 (flush boundary).
-      // Close commits via WriteAsync PutBlock only when putBlockOnClose is disabled.
-      int expectedPutBlocks = putBlockOnCloseEnabled ? 1 : 2;
+      // Close commits via WriteAsync PutBlock only when PutBlock does not go through the data stream.
+      int expectedPutBlocks = putBlockWithoutRaft ? 1 : 2;
       assertEquals(
           metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
           putBlockCount + expectedPutBlocks);
+      if (putBlockWithoutRaft) {
+        // No PutBlock went through Raft, so there is no log index to use as block commit sequence id.
+        assertEquals(0, entry.getBlockID().getBlockCommitSequenceId());
+      } else {
+        assertThat(entry.getBlockID().getBlockCommitSequenceId()).isPositive();
+      }
       validateData(client, keyName, data);
     }
   }
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testMinPacketSize(boolean flushDelay, boolean putBlockOnCloseEnabled)
+  public void testMinPacketSize(boolean flushDelay, boolean putBlockWithoutRaft)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockWithoutRaft);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       String keyName = getKeyName();
       XceiverClientMetrics metrics =
@@ -329,9 +337,9 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testTotalAckDataLength(boolean flushDelay, boolean putBlockOnCloseEnabled)
+  public void testTotalAckDataLength(boolean flushDelay, boolean putBlockWithoutRaft)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockWithoutRaft);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       int dataLength = 400;
       String keyName = getKeyName();
@@ -352,9 +360,9 @@ public class TestBlockDataStreamOutput {
 
   @ParameterizedTest
   @MethodSource("clientParameters")
-  public void testDatanodeVersion(boolean flushDelay, boolean putBlockOnCloseEnabled)
+  public void testDatanodeVersion(boolean flushDelay, boolean putBlockWithoutRaft)
       throws Exception {
-    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockOnCloseEnabled);
+    OzoneClientConfig config = newClientConfig(cluster.getConf(), flushDelay, putBlockWithoutRaft);
     try (OzoneClient client = newClient(cluster.getConf(), config)) {
       // Verify all DNs internally have versions set correctly
       List<HddsDatanodeService> dns = cluster.getHddsDatanodes();

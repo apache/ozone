@@ -4625,6 +4625,53 @@
                 "name": "ozoneAvailable",
                 "type": "uint64",
                 "optional": true
+              },
+              {
+                "id": 9,
+                "name": "storageType",
+                "type": "StorageTypeProto",
+                "optional": true
+              }
+            ]
+          },
+          {
+            "name": "StorageTypeDiskBalancerInfoProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "storageType",
+                "type": "StorageTypeProto",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "currentVolumeDensitySum",
+                "type": "double",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "bytesToMove",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "idealUsage",
+                "type": "double",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "usableVolumeCount",
+                "type": "uint32",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "balanceable",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -4689,6 +4736,12 @@
                 "id": 10,
                 "name": "volumeInfo",
                 "type": "VolumeReportProto",
+                "is_repeated": true
+              },
+              {
+                "id": 11,
+                "name": "storageTypeInfo",
+                "type": "StorageTypeDiskBalancerInfoProto",
                 "is_repeated": true
               }
             ]

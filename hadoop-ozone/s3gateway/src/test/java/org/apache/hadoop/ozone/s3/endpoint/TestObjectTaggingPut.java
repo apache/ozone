@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.createObjectEndpoint;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putTagging;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
@@ -27,15 +28,17 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
@@ -77,6 +80,19 @@ public class TestObjectTaggingPut {
   }
 
   @Test
+  public void testPutTaggingWithoutBucketLookup() throws Exception {
+    OzoneVolume volume = mock(OzoneVolume.class);
+    ClientProtocol protocol = mock(ClientProtocol.class);
+    ObjectEndpoint endpoint = createObjectEndpoint(protocol, volume, BUCKET_NAME);
+
+    putTagging(endpoint, BUCKET_NAME, KEY_NAME, twoTags());
+
+    verify(volume, never()).getBucket(anyString());
+    verify(protocol, never()).getBucketDetails(anyString(), anyString());
+    verify(protocol).putObjectTagging("s3Volume", BUCKET_NAME, KEY_NAME, TAGS);
+  }
+
+  @Test
   public void testPutObjectTaggingWithEmptyBody() {
     assertErrorResponse(MALFORMED_XML, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, ""));
   }
@@ -101,6 +117,14 @@ public class TestObjectTaggingPut {
   }
 
   @Test
+  public void testPutObjectTaggingWithVersionIdIsNotImplemented() throws Exception {
+    objectEndpoint.queryParamsForTest().set(S3Consts.QueryParams.VERSION_ID, "nonexistent");
+
+    assertErrorResponse(NOT_IMPLEMENTED, () -> putTagging(objectEndpoint, BUCKET_NAME, KEY_NAME, twoTags()));
+    assertThat(clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME).getTags()).isEmpty();
+  }
+
+  @Test
   public void testPutObjectTaggingNoKeyFound() {
     assertErrorResponse(NO_SUCH_KEY, () -> putTagging(objectEndpoint, BUCKET_NAME, "nonexistent", twoTags()));
   }
@@ -115,19 +139,20 @@ public class TestObjectTaggingPut {
     OzoneClient mockClient = mock(OzoneClient.class);
     ObjectStore mockObjectStore = mock(ObjectStore.class);
     OzoneVolume mockVolume = mock(OzoneVolume.class);
-    OzoneBucket mockBucket = mock(OzoneBucket.class);
+    ClientProtocol protocol = mock(ClientProtocol.class);
 
     when(mockClient.getObjectStore()).thenReturn(mockObjectStore);
     when(mockObjectStore.getS3Volume()).thenReturn(mockVolume);
-    when(mockObjectStore.getClientProxy()).thenReturn(mock(ClientProtocol.class));
-    when(mockVolume.getBucket("fsoBucket")).thenReturn(mockBucket);
+    when(mockObjectStore.getClientProxy()).thenReturn(protocol);
+    when(mockClient.getProxy()).thenReturn(protocol);
+    when(mockVolume.getName()).thenReturn("s3Volume");
 
     ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(mockClient)
         .build();
 
     doThrow(new OMException("PutObjectTagging is not currently supported for FSO directory",
-        ResultCodes.NOT_SUPPORTED_OPERATION)).when(mockBucket).putObjectTagging("dir/", TAGS);
+        ResultCodes.NOT_SUPPORTED_OPERATION)).when(protocol).putObjectTagging("s3Volume", "fsoBucket", "dir/", TAGS);
 
     assertErrorResponse(NOT_IMPLEMENTED, () -> putTagging(endpoint, "fsoBucket", "dir/", twoTags()));
   }

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.hdds.client.StorageTypeUtils.getStorageTypeProto;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
@@ -284,7 +285,7 @@ public class TestSCMContainerPlacementRackScatter {
           .mapToLong(StorageReportProto::getScmUsed).sum();
       long remaining = di.getStorageReports().stream()
           .mapToLong(StorageReportProto::getRemaining).sum();
-      return new SCMNodeMetric(capacity, used, remaining, 0, remaining, 0);
+      return createSCMNodeMetric(capacity, used, remaining, 0, remaining, 0);
     });
 
     // create placement policy instances
@@ -959,9 +960,9 @@ public class TestSCMContainerPlacementRackScatter {
     conf.setBoolean(OZONE_SCM_CONTAINER_PLACEMENT_RACK_SCATTER_CAPACITY_AWARE_ENABLED, true);
     policy = new SCMContainerPlacementRackScatter(nodeManager, conf, cluster, true, metrics);
     when(nodeManager.getNodeStat(datanodes.get(0)))
-        .thenReturn(new SCMNodeMetric(100L, 10L, 90L, 0L, 0L, 0L));
+        .thenReturn(createSCMNodeMetric(100L, 10L, 90L, 0L, 0L, 0L));
     when(nodeManager.getNodeStat(datanodes.get(1)))
-        .thenReturn(new SCMNodeMetric(100L, 90L, 10L, 0L, 0L, 0L));
+        .thenReturn(createSCMNodeMetric(100L, 90L, 10L, 0L, 0L, 0L));
 
     List<DatanodeDetails> chosen = policy.chooseDatanodes(
         new ArrayList<>(), new ArrayList<>(), null, 1, 0, 0);
@@ -984,5 +985,16 @@ public class TestSCMContainerPlacementRackScatter {
     return (storageType == null
         || getStorageTypeProto(storageType).equals(report.getStorageType()))
         && report.getRemaining() > 1L;
+  }
+
+  private static SCMNodeMetric createSCMNodeMetric(long capacity, long used, long remaining,
+      long committed, long freeSpaceToSpare, long reserved) {
+    return new SCMNodeMetric(
+        singletonMap(StorageType.DEFAULT, capacity),
+        singletonMap(StorageType.DEFAULT, used),
+        singletonMap(StorageType.DEFAULT, remaining),
+        singletonMap(StorageType.DEFAULT, committed),
+        singletonMap(StorageType.DEFAULT, freeSpaceToSpare),
+        singletonMap(StorageType.DEFAULT, reserved));
   }
 }

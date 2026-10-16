@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.junit.jupiter.api.AfterAll;
@@ -61,9 +60,7 @@ public abstract class ClusterForTests<C extends MiniOzoneCluster> {
     raftClientConfig.setRpcWatchRequestTimeout(Duration.ofSeconds(10));
     conf.setFromObject(raftClientConfig);
 
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setStreamBufferFlushDelay(false);
-    conf.setFromObject(clientConfig);
+    conf.setBoolean("ozone.client.stream.buffer.flush.delay", false);
 
     conf.setBoolean(OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);

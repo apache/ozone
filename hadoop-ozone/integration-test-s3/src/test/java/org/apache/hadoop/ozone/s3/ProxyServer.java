@@ -23,14 +23,21 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Locale;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
-import org.eclipse.jetty.proxy.ProxyServlet;
+import org.apache.commons.lang3.StringUtils;
+import org.eclipse.jetty.ee8.proxy.ProxyServlet;
+import org.eclipse.jetty.ee8.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee8.servlet.ServletHolder;
+import org.eclipse.jetty.http.HttpField;
+import org.eclipse.jetty.http.UriCompliance;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +64,15 @@ public class ProxyServer {
     this.host = host;
     this.port = proxyPort;
 
-    server = new Server(proxyPort);
+    // Match the S3 Gateway's lenient URI handling so that object keys
+    // containing "//" or percent-encoded characters are forwarded rather than
+    // rejected with 400 by Jetty 12's default (strict) URI compliance.
+    HttpConfiguration httpConfig = new HttpConfiguration();
+    httpConfig.setUriCompliance(UriCompliance.LEGACY);
+    server = new Server();
+    ServerConnector connector = new ServerConnector(server, new HttpConnectionFactory(httpConfig));
+    connector.setPort(proxyPort);
+    server.addConnector(connector);
     ServletContextHandler context = new ServletContextHandler();
     context.setContextPath("/");
 
@@ -177,10 +192,35 @@ public class ProxyServer {
       super.service(request, response);
     }
 
+    /**
+     * Copies the backend response headers verbatim, as Jetty 12.0 did.
+     * Jetty 12.1's implementation forwards {@code HttpField.getValueList()} joined with ",",
+     * and that list is produced by a QuotedCSV parse which drops optional whitespace and
+     * quoting. A header such as {@code Content-Disposition: attachment; filename="test.txt"}
+     * therefore reaches the client as {@code attachment;filename=test.txt}, so the proxy
+     * rewrites values the S3 Gateway returns correctly.
+     */
+    @Override
+    protected void onServerResponseHeaders(HttpServletRequest clientRequest,
+                                           HttpServletResponse proxyResponse,
+                                           org.eclipse.jetty.client.Response serverResponse) {
+      for (HttpField field : serverResponse.getHeaders()) {
+        String headerName = field.getName();
+        if (HOP_HEADERS.contains(headerName.toLowerCase(Locale.ENGLISH))) {
+          continue;
+        }
+        String headerValue = filterServerResponseHeader(clientRequest, serverResponse, headerName, field.getValue());
+        if (StringUtils.isBlank(headerValue)) {
+          continue;
+        }
+        proxyResponse.addHeader(headerName, headerValue);
+      }
+    }
+
     @Override
     protected void onProxyResponseFailure(HttpServletRequest clientRequest,
                                           HttpServletResponse proxyResponse,
-                                          org.eclipse.jetty.client.api.Response serverResponse,
+                                          org.eclipse.jetty.client.Response serverResponse,
                                           Throwable failure) {
       LOG.error("===  Proxy Response Failure===");
       LOG.error("Client request: {} {}", clientRequest.getMethod(), clientRequest.getRequestURL());

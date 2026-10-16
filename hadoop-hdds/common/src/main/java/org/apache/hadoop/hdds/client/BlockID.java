@@ -19,7 +19,8 @@ package org.apache.hadoop.hdds.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.Objects;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 /**
@@ -34,29 +35,42 @@ public class BlockID {
   // BlockID object.
   private final Integer replicaIndex;
 
+  // Represents storage type of Block on a particular Datanode.
+  // Note this variable in the OM side will be null,
+  // because the OmKeyLocationInfo#getProtobuf Use BlockID#getProtobuf to get Protobuf object,
+  // BlockID#getProtobuf does not set storageType value in Protobuf.
+
+  // Currently for java class BlockID, OM and Datanode share the same java class object,
+  // but the protobuf objects HddsProtos.BlockID and ContainerProtos.DatanodeBlockID are
+  // used for OM and Datanode respectively.
+  private StorageType storageType;
+
   public BlockID(long containerID, long localID) {
-    this(containerID, localID, 0, null);
+    this(containerID, localID, 0, null, null);
   }
 
-  private BlockID(long containerID, long localID, long bcsID, Integer repIndex) {
+  private BlockID(long containerID, long localID, long bcsID, Integer repIndex,
+      StorageType storageType) {
     containerBlockID = new ContainerBlockID(containerID, localID);
     blockCommitSequenceId = bcsID;
     this.replicaIndex = repIndex;
+    this.storageType = storageType;
   }
 
   public BlockID(BlockID blockID) {
     this(blockID.getContainerID(), blockID.getLocalID(), blockID.getBlockCommitSequenceId(),
-        blockID.getReplicaIndex());
+        blockID.getReplicaIndex(), blockID.getStorageType());
   }
 
   public BlockID(ContainerBlockID containerBlockID) {
-    this(containerBlockID, 0, null);
+    this(containerBlockID, 0, null, null);
   }
 
-  private BlockID(ContainerBlockID containerBlockID, long bcsId, Integer repIndex) {
+  private BlockID(ContainerBlockID containerBlockID, long bcsId, Integer repIndex, StorageType storageType) {
     this.containerBlockID = containerBlockID;
     blockCommitSequenceId = bcsId;
     this.replicaIndex = repIndex;
+    this.storageType = storageType;
   }
 
   public long getContainerID() {
@@ -84,6 +98,10 @@ public class BlockID {
     return containerBlockID;
   }
 
+  public StorageType getStorageType() {
+    return storageType;
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder(64);
@@ -94,32 +112,51 @@ public class BlockID {
   public void appendTo(StringBuilder sb) {
     containerBlockID.appendTo(sb);
     sb.append(" bcsId: ").append(blockCommitSequenceId)
-        .append(" replicaIndex: ").append(replicaIndex);
+        .append(" replicaIndex: ").append(replicaIndex)
+        .append(" storageType: ").append(storageType);
   }
 
   @JsonIgnore
-  public ContainerProtos.DatanodeBlockID getDatanodeBlockIDProtobuf() {
-    ContainerProtos.DatanodeBlockID.Builder blockID = getDatanodeBlockIDProtobufBuilder();
-    if (replicaIndex != null) {
-      blockID.setReplicaIndex(replicaIndex);
+  public DatanodeBlockID getDatanodeBlockIDProtobuf() {
+    DatanodeBlockID.Builder blockID = getDatanodeBlockIDProtobufBuilder(replicaIndex);
+    if (storageType != null) {
+      blockID.setStorageTypeID(StorageTypeUtils.getID(storageType));
     }
     return blockID.build();
   }
 
   @JsonIgnore
-  public ContainerProtos.DatanodeBlockID.Builder getDatanodeBlockIDProtobufBuilder() {
-    return ContainerProtos.DatanodeBlockID.newBuilder().
-        setContainerID(containerBlockID.getContainerID())
-        .setLocalID(containerBlockID.getLocalID())
-        .setBlockCommitSequenceId(blockCommitSequenceId);
+  public DatanodeBlockID.Builder getDatanodeBlockIDProtobufBuilder(Integer replicaIdx) {
+    return getDatanodeBlockIDProtobufBuilder(replicaIdx, null);
   }
 
   @JsonIgnore
-  public static BlockID getFromProtobuf(ContainerProtos.DatanodeBlockID blockID) {
+  public DatanodeBlockID.Builder getDatanodeBlockIDProtobufBuilder(Integer replicaIdx, Integer storageTypeId) {
+    final DatanodeBlockID.Builder b = DatanodeBlockID.newBuilder()
+        .setContainerID(containerBlockID.getContainerID())
+        .setLocalID(containerBlockID.getLocalID())
+        .setBlockCommitSequenceId(blockCommitSequenceId);
+    if (replicaIdx != null) {
+      b.setReplicaIndex(replicaIdx);
+    }
+    if (storageTypeId != null) {
+      b.setStorageTypeID(storageTypeId);
+    }
+    return b;
+  }
+
+  @JsonIgnore
+  public static BlockID getFromProtobuf(DatanodeBlockID blockID) throws
+      IllegalArgumentException {
+    StorageType storageType = null;
+    if (blockID.hasStorageTypeID() && blockID.getStorageTypeID() > 0) {
+      storageType = StorageTypeUtils.getStorageTypeFromID(blockID.getStorageTypeID());
+    }
     return new BlockID(blockID.getContainerID(),
         blockID.getLocalID(),
         blockID.getBlockCommitSequenceId(),
-        blockID.hasReplicaIndex() ? blockID.getReplicaIndex() : null);
+        blockID.hasReplicaIndex() ? blockID.getReplicaIndex() : null,
+        storageType);
   }
 
   @JsonIgnore
@@ -133,7 +170,7 @@ public class BlockID {
   public static BlockID getFromProtobuf(HddsProtos.BlockID blockID) {
     return new BlockID(
         ContainerBlockID.getFromProtobuf(blockID.getContainerBlockID()),
-        blockID.getBlockCommitSequenceId(), null);
+        blockID.getBlockCommitSequenceId(), null, null);
   }
 
   @Override

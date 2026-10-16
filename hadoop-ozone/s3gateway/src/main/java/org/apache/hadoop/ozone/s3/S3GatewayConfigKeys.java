@@ -103,6 +103,21 @@ public final class S3GatewayConfigKeys {
   public static final int OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT = 1000;
 
   /**
+   * Storage policy for writes that request the STANDARD storage class: HOT, WARM, or empty to
+   * inherit the bucket's policy. COLD is not allowed, because those writes would then report
+   * GLACIER.
+   */
+  public static final String OZONE_S3G_STORAGE_CLASS_STANDARD_STORAGE_POLICY =
+      "ozone.s3g.storage-class.standard.storage-policy";
+
+  /**
+   * Storage policy for writes that request the REDUCED_REDUNDANCY storage class: HOT, WARM, or
+   * empty to inherit the bucket's policy. COLD is not allowed.
+   */
+  public static final String OZONE_S3G_STORAGE_CLASS_REDUCED_REDUNDANCY_STORAGE_POLICY =
+      "ozone.s3g.storage-class.reduced-redundancy.storage-policy";
+
+  /**
    * Never constructed.
    */
   private S3GatewayConfigKeys() {

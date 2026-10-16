@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.EXPORT_CONTAINER_METADATA_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IMPORT_CONTAINER_METADATA_FAILED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_ARGUMENT;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_READ_METADATA_DB;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
@@ -37,6 +38,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
@@ -208,6 +210,23 @@ public final class BlockUtils {
     } catch (IOException e) {
       throw new StorageContainerException("Failed to parse block data from " +
           "the bytes array.", NO_SUCH_BLOCK);
+    }
+  }
+
+  /**
+   * Verify if request block storage type matches the container storage type.
+   *
+   * @param containerData container data
+   * @param blockID requested block info
+   * @throws StorageContainerException if storage types do not match
+   */
+  public static void verifyStorageType(ContainerData containerData, BlockID blockID)
+      throws StorageContainerException {
+    if (blockID.getStorageType() != null && containerData.getStorageType() != null &&
+        blockID.getStorageType() != containerData.getStorageType()) {
+      throw new StorageContainerException(String.format(
+          "Block storage type %s does not match container storage type %s",
+          blockID.getStorageType(), containerData.getStorageType()), INVALID_ARGUMENT);
     }
   }
 

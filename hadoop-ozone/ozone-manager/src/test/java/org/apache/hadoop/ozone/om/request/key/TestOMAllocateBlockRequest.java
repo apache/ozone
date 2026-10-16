@@ -43,6 +43,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.client.StoragePolicy;
@@ -359,7 +360,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     // requestedSize spans two scmBlockSize blocks on the same pipeline.
     List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
         new ExcludeList(), 2 * scmBlockSize, true,
-        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager,
+        OzoneStoragePolicy.getDefaultPolicy(), true);
 
     // Sorted once for the shared pipeline...
     verify(mockKeyManager, times(1)).sortDatanodesForWrite(any(), eq("1.2.3.4"), any());
@@ -415,7 +417,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         getOmAllocateBlockRequest(createAllocateBlockRequest());
     List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
         new ExcludeList(), 2 * scmBlockSize, true,
-        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager);
+        UserInfo.newBuilder().setRemoteAddress("1.2.3.4").build(), ozoneManager,
+        OzoneStoragePolicy.getDefaultPolicy(), true);
 
     assertEquals(2, locations.size());
     // Each pipeline keeps its own order; the skipped-sort result is not shared.
@@ -457,7 +460,8 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         getOmAllocateBlockRequest(createAllocateBlockRequest());
     List<OmKeyLocationInfo> locations = request.allocateBlock(replicationConfig,
         new ExcludeList(), scmBlockSize, true,
-        UserInfo.newBuilder().setRemoteAddress("").build(), ozoneManager);
+        UserInfo.newBuilder().setRemoteAddress("").build(), ozoneManager,
+        OzoneStoragePolicy.getDefaultPolicy(), true);
 
     assertEquals("", clientMachine.getValue());
     verify(mockKeyManager, never()).sortDatanodesForWrite(any(), anyString(), any());
