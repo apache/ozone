@@ -204,6 +204,45 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
+  public void testUpdateReconOmDBWithUnreadableSnapshot(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+
+    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(dirOmMetadata);
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata);
+    RDBStore activeStore = (RDBStore) reconOMMetadataManager.getStore();
+
+    // A downloaded snapshot that RocksDB cannot open.
+    DBCheckpoint checkpoint = omMetadataManager.getStore().getCheckpoint(true);
+    FileUtils.writeStringToFile(checkpoint.getCheckpointLocation().resolve("CURRENT").toFile(), "MANIFEST-999999\n",
+        UTF_8);
+    ReconUtils reconUtilsMock = getMockReconUtils();
+    when(reconUtilsMock.getReconNodeDetails(any(OzoneConfiguration.class)))
+        .thenReturn(ReconTestUtils.getReconNodeDetails());
+    ReconTaskController reconTaskController = getMockTaskController();
+
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+        new OzoneManagerServiceProviderImpl(configuration,
+            reconOMMetadataManager, reconTaskController, reconUtilsMock, ozoneManagerProtocol,
+            reconContext, getMockTaskStatusUpdaterManager());
+    ozoneManagerServiceProvider.setReconSnapshotProvider(
+        newStubSnapshotProvider(omSnapshotDbParentDir, checkpoint.getCheckpointLocation(), false));
+
+    assertFalse(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
+
+    // The snapshot that failed to open is deleted.
+    String[] snapshots = omSnapshotDbParentDir.list((dir, name) -> name.startsWith(RECON_OM_SNAPSHOT_DB + "_"));
+    assertNotNull(snapshots);
+    assertEquals(0, snapshots.length, String.join(", ", snapshots));
+
+    // The active DB is kept.
+    assertEquals(activeStore, reconOMMetadataManager.getStore());
+    assertFalse(activeStore.isClosed());
+    assertNotNull(reconOMMetadataManager.getVolumeTable().get("/sampleVol"));
+    omMetadataManager.stop();
+    reconOMMetadataManager.stop();
+  }
+
+  @Test
   public void testUpdateReconOmDBWithNewSnapshotSuccess(
       @TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
 
