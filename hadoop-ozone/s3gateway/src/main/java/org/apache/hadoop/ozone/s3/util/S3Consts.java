@@ -148,6 +148,12 @@ public final class S3Consts {
   // Maximum number of parts returned in one GetObjectAttributes response.
   public static final int GET_OBJECT_ATTRIBUTES_MAX_PARTS_LIMIT = 1000;
 
+  // S3 storage class values passed via the `x-amz-storage-class` request header.
+  public static final String S3_STORAGE_CLASS_REDUCED_REDUNDANCY = "REDUCED_REDUNDANCY";
+  public static final String S3_STORAGE_CLASS_STANDARD = "STANDARD";
+  public static final String S3_STORAGE_CLASS_STANDARD_IA = "STANDARD_IA";
+  public static final String S3_STORAGE_CLASS_GLACIER = "GLACIER";
+
   //Never Constructed
   private S3Consts() {
 

@@ -2102,6 +2102,29 @@
   </property>
 
   <property>
+    <name>ozone.s3g.storage-class.standard.storage-policy</name>
+    <value></value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      Storage policy for writes that request the STANDARD S3 storage class.
+      HOT or WARM. Leave empty to inherit the bucket's storage policy, or the
+      cluster default if the bucket has none. COLD is not allowed, because
+      those writes would then report the GLACIER storage class.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.s3g.storage-class.reduced-redundancy.storage-policy</name>
+    <value></value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      Storage policy for writes that request the REDUCED_REDUNDANCY S3 storage
+      class. HOT or WARM. Leave empty to inherit the bucket's storage policy,
+      or the cluster default if the bucket has none. COLD is not allowed.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.s3g.secret.http.enabled</name>
     <value>false</value>
     <tag>OZONE, S3GATEWAY</tag>
