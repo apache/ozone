@@ -78,8 +78,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final String name = "stream" + STREAM_ID.getAndIncrement();
   private final BlockID blockID;
   private long blockLength;
-  // The block is under construction, so its length is fetched from the datanode before the first access.
-  private boolean underConstruction;
+  // The block is under construction, so its length from OM may be stale; fetch it from the datanode once.
+  private boolean needUpdateBlockLength;
   private final int responseDataSize;
   private final long preReadSize;
   private final Duration readTimeout;
@@ -119,7 +119,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       OzoneClientConfig config) throws IOException {
     this.blockID = blockInfo.getBlockID();
     this.blockLength = blockInfo.getLength();
-    this.underConstruction = blockInfo.isUnderConstruction();
+    this.needUpdateBlockLength = blockInfo.isUnderConstruction();
     pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
@@ -451,12 +451,12 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
    * since the length from OM may be stale (e.g. the last block of an hsync-ed file).
    */
   public synchronized void updateBlockLength() throws IOException {
-    while (underConstruction) {
+    while (needUpdateBlockLength) {
       try {
         acquireClient();
         blockLength = ContainerProtocolCalls.getBlock(xceiverClient, blockID, tokenRef.get(), pipelineRef.get())
             .getBlockData().getSize();
-        underConstruction = false;
+        needUpdateBlockLength = false;
         retries = 0;
         LOG.debug("{}: Updated block length to {} for block {}", name, blockLength, blockID);
       } catch (IOException ioe) {

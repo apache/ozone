@@ -34,7 +34,7 @@ import org.apache.hadoop.fs.FSExceptionMessages;
 public class MultipartInputStream extends ExtendedInputStream {
 
   private final String key;
-  private long length;
+  private volatile long length;
 
   // List of PartInputStream, one for each part of the key
   private final List<? extends PartInputStream> partStreams;
@@ -56,7 +56,7 @@ public class MultipartInputStream extends ExtendedInputStream {
   // can be reset if a new position is seeked.
   private int prevPartIndex;
 
-  private boolean initialized = false;
+  private volatile boolean initialized = false;
 
   public MultipartInputStream(String keyName,
                               List<? extends PartInputStream> inputStreams) {
@@ -184,6 +184,10 @@ public class MultipartInputStream extends ExtendedInputStream {
     checkOpen();
     if (!buffer.hasRemaining()) {
       return 0;
+    }
+    if (!initialized) {
+      // Update the key length, e.g. for the under-construction last block of an hsync-ed key.
+      initialize();
     }
     long pos = position;
     int bytesRead = 0;
