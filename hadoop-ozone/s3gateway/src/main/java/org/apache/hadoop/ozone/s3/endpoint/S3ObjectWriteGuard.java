@@ -130,7 +130,7 @@ class S3ObjectWriteGuard implements AutoCloseable {
     return writtenLength;
   }
 
-  private static void verifyChunksComplete(InputStream body) throws IOException {
+  static void verifyChunksComplete(InputStream body) throws IOException {
     InputStream chunks = body instanceof MultiDigestInputStream
         ? ((MultiDigestInputStream) body).getWrappedStream() : body;
     if (chunks instanceof SignedChunksInputStream) {

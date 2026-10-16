@@ -140,7 +140,7 @@ public class TestUploadWithStream {
   public void testUploadWithValidSignedTrailer() throws Exception {
     OzoneBucket bucket = configureSignedChunksWithTrailer(S3_COPY_EXISTING_KEY_CONTENT.length());
     String body = signedChunkedBodyWithTrailer(
-        S3_COPY_EXISTING_KEY_CONTENT, "x-amz-checksum-crc32c", "sOO8/Q==");
+        S3_COPY_EXISTING_KEY_CONTENT, "x-amz-checksum-crc32c", "toGW0A==");
 
     assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, body));
 

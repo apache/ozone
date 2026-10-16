@@ -286,9 +286,8 @@ class TestObjectPut {
   void testPutObjectWithValidSignedChunksAndTrailer(String content) throws Exception {
     configureSignedChunksWithTrailer(content.length());
 
-    // The trailer value is covered by the HMAC; checksum calculation is outside this test.
     assertSucceeds(() -> putObject(signedChunkedBodyWithTrailer(
-        content, "x-amz-checksum-crc32c", "sOO8/Q==")));
+        content, "x-amz-checksum-crc32c", content.isEmpty() ? "AAAAAA==" : "KAwGng==")));
 
     assertThat(assertKeyContent(bucket, KEY_NAME, content).getDataSize()).isEqualTo(content.length());
   }
@@ -1054,12 +1053,18 @@ class TestObjectPut {
     assertThat(key.isFile()).as("directory").isFalse();
   }
 
-  @Test
-  void testDirectoryCreationWithUnsignedTrailer() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDirectoryCreationWithTrailer(boolean signed) throws Exception {
     configureUnsignedTrailer(0, false);
+    if (signed) {
+      configureSignedChunksWithTrailer(0);
+    }
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+    String body = signed ? signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32", "AAAAAA==")
+        : "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n";
 
-    assertSucceeds(() -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/",
-        "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n"));
+    assertSucceeds(() -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/", body));
     assertThat(fsoBucket.getKey("dir/").isFile()).isFalse();
   }
 
@@ -1226,6 +1231,75 @@ class TestObjectPut {
     assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT,
         () -> putObject("0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n"));
     assertKeyWasNotCommitted();
+  }
+
+  static Stream<Arguments> checksumTrailers() {
+    // Independent checksums of "123456789", computed with AWS CRT and Python hashlib.
+    return Stream.of(
+        Arguments.of("crc32", "y/Q5Jg=="),
+        Arguments.of("crc32c", "4waSgw=="),
+        Arguments.of("crc64nvme", "rosUhgp5mIg="),
+        Arguments.of("sha1", "98O8HYCOBHMq32eZZczDTKeuNEE="),
+        Arguments.of("sha256", "FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="))
+        .flatMap(args -> Stream.of(false, true).flatMap(signed -> Stream.of(false, true)
+            .map(datastream -> Arguments.of(args.get()[0], args.get()[1], signed, datastream))));
+  }
+
+  @ParameterizedTest
+  @MethodSource("checksumTrailers")
+  void testPutObjectRejectsWrongTrailerChecksum(String algorithm, String checksum, boolean signed, boolean datastream)
+      throws Exception {
+    String header = "x-amz-checksum-" + algorithm;
+    configureUnsignedTrailer(CONTENT.length(), datastream);
+    if (signed) {
+      configureSignedChunksWithTrailer(CONTENT.length());
+    }
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn(header);
+    String body = signed ? signedChunkedBodyWithTrailer(CONTENT, header, checksum)
+        : "a\r\n" + CONTENT + "\r\n0\r\n" + header + ":" + checksum + "\r\n\r\n";
+
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> putObject(body));
+    assertKeyWasNotCommitted();
+
+    // A valid upload still succeeds, and a rejected overwrite preserves it.
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("9");
+    String validBody = signed ? signedChunkedBodyWithTrailer("123456789", header, checksum)
+        : "9\r\n123456789\r\n0\r\n" + header + ":" + checksum + "\r\n\r\n";
+    assertSucceeds(() -> putObject(validBody));
+    assertKeyContent(bucket, KEY_NAME, "123456789");
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(CONTENT.length()));
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> putObject(body));
+    assertKeyContent(bucket, KEY_NAME, "123456789");
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testPutEmptyObjectRejectsWrongTrailerChecksum(boolean signed) {
+    configureUnsignedTrailer(0, false);
+    if (signed) {
+      configureSignedChunksWithTrailer(0);
+    }
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+    String body = signed ? signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32", "y/Q5Jg==")
+        : "0\r\nx-amz-checksum-crc32:y/Q5Jg==\r\n\r\n";
+
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> putObject(body));
+    assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDirectoryCreationRejectsWrongTrailerChecksum(boolean signed) {
+    configureUnsignedTrailer(0, false);
+    if (signed) {
+      configureSignedChunksWithTrailer(0);
+    }
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+    String body = signed ? signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32", "y/Q5Jg==")
+        : "0\r\nx-amz-checksum-crc32:y/Q5Jg==\r\n\r\n";
+
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/", body));
+    assertThatThrownBy(() -> fsoBucket.getKey("dir/")).isInstanceOf(IOException.class);
   }
 
   private void configureUnsignedTrailer(long decodedLength, boolean datastream) {
