@@ -39,19 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Ratis data-stream {@link org.apache.ratis.statemachine.StateMachine.DataChannel}
- * for file-per-block key-value containers: stream bytes are written to the block chunk file.
- * <p>
- * On stream close the client may append a serialized PutBlock request followed by its length
- * (4 bytes); see {@link BlockDataStreamOutput#executePutBlockClose}. Whether that PutBlock is
- * applied depends on stream init:
- * <ul>
- *   <li>{@code StreamInitWithPutBlock}: the {@code putBlock} callback commits PutBlock via
- *       {@code STREAM_LINK} (no separate Raft log entry). {@link #drainBuffers()} must run
- *       before mid-stream PutBlock commands so buffered data is on disk first.</li>
- *   <li>{@code StreamInit}: {@code putBlock} is null; trailing PutBlock bytes are ignored
- *       (HDDS-12007) and PutBlock is committed by the client through the usual Raft write path.</li>
- * </ul>
+ * This class is used to get the DataChannel for streaming.
  */
 public class KeyValueStreamDataChannel extends StreamDataChannelBase {
   static final Logger LOG = LoggerFactory.getLogger(KeyValueStreamDataChannel.class);
