@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -55,6 +56,7 @@ import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.RatisTestHelper;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -219,10 +221,21 @@ public class TestFailureHandlingByClient {
           cluster.getStorageContainerManager().getPipelineManager()
               .getPipeline(container.getPipelineID());
       List<DatanodeDetails> datanodes = pipeline.getNodes();
-      cluster.shutdownHddsDatanode(datanodes.get(0));
-      cluster.shutdownHddsDatanode(datanodes.get(1));
-      restartDataNodes.add(datanodes.get(0));
-      restartDataNodes.add(datanodes.get(1));
+      // Keep the Ratis leader running. It has every entry the client counted as committed, while a lagging
+      // follower may not have the block at all, and the data must stay readable from the surviving replica.
+      DatanodeDetails leader = null;
+      for (DatanodeDetails dn : datanodes) {
+        if (RatisTestHelper.isRatisLeader(cluster.getHddsDatanode(dn), pipeline)) {
+          leader = dn;
+        }
+      }
+      assertNotNull(leader, "No Ratis leader found in pipeline " + pipeline.getId());
+      for (DatanodeDetails dn : datanodes) {
+        if (!dn.equals(leader)) {
+          cluster.shutdownHddsDatanode(dn);
+          restartDataNodes.add(dn);
+        }
+      }
       // The write will fail but exception will be handled and length will be
       // updated correctly in OzoneManager once the steam is closed
     }
@@ -286,7 +299,7 @@ public class TestFailureHandlingByClient {
       block2ExpectedChunkCount = 2;
     }
 
-    // For the first block, first 2 DNs in the pipeline are shutdown (to
+    // For the first block, the 2 follower DNs in the pipeline are shutdown (to
     // simulate a failure). It should have 1 or 2 chunks (depending on
     // whether the DN CommitWatcher successfully acknowledged the 2nd chunk
     // write or not). The 3rd chunk would not exist on the first pipeline as
