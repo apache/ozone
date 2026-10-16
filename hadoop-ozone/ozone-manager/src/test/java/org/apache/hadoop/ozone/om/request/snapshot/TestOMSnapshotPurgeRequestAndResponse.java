@@ -108,7 +108,9 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
     return purgeSnapshots;
   }
 
-  // Marks snapshots SNAPSHOT_DELETED and bumps NumSnapshotDeleted, as a successful snapshot delete would.
+  /**
+   * Marks snapshots SNAPSHOT_DELETED and increments NumSnapshotDeleted for each.
+   */
   private void markSnapshotsDeleted(List<String> snapshotKeys) throws IOException {
     Table<String, SnapshotInfo> snapshotInfoTable = getOmMetadataManager().getSnapshotInfoTable();
     for (String snapshotKey : snapshotKeys) {
@@ -308,7 +310,7 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
 
   @Test
   public void testNumSnapshotDeletedUnchangedOnPartialPurgeFailure() throws Exception {
-    // Chain is s1 -> s2. Purging s2 first touches only s2, so s2 is fully purged in cache before get(s1) throws.
+    // Purge s2 (latest) first so it completes before get(s1) throws.
     List<String> snapshotKeys = createSnapshots(2);
     markSnapshotsDeleted(snapshotKeys);
     assertEquals(2, getOmMetrics().getNumSnapshotDeleted());
@@ -324,7 +326,7 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
         omSnapshotPurgeRequest.validateAndUpdateCache(getOzoneManager(), 200L);
 
     assertEquals(INTERNAL_ERROR, omSnapshotPurgeResponse.getOMResponse().getStatus());
-    // s2 was removed from cache before the fault, so a per-snapshot decrement inside the loop would have fired.
+    // s2 was purged before the fault.
     assertNull(snapshotInfoTable.get(snapshotKeys.get(1)));
     assertEquals(2, getOmMetrics().getNumSnapshotDeleted());
   }
