@@ -66,6 +66,9 @@ describe('Namespace Usage page (Disk Usage)', () => {
   const rootUsageRequestCount = () =>
     usagePathsRequested.filter((path) => path === '/').length;
 
+  // Give any request fired on render/click a chance to reach the mock server before asserting none was sent.
+  const flushPendingRequests = () => new Promise((resolve) => setTimeout(resolve, 50));
+
   const confirmRootLoad = async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Load usage' }));
     expect(screen.getByText('Confirm Root Path Usage Load')).toBeInTheDocument();
@@ -85,6 +88,12 @@ describe('Namespace Usage page (Disk Usage)', () => {
       expect(entityTypeRow).toHaveTextContent(entityType);
     });
     return metadataTable;
+  };
+
+  const metadataValueCell = (table: HTMLElement, propertyLabel: string) => {
+    const row = within(table).getByText(propertyLabel).closest('tr');
+    expect(row).not.toBeNull();
+    return row!.querySelectorAll('td')[1];
   };
 
   const clickBreadcrumbSubmenuItem = async (label: string) => {
@@ -109,6 +118,8 @@ describe('Namespace Usage page (Disk Usage)', () => {
 
     expect(screen.getByText('Namespace Usage')).toBeInTheDocument();
     expect(screen.getByText(/Root path usage is not loaded by default/i)).toBeInTheDocument();
+
+    await flushPendingRequests();
     expect(usagePathsRequested).toEqual([]);
 
     await confirmRootLoad();
@@ -122,9 +133,7 @@ describe('Namespace Usage page (Disk Usage)', () => {
     });
 
     const metadataTable = await waitForMetadataEntityType('ROOT');
-
-    const volumesRow = within(metadataTable).getByText('Volumes').closest('tr');
-    expect(volumesRow).toHaveTextContent('2');
+    expect(metadataValueCell(metadataTable, 'Volumes')).toHaveTextContent(/^2$/);
   });
 
   test('navigates to a child path via breadcrumb submenu', async () => {
@@ -142,8 +151,7 @@ describe('Namespace Usage page (Disk Usage)', () => {
     expect(nameRow).toHaveTextContent('vol1');
     const volumeNameRow = within(metadataTable).getByText('Volume Name').closest('tr');
     expect(volumeNameRow).toHaveTextContent('vol1');
-    const bucketsRow = within(metadataTable).getByText('Buckets').closest('tr');
-    expect(bucketsRow).toHaveTextContent('1');
+    expect(metadataValueCell(metadataTable, 'Buckets')).toHaveTextContent(/^1$/);
   });
 
   test('navigates to a key path via breadcrumb search', async () => {
@@ -164,7 +172,29 @@ describe('Namespace Usage page (Disk Usage)', () => {
     expect(fileSizeRow).toHaveTextContent('2.93 KB');
   });
 
-  test('shows error when API returns PATH_NOT_FOUND', async () => {
+  test('prompts before reloading root from home and cancel does not refetch root usage', async () => {
+    render(<NamespaceUsage />);
+    await confirmRootLoad();
+    await clickBreadcrumbSubmenuItem('vol1');
+    await waitForMetadataEntityType('VOLUME');
+
+    const usagePathsBeforeHome = [...usagePathsRequested];
+    const rootUsageBeforeHome = rootUsageRequestCount();
+
+    await userEvent.click(
+      document.querySelector('#breadcrumb-container .anticon-home') as HTMLElement
+    );
+    expect(screen.getByText('Confirm Root Path Usage Load')).toBeInTheDocument();
+
+    const modal = document.querySelector('.ant-modal') as HTMLElement;
+    await userEvent.click(within(modal).getByRole('button', { name: /cancel/i }));
+
+    await flushPendingRequests();
+    expect(rootUsageRequestCount()).toBe(rootUsageBeforeHome);
+    expect(usagePathsRequested).toEqual(usagePathsBeforeHome);
+  });
+
+  test('shows error and clears metadata when path is not found', async () => {
     render(<NamespaceUsage />);
     await confirmRootLoad();
     const metadataTable = await waitForMetadataEntityType('ROOT');
@@ -172,13 +202,9 @@ describe('Namespace Usage page (Disk Usage)', () => {
 
     await searchPathFromBreadcrumb('missing');
 
-    await waitFor(() => {
-      const invalidPathCalls = vi.mocked(commonUtils.showDataFetchError).mock.calls.filter(
-        (call) => call[0] === 'Invalid Path: /missing'
-      );
-      expect(invalidPathCalls).toHaveLength(2);
-    });
-
+    await waitFor(() =>
+      expect(commonUtils.showDataFetchError).toHaveBeenCalledWith('Invalid Path: /missing')
+    );
     await waitFor(() => {
       const table = screen.getByRole('table');
       expect(within(table).queryByText('Entity Type')).not.toBeInTheDocument();
@@ -189,7 +215,11 @@ describe('Namespace Usage page (Disk Usage)', () => {
   test('notifies when namespace summary is still initializing', async () => {
     namespaceUsageServer.use(
       http.get('/api/v1/namespace/usage', () =>
-        HttpResponse.json(mockResponses.InitializingUsage))
+        HttpResponse.json(mockResponses.InitializingUsage)),
+      http.get('/api/v1/namespace/summary', () =>
+        HttpResponse.json(mockResponses.InitializingSummaryResponse)),
+      http.get('/api/v1/namespace/quota', () =>
+        HttpResponse.json(mockResponses.InitializingQuotaResponse))
     );
 
     render(<NamespaceUsage />);

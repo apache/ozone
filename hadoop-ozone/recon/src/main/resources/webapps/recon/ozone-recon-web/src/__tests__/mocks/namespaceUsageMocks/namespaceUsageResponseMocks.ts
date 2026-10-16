@@ -75,6 +75,11 @@ export const PathNotFoundUsage: NUResponse = {
   subPaths: []
 };
 
+export const pathNotFoundUsage = (path: string): NUResponse => ({
+  ...PathNotFoundUsage,
+  path
+});
+
 export const InitializingUsage: NUResponse = {
   status: 'INITIALIZING',
   path: '/',
@@ -83,6 +88,23 @@ export const InitializingUsage: NUResponse = {
   subPathCount: 0,
   sizeDirectKey: 0,
   subPaths: []
+};
+
+export const InitializingSummaryResponse = {
+  status: 'INITIALIZING',
+  path: '/',
+  type: 'ROOT',
+  countStats: {
+    numVolume: 0,
+    numBucket: 0,
+    numDir: 0,
+    numKey: 0
+  },
+  objectInfo: {}
+};
+
+export const InitializingQuotaResponse = {
+  status: 'INITIALIZING'
 };
 
 export const RootSummaryResponse = {
@@ -157,7 +179,9 @@ export const Key1SummaryResponse = {
 };
 
 export const RootQuotaResponse = {
-  status: 'TYPE_NOT_APPLICABLE'
+  status: 'OK',
+  allowed: 10000,
+  used: 10000
 };
 
 export const Vol1QuotaResponse = {
@@ -170,6 +194,10 @@ export const Bucket1QuotaResponse = {
   status: 'OK',
   allowed: 1073741824,
   used: 6000
+};
+
+export const Key1QuotaResponse = {
+  status: 'TYPE_NOT_APPLICABLE'
 };
 
 export const PathNotFoundSummaryResponse = {
@@ -188,3 +216,8 @@ export const PathNotFoundSummaryResponse = {
 export const PathNotFoundQuotaResponse = {
   status: 'PATH_NOT_FOUND'
 };
+
+export const pathNotFoundSummary = (path: string) => ({
+  ...PathNotFoundSummaryResponse,
+  path
+});

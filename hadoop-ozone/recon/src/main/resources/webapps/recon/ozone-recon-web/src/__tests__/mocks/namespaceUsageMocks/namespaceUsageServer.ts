@@ -45,7 +45,10 @@ const usageHandler = http.get('/api/v1/namespace/usage', ({ request }) => {
   if (path === '/vol1') {
     return HttpResponse.json(mockResponses.Vol1NamespaceUsage);
   }
-  return HttpResponse.json(mockResponses.RootNamespaceUsage);
+  if (path === '/') {
+    return HttpResponse.json(mockResponses.RootNamespaceUsage);
+  }
+  return HttpResponse.json(mockResponses.pathNotFoundUsage(path));
 });
 
 const summaryHandler = http.get('/api/v1/namespace/summary', ({ request }) => {
@@ -63,7 +66,10 @@ const summaryHandler = http.get('/api/v1/namespace/summary', ({ request }) => {
   if (path === '/vol1') {
     return HttpResponse.json(mockResponses.Vol1SummaryResponse);
   }
-  return HttpResponse.json(mockResponses.RootSummaryResponse);
+  if (path === '/') {
+    return HttpResponse.json(mockResponses.RootSummaryResponse);
+  }
+  return HttpResponse.json(mockResponses.pathNotFoundSummary(path));
 });
 
 const quotaHandler = http.get('/api/v1/namespace/quota', ({ request }) => {
@@ -72,13 +78,19 @@ const quotaHandler = http.get('/api/v1/namespace/quota', ({ request }) => {
   if (path === '/missing') {
     return HttpResponse.json(mockResponses.PathNotFoundQuotaResponse);
   }
-  if (path === '/vol1/bucket1' || path === '/vol1/bucket1/key1') {
+  if (path === '/vol1/bucket1/key1') {
+    return HttpResponse.json(mockResponses.Key1QuotaResponse);
+  }
+  if (path === '/vol1/bucket1') {
     return HttpResponse.json(mockResponses.Bucket1QuotaResponse);
   }
   if (path === '/vol1') {
     return HttpResponse.json(mockResponses.Vol1QuotaResponse);
   }
-  return HttpResponse.json(mockResponses.RootQuotaResponse);
+  if (path === '/') {
+    return HttpResponse.json(mockResponses.RootQuotaResponse);
+  }
+  return HttpResponse.json(mockResponses.PathNotFoundQuotaResponse);
 });
 
 export const namespaceUsageServer = setupServer(
