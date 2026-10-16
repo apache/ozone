@@ -141,6 +141,7 @@ import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -2587,26 +2588,36 @@ public class RpcClient implements ClientProtocol {
   @Override
   public List<OzoneFileStatus> listStatus(ListStatusLightOptions options)
       throws IOException {
+    return listStatusPage(options).getStatuses();
+  }
+
+  @Override
+  public ListStatusResult<OzoneFileStatus> listStatusPage(ListStatusLightOptions options)
+      throws IOException {
     final OmKeyArgs keyArgs = prepareListStatusKeyArgs(options);
-    return ozoneManagerClient.listStatus(keyArgs, options.isRecursive(), options.getStartKey(),
+    return ozoneManagerClient.listStatusPage(keyArgs, options.isRecursive(), options.getStartKey(),
         options.getNumEntries(), options.isAllowPartialPrefixes());
   }
 
   @Override
   public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
       throws IOException {
+    return listStatusLightPage(options).getStatuses();
+  }
+
+  @Override
+  public ListStatusResult<OzoneFileStatusLight> listStatusLightPage(ListStatusLightOptions options)
+      throws IOException {
     final OmKeyArgs keyArgs = prepareListStatusKeyArgs(options);
     if (OzoneManagerVersion.LIGHTWEIGHT_LIST_STATUS.isSupportedBy(omVersion)) {
-      return ozoneManagerClient.listStatusLight(
+      return ozoneManagerClient.listStatusLightPage(
           keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),
           options.isAllowPartialPrefixes());
     } else {
-      return ozoneManagerClient.listStatus(
+      return ozoneManagerClient.listStatusPage(
           keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),
               options.isAllowPartialPrefixes())
-          .stream()
-          .map(OzoneFileStatusLight::fromOzoneFileStatus)
-          .collect(Collectors.toList());
+          .map(OzoneFileStatusLight::fromOzoneFileStatus);
     }
   }
 
