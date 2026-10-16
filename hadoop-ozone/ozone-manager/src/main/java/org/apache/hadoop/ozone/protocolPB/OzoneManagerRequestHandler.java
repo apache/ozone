@@ -61,8 +61,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatu
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -1331,12 +1333,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setKeyName(keyArgs.getKeyName())
         .setLatestVersionLocation(keyArgs.getLatestVersionLocation())
         .setHeadOp(keyArgs.getHeadOp())
+        .setRequireFileSystemLayout(request.getRequireFileSystemLayout())
         .build();
     boolean allowPartialPrefixes =
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
+    final long numEntries = limitListSize(request.getNumEntries());
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), limitListSize(request.getNumEntries()),
+            request.getStartKey(), numEntries,
             allowPartialPrefixes);
     ListStatusResponse.Builder
         listStatusResponseBuilder =
@@ -1344,6 +1348,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (OzoneFileStatus status : statuses) {
       listStatusResponseBuilder.addStatuses(status.getProtobuf(clientVersion));
     }
+    listStatusResponseBuilder.setIsTruncated(isListStatusTruncated(statuses.size(), numEntries));
     return listStatusResponseBuilder.build();
   }
 
@@ -1355,16 +1360,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .setKeyName(keyArgs.getKeyName())
         .setSortDatanodesInPipeline(false)
         .setLatestVersionLocation(true)
-        .setHeadOp(keyArgs.getHeadOp());
+        .setHeadOp(keyArgs.getHeadOp())
+        .setRequireFileSystemLayout(request.getRequireFileSystemLayout());
     if (request.hasListPrefix() && !request.getListPrefix().isEmpty()) {
       omKeyArgsBuilder.setListPrefix(request.getListPrefix());
     }
     OmKeyArgs omKeyArgs = omKeyArgsBuilder.build();
     boolean allowPartialPrefixes =
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
+    final long numEntries = limitListSize(request.getNumEntries());
     List<OzoneFileStatusLight> statuses =
         impl.listStatusLight(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), limitListSize(request.getNumEntries()),
+            request.getStartKey(), numEntries,
             allowPartialPrefixes);
     ListStatusLightResponse.Builder
         listStatusLightResponseBuilder =
@@ -1372,7 +1379,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (OzoneFileStatusLight status : statuses) {
       listStatusLightResponseBuilder.addStatuses(status.getProtobuf());
     }
+    listStatusLightResponseBuilder.setIsTruncated(isListStatusTruncated(statuses.size(), numEntries));
     return listStatusLightResponseBuilder.build();
+  }
+
+  /**
+   * More entries may follow a listing page only if it is full. listStatus returns
+   * {@code min(page size, remaining entries)}, where the page size is the request
+   * capped by both server limits, so a shorter page is the last one.
+   */
+  private boolean isListStatusTruncated(int returned, long numEntries) {
+    return returned >= OmMetadataReader.listStatusPageSize(impl.getConfiguration(), numEntries);
   }
 
   @RequestFeatureValidator(
@@ -1673,7 +1690,13 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return impl;
   }
 
-  private EchoRPCResponse echoRPC(EchoRPCRequest req) {
+  private EchoRPCResponse echoRPC(EchoRPCRequest req) throws IOException {
+    // The caller chooses the size of the response payload, so EchoRPC is limited to admins.
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+    if (impl.isAdminAuthorizationEnabled() && !impl.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi + ". Superuser privilege is required for EchoRPC.",
+          OMException.ResultCodes.ACCESS_DENIED);
+    }
     EchoRPCResponse.Builder builder = EchoRPCResponse.newBuilder();
     final ByteString payloadBytes = PayloadUtils.generatePayloadProto2(req.getPayloadSizeResp());
     builder.setPayload(payloadBytes);

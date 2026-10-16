@@ -58,13 +58,6 @@ public final class ExportScope {
     return healthState;
   }
 
-  /**
-   * Stable filter name segment used in export TAR and part file names.
-   */
-  public String getValue() {
-    return value;
-  }
-
   @Override
   public String toString() {
     return value;

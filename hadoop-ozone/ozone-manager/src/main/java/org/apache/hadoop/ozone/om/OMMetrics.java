@@ -55,7 +55,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numVolumeCreates;
   private @Metric MutableCounterLong numVolumeUpdates;
   private @Metric MutableCounterLong numVolumeInfos;
-  private @Metric MutableCounterLong numVolumeCheckAccesses;
   private @Metric MutableCounterLong numBucketCreates;
   private @Metric MutableCounterLong numFSOBucketCreates;
   private @Metric MutableCounterLong numVolumeDeletes;
@@ -76,7 +75,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numKeyHSyncs;
   private @Metric MutableCounterLong numBlockAllocations;
   private @Metric MutableCounterLong numGetServiceLists;
-  private @Metric MutableCounterLong numBucketS3Lists;
   private @Metric MutableCounterLong numInitiateMultipartUploads;
   private @Metric MutableCounterLong numCompleteMultipartUploads;
   private @Metric MutableCounterLong numSnapshotCreates;
@@ -133,7 +131,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numVolumeInfoFails;
   private @Metric MutableCounterLong numVolumeDeleteFails;
   private @Metric MutableCounterLong numBucketCreateFails;
-  private @Metric MutableCounterLong numVolumeCheckAccessFails;
   private @Metric MutableCounterLong numBucketInfoFails;
   private @Metric MutableCounterLong numBucketUpdateFails;
   private @Metric MutableCounterLong numBucketDeleteFails;
@@ -148,8 +145,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numVolumeListFails;
   private @Metric MutableCounterLong numKeyCommitFails;
   private @Metric MutableCounterLong numBlockAllocationFails;
-  private @Metric MutableCounterLong numGetServiceListFails;
-  private @Metric MutableCounterLong numBucketS3ListFails;
   private @Metric MutableCounterLong numInitiateMultipartUploadFails;
   private @Metric MutableCounterLong numCommitMultipartUploadParts;
   private @Metric MutableCounterLong numCommitMultipartUploadPartFails;
@@ -224,17 +219,11 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   private @Metric MutableGaugeLong numVolumes;
   private @Metric MutableGaugeLong numBuckets;
-  private @Metric MutableCounterLong numS3Buckets;
 
   //TODO: This metric is an estimate and it may be inaccurate on restart if the
   // OM process was not shutdown cleanly. Key creations/deletions in the last
   // few minutes before restart may not be included in this count.
   private @Metric MutableGaugeLong numKeys;
-
-  private @Metric MutableCounterLong numBucketS3Creates;
-  private @Metric MutableCounterLong numBucketS3CreateFails;
-  private @Metric MutableCounterLong numBucketS3Deletes;
-  private @Metric MutableCounterLong numBucketS3DeleteFails;
 
   private @Metric MutableCounterLong numListMultipartUploadFails;
   private @Metric MutableCounterLong numListMultipartUploads;
@@ -243,7 +232,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numTrashRenames;
   private @Metric MutableCounterLong numTrashDeletes;
   private @Metric MutableCounterLong numTrashListStatus;
-  private @Metric MutableCounterLong numTrashListKeys;
   private @Metric MutableCounterLong numTrashGetFileStatus;
   private @Metric MutableCounterLong numTrashGetTrashRoots;
   private @Metric MutableCounterLong numTrashExists;
@@ -251,7 +239,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numTrashFilesRenames;
   private @Metric MutableCounterLong numTrashFilesDeletes;
   private @Metric MutableCounterLong numTrashActiveCycles;
-  private @Metric MutableCounterLong numTrashCheckpointsProcessed;
   private @Metric MutableCounterLong numTrashFails;
   private @Metric MutableCounterLong numTrashRootsEnqueued;
   private @Metric MutableCounterLong numTrashRootsProcessed;
@@ -320,35 +307,8 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     }
   }
 
-  public void incNumS3BucketCreates() {
-    numBucketOps.incr();
-    numBucketS3Creates.incr();
-  }
-
-  public void incNumS3BucketCreateFails() {
-    numBucketS3CreateFails.incr();
-  }
-
-  public void incNumS3BucketDeletes() {
-    numBucketOps.incr();
-    numBucketS3Deletes.incr();
-  }
-
-  public void incNumS3BucketDeleteFails() {
-    numBucketOps.incr();
-    numBucketS3DeleteFails.incr();
-  }
-
   public void incDataCommittedBytes(long bytesWritten) {
     totalDataCommitted.incr(bytesWritten);
-  }
-
-  public void incNumS3Buckets() {
-    numS3Buckets.incr();
-  }
-
-  public void decNumS3Buckets() {
-    numS3Buckets.incr();
   }
 
   public void incNumVolumes() {
@@ -435,11 +395,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numVolumeDeletes.incr();
   }
 
-  public void incNumVolumeCheckAccesses() {
-    numVolumeOps.incr();
-    numVolumeCheckAccesses.incr();
-  }
-
   public void incNumBucketCreates() {
     numBucketOps.incr();
     numBucketCreates.incr();
@@ -482,15 +437,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   public void incNumVolumeLists() {
     numVolumeOps.incr();
     numVolumeLists.incr();
-  }
-
-  public void incNumListS3Buckets() {
-    numBucketOps.incr();
-    numBucketS3Lists.incr();
-  }
-
-  public void incNumListS3BucketsFails() {
-    numBucketS3ListFails.incr();
   }
 
   public void incNumListOpenFiles() {
@@ -607,10 +553,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumSnapshotDeleted() {
     numSnapshotDeleted.incr();
-  }
-
-  public void decNumSnapshotDeleted() {
-    numSnapshotDeleted.incr(-1);
   }
 
   public int getNumSnapshotCacheSize() {
@@ -817,10 +759,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
     numVolumeDeleteFails.incr();
   }
 
-  public void incNumVolumeCheckAccessFails() {
-    numVolumeCheckAccessFails.incr();
-  }
-
   public void incNumBucketCreateFails() {
     numBucketCreateFails.incr();
   }
@@ -939,10 +877,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumVolumeListFails() {
     numVolumeListFails.incr();
-  }
-
-  public void incNumGetServiceListFails() {
-    numGetServiceListFails.incr();
   }
 
   public void incNumOpenKeyDeleteRequests() {
@@ -1111,11 +1045,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   }
 
   @VisibleForTesting
-  public long getNumVolumeCheckAccesses() {
-    return numVolumeCheckAccesses.value();
-  }
-
-  @VisibleForTesting
   public long getNumBucketCreates() {
     return numBucketCreates.value();
   }
@@ -1183,11 +1112,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   @VisibleForTesting
   public long getNumVolumeDeleteFails() {
     return numVolumeDeleteFails.value();
-  }
-
-  @VisibleForTesting
-  public long getNumVolumeCheckAccessFails() {
-    return numVolumeCheckAccessFails.value();
   }
 
   @VisibleForTesting
@@ -1333,21 +1257,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   @VisibleForTesting
   public long getNumBlockAllocateFails() {
     return numBlockAllocationFails.value();
-  }
-
-  @VisibleForTesting
-  public long getNumGetServiceListFails() {
-    return numGetServiceListFails.value();
-  }
-
-  @VisibleForTesting
-  public long getNumListS3Buckets() {
-    return numBucketS3Lists.value();
-  }
-
-  @VisibleForTesting
-  public long getNumListS3BucketsFails() {
-    return numBucketS3ListFails.value();
   }
 
   @VisibleForTesting

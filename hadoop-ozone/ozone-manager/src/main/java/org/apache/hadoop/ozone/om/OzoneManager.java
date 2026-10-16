@@ -93,6 +93,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
@@ -102,6 +103,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_NOT_READY;
@@ -1417,7 +1419,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public UUID refetchSecretKey() throws IOException {
     checkAdminUserPrivilege("refetch secret key.");
-    secretKeyClient.refetchSecretKey();
+    try {
+      secretKeyClient.refetchSecretKey();
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
+    }
     return secretKeyClient.getCurrentSecretKey().getId();
   }
 
@@ -3907,10 +3913,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       services.add(scmServiceInfoBuilder.build());
     }
     metrics.incNumGetServiceLists();
-    // For now there is no exception that can can happen in this call,
-    // so failure metrics is not handled. In future if there is any need to
-    // handle exception in this method, we need to incorporate
-    // metrics.incNumGetServiceListFails()
     AUDIT.logReadSuccess(
         buildAuditMessageForSuccess(OMAction.GET_SERVICE_LIST,
             new LinkedHashMap<>()));
@@ -5525,6 +5527,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (allowDanglingBuckets) {
         return null;
       }
+
+      if (!visited.isEmpty() && (e.getResult() == VOLUME_NOT_FOUND || e.getResult() == BUCKET_NOT_FOUND)) {
+        throw new OMException("Cannot follow bucket link: linked source bucket does not exist", e, e.getResult());
+      }
       throw e;
     }
     if (!info.isLink()) {
@@ -5734,6 +5740,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("Enter safe mode is unsupported",
           INTERNAL_ERROR);
     case FORCE_EXIT:
+      // SCM sees this call as coming from the OM user, so the caller has to be checked here.
+      checkAdminUserPrivilege("force exit safe mode.");
       return getScmClient().getContainerClient().forceExitSafeMode();
     case GET:
       return getScmClient().getContainerClient().inSafeMode();

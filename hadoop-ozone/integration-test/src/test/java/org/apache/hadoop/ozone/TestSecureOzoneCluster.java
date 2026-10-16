@@ -289,6 +289,7 @@ class TestSecureOzoneCluster extends KerberosTests {
     assertScmSecurityProtocolRejectsNonKerberosUser();
     assertScmAdminProtocolDeniesNonAdminUser();
     assertScmAdminProtocolRejectsNonKerberosUser();
+    assertScmSecurityProtocolRequiresAdminForScmRoleCertificate();
 
     // Secure OM initialization against the shared SCM.
     assertSecureOmInitFailsWithInvalidTokenAndSecretKeyConfig();
@@ -351,6 +352,25 @@ class TestSecureOzoneCluster extends KerberosTests {
     IOException adminException = assertThrows(IOException.class,
         scmRpcClient::forceExitSafeMode);
     assertThat(adminException).hasMessageContaining("Access denied");
+  }
+
+  /** SCM security protocol - SCM role certificates require SCM admin access, through either signing RPC. */
+  private void assertScmSecurityProtocolRequiresAdminForScmRoleCertificate() throws Exception {
+    UserGroupInformation ugi = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+        getTestUserPrincipal(), getTestUserKeytab().getCanonicalPath());
+    String csr = new CertificateSignRequest.Builder().setKey(keyPair).setConfiguration(new SecurityConfig(conf))
+        .setScmID(scmId).setClusterID(clusterId).setSubject("scm-host").setDigitalSignature(true)
+        .build().toEncodedFormat();
+    HddsProtos.ScmNodeDetailsProto scmDetails = HddsProtos.ScmNodeDetailsProto.newBuilder().setClusterId(clusterId)
+        .setHostName("scm-host").setScmNodeId("scm-node").build();
+    HddsProtos.NodeDetailsProto scmNode = HddsProtos.NodeDetailsProto.newBuilder().setClusterId(clusterId)
+        .setHostName("scm-host").setUuid(UUID.randomUUID().toString()).setNodeType(HddsProtos.NodeType.SCM).build();
+    try (SCMSecurityProtocolClientSideTranslatorPB securityClient = getScmSecurityClient(conf, ugi)) {
+      IOException denied = assertThrows(IOException.class, () -> securityClient.getSCMCertificate(scmDetails, csr));
+      assertThat(denied).hasMessageContaining("Access denied");
+      denied = assertThrows(IOException.class, () -> securityClient.getCertificate(scmNode, csr));
+      assertThat(denied).hasMessageContaining("Access denied");
+    }
   }
 
   /** SCM admin protocol - user without Kerberos credentials fails. */

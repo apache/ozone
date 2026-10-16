@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.CONTAINER_COUNT_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.CONTAINER_KEY_COUNT;
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.KEY_CONTAINER;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY_V2;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
@@ -76,11 +75,12 @@ public class ReconContainerMetadataManagerImpl
   private Table<ContainerKeyPrefix, Integer> containerKeyTable;
   private Table<KeyPrefixContainer, Integer> keyContainerTable;
   private Table<Long, Long> containerKeyCountTable;
-  private Table<Long, ContainerReplicaHistoryList>
+  private final Table<Long, ContainerReplicaHistoryList>
       containerReplicaHistoryTable;
   private GlobalStatsDao globalStatsDao;
 
   private DBStore containerDbStore;
+  private final ReconReplicaHistoryDBProvider replicaHistoryDBProvider;
 
   private Configuration sqlConfiguration;
 
@@ -88,13 +88,17 @@ public class ReconContainerMetadataManagerImpl
 
   @Inject
   public ReconContainerMetadataManagerImpl(
-      ReconDBProvider reconDBProvider, Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
-    this(reconDBProvider.getDbStore(), sqlConfiguration, omMetadataManager);
+      ReconDBProvider reconDBProvider, ReconReplicaHistoryDBProvider replicaHistoryDBProvider,
+      Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
+    this(reconDBProvider.getDbStore(), replicaHistoryDBProvider, sqlConfiguration, omMetadataManager);
   }
 
   private ReconContainerMetadataManagerImpl(
-      DBStore reconDBStore, Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
+      DBStore reconDBStore, ReconReplicaHistoryDBProvider replicaHistoryDBProvider,
+      Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
     containerDbStore = reconDBStore;
+    this.replicaHistoryDBProvider = replicaHistoryDBProvider;
+    containerReplicaHistoryTable = replicaHistoryDBProvider.getReplicaHistoryTable();
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
     this.sqlConfiguration = sqlConfiguration;
     this.omMetadataManager = omMetadataManager;
@@ -104,7 +108,8 @@ public class ReconContainerMetadataManagerImpl
   @Override
   public ReconContainerMetadataManager getStagedReconContainerMetadataManager(
       DBStore stagedReconDbStore) {
-    return new ReconContainerMetadataManagerImpl(stagedReconDbStore, sqlConfiguration, omMetadataManager);
+    return new ReconContainerMetadataManagerImpl(
+        stagedReconDbStore, replicaHistoryDBProvider, sqlConfiguration, omMetadataManager);
   }
 
   @Override
@@ -167,8 +172,6 @@ public class ReconContainerMetadataManagerImpl
       }
       this.containerKeyCountTable =
           CONTAINER_KEY_COUNT.getTable(containerDbStore);
-      this.containerReplicaHistoryTable =
-          REPLICA_HISTORY_V2.getTable(containerDbStore);
     } catch (IOException e) {
       LOG.error("Unable to create Container Key tables.", e);
     }
@@ -241,11 +244,18 @@ public class ReconContainerMetadataManagerImpl
       Map<Long, Map<DatanodeID, ContainerReplicaHistory>> replicaHistoryMap)
       throws IOException {
     try (BatchOperation batchOperation =
-             containerDbStore.initBatchOperation()) {
+             replicaHistoryDBProvider.getDbStore().initBatchOperation()) {
       for (Map.Entry<Long, Map<DatanodeID, ContainerReplicaHistory>> entry :
           replicaHistoryMap.entrySet()) {
         final long containerId = entry.getKey();
-        final Map<DatanodeID, ContainerReplicaHistory> tsMap = entry.getValue();
+        // The in-memory map contains only current replicas; preserve departed datanodes on shutdown.
+        final Map<DatanodeID, ContainerReplicaHistory> tsMap = getContainerReplicaHistory(containerId);
+        entry.getValue().forEach((id, inMemory) -> tsMap.merge(id, inMemory, (stored, current) -> {
+          // Prefer the in-memory record on equal timestamps, as before.
+          ContainerReplicaHistory latest = stored.getLastSeenTime() > current.getLastSeenTime() ? stored : current;
+          return new ContainerReplicaHistory(id, Math.min(stored.getFirstSeenTime(), current.getFirstSeenTime()),
+              latest.getLastSeenTime(), latest.getBcsId(), latest.getState(), latest.getChecksums());
+        }));
 
         List<ContainerReplicaHistory> tsList = new ArrayList<>();
         for (Map.Entry<DatanodeID, ContainerReplicaHistory> e : tsMap.entrySet()) {
@@ -256,7 +266,7 @@ public class ReconContainerMetadataManagerImpl
             new ContainerReplicaHistoryList(tsList));
       }
 
-      containerDbStore.commitBatchOperation(batchOperation);
+      replicaHistoryDBProvider.getDbStore().commitBatchOperation(batchOperation);
     }
   }
 

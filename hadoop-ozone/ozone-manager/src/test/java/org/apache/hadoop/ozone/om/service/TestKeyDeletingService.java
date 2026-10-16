@@ -120,7 +120,6 @@ import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -659,7 +658,6 @@ class TestKeyDeletingService extends OzoneTestBase {
        of Snap3 should be empty.
      */
     @Test
-    @Flaky("HDDS-13880")
     void testSnapshotDeepClean() throws Exception {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
@@ -721,23 +719,29 @@ class TestKeyDeletingService extends OzoneTestBase {
       keyDeletingService.resume();
       directoryDeletingService.resume();
 
+      // Hold the snap3 DB handle only while its tables are read: the handle keeps a snapshot DB read lock, and the
+      // OMDoubleBuffer flush thread needs a colliding write lock on the same stripe to purge snap2 below.
       try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
                om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
-        OmSnapshot snapshot3 = rcOmSnapshot.get();
-
         Table<String, RepeatedOmKeyInfo> snap3deletedTable =
-            snapshot3.getMetadataManager().getDeletedTable();
-
+            rcOmSnapshot.get().getMetadataManager().getDeletedTable();
         // 5 keys can be deep cleaned as it was stuck previously
         assertTableRowCount(snap3deletedTable, initialDeletedCount + 10, metadataManager);
-
-        writeClient.deleteSnapshot(volumeName, bucketName, snap2);
-        assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
-
-        assertTableRowCount(snap3deletedTable, initialDeletedCount, metadataManager);
-        assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
-        checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       }
+
+      writeClient.deleteSnapshot(volumeName, bucketName, snap2);
+      assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
+
+      // Re-fetch the deleted table: SnapshotCache may have closed and reloaded snap3 while no handle was held.
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
+               om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
+        Table<String, RepeatedOmKeyInfo> snap3deletedTable =
+            rcOmSnapshot.get().getMetadataManager().getDeletedTable();
+        assertTableRowCount(snap3deletedTable, initialDeletedCount, metadataManager);
+      }
+
+      assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
+      checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       sstFilteringService.resume();
     }
 

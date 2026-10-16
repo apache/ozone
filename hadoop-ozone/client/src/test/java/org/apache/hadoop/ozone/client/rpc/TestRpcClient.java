@@ -41,9 +41,15 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -342,6 +348,49 @@ public class TestRpcClient {
     }
   }
 
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, names = {
+      "ATOMIC_CREATE_IF_NOT_EXISTS", "S3_BUCKET_TAGGING_API", "GET_FILE_STATUS_REJECTS_OBS", "UNKNOWN_VERSION"
+  })
+  public void testBucketTaggingVersionChecks(OzoneManagerVersion version) throws IOException {
+    List<Type> requests = new LinkedList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) {
+        OMResponse.Builder response = OMResponse.newBuilder()
+            .setCmdType(request.getCmdType()).setSuccess(true).setStatus(Status.OK);
+        if (request.getCmdType() == Type.ServiceList) {
+          response.setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()));
+        } else {
+          requests.add(request.getCmdType());
+        }
+        return response.build();
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      List<Executable> operations = Arrays.asList(
+          () -> assertThat(client.getBucketTagging("volume1", "bucket1")).isEmpty(),
+          () -> client.putBucketTagging("volume1", "bucket1", Collections.singletonMap("tag", "value")),
+          () -> client.deleteBucketTagging("volume1", "bucket1"));
+      for (Executable operation : operations) {
+        if (version == OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS) {
+          IOException error = assertThrows(IOException.class, operation);
+          assertThat(error).hasMessage("OzoneManager does not support S3 bucket tagging API");
+        } else {
+          assertDoesNotThrow(operation);
+        }
+      }
+      if (version == OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS) {
+        assertThat(requests).isEmpty();
+      } else {
+        assertThat(requests).containsExactly(Type.GetBucketTagging, Type.PutBucketTagging, Type.DeleteBucketTagging);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   private static ServiceInfo om(OzoneManagerVersion version) {
     return new ServiceInfo.Builder()
         .setNodeType(HddsProtos.NodeType.OM)
@@ -355,11 +404,15 @@ public class TestRpcClient {
   }
 
   private static RpcClient createRpcClient() throws IOException {
+    return createRpcClient(new MockOmTransport());
+  }
+
+  private static RpcClient createRpcClient(OmTransport transport) throws IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     return new RpcClient(config, null) {
       @Override
       protected OmTransport createOmTransport(String omServiceId) {
-        return new MockOmTransport();
+        return transport;
       }
 
       @Override

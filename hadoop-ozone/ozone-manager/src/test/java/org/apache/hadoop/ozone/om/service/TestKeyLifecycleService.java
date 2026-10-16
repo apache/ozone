@@ -62,6 +62,7 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -1151,6 +1152,65 @@ class TestKeyLifecycleService extends OzoneTestBase {
         assertTrue(logCapturer.getOutput().contains("Seek to key"));
       } else {
         assertFalse(logCapturer.getOutput().contains("Seek to key"));
+      }
+    }
+
+    @Test
+    void testCacheOnlyKeyNotSavedAsLastScannedKey() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+
+      keyLifecycleService.setKeyDeleteBatchSize(1);
+      keyLifecycleService.suspend();
+
+      createVolumeAndBucket(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED,
+          UserGroupInformation.getCurrentUser().getShortUserName());
+      createAndCommitKey(volumeName, bucketName, "dir1/key1", 1, null);
+      createAndCommitKey(volumeName, bucketName, "dir1/key2", 1, null);
+      GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == 2,
+          WAIT_CHECK_INTERVAL, 1000);
+      awaitKeyCacheDrained(FILE_SYSTEM_OPTIMIZED, volumeName, bucketName);
+
+      long volumeId = metadataManager.getVolumeTable().get(metadataManager.getVolumeKey(volumeName)).getObjectID();
+      long bucketId =
+          metadataManager.getBucketTable().get(metadataManager.getBucketKey(volumeName, bucketName)).getObjectID();
+      long dir1Id = metadataManager.getDirectoryTable().get(
+          metadataManager.getOzonePathKey(volumeId, bucketId, bucketId, "dir1")).getObjectID();
+
+      // key9 sorts after the table keys and only exists in the cache. The max epoch keeps the double buffer
+      // from evicting it before the scan.
+      Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(FILE_SYSTEM_OPTIMIZED);
+      OmKeyInfo key1Info = keyTable.get(metadataManager.getOzonePathKey(volumeId, bucketId, dir1Id, "key1"));
+      OmKeyInfo cacheOnlyKey = key1Info.toBuilder().setKeyName("key9").build();
+      String cacheOnlyDbKey = metadataManager.getOzonePathKey(volumeId, bucketId, dir1Id, "key9");
+      keyTable.addCacheEntry(new CacheKey<>(cacheOnlyDbKey), CacheValue.get(Long.MAX_VALUE, cacheOnlyKey));
+
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
+
+      Field tableField = OmMetadataManagerImpl.class.getDeclaredField("lifecycleScanStateTable");
+      tableField.setAccessible(true);
+      Table<String, OmLifecycleScanState> originalTable =
+          (Table<String, OmLifecycleScanState>) tableField.get(metadataManager);
+      Table<String, OmLifecycleScanState> spyTable = spy(originalTable);
+      tableField.set(metadataManager, spyTable);
+      try {
+        runSingleLifecycleScan(volumeName, bucketName);
+
+        GenericTestUtils.waitFor(() ->
+            (getDeletedKeyCount() - initialDeletedKeyCount) == 3, WAIT_CHECK_INTERVAL, 10000);
+        assertEquals(0, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
+
+        String bucketKey = metadataManager.getBucketKey(volumeName, bucketName);
+        // With a batch size of 1, the expired list fills right after the cache pass, so scan state is saved
+        // while the cache-only key is the last key evaluated.
+        verify(spyTable, atLeast(1)).addCacheEntry(argThat(k -> k.getCacheKey().equals(bucketKey)), any());
+        verify(spyTable, never()).addCacheEntry(argThat(k -> k.getCacheKey().equals(bucketKey)),
+            argThat(v -> v.getCacheValue() != null && cacheOnlyDbKey.equals(v.getCacheValue().getLastScannedKey())));
+      } finally {
+        tableField.set(metadataManager, originalTable);
       }
     }
 

@@ -22,7 +22,8 @@ Apache Ozone is a multi-module Maven project. The root coordinates and version l
 
 Tech stack:
 
-- Java 8 bytecode with JDK 21 runtime compatibility (see the `[21,]` profile in `pom.xml`)
+- Java 17 by default (`ozone.java.version.server` in `pom.xml`). Modules that set `maven.compiler.release` to
+  `${ozone.java.version.client}` in their own `pom.xml` still target Java 8.
 - Maven build
 - Hadoop RPC and gRPC over Protobuf
 - RocksDB for persistent metadata
@@ -52,7 +53,8 @@ server-side handling, client translation code, and integration tests.
 
 ## Local Environment
 
-- Use a JDK 21 runtime locally. Source and target compatibility remain Java 8.
+- Use a JDK 21 runtime locally. Before using Java 9+ syntax or standard-library APIs, check the module's
+  `maven.compiler.release` in its `pom.xml`; Maven `--release` governs both language level and API surface.
 - Ozone formatting conventions are shared through `.editorconfig`.
 - If Maven behaves unexpectedly, check `java -version` and `mvn -version` first.
 
