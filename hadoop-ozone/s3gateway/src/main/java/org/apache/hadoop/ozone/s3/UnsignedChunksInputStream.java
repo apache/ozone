@@ -57,8 +57,8 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
  * </p>
  *
  * <p>
- * This stream validates chunk and trailer framing, including the checksum encoding and length.
- * It does not compare the trailer checksum with the payload.
+ * This stream validates chunk and trailer framing, including the checksum encoding and length,
+ * and compares the trailer checksum with the decoded payload before reporting completion.
  * </p>
  *
  * Reference:
@@ -81,6 +81,7 @@ public class UnsignedChunksInputStream extends InputStream {
   private final InputStream originalStream;
   private final String keyPath;
   private final TrailerHeader trailerHeader;
+  private final TrailerChecksum payloadChecksum;
   private long remainingData;
   private boolean isFinalChunkEncountered;
   private byte[] trailerChecksum;
@@ -92,6 +93,7 @@ public class UnsignedChunksInputStream extends InputStream {
     if (trailerHeader == TrailerHeader.NONE) {
       throw new IllegalArgumentException("Unsigned chunked uploads require a checksum trailer");
     }
+    this.payloadChecksum = trailerHeader.newChecksum();
   }
 
   @Override
@@ -103,6 +105,7 @@ public class UnsignedChunksInputStream extends InputStream {
     if (value == -1) {
       throw invalidBody("Truncated chunk payload");
     }
+    payloadChecksum.update((byte) value);
     remainingData--;
     endChunkIfComplete();
     return value;
@@ -124,6 +127,7 @@ public class UnsignedChunksInputStream extends InputStream {
       if (readLength == -1) {
         throw invalidBody("Truncated chunk payload");
       }
+      payloadChecksum.update(b, off + totalReadBytes, readLength);
       totalReadBytes += readLength;
       remainingData -= readLength;
       endChunkIfComplete();
@@ -170,6 +174,7 @@ public class UnsignedChunksInputStream extends InputStream {
     return trailerChecksum == null ? null : trailerChecksum.clone();
   }
 
+  /** Check framing and decode the value, then compare the checksum only after the final terminator. */
   private void readTrailer() throws IOException {
     String trailer = readLine();
     int separator = trailer.indexOf(':');
@@ -187,6 +192,7 @@ public class UnsignedChunksInputStream extends InputStream {
     if (originalStream.read() != -1) {
       throw invalidBody("Unexpected data after trailing checksum");
     }
+    payloadChecksum.verify(checksum, keyPath);
     trailerChecksum = checksum;
   }
 
