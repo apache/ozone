@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.scm.OzoneClientConfig.DATA_TRANSFER_MAGIC_C
 import static org.apache.hadoop.hdds.scm.OzoneClientConfig.DATA_TRANSFER_VERSION;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getBlockMapKey;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getRequestKey;
 
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Scope;
@@ -110,7 +111,7 @@ final class Receiver implements Runnable {
         } catch (SocketTimeoutException | EOFException | ClosedChannelException e) {
           // Since we optimistically expect the next request, it's quite normal to
           // get EOF here.
-          LOG.info("{} is closed with {} after received {} ops and handled {} ops.",
+          LOG.debug("{} is closed with {} after received {} ops and handled {} ops.",
               peer, e.getClass().getName(), opsReceived, opsHandled.get());
           throw e;
         }
@@ -241,7 +242,7 @@ final class Receiver implements Runnable {
       responseProto.writeDelimitedTo(output);
       if (LOG.isDebugEnabled()) {
         LOG.debug("send response size {} for request {} through {}", responseProto.getSerializedSize(),
-            getBlockMapKey(entry.getRequest()), peer.getDomainSocket());
+            getRequestKey(entry.getRequest()), peer.getDomainSocket());
       }
       output.flush();
       if (file != null) {
@@ -270,9 +271,9 @@ final class Receiver implements Runnable {
         }
       }
       if (LOG.isDebugEnabled()) {
-        LOG.debug("Request {} {}:{}, receive {} ns, in queue {} ns, " +
-                " handle {} ns, send out {} ns, total {} ns", type, responseProto.getClientId().toStringUtf8(),
-            responseProto.getCallId(), entry.getReceiveTimeNs(), entry.getInQueueTimeNs(),
+        LOG.debug("Request {} {}, receive {} ns, in queue {} ns, " +
+                " handle {} ns, send out {} ns, total {} ns", type, getRequestKey(entry.getRequest()),
+            entry.getReceiveTimeNs(), entry.getInQueueTimeNs(),
             entry.getProcessTimeNs(), entry.getSendTimeNs(), entry.getTotalTimeNs());
       }
       if (isSupportedCmdType(type)) {
