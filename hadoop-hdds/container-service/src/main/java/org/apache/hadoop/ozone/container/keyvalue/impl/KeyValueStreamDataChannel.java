@@ -141,7 +141,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
    * Note that the PutBlock proto at the end is ignored; see HDDS-12007.
    */
   private void writeBuffers() throws IOException {
-    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(false);
     final ByteBuf buf = ref.retain();
     try {
       setEndIndex(buf);
@@ -159,10 +159,10 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
    */
   public void drainBuffers() throws IOException {
     assertOpen();
-    if (buffers.isEmpty()) {
+    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(true);
+    if (ref == null) {
       return;
     }
-    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
     final ByteBuf buf = ref.retain();
     try {
       writeFully(buf.nioBuffer(), super::writeFileChannel);
@@ -173,7 +173,7 @@ public class KeyValueStreamDataChannel extends StreamDataChannelBase {
 
   static ContainerCommandRequestProto closeBuffers(
       Buffers buffers, WriteMethod writeMethod) throws IOException {
-    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(false);
     final ByteBuf buf = ref.retain();
     final ContainerCommandRequestProto putBlockRequestProto;
     try {

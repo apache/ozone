@@ -1206,8 +1206,8 @@ public class TestECUnderReplicationHandler {
 
   /**
    * HDDS-7683 was a case where the maintenance logic was calling the placement
-   * policy requesting zero nodes. This test asserts that it is never called
-   * with zero nodes to ensure that issue is fixed.
+   * policy requesting zero nodes. This test asserts that only decommission
+   * replication calls the placement policy, without an unnecessary maintenance call.
    */
   @Test
   public void testMaintenanceDoesNotRequestZeroNodes() throws IOException {
@@ -1236,9 +1236,8 @@ public class TestECUnderReplicationHandler {
     handler.processAndSendCommands(availableReplicas,
         emptyList(), result, 1);
     assertEquals(1, commandsSent.size());
-    verify(ecPlacementPolicy, times(0))
-        .chooseDatanodes(anyList(), isNull(), eq(0), anyLong(),
-            anyLong());
+    verify(ecPlacementPolicy, times(1))
+        .chooseDatanodes(anyList(), anyList(), isNull(), anyInt(), anyLong(), anyLong());
   }
 
   /**

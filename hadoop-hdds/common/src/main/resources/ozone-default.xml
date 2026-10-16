@@ -2568,7 +2568,10 @@
     <name>ozone.om.kerberos.principal</name>
     <value>OM/_HOST@REALM</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
-    <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
+    <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM
+      SCM allocates and deletes blocks only for this service user or an SCM admin, so the property must be set in the
+      configuration of SCM as well.
+    </description>
   </property>
   <property>
     <name>ozone.om.kerberos.principal.pattern</name>

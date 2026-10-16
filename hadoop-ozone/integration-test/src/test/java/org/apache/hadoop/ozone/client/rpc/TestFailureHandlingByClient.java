@@ -337,6 +337,11 @@ public class TestFailureHandlingByClient {
     AtomicReference<KeyValueContainerData> found = new AtomicReference<>();
     GenericTestUtils.waitFor(() -> {
       for (HddsDatanodeService dn : cluster.getHddsDatanodes()) {
+        // BlockUtils.getDB would reopen the closed DB of a stopped datanode and keep it cached,
+        // so restarting that datanode later fails to lock its DB and exits the JVM.
+        if (dn.isStopped()) {
+          continue;
+        }
         KeyValueContainer container = (KeyValueContainer) dn
             .getDatanodeStateMachine().getContainer().getContainerSet()
             .getContainer(containerId);

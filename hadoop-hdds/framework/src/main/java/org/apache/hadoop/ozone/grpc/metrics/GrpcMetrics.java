@@ -29,15 +29,20 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 import org.apache.hadoop.ozone.util.MetricUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Class which maintains metrics related to using GRPC.
+ *
+ * The two latency rates are kept outside the {@link MetricsRegistry} as
+ * lock-free {@link ConcurrentMutableRate}s, because they are updated on every
+ * gRPC call and {@code MutableStat.add} is synchronized. {@link #getMetrics}
+ * snapshots them next to the registry, keeping the emitted metric names unchanged.
  */
 @Metrics(about = "GRPC Metrics", context = OzoneConsts.OZONE)
 public class GrpcMetrics implements MetricsSource {
@@ -56,7 +61,8 @@ public class GrpcMetrics implements MetricsSource {
 
   private final MetricsRegistry registry;
   private final boolean grpcQuantileEnable;
-  private String requestType;
+  // written by the gRPC handler threads and read by the metrics snapshot
+  private volatile String requestType;
 
   @Metric("Number of sent bytes")
   private MutableCounterLong sentBytes;
@@ -70,15 +76,13 @@ public class GrpcMetrics implements MetricsSource {
   @Metric("Number of unknown messages received")
   private MutableCounterLong unknownMessagesReceived;
 
-  @Metric("Queue time")
-  private MutableRate grpcQueueTime;
+  private final ConcurrentMutableRate grpcQueueTime;
 
   // There should be no getter method to avoid
   // exposing internal representation. FindBugs error raised.
   private MutableQuantiles[] grpcQueueTimeMillisQuantiles;
 
-  @Metric("Processing time")
-  private MutableRate grpcProcessingTime;
+  private final ConcurrentMutableRate grpcProcessingTime;
 
   // There should be no getter method to avoid
   // exposing internal representation. FindBugs error raised.
@@ -90,6 +94,10 @@ public class GrpcMetrics implements MetricsSource {
   public GrpcMetrics(Configuration conf) {
     this.registry = new MetricsRegistry("grpc");
     this.requestType = "NoRequest";
+    // Names match what MutableMetricsFactory derived from the field names, so
+    // the emitted metrics are unchanged
+    grpcQueueTime = new ConcurrentMutableRate("GrpcQueueTime", "Queue time", false);
+    grpcProcessingTime = new ConcurrentMutableRate("GrpcProcessingTime", "Processing time", false);
     int[] intervals = conf.getInts(
         OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY);
     grpcQuantileEnable = (intervals.length > 0);
@@ -135,7 +143,10 @@ public class GrpcMetrics implements MetricsSource {
 
   @Override
   public synchronized void getMetrics(MetricsCollector collector, boolean all) {
-    registry.snapshot(collector.addRecord(registry.info()), all);
+    MetricsRecordBuilder builder = collector.addRecord(registry.info());
+    registry.snapshot(builder, all);
+    grpcQueueTime.snapshot(builder, all);
+    grpcProcessingTime.snapshot(builder, all);
     MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
     recordBuilder.tag(LATEST_REQUEST_TYPE, requestType);
   }
@@ -202,11 +213,11 @@ public class GrpcMetrics implements MetricsSource {
     return unknownMessagesReceived.value();
   }
   
-  MutableRate getGrpcQueueTime() {
+  ConcurrentMutableRate getGrpcQueueTime() {
     return grpcQueueTime;
   }
 
-  MutableRate getGrpcProcessingTime() {
+  ConcurrentMutableRate getGrpcProcessingTime() {
     return grpcProcessingTime;
   }
 
