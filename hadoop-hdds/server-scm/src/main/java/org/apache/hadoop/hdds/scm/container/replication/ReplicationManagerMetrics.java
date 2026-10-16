@@ -234,8 +234,8 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       + "to the pending commands on all source datanodes")
   private MutableCounterLong replicateContainerCmdsDeferredTotal;
 
-  @Metric("Number of times EC reconstruction was triggered for decommission "
-      + "due to source node load.")
+  @Metric("Number of EC reconstruction commands sent for decommission recovery "
+      + "because a decommissioning source datanode was highly loaded.")
   private MutableCounterLong ecReconstructionDecommissionTriggeredTotal;
 
   @Metric("Number of times EC decommission recovery fell back to 1-1 "

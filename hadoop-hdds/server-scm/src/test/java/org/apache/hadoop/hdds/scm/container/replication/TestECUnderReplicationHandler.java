@@ -675,6 +675,55 @@ public class TestECUnderReplicationHandler {
   }
 
   @Test
+  public void testUnderReplicationWithDecomNodesRethrowsOnPartialReconstruction()
+      throws IOException {
+    replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1),
+            Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+
+    DatanodeDetails decomNode = availableReplicas.stream()
+        .filter(r -> r.getReplicaIndex() == 1)
+        .findFirst().get().getDatanodeDetails();
+    when(replicationManager.isNodeHighlyLoaded(decomNode)).thenReturn(true);
+
+    when(ecPlacementPolicy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong()))
+        .thenAnswer(invocation -> {
+          int nodesRequired = invocation.getArgument(3);
+          if (nodesRequired == 2) {
+            return singletonList(MockDatanodeDetails.randomDatanodeDetails());
+          }
+          int count = nodesRequired;
+          List<DatanodeDetails> targets = new ArrayList<>();
+          for (int i = 0; i < count; i++) {
+            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+          }
+          return targets;
+        });
+
+    ECUnderReplicationHandler ecURH =
+        new ECUnderReplicationHandler(ecPlacementPolicy, conf, replicationManager);
+    UnderReplicatedHealthResult result =
+        mock(UnderReplicatedHealthResult.class);
+    when(result.isUnrecoverable()).thenReturn(false);
+    when(result.getContainerInfo()).thenReturn(container);
+
+    assertThrows(InsufficientDatanodesException.class, () ->
+        ecURH.processAndSendCommands(availableReplicas, ImmutableList.of(),
+            result, remainingMaintenanceRedundancy));
+
+    assertEquals(1, commandsSent.stream()
+        .filter(c -> c.getValue() instanceof ReconstructECContainersCommand)
+        .count());
+    assertEquals(0, commandsSent.stream()
+        .filter(c -> c.getValue() instanceof ReplicateContainerCommand)
+        .count());
+    assertEquals(0, metrics.getEcDecommissionReconstructionFallbackNoOpTotal());
+    assertEquals(0, metrics.getEcReconstructionDecommissionTriggeredTotal());
+  }
+
+  @Test
   public void testUnderReplicationWithDecomIndex12() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(DECOMMISSIONING, 1),

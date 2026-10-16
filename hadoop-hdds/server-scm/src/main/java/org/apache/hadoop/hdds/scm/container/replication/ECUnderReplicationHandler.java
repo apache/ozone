@@ -531,6 +531,10 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
               container.containerID(), e);
           metrics.incrEcDecommissionReconstructionFallbackTargetOverloadedTotal();
         } catch (InsufficientDatanodesException e) {
+          if (replicaCount.decommissioningOnlyIndexes(true).size()
+              < decomIndexes.size()) {
+            throw e;
+          }
           LOG.debug("Reconstruction could not place targets for decommissioning "
                   + "container {}, using 1-1 replication.",
               container.containerID(), e);
