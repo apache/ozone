@@ -119,6 +119,11 @@ public class TestDeletedBlockLog {
   private static final int ONE = ReplicationFactor.ONE_VALUE;
 
   private ReplicationManager replicationManager;
+  // Advance across generateData() calls so each generated containerID and
+  // block localID is unique, matching production where localIDs come from a
+  // global SCM sequence and are never reused.
+  private long nextContainerIdBase = 1;
+  private long nextLocalId = 1;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -209,15 +214,15 @@ public class TestDeletedBlockLog {
   private Map<Long, List<DeletedBlock>> generateData(int txCount,
       HddsProtos.LifeCycleState state) throws IOException {
     Map<Long, List<DeletedBlock>> blockMap = new HashMap<>();
-    long continerIDBase = RandomUtils.secure().randomLong(0, 100);
-    int localIDBase = RandomUtils.secure().randomInt(0, 1000);
+    long continerIDBase = nextContainerIdBase;
+    nextContainerIdBase += txCount;
     long blockSize = 1024 * 1024 * 64;
     for (int i = 0; i < txCount; i++) {
       List<DeletedBlock> blocks = new ArrayList<>();
       long containerID = continerIDBase + i;
       updateContainerMetadata(containerID, state);
       for (int j = 0; j < BLOCKS_PER_TXN; j++)  {
-        long localID = localIDBase + j;
+        long localID = nextLocalId++;
         blocks.add(new DeletedBlock(new BlockID(containerID, localID),
             blockSize + j, blockSize + j, blockSize + j));
       }
@@ -324,6 +329,22 @@ public class TestDeletedBlockLog {
     for (ContainerInfo containerInfo : containerManager.getContainers()) {
       assertEquals(0, containerInfo.getDeleteTransactionId());
     }
+  }
+
+  @Test
+  public void testDuplicateTransactionsAreNotPersisted() throws Exception {
+    Map<Long, List<DeletedBlock>> deletedBlocks = generateData(30);
+    addTransactions(deletedBlocks, true);
+    assertEquals(30, deletedBlockLog.getNumOfValidTransactions());
+    long created = metrics.getNumBlockDeletionTransactionCreated();
+
+    // Re-send the exact same blocks, as if OM retried the delete request.
+    // SCM must skip them instead of creating new transactions.
+    addTransactions(deletedBlocks, true);
+    assertEquals(30, deletedBlockLog.getNumOfValidTransactions());
+    assertEquals(created, metrics.getNumBlockDeletionTransactionCreated());
+    assertEquals((long) 30 * BLOCKS_PER_TXN,
+        metrics.getNumDuplicateDeleteBlocksSkipped());
   }
 
   private void mockContainerHealthResult(Boolean healthy) {

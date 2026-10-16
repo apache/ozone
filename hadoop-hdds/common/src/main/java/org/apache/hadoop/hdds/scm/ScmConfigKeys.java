@@ -479,6 +479,11 @@ public final class ScmConfigKeys {
 
   public static final int OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR_DEFAULT = 8;
 
+  public static final String OZONE_SCM_BLOCK_DELETION_DUPLICATE_CACHE_SIZE =
+      "ozone.scm.block.deletion.duplicate.cache.size";
+
+  public static final int OZONE_SCM_BLOCK_DELETION_DUPLICATE_CACHE_SIZE_DEFAULT = 1_000_000;
+
   public static final String OZONE_SCM_SEQUENCE_ID_BATCH_SIZE =
       "ozone.scm.sequence.id.batch.size";
   public static final int OZONE_SCM_SEQUENCE_ID_BATCH_SIZE_DEFAULT = 1000;
