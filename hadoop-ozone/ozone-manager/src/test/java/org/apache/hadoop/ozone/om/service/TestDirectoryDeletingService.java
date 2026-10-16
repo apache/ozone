@@ -276,7 +276,7 @@ public class TestDirectoryDeletingService {
     String directoryName = StringUtils.repeat("d", 1200);
     OzoneManagerProtocolProtos.KeyInfo keyInfo =
         OMRequestTestUtils.createOmKeyInfo("volume", "bucket", "key", RatisReplicationConfig.getInstance(ONE))
-            .build().getProtobuf(ClientVersion.CURRENT_VERSION);
+            .build().getProtobuf(ClientVersion.CURRENT);
     for (int i = 0; i < 3; i++) {
       purgeList.add(PurgePathRequest.newBuilder().setVolumeId(1).setBucketId(2)
           .setDeletedDir(directoryName + i).addMarkDeletedSubDirs(keyInfo)
@@ -383,7 +383,7 @@ public class TestDirectoryDeletingService {
       List<Pair<String, OmKeyInfo>> subDirs = new ArrayList<>();
       subDirs.add(Pair.of(childDeleteKey, child));
       PurgePathRequest parent = PurgePathRequest.newBuilder().setVolumeId(1).setBucketId(2)
-          .setDeletedDir("parent").addMarkDeletedSubDirs(child.getProtobuf(ClientVersion.CURRENT_VERSION)).build();
+          .setDeletedDir("parent").addMarkDeletedSubDirs(child.getProtobuf(ClientVersion.CURRENT)).build();
       List<PurgePathRequest> purgeList = new ArrayList<>();
       purgeList.add(parent);
       PurgePathRequest otherBucket = PurgePathRequest.newBuilder().setVolumeId(1).setBucketId(3)
