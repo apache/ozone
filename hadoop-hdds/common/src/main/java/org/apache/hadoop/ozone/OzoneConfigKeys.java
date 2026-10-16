@@ -572,6 +572,9 @@ public final class OzoneConfigKeys {
   public static final String OZONE_HTTP_SNI_HOST_CHECK_ENABLED =
       "ozone.http.sni.host.check.enabled";
   public static final boolean OZONE_HTTP_SNI_HOST_CHECK_ENABLED_DEFAULT = false;
+  public static final String OZONE_HTTP_SNI_KEYMANAGER_DELEGATE_ENABLED =
+      "ozone.http.sni.keymanager.delegate.enabled";
+  public static final boolean OZONE_HTTP_SNI_KEYMANAGER_DELEGATE_ENABLED_DEFAULT = false;
   public static final String  OZONE_SSL_ENABLED_PROTOCOLS = "ozone.ssl.enabled.protocols";
   public static final String  OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY =
       "ozone.https.server.keystore.resource";

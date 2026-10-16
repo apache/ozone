@@ -113,6 +113,7 @@ import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
 import org.eclipse.jetty.util.ArrayUtil;
 import org.eclipse.jetty.util.ExceptionUtil;
+import org.eclipse.jetty.util.ssl.SniX509ExtendedKeyManager;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -638,6 +639,22 @@ public final class HttpServer2 implements FilterContainer {
       SslContextFactory.Server sslContextFactory =
           new SslContextFactory.Server();
       sslContextFactory.setNeedClientAuth(needsClientAuth);
+      // With a combined keystore (for example separate TLS-server-auth and
+      // client-auth certificates issued under single-purpose EKU), Jetty's
+      // default SNI key manager picks the server certificate by matching the
+      // SNI host against each certificate's SAN/CN, ignoring the extended key
+      // usage. That selection fails to pick the server-auth certificate for
+      // requests that carry no matching SNI. When enabled, delegate alias
+      // selection to the JDK key manager using the EKU-aware PKIX algorithm,
+      // so the server-auth certificate is chosen regardless of SNI.
+      boolean sniKeyManagerDelegate = conf.getBoolean(
+          OzoneConfigKeys.OZONE_HTTP_SNI_KEYMANAGER_DELEGATE_ENABLED,
+          OzoneConfigKeys.OZONE_HTTP_SNI_KEYMANAGER_DELEGATE_ENABLED_DEFAULT);
+      if (sniKeyManagerDelegate) {
+        sslContextFactory.setSNISelector(
+            (keyType, issuers, session, sniHost, certificates) ->
+                SniX509ExtendedKeyManager.SniSelector.DELEGATE);
+      }
       if (keyPassword != null) {
         sslContextFactory.setKeyManagerPassword(keyPassword);
       }
