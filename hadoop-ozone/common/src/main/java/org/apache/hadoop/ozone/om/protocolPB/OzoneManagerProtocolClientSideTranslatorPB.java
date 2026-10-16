@@ -2650,6 +2650,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     final ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(
         keyArgs, recursive, startKey, numEntries, allowPartialPrefixes);
+    if (args.isRequireFileSystemLayout()) {
+      listStatusRequestBuilder.setRequireFileSystemLayout(true);
+    }
 
     OMRequest omRequest = createOMRequest(Type.ListStatus)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2682,6 +2685,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     final String listPrefix = args.getListPrefix();
     if (listPrefix != null && !listPrefix.isEmpty()) {
       listStatusRequestBuilder.setListPrefix(listPrefix);
+    }
+    if (args.isRequireFileSystemLayout()) {
+      listStatusRequestBuilder.setRequireFileSystemLayout(true);
     }
 
     OMRequest omRequest = createOMRequest(Type.ListStatusLight)

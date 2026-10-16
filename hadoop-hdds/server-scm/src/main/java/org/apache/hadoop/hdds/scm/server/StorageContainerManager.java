@@ -90,6 +90,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
 import org.apache.hadoop.hdds.scm.container.balancer.MoveManager;
+import org.apache.hadoop.hdds.scm.container.export.ContainerExportManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
@@ -117,6 +118,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceException;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManager;
 import org.apache.hadoop.hdds.scm.ha.StatefulServiceStateManagerImpl;
@@ -306,6 +308,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private final ContainerBalancer containerBalancer;
   // MoveManager is used by ContainerBalancer to schedule container moves
   private final MoveManager moveManager;
+  private final ContainerExportManager containerExportManager;
   private StatefulServiceStateManager statefulServiceStateManager;
   // Used to keep track of pending replication and pending deletes for
   // container replicas.
@@ -429,6 +432,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
     initializeSystemManagers(conf, configurator);
+
+    containerExportManager = new ContainerExportManager(
+        getScmId(), containerManager, this::checkLeader, conf);
 
     if (isSecretKeyEnable(securityConfig)) {
       secretKeyManagerService = new SecretKeyManagerService(scmContext, conf,
@@ -1569,6 +1575,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmBlockManager.start();
     leaseManager.start();
+    containerExportManager.start();
 
     try {
       httpServer = new StorageContainerManagerHttpServer(configuration, this);
@@ -1627,6 +1634,12 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       stopReplicationManager(); // started eagerly
       return;
     }
+
+    SCMStateMachine stateMachine = getScmHAManager().getRatisServer()
+        .getSCMStateMachine();
+    if (stateMachine != null) {
+      stateMachine.stopDNServerStartRetry();
+    }
     try {
       if (containerBalancer.isBalancerRunning()) {
         LOG.info("Stopping Container Balancer service.");
@@ -1640,6 +1653,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     }
 
     stopReplicationManager();
+    stopContainerExportManager();
 
     try {
       LOG.info("Stopping the Datanode Admin Monitor.");
@@ -1770,6 +1784,15 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       replicationManager.stop();
     } catch (Exception ex) {
       LOG.error("Replication manager service stop failed.", ex);
+    }
+  }
+
+  private void stopContainerExportManager() {
+    try {
+      LOG.info("Shutting down Container Export Manager.");
+      containerExportManager.shutdown();
+    } catch (Exception ex) {
+      LOG.error("Container Export Manager shutdown failed.", ex);
     }
   }
 
@@ -1908,6 +1931,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public MoveManager getMoveManager() {
     return moveManager;
+  }
+
+  public ContainerExportManager getContainerExportManager() {
+    return containerExportManager;
   }
 
   /**
@@ -2219,6 +2246,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public Collection<String> getScmAdminUsernames() {
     return scmAdmins.getAdminUsernames();
+  }
+
+  public Collection<String> getScmAdminGroups() {
+    return scmAdmins.getAdminGroups();
   }
 
   public Collection<String> getScmReadOnlyAdminUsernames() {

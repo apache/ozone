@@ -63,6 +63,7 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.key.JavaKeyStoreProvider;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
@@ -82,6 +83,7 @@ import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.storage.MultipartInputStream;
+import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
@@ -308,6 +310,17 @@ class TestOzoneAtRestEncryption {
     createAndVerifyKeyData(bucket);
     createAndVerifyStreamKeyData(bucket);
     createAndVerifyFileSystemData(bucket);
+
+    String keyName = UUID.randomUUID().toString();
+    byte[] data = generateRandomData(PositionedReadTestHelper.SOURCE_SIZE);
+    DataTestUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, ONE), data);
+    try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
+      assertInstanceOf(CryptoInputStream.class, inputStream.getInputStream());
+      inputStream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(data, inputStream::readFully);
+      assertEquals(123, inputStream.getPos());
+      assertEquals(Byte.toUnsignedInt(data[123]), inputStream.read());
+    }
   }
 
   @ParameterizedTest
@@ -721,6 +734,19 @@ class TestOzoneAtRestEncryption {
     try (OzoneInputStream inputStream = bucket.readKey(keyName)) {
 
       assertInstanceOf(MultipartInputStream.class, inputStream.getInputStream());
+      if (numParts == 2) {
+        inputStream.seek(123);
+        PositionedReadTestHelper.runConcurrentPositionedReads(inputData, inputStream::readFully);
+        int offset = partsData.get(0).length - 17;
+        ByteBuffer destination = ByteBuffer.allocateDirect(DEFAULT_CRYPTO_BUFFER_SIZE + 37);
+        inputStream.readFully(offset, destination);
+        destination.flip();
+        byte[] actual = new byte[destination.remaining()];
+        destination.get(actual);
+        assertArrayEquals(Arrays.copyOfRange(inputData, offset, offset + actual.length), actual);
+        assertEquals(123, inputStream.getPos());
+        inputStream.seek(0);
+      }
 
       // Test complete read
       byte[] completeRead = new byte[keySize];

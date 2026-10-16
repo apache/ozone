@@ -213,18 +213,19 @@ jobs:
             hadoop-ozone/dev-support/checks/junit.sh $args -Dtest="$TEST_CLASS#$TEST_METHOD,Abstract*Test*\$*"
           fi
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          CHECK: flaky
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
           repo_path: ${{ steps.download-ozone-repo.outputs.download-path }}
           ratis_args: ${{ needs.ratis.outputs.build-args }}
       - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
+        run: hadoop-ozone/dev-support/checks/_summary.sh target/flaky/summary.txt
         if: ${{ failure() }}
       - name: Archive build results
         uses: actions/upload-artifact@v7
         if: ${{ failure() }}
         with:
           name: result-${{ github.run_number }}-${{ github.run_id }}-split-${{ matrix.split }}
-          path: target/unit
+          path: target/flaky
   count-failures:
     if: ${{ failure() }}
     needs: run-test

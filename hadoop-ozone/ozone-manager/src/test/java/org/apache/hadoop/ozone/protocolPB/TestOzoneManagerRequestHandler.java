@@ -308,6 +308,42 @@ public class TestOzoneManagerRequestHandler {
   }
 
   /**
+   * ListStatus and ListStatusLight must forward requireFileSystemLayout from
+   * the request into the OmKeyArgs handed to the OM.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListStatusForwardsRequireFileSystemLayout(boolean require) throws IOException {
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+    OzoneManager ozoneManager = requestHandler.getOzoneManager();
+    OzoneManagerProtocolProtos.ListStatusRequest listStatusRequest =
+        OzoneManagerProtocolProtos.ListStatusRequest.newBuilder()
+            .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                .setVolumeName("volume").setBucketName("bucket").setKeyName("dir"))
+            .setRecursive(false).setStartKey("").setNumEntries(10)
+            .setRequireFileSystemLayout(require)
+            .build();
+
+    for (OzoneManagerProtocolProtos.Type type : Arrays.asList(
+        OzoneManagerProtocolProtos.Type.ListStatus, OzoneManagerProtocolProtos.Type.ListStatusLight)) {
+      OzoneManagerProtocolProtos.OMRequest request = Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+      Mockito.when(request.getTraceID()).thenReturn("traceId");
+      Mockito.when(request.getCmdType()).thenReturn(type);
+      Mockito.when(request.getListStatusRequest()).thenReturn(listStatusRequest);
+      requestHandler.handleReadRequest(request);
+    }
+
+    ArgumentCaptor<OmKeyArgs> listStatusArgs = ArgumentCaptor.forClass(OmKeyArgs.class);
+    Mockito.verify(ozoneManager).listStatus(listStatusArgs.capture(), Mockito.anyBoolean(), Mockito.anyString(),
+        Mockito.anyLong(), Mockito.anyBoolean());
+    Assertions.assertEquals(require, listStatusArgs.getValue().isRequireFileSystemLayout());
+    ArgumentCaptor<OmKeyArgs> listStatusLightArgs = ArgumentCaptor.forClass(OmKeyArgs.class);
+    Mockito.verify(ozoneManager).listStatusLight(listStatusLightArgs.capture(), Mockito.anyBoolean(),
+        Mockito.anyString(), Mockito.anyLong(), Mockito.anyBoolean());
+    Assertions.assertEquals(require, listStatusLightArgs.getValue().isRequireFileSystemLayout());
+  }
+
+  /**
    * Test to verify BasicOmKeyInfo encryption field works in listKeysLight.
    */
   @Test

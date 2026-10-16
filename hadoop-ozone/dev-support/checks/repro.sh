@@ -23,4 +23,6 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=repro
 ERROR_PATTERN='ERROR.*mismatch'
 
-source "${DIR}"/_build.sh verify artifact:compare "$@"
+source "${DIR}"/_build.sh verify artifact:compare "$@" \
+    -Ddevelocity.cache.local.enabled=false \
+    -Ddevelocity.cache.remote.enabled=false
