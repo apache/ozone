@@ -495,6 +495,7 @@ public final class HddsUtils {
     case UpdateContainer:
     case GetContainerChecksumInfo:
     case ListBlock:
+    case Echo:
       return true;
     default:
       return false;
