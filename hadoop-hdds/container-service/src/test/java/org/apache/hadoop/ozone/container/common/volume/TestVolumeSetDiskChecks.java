@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.commons.lang3.RandomStringUtils.secure;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -315,7 +314,7 @@ public class TestVolumeSetDiskChecks {
     container1.create(volumeSet1,
         new RoundRobinVolumeChoosingPolicy(), UUID.randomUUID().toString());
     conSet.addContainer(container1);
-    assertThat(conSet.getRecoveringContainerMap()).hasSize(state == RECOVERING ? 2 : 0);
+    assertThat(conSet.getRecoveringContainerMap()).hasSize(state == State.RECOVERING ? 2 : 0);
     DatanodeStateMachine datanodeStateMachineMock =
         mock(DatanodeStateMachine.class);
     StateContext stateContext = new StateContext(
@@ -341,7 +340,7 @@ public class TestVolumeSetDiskChecks {
     assertThat(conSet.getRecoveringContainerMap()).doesNotContainKey(containerID1);
     // ContainerID should exist belonging to normal volume
     assertNotNull(conSet.getContainer(containerID));
-    assertThat(conSet.getRecoveringContainerMap()).hasSize(state == RECOVERING ? 1 : 0);
+    assertThat(conSet.getRecoveringContainerMap()).hasSize(state == State.RECOVERING ? 1 : 0);
     expectedReportCount.put(
         StorageContainerDatanodeProtocolProtos.ContainerReportsProto
             .getDescriptor().getFullName(), 1);
