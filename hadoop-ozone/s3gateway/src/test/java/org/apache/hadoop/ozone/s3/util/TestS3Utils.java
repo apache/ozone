@@ -53,6 +53,34 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Tests the S3Utils APIs.
  */
 public class TestS3Utils {
+  private static final ReplicationConfig EC32REPLICATIONCONFIG =
+      new ECReplicationConfig(3, 2);
+  private static final ReplicationConfig RATIS3REPLICATIONCONFIG =
+      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+  private static final ReplicationConfig RATIS1REPLICATIONCONFIG =
+      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+
+  private static final List<ReplicationConfig> REPLICATIONS = Arrays.asList(
+      null,
+      RATIS1REPLICATIONCONFIG,
+      RATIS3REPLICATIONCONFIG,
+      EC32REPLICATIONCONFIG
+  );
+
+  private static final List<String> S3STORAGETYPES = Arrays.asList(
+      null,
+      "",
+      S3StorageType.STANDARD.name(),
+      S3StorageType.REDUCED_REDUNDANCY.name(),
+      S3StorageType.STANDARD_IA.name()
+  );
+
+  private static final List<String> S3STORAGECONFIG = Arrays.asList(
+      null,
+      "",
+      "rs-6-3-1024k"
+  );
+
   @ParameterizedTest
   @EmptySource
   @ValueSource(strings = {
@@ -100,34 +128,6 @@ public class TestS3Utils {
         () -> S3Utils.validateSignatureHeader(headers, "key", true));
     assertEquals(S3ErrorTable.INVALID_ARGUMENT.getCode(), error.getCode());
   }
-
-  private static final ReplicationConfig EC32REPLICATIONCONFIG =
-      new ECReplicationConfig(3, 2);
-  private static final ReplicationConfig RATIS3REPLICATIONCONFIG =
-      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
-  private static final ReplicationConfig RATIS1REPLICATIONCONFIG =
-      RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
-
-  private static final List<ReplicationConfig> REPLICATIONS = Arrays.asList(
-      null,
-      RATIS1REPLICATIONCONFIG,
-      RATIS3REPLICATIONCONFIG,
-      EC32REPLICATIONCONFIG
-  );
-
-  private static final List<String> S3STORAGETYPES = Arrays.asList(
-      null,
-      "",
-      S3StorageType.STANDARD.name(),
-      S3StorageType.REDUCED_REDUNDANCY.name(),
-      S3StorageType.STANDARD_IA.name()
-  );
-
-  private static final List<String> S3STORAGECONFIG = Arrays.asList(
-      null,
-      "",
-      "rs-6-3-1024k"
-  );
 
   public static List<Arguments> validS3ReplicationConfigs() {
     List<Arguments> args = new ArrayList<>();
