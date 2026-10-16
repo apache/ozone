@@ -217,6 +217,13 @@ public final class S3Utils {
       throw ex;
     }
 
+    if (!hasUnsignedPayload(xAmzContentSha256Header) && !hasMultiChunksPayload(xAmzContentSha256Header)
+        && !xAmzContentSha256Header.matches("[0-9a-fA-F]{64}")) {
+      OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
+      ex.setErrorMessage("The " + X_AMZ_CONTENT_SHA256 + " header must contain 64 hexadecimal characters");
+      throw ex;
+    }
+
     return xAmzContentSha256Header;
   }
 
