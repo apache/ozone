@@ -51,10 +51,12 @@ Datanodes are reachable by IPv6 address
                         Should Contain X Times                  ${output}           Reconfigurable properties    3
 
 HTTP servers listen on IPv6
-    FOR    ${host}    ${port}    IN    scm1    9876    om1    9874    recon    9888    s3g    19878    httpfs    14000
+    FOR    ${host}    ${port}    IN    scm1    9876    om1    9874    recon    9888    s3g    19878
         ${literal} =    IPv6 Literal Of     ${host}
                         Execute             curl -g -sSf -o /dev/null 'http://${literal}:${port}/jmx'
     END
+    ${literal} =        IPv6 Literal Of     httpfs
+                        Execute             curl -g -sSf -o /dev/null 'http://${literal}:14000/webhdfs/v1/?op=GETFILESTATUS&user.name=httpfs'
 
 SCM is reachable by IPv6 literal
     ${overrides} =      Address Overrides   ozone.scm.address.scmservice            scm1    scm2    scm3
