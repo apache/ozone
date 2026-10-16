@@ -1831,6 +1831,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
           OzoneAcl.toProtobuf(a)).collect(Collectors.toList()));
     }
 
+    if (omKeyArgs.getStoragePolicy() != null) {
+      keyArgs.setStoragePolicy(OzoneStoragePolicy.toProto(omKeyArgs.getStoragePolicy()));
+    }
+
     setReplicationConfig(omKeyArgs.getReplicationConfig(), keyArgs);
 
     multipartInfoInitiateRequest.setKeyArgs(keyArgs.build());

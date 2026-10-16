@@ -64,6 +64,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
@@ -486,6 +487,40 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
         omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertSame(omKeyCreateResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.QUOTA_EXCEEDED);
+  }
+
+  /**
+   * A part open key takes the storage policy of the multipart key. The client does not send one when it opens
+   * a part, and the blocks of the part are allocated later with the policy recorded on the part.
+   */
+  @Test
+  public void testMultipartPartTakesStoragePolicyOfMultipartKey() throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(false, false));
+    StoragePolicy multipartKeyPolicy = OzoneStoragePolicy.HOT;
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    String uploadID = UUID.randomUUID().toString();
+    omMetadataManager.getOpenKeyTable(getBucketLayout()).put(getMultipartOpenKey(uploadID),
+        createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig)
+            .setStoragePolicy(multipartKeyPolicy).build());
+
+    OMRequest request = createKeyRequest(true, 1);
+    request = request.toBuilder().setCreateKeyRequest(request.getCreateKeyRequest().toBuilder()
+        .setKeyArgs(request.getCreateKeyRequest().getKeyArgs().toBuilder().setMultipartUploadID(uploadID))).build();
+    OMRequest modifiedRequest = doPreExecute(request);
+
+    OMClientResponse response = getOMKeyCreateRequest(modifiedRequest).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertThat(response.getOMResponse().getStatus()).isEqualTo(OK);
+    OmKeyInfo partKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getOpenKey(modifiedRequest.getCreateKeyRequest().getClientID()));
+    assertThat(partKeyInfo).isNotNull();
+    assertThat(partKeyInfo.getStoragePolicy()).isEqualTo(multipartKeyPolicy);
+  }
+
+  /** Key of the open key table row of the multipart key {@code keyName} with the given upload ID. */
+  protected String getMultipartOpenKey(String uploadID) throws IOException {
+    return omMetadataManager.getMultipartKey(volumeName, bucketName, keyName, uploadID);
   }
 
   private void checkResponse(

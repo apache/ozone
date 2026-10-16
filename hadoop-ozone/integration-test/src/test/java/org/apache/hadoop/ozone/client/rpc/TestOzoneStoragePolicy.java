@@ -29,7 +29,10 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.UUID;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
@@ -51,6 +54,7 @@ import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -65,6 +69,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -317,6 +322,78 @@ public class TestOzoneStoragePolicy {
   }
 
   /**
+   * A multipart key honours its storage policy: it inherits the bucket policy unless the upload is
+   * initiated with one, and every block of every part lands on the tier of that policy.
+   *
+   * <p>No block is allocated when a part is opened. The client allocates them one by one while writing,
+   * sending the storage policy of the part open key with each call, and OM falls back to the bucket
+   * policy when none is sent. So the part open key must carry the policy of the multipart key. The
+   * COLD upload on a WARM bucket is what catches a missing policy: with the fallback, its blocks would
+   * land on the WARM tier instead of the COLD one. The first part spans two blocks so that more than
+   * one allocateBlock call is checked.
+   */
+  @Test
+  public void testMultipartUploadStoragePolicy() throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    for (BucketLayout layout : Arrays.asList(BucketLayout.OBJECT_STORE, BucketLayout.FILE_SYSTEM_OPTIMIZED)) {
+      OzoneBucket bucket = createBucket(OzoneStoragePolicy.WARM, layout);
+
+      assertMultipartKey(doMultipartUpload(bucket, UUID.randomUUID().toString(), null),
+          OzoneStoragePolicy.WARM);
+      assertMultipartKey(doMultipartUpload(bucket, UUID.randomUUID().toString(), OzoneStoragePolicy.COLD),
+          OzoneStoragePolicy.COLD);
+    }
+  }
+
+  /**
+   * The policy of a multipart key is fixed when the upload is initiated, so changing the bucket policy
+   * while the upload is open does not move the blocks of the parts uploaded afterwards.
+   */
+  @Test
+  public void testMultipartUploadKeepsStoragePolicyOfInitiate() throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    OzoneBucket bucket = createBucket(OzoneStoragePolicy.WARM, BucketLayout.OBJECT_STORE);
+    String keyName = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(bucket, keyName, null);
+    bucket.setStoragePolicy(OzoneStoragePolicy.HOT);
+    uploadPartsAndComplete(bucket, keyName, uploadID);
+
+    assertMultipartKey(lookupKey(bucket, keyName), OzoneStoragePolicy.WARM);
+  }
+
+  /**
+   * Overwriting a key must leave it with the storage policy of the write that produced its blocks,
+   * not the policy of the key it replaced, the same rule as for a plain key overwrite.
+   */
+  @Test
+  public void testMultipartUploadOverwriteWithDifferentStoragePolicy() throws Exception {
+    startCluster(allTierTopology(RATIS_THREE.getRequiredNodes()));
+
+    OzoneBucket bucket = createBucket(null, BucketLayout.OBJECT_STORE);
+    String keyName = UUID.randomUUID().toString();
+
+    writeKey(bucket, keyName, OzoneStoragePolicy.HOT);
+    assertThat(lookupKey(bucket, keyName).getStoragePolicy()).isEqualTo(OzoneStoragePolicy.HOT);
+
+    assertMultipartKey(doMultipartUpload(bucket, keyName, OzoneStoragePolicy.COLD), OzoneStoragePolicy.COLD);
+    assertMultipartKey(doMultipartUpload(bucket, keyName, OzoneStoragePolicy.HOT), OzoneStoragePolicy.HOT);
+
+    writeKey(bucket, keyName, OzoneStoragePolicy.COLD);
+    OmKeyInfo plainKey = lookupKey(bucket, keyName);
+    assertThat(plainKey.getStoragePolicy()).isEqualTo(OzoneStoragePolicy.COLD);
+    assertAllBlocksOnTier(plainKey, OzoneStoragePolicy.COLD.getCreationTier());
+
+    String hotUpload = initiateMultipartUpload(bucket, keyName, OzoneStoragePolicy.HOT);
+    String coldUpload = initiateMultipartUpload(bucket, keyName, OzoneStoragePolicy.COLD);
+    uploadPartsAndComplete(bucket, keyName, hotUpload);
+    assertMultipartKey(lookupKey(bucket, keyName), OzoneStoragePolicy.HOT);
+    uploadPartsAndComplete(bucket, keyName, coldUpload);
+    assertMultipartKey(lookupKey(bucket, keyName), OzoneStoragePolicy.COLD);
+  }
+
+  /**
    * Checks every block of a key landed on a container of the expected tier. The
    * {@code assertDatanodeContainerAndBlock} helper only inspects the first block, which cannot
    * catch a tier that changes partway through a key.
@@ -334,6 +411,54 @@ public class TestOzoneStoragePolicy {
           containerInfo.getStorageTier().getUniformStorageType(),
           "block " + i + " of " + blocks.size() + " landed on the wrong tier");
     }
+  }
+
+  /** Initiates an upload, completes it with two parts and returns the completed key. */
+  private OmKeyInfo doMultipartUpload(OzoneBucket bucket, String keyName,
+      OzoneStoragePolicy storagePolicy) throws Exception {
+    String uploadID = initiateMultipartUpload(bucket, keyName, storagePolicy);
+    uploadPartsAndComplete(bucket, keyName, uploadID);
+    return lookupKey(bucket, keyName);
+  }
+
+  private String initiateMultipartUpload(OzoneBucket bucket, String keyName,
+      OzoneStoragePolicy storagePolicy) throws IOException {
+    OmMultipartInfo multipartInfo = bucket.initiateMultipartUpload(keyName, RATIS_THREE,
+        Collections.emptyMap(), Collections.emptyMap(), storagePolicy);
+    assertThat(multipartInfo.getUploadID()).isNotNull();
+    return multipartInfo.getUploadID();
+  }
+
+  /**
+   * Uploads a part of the minimum size, which spans more than one block, and a small last part,
+   * then completes the upload.
+   */
+  private void uploadPartsAndComplete(OzoneBucket bucket, String keyName, String uploadID)
+      throws IOException {
+    Map<Integer, String> partsMap = new TreeMap<>();
+    int[] partSizes = {OzoneConsts.OM_MULTIPART_MIN_SIZE, 1024};
+    for (int i = 0; i < partSizes.length; i++) {
+      int partNumber = i + 1;
+      byte[] data = new byte[partSizes[i]];
+      Arrays.fill(data, (byte) ('a' + i));
+      OzoneOutputStream out = bucket.createMultipartKey(keyName, data.length, partNumber, uploadID);
+      out.write(data);
+      out.getMetadata().put(OzoneConsts.ETAG, DigestUtils.md5Hex(data));
+      out.close();
+      partsMap.put(partNumber, out.getCommitUploadPartInfo().getETag());
+    }
+    bucket.completeMultipartUpload(keyName, uploadID, partsMap);
+  }
+
+  /** Checks the key records the policy and that all of its several blocks sit on the tier of that policy. */
+  private void assertMultipartKey(OmKeyInfo keyInfo, OzoneStoragePolicy expectedPolicy)
+      throws IOException {
+    assertThat(keyInfo.getStoragePolicy()).isEqualTo(expectedPolicy);
+    assertThat(keyInfo.getLatestVersionLocations().getBlocksLatestVersionOnly().size())
+        .withFailMessage("Expected more than one block so that several allocations are exercised")
+        .isGreaterThan(1);
+    assertAllBlocksOnTier(keyInfo, expectedPolicy.getCreationTier());
+    assertDatanodeContainerAndBlock(keyInfo, expectedPolicy.getCreationTier());
   }
 
   private OzoneBucket createBucket(OzoneStoragePolicy storagePolicy,

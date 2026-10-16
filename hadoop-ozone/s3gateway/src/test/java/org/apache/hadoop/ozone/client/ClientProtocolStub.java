@@ -465,6 +465,15 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OmMultipartInfo initiateMultipartUpload(String volumeName,
+         String bucketName, String keyName, ReplicationConfig replicationConfig,
+         Map<String, String> metadata, Map<String, String> tags, StoragePolicy storagePolicy)
+      throws IOException {
+    return getBucket(volumeName, bucketName)
+        .initiateMultipartUpload(keyName, replicationConfig, metadata, tags, storagePolicy);
+  }
+
+  @Override
   public OzoneOutputStream createMultipartKey(String volumeName,
                                               String bucketName, String keyName,
                                               long size, int partNumber,

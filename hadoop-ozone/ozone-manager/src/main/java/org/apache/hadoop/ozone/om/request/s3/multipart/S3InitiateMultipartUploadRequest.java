@@ -26,7 +26,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -90,11 +92,15 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
 
+    final OmBucketInfo bucketInfo = ozoneManager
+        .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
+
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
             .setMultipartUploadID(
                 OMMultipartUploadUtils.getMultipartUploadId())
             .setModificationTime(Time.now())
-            .setKeyName(keyPath);
+            .setKeyName(keyPath)
+            .setStoragePolicy(OzoneStoragePolicy.toProto(getStoragePolicy(bucketInfo, keyArgs)));
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
@@ -192,11 +198,16 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
                   bucketInfo.getDefaultReplicationConfig() :
                   null, ozoneManager);
 
+      // Absent when replaying a request logged by an OM that did not set it; stays null then.
+      final StoragePolicy storagePolicy = keyArgs.hasStoragePolicy()
+          ? OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()) : null;
+
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
           .setCreationTime(keyArgs.getModificationTime())
           .setReplicationConfig(
               replicationConfig)
+          .setStoragePolicy(storagePolicy)
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           // Source of truth is the value stamped onto the proto in preExecute
@@ -222,6 +233,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
           .setOwnerName(keyArgs.getOwnerName())
           .addAllTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
+          .setStoragePolicy(storagePolicy)
           .build();
 
       // Add to cache

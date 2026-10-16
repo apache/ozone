@@ -28,7 +28,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneConfigUtil;
@@ -161,10 +163,15 @@ public class S3InitiateMultipartUploadRequestWithFSO
                   bucketInfo.getDefaultReplicationConfig() :
                   null, ozoneManager);
 
+      // Absent when replaying a request logged by an OM that did not set it; stays null then.
+      final StoragePolicy storagePolicy = keyArgs.hasStoragePolicy()
+          ? OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()) : null;
+
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
           .setCreationTime(keyArgs.getModificationTime())
           .setReplicationConfig(replicationConfig)
+          .setStoragePolicy(storagePolicy)
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
           .setParentID(pathInfoFSO.getLastKnownParentId())
@@ -192,8 +199,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setParentObjectID(pathInfoFSO.getLastKnownParentId())
           .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
           .addAllTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
+          .setStoragePolicy(storagePolicy)
           .build();
-      
+
       // validate and update namespace for missing parent directory
       if (null != missingParentInfos) {
         checkBucketQuotaInNamespace(bucketInfo, missingParentInfos.size());
