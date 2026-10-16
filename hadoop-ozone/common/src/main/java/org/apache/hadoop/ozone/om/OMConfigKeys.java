@@ -114,6 +114,18 @@ public final class OMConfigKeys {
   public static final int OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT
       = 20000;
 
+  public static final String
+      OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD =
+      "ozone.om.key.deleting.scm.follower.lag.throttle.threshold";
+  public static final int
+      OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD_DEFAULT = 100000;
+
+  public static final String
+      OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK =
+      "ozone.om.key.deleting.scm.lag.throttled.limit.per.task";
+  public static final int
+      OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK_DEFAULT = 1000;
+
   public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL =
       "ozone.om.open.key.cleanup.service.interval";
   public static final String

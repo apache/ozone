@@ -193,6 +193,8 @@ message KeyBlocks {
  */
 message DeleteScmKeyBlocksResponseProto {
   repeated DeleteKeyBlocksResultProto results = 1;
+  // Max SCM Ratis follower replication lag. OM uses it to throttle block deletion load.
+  optional int64 scmFollowerReplicationLag = 2;
 }
 
 /**

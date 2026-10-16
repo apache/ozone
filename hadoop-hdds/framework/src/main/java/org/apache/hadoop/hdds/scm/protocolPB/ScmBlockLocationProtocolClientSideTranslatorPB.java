@@ -99,6 +99,13 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
   private SCMBlockLocationFailoverProxyProvider failoverProxyProvider;
 
   /**
+   * SCM Ratis follower replication lag (Raft log entries) observed on the most
+   * recent {@link #deleteKeyBlocks} call. Advisory; read by OM to throttle
+   * block-deletion load. 0 means no lag or not yet observed.
+   */
+  private volatile long lastKnownFollowerReplicationLag;
+
+  /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
    *
    * @param proxyProvider {@link SCMBlockLocationFailoverProxyProvider}
@@ -297,6 +304,10 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
     final DeleteScmKeyBlocksResponseProto resp =
         wrappedResponse.getDeleteScmKeyBlocksResponse();
 
+    // Record the advisory SCM follower replication lag so OM can throttle its
+    // block-deletion load. Absent/old SCM leaves this at the proto default 0.
+    lastKnownFollowerReplicationLag = resp.getScmFollowerReplicationLag();
+
     List<DeleteBlockGroupResult> results =
         new ArrayList<>(resp.getResultsCount());
     results.addAll(resp.getResultsList().stream().map(
@@ -305,6 +316,11 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
                 .convertBlockResultProto(result.getBlockResultsList())))
         .collect(Collectors.toList()));
     return results;
+  }
+
+  @Override
+  public long getLastKnownFollowerReplicationLag() {
+    return lastKnownFollowerReplicationLag;
   }
 
   /**
