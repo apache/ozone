@@ -26,7 +26,6 @@ final class TrailerChecksum {
   private final MessageDigest digest;
   private final Checksum checksum;
   private final int checksumLength;
-  private final byte[] singleByte = new byte[1];
 
   TrailerChecksum(MessageDigest digest) {
     this.digest = digest;
@@ -41,8 +40,11 @@ final class TrailerChecksum {
   }
 
   void update(byte value) {
-    singleByte[0] = value;
-    update(singleByte, 0, 1);
+    if (digest != null) {
+      digest.update(value);
+    } else {
+      checksum.update(value);
+    }
   }
 
   void update(byte[] bytes, int offset, int length) {
