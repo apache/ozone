@@ -505,14 +505,11 @@ public class OzoneManagerServiceProviderImpl
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(
           ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-      // Clear the candidate dir, as the OM follower does after a failed download.
-      // A failed untar can leave a truncated file there, and the next request
-      // would list it as received, so the leader would not send it again.
-      try {
-        reconSnapshotProvider.init();
-      } catch (RuntimeException resetEx) {
-        LOG.warn("Failed to clear candidate dir {}", reconSnapshotProvider.getCandidateDir(), resetEx);
-      }
+      // Do not wipe the candidate dir here. The shared RDBSnapshotProvider's
+      // checkLeaderConsistency() manages it on the next attempt: kept for the
+      // same leader (so a future batched/chunked transfer can resume the parts
+      // already received), reset on a leader change. It only holds fully
+      // extracted files, see ReconRDBSnapshotProvider#untarContentsOfTarball.
       return null;
     }
   }
