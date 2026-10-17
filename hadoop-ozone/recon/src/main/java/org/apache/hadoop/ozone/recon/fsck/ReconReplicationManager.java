@@ -310,6 +310,10 @@ public class ReconReplicationManager extends ReplicationManager {
         ContainerID cid = container.containerID();
         Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
         List<ContainerReplicaOp> pendingOps = getPendingReplicationOps(cid);
+        if (container.isSuppressed()) {
+          // processContainer skips a suppressed container and would leave its last health state in place.
+          container.setHealthState(ContainerHealthState.HEALTHY);
+        }
 
         // Call inherited processContainer - this runs SCM's health check chain
         // readOnly=true ensures no commands are generated
