@@ -48,6 +48,7 @@ import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
+import org.eclipse.jetty.util.ssl.SniX509ExtendedKeyManager;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -250,6 +251,42 @@ public class TestHttpServer2SSL {
     OzoneConfiguration serverConf = new OzoneConfiguration(conf);
     serverConf.set(SSLFactory.SSL_ENABLED_PROTOCOLS_KEY, "TLSv1.3");
     assertServerAppliesEnabledProtocol(serverConf, "TLSv1.3");
+  }
+
+  /**
+   * With {@link OzoneConfigKeys#OZONE_HTTP_SNI_KEYMANAGER_DELEGATE_ENABLED}
+   * enabled, the HTTPS connector switches to the EKU-aware PKIX key manager and
+   * installs an SNI selector that always delegates alias selection to that key
+   * manager instead of Jetty's SNI host matching. The server still serves
+   * requests over TLS.
+   */
+  @Test
+  public void testSniKeyManagerDelegateAppliesDelegateSelector() throws Exception {
+    OzoneConfiguration serverConf = new OzoneConfiguration(conf);
+    serverConf.setBoolean(OzoneConfigKeys.OZONE_HTTP_SNI_KEYMANAGER_DELEGATE_ENABLED, true);
+    HttpServer2 server = buildServer(serverConf, null, null, null);
+    server.start();
+    try {
+      ServerConnector listener = server.getListeners().get(0);
+      SslConnectionFactory connectionFactory =
+          listener.getConnectionFactory(SslConnectionFactory.class);
+      assertNotNull(connectionFactory,
+          "Expected HTTPS listener with an SSL connection factory");
+      SslContextFactory.Server sslContextFactory =
+          (SslContextFactory.Server) connectionFactory.getSslContextFactory();
+
+      SniX509ExtendedKeyManager.SniSelector selector = sslContextFactory.getSNISelector();
+      assertNotNull(selector, "Expected a custom SNI selector");
+      assertEquals(SniX509ExtendedKeyManager.SniSelector.DELEGATE,
+          selector.sniSelect(null, null, null, null, null));
+
+      // The server still serves requests over TLS with the delegate selector.
+      InetSocketAddress addr = server.getConnectorAddress(0);
+      SSLSocketFactory factory = createSocketFactory(null, null);
+      assertEquals(HttpURLConnection.HTTP_OK, connectWithFactory(factory, addr));
+    } finally {
+      server.stop();
+    }
   }
 
   private void assertServerAppliesEnabledProtocol(
