@@ -83,6 +83,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
@@ -661,16 +662,14 @@ public class TestStorageContainerManager {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
-      DataTestUtil.createKeys(cluster, 10);
-      GenericTestUtils.waitFor(() ->
-          cluster.getStorageContainerManager().getContainerManager()
-              .getContainers() != null, 1000, 10000);
+      OmKeyInfo key = DataTestUtil.createKeys(cluster, 10)
+          .values().iterator().next();
+      long containerID = key.getLatestVersionLocations()
+          .createLocationList().get(0).getContainerID();
 
       StorageContainerManager scm = cluster.getStorageContainerManager();
-      List<ContainerInfo> containers = cluster.getStorageContainerManager()
-          .getContainerManager().getContainers();
-      assertNotNull(containers);
-      ContainerInfo selectedContainer = containers.iterator().next();
+      ContainerInfo selectedContainer = scm.getContainerManager()
+          .getContainer(ContainerID.valueOf(containerID));
 
       // Stop processing HB
       scm.getDatanodeProtocolServer().stop();
