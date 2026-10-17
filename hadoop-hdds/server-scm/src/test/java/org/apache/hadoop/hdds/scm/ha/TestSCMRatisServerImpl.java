@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -28,30 +29,48 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.client.RaftClient;
+import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.grpc.GrpcFactory;
+import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.server.storage.RaftStorage;
+import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test for SCM Ratis Server Implementation.
  */
 public class TestSCMRatisServerImpl {
+
+  @TempDir
+  private Path tempDir;
 
   @Test
   public void  testGetLeaderId() throws Exception {
@@ -224,4 +243,51 @@ public class TestSCMRatisServerImpl {
     }
   }
 
+  @Test
+  public void testInitializeSkipEntriesOfStaleGroup() throws Exception {
+    final int port;
+    try (ServerSocket socket = new ServerSocket(0)) {
+      port = socket.getLocalPort();
+    }
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR, tempDir.resolve("ratis").toString());
+    conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, port);
+    final SCMNodeDetails details = new SCMNodeDetails.Builder()
+        .setRpcAddress(new InetSocketAddress("localhost", 0))
+        .setRatisPort(port)
+        .setSCMNodeId("scm1")
+        .build();
+
+    // A previous SCM initialized its group and committed a data entry.
+    final String oldClusterId = "CID-" + UUID.randomUUID();
+    final String oldScmId = UUID.randomUUID().toString();
+    SCMRatisServerImpl.initialize(oldClusterId, oldScmId, details, conf);
+    final RaftGroup oldGroup = RaftGroup.valueOf(SCMRatisServerImpl.buildRaftGroupId(oldClusterId),
+        RaftPeer.newBuilder().setId(RaftPeerId.getRaftPeerId(oldScmId)).setAddress("localhost:" + port).build());
+    final RaftProperties properties = RatisUtil.newRaftProperties(conf);
+    try (RaftServer server = RaftServer.newBuilder().setServerId(RaftPeerId.getRaftPeerId(oldScmId))
+        .setProperties(properties).setGroup(oldGroup).setStateMachine(new BaseStateMachine())
+        .setOption(RaftStorage.StartupOption.RECOVER).build();
+         RaftClient client = RaftClient.newBuilder().setProperties(properties).setRaftGroup(oldGroup)
+             .setClientRpc(new GrpcFactory(new Parameters()).newRaftClientRpc(ClientId.randomId(), properties))
+             .build()) {
+      server.start();
+      assertTrue(client.io().send(SCMRatisRequest.of(RequestType.CONTAINER, "op", new Class<?>[0]).encode())
+          .isSuccess());
+    }
+
+    // The Ratis directory is kept while the SCM is initialized again with a new cluster ID and SCM ID.
+    final LogCapturer logs = LogCapturer.captureLogs(
+        LoggerFactory.getLogger("org.apache.ratis.server.impl.StateMachineUpdater"));
+    final LogCapturer smLogs = LogCapturer.captureLogs(SCMStateMachine.class);
+    try {
+      SCMRatisServerImpl.initialize("CID-" + UUID.randomUUID(), UUID.randomUUID().toString(), details, conf);
+
+      assertThat(smLogs.getOutput()).contains("Skipping applyTransaction");
+      assertThat(logs.getOutput()).doesNotContain("NullPointerException");
+    } finally {
+      logs.stopCapturing();
+      smLogs.stopCapturing();
+    }
+  }
 }
