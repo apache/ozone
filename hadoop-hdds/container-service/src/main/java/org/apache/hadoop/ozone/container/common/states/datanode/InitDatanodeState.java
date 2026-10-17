@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
@@ -76,11 +77,13 @@ public class InitDatanodeState implements DatanodeState,
   @Override
   public DatanodeStateMachine.DatanodeStates call() throws Exception {
     final Collection<HostAndPort> addresses;
+    final HostAndPort reconAddress;
     try {
       addresses = HddsServerUtil.getSCMAddressForDatanodes(conf);
-    } catch (IllegalArgumentException e) {
+      reconAddress = getReconAddressForDatanodes(conf);
+    } catch (IllegalArgumentException | ConfigurationException e) {
       if (!Strings.isNullOrEmpty(e.getMessage())) {
-        LOG.error("Failed to get SCM addresses: {}", e.getMessage());
+        LOG.error("Failed to get SCM or Recon addresses: {}", e.getMessage());
       }
       return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
     }
@@ -103,7 +106,6 @@ public class InitDatanodeState implements DatanodeState,
         connectionManager.addSCMServer(addr, context.getThreadNamePrefix());
         this.context.addEndpoint(addr);
       }
-      final HostAndPort reconAddress = getReconAddressForDatanodes(conf);
       if (reconAddress != null) {
         connectionManager.addReconServer(reconAddress,
             context.getThreadNamePrefix());

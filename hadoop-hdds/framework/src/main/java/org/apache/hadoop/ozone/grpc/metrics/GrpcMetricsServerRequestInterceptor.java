@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.grpc.metrics;
 
 import com.google.protobuf.AbstractMessage;
+import com.google.protobuf.Descriptors;
 import io.grpc.ForwardingServerCallListener.SimpleForwardingServerCallListener;
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
@@ -28,6 +29,8 @@ import io.grpc.ServerInterceptor;
  * Interceptor to gather metrics based on grpc server request.
  */
 public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
+
+  private static final String CMD_TYPE_FIELD = "cmdType";
 
   private final GrpcMetrics grpcMetrics;
   private long receivedTime;
@@ -60,20 +63,17 @@ public class GrpcMetricsServerRequestInterceptor implements ServerInterceptor {
         if (message instanceof AbstractMessage) {
           AbstractMessage parsedMessage = (AbstractMessage) message;
           messageSize += parsedMessage.getSerializedSize();
+          // Read the field directly instead of rendering the whole request to text
+          Descriptors.FieldDescriptor cmdType =
+              parsedMessage.getDescriptorForType().findFieldByName(CMD_TYPE_FIELD);
+          if (cmdType != null && parsedMessage.hasField(cmdType)) {
+            grpcMetrics.setRequestType(parsedMessage.getField(cmdType).toString());
+          }
         } else {
           grpcMetrics.incrUnknownMessagesReceived();
         }
 
         grpcMetrics.incrReceivedBytes(messageSize);
-
-        String[] messageFields = message.toString()
-            .split(System.lineSeparator());
-        // messageFields[0] should be in the format
-        // cmdType: "type"
-        String[] cmdTypeLine = messageFields[0].split(":");
-
-        // Get only the type and remove any leading spaces
-        grpcMetrics.setRequestType(cmdTypeLine[1].trim());
 
         super.onMessage(message);
       }

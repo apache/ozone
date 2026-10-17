@@ -54,7 +54,7 @@ import java.util.stream.Stream;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -83,7 +83,7 @@ import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.ScmNodeAddress;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
@@ -122,6 +122,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       HddsDatanodeService.class);
 
   public static final String TESTING_DATANODE_VERSION_INITIAL = "testing.hdds.datanode.version.initial";
+  // TODO(HDDS-16044): TESTING_DATANODE_VERSION_CURRENT is unused until SCM-side version setting lands.
   public static final String TESTING_DATANODE_VERSION_CURRENT = "testing.hdds.datanode.version.current";
 
   private OzoneConfiguration conf;
@@ -288,7 +289,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         LOG.info("Hdds Datanode login successful.");
       }
 
-      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+      DatanodeStorage layoutStorage = new DatanodeStorage(conf,
           datanodeDetails.getUuidString());
       if (layoutStorage.getState() != INITIALIZED) {
         layoutStorage.initialize();
@@ -478,8 +479,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       details = DatanodeDetails.newBuilder().setID(DatanodeID.randomID()).build();
       details.setInitialVersion(getInitialVersion());
     }
-    // Current version is always overridden to the latest
-    details.setCurrentVersion(getCurrentVersion());
     return details;
   }
 
@@ -854,14 +853,8 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   /**
    * Returns the initial version of the datanode.
    */
-  private int getInitialVersion() {
-    return conf.getInt(TESTING_DATANODE_VERSION_INITIAL, DatanodeVersion.CURRENT_VERSION);
-  }
-
-  /**
-   * Returns the current version of the datanode.
-   */
-  private int getCurrentVersion() {
-    return conf.getInt(TESTING_DATANODE_VERSION_CURRENT, DatanodeVersion.CURRENT_VERSION);
+  private HDDSVersion getInitialVersion() {
+    return HDDSVersion.deserialize(
+        conf.getInt(TESTING_DATANODE_VERSION_INITIAL, HDDSVersion.SOFTWARE_VERSION.serialize()));
   }
 }

@@ -73,7 +73,7 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -642,8 +642,8 @@ public class OzoneContainer {
   }
 
   private void initializeContainerServices(String clusterId) throws IOException {
-    DatanodeLayoutStorage layoutStorage
-        = new DatanodeLayoutStorage(config);
+    DatanodeStorage layoutStorage
+        = new DatanodeStorage(config);
     layoutStorage.setClusterId(clusterId);
     layoutStorage.persistCurrentState();
 
@@ -800,8 +800,12 @@ public class OzoneContainer {
             = StorageContainerDatanodeProtocolProtos.
             NodeReportProto.newBuilder();
 
+    Map<String, Long> openCounts = getContainerSet().getOpenContainerCountsByVolume();
     for (StorageLocationReport report : reports) {
-      nrb.addStorageReport(report.getProtoBufMessage());
+      StorageContainerDatanodeProtocolProtos.StorageReportProto proto = report.getProtoBufMessage();
+      nrb.addStorageReport(proto.toBuilder()
+          .setOpenContainerCount(openCounts.getOrDefault(proto.getStorageUuid(), 0L))
+          .build());
     }
 
     StorageLocationReport[] metaReports = metaVolumeSet.getStorageReport();

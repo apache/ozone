@@ -530,7 +530,7 @@ public class DeletedBlockLogImpl
           metrics.incrDNCommandsFailure(dnId, 1);
         } else {
           LOG.debug("Delete Block Command {} is not executed on the Datanode" +
-              " {}.", commandStatus.getCmdId(), dnId);
+              " {}.", commandStatus.getCmdId(), details);
         }
 
         getSCMDeletedBlockTransactionStatusManager()
