@@ -146,6 +146,17 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   }
 
   @Override
+  public void flushAndRun(Runnable action) throws RocksDatabaseException {
+    rwLock.writeLock().lock();
+    try {
+      flush();
+      action.run();
+    } finally {
+      rwLock.writeLock().unlock();
+    }
+  }
+
+  @Override
   public boolean shouldFlush(long snapshotWaitTime) {
     return true;
   }

@@ -42,14 +42,18 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.block.BlockManager;
+import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
 import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
+import org.apache.hadoop.hdds.scm.node.NodeDecommissionManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.util.concurrent.ExecutorHelper;
 import org.apache.ozone.test.GenericTestUtils;
@@ -395,6 +399,71 @@ public class TestSCMStateMachine {
     } finally {
       ExitUtils.clear();
     }
+  }
+
+  @Test
+  public void testBecomingLeaderFlushesAndReloadsDeletedBlockLogUnderOneLock() throws Exception {
+    SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+    DeletedBlockLogImpl deletedBlockLog = mock(DeletedBlockLogImpl.class);
+    NodeDecommissionManager decommissionManager = mock(NodeDecommissionManager.class);
+    doAnswer(invocation -> {
+      verify(deletedBlockLog, never()).onBecomeLeader();
+      invocation.<Runnable>getArgument(0).run();
+      return null;
+    }).when(buffer).flushAndRun(any());
+    SCMStateMachine leaderStateMachine = newLeaderStateMachine(buffer, deletedBlockLog, decommissionManager);
+
+    leaderStateMachine.notifyLeaderChanged(memberId(), followerId);
+
+    InOrder order = inOrder(buffer, deletedBlockLog, decommissionManager);
+    order.verify(buffer).flushAndRun(any());
+    order.verify(deletedBlockLog).onBecomeLeader();
+    order.verify(decommissionManager).onBecomeLeader();
+    verify(buffer, never()).flush();
+  }
+
+  @Test
+  public void testFlushAndRunFailureOnBecomingLeaderTerminates() throws Exception {
+    ExitUtils.disableSystemExit();
+    try {
+      SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
+      DeletedBlockLogImpl deletedBlockLog = mock(DeletedBlockLogImpl.class);
+      NodeDecommissionManager decommissionManager = mock(NodeDecommissionManager.class);
+      doThrow(new RocksDatabaseException("injected flush failure")).when(buffer).flushAndRun(any());
+      SCMStateMachine leaderStateMachine = newLeaderStateMachine(buffer, deletedBlockLog, decommissionManager);
+
+      assertThrows(ExitUtils.ExitException.class,
+          () -> leaderStateMachine.notifyLeaderChanged(memberId(), followerId));
+
+      verify(deletedBlockLog, never()).onBecomeLeader();
+      verify(decommissionManager, never()).onBecomeLeader();
+    } finally {
+      ExitUtils.clear();
+    }
+  }
+
+  private SCMStateMachine newLeaderStateMachine(SCMHADBTransactionBuffer buffer, DeletedBlockLogImpl deletedBlockLog,
+      NodeDecommissionManager decommissionManager) {
+    StorageContainerManager scm = mock(StorageContainerManager.class);
+    SCMHAManager haManager = mock(SCMHAManager.class);
+    SCMRatisServer ratisServer = mock(SCMRatisServer.class);
+    RaftServer.Division division = mock(RaftServer.Division.class);
+    DivisionInfo divisionInfo = mock(DivisionInfo.class);
+    BlockManager blockManager = mock(BlockManager.class);
+    when(scm.getMetrics()).thenReturn(mock(SCMMetrics.class));
+    when(scm.getScmContext()).thenReturn(mock(SCMContext.class));
+    when(scm.getScmHAManager()).thenReturn(haManager);
+    when(haManager.getRatisServer()).thenReturn(ratisServer);
+    when(ratisServer.getDivision()).thenReturn(division);
+    when(division.getInfo()).thenReturn(divisionInfo);
+    when(scm.getSequenceIdGen()).thenReturn(mock(SequenceIdGenerator.class));
+    when(scm.getDatanodeProtocolServer()).thenReturn(datanodeProtocolServer);
+    when(scm.getScmSafeModeManager()).thenReturn(safeModeManager);
+    when(scm.getScmBlockManager()).thenReturn(blockManager);
+    when(blockManager.getDeletedBlockLog()).thenReturn(deletedBlockLog);
+    when(scm.getScmDecommissionManager()).thenReturn(decommissionManager);
+    when(buffer.getLatestTrxInfo()).thenReturn(TransactionInfo.valueOf(TermIndex.valueOf(0, 0)));
+    return new SCMStateMachine(scm, buffer);
   }
 
   private static TransactionContext newTransaction(RequestType type, long index) throws Exception {

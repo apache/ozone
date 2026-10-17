@@ -44,6 +44,8 @@ public interface SCMHADBTransactionBuffer
 
   void flush() throws RocksDatabaseException, CodecException;
 
+  void flushAndRun(Runnable action) throws RocksDatabaseException, CodecException;
+
   void flushIfNeeded(long snapshotWaitTime)
       throws RocksDatabaseException, CodecException;
 
