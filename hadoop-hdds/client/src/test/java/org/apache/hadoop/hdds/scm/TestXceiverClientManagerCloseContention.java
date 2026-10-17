@@ -18,6 +18,10 @@
 package org.apache.hadoop.hdds.scm;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.withSettings;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -25,10 +29,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager.XceiverClientManagerConfigBuilder;
 import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
@@ -48,9 +55,9 @@ import org.slf4j.LoggerFactory;
  * observe channel termination. Every {@code close()} therefore costs &ge;100ms
  * instead of ~1ms.
  *
- * <p>The damage is amplified by <em>where</em> {@code close()} runs. Clients
+ * <p>The damage was amplified by <em>where</em> {@code close()} ran. Clients
  * are torn down through {@link XceiverClientManager}'s cache eviction, and the
- * whole acquire / evict / close sequence executes under the {@code clientCache}
+ * whole acquire / evict / close sequence executed under the {@code clientCache}
  * monitor:
  * <pre>
  *   acquireClient()                    // synchronized (clientCache)
@@ -60,9 +67,12 @@ import org.slf4j.LoggerFactory;
  *             -&gt; RemovalListener.onRemoval()   // synchronized (clientCache)
  *                -&gt; XceiverClientSpi.setEvicted() -&gt; cleanup() -&gt; close()
  * </pre>
- * So the blocking graceful-shutdown wait runs while the {@code clientCache}
- * monitor is held, and every other thread in {@code acquireClient()} /
- * {@code releaseClient()} serializes behind it.
+ * So the blocking graceful-shutdown wait ran while the {@code clientCache}
+ * monitor was held, and every other thread in {@code acquireClient()} /
+ * {@code releaseClient()} serialized behind it.
+ *
+ * <p>The manager now closes evicted clients one at a time on a background
+ * thread, so a slow {@code close()} delays the closes queued behind it.
  *
  * <p>This test exercises the <b>real</b> {@code XceiverClientManager} and
  * {@code XceiverClientGrpc.close()} — nothing is emulated. Real (lazily
@@ -135,6 +145,8 @@ class TestXceiverClientManagerCloseContention {
       } finally {
         pool.shutdownNow();
       }
+      // closing the manager waits for the closes still queued, so that their cost is measured
+      manager.close();
       long wallMillis =
           TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - wallStartNanos);
 
@@ -157,5 +169,54 @@ class TestXceiverClientManagerCloseContention {
               + "graceful-shutdown wait forces a ~100ms floor per close")
           .isLessThan(MAX_MILLIS_PER_CLOSE);
     }
+  }
+
+  /**
+   * A client whose close() is slow, like XceiverClientRatis waiting for channel termination, must be closed
+   * off the caller thread and outside the clientCache lock.
+   */
+  @Test
+  void slowCloseOfEvictedClientDoesNotBlockCaller() throws Exception {
+    ScmClientConfig clientConf = new XceiverClientManagerConfigBuilder()
+        .setMaxCacheSize(1)
+        .setStaleThresholdMs(TimeUnit.SECONDS.toMillis(30))
+        .build();
+    CountDownLatch closeStarted = new CountDownLatch(1);
+    CountDownLatch finishClose = new CountDownLatch(1);
+    AtomicReference<Thread> closeThread = new AtomicReference<>();
+    AtomicBoolean closedUnderCacheLock = new AtomicBoolean();
+    AtomicBoolean closed = new AtomicBoolean();
+
+    try (XceiverClientManager manager = new XceiverClientManager(new OzoneConfiguration(), clientConf, null) {
+      @Override
+      protected XceiverClientSpi newClient(Pipeline pipeline, DatanodeDetails dn) {
+        XceiverClientSpi client = mock(XceiverClientSpi.class,
+            withSettings().useConstructor().defaultAnswer(CALLS_REAL_METHODS));
+        doAnswer(invocation -> {
+          closeThread.set(Thread.currentThread());
+          closedUnderCacheLock.set(Thread.holdsLock(getClientCache()));
+          closeStarted.countDown();
+          finishClose.await(10, TimeUnit.SECONDS);
+          closed.set(true);
+          return null;
+        }).when(client).close();
+        return client;
+      }
+    }) {
+      XceiverClientSpi client1 = manager.acquireClient(MockPipeline.createPipeline(1));
+      manager.releaseClient(client1, false);
+      // evicts client1, which has no reference left and so gets closed
+      XceiverClientSpi client2 = manager.acquireClient(MockPipeline.createPipeline(1));
+
+      assertThat(closeStarted.await(10, TimeUnit.SECONDS)).isTrue();
+      assertThat(closeThread.get()).isNotSameAs(Thread.currentThread());
+      assertThat(closedUnderCacheLock).isFalse();
+      // the close of client1 is still in progress, yet the cache is usable
+      assertThat(closed).isFalse();
+      manager.releaseClient(client2, false);
+      finishClose.countDown();
+    }
+    // closing the manager waits for pending closes
+    assertThat(closed).isTrue();
   }
 }
