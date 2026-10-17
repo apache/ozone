@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import io.grpc.Context;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -172,4 +173,16 @@ public class TestOMClientRequestWithUserInfo {
     assertEquals("AccessId", omClientRequest.getUserInfo().getUserName());
   }
 
+  @Test
+  public void testUserInfoWithoutRemoteAddress() throws Exception {
+    when(ozoneManager.getOmRpcServerAddr()).thenReturn(new InetSocketAddress(inetAddress, 9862));
+
+    OMRequest request = createRequestWithS3Credentials("AccessId", "Signature", "StringToSign");
+    OMClientRequest omClientRequest = new OMKeyCommitRequest(request, mock(BucketLayout.class));
+
+    OzoneManagerProtocolProtos.UserInfo userInfo = omClientRequest.getUserIfNotExists(ozoneManager);
+
+    assertEquals("AccessId", userInfo.getUserName());
+    assertEquals(inetAddress.getHostAddress(), userInfo.getRemoteAddress());
+  }
 }
