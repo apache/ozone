@@ -164,7 +164,7 @@ const Containers: React.FC<{}> = () => {
     CONSTANTS.DEFAULT_CLUSTER_STATE,
     {
       retryAttempts: 2,
-      initialFetch: true,
+      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -424,11 +424,6 @@ const Containers: React.FC<{}> = () => {
       showDataFetchError(error);
     }
   };
-
-  useEffect(() => {
-    fetchTabData('1', 0, DEFAULT_PAGE_SIZE);
-    fetchQuasiClosedCount();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
