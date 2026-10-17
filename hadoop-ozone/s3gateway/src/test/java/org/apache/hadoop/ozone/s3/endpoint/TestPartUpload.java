@@ -49,6 +49,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
@@ -58,11 +59,13 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Stream;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -110,7 +113,7 @@ public class TestPartUpload {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, enableDataStream);
@@ -143,6 +146,19 @@ public class TestPartUpload {
       assertNotNull(newETag);
       assertNotEquals(eTag, newETag);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, 32, 64})
+  void testContentSha256(int uppercaseLength) throws Exception {
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
+    String content = "Multipart Upload";
+    String hash = DigestUtils.sha256Hex(content);
+    hash = hash.substring(0, uppercaseLength).toUpperCase(Locale.ROOT) + hash.substring(uppercaseLength);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(hash);
+
+    assertSucceeds(() -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content));
+    assertContentLength(uploadID, OzoneConsts.KEY, content.length());
   }
 
   @Test
@@ -315,6 +331,20 @@ public class TestPartUpload {
   }
 
   @Test
+  public void testRejectMalformedContentSha256BeforeReadingBody() throws Exception {
+    String key = OzoneConsts.KEY;
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, key);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("invalid");
+    InputStream body = spy(new ByteArrayInputStream(new byte[] {1}));
+
+    assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT,
+        () -> putPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, 1, body));
+
+    verifyNoInteractions(body);
+    assertNoParts(uploadID, key);
+  }
+
+  @Test
   public void testPartUploadMessageDigestResetDuringException() throws IOException, OS3Exception {
     String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
 
@@ -353,7 +383,8 @@ public class TestPartUpload {
 
     HttpHeaders headersWithMD5 = mock(HttpHeaders.class);
     when(headersWithMD5.getHeaderString("Content-MD5")).thenReturn(md5Base64);
-    when(headersWithMD5.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headersWithMD5.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     when(headersWithMD5.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
 
     ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -388,7 +419,8 @@ public class TestPartUpload {
 
     HttpHeaders headersWithWrongMD5 = mock(HttpHeaders.class);
     when(headersWithWrongMD5.getHeaderString("Content-MD5")).thenReturn(wrongContentMD5);
-    when(headersWithWrongMD5.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headersWithWrongMD5.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     when(headersWithWrongMD5.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
 
     ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
