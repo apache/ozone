@@ -79,6 +79,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "system clients no longer need the client-side InfoBucket layout "
           + "check for listStatus"),
 
+  S3_MULTIPART_UPLOAD_ABORT_CONTEXT(102,
+      "OzoneManager version that resolves S3 volume context for multipart upload abort"),
+
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
 
