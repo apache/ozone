@@ -1711,6 +1711,10 @@ public interface ClientProtocol {
   Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName)
       throws IOException;
 
+  Map<String, String> getObjectTagging(String volumeName,
+      String bucketName, String keyName, boolean assumeS3Context)
+      throws IOException;
+
   /**
    * Sets the tags to an existing key.
    * @param volumeName Volume name.
