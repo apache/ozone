@@ -40,8 +40,8 @@ public final class OzoneConfigurationHolder {
 
   public static void setConfiguration(
       OzoneConfiguration conf) {
-    // Nullity check is used in case the configuration was already set
-    // in the MiniOzoneCluster
+    // First writer wins: S3GatewayService and LocalOzoneCluster set this before Gateway#call()
+    // reaches it, and their configuration is the one the in-JVM gateway has to run with.
     if (configuration == null) {
       OzoneConfigurationHolder.configuration = conf;
     }

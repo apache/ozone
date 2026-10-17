@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.local;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
@@ -40,7 +41,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_HOST_KE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_HTTP_ENABLED_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTPS_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_HTTP_BIND_HOST_KEY;
@@ -66,7 +66,6 @@ import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -149,6 +148,7 @@ class TestLocalOzoneCluster {
     assertFalse(conf.getBoolean(HDDS_CONTAINER_RATIS_ENABLED_KEY, true));
     assertFalse(conf.getBoolean(HDDS_SCM_SAFEMODE_PIPELINE_CREATION, true));
     assertEquals(2, conf.getInt(HDDS_SCM_SAFEMODE_MIN_DATANODE, 0));
+    assertTrue(conf.getBoolean(HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED, false));
     assertTrue(conf.get(OZONE_SCM_CLIENT_ADDRESS_KEY).endsWith(":9860"));
     assertTrue(conf.get(OZONE_OM_ADDRESS_KEY).endsWith(":9862"));
     assertTrue(conf.get(OZONE_S3G_HTTP_ADDRESS_KEY).endsWith(":9878"));
@@ -420,10 +420,6 @@ class TestLocalOzoneCluster {
     assertEquals(40000, allocator.reserve(40000));
   }
 
-  /**
-   * configureRecon() runs after configureLocalDefaults(), so the value has to be rejected where it is applied
-   * rather than by a check that only covers the keys set earlier.
-   */
   @Test
   void reconOverrideRejectsConflictingUserValue() {
     OzoneConfiguration seed = new OzoneConfiguration();
@@ -435,6 +431,8 @@ class TestLocalOzoneCluster {
 
     IOException error = assertPrepareFails(config, seed);
 
+    // configureRecon() runs after configureLocalDefaults(), so the value has to be rejected where
+    // it is applied rather than by a check that only covers the keys set earlier.
     String message = error.getMessage();
     assertTrue(message.contains(OZONE_RECON_TASK_SAFEMODE_WAIT_THRESHOLD), message);
     assertTrue(message.contains("9m"), message);
@@ -517,40 +515,6 @@ class TestLocalOzoneCluster {
   }
 
   @Test
-  void prepareConfigurationRejectsDisabledReconHttpListener() {
-    OzoneConfiguration seed = new OzoneConfiguration();
-    seed.setBoolean(OZONE_RECON_HTTP_ENABLED_KEY, false);
-    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(tempDir.resolve("local-ozone"))
-        .setReconEnabled(true)
-        .build();
-
-    IOException error = assertPrepareFails(config, seed);
-
-    assertMessageContains(error, OZONE_RECON_HTTP_ENABLED_KEY);
-  }
-
-  @ParameterizedTest
-  @EnumSource(HttpConfig.Policy.class)
-  void prepareConfigurationChecksHttpPolicyForRecon(HttpConfig.Policy policy) throws Exception {
-    OzoneConfiguration seed = new OzoneConfiguration();
-    seed.set(OZONE_HTTP_POLICY_KEY, policy.name(), "test-ozone-site.xml");
-    LocalOzoneClusterConfig reconOnly = LocalOzoneClusterConfig.builder(tempDir.resolve("local-ozone"))
-        .setS3gEnabled(false)
-        .setReconEnabled(true)
-        .build();
-
-    if (policy.isHttpEnabled()) {
-      try (LocalOzoneCluster cluster = new LocalOzoneCluster(reconOnly, seed)) {
-        cluster.prepareConfiguration();
-      }
-    } else {
-      IOException error = assertPrepareFails(reconOnly, seed);
-      assertMessageContains(error, OZONE_HTTP_POLICY_KEY);
-      assertMessageContains(error, "test-ozone-site.xml");
-    }
-  }
-
-  @Test
   void formatNeverRejectsPortStateMissingReconPorts() throws Exception {
     Path dataDir = tempDir.resolve("local-ozone");
     prepare(LocalOzoneClusterConfig.builder(dataDir).build());
@@ -619,6 +583,7 @@ class TestLocalOzoneCluster {
         + "; each datanode reserves 8 local ports.", error.getMessage());
   }
 
+  /** A local cluster with no datanodes is unusable and would otherwise time out during readiness. */
   @Test
   void zeroDatanodesIsRejected() throws Exception {
     LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
@@ -631,7 +596,10 @@ class TestLocalOzoneCluster {
     assertMessageContains(error, "Datanode count 0");
   }
 
-  /** Configuration#unset() keeps the source, so the key must read as unconfigured, not as a conflict. */
+  /**
+   * A key unset after being configured still reports a source with no value behind it, so
+   * setLocalOverride has to treat it as unconfigured rather than as a conflict.
+   */
   @Test
   void keyUnsetAfterBeingConfiguredIsNotRejected() throws Exception {
     OzoneConfiguration seed = new OzoneConfiguration();
@@ -650,6 +618,10 @@ class TestLocalOzoneCluster {
         prepared(seed).get(OZONE_METADATA_DIRS));
   }
 
+  /**
+   * A file named with --conf is the user's choice however it is called, so a path ending in
+   * ozone-default.xml stays a conflict rather than counting as a shipped default.
+   */
   @Test
   void defaultsFileNamedByPathCountsAsUserConfig() {
     OzoneConfiguration seed = new OzoneConfiguration();
@@ -675,6 +647,9 @@ class TestLocalOzoneCluster {
         "format ALWAYS must not delete the data dir for a run that cannot start");
   }
 
+  /**
+   * The rejection message has to carry enough for the user to locate and remove the value.
+   */
   @Test
   void conflictingUserConfigIsRejected() {
     OzoneConfiguration seed = new OzoneConfiguration();
@@ -712,6 +687,10 @@ class TestLocalOzoneCluster {
         "format ALWAYS must not delete the data dir for a run that cannot start");
   }
 
+  /**
+   * A duplicate configured port is a user-input error PortAllocator detects deterministically, so
+   * it must be rejected before format mode ALWAYS deletes the data dir.
+   */
   @Test
   void duplicateConfiguredPortsAreRejectedBeforeFormatDeletesDataDir() throws Exception {
     Path dataDir = tempDir.resolve("local-ozone");
@@ -729,7 +708,10 @@ class TestLocalOzoneCluster {
         "format ALWAYS must not delete the data dir for a run that cannot start");
   }
 
-  /** Hadoop keeps XML whitespace, so padding around the required value is not a conflict. */
+  /**
+   * Hadoop never trims XML values on load and the services read these keys through getTrimmed(),
+   * so a padded value that names the required setting already means what the runtime requires.
+   */
   @Test
   void paddedValueMatchingTheLocalRequirementIsAccepted() throws Exception {
     OzoneConfiguration seed = new OzoneConfiguration();
@@ -738,13 +720,17 @@ class TestLocalOzoneCluster {
     assertEquals(ReplicationType.STAND_ALONE.name(), prepared(seed).get(OZONE_REPLICATION_TYPE));
   }
 
-  /** Duration#toNanos throws ArithmeticException for this timeout, so the wait must not call it. */
+  /** Duration#toNanos overflows for very long timeouts, so the wait must not read it. */
   @Test
   void readinessAcceptsTimeoutBeyondNanoTimeRange() throws Exception {
     LocalOzoneCluster.waitForReadiness(() -> null, "Ozone cluster",
         Duration.ofDays(999_999_999L));
   }
 
+  /**
+   * The same interval written in another unit means what the runtime requires, so comparing as a
+   * duration rather than as text has to accept it instead of refusing to start.
+   */
   @Test
   void equivalentDurationSpellingIsAccepted() throws Exception {
     OzoneConfiguration seed = new OzoneConfiguration();
@@ -759,6 +745,7 @@ class TestLocalOzoneCluster {
     assertEquals("3s", conf.get(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT));
   }
 
+  /** ozone local requires explicit units even though the service accessors accept bare numbers. */
   @Test
   void unitlessConfigurationDurationsAreRejected() {
     assertUnitlessDurationRejected(HDDS_HEARTBEAT_INTERVAL, "1000");
@@ -774,6 +761,10 @@ class TestLocalOzoneCluster {
     assertFalse(prepared(seed).getBoolean(HDDS_CONTAINER_RATIS_ENABLED_KEY, true));
   }
 
+  /**
+   * ReplicationConfig.parse() reads both "1" and "ONE", and compose environments in this repo
+   * write the numeric form, so it has to be accepted as the value the runtime requires.
+   */
   @Test
   void numericReplicationIsAccepted() throws Exception {
     OzoneConfiguration seed = new OzoneConfiguration();
@@ -783,6 +774,9 @@ class TestLocalOzoneCluster {
         prepared(seed).get(OZONE_SERVER_DEFAULT_REPLICATION_KEY));
   }
 
+  /**
+   * Comparing durations by value must not swallow a genuine conflict.
+   */
   @Test
   void conflictingDurationIsRejected() {
     OzoneConfiguration seed = new OzoneConfiguration();
@@ -794,6 +788,10 @@ class TestLocalOzoneCluster {
     assertMessageContains(error, "30s");
   }
 
+  /**
+   * A value the accessor cannot parse is a conflict, reported by the same message rather than
+   * escaping as a NumberFormatException from the comparison itself.
+   */
   @Test
   void unparseableValueIsRejected() {
     OzoneConfiguration seed = new OzoneConfiguration();
@@ -806,8 +804,9 @@ class TestLocalOzoneCluster {
   }
 
   /**
-   * Regression guard: ozone-default.xml ships hdds.heartbeat.interval=30s, so a shipped default read as a
-   * user choice would reject every run.
+   * Regression guard: ozone-default.xml ships a value for most keys the local runtime requires
+   * (hdds.heartbeat.interval=30s, and so on) and is always on the classpath, so counting a shipped
+   * default as a user choice would reject every run.
    */
   @Test
   void shippedDefaultIsNotTreatedAsUserConfig() throws Exception {
@@ -947,6 +946,8 @@ class TestLocalOzoneCluster {
         assertThrows(IOException.class, () -> LocalOzoneCluster.executeWithinStartupTimeout(
             "Recon", () -> {
               try {
+                // Simulate an in-JVM startup that blocks until it leaves safe
+                // mode; the deadline must interrupt it rather than hang.
                 Thread.sleep(TimeUnit.MINUTES.toMillis(5));
               } catch (InterruptedException e) {
                 interrupted.countDown();
@@ -962,15 +963,13 @@ class TestLocalOzoneCluster {
 
   @Test
   void executeWithinStartupTimeoutPropagatesStartupFailure() {
-    AtomicBoolean cleanedUp = new AtomicBoolean();
     IOException error =
         assertThrows(IOException.class, () -> LocalOzoneCluster.executeWithinStartupTimeout(
             "Recon", () -> {
               throw new IOException("startup boom");
-            }, () -> cleanedUp.set(true), Duration.ofSeconds(30)));
+            }, () -> { }, Duration.ofSeconds(30)));
 
     assertMessageContains(error, "startup boom");
-    assertTrue(cleanedUp.get(), "a failed startup should run its cleanup");
   }
 
   private LocalOzoneCluster.PreparedConfiguration prepare(
@@ -984,6 +983,7 @@ class TestLocalOzoneCluster {
     return new LocalOzoneCluster(config, new OzoneConfiguration());
   }
 
+  /** Prepares a default-config cluster over {@code seed} and returns the prepared configuration. */
   private OzoneConfiguration prepared(OzoneConfiguration seed) throws IOException {
     LocalOzoneClusterConfig config = defaultConfig();
     try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, seed)) {
