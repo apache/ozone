@@ -56,6 +56,7 @@ import java.util.stream.Stream;
 import javax.ws.rs.HttpMethod;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -101,7 +102,7 @@ public class TestPartUpload {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("UNSIGNED-PAYLOAD");
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, enableDataStream);
@@ -134,6 +135,44 @@ public class TestPartUpload {
       assertNotNull(newETag);
       assertNotEquals(eTag, newETag);
     }
+  }
+
+  @Test
+  public void testPartUploadWithContentSha256() throws Exception {
+    String content = "Multipart Upload";
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(DigestUtils.sha256Hex(content));
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
+
+    assertSucceeds(() -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content));
+    assertContentLength(uploadID, OzoneConsts.KEY, content.length());
+  }
+
+  @Test
+  public void testPartUploadWithWrongContentSha256() throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(DigestUtils.sha256Hex("expected"));
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
+
+    assertErrorResponse(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH,
+        () -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, "different"));
+    assertNoParts(uploadID, OzoneConsts.KEY);
+  }
+
+  @Test
+  public void testPartUploadWithWrongContentSha256PreservesExistingPart() throws Exception {
+    String content = "Multipart Upload";
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(DigestUtils.sha256Hex(content));
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
+    String eTag;
+    try (Response response = put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content)) {
+      eTag = response.getHeaderString(OzoneConsts.ETAG);
+    }
+
+    assertErrorResponse(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH,
+        () -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, "different"));
+    assertContentLength(uploadID, OzoneConsts.KEY, content.length());
+    OzoneMultipartUploadPartListParts parts = client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET)
+        .listParts(OzoneConsts.KEY, uploadID, 0, 100);
+    assertEquals(eTag, "\"" + parts.getPartInfoList().get(0).getETag() + "\"");
   }
 
   @Test
@@ -268,6 +307,7 @@ public class TestPartUpload {
   public void testPartUploadMessageDigestResetDuringException() throws IOException, OS3Exception {
     String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
 
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(DigestUtils.sha256Hex("expected"));
     MessageDigest messageDigest = mock(MessageDigest.class);
     when(messageDigest.getAlgorithm()).thenReturn(OzoneConsts.MD5_HASH);
     MessageDigest sha256Digest = mock(MessageDigest.class);
@@ -303,7 +343,7 @@ public class TestPartUpload {
 
     HttpHeaders headersWithMD5 = mock(HttpHeaders.class);
     when(headersWithMD5.getHeaderString("Content-MD5")).thenReturn(md5Base64);
-    when(headersWithMD5.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headersWithMD5.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
     when(headersWithMD5.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
 
     ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -338,7 +378,7 @@ public class TestPartUpload {
 
     HttpHeaders headersWithWrongMD5 = mock(HttpHeaders.class);
     when(headersWithWrongMD5.getHeaderString("Content-MD5")).thenReturn(wrongContentMD5);
-    when(headersWithWrongMD5.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headersWithWrongMD5.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
     when(headersWithWrongMD5.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
 
     ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()

@@ -125,7 +125,7 @@ public class TestMultipartUploadWithCopy {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("UNSIGNED-PAYLOAD");
 
     endpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
@@ -383,7 +383,7 @@ public class TestMultipartUploadWithCopy {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("UNSIGNED-PAYLOAD");
 
     additionalHeaders
         .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));
