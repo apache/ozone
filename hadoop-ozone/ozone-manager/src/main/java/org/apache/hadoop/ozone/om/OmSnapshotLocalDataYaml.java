@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
@@ -127,8 +128,11 @@ public final class OmSnapshotLocalDataYaml {
    * This is used when parsing YAML files into OmSnapshotLocalDataYaml objects.
    */
   private static class SnapshotLocalDataConstructor extends SafeConstructor {
-    SnapshotLocalDataConstructor() {
+    private final boolean skipSstFiles;
+
+    SnapshotLocalDataConstructor(boolean skipSstFiles) {
       super(createLoaderOptions());
+      this.skipSstFiles = skipSstFiles;
       //Adding our own specific constructors for tags.
       this.yamlConstructors.put(SNAPSHOT_YAML_TAG, new ConstructSnapshotLocalData());
       this.yamlConstructors.put(SNAPSHOT_VERSION_META_TAG, new ConstructVersionMeta());
@@ -165,9 +169,20 @@ public final class OmSnapshotLocalDataYaml {
       @Override
       public Object construct(Node node) {
         MappingNode mnode = (MappingNode) node;
+        if (skipSstFiles) {
+          // Drop the SST file list node before construction so none of its entries are built.
+          mnode = new MappingNode(mnode.getTag(), mnode.getValue().stream()
+              .filter(tuple -> !isSstFilesKey(tuple.getKeyNode())).collect(Collectors.toList()), mnode.getFlowStyle());
+        }
         Map<Object, Object> nodes = constructMapping(mnode);
-        return new VersionMeta((Integer) nodes.get(OzoneConsts.OM_SLD_VERSION_META_PREV_SNAP_VERSION),
-            (List<SstFileInfo>) nodes.get(OzoneConsts.OM_SLD_VERSION_META_SST_FILES));
+        List<SstFileInfo> sstFiles = skipSstFiles ? Collections.emptyList()
+            : (List<SstFileInfo>) nodes.get(OzoneConsts.OM_SLD_VERSION_META_SST_FILES);
+        return new VersionMeta((Integer) nodes.get(OzoneConsts.OM_SLD_VERSION_META_PREV_SNAP_VERSION), sstFiles);
+      }
+
+      private boolean isSstFilesKey(Node keyNode) {
+        return keyNode instanceof ScalarNode
+            && OzoneConsts.OM_SLD_VERSION_META_SST_FILES.equals(((ScalarNode) keyNode).getValue());
       }
     }
 
@@ -236,6 +251,19 @@ public final class OmSnapshotLocalDataYaml {
    * ensuring efficient resource usage in high-concurrency environments.
    */
   public static class YamlFactory extends BasePooledObjectFactory<Yaml> {
+    private final boolean skipSstFiles;
+
+    public YamlFactory() {
+      this(false);
+    }
+
+    /**
+     * @param skipSstFiles when true, loaded {@link VersionMeta}s have an empty SST file list, which makes loading
+     *     much cheaper for callers that only need snapshot ids and versions. Objects loaded this way must not be saved.
+     */
+    public YamlFactory(boolean skipSstFiles) {
+      this.skipSstFiles = skipSstFiles;
+    }
 
     @Override
     public Yaml create() {
@@ -245,7 +273,7 @@ public final class OmSnapshotLocalDataYaml {
       DumperOptions options = new DumperOptions();
       Representer representer = new OmSnapshotLocalDataRepresenter(options);
       representer.setPropertyUtils(propertyUtils);
-      SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
+      SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor(skipSstFiles);
       return new Yaml(snapshotDataConstructor, representer);
     }
 

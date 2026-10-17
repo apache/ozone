@@ -232,6 +232,41 @@ public class TestOmSnapshotLocalDataYaml {
   }
 
   @Test
+  public void testLoadWithoutSstFiles() throws IOException {
+    TransactionInfo transactionInfo = TransactionInfo.valueOf(1, 2);
+    File yamlFile = writeToYaml(UUID.randomUUID(), "snapshot7", transactionInfo).getLeft();
+    OmSnapshotLocalData fullData = omSnapshotLocalDataSerializer.load(yamlFile);
+
+    ObjectSerializer<OmSnapshotLocalData> metaSerializer =
+        new YamlSerializer<OmSnapshotLocalData>(new OmSnapshotLocalDataYaml.YamlFactory(true)) {
+          @Override
+          public void computeAndSetChecksum(Yaml yaml, OmSnapshotLocalData data) throws IOException {
+            data.computeAndSetChecksum(yaml);
+          }
+        };
+    OmSnapshotLocalData metaData;
+    try {
+      metaData = metaSerializer.load(yamlFile);
+    } finally {
+      metaSerializer.close();
+    }
+
+    assertEquals(fullData.getSnapshotId(), metaData.getSnapshotId());
+    assertEquals(fullData.getPreviousSnapshotId(), metaData.getPreviousSnapshotId());
+    assertEquals(fullData.getVersion(), metaData.getVersion());
+    assertEquals(transactionInfo, metaData.getTransactionInfo());
+    assertEquals(fullData.getChecksum(), metaData.getChecksum());
+    assertThat(metaData.getVersionSstFileInfos()).hasSameSizeAs(fullData.getVersionSstFileInfos());
+    fullData.getVersionSstFileInfos().forEach((version, versionMeta) -> {
+      assertThat(versionMeta.getSstFiles()).isNotEmpty();
+      assertThat(metaData.getVersionSstFileInfos()).containsKey(version);
+      VersionMeta metaOnly = metaData.getVersionSstFileInfos().get(version);
+      assertEquals(versionMeta.getPreviousSnapshotVersion(), metaOnly.getPreviousSnapshotVersion());
+      assertThat(metaOnly.getSstFiles()).isEmpty();
+    });
+  }
+
+  @Test
   public void testEmptyFile() throws IOException {
     File emptyFile = new File(testRoot, "empty.yaml");
     assertTrue(emptyFile.createNewFile());
