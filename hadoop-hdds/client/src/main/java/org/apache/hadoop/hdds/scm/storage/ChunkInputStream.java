@@ -410,9 +410,12 @@ public class ChunkInputStream extends InputStream
       adjustedLen = toRead;
     }
 
+    // Datanodes do not verify client reads, so do not send (and get echoed back) the chunk's checksums.
     return ChunkInfo.newBuilder(chunkInfo)
         .setOffset(chunkInfo.getOffset() + adjustedOffset)
         .setLen(adjustedLen)
+        .setChecksumData(chunkInfo.getChecksumData().toBuilder().clearChecksums())
+        .clearStripeChecksum()
         .build();
   }
 
