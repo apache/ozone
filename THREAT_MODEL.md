@@ -9,7 +9,7 @@
 - **Author:** ASF Security team, via the threat-model-producer rubric (Scovetta
   rubric) at the Ozone PMC's request (path 3, confirmed siyao@ 2026-06-02).
 - **Status:** v1 — ratified by the Ozone PMC. Maintainer review complete (Siyao Meng / smengcl and Wei-Chiu Chuang / jojochuang, 2026-06/07); wave-1–3 answers folded.
-- **Revisions:** 2026-10, availability added (§4, §7, §8 item 7, §9, §10, §11a, §13); GDPR buckets (§9).
+- **Revisions:** 2026-10, availability added (§4, §7, §8 item 7, §9, §10, §11a, §13); GDPR buckets (§9); key name visibility in listings (§11a).
 - **Version binding:** versioned with the project; a report against version *N*
   is triaged against the model as it stood at *N*.
 - **Reporting cross-reference:** §8-violating findings go to
@@ -378,6 +378,7 @@ list. *(requested by jojochuang, 2026-06-25.)*
 - **Denial of service by request volume** (floods, many connections, many concurrent requests whose cost the server already limits): `BY-DESIGN: property-disclaimed` (§9). A small, fixed number of requests that stops a service is different and is `VALID` under §8 item 7.
 - **A user exhausts resources the operator granted them** (fills their quota, creates all the keys or buckets they are allowed, runs listings within the server's page limits): `BY-DESIGN: property-disclaimed` (§9/§10).
 - **An admin (a principal in a configured administrator list) can stop or degrade a service**: `OUT-OF-MODEL: adversary-not-in-scope` (§7/§9). A caller admitted to an internal protocol only by its service ACL is covered by the service ACL entry above.
+- **Key names visible to a principal who can list the bucket or the parent path, despite a per-key ACL that denies READ** (for example through recursive `listStatus`, `listKeys`, or a snapshot diff of that bucket): `KNOWN-NON-FINDING`. Per-key and prefix ACLs control access to a key's content and metadata; key names, sizes and modification times are visible to anyone allowed to list the bucket or the parent path. Which right (READ or LIST) bucket-level listings require is a consistency question, not a §8 break. *(maintainer, smengcl, 2026-10.)*
 - **Findings in `ozone-thirdparty`, `integration-test-*`, `*TestImpl`** —
   `OUT-OF-MODEL: unsupported-component` (§3).
 - **KDC/KMS/Ranger/SCM-CA-key compromise scenarios** — out of layer (§3/§7).
