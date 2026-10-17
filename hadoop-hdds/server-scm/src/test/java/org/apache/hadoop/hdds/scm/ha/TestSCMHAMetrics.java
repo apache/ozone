@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
@@ -60,6 +62,22 @@ class TestSCMHAMetrics {
 
     // THEN
     assertEquals(0, scmhaMetrics.getSCMHAMetricsInfoLeaderState());
+  }
+
+  @Test
+  public void testGetMetricsWithFlushMetrics() {
+    // GIVEN
+    SCMHADBTransactionBuffer transactionBuffer = mock(SCMHADBTransactionBuffer.class);
+    when(transactionBuffer.getLatestSnapshotIndex()).thenReturn(123L);
+    when(transactionBuffer.getLastSnapshotTimeMs()).thenReturn(456L);
+
+    // WHEN
+    SCMHAMetrics scmhaMetrics = SCMHAMetrics.create(NODE_ID, NODE_ID, transactionBuffer);
+    scmhaMetrics.getMetrics(METRICS_COLLECTOR, true);
+
+    // THEN
+    assertEquals(123L, scmhaMetrics.getSCMHAMetricsInfoLastTransactionInfoIndex());
+    assertEquals(456L, scmhaMetrics.getSCMHAMetricsInfoLastFlushTimeMs());
   }
 
 }

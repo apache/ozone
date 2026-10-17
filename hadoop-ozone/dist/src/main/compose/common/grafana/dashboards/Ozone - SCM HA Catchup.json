@@ -1,0 +1,868 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "panels": [],
+      "title": "SCM HA Catchup Overview",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "max({__name__=\"$applied_index_metric\",instance=\"$leader_instance\"})",
+          "legendFormat": "leader",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "max({__name__=\"$applied_index_metric\",instance=\"$follower1_instance\"})",
+          "legendFormat": "follower1",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "max({__name__=\"$applied_index_metric\",instance=\"$follower2_instance\"})",
+          "legendFormat": "follower2",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Leader/Follower Index Progress",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "max({__name__=\"$applied_index_metric\",instance=\"$leader_instance\"}) - max({__name__=\"$applied_index_metric\",instance=\"$follower1_instance\"})",
+          "legendFormat": "lag to follower1",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "max({__name__=\"$applied_index_metric\",instance=\"$leader_instance\"}) - max({__name__=\"$applied_index_metric\",instance=\"$follower2_instance\"})",
+          "legendFormat": "lag to follower2",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Lag Estimate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 9
+      },
+      "id": 4,
+      "panels": [],
+      "title": "Replication Throughput and Pressure",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "entries/s",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "rate({__name__=\"$applied_index_metric\",instance=\"$leader_instance\"}[5m])",
+          "legendFormat": "leader",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "rate({__name__=\"$applied_index_metric\",instance=\"$follower1_instance\"}[5m])",
+          "legendFormat": "follower1",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "rate({__name__=\"$applied_index_metric\",instance=\"$follower2_instance\"}[5m])",
+          "legendFormat": "follower2",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "Applied Index Rate by SCM (5m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "queue size",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "ratis_log_worker_workerQueueSize{instance=\"$leader_instance\"}",
+          "legendFormat": "workerQueue leader",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "ratis_log_worker_workerQueueSize{instance=\"$follower1_instance\"}",
+          "legendFormat": "workerQueue follower1",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "ratis_log_worker_workerQueueSize{instance=\"$follower2_instance\"}",
+          "legendFormat": "workerQueue follower2",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "editorMode": "code",
+          "expr": "ratis_log_worker_dataQueueSize{instance=\"$leader_instance\"}",
+          "legendFormat": "dataQueue leader",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "editorMode": "code",
+          "expr": "ratis_log_worker_dataQueueSize{instance=\"$follower1_instance\"}",
+          "legendFormat": "dataQueue follower1",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "editorMode": "code",
+          "expr": "ratis_log_worker_dataQueueSize{instance=\"$follower2_instance\"}",
+          "legendFormat": "dataQueue follower2",
+          "range": true,
+          "refId": "F"
+        }
+      ],
+      "title": "Follower Queue Pressure",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "latency",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "avg(ratis_log_worker_appendEntryLatency{instance=\"$leader_instance\"})",
+          "legendFormat": "appendEntryLatency leader",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "avg(ratis_log_worker_appendEntryLatency{instance=\"$follower1_instance\"})",
+          "legendFormat": "appendEntryLatency follower1",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "avg(ratis_log_worker_appendEntryLatency{instance=\"$follower2_instance\"})",
+          "legendFormat": "appendEntryLatency follower2",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "editorMode": "code",
+          "expr": "avg(ratis_log_worker_queueingDelay{instance=\"$leader_instance\"})",
+          "legendFormat": "queueingDelay leader",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "editorMode": "code",
+          "expr": "avg(ratis_log_worker_queueingDelay{instance=\"$follower1_instance\"})",
+          "legendFormat": "queueingDelay follower1",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "editorMode": "code",
+          "expr": "avg(ratis_log_worker_queueingDelay{instance=\"$follower2_instance\"})",
+          "legendFormat": "queueingDelay follower2",
+          "range": true,
+          "refId": "F"
+        }
+      ],
+      "title": "Follower Ratis Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "latency",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "ratis_server_follower_entry_latency{instance=\"$leader_instance\"}",
+          "legendFormat": "leader={{instance}} follower={{follower}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Leader View of Follower Entry Latency",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 26
+      },
+      "id": 9,
+      "panels": [],
+      "title": "SCM DB Flush Metrics",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "index",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 27
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "max(scmha_metrics_scmha_last_transaction_info_index{instance=\"$leader_instance\"})",
+          "legendFormat": "leader",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "max(scmha_metrics_scmha_last_transaction_info_index{instance=\"$follower1_instance\"})",
+          "legendFormat": "follower1",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "max(scmha_metrics_scmha_last_transaction_info_index{instance=\"$follower2_instance\"})",
+          "legendFormat": "follower2",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "SCM Flush Index (transactionInfo)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "time",
+            "axisPlacement": "auto",
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 4,
+            "showPoints": "auto",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "dateTimeAsIso"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 27
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "max(scmha_metrics_scmha_last_flush_time_ms{instance=\"$leader_instance\"})",
+          "legendFormat": "leader",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "editorMode": "code",
+          "expr": "max(scmha_metrics_scmha_last_flush_time_ms{instance=\"$follower1_instance\"})",
+          "legendFormat": "follower1",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "editorMode": "code",
+          "expr": "max(scmha_metrics_scmha_last_flush_time_ms{instance=\"$follower2_instance\"})",
+          "legendFormat": "follower2",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "title": "SCM Last Flush Time",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 37,
+  "style": "dark",
+  "tags": [
+    "ozone",
+    "scm",
+    "ha",
+    "ratis"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "scm-0:9883",
+          "value": "scm-0:9883"
+        },
+        "hide": 0,
+        "multi": false,
+        "name": "leader_instance",
+        "options": [
+          {
+            "selected": true,
+            "text": "scm-0:9883",
+            "value": "scm-0:9883"
+          }
+        ],
+        "query": "scm-0:9883",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "scm-1:9883",
+          "value": "scm-1:9883"
+        },
+        "hide": 0,
+        "multi": false,
+        "name": "follower1_instance",
+        "options": [
+          {
+            "selected": true,
+            "text": "scm-1:9883",
+            "value": "scm-1:9883"
+          }
+        ],
+        "query": "scm-1:9883",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "scm-2:9883",
+          "value": "scm-2:9883"
+        },
+        "hide": 0,
+        "multi": false,
+        "name": "follower2_instance",
+        "options": [
+          {
+            "selected": true,
+            "text": "scm-2:9883",
+            "value": "scm-2:9883"
+          }
+        ],
+        "query": "scm-2:9883",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "ratis_state_machine_appliedIndex",
+          "value": "ratis_state_machine_appliedIndex"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "name": "leader_commit_metric",
+        "options": [],
+        "query": {
+          "query": "label_values({instance=\"$leader_instance\",__name__=~\"ratis.*(last.*appl|appl.*index|state.*machine.*appl).*\"}, __name__)",
+          "refId": "PrometheusVariableQueryEditor-4"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "ratis_state_machine_appliedIndex",
+          "value": "ratis_state_machine_appliedIndex"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "multi": false,
+        "name": "follower_applied_metric",
+        "options": [],
+        "query": {
+          "query": "label_values({instance=~\"($follower1_instance|$follower2_instance)\",__name__=~\"ratis.*(last.*appl|appl.*index|state.*machine.*appl).*\"}, __name__)",
+          "refId": "PrometheusVariableQueryEditor-5"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "ratis_state_machine_appliedIndex",
+          "value": "ratis_state_machine_appliedIndex"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "applied_index_metric",
+        "options": [],
+        "query": {
+          "query": "label_values({instance=~\"($leader_instance|$follower1_instance|$follower2_instance)\",__name__=~\"ratis.*(last.*appl|appl.*index|state.*machine.*appl).*\"}, __name__)",
+          "refId": "PrometheusVariableQueryEditor-7"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Ozone - SCM HA Catchup",
+  "uid": "ozone-scm-ha-catchup",
+  "version": 8,
+  "weekStart": ""
+}
