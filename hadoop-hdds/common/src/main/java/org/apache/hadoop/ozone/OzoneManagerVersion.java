@@ -73,6 +73,11 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "server-side, so file system clients no longer need the "
           + "client-side InfoBucket layout check for getFileChecksum"),
   ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
+  LIST_STATUS_REJECTS_OBS(101,
+      "OzoneManager version that rejects listStatus on OBJECT_STORE buckets "
+          + "server-side when the request sets requireFileSystemLayout, so file "
+          + "system clients no longer need the client-side InfoBucket layout "
+          + "check for listStatus"),
 
   S3_MULTIPART_UPLOAD_ABORT_CONTEXT(102,
       "OzoneManager version that resolves S3 volume context for multipart upload abort"),

@@ -130,6 +130,31 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
 
   @Override
   @Test
+  public void testValidateAndUpdateCacheWithUpdateID() throws Exception {
+    String dbFromKey = OMRequestTestUtils.addFileToKeyTable(false, false,
+        fromKeyInfo.getFileName(), fromKeyInfo, clientID, txnLogId, omMetadataManager);
+    long updateID = fromKeyInfo.getUpdateID();
+    OMRequest omRequest = createRenameKeyRequest(volumeName, bucketName, fromKeyName, toKeyName);
+
+    OMRequest mismatchRequest = doPreExecute(omRequest.toBuilder().setRenameKeyRequest(
+        omRequest.getRenameKeyRequest().toBuilder().setUpdateID(updateID + 1)).build());
+    OMClientResponse response = getOMKeyRenameRequest(mismatchRequest).validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.UPDATE_ID_NOT_MATCH, response.getOMResponse().getStatus());
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(dbFromKey));
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey));
+
+    OMRequest matchRequest = doPreExecute(omRequest.toBuilder().setRenameKeyRequest(
+        omRequest.getRenameKeyRequest().toBuilder().setUpdateID(updateID)).build());
+    response = getOMKeyRenameRequest(matchRequest).validateAndUpdateCache(ozoneManager, 101L);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+    assertNull(omMetadataManager.getKeyTable(getBucketLayout()).get(dbFromKey));
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout()).get(dbToKey));
+  }
+
+  @Override
+  @Test
   public void testValidateAndUpdateCacheWithToKeyInvalid() throws Exception {
     String invalidToKeyName = "invalid:";
     assertThrows(

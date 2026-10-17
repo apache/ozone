@@ -715,6 +715,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public List<OzoneFileStatus> listStatus(ListStatusLightOptions options) throws IOException {
+    return null;
+  }
+
+  @Override
   public boolean addAcl(OzoneObj obj, OzoneAcl acl) throws IOException {
     return false;
   }

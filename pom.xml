@@ -202,7 +202,7 @@
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.20</slf4j.version>
     <snakeyaml.version>2.5</snakeyaml.version>
-    <snappy-java.version>1.1.10.8</snappy-java.version>
+    <snappy-java.version>1.1.10.10</snappy-java.version>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     <sonar.java.binaries>${basedir}/target/classes</sonar.java.binaries>
     <sonar.organization>apache</sonar.organization>
@@ -225,7 +225,7 @@
     <weld-servlet.version>3.1.9.Final</weld-servlet.version>
     <woodstox.version>5.4.0</woodstox.version>
     <zookeeper.version>3.8.6</zookeeper.version>
-    <zstd-jni.version>1.5.7-20</zstd-jni.version>
+    <zstd-jni.version>1.5.7-21</zstd-jni.version>
   </properties>
 
   <dependencyManagement>
@@ -1755,6 +1755,70 @@
   <build>
     <pluginManagement>
       <plugins>
+        <plugin>
+          <!-- Declare paths passed to tests via system properties as inputs/local state, so that test goals get a cache key -->
+          <!-- (required by Develocity Predictive Test Selection) -->
+          <groupId>com.gradle</groupId>
+          <artifactId>develocity-maven-extension</artifactId>
+          <version>2.6.0</version>
+          <configuration>
+            <develocity>
+              <plugins>
+                <plugin>
+                  <artifactId>maven-surefire-plugin</artifactId>
+                  <inputs>
+                    <fileSets>
+                      <fileSet>
+                        <name>krb5-conf</name>
+                        <paths>
+                          <path>${project.build.directory}/test-classes/krb5.conf</path>
+                        </paths>
+                        <normalization>RELATIVE_PATH</normalization>
+                      </fileSet>
+                      <fileSet>
+                        <name>native-lib</name>
+                        <paths>
+                          <path>${maven.multiModuleProjectDirectory}/target/native-lib</path>
+                        </paths>
+                        <normalization>RELATIVE_PATH</normalization>
+                      </fileSet>
+                      <fileSet>
+                        <name>rocksdb-native-lib</name>
+                        <paths>
+                          <path>${project.build.directory}/native/rocksdb</path>
+                          <path>${maven.multiModuleProjectDirectory}/hadoop-hdds/rocks-native/target/native/rocksdb</path>
+                        </paths>
+                        <normalization>RELATIVE_PATH</normalization>
+                      </fileSet>
+                    </fileSets>
+                  </inputs>
+                  <localState>
+                    <fileSets>
+                      <fileSet>
+                        <name>test-dir</name>
+                        <paths>
+                          <path>${test.build.dir}</path>
+                        </paths>
+                      </fileSet>
+                      <fileSet>
+                        <name>log-dir</name>
+                        <paths>
+                          <path>${project.build.directory}/log</path>
+                        </paths>
+                      </fileSet>
+                      <fileSet>
+                        <name>tmp-dir</name>
+                        <paths>
+                          <path>${project.build.directory}/tmp</path>
+                        </paths>
+                      </fileSet>
+                    </fileSets>
+                  </localState>
+                </plugin>
+              </plugins>
+            </develocity>
+          </configuration>
+        </plugin>
         <plugin>
           <groupId>com.coderplus.maven.plugins</groupId>
           <artifactId>copy-rename-maven-plugin</artifactId>

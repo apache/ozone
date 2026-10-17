@@ -400,7 +400,9 @@ class TestPerVolumePushReplication {
       ReplicateContainerCommand cmd, DatanodeDetails source) throws IOException {
     DatanodeStateMachine stateMachine = cluster.getHddsDatanode(source).getDatanodeStateMachine();
     StateContext context = stateMachine.getContext();
-    context.getTermOfLeaderSCM().ifPresent(cmd::setTerm);
+    // Use the SCM term, not the datanode's: a just restarted datanode has no term yet, so the command would keep
+    // term 0 and be dropped as stale once the first real SCM command initializes the term.
+    cmd.setTerm(cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     context.addCommand(cmd);
   }
 

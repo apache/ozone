@@ -2568,7 +2568,10 @@
     <name>ozone.om.kerberos.principal</name>
     <value>OM/_HOST@REALM</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
-    <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM</description>
+    <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM
+      SCM issues an OM certificate only to this service user, and allocates and deletes blocks only for this service
+      user or an SCM admin, so the property must be set in the configuration of SCM as well.
+    </description>
   </property>
   <property>
     <name>ozone.om.kerberos.principal.pattern</name>
@@ -3515,6 +3518,8 @@
     <tag>OM, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
+      kerberos takes effect only when ozone.security.http.kerberos.enabled is true.
+      With simple, requests are not authenticated, so the admin check of the /dbCheckpoint and /v2/dbCheckpoint endpoints is not applied.
     </description>
   </property>
   <property>
@@ -3523,6 +3528,8 @@
     <tag>OM, SECURITY, KERBEROS</tag>
     <description> simple or kerberos. If kerberos is set, SPNEGO
       will be used for http authentication.
+      kerberos takes effect only when ozone.security.http.kerberos.enabled is true.
+      With simple, requests are not authenticated, so the admin check of the /dbCheckpoint endpoint is not applied.
     </description>
   </property>
   <property>
@@ -5260,6 +5267,8 @@
       dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
       own fully qualified hostname at startup. The _HOST placeholder
       allows using the same configuration setting on all Datanodes.
+      SCM issues a Datanode certificate only to this service user, so the
+      property must be set in the configuration of SCM as well.
     </description>
   </property>
   <property>
