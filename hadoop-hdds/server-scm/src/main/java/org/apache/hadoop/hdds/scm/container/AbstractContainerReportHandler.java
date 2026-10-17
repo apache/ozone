@@ -411,6 +411,7 @@ abstract class AbstractContainerReportHandler {
         .setBytesUsed(replicaProto.getUsed())
         .setEmpty(replicaProto.getIsEmpty())
         .setChecksums(ContainerChecksums.of(replicaProto.getDataChecksum()))
+        .setStreamCommitOnly(replicaProto.getStreamCommitOnly())
         .build();
 
     if (replica.getState().equals(State.DELETED)) {

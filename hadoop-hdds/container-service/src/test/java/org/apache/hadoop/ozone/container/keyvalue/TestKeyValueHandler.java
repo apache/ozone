@@ -112,6 +112,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -124,6 +125,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
@@ -1077,6 +1079,47 @@ public class TestKeyValueHandler {
     ArgumentCaptor<DispatcherContext> captor = ArgumentCaptor.forClass(DispatcherContext.class);
     verify(spyChunkManager).writeChunk(eq(container), any(), any(), any(ChunkBuffer.class), captor.capture());
     assertEquals(HDDSVersion.ZDU, captor.getValue().getWriteVersion());
+  }
+
+  @Test
+  public void testStreamCommitOnly() throws Exception {
+    conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(tempDir);
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+    long containerID = ContainerTestHelper.getTestContainerID();
+    assertEquals(ContainerProtos.Result.SUCCESS,
+        kvHandler.handleCreateContainer(createContainerRequest(DATANODE_UUID, containerID), null).getResult());
+    KeyValueContainer container = (KeyValueContainer) handlerWithVolume.getContainerSet().getContainer(containerID);
+    KeyValueContainerData data = container.getContainerData();
+    assertTrue(data.isStreamCommitOnlyUndecided());
+
+    BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+    ContainerCommandRequestProto writeChunk = ContainerTestHelper
+        .getWriteChunkRequest(MockPipeline.createSingleNodePipeline(), blockID, 1024);
+    ContainerCommandRequestProto streamInit = writeChunk.toBuilder()
+        .setCmdType(ContainerProtos.Type.StreamInitWithPutBlock).build();
+    DispatcherContext streamInitContext = DispatcherContext.newBuilder(DispatcherContext.Op.STREAM_INIT)
+        .setStage(DispatcherContext.WriteChunkStage.WRITE_DATA).build();
+
+    // The first write of a new container is a stream with PutBlock
+    assertEquals(ContainerProtos.Result.SUCCESS,
+        kvHandler.handleStreamInit(streamInit, container, streamInitContext).getResult());
+    assertTrue(data.isStreamCommitOnly());
+    assertTrue(data.buildContainerReplicaProto().getStreamCommitOnly());
+    try (DBHandle db = BlockUtils.getDB(data, conf)) {
+      assertNotNull(db.getStore().getMetadataTable().get(data.getStreamCommitOnlyKey()));
+    }
+
+    // A WriteChunk clears it permanently
+    assertEquals(ContainerProtos.Result.SUCCESS, kvHandler.handleWriteChunk(writeChunk, container, null).getResult());
+    assertFalse(data.isStreamCommitOnly());
+    assertFalse(data.buildContainerReplicaProto().getStreamCommitOnly());
+    try (DBHandle db = BlockUtils.getDB(data, conf)) {
+      assertNull(db.getStore().getMetadataTable().get(data.getStreamCommitOnlyKey()));
+    }
+    assertEquals(ContainerProtos.Result.SUCCESS,
+        kvHandler.handleStreamInit(streamInit, container, streamInitContext).getResult());
+    assertFalse(data.isStreamCommitOnly());
   }
 
   private static ChunkManager spyChunkManager(KeyValueHandler kvHandler) throws Exception {

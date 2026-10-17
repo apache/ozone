@@ -335,6 +335,7 @@ public final class KeyValueContainerUtil {
     if (bcsId != null) {
       kvContainerData.updateBlockCommitSequenceId(bcsId);
     }
+    kvContainerData.setStreamCommitOnly(metadataTable.get(kvContainerData.getStreamCommitOnlyKey()) != null);
 
     // Set block statistics
     populateBlockStatistics(kvContainerData, metadataTable, store);

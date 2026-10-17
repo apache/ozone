@@ -35,6 +35,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
+import static org.apache.hadoop.ozone.OzoneConsts.STREAM_COMMIT_ONLY;
 import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -89,6 +90,9 @@ public class KeyValueContainerData extends ContainerData {
   private long deleteTransactionId;
 
   private long blockCommitSequenceId;
+
+  // Whether all the blocks are committed through data streams; null for a new container until its first write.
+  private volatile Boolean streamCommitOnly = false;
 
   private final Set<Long> finalizedBlockSet;
 
@@ -220,6 +224,49 @@ public class KeyValueContainerData extends ContainerData {
   }
 
   /**
+   * @return true if all the blocks are committed through data streams,
+   *         i.e. on all the replicas before acknowledged, without Raft log entries.
+   */
+  public boolean isStreamCommitOnly() {
+    return Boolean.TRUE.equals(streamCommitOnly);
+  }
+
+  /** For loading the value persisted by {@link #markStreamCommitOnly}. */
+  public void setStreamCommitOnly(boolean streamCommitOnly) {
+    this.streamCommitOnly = streamCommitOnly;
+  }
+
+  /** Let the first write of this newly created container decide whether it is stream-commit-only. */
+  public void setStreamCommitOnlyUndecided() {
+    this.streamCommitOnly = null;
+  }
+
+  public boolean isStreamCommitOnlyUndecided() {
+    return streamCommitOnly == null;
+  }
+
+  public boolean isStreamCommitOnlyCleared() {
+    return Boolean.FALSE.equals(streamCommitOnly);
+  }
+
+  /** Mark this container stream-commit-only if no other write has decided otherwise. */
+  public synchronized void markStreamCommitOnly(DBHandle db) throws IOException {
+    if (streamCommitOnly == null) {
+      db.getStore().getMetadataTable().put(getStreamCommitOnlyKey(), 1L);
+      streamCommitOnly = true;
+    }
+  }
+
+  /** A write not committed through a data stream permanently clears stream-commit-only. */
+  public synchronized void clearStreamCommitOnly(DBHandle db) throws IOException {
+    if (Boolean.TRUE.equals(streamCommitOnly)) {
+      db.getStore().getMetadataTable().delete(getStreamCommitOnlyKey());
+      db.getStore().flushLog(true);
+    }
+    streamCommitOnly = false;
+  }
+
+  /**
    * Returns the DBType used for the container.
    * @return containerDBType
    */
@@ -284,6 +331,7 @@ public class KeyValueContainerData extends ContainerData {
         .setBlockCommitSequenceId(getBlockCommitSequenceId())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setDataChecksum(getDataChecksum())
+        .setStreamCommitOnly(isStreamCommitOnly())
         .build();
   }
 
@@ -445,6 +493,10 @@ public class KeyValueContainerData extends ContainerData {
 
   public String getContainerDataChecksumKey() {
     return formatKey(CONTAINER_DATA_CHECKSUM);
+  }
+
+  public String getStreamCommitOnlyKey() {
+    return formatKey(STREAM_COMMIT_ONLY);
   }
   
   public String getPendingDeleteBlockBytesKey() {

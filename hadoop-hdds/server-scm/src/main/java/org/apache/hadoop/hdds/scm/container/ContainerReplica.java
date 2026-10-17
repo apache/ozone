@@ -49,6 +49,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
   private final long bytesUsed;
   private final boolean isEmpty;
   private final ContainerChecksums checksums;
+  /** All the blocks are committed through data streams, i.e. on all the replicas before acknowledged. */
+  private final boolean streamCommitOnly;
 
   private ContainerReplica(ContainerReplicaBuilder b) {
     this.containerID = Objects.requireNonNull(b.containerID, "containerID == null");
@@ -61,6 +63,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     this.isEmpty = b.isEmpty;
     this.sequenceId = b.sequenceId;
     this.checksums = Objects.requireNonNull(b.checksums, "checksums == null");
+    this.streamCommitOnly = b.streamCommitOnly;
   }
 
   public ContainerID getContainerID() {
@@ -133,6 +136,10 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     return checksums.getDataChecksum();
   }
 
+  public boolean isStreamCommitOnly() {
+    return streamCommitOnly;
+  }
+
   @Override
   public int hashCode() {
     return new HashCodeBuilder(61, 71)
@@ -194,7 +201,8 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         .setReplicaIndex(replicaIndex)
         .setSequenceId(sequenceId)
         .setEmpty(isEmpty)
-        .setChecksums(checksums);
+        .setChecksums(checksums)
+        .setStreamCommitOnly(streamCommitOnly);
   }
 
   @Override
@@ -209,6 +217,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
         + ", bytesUsed=" + bytesUsed
         + ", " + (isEmpty ? "empty" : "non-empty")
         + ", checksums=" + checksums
+        + (streamCommitOnly ? ", streamCommitOnly" : "")
         + '}';
   }
 
@@ -227,6 +236,7 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
     private int replicaIndex;
     private boolean isEmpty;
     private ContainerChecksums checksums;
+    private boolean streamCommitOnly;
 
     /**
      * Set Container Id.
@@ -303,6 +313,11 @@ public final class ContainerReplica implements Comparable<ContainerReplica> {
 
     public ContainerReplicaBuilder setChecksums(ContainerChecksums checksums) {
       this.checksums = checksums;
+      return this;
+    }
+
+    public ContainerReplicaBuilder setStreamCommitOnly(boolean streamCommitOnly) {
+      this.streamCommitOnly = streamCommitOnly;
       return this;
     }
 

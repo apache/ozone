@@ -251,6 +251,8 @@ message ContainerReplicaProto {
   optional int32 replicaIndex = 14;
   optional bool isEmpty = 15 [default = false];
   optional int64 dataChecksum = 16;
+  // All the blocks are committed through data streams, i.e. on all the replicas before acknowledged.
+  optional bool streamCommitOnly = 17 [default = false];
 }
 
 message CommandStatusReportsProto {

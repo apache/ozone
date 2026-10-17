@@ -429,10 +429,18 @@ public class KeyValueHandler extends Handler {
           && DispatcherContext.op(dispatcherContext) == DispatcherContext.Op.APPLY_TRANSACTION) {
         return handleStreamCommitApplied(request, kvContainer, blockID, dispatcherContext.getLogIndex());
       }
+      if (request.getCmdType() == Type.StreamInitWithPutBlock) {
+        markStreamCommitOnly(kvContainer);
+      } else {
+        clearStreamCommitOnly(kvContainer);
+      }
       path = chunkManager
           .streamInit(kvContainer, blockID);
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ex) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("Stream init failed", ex, IO_EXCEPTION), request);
     }
 
     return getSuccessResponseBuilder(request)
@@ -455,6 +463,28 @@ public class KeyValueHandler extends Handler {
     } catch (IOException ex) {
       return ContainerUtils.logAndReturnError(LOG,
           new StorageContainerException("Failed to commit the BCSID of block " + blockID, ex, IO_EXCEPTION), request);
+    }
+  }
+
+  private void markStreamCommitOnly(KeyValueContainer kvContainer) throws IOException {
+    final KeyValueContainerData data = kvContainer.getContainerData();
+    if (data.isStreamCommitOnlyUndecided()) {
+      try (DBHandle db = BlockUtils.getDB(data, conf)) {
+        data.markStreamCommitOnly(db);
+      }
+    }
+  }
+
+  /**
+   * A write which may be acknowledged before it is on all the replicas clears stream-commit-only.
+   * For WriteChunk, it is cleared when the data is written, i.e. before the Raft log entry is committed.
+   */
+  private void clearStreamCommitOnly(KeyValueContainer kvContainer) throws IOException {
+    final KeyValueContainerData data = kvContainer.getContainerData();
+    if (!data.isStreamCommitOnlyCleared()) {
+      try (DBHandle db = BlockUtils.getDB(data, conf)) {
+        data.clearStreamCommitOnly(db);
+      }
     }
   }
 
@@ -509,6 +539,7 @@ public class KeyValueHandler extends Handler {
     }
     newContainerData.setReplicaIndex(request.getCreateContainer()
         .getReplicaIndex());
+    newContainerData.setStreamCommitOnlyUndecided();
 
     // TODO: Add support to add metadataList to ContainerData. Add metadata
     // to container during creation.
@@ -697,6 +728,9 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
       BlockData blockData = BlockData.getFromProtoBuf(data);
       Objects.requireNonNull(blockData, "blockData == null");
+      if (!DispatcherContext.op(dispatcherContext).isStreamCommit()) {
+        clearStreamCommitOnly(kvContainer);
+      }
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
@@ -1128,6 +1162,7 @@ public class KeyValueHandler extends Handler {
 
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
       Objects.requireNonNull(chunkInfo,  "chunkInfo == null");
+      clearStreamCommitOnly(kvContainer);
 
       ChunkBuffer data = null;
       if (dispatcherContext == null) {
@@ -1288,6 +1323,8 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.ChunkInfo chunkInfoProto = putSmallFileReq.getChunkInfo();
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
       Objects.requireNonNull(chunkInfo, "chunkInfo == null");
+      // Without data in the Raft log entry, it can only be cleared when the entry is applied.
+      clearStreamCommitOnly(kvContainer);
 
       ChunkBuffer data = ChunkBuffer.wrap(
           putSmallFileReq.getData().asReadOnlyByteBufferList());

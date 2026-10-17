@@ -39,6 +39,7 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -1396,6 +1397,30 @@ public class TestContainerReportHandler {
       numReplicasChecked++;
     }
     assertEquals(numNodes, numReplicasChecked);
+  }
+
+  @Test
+  public void testWithStreamCommitOnly() throws Exception {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    final DatanodeDetails dn = nodeManager.getNodes(NodeStatus.inServiceHealthy()).get(0);
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    final ContainerID contID = container.containerID();
+    nodeManager.setContainers(dn, Collections.singleton(contID));
+    containerStateManager.addContainer(container.getProtobuf());
+
+    for (boolean streamCommitOnly : new boolean[] {true, false}) {
+      final ContainerReportsProto report = getContainerReportsProto(
+          contID, ContainerReplicaProto.State.CLOSED, dn.getUuidString());
+      final ContainerReplicaProto replica = report.getReports(0).toBuilder()
+          .setStreamCommitOnly(streamCommitOnly)
+          .build();
+      reportHandler.onMessage(new ContainerReportFromDatanode(dn,
+          report.toBuilder().clearReports().addReports(replica).build()), publisher);
+
+      final Set<ContainerReplica> replicas = containerManager.getContainerReplicas(contID);
+      assertEquals(1, replicas.size());
+      assertEquals(streamCommitOnly, replicas.iterator().next().isStreamCommitOnly());
+    }
   }
 
   /**
