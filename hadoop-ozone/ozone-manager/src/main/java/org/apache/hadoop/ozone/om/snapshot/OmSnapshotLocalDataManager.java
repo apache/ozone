@@ -91,8 +91,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   private static final String LOCAL_DATA_MANAGER_SERVICE_NAME = "OmSnapshotLocalDataManagerService";
 
   private final ObjectSerializer<OmSnapshotLocalData> snapshotLocalDataSerializer;
-  // Loads only snapshot ids and versions (empty SST file lists) for building the version graph; never used to save.
-  private final ObjectSerializer<OmSnapshotLocalData> snapshotLocalDataMetaSerializer;
   // In-memory DAG of snapshot-version dependencies. Each node represents a
   // specific (snapshotId, version) pair, and a directed edge points to the
   // corresponding (previousSnapshotId, previousSnapshotVersion) it depends on.
@@ -133,15 +131,6 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       @Override
       public void computeAndSetChecksum(Yaml yaml, OmSnapshotLocalData data) throws IOException {
         data.computeAndSetChecksum(yaml);
-      }
-    };
-    this.snapshotLocalDataMetaSerializer = new YamlSerializer<OmSnapshotLocalData>(
-        new OmSnapshotLocalDataYaml.YamlFactory(true)) {
-
-      @Override
-      public void computeAndSetChecksum(Yaml yaml, OmSnapshotLocalData data) throws IOException {
-        // save() computes the checksum first, so this keeps data without SST file lists from overwriting a YAML.
-        throw new IOException("Snapshot local data loaded without SST file lists cannot be saved");
       }
     };
     this.versionNodeMap = new ConcurrentHashMap<>();
@@ -347,7 +336,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             }
             prevSnapshotLocalData = loadedLocalData.get();
           } else {
-            prevSnapshotLocalData = snapshotLocalDataMetaSerializer.load(previousSnapshotLocalDataFile);
+            prevSnapshotLocalData = OmSnapshotLocalDataYaml.loadWithoutSstFiles(previousSnapshotLocalDataFile);
           }
           if (!prevSnapId.equals(prevSnapshotLocalData.getSnapshotId())) {
             String mismatch = "Expected SnapshotId " + prevSnapId +
@@ -378,7 +367,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return Optional.empty();
     }
     try {
-      return Optional.of(snapshotLocalDataMetaSerializer.load(localDataFile));
+      return Optional.of(OmSnapshotLocalDataYaml.loadWithoutSstFiles(localDataFile));
     } catch (IOException e) {
       failedFilePaths.add(path);
       LOG.error("Skipping snapshot local data file {} because it could not be loaded. " +
@@ -554,10 +543,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
   @Override
   public synchronized void close() {
     if (!closed) {
-      for (ObjectSerializer<OmSnapshotLocalData> serializer :
-          Arrays.asList(snapshotLocalDataSerializer, snapshotLocalDataMetaSerializer)) {
+      if (snapshotLocalDataSerializer != null) {
         try {
-          serializer.close();
+          snapshotLocalDataSerializer.close();
         } catch (IOException e) {
           LOG.error("Failed to close snapshot local data serializer", e);
         }

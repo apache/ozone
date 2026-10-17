@@ -17,11 +17,15 @@
 
 package org.apache.hadoop.ozone.om;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.apache.commons.pool2.BasePooledObjectFactory;
 import org.apache.commons.pool2.PooledObject;
 import org.apache.commons.pool2.impl.DefaultPooledObject;
@@ -35,6 +39,15 @@ import org.yaml.snakeyaml.TypeDescription;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.AbstractConstruct;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
+import org.yaml.snakeyaml.events.CollectionEndEvent;
+import org.yaml.snakeyaml.events.CollectionStartEvent;
+import org.yaml.snakeyaml.events.DocumentEndEvent;
+import org.yaml.snakeyaml.events.DocumentStartEvent;
+import org.yaml.snakeyaml.events.Event;
+import org.yaml.snakeyaml.events.MappingStartEvent;
+import org.yaml.snakeyaml.events.ScalarEvent;
+import org.yaml.snakeyaml.events.StreamEndEvent;
+import org.yaml.snakeyaml.events.StreamStartEvent;
 import org.yaml.snakeyaml.introspector.BeanAccess;
 import org.yaml.snakeyaml.introspector.Property;
 import org.yaml.snakeyaml.introspector.PropertyUtils;
@@ -43,6 +56,10 @@ import org.yaml.snakeyaml.nodes.Node;
 import org.yaml.snakeyaml.nodes.NodeTuple;
 import org.yaml.snakeyaml.nodes.ScalarNode;
 import org.yaml.snakeyaml.nodes.Tag;
+import org.yaml.snakeyaml.parser.Parser;
+import org.yaml.snakeyaml.parser.ParserImpl;
+import org.yaml.snakeyaml.reader.StreamReader;
+import org.yaml.snakeyaml.reader.UnicodeReader;
 import org.yaml.snakeyaml.representer.Represent;
 import org.yaml.snakeyaml.representer.Representer;
 
@@ -62,6 +79,112 @@ public final class OmSnapshotLocalDataYaml {
   public static final int SNAPSHOT_LOCAL_DATA_YAML_CODE_POINT_LIMIT = 128 * 1024 * 1024;
 
   private OmSnapshotLocalDataYaml() {
+  }
+
+  /**
+   * Loads only the snapshot ids and versions of a snapshot local data YAML, streaming parser events instead of
+   * building the document, so the SST file lists are skipped without being held in memory.
+   * The returned object has empty SST file lists, no transaction info and no checksum, so it must not be saved.
+   */
+  public static OmSnapshotLocalData loadWithoutSstFiles(File yamlFile) throws IOException {
+    try (InputStream in = Files.newInputStream(yamlFile.toPath())) {
+      Parser parser = new ParserImpl(new StreamReader(new UnicodeReader(in)),
+          SnapshotLocalDataConstructor.createLoaderOptions());
+      nextEvent(parser, StreamStartEvent.class);
+      nextEvent(parser, DocumentStartEvent.class);
+      MappingStartEvent root = nextEvent(parser, MappingStartEvent.class);
+      if (!SNAPSHOT_YAML_TAG.getValue().equals(root.getTag())) {
+        throw new IOException("Expected tag " + SNAPSHOT_YAML_TAG + " but found " + root);
+      }
+      String snapId = null;
+      String prevSnapId = null;
+      String version = null;
+      Map<Integer, VersionMeta> versionMetas = null;
+      while (!parser.checkEvent(Event.ID.MappingEnd)) {
+        switch (nextScalar(parser)) {
+        case OzoneConsts.OM_SLD_SNAP_ID:
+          snapId = nextScalar(parser);
+          break;
+        case OzoneConsts.OM_SLD_PREV_SNAP_ID:
+          prevSnapId = nextScalar(parser);
+          break;
+        case OzoneConsts.OM_SLD_VERSION:
+          version = nextScalar(parser);
+          break;
+        case OzoneConsts.OM_SLD_VERSION_SST_FILE_INFO:
+          versionMetas = nextVersionMetas(parser);
+          break;
+        default:
+          skipValue(parser);
+        }
+      }
+      parser.getEvent();
+      nextEvent(parser, DocumentEndEvent.class);
+      nextEvent(parser, StreamEndEvent.class);
+      OmSnapshotLocalData data = new OmSnapshotLocalData(UUID.fromString(require(snapId, OzoneConsts.OM_SLD_SNAP_ID)),
+          Collections.emptyList(), prevSnapId == null ? null : UUID.fromString(prevSnapId), null, 0);
+      data.setVersion(Integer.parseInt(require(version, OzoneConsts.OM_SLD_VERSION)));
+      if (versionMetas != null) {
+        data.setVersionSstFileInfos(versionMetas);
+      }
+      return data;
+    } catch (RuntimeException e) {
+      throw new IOException("Failed to load " + yamlFile, e);
+    }
+  }
+
+  private static Map<Integer, VersionMeta> nextVersionMetas(Parser parser) throws IOException {
+    Map<Integer, VersionMeta> versionMetas = new LinkedHashMap<>();
+    nextEvent(parser, MappingStartEvent.class);
+    while (!parser.checkEvent(Event.ID.MappingEnd)) {
+      int version = Integer.parseInt(nextScalar(parser));
+      String prevVersion = null;
+      nextEvent(parser, MappingStartEvent.class);
+      while (!parser.checkEvent(Event.ID.MappingEnd)) {
+        if (OzoneConsts.OM_SLD_VERSION_META_PREV_SNAP_VERSION.equals(nextScalar(parser))) {
+          prevVersion = nextScalar(parser);
+        } else {
+          skipValue(parser);
+        }
+      }
+      parser.getEvent();
+      versionMetas.put(version, new VersionMeta(
+          Integer.parseInt(require(prevVersion, OzoneConsts.OM_SLD_VERSION_META_PREV_SNAP_VERSION)),
+          Collections.emptyList()));
+    }
+    parser.getEvent();
+    return versionMetas;
+  }
+
+  private static <T extends Event> T nextEvent(Parser parser, Class<T> type) throws IOException {
+    Event event = parser.getEvent();
+    if (!type.isInstance(event)) {
+      throw new IOException("Expected " + type.getSimpleName() + " but found " + event);
+    }
+    return type.cast(event);
+  }
+
+  private static String nextScalar(Parser parser) throws IOException {
+    return nextEvent(parser, ScalarEvent.class).getValue();
+  }
+
+  private static void skipValue(Parser parser) {
+    int depth = 0;
+    do {
+      Event event = parser.getEvent();
+      if (event instanceof CollectionStartEvent) {
+        depth++;
+      } else if (event instanceof CollectionEndEvent) {
+        depth--;
+      }
+    } while (depth > 0);
+  }
+
+  private static String require(String value, String key) throws IOException {
+    if (value == null) {
+      throw new IOException("Missing " + key);
+    }
+    return value;
   }
 
   /**
@@ -128,11 +251,8 @@ public final class OmSnapshotLocalDataYaml {
    * This is used when parsing YAML files into OmSnapshotLocalDataYaml objects.
    */
   private static class SnapshotLocalDataConstructor extends SafeConstructor {
-    private final boolean skipSstFiles;
-
-    SnapshotLocalDataConstructor(boolean skipSstFiles) {
+    SnapshotLocalDataConstructor() {
       super(createLoaderOptions());
-      this.skipSstFiles = skipSstFiles;
       //Adding our own specific constructors for tags.
       this.yamlConstructors.put(SNAPSHOT_YAML_TAG, new ConstructSnapshotLocalData());
       this.yamlConstructors.put(SNAPSHOT_VERSION_META_TAG, new ConstructVersionMeta());
@@ -169,20 +289,9 @@ public final class OmSnapshotLocalDataYaml {
       @Override
       public Object construct(Node node) {
         MappingNode mnode = (MappingNode) node;
-        if (skipSstFiles) {
-          // Drop the SST file list node before construction so none of its entries are built.
-          mnode = new MappingNode(mnode.getTag(), mnode.getValue().stream()
-              .filter(tuple -> !isSstFilesKey(tuple.getKeyNode())).collect(Collectors.toList()), mnode.getFlowStyle());
-        }
         Map<Object, Object> nodes = constructMapping(mnode);
-        List<SstFileInfo> sstFiles = skipSstFiles ? Collections.emptyList()
-            : (List<SstFileInfo>) nodes.get(OzoneConsts.OM_SLD_VERSION_META_SST_FILES);
-        return new VersionMeta((Integer) nodes.get(OzoneConsts.OM_SLD_VERSION_META_PREV_SNAP_VERSION), sstFiles);
-      }
-
-      private boolean isSstFilesKey(Node keyNode) {
-        return keyNode instanceof ScalarNode
-            && OzoneConsts.OM_SLD_VERSION_META_SST_FILES.equals(((ScalarNode) keyNode).getValue());
+        return new VersionMeta((Integer) nodes.get(OzoneConsts.OM_SLD_VERSION_META_PREV_SNAP_VERSION),
+            (List<SstFileInfo>) nodes.get(OzoneConsts.OM_SLD_VERSION_META_SST_FILES));
       }
     }
 
@@ -251,19 +360,6 @@ public final class OmSnapshotLocalDataYaml {
    * ensuring efficient resource usage in high-concurrency environments.
    */
   public static class YamlFactory extends BasePooledObjectFactory<Yaml> {
-    private final boolean skipSstFiles;
-
-    public YamlFactory() {
-      this(false);
-    }
-
-    /**
-     * @param skipSstFiles when true, loaded {@link VersionMeta}s have an empty SST file list, which makes loading
-     *     much cheaper for callers that only need snapshot ids and versions. Objects loaded this way must not be saved.
-     */
-    public YamlFactory(boolean skipSstFiles) {
-      this.skipSstFiles = skipSstFiles;
-    }
 
     @Override
     public Yaml create() {
@@ -273,7 +369,7 @@ public final class OmSnapshotLocalDataYaml {
       DumperOptions options = new DumperOptions();
       Representer representer = new OmSnapshotLocalDataRepresenter(options);
       representer.setPropertyUtils(propertyUtils);
-      SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor(skipSstFiles);
+      SafeConstructor snapshotDataConstructor = new SnapshotLocalDataConstructor();
       return new Yaml(snapshotDataConstructor, representer);
     }
 
