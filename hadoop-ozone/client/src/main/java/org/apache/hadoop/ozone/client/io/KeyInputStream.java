@@ -36,6 +36,7 @@ import org.apache.hadoop.hdds.scm.storage.PartInputStream;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,10 +105,16 @@ public class KeyInputStream extends MultipartInputStream {
     return partStreams;
   }
 
-  private static BlockLocationInfo getBlockLocationInfo(OmKeyInfo newKeyInfo,
+  static BlockLocationInfo getBlockLocationInfo(OmKeyInfo newKeyInfo,
       BlockID blockID) {
-    for (List<OmKeyLocationInfo> locationList
-        : newKeyInfo.getLatestVersionLocations().getLocationLists()) {
+    if (newKeyInfo == null) {
+      return null;
+    }
+    OmKeyLocationInfoGroup latestLocations = newKeyInfo.getLatestVersionLocations();
+    if (latestLocations == null) {
+      return null;
+    }
+    for (List<OmKeyLocationInfo> locationList : latestLocations.getLocationLists()) {
       for (OmKeyLocationInfo location : locationList) {
         if (location.getBlockID().equals(blockID)) {
           return location;
