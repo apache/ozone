@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.client;
 
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT;
 
@@ -70,7 +72,7 @@ public class ScmTopologyClient {
     cache.set(new NetworkTopologyImpl(conf.get(
         ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
         ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
-        initialTopology));
+        initialTopology, isSortGroupByRack(conf)));
     scheduleNetworkTopologyPoller(conf, Instant.now());
   }
 
@@ -114,6 +116,11 @@ public class ScmTopologyClient {
     return Duration.ofMillis(refreshDurationInMs);
   }
 
+  private static boolean isSortGroupByRack(ConfigurationSource conf) {
+    return conf.getBoolean(OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_KEY,
+        OZONE_NETWORK_TOPOLOGY_SORT_GROUP_BY_RACK_DEFAULT);
+  }
+
   private synchronized void checkAndRefresh(ConfigurationSource conf) {
     InnerNode current = (InnerNode) cache.get().getNode(ROOT);
     try {
@@ -122,7 +129,7 @@ public class ScmTopologyClient {
         cache.set(new NetworkTopologyImpl(conf.get(
             ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE,
             ScmConfigKeys.OZONE_SCM_NETWORK_TOPOLOGY_SCHEMA_FILE_DEFAULT),
-            newTopology));
+            newTopology, isSortGroupByRack(conf)));
         LOG.info("Updated network topology fetched from SCM: {}.", newTopology);
       }
     } catch (IOException e) {

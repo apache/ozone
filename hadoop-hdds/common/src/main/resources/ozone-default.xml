@@ -3631,6 +3631,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.network.topology.sort.group.by.rack</name>
+    <value>false</value>
+    <tag>OZONE, PERFORMANCE</tag>
+    <description>
+      When sorting datanodes by network distance to a client, whether to keep
+      datanodes at the same distance and in the same rack next to each other,
+      so that a pipeline through the sorted datanodes does not cross racks more
+      often than needed.
+    </description>
+  </property>
+  <property>
     <name>ozone.recon.om.db.dir</name>
   <value/>
   <tag>OZONE, RECON, STORAGE</tag>
