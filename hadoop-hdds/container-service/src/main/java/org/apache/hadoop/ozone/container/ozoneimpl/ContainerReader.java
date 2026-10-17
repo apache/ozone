@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import java.io.File;
 import java.io.IOException;
 import java.util.Objects;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -41,6 +42,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
+import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,11 +97,26 @@ public class ContainerReader implements Runnable {
   @Override
   public void run() {
     try {
+      if (shouldDelete) {
+        cleanupContainerCopyDir();
+      }
       readVolume(hddsVolumeDir);
     } catch (Throwable t) {
       LOG.error("Could not read container files from the volume {}. " +
           "Marking the volume as failed", hddsVolumeDir, t);
       volumeSet.failVolume(hddsVolumeDir.getPath());
+    }
+  }
+
+  private void cleanupContainerCopyDir() {
+    // Startup loads containers before starting the replication server, so no imports can be in progress here.
+    try {
+      File copyDir = ContainerImporter.getUntarDirectory(hddsVolume).toFile();
+      if (copyDir.exists()) {
+        FileUtils.cleanDirectory(copyDir);
+      }
+    } catch (IOException | RuntimeException e) {
+      LOG.warn("Failed to remove leftover container import files under {}", hddsVolume.getVolumeRootDir(), e);
     }
   }
 
