@@ -336,7 +336,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
             }
             prevSnapshotLocalData = loadedLocalData.get();
           } else {
-            prevSnapshotLocalData = snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
+            prevSnapshotLocalData = OmSnapshotLocalDataYaml.loadWithoutSstFiles(previousSnapshotLocalDataFile);
           }
           if (!prevSnapId.equals(prevSnapshotLocalData.getSnapshotId())) {
             String mismatch = "Expected SnapshotId " + prevSnapId +
@@ -358,13 +358,16 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     return true;
   }
 
+  /**
+   * Loads the snapshot ids and versions of a local data YAML, without its SST file lists.
+   */
   private Optional<OmSnapshotLocalData> tryLoadSnapshotLocalData(File localDataFile, Set<String> failedFilePaths) {
     String path = localDataFile.getAbsolutePath();
     if (failedFilePaths.contains(path)) {
       return Optional.empty();
     }
     try {
-      return Optional.of(snapshotLocalDataSerializer.load(localDataFile));
+      return Optional.of(OmSnapshotLocalDataYaml.loadWithoutSstFiles(localDataFile));
     } catch (IOException e) {
       failedFilePaths.add(path);
       LOG.error("Skipping snapshot local data file {} because it could not be loaded. " +
