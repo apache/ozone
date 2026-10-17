@@ -89,7 +89,7 @@ To configure a Listener OM, you need to perform the following steps:
 
     In this example, `om1`, `om2`, and `om3` are the voting OMs, and `om4` and `om5` are the Listener OMs.
 
-2.  **Bootstrap the Listener OM:** Before a new Listener OM can be started, it needs to be bootstrapped. This is the same process as bootstrapping a regular OM. For more details, please refer to the [OM High Availability]({{< ref "../feature/OM-HA.md#om-bootstrap" >}}) documentation.
+2.  **Bootstrap the Listener OM:** Before a new Listener OM can be started, it needs to be bootstrapped. This is the same process as bootstrapping a regular OM. For more details, please refer to the [OM High Availability](https://ozone.apache.org/docs/administrator-guide/configuration/high-availability/om-ha#om-bootstrap) documentation.
 
 
 
@@ -99,4 +99,4 @@ Listener OMs provide eventual consistency for read operations. This means that t
 
 ## References
 
-* [Ozone Manager High Availability]({{< ref "../feature/OM-HA.md" >}})
+* [Ozone Manager High Availability](https://ozone.apache.org/docs/administrator-guide/configuration/high-availability/om-ha)

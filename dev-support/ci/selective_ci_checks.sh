@@ -170,6 +170,7 @@ function filter_changed_files() {
 
 SOURCES_TRIGGERING_TESTS=(
     "^.github"
+    "^design"
     "^dev-support"
     "^hadoop-hdds"
     "^hadoop-ozone"
@@ -250,16 +251,15 @@ function get_count_compose_files() {
     start_end::group_end
 }
 
-function get_count_doc_files() {
-    start_end::group_start "Count doc files"
+# Design docs in the top-level design/ directory are handled by the
+# rat basic check only; adding them to matched_files keeps them from triggering
+# the functional test matrix.
+function get_count_design_files() {
+    start_end::group_start "Count design doc files"
     local pattern_array=(
-        "^hadoop-hdds/docs"
-        "^hadoop-ozone/dev-support/checks/docs.sh"
-        "^hadoop-ozone/dev-support/checks/install/hugo.sh"
+        "^design"
     )
     filter_changed_files true
-    COUNT_DOC_CHANGED_FILES=${match_count}
-    readonly COUNT_DOC_CHANGED_FILES
     start_end::group_end
 }
 
@@ -449,12 +449,6 @@ function check_needs_checkstyle() {
     start_end::group_end
 }
 
-function check_needs_docs() {
-    if [[ ${COUNT_DOC_CHANGED_FILES} != "0" ]]; then
-        add_basic_check docs
-    fi
-}
-
 function check_needs_errorprone() {
     start_end::group_start "Check if Error Prone is needed"
     local pattern_array=(
@@ -641,7 +635,7 @@ run_all_tests_if_environment_files_changed
 
 get_count_all_files
 get_count_compose_files
-get_count_doc_files
+get_count_design_files
 get_changed_test_classes
 get_count_integration_files
 get_count_kubernetes_files
@@ -656,7 +650,6 @@ BASIC_CHECKS="rat"
 check_needs_author
 check_needs_bats
 check_needs_checkstyle
-check_needs_docs
 check_needs_errorprone
 check_needs_findbugs
 check_needs_pmd
