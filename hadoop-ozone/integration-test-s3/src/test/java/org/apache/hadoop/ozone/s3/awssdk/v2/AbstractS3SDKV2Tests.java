@@ -143,6 +143,9 @@ import software.amazon.awssdk.services.s3.model.DeleteBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectsResponse;
+import software.amazon.awssdk.services.s3.model.DeletedObject;
+import software.amazon.awssdk.services.s3.model.EncodingType;
 import software.amazon.awssdk.services.s3.model.ExpirationStatus;
 import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketLifecycleConfigurationResponse;
@@ -167,6 +170,7 @@ import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsRequest;
 import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsResponse;
 import software.amazon.awssdk.services.s3.model.ListMultipartUploadsRequest;
 import software.amazon.awssdk.services.s3.model.ListMultipartUploadsResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
@@ -177,6 +181,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectAttributes;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.ObjectLockLegalHoldStatus;
+import software.amazon.awssdk.services.s3.model.ObjectVersion;
 import software.amazon.awssdk.services.s3.model.PutBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.PutBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -965,6 +970,39 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     // the current object must not be deleted
     assertDoesNotThrow(() -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectsListedByListObjectVersions() {
+    final String bucketName = getBucketName();
+    final List<String> keyNames = Arrays.asList("dir/key 3", "key+1", "key2");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    keyNames.forEach(k -> s3Client.putObject(b -> b.bucket(bucketName).key(k), RequestBody.fromString("bar")));
+
+    final List<ObjectVersion> versions = s3Client.listObjectVersionsPaginator(
+            b -> b.bucket(bucketName).maxKeys(2).encodingType(EncodingType.URL))
+        .versions().stream().collect(Collectors.toList());
+
+    // versioning is not implemented, each object only has the null version
+    assertThat(versions).extracting(ObjectVersion::key).containsExactlyElementsOf(keyNames);
+    assertThat(versions).allSatisfy(v -> {
+      assertThat(v.versionId()).isEqualTo("null");
+      assertThat(v.isLatest()).isTrue();
+      assertThat(v.size()).isEqualTo(3L);
+    });
+
+    final DeleteObjectsResponse deleted = s3Client.deleteObjects(b -> b.bucket(bucketName).delete(d -> d.objects(
+        versions.stream()
+            .map(v -> ObjectIdentifier.builder().key(v.key()).versionId(v.versionId()).build())
+            .collect(Collectors.toList()))));
+
+    assertThat(deleted.errors()).isEmpty();
+    assertThat(deleted.deleted()).extracting(DeletedObject::key).containsExactlyInAnyOrderElementsOf(keyNames);
+    assertThat(deleted.deleted()).extracting(DeletedObject::versionId).containsOnly("null");
+    final ListObjectVersionsResponse remaining = s3Client.listObjectVersions(b -> b.bucket(bucketName));
+    assertThat(remaining.versions()).isEmpty();
+    assertThat(remaining.deleteMarkers()).isEmpty();
+    assertThat(remaining.isTruncated()).isFalse();
   }
 
   @Test

@@ -18,12 +18,16 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PERMISSION_DENIED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
@@ -52,6 +56,8 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.ratis.protocol.ClientId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Test OM Ratis request handling.
@@ -167,6 +173,26 @@ public class TestOzoneManagerRatisRequest {
         serverSideTranslatorPB.processRequest(omRequest);
 
     assertEquals(expectedResponse, actualResponse);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerProtocolProtos.Type.class, names = {"PurgeKeys", "PurgeDirectories",
+      "DeleteOpenKeys", "AbortExpiredMultiPartUploads", "SnapshotMoveDeletedKeys", "SnapshotMoveTableKeys",
+      "SnapshotPurge", "SetSnapshotProperty", "SetRangerServiceVersion", "QuotaRepair", "DeleteRevokedSTSTokens",
+      "SaveLifecycleScanState", "CompleteFinalizeUpgrade"})
+  public void testInternalRequestRejectedFromClient(OzoneManagerProtocolProtos.Type cmdType) throws ServiceException {
+    ozoneManager = mock(OzoneManager.class);
+    OzoneManagerProtocolProtos.OMRequest omRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+        .setCmdType(cmdType)
+        .setClientId("test-client-id")
+        .build();
+
+    OzoneManagerProtocolProtos.OMResponse response = new OMExecutionFlow(ozoneManager).submit(omRequest, true);
+
+    assertThat(response.getSuccess()).isFalse();
+    assertEquals(PERMISSION_DENIED, response.getStatus());
+    assertThat(response.getMessage()).contains(cmdType + " requests are not accepted from clients");
+    verify(ozoneManager, never()).getOmRatisServer();
   }
 
   @Test

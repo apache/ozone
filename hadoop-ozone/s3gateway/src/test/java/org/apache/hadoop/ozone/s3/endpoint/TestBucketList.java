@@ -19,7 +19,10 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder.newBucketEndpointBuilder;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -97,6 +100,24 @@ public class TestBucketList {
         getBucketResponse.getCommonPrefixes().get(0).getPrefix().getName());
 
     assertEquals(0, getBucketResponse.getContents().size());
+  }
+
+  /**
+   * Key equal to prefix + delimiter (dir/ with prefix dir) is handled by the
+   * indexOf(delimiter) branch as a common prefix.
+   */
+  @Test
+  public void listExactPrefixWithTrailingDelimiter() throws OS3Exception, IOException {
+    setup("dir/", "other");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.PREFIX, "dir");
+    ListObjectResponse response =
+        (ListObjectResponse) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertEquals(1, response.getCommonPrefixes().size());
+    assertEquals("dir/", response.getCommonPrefixes().get(0).getPrefix().getName());
+    assertEquals(0, response.getContents().size());
   }
 
   @Test
@@ -667,6 +688,147 @@ public class TestBucketList {
         "expected <ContinuationToken> element, got: " + xml);
     assertFalse(xml.contains("continueToken"),
         "response must not use the non-AWS <continueToken> element");
+  }
+
+  @Test
+  public void listObjectVersionsReturnsNullVersionOfEachKey() throws OS3Exception, IOException {
+    setup("dir1/file2", "file+1", "file3");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ENCODING_TYPE, ENCODING_TYPE);
+    ListVersionsResult result = (ListVersionsResult) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertThat(result.isTruncated()).isFalse();
+    assertThat(result.getNextKeyMarker()).isNull();
+    assertThat(result.getNextVersionIdMarker()).isNull();
+    assertThat(result.getCommonPrefixes()).extracting(p -> p.getPrefix().getName()).containsExactly("dir1/");
+    assertThat(result.getVersions()).extracting(v -> v.getKey().getName()).containsExactly("file+1", "file3");
+    assertThat(result.getVersions()).allSatisfy(v -> {
+      assertThat(v.getVersionId()).isEqualTo(NULL_VERSION_ID);
+      assertThat(v.getIsLatest()).isTrue();
+      assertThat(v.getOwner()).isNotNull();
+    });
+
+    StringWriter writer = new StringWriter();
+    JAXB.marshal(result, writer);
+    // LastModified and the owner depend on the time and the user running the test
+    assertThat(writer.toString().replaceAll("<(LastModified|DisplayName|ID)>[^<]*</\\1>", "<$1/>")).isEqualTo("""
+        <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        <ListVersionsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+            <Name>b1</Name>
+            <Prefix></Prefix>
+            <KeyMarker></KeyMarker>
+            <VersionIdMarker></VersionIdMarker>
+            <MaxKeys>1000</MaxKeys>
+            <Delimiter>/</Delimiter>
+            <EncodingType>url</EncodingType>
+            <IsTruncated>false</IsTruncated>
+            <Version>
+                <Key>file%2B1</Key>
+                <Owner>
+                    <DisplayName/>
+                    <ID/>
+                </Owner>
+                <LastModified/>
+                <Size>0</Size>
+                <StorageClass>REDUCED_REDUNDANCY</StorageClass>
+                <VersionId>null</VersionId>
+                <IsLatest>true</IsLatest>
+            </Version>
+            <Version>
+                <Key>file3</Key>
+                <Owner>
+                    <DisplayName/>
+                    <ID/>
+                </Owner>
+                <LastModified/>
+                <Size>0</Size>
+                <StorageClass>REDUCED_REDUNDANCY</StorageClass>
+                <VersionId>null</VersionId>
+                <IsLatest>true</IsLatest>
+            </Version>
+            <CommonPrefixes>
+                <Prefix>dir1/</Prefix>
+            </CommonPrefixes>
+        </ListVersionsResult>
+        """);
+  }
+
+  @Test
+  public void listObjectVersionsPaginatesWithKeyMarker() throws OS3Exception, IOException {
+    setup("file+1", "file2", "file3");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ENCODING_TYPE, ENCODING_TYPE);
+    bucketEndpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, 1);
+    // marker is the pagination parameter of ListObjects, it must be ignored
+    bucketEndpoint.queryParamsForTest().set(QueryParams.MARKER, "file3");
+    ListVersionsResult first = (ListVersionsResult) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertThat(first.isTruncated()).isTrue();
+    assertThat(first.getVersions()).extracting(v -> v.getKey().getName()).containsExactly("file+1");
+    assertThat(first.getNextKeyMarker().getName()).isEqualTo("file+1");
+    assertThat(first.getNextVersionIdMarker()).isEqualTo(NULL_VERSION_ID);
+    StringWriter writer = new StringWriter();
+    JAXB.marshal(first, writer);
+    assertThat(writer.toString())
+        .contains("<NextKeyMarker>file%2B1</NextKeyMarker>", "<NextVersionIdMarker>null</NextVersionIdMarker>");
+
+    bucketEndpoint.queryParamsForTest().unset(QueryParams.MAX_KEYS);
+    bucketEndpoint.queryParamsForTest().set(QueryParams.KEY_MARKER, first.getNextKeyMarker().getName());
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSION_ID_MARKER, first.getNextVersionIdMarker());
+    ListVersionsResult second = (ListVersionsResult) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertThat(second.isTruncated()).isFalse();
+    assertThat(second.getKeyMarker().getName()).isEqualTo("file+1");
+    assertThat(second.getVersionIdMarker()).isEqualTo(NULL_VERSION_ID);
+    assertThat(second.getVersions()).extracting(v -> v.getKey().getName()).containsExactly("file2", "file3");
+  }
+
+  @Test
+  public void listObjectVersionsRejectsVersionIdMarkerWithoutKeyMarker() throws IOException {
+    setup("file1");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSION_ID_MARKER, NULL_VERSION_ID);
+
+    assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT, () -> bucketEndpoint.get(BUCKET_NAME));
+  }
+
+  @Test
+  public void listObjectVersionsRejectsNonNullVersionIdMarker() throws IOException {
+    setup("file1", "file2");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.KEY_MARKER, "file1");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSION_ID_MARKER, "nonexistent");
+
+    assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> bucketEndpoint.get(BUCKET_NAME));
+  }
+
+  @Test
+  public void listObjectVersionsIgnoresListObjectsV2Params() throws OS3Exception, IOException {
+    setup("file1", "file2");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.VERSIONS, "");
+    bucketEndpoint.queryParamsForTest().setInt(QueryParams.LIST_TYPE, 2);
+    bucketEndpoint.queryParamsForTest().set(QueryParams.START_AFTER, "file1");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.CONTINUATION_TOKEN, "invalid");
+    ListVersionsResult result = (ListVersionsResult) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertThat(result.getVersions()).extracting(v -> v.getKey().getName()).containsExactly("file1", "file2");
+    assertThat(result.getVersions()).allSatisfy(v -> assertThat(v.getOwner()).isNotNull());
+  }
+
+  @Test
+  public void listObjectsDoesNotReturnVersionId() throws Exception {
+    setup("file1");
+
+    StringWriter writer = new StringWriter();
+    JAXB.marshal(bucketEndpoint.get(BUCKET_NAME).getEntity(), writer);
+
+    assertThat(writer.toString()).contains("<ListBucketResult ").doesNotContain("VersionId", "IsLatest");
   }
 
   @Test

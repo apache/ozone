@@ -119,7 +119,7 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
 
   // Tagging a specific version is not implemented; ignoring versionId would modify the tags of the current object.
   private void rejectVersionId(String keyName) {
-    if (queryParams().get(S3Consts.QueryParams.VERSION_ID) != null) {
+    if (isUnsupportedVersionId(queryParams().get(S3Consts.QueryParams.VERSION_ID))) {
       throw S3ErrorTable.newError(S3ErrorTable.NOT_IMPLEMENTED, keyName);
     }
   }

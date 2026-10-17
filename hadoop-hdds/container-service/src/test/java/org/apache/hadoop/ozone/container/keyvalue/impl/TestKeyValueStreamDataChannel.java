@@ -26,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -163,6 +164,37 @@ public class TestKeyValueStreamDataChannel {
     System.arraycopy(data1, 0, expected, 0, data1.length);
     System.arraycopy(data2, 0, expected, data1.length, data2.length);
     assertArrayEquals(expected, Files.readAllBytes(tempFile.toPath()));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testPollAll(boolean allowEmpty) {
+    final Buffers buffers = new Buffers(PUT_BLOCK_REQUEST_LENGTH_MAX);
+    final byte[] data = RandomUtils.secure().randomBytes(50);
+    final ReferenceCountedObject<ByteBuffer> offered =
+        ReferenceCountedObject.wrap(ByteBuffer.wrap(data), () -> { }, () -> { });
+    offered.retain();
+    assertFalse(buffers.offer(offered).iterator().hasNext());
+    offered.release();
+    assertFalse(buffers.isEmpty());
+
+    final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(allowEmpty);
+    final ByteBuf buf = ref.retain();
+    try {
+      final byte[] polled = new byte[buf.readableBytes()];
+      buf.readBytes(polled);
+      assertArrayEquals(data, polled);
+    } finally {
+      ref.release();
+    }
+    assertTrue(buffers.isEmpty());
+
+    if (allowEmpty) {
+      assertNull(buffers.pollAll(true));
+    } else {
+      assertThrows(IllegalStateException.class, () -> buffers.pollAll(false));
+    }
+    assertTrue(buffers.isEmpty());
   }
 
   @Test
@@ -351,7 +383,7 @@ public class TestKeyValueStreamDataChannel {
 
     static ContainerCommandRequestProto closeBuffers(
         Buffers buffers, WriteMethod writeMethod) throws IOException {
-      final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll();
+      final ReferenceCountedObject<ByteBuf> ref = buffers.pollAll(false);
       final ByteBuf buf = ref.retain();
       final ContainerCommandRequestProto putBlockRequest;
       try {

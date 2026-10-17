@@ -25,6 +25,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneLifecycleConfiguration;
@@ -136,7 +137,8 @@ public class BucketLifecycleHandler extends BucketOperationHandler {
       s3LifecycleConfiguration = new PutBucketLifecycleConfigurationUnmarshaller().readFrom(body);
       lcc = s3LifecycleConfiguration.toOmLifecycleConfiguration(ozoneBucket);
     } catch (WebApplicationException ex) {
-      throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName);
+      throw S3ErrorTable.newError(S3ErrorTable.MALFORMED_XML, bucketName, ex)
+          .withMessage(StringUtils.defaultIfEmpty(ex.getMessage(), S3ErrorTable.MALFORMED_XML.getErrorMessage()));
     } catch (OMException ex) {
       // Rule validation rejects client-supplied values with INVALID_REQUEST, which the shared
       // translation maps to InvalidRequest. AWS S3 uses InvalidArgument for a rejected lifecycle
