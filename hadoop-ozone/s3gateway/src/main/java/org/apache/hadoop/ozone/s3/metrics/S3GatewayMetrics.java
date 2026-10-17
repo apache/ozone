@@ -72,8 +72,7 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   private @Metric MutableCounterLong listS3BucketsSuccess;
   private @Metric MutableCounterLong listS3BucketsFailure;
 
-  // Gateway-wide: S3 operations being processed, held until the response is
-  // fully sent (in-flight). A gauge, so it can rise and fall.
+  // Gateway-wide: S3 operations pending until the gateway finishes processing the response, including failures.
   private @Metric MutableGaugeLong pendingOperations;
 
   // ObjectEndpoint
