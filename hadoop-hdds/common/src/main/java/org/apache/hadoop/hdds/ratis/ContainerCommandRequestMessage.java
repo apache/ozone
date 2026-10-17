@@ -49,7 +49,7 @@ public final class ContainerCommandRequestMessage implements Message {
       b.setTraceID(traceId);
     }
     if (!request.hasVersion()) {
-      b.setVersion(ClientVersion.CURRENT.toProtoValue());
+      b.setVersion(ClientVersion.CURRENT.serialize());
     }
 
     ByteString data = ByteString.EMPTY;

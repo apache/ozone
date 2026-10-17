@@ -114,7 +114,7 @@ public class TestContainerBalancerDatanodeNodeLimit {
             n.getDatanodeDetails(), config.getExcludeNodes(), config.getIncludeNodes()))
         .collect(Collectors.toList());
     List<DatanodeUsageInfoProto> protos = eligible.stream()
-        .map(n -> n.toProto(ClientVersion.DEFAULT_VERSION.toProtoValue()))
+        .map(n -> n.toProto(ClientVersion.DEFAULT_VERSION))
         .collect(Collectors.toList());
 
     ContainerBalancerClusterSnapshot snapshot = ContainerBalancerClusterAnalyzer.analyze(
@@ -620,8 +620,17 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
     ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
     assertEquals(ContainerBalancerTask.IterationResult.ITERATION_COMPLETED, task.getIterationResult());
-    assertEquals(1, task.getMetrics().getNumContainerMovesCompletedInLatestIteration());
-    assertThat(task.getMetrics().getNumContainerMovesTimeoutInLatestIteration()).isGreaterThanOrEqualTo(1);
+
+    // The random cluster layout decides how many moves get scheduled. The first mocked move completes
+    // instantly; subsequent moves take 150ms which exceeds moveTimeout (50ms). If the cluster layout
+    // allows more than one move, exactly the first completes and the rest time out. If only one move
+    // is possible in this layout, it completes and no timeouts occur.
+    ContainerBalancerMetrics metrics = task.getMetrics();
+    assertThat(metrics.getNumContainerMovesCompletedInLatestIteration()).isGreaterThanOrEqualTo(1);
+    if (metrics.getNumContainerMovesScheduledInLatestIteration() > 1) {
+      assertEquals(1, metrics.getNumContainerMovesCompletedInLatestIteration());
+      assertThat(metrics.getNumContainerMovesTimeoutInLatestIteration()).isGreaterThanOrEqualTo(1);
+    }
   }
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
