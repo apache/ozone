@@ -149,6 +149,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.BlockIterator;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockObserver;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
@@ -175,7 +177,6 @@ import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -2285,7 +2286,7 @@ public class KeyValueHandler extends Handler {
   public ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto request, Container kvContainer,
       RandomAccessFileChannel blockFile,
-      StreamObserver<ContainerCommandResponseProto> streamObserver) {
+      ReadBlockObserver streamObserver) {
 
     if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
       return ContainerUtils.logAndReturnError(LOG,
@@ -2325,7 +2326,7 @@ public class KeyValueHandler extends Handler {
   }
 
   private long readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
-      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver)
+      Container kvContainer, ReadBlockObserver streamObserver)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
     int responseDataSize = readBlock.getResponseDataSize();
@@ -2351,12 +2352,14 @@ public class KeyValueHandler extends Handler {
     }
     final BlockReadCursor cursor = new BlockReadCursor(readBlock.getOffset(), readBlock.getLength(),
         responseDataSize, blockData.getChunks());
-    final ByteBuffer buffer = ByteBuffer.allocate(cursor.responseDataSize());
     long bytesRead = 0;
     while (cursor.hasNext()) {
       final BlockReadCursor.ReadRange range = cursor.next();
+      final ContainerCommandResponseProto response =
+          getReadBlockResponse(request, range.chunks(), ByteString.EMPTY, range.offset());
+      // The observer provides the buffer, so it can have the data read straight into what it sends.
+      final ByteBuffer buffer = streamObserver.allocate(response, range.length());
       blockFile.position(range.offset());
-      buffer.clear().limit(range.length());
       blockFile.read(buffer);
       if (buffer.hasRemaining()) {
         throw new EOFException("Unexpected end of block " + blockID + " at " + range.offset());
@@ -2366,7 +2369,7 @@ public class KeyValueHandler extends Handler {
       if (validateChunkChecksumData) {
         Checksum.validateChecksums(buffer, range.offset(), 0, range.chunks());
       }
-      streamObserver.onNext(getReadBlockResponse(request, range.chunks(), buffer, range.offset()));
+      streamObserver.onNext(new ReadBlockResponse(response, buffer.asReadOnlyBuffer()));
     }
     return bytesRead;
   }
@@ -2377,7 +2380,7 @@ public class KeyValueHandler extends Handler {
    * block file: GrpcXceiverService closes it only when the client ends the stream or a request throws.
    */
   private static long rejectReadBlock(RandomAccessFileChannel blockFile,
-      StreamObserver<ContainerCommandResponseProto> streamObserver, Status status) {
+      ReadBlockObserver streamObserver, Status status) {
     blockFile.close();
     streamObserver.onError(status.asRuntimeException());
     return 0;

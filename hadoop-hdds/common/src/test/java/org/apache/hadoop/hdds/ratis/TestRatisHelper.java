@@ -24,7 +24,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
 import org.apache.ratis.conf.RaftProperties;
+import org.apache.ratis.netty.NettyConfigKeys;
 import org.apache.ratis.protocol.RaftPeer;
 import org.junit.jupiter.api.Test;
 
@@ -48,6 +50,18 @@ public class TestRatisHelper {
     assertEquals("30s", raftProperties.get("raft.client.rpc.request.timeout"));
     assertNull(raftProperties.get("raft.server.rpc.watch.request.timeout"));
 
+  }
+
+  @Test
+  public void testDataStreamClientWorkerGroupSize() {
+    assertEquals(16, new OzoneConfiguration().getObject(RatisClientConfig.DataStreamClientConfig.class)
+        .getWorkerGroupSize());
+
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt("hdds.ratis." + NettyConfigKeys.DataStream.Client.WORKER_GROUP_SIZE_KEY, 100);
+    final RaftProperties configured = new RaftProperties();
+    RatisHelper.createRaftClientProperties(conf, configured);
+    assertEquals(100, NettyConfigKeys.DataStream.Client.workerGroupSize(configured));
   }
 
   @Test

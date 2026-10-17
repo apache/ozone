@@ -42,6 +42,9 @@ public enum HDDSVersion implements ComponentVersion {
 
   ZDU(100, "Version that supports zero downtime upgrade"),
 
+  RATIS_DATASTREAM_READ_BLOCK_SUPPORT(101,
+      "This version supports Ratis DataStream ReadBlock, including group-independent reads for closed containers."),
+
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
 

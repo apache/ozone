@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.interfaces;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -25,8 +26,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.ratis.datastream.DataStreamObserver;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.function.CheckedConsumer;
 
 /**
@@ -38,6 +39,37 @@ import org.apache.ratis.util.function.CheckedConsumer;
  * The reply from the request is dispatched to the client.
  */
 public interface ContainerDispatcher {
+  /** A ReadBlock response with its data kept outside the protobuf metadata. */
+  final class ReadBlockResponse {
+    private final ContainerCommandResponseProto response;
+    private final ByteBuffer data;
+
+    public ReadBlockResponse(ContainerCommandResponseProto response,
+        ByteBuffer data) {
+      this.response = response;
+      this.data = data;
+    }
+
+    public ContainerCommandResponseProto getResponse() {
+      return response;
+    }
+
+    public ByteBuffer getData() {
+      return data;
+    }
+  }
+
+  /** Receives the responses of {@link #streamDataReadOnly}. */
+  interface ReadBlockObserver extends DataStreamObserver<ReadBlockResponse> {
+    /**
+     * @return the buffer to read the {@code length} bytes of data of {@code response} into, from position 0, before
+     *     they are passed to {@link #onNext}. The default is a new heap buffer, which the observer may keep.
+     */
+    default ByteBuffer allocate(ContainerCommandResponseProto response, int length) {
+      return ByteBuffer.allocate(length);
+    }
+  }
+
   /**
    * Dispatches commands to container layer.
    * @param msg - Command Request
@@ -101,7 +133,7 @@ public interface ContainerDispatcher {
    */
   default void streamDataReadOnly(
        ContainerCommandRequestProto msg,
-       StreamObserver<ContainerCommandResponseProto> streamObserver,
+       ReadBlockObserver streamObserver,
        RandomAccessFileChannel blockFile,
        DispatcherContext dispatcherContext) {
     throw new UnsupportedOperationException("streamDataReadOnly not supported.");

@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
+import org.apache.hadoop.hdds.scm.storage.RatisDataStreamBlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.StreamBlockInputStream;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
@@ -71,6 +72,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
@@ -152,11 +155,14 @@ public class TestStreamRead {
     runTestReadKey(KEY_SIZE, bytesPerChecksum);
   }
 
-  @Test
-  void testUnevenFlushedChunks() throws Exception {
+  /** Both streaming read paths, gRPC and Ratis data stream, must verify blocks whose chunks shift the checksum grid. */
+  @ParameterizedTest(name = "ratis={0}")
+  @ValueSource(booleans = {false, true})
+  void testUnevenFlushedChunks(boolean ratis) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration(cluster.getConf());
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
-    config.setStreamReadBlock(true);
+    config.setStreamReadBlock(!ratis);
+    config.setRatisStreamReadBlock(ratis);
     config.setChecksumVerify(true);
     config.setBytesPerChecksum(16 * 1024);
     config.setStreamReadResponseDataSize(32 * 1024);
@@ -166,7 +172,7 @@ public class TestStreamRead {
     new java.util.Random(16258).nextBytes(expected);
     try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
       BucketForTesting bucket = BucketForTesting.newBuilder(client).build();
-      String key = "uneven-flushed-chunks";
+      String key = "uneven-flushed-chunks-" + (ratis ? "ratis" : "grpc");
       try (OutputStream out = bucket.delegate().createKey(key, expected.length,
           RatisReplicationConfig.getInstance(ONE), Collections.emptyMap())) {
         int offset = 0;
@@ -194,7 +200,8 @@ public class TestStreamRead {
       long shiftedOffset = chunks.get(1).getOffset();
       assertTrue(shiftedOffset % config.getBytesPerChecksum() != 0, "second chunk must shift the checksum grid");
       try (KeyInputStream in = bucket.getKeyInputStream(key)) {
-        in.getPartStreams().forEach(part -> assertInstanceOf(StreamBlockInputStream.class, part));
+        in.getPartStreams().forEach(part -> assertEquals(
+            ratis ? RatisDataStreamBlockInputStream.class : StreamBlockInputStream.class, part.getClass()));
         byte[] actual = new byte[expected.length];
         org.apache.hadoop.io.IOUtils.readFully(in, actual, 0, actual.length);
         assertArrayEquals(expected, actual);

@@ -45,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.atMostOnce;
 import static org.mockito.Mockito.doAnswer;
@@ -112,6 +113,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.impl.HddsDispatcher;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockObserver;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher.ReadBlockResponse;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -135,7 +138,6 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
-import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1302,11 +1304,12 @@ public class TestKeyValueHandler {
 
       final AtomicInteger responseCount = new AtomicInteger(0);
 
-      StreamObserver<ContainerCommandResponseProto> streamObserver =
-          new StreamObserver<ContainerCommandResponseProto>() {
+      ReadBlockObserver streamObserver =
+          new ReadBlockObserver() {
             @Override
-            public void onNext(ContainerCommandResponseProto response) {
-              assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+            public void onNext(ReadBlockResponse response) {
+              assertEquals(ContainerProtos.Result.SUCCESS,
+                  response.getResponse().getResult());
               responseCount.incrementAndGet();
             }
 
@@ -1605,7 +1608,7 @@ public class TestKeyValueHandler {
    * Collects everything a single readBlock call produced: the streamed data responses, the errors and the response
    * proto returned by the handler.
    */
-  private static final class ReadBlockResult implements StreamObserver<ContainerCommandResponseProto> {
+  private static final class ReadBlockResult implements ReadBlockObserver {
     private final BlockID blockID;
     private final List<ContainerCommandResponseProto> dataResponses = new ArrayList<>();
     private final List<Throwable> errors = new ArrayList<>();
@@ -1615,9 +1618,14 @@ public class TestKeyValueHandler {
       this.blockID = blockID;
     }
 
+    /** Keeps each response with its data inside, as GrpcXceiverService sends it. */
     @Override
-    public void onNext(ContainerCommandResponseProto dataResponse) {
-      dataResponses.add(dataResponse);
+    public void onNext(ReadBlockResponse dataResponse) {
+      final ContainerCommandResponseProto proto = dataResponse.getResponse();
+      dataResponses.add(dataResponse.getData() == null ? proto : proto.toBuilder()
+          .setReadBlock(proto.getReadBlock().toBuilder()
+              .setData(ByteString.copyFrom(dataResponse.getData().duplicate())))
+          .build());
     }
 
     @Override
@@ -1835,13 +1843,12 @@ public class TestKeyValueHandler {
                 .build())
             .build();
 
-    @SuppressWarnings("unchecked")
-    StreamObserver<ContainerCommandResponseProto> streamObserver = mock(StreamObserver.class);
-    List<ContainerCommandResponseProto> capturedResponses = new java.util.ArrayList<>();
+    ReadBlockObserver streamObserver = mock(ReadBlockObserver.class, CALLS_REAL_METHODS);
+    List<ReadBlockResponse> capturedResponses = new java.util.ArrayList<>();
     doAnswer(invocation -> {
       capturedResponses.add(invocation.getArgument(0));
       return null;
-    }).when(streamObserver).onNext(any(ContainerCommandResponseProto.class));
+    }).when(streamObserver).onNext(any(ReadBlockResponse.class));
 
     try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
       ContainerCommandResponseProto response = handlerWithVolume.getHandler().readBlock(
@@ -1854,26 +1861,26 @@ public class TestKeyValueHandler {
     verify(streamObserver, atLeastOnce()).onNext(any());
 
     int returnedDataLen = 0;
-    for (ContainerCommandResponseProto resp : capturedResponses) {
-      returnedDataLen += resp.getReadBlock().getData().size();
+    for (ReadBlockResponse resp : capturedResponses) {
+      returnedDataLen += resp.getData().remaining();
     }
     List<ContainerProtos.ChunkInfo> storedChunks = handlerWithVolume.getHandler().getBlockManager()
         .getBlock(container, blockID).getChunks();
     ByteBuffer allData = ByteBuffer.allocate(returnedDataLen);
-    long firstResponseOffset = capturedResponses.get(0).getReadBlock().getOffset();
+    long firstResponseOffset = capturedResponses.get(0).getResponse().getReadBlock().getOffset();
 
-    for (ContainerCommandResponseProto resp : capturedResponses) {
-      assertEquals(ContainerProtos.Result.SUCCESS, resp.getResult());
-      assertTrue(resp.hasReadBlock());
-      long responseOffset = resp.getReadBlock().getOffset();
-      long responseEnd = responseOffset + resp.getReadBlock().getData().size();
+    for (ReadBlockResponse resp : capturedResponses) {
+      assertEquals(ContainerProtos.Result.SUCCESS, resp.getResponse().getResult());
+      assertTrue(resp.getResponse().hasReadBlock());
+      final ContainerProtos.ReadBlockResponseProto readBlock = resp.getResponse().getReadBlock();
+      long responseOffset = readBlock.getOffset();
+      long responseEnd = responseOffset + resp.getData().remaining();
       List<ContainerProtos.ChunkInfo> overlapping = storedChunks.stream()
           .filter(chunk -> chunk.getOffset() < responseEnd && chunk.getOffset() + chunk.getLen() > responseOffset)
           .collect(java.util.stream.Collectors.toList());
-      assertEquals(overlapping, resp.getReadBlock().getChunkInfoListList());
-      Checksum.validateChecksums(resp.getReadBlock().getData().asReadOnlyByteBuffer(),
-          resp.getReadBlock().getOffset(), 0, resp.getReadBlock().getChunkInfoListList());
-      allData.put(resp.getReadBlock().getData().asReadOnlyByteBuffer());
+      assertEquals(overlapping, readBlock.getChunkInfoListList());
+      Checksum.validateChecksums(resp.getData(), responseOffset, 0, readBlock.getChunkInfoListList());
+      allData.put(resp.getData().duplicate());
     }
 
     assertEquals(readBackOffset, firstResponseOffset);

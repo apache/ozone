@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -158,6 +159,36 @@ public class TestChecksum {
     data[8]++;
     assertThrows(OzoneChecksumException.class,
         () -> Checksum.validateChecksums(ByteBuffer.wrap(data), 0, 0, chunks));
+  }
+
+  /** Data in several buffers, which chunk and checksum windows may span, verifies as if it were in one. */
+  @Test
+  void testChunkRelativeRangesAcrossBuffers() throws Exception {
+    byte[] data = "ABCDEFGHIJKL".getBytes(UTF_8);
+    List<ContainerProtos.ChunkInfo> chunks = Arrays.asList(chunk(data, 0, 3, 4), chunk(data, 3, 9, 4));
+    for (int size = 1; size <= data.length; size++) {
+      for (int start : new int[] {0, 3, 7, 11}) {
+        List<ByteBuffer> buffers = split(data, start, size);
+        Checksum.validateChecksums(buffers, start, start == 0 ? 0 : 1, chunks);
+        for (int i = 0; i < buffers.size(); i++) {
+          assertEquals(start + i * size, buffers.get(i).position());
+        }
+      }
+    }
+    data[8]++;
+    for (int size = 1; size <= data.length; size++) {
+      List<ByteBuffer> buffers = split(data, 0, size);
+      assertThrows(OzoneChecksumException.class, () -> Checksum.validateChecksums(buffers, 0, 0, chunks));
+    }
+  }
+
+  /** @return the bytes of {@code data} from {@code start} in buffers of {@code size} bytes, positioned in data */
+  private static List<ByteBuffer> split(byte[] data, int start, int size) {
+    List<ByteBuffer> buffers = new ArrayList<>();
+    for (int i = start; i < data.length; i += size) {
+      buffers.add(ByteBuffer.wrap(data, i, Math.min(size, data.length - i)));
+    }
+    return buffers;
   }
 
   @Test
