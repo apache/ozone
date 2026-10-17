@@ -337,6 +337,46 @@ public class TestOMMetadataReader {
   }
 
   @Test
+  public void testListStatusUsesListAclOnBucketRootForNonStsRequest() throws Exception {
+    setupNonStsS3Request();
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final KeyManager keyManager = createListStatusKeyManagerReturningEmpty();
+
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, keyManager);
+    final OmKeyArgs args = new OmKeyArgs.Builder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName("")
+        .build();
+
+    final List<OzoneFileStatus> statuses = omMetadataReader.listStatus(args, false, "", MAX_KEYS, false);
+    assertTrue(statuses.isEmpty());
+
+    final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
+    assertContainsVolumeReadCheck(checks);
+    assertContainsBucketListCheck(checks);
+    assertFalse(checks.stream().anyMatch(check -> check.getObj().getResourceType() == OzoneObj.ResourceType.BUCKET
+        && check.getContext().getAclRights() == READ), "Bucket root listing should not check bucket READ");
+  }
+
+  @Test
+  public void testListStatusLightUsesListAclForPartialPrefixForNonStsRequest() throws Exception {
+    setupNonStsS3Request();
+
+    final IAccessAuthorizer accessAuthorizer = createMockIAccessAuthorizerReturningTrue();
+    final OmMetadataReader omMetadataReader = createMetadataReader(accessAuthorizer, mock(KeyManager.class));
+
+    omMetadataReader.listStatusLight(createOmKeyArgs(), false, "", MAX_KEYS, true);
+
+    // Volume READ with each of bucket LIST and key READ on the prefix.
+    final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 4);
+    assertContainsVolumeReadCheck(checks);
+    assertContainsBucketListCheck(checks);
+    assertContainsKeyReadCheckWithName(checks);
+  }
+
+  @Test
   public void testListStatusUsesListPrefixForAclWhenKeyNameEmptyAndListPrefixSet() throws Exception {
     setupStsS3Request();
 

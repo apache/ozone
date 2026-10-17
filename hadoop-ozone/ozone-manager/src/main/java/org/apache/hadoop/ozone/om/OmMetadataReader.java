@@ -262,7 +262,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         validateFileSystemLayout(bucket);
       }
       if (isAclEnabled) {
-        checkListStatusAcls(args, bucket);
+        checkListStatusAcls(args, bucket, allowPartialPrefixes);
       }
       metrics.incNumListStatus();
       return keyManager.listStatus(args, recursive, startKey,
@@ -296,7 +296,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         validateFileSystemLayout(bucket);
       }
       if (isAclEnabled) {
-        checkListStatusAcls(resolvedArgs, bucket);
+        checkListStatusAcls(resolvedArgs, bucket, allowPartialPrefixes);
       }
       metrics.incNumListStatus();
       List<OzoneFileStatus> ozoneFileStatuses = keyManager.listStatus(
@@ -882,7 +882,8 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     return getS3Auth() != null && OzoneManager.getStsTokenIdentifier() != null;
   }
 
-  private void checkListStatusAcls(OmKeyArgs args, ResolvedBucket bucket) throws IOException {
+  private void checkListStatusAcls(OmKeyArgs args, ResolvedBucket bucket, boolean allowPartialPrefixes)
+      throws IOException {
     if (isStsS3Request()) {
       checkAcls(
           ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket.realVolume(), bucket.realBucket(),
@@ -890,7 +891,14 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       return;
     }
 
-    checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
+    // Listing the bucket root, or the keys matching a name prefix, needs LIST on the bucket, as listKeys does.
+    final ResourceType resourceType = getResourceType(args);
+    if (allowPartialPrefixes || resourceType == ResourceType.BUCKET) {
+      checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, bucket, args.getKeyName());
+    }
+    if (resourceType == ResourceType.KEY) {
+      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
+    }
   }
 
   private static String getStsListStatusAclKey(OmKeyArgs args) throws OMException {

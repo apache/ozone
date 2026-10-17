@@ -480,9 +480,10 @@ public class TestOzoneManagerSnapshotAcl {
   /**
    * Verifies that bucket owner can: create, rename and delete snapshots.
    * Verifies that non bucket owner can not create, rename and delete.
-   * Verifies that user with bucket read permissions can: list snapshots, get snapshot info,
+   * Verifies that user with bucket read and list permissions can: list snapshots, get snapshot info,
    * snapshot diff, list snapshot diff jobs and cancel snapshot diff jobs.
    * Verifies that user with no permissions cannot do any of the above.
+   * Verifies that user with bucket read but without list permission cannot run snapshot diff.
    *
    * @param bucketLayout
    * @throws Exception
@@ -569,6 +570,21 @@ public class TestOzoneManagerSnapshotAcl {
         () -> objectStore3.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2));
     assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
 
+    // with volume and bucket READ but without bucket LIST, user3 can get snapshot info, but cannot run a snapshot diff.
+    final OzoneAcl user3Read = OzoneAcl.parseAcl("user:" + USER3 + ":r");
+    objectStore.addAcl(OzoneObjInfo.Builder.newBuilder().setResType(OzoneObj.ResourceType.VOLUME)
+        .setStoreType(OzoneObj.StoreType.OZONE).setVolumeName(volumeName).build(), user3Read);
+    objectStore.addAcl(OzoneObjInfo.Builder.newBuilder().setResType(OzoneObj.ResourceType.BUCKET)
+        .setStoreType(OzoneObj.StoreType.OZONE).setVolumeName(volumeName).setBucketName(bucketName).build(), user3Read);
+    objectStore3.getSnapshotInfo(volumeName, bucketName, snapshot1);
+
+    ex = assertThrows(OMException.class,
+        () -> objectStore3.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2, null, 0, false, false));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+
+    ex = assertThrows(OMException.class,
+        () -> objectStore3.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2, false, false));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
   }
 
   private void setup(BucketLayout bucketLayout)
