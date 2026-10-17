@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -48,11 +49,13 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.ozone.RootedOzoneFileSystem;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -62,6 +65,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -71,6 +75,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.SecretKeyTestClient;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -78,8 +83,10 @@ import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
@@ -432,6 +439,62 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     omResponse = getCluster().getOzoneManager().getOmServerProtocol()
         .submitRequest(null, readRequest);
     assertEquals(Status.INVALID_TOKEN, omResponse.getStatus());
+  }
+
+  /**
+   * Reads a multi-cell EC key with S3 authentication and a read-consistency hint set on the request thread, with
+   * sequential and with parallel EC reads.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testEcReadWithS3AuthAndReadConsistency(boolean parallelRead) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    getStore().createVolume(volumeName);
+    getStore().getVolume(volumeName).createBucket(bucketName);
+    OzoneBucket bucket = getStore().getVolume(volumeName).getBucket(bucketName);
+
+    // Two full rs-3-2-1024k stripes and a partial one, so one read spans all data cells.
+    byte[] data = new byte[7 * (int) OzoneConsts.MB + 100];
+    ThreadLocalRandom.current().nextBytes(data);
+    ECReplicationConfig ecConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, (int) OzoneConsts.MB);
+    try (OzoneOutputStream out = bucket.createKey(keyName, data.length, ecConfig, new HashMap<>())) {
+      out.write(data);
+    }
+
+    String strToSign = "AWS4-HMAC-SHA256\n" +
+        "20150830T123600Z\n" +
+        "20150830/us-east-1/iam/aws4_request\n" +
+        "f536975d06c0309214f805bb90ccff089219ecd68b2" +
+        "577efef23edd43b7e1a59";
+    String signature = "5d672d79c15b13162d9279b0855cfba" +
+        "6789a8edb4c82c400e06b5924a6f2b5d7";
+    String secret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
+    String accessKey = UserGroupInformation.getCurrentUser().getUserName();
+    getCluster().getOzoneManager().getS3SecretManager().storeSecret(accessKey, S3SecretValue.of(accessKey, secret));
+
+    OzoneConfiguration readConf = new OzoneConfiguration(getCluster().getConf());
+    OzoneClientConfig clientConfig = readConf.getObject(OzoneClientConfig.class);
+    clientConfig.setEcParallelReadEnabled(parallelRead);
+    readConf.setFromObject(clientConfig);
+    try (OzoneClient readClient = OzoneClientFactory.getRpcClient(readConf)) {
+      ClientProtocol proxy = readClient.getProxy();
+      proxy.setThreadLocalS3Auth(new S3Auth(strToSign, signature, accessKey, accessKey));
+      proxy.setThreadLocalReadConsistency(ReadConsistency.LINEARIZABLE_LEADER_ONLY);
+      try (OzoneInputStream in = readClient.getObjectStore().getVolume(volumeName).getBucket(bucketName)
+          .readKey(keyName)) {
+        byte[] read = new byte[data.length];
+        IOUtils.readFully(in, read);
+        assertArrayEquals(data, read);
+      } finally {
+        proxy.clearThreadLocalS3Auth();
+        proxy.clearThreadLocalReadConsistency();
+      }
+      // The pool is shut down with the client, so check for its threads before closing it.
+      assertEquals(parallelRead, Thread.getAllStackTraces().keySet().stream()
+          .anyMatch(t -> t.getName().startsWith("ec-parallel-reader-")));
+    }
   }
 
   @Test
