@@ -235,6 +235,12 @@ import software.amazon.awssdk.utils.IoUtils;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonHATests.TestCase {
 
+  /**
+   * Test-only key for the {@code host:port} http address of a gateway, outside the proxy, that has
+   * {@code ozone.client.ec.parallel.read.enabled} set.
+   */
+  public static final String EC_PARALLEL_READ_S3G_HTTP_ADDRESS_KEY = "ozone.test.s3g.ec.parallel.read.http.address";
+
   private static final String READ_CONSISTENCY_HEADER =
       "x-ozone-read-consistency";
   private static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
@@ -343,13 +349,28 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   /**
+   * Serial reads come first: a serial read asserts that no parallel read thread exists, and the threads of the
+   * parallel read pool outlive the read that starts them.
+   */
+  static Stream<Arguments> multiCellEcGetArguments() {
+    Stream.Builder<Arguments> arguments = Stream.builder();
+    for (boolean parallelRead : new boolean[] {false, true}) {
+      for (String readConsistency : new String[] {"follower-stale", "follower-linearizable", "leader-only"}) {
+        arguments.add(Arguments.of(readConsistency, parallelRead));
+      }
+    }
+    return arguments.build();
+  }
+
+  /**
    * Gets an object of an EC bucket that spans several cells, so the gateway reads it with the request's S3
-   * authentication and read-consistency hint on the request thread, and in parallel when
-   * {@code ozone.client.ec.parallel.read.enabled} is set.
+   * authentication and read-consistency hint on the request thread, and, through the gateway at
+   * {@link #EC_PARALLEL_READ_S3G_HTTP_ADDRESS_KEY}, on its parallel read threads.
    */
   @ParameterizedTest
-  @ValueSource(strings = {"follower-stale", "follower-linearizable", "leader-only"})
-  public void testGetMultiCellEcObjectWithReadConsistencyHeader(String readConsistency) throws IOException {
+  @MethodSource("multiCellEcGetArguments")
+  public void testGetMultiCellEcObjectWithReadConsistencyHeader(String readConsistency, boolean parallelRead)
+      throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     ECReplicationConfig ecConfig = new ECReplicationConfig("rs-3-2-1024k");
@@ -366,21 +387,32 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
           .getReplicationConfig());
     }
 
-    ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
-        b -> b.bucket(bucketName)
-            .key(keyName)
-            .overrideConfiguration(c -> {
-              c.putHeader(READ_CONSISTENCY_HEADER, readConsistency);
-              if ("follower-stale".equals(readConsistency)) {
-                c.putHeader(LOCAL_LEASE_LOG_LIMIT_HEADER, "10");
-              }
-            }));
+    ResponseBytes<GetObjectResponse> objectBytes;
+    try (S3Client readClient = parallelRead ? createEcParallelReadS3Client() : null) {
+      objectBytes = (parallelRead ? readClient : s3Client).getObjectAsBytes(
+          b -> b.bucket(bucketName)
+              .key(keyName)
+              .overrideConfiguration(c -> {
+                c.putHeader(READ_CONSISTENCY_HEADER, readConsistency);
+                if ("follower-stale".equals(readConsistency)) {
+                  c.putHeader(LOCAL_LEASE_LOG_LIMIT_HEADER, "10");
+                }
+              }));
+    }
 
     assertArrayEquals(content, objectBytes.asByteArray());
-    if (cluster.getConf().getBoolean("ozone.client.ec.parallel.read.enabled", false)) {
-      assertTrue(Thread.getAllStackTraces().keySet().stream()
-          .anyMatch(t -> t.getName().startsWith("ec-parallel-reader-")));
-    }
+    // Only the gateway with parallel reads enabled starts the pool.
+    assertEquals(parallelRead, Thread.getAllStackTraces().keySet().stream()
+        .anyMatch(t -> t.getName().startsWith("ec-parallel-reader-")));
+  }
+
+  /** An S3 client bound to the gateway that reads the cells of EC keys in parallel. */
+  private S3Client createEcParallelReadS3Client() throws Exception {
+    String address = cluster.getConf().get(EC_PARALLEL_READ_S3G_HTTP_ADDRESS_KEY);
+    assertNotNull(address, "expected the cluster to run a gateway with EC parallel reads enabled");
+    OzoneConfiguration gatewayConf = new OzoneConfiguration(cluster.getConf());
+    gatewayConf.set(S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY, address);
+    return new S3ClientFactory(gatewayConf).createS3ClientV2();
   }
 
   @Test

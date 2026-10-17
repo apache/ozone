@@ -81,6 +81,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.Parameter;
 import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
@@ -654,6 +655,24 @@ public class TestOzoneECClient {
       assertArrayEquals(lastChunk, Arrays.copyOf(fileContent, lastChunk.length));
       // A further read should give EOF
       assertEquals(-1, is.read(fileContent));
+    }
+  }
+
+  /** A parallel read pool limit below the pool's default core size still reads multi-cell ranges. */
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2})
+  public void testReadWithSmallParallelReadPoolLimit(int poolLimit) throws IOException {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setEcParallelReadPoolLimit(poolLimit);
+    conf.setFromObject(clientConfig);
+    createNewClient(conf, transportStub);
+    OzoneBucket bucket = writeIntoECKey(inputChunks, keyName, null);
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[inputSize];
+      assertEquals(inputSize, is.read(fileContent));
+      for (int i = 0; i < dataBlocks; i++) {
+        assertArrayEquals(inputChunks[i], Arrays.copyOfRange(fileContent, i * chunkSize, (i + 1) * chunkSize));
+      }
     }
   }
 

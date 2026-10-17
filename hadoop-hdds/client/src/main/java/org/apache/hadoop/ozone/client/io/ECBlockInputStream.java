@@ -500,6 +500,11 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
         unexpected = unexpected == null ? e.getCause() : unexpected;
       }
     }
+    // After a failure, the streams of indexes read past the cells that position advances by below, so a later read
+    // must check the position of every stream, as after a seek.
+    if (unexpected != null || results.values().stream().anyMatch(result -> result.error != null)) {
+      seeked = true;
+    }
     if (unexpected != null) {
       Throwables.throwIfUnchecked(unexpected);
       throw new IOException(unexpected);

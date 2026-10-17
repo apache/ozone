@@ -264,9 +264,10 @@ public class RpcClient implements ClientProtocol {
         EC_RECONSTRUCT_STRIPE_READ_POOL_MIN_SIZE, clientConfig.getEcReconstructStripeReadPoolLimit(),
         "ec-reconstruct-reader-TID-%d"));
     // Created on first use, after ozoneManagerClient, which holds the thread-local request context.
+    // The core size must not exceed the limit, which can be configured below EC_PARALLEL_READ_POOL_MIN_SIZE.
     this.ecParallelReadExecutor = MemoizedSupplier.valueOf(() -> createRequestContextPropagatingExecutor(
-        EC_PARALLEL_READ_POOL_MIN_SIZE, clientConfig.getEcParallelReadPoolLimit(), "ec-parallel-reader-TID-%d",
-        requestContext()));
+        Math.min(EC_PARALLEL_READ_POOL_MIN_SIZE, clientConfig.getEcParallelReadPoolLimit()),
+        clientConfig.getEcParallelReadPoolLimit(), "ec-parallel-reader-TID-%d", requestContext()));
     this.writeExecutor = MemoizedSupplier.valueOf(() -> createThreadPoolExecutor(
         WRITE_POOL_MIN_SIZE, Integer.MAX_VALUE, "client-write-TID-%d"));
 

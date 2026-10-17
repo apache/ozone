@@ -722,6 +722,27 @@ public class TestECBlockInputStream {
   }
 
   @Test
+  public void testReadAfterFailedParallelReadReturnsCorrectData() throws IOException {
+    repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
+    int blockLength = 3 * 300;
+    BlockLocationInfo keyInfo = ECStreamTestUtil.createKeyInfo(repConfig, 5, blockLength);
+    ECStreamTestUtil.TestBlockInputStreamFactory dataStreamFactory = createDataStreamFactory(blockLength);
+    dataStreamFactory.setCurrentPipeline(keyInfo.getPipeline());
+    dataStreamFactory.setFailIndexes(2);
+
+    try (ECBlockInputStream ecb = createParallelStream(keyInfo, dataStreamFactory, true)) {
+      assertThrows(BadDataLocationException.class, () -> ecb.read(ByteBuffer.allocate(300)));
+      assertEquals(100, ecb.getPos());
+      // index 3 has read its cell although the position stays before it, so the retry must seek its stream back
+      dataStreamFactory.getBlockStream(2).setShouldError(false);
+      ByteBuffer buf = ByteBuffer.allocate(200);
+      assertEquals(200, ecb.read(buf));
+      assertDataMatches(buf, 100, 200);
+      assertEquals(300, ecb.getPos());
+    }
+  }
+
+  @Test
   public void testParallelReadRetriesFailedIndexOnSpare() throws IOException {
     repConfig = new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS, 100);
     int blockLength = 3 * 300;

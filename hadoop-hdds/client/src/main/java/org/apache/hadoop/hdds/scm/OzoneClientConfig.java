@@ -405,6 +405,12 @@ public class OzoneClientConfig {
           OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
     }
 
+    if (ecParallelReadPoolLimit < 1) {
+      LOG.warn("ozone.client.ec.parallel.read.pool.limit ({}) must be at least 1, resetting to 1.",
+          ecParallelReadPoolLimit);
+      ecParallelReadPoolLimit = 1;
+    }
+
     // Verify client configs related to HBase enhancements
     // Enforce check on ozone.client.hbase.enhancements.allowed
     if (!hbaseEnhancementsAllowed) {
