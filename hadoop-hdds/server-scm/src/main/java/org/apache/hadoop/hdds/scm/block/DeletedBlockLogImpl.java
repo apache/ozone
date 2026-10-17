@@ -117,7 +117,8 @@ public class DeletedBlockLogImpl
     this.transactionStatusManager =
         new SCMDeletedBlockTransactionStatusManager(deletedBlockLogStateManager,
             scm.getScmMetadataStore().getStatefulServiceConfigTable(),
-            containerManager, metrics, scmCommandTimeoutMs);
+            containerManager, () -> scm.getReplicationManager().getContainerReplicaPendingOps(), metrics,
+            scmCommandTimeoutMs);
     int limit = (int) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
@@ -414,7 +415,11 @@ public class DeletedBlockLogImpl
                   .getContainerReplicas(
                       ContainerID.valueOf(txn.getContainerID()));
               if (!checkInadequateReplica(replicas, txn, dnList)) {
-                getTransaction(txn, transactions, replicas, commandStatus, maxDeleteBlocksPerDatanode);
+                if (transactionStatusManager.isPurgeableWithoutAck(txn.getTxID(), id)) {
+                  txIDs.add(txn.getTxID());
+                } else {
+                  getTransaction(txn, transactions, replicas, commandStatus, maxDeleteBlocksPerDatanode);
+                }
               } else {
                 metrics.incrSkippedTransaction();
               }
