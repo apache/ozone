@@ -77,7 +77,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   private final String name = "stream" + STREAM_ID.getAndIncrement();
   private final BlockID blockID;
-  private final long blockLength;
+  private long blockLength;
+  // The block is under construction, so its length from OM may be stale; fetch it from the datanode once.
+  private boolean needUpdateBlockLength;
   private final int responseDataSize;
   private final long preReadSize;
   private final Duration readTimeout;
@@ -105,8 +107,19 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) throws IOException {
-    this.blockID = blockID;
-    this.blockLength = length;
+    this(new BlockLocationInfo.Builder().setBlockID(blockID).setLength(length).build(),
+        pipeline, token, xceiverClientFactory, refreshFunction, config);
+  }
+
+  public StreamBlockInputStream(
+      BlockLocationInfo blockInfo, Pipeline pipeline,
+      Token<OzoneBlockTokenIdentifier> token,
+      XceiverClientFactory xceiverClientFactory,
+      Function<BlockID, BlockLocationInfo> refreshFunction,
+      OzoneClientConfig config) throws IOException {
+    this.blockID = blockInfo.getBlockID();
+    this.blockLength = blockInfo.getLength();
+    this.needUpdateBlockLength = blockInfo.isUnderConstruction();
     pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
@@ -192,6 +205,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!dst.hasRemaining()) {
       return 0;
     }
+    updateBlockLength();
     if (blockOffset < 0 || blockOffset >= blockLength) {
       return EOF;
     }
@@ -270,6 +284,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private synchronized boolean dataAvailableToRead(int length, boolean preRead) throws IOException {
+    updateBlockLength();
     if (position >= blockLength) {
       return false;
     }
@@ -429,6 +444,27 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       throw new IOException("Unexpected client class: " + acquired.getClass().getName() + ", " + pipeline);
     }
     return (XceiverClientGrpc) acquired;
+  }
+
+  /**
+   * Use the block length from the datanode if the block is under construction,
+   * since the length from OM may be stale (e.g. the last block of an hsync-ed file).
+   */
+  public synchronized void updateBlockLength() throws IOException {
+    while (needUpdateBlockLength) {
+      try {
+        acquireClient();
+        blockLength = ContainerProtocolCalls.getBlock(xceiverClient, blockID, tokenRef.get(), pipelineRef.get())
+            .getBlockData().getSize();
+        needUpdateBlockLength = false;
+        retries = 0;
+        LOG.debug("{}: Updated block length to {} for block {}", name, blockLength, blockID);
+      } catch (IOException ioe) {
+        handleExceptions(ioe);
+      } finally {
+        releaseClient();
+      }
+    }
   }
 
   private synchronized void initialize() throws IOException {
