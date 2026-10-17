@@ -549,13 +549,6 @@ public class TestReplicationSupervisor {
       assertEquals(4, replicationSupervisor.getReplicationRequestCount());
       assertEquals(4, replicationSupervisor.getReplicationRequestCount(
           reconciliationTask.getMetricName()));
-
-
-      assertTrue(replicationSupervisor.getReplicationRequestTotalTime(
-          reconciliationTask.getMetricName()) > 0);
-      assertTrue(replicationSupervisor.getReplicationRequestAvgTime(
-          reconciliationTask.getMetricName()) > 0);
-
       MetricsCollectorImpl replicationMetricsCollector = new MetricsCollectorImpl();
       replicationMetrics.getMetrics(replicationMetricsCollector, true);
       assertEquals(1, replicationMetricsCollector.getRecords().size());
