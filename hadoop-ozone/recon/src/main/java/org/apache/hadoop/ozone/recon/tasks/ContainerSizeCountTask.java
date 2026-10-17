@@ -87,7 +87,14 @@ public class ContainerSizeCountTask extends ReconScmTask {
         wait(interval);
         long startTime, endTime, duration, durationMilliseconds;
         startTime = System.nanoTime();
-        initializeAndRunTask();
+        try {
+          initializeAndRunTask();
+        } catch (Exception e) {
+          LOG.error("Failed to run Container Size Distribution task.", e);
+          taskStatusUpdater.setLastTaskRunStatus(-1);
+          taskStatusUpdater.recordRunCompletion();
+          continue;
+        }
         endTime = System.nanoTime();
         duration = endTime - startTime;
         durationMilliseconds = duration / 1_000_000;
@@ -195,6 +202,10 @@ public class ContainerSizeCountTask extends ReconScmTask {
       containerSizeCountMap.clear();
       LOG.debug("Completed a 'process' run of ContainerSizeCountTask.");
       taskStatusUpdater.setLastTaskRunStatus(processingFailed ? -1 : 0);
+    } catch (RuntimeException e) {
+      // The table may contain only part of this run's changes. Recount on the next run.
+      processedContainers.clear();
+      throw e;
     } finally {
       lock.writeLock().unlock();
     }
