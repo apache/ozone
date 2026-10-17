@@ -31,6 +31,7 @@ on:
       - '!**/CMakeLists.txt'
       - '!**/src/main/resources/**'
       - '!**/src/test/resources/**'
+      - '!dev-support/rat/rat-exclusions.txt'
       - '!hadoop-ozone/dist/src/main/license/jar-report.txt'
       # ignore .github except this workflow and the ones used transitively
       - '.github/**'
