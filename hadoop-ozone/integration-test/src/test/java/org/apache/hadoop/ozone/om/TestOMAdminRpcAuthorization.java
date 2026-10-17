@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -50,6 +51,8 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SafeMode;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -194,6 +197,25 @@ public class TestOMAdminRpcAuthorization {
   }
 
   @Test
+  void listTenantWithoutRpcUserIsDenied() {
+    OMException ex = assertThrows(OMException.class, () -> cluster.getOzoneManager().listTenant());
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+  }
+
+  @Test
+  void listTenantAdminIsAllowed() throws Exception {
+    Server.Call call = mock(Server.Call.class);
+    when(call.getRemoteUser())
+        .thenReturn(UserGroupInformation.createUserForTesting("admin", new String[] {"admins"}));
+    Server.getCurCall().set(call);
+    try {
+      assertThat(cluster.getOzoneManager().listTenant().getTenantStateList()).isEmpty();
+    } finally {
+      Server.getCurCall().remove();
+    }
+  }
+
+  @Test
   void bootstrapNonAdminIsDenied() {
     UserGroupInformation nonAdmin =
         UserGroupInformation.createUserForTesting("nonadmin", new String[] {"users"});
@@ -242,6 +264,25 @@ public class TestOMAdminRpcAuthorization {
     try {
       OMResponse response = cluster.getOzoneManager().getOmServerProtocol().submitRequest(null, request);
       assertEquals(Status.ACCESS_DENIED, response.getStatus());
+    } finally {
+      Server.getCurCall().remove();
+    }
+  }
+
+  @Test
+  void forceExitSafeModeWithoutRpcUserIsDenied() throws Exception {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.SetSafeMode)
+        .setClientId(ClientId.randomId().toString())
+        .setSetSafeModeRequest(SetSafeModeRequest.newBuilder().setSafeMode(SafeMode.FORCE_EXIT))
+        .build();
+
+    // The call context that OzoneManagerServiceGrpc sets up: a client ID, but no connection and so no user.
+    Server.getCurCall().set(new Server.Call(1, 1, null, null, RPC.RpcKind.RPC_PROTOCOL_BUFFER,
+        ClientId.randomId().toByteString().toByteArray()));
+    try {
+      OMResponse response = cluster.getOzoneManager().getOmServerProtocol().submitRequest(null, request);
+      assertEquals(Status.PERMISSION_DENIED, response.getStatus());
     } finally {
       Server.getCurCall().remove();
     }
