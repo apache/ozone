@@ -23,6 +23,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -80,6 +83,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -257,6 +261,58 @@ class TestKeyDeletingService extends OzoneTestBase {
           keyManager, om.getMetadataManager().getLock())) {
         assertThat(keyManager.getPendingDeletionKeys(filter, Integer.MAX_VALUE).getPurgedKeys()).isEmpty();
       }
+    }
+
+    /**
+     * When SCM reports follower replication lag at or above the configured
+     * threshold, the service must reduce its per-task key limit and
+     * record the throttle in metrics; below the threshold it uses the full
+     * limit.
+     */
+    @Test
+    void throttlesKeyDeletionWhenScmFollowerLagHigh() {
+      OzoneConfiguration throttleConf = new OzoneConfiguration(conf);
+      throttleConf.setInt(OZONE_KEY_DELETING_LIMIT_PER_TASK, 50);
+      throttleConf.setInt(OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD, 10);
+      throttleConf.setInt(OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK, 5);
+
+      ScmBlockLocationProtocol laggedClient = Mockito.spy(scmBlockTestingClient);
+      KeyDeletingService service = new KeyDeletingService(
+          om, laggedClient, 100, 10000, throttleConf, 10, false);
+
+      // No lag observed yet -> full limit.
+      Mockito.doReturn(0L).when(laggedClient).getLastKnownFollowerReplicationLag();
+      assertEquals(50, service.getEffectiveKeyLimitPerTask());
+
+      long throttledBefore = service.getMetrics().getNumKeyDeletionThrottledBySCMLag();
+
+      // Lag at/above threshold -> throttled limit and a throttle metric increment.
+      Mockito.doReturn(20L).when(laggedClient).getLastKnownFollowerReplicationLag();
+      assertEquals(5, service.getEffectiveKeyLimitPerTask());
+      assertEquals(throttledBefore + 1, service.getMetrics().getNumKeyDeletionThrottledBySCMLag());
+
+      // Lag below threshold -> full limit, no further throttling.
+      Mockito.doReturn(5L).when(laggedClient).getLastKnownFollowerReplicationLag();
+      assertEquals(50, service.getEffectiveKeyLimitPerTask());
+      assertEquals(throttledBefore + 1, service.getMetrics().getNumKeyDeletionThrottledBySCMLag());
+    }
+
+    /**
+     * A threshold of 0 (or less) disables the throttle entirely, regardless of
+     * the lag SCM reports.
+     */
+    @Test
+    void scmLagThrottleDisabledWhenThresholdNonPositive() {
+      OzoneConfiguration disabledConf = new OzoneConfiguration(conf);
+      disabledConf.setInt(OZONE_KEY_DELETING_LIMIT_PER_TASK, 50);
+      disabledConf.setInt(OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD, 0);
+
+      ScmBlockLocationProtocol laggedClient = Mockito.spy(scmBlockTestingClient);
+      KeyDeletingService service = new KeyDeletingService(
+          om, laggedClient, 100, 10000, disabledConf, 10, false);
+
+      Mockito.doReturn(1_000_000L).when(laggedClient).getLastKnownFollowerReplicationLag();
+      assertEquals(50, service.getEffectiveKeyLimitPerTask());
     }
 
     /**

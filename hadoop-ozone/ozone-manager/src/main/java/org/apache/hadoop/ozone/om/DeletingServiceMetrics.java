@@ -54,6 +54,8 @@ public final class DeletingServiceMetrics {
   private MutableGaugeLong numKeysProcessed;
   @Metric("Total no. of deleted keys sent for purge")
   private MutableGaugeLong numKeysSentForPurge;
+  @Metric("Total no. of KeyDeletingService runs throttled due to SCM follower replication lag")
+  private MutableGaugeLong numKeyDeletionThrottledBySCMLag;
   /*
    * Directory purge request metrics.
    */
@@ -196,6 +198,14 @@ public final class DeletingServiceMetrics {
 
   public void incrNumKeysSentForPurge(long keysPurge) {
     this.numKeysSentForPurge.incr(keysPurge);
+  }
+
+  public void incrNumKeyDeletionThrottledBySCMLag() {
+    this.numKeyDeletionThrottledBySCMLag.incr();
+  }
+
+  public long getNumKeyDeletionThrottledBySCMLag() {
+    return numKeyDeletionThrottledBySCMLag.value();
   }
 
   public void incrNumDirPurged(long dirPurged) {

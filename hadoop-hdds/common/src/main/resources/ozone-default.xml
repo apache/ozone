@@ -503,6 +503,29 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.key.deleting.scm.follower.lag.throttle.threshold</name>
+    <value>100000</value>
+    <tag>OM, DELETION</tag>
+    <description>
+      When SCM reports that its Ratis followers lag the leader by at least this
+      many Raft log entries, OM throttles key block deletion to SCM by sending
+      fewer keys per task run (see
+      ozone.om.key.deleting.scm.lag.throttled.limit.per.task).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.key.deleting.scm.lag.throttled.limit.per.task</name>
+    <value>1000</value>
+    <tag>OM, DELETION</tag>
+    <description>
+      The reduced value of ozone.key.deleting.limit.per.task used by the key
+      deleting service while SCM follower replication lag is at or above
+      ozone.om.key.deleting.scm.follower.lag.throttle.threshold. Must be greater
+      than 0 so OM keeps sending smaller batches to SCM and keeps receiving
+      fresh lag readings, allowing it to stop throttling once the lag clears.
+    </description>
+  </property>
+  <property>
     <name>ozone.snapshot.key.deleting.limit.per.task</name>
     <value>20000</value>
     <tag>OM, PERFORMANCE, DELETION</tag>
