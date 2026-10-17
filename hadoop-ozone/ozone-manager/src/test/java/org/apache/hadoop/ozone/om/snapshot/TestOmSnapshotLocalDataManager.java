@@ -1119,6 +1119,26 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   @Test
+  public void testCheckOrphanSnapshotVersionsContinuesAfterLoadFailure() throws IOException {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    UUID firstSnapId = snapshotIds.get(0);
+    UUID secondSnapId = snapshotIds.get(1);
+    Map<UUID, Integer> orphanCheckMap = localDataManager.getSnapshotToBeCheckedForOrphans();
+    orphanCheckMap.clear();
+    orphanCheckMap.put(firstSnapId, 1);
+    orphanCheckMap.put(secondSnapId, 1);
+    // Corrupt the second snapshot's YAML after it has been loaded into the version graph.
+    Files.write(Paths.get(localDataManager.getSnapshotLocalPropertyYamlPath(secondSnapId)),
+        "not: [valid".getBytes(StandardCharsets.UTF_8));
+
+    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, null);
+
+    // The first snapshot is still processed and the failed one stays queued for the next run.
+    assertThat(orphanCheckMap).containsOnlyKeys(secondSnapId).containsEntry(secondSnapId, 1);
+  }
+
+  @Test
   public void testInitSkipsYamlFileWhosePathDoesNotMatchStoredSnapshotId() throws IOException {
     UUID snapshotId = UUID.randomUUID();
 

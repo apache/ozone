@@ -459,12 +459,18 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
 
   }
 
-  private void checkOrphanSnapshotVersions(OMMetadataManager metadataManager, SnapshotChainManager chainManager)
-      throws IOException {
+  @VisibleForTesting
+  void checkOrphanSnapshotVersions(OMMetadataManager metadataManager, SnapshotChainManager chainManager) {
     for (Map.Entry<UUID, Integer> entry : snapshotToBeCheckedForOrphans.entrySet()) {
       UUID snapshotId = entry.getKey();
       int countBeforeCheck = entry.getValue();
-      checkOrphanSnapshotVersions(metadataManager, chainManager, snapshotId);
+      try {
+        checkOrphanSnapshotVersions(metadataManager, chainManager, snapshotId);
+      } catch (IOException e) {
+        // Keep the count so the snapshot is retried in the next run.
+        LOG.error("Failed to check orphan versions for snapshot {}, will retry in the next run", snapshotId, e);
+        continue;
+      }
       decrementOrphanCheckCount(snapshotId, countBeforeCheck);
     }
   }
