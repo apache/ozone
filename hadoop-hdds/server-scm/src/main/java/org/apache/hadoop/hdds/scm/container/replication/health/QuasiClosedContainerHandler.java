@@ -131,8 +131,17 @@ public class QuasiClosedContainerHandler extends AbstractCheck {
     // It is possible to CLOSE a container that has one QC and the remaining UNHEALTHY, provided the QC is one of the
     // replicas with the highest sequence ID. If an UNHEALTHY replica has a higher sequence ID, the container will
     // remain in QUASI_CLOSED state.
+    // The exception is a container committed only through data streams: every acknowledged block is committed on all
+    // the replicas, so a majority of such replicas with the highest sequence ID is enough.
+    final long maxSeq = maxQCSeq;
+    final long uniqueStreamCommitOnlyReplicaCount = replicas.stream()
+        .filter(r -> r.getState() == State.QUASI_CLOSED && r.isStreamCommitOnly() && r.getSequenceId() == maxSeq)
+        .map(ContainerReplica::getOriginDatanodeId)
+        .distinct()
+        .count();
     return maxQCSeq > -1 && maxQCSeq >= maxUnhealthySeq
-        && uniqueQuasiClosedOrUnhealthyReplicaCount >= replicationFactor;
+        && (uniqueQuasiClosedOrUnhealthyReplicaCount >= replicationFactor
+            || uniqueStreamCommitOnlyReplicaCount > replicationFactor / 2);
   }
 
   /**

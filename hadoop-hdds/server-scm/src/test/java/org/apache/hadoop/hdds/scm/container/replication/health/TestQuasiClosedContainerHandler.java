@@ -368,4 +368,76 @@ public class TestQuasiClosedContainerHandler {
     verify(replicationManager, times(1))
         .sendCloseContainerReplicaCommand(eq(containerInfo), eq(dnThree), anyBoolean());
   }
+
+  /**
+   * A container committed only through data streams can be force closed with a majority of the replicas.
+   */
+  @Test
+  public void testStreamCommitOnlyMajoritySendsForceClose() {
+    final ContainerInfo containerInfo = getContainer(HddsProtos.LifeCycleState.QUASI_CLOSED);
+    DatanodeDetails dnOne = randomDatanodeDetails();
+    DatanodeDetails dnTwo = randomDatanodeDetails();
+    Set<ContainerReplica> containerReplicas = new HashSet<>();
+    containerReplicas.add(getStreamCommitOnlyReplica(containerInfo.containerID(), State.QUASI_CLOSED, 1000L, dnOne));
+    containerReplicas.add(getStreamCommitOnlyReplica(containerInfo.containerID(), State.QUASI_CLOSED, 1000L, dnTwo));
+
+    ContainerCheckRequest request = newRequest(containerInfo, containerReplicas);
+    assertFalse(quasiClosedContainerHandler.handle(request));
+    verify(replicationManager, times(1))
+        .sendCloseContainerReplicaCommand(eq(containerInfo), eq(dnOne), anyBoolean());
+    verify(replicationManager, times(1))
+        .sendCloseContainerReplicaCommand(eq(containerInfo), eq(dnTwo), anyBoolean());
+    assertEquals(0, request.getReport().getStat(ContainerHealthState.QUASI_CLOSED_STUCK));
+  }
+
+  @Test
+  public void testStreamCommitOnlyMinorityReturnsFalse() {
+    final ContainerInfo containerInfo = getContainer(HddsProtos.LifeCycleState.QUASI_CLOSED);
+    final ContainerID id = containerInfo.containerID();
+    DatanodeDetails dnOne = randomDatanodeDetails();
+    DatanodeDetails dnTwo = randomDatanodeDetails();
+    Set<ContainerReplica> containerReplicas = new HashSet<>();
+    containerReplicas.add(getStreamCommitOnlyReplica(id, State.QUASI_CLOSED, 1000L, dnOne));
+    containerReplicas.add(getReplicas(id, State.QUASI_CLOSED, 1000L, dnTwo.getID(), dnTwo));
+
+    assertStuck(containerInfo, containerReplicas);
+  }
+
+  @Test
+  public void testStreamCommitOnlyWithoutHighestSeqReturnsFalse() {
+    final ContainerInfo containerInfo = getContainer(HddsProtos.LifeCycleState.QUASI_CLOSED);
+    final ContainerID id = containerInfo.containerID();
+    Set<ContainerReplica> containerReplicas = new HashSet<>();
+    containerReplicas.add(getStreamCommitOnlyReplica(id, State.QUASI_CLOSED, 1000L, randomDatanodeDetails()));
+    containerReplicas.add(getStreamCommitOnlyReplica(id, State.QUASI_CLOSED, 999L, randomDatanodeDetails()));
+    assertStuck(containerInfo, containerReplicas);
+
+    containerReplicas.clear();
+    containerReplicas.add(getStreamCommitOnlyReplica(id, State.QUASI_CLOSED, 1000L, randomDatanodeDetails()));
+    containerReplicas.add(getStreamCommitOnlyReplica(id, State.QUASI_CLOSED, 1000L, randomDatanodeDetails()));
+    containerReplicas.add(getStreamCommitOnlyReplica(id, State.UNHEALTHY, 1001L, randomDatanodeDetails()));
+    assertStuck(containerInfo, containerReplicas);
+  }
+
+  private void assertStuck(ContainerInfo containerInfo, Set<ContainerReplica> containerReplicas) {
+    ContainerCheckRequest request = newRequest(containerInfo, containerReplicas);
+    assertFalse(quasiClosedContainerHandler.handle(request));
+    verify(replicationManager, times(0))
+        .sendCloseContainerReplicaCommand(any(), any(), anyBoolean());
+    assertEquals(1, request.getReport().getStat(ContainerHealthState.QUASI_CLOSED_STUCK));
+  }
+
+  private ContainerCheckRequest newRequest(ContainerInfo containerInfo, Set<ContainerReplica> containerReplicas) {
+    return new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+  }
+
+  private static ContainerReplica getStreamCommitOnlyReplica(ContainerID id, State state, long seq,
+      DatanodeDetails dn) {
+    return getReplicas(id, state, seq, dn.getID(), dn).toBuilder().setStreamCommitOnly(true).build();
+  }
 }
