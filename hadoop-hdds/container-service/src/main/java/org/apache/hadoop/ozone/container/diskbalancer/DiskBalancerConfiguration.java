@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
@@ -51,6 +52,17 @@ public final class DiskBalancerConfiguration {
    */
   public static final String DEFAULT_CONTAINER_STATES = "CLOSED,QUASI_CLOSED";
 
+  public static final String HDDS_DATANODE_DISK_BALANCER_THRESHOLD =
+      "hdds.datanode.disk.balancer.volume.density.threshold.percent";
+  public static final String HDDS_DATANODE_DISK_BALANCER_BANDWIDTH =
+      "hdds.datanode.disk.balancer.max.disk.throughputInMBPerSec";
+  public static final String HDDS_DATANODE_DISK_BALANCER_PARALLEL_THREAD =
+      "hdds.datanode.disk.balancer.parallel.thread";
+
+  public static final double DEFAULT_THRESHOLD = 10d;
+  public static final long DEFAULT_DISK_BANDWIDTH_IN_MB = 10L;
+  public static final int DEFAULT_PARALLEL_THREAD = 5;
+
   @Config(key = "hdds.datanode.disk.balancer.info.dir", type = ConfigType.STRING,
       defaultValue = "", tags = {ConfigTag.DISKBALANCER},
       description = "The path where datanode diskBalancer's conf is to be " +
@@ -58,24 +70,24 @@ public final class DiskBalancerConfiguration {
           "back to use metadata directory instead.")
   private String infoDir;
 
-  @Config(key = "hdds.datanode.disk.balancer.volume.density.threshold.percent", type = ConfigType.DOUBLE,
+  @Config(key = HDDS_DATANODE_DISK_BALANCER_THRESHOLD, type = ConfigType.DOUBLE,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +
           "datanode is considered balanced if for each volume, the " +
           "utilization of the volume(used space to capacity ratio) differs" +
           " from the utilization of the datanode(used space to capacity ratio" +
           " of the entire datanode) no more than the threshold.")
-  private double threshold = 10d;
+  private double threshold = DEFAULT_THRESHOLD;
 
-  @Config(key = "hdds.datanode.disk.balancer.max.disk.throughputInMBPerSec", type = ConfigType.LONG,
+  @Config(key = HDDS_DATANODE_DISK_BALANCER_BANDWIDTH, type = ConfigType.LONG,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "The max balance speed.")
-  private long diskBandwidthInMB = 10;
+  private long diskBandwidthInMB = DEFAULT_DISK_BANDWIDTH_IN_MB;
 
-  @Config(key = "hdds.datanode.disk.balancer.parallel.thread", type = ConfigType.INT,
+  @Config(key = HDDS_DATANODE_DISK_BALANCER_PARALLEL_THREAD, type = ConfigType.INT,
       defaultValue = "5", tags = {ConfigTag.DISKBALANCER},
       description = "The max parallel balance thread count.")
-  private int parallelThread = 5;
+  private int parallelThread = DEFAULT_PARALLEL_THREAD;
 
   @Config(key = "hdds.datanode.disk.balancer.should.run.default",
       defaultValue = "false",
@@ -169,6 +181,32 @@ public final class DiskBalancerConfiguration {
   public DiskBalancerConfiguration() {
   }
 
+  private static boolean isValidThreshold(double threshold) {
+    return Double.isFinite(threshold) && threshold > 0d && threshold < 100d;
+  }
+
+  @PostConstruct
+  public void validate() {
+    if (!isValidThreshold(threshold)) {
+      LOG.warn(HDDS_DATANODE_DISK_BALANCER_THRESHOLD +
+              " must be in the range 0 to 100 both exclusive and was set to {}. Defaulting to {}",
+          threshold, DEFAULT_THRESHOLD);
+      threshold = DEFAULT_THRESHOLD;
+    }
+
+    if (diskBandwidthInMB <= 0L) {
+      LOG.warn(HDDS_DATANODE_DISK_BALANCER_BANDWIDTH + " must be > 0 and was set to {}. Defaulting to {}",
+          diskBandwidthInMB, DEFAULT_DISK_BANDWIDTH_IN_MB);
+      diskBandwidthInMB = DEFAULT_DISK_BANDWIDTH_IN_MB;
+    }
+
+    if (parallelThread <= 0) {
+      LOG.warn(HDDS_DATANODE_DISK_BALANCER_PARALLEL_THREAD + " must be > 0 and was set to {}. Defaulting to {}",
+          parallelThread, DEFAULT_PARALLEL_THREAD);
+      parallelThread = DEFAULT_PARALLEL_THREAD;
+    }
+  }
+
   public String getDiskBalancerInfoDir() {
     return infoDir;
   }
@@ -237,7 +275,7 @@ public final class DiskBalancerConfiguration {
    * @param threshold a percentage value in the range (0 to 100) both exclusive
    */
   public void setThreshold(double threshold) {
-    if (threshold <= 0d || threshold >= 100d) {
+    if (!isValidThreshold(threshold)) {
       throw new IllegalArgumentException(
           "Threshold must be a percentage(double) in the range 0 to 100 both exclusive.");
     }
