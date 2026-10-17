@@ -26,7 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ByteString;
@@ -35,6 +38,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -47,6 +51,8 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -100,6 +106,20 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
     }
 
     return purgeSnapshots;
+  }
+
+  /**
+   * Marks snapshots SNAPSHOT_DELETED and increments NumSnapshotDeleted for each.
+   */
+  private void markSnapshotsDeleted(List<String> snapshotKeys) throws IOException {
+    Table<String, SnapshotInfo> snapshotInfoTable = getOmMetadataManager().getSnapshotInfoTable();
+    for (String snapshotKey : snapshotKeys) {
+      SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotKey);
+      snapshotInfo.setSnapshotStatus(SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED);
+      snapshotInfoTable.addCacheEntry(new CacheKey<>(snapshotKey), CacheValue.get(2L, snapshotInfo));
+      snapshotInfoTable.put(snapshotKey, snapshotInfo);
+      getOmMetrics().incNumSnapshotDeleted();
+    }
   }
 
   /**
@@ -161,6 +181,9 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
     long initialSnapshotPurgeFailCount = getOmSnapshotIntMetrics().getNumSnapshotPurgeFails();
 
     List<String> snapshotDbKeysToPurge = createSnapshots(10);
+    // Leave the last snapshot active: purging it must not decrement NumSnapshotDeleted.
+    markSnapshotsDeleted(snapshotDbKeysToPurge.subList(0, 9));
+    assertEquals(9, getOmMetrics().getNumSnapshotDeleted());
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
     List<SnapshotInfo> snapshotInfos = new ArrayList<>();
     for (String snapshotKey : snapshotDbKeysToPurge) {
@@ -214,11 +237,14 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
 
     assertEquals(initialSnapshotPurgeCount + 1, getOmSnapshotIntMetrics().getNumSnapshotPurges());
     assertEquals(initialSnapshotPurgeFailCount, getOmSnapshotIntMetrics().getNumSnapshotPurgeFails());
+    assertEquals(0, getOmMetrics().getNumSnapshotDeleted());
   }
 
   @Test
   public void testDuplicateSnapshotPurge() throws Exception {
     List<String> snapshotDbKeysToPurge = createSnapshots(1);
+    markSnapshotsDeleted(snapshotDbKeysToPurge);
+    assertEquals(1, getOmMetrics().getNumSnapshotDeleted());
     assertFalse(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
     OMRequest snapshotPurgeRequest = createPurgeKeysRequest(
         snapshotDbKeysToPurge);
@@ -235,6 +261,7 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
 
     // Check if the entries are deleted.
     assertTrue(getOmMetadataManager().getSnapshotInfoTable().isEmpty());
+    assertEquals(0, getOmMetrics().getNumSnapshotDeleted());
 
     OMSnapshotPurgeResponse omSnapshotPurgeResponse1 = (OMSnapshotPurgeResponse)
         omSnapshotPurgeRequest.validateAndUpdateCache(getOzoneManager(), 201L);
@@ -250,6 +277,7 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
       omSnapshotPurgeResponse1.checkAndUpdateDB(getOmMetadataManager(), batchOperation);
       getOmMetadataManager().getStore().commitBatchOperation(batchOperation);
     }
+    assertEquals(0, getOmMetrics().getNumSnapshotDeleted());
   }
 
   /**
@@ -278,6 +306,29 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
     assertEquals(INTERNAL_ERROR, omSnapshotPurgeResponse.getOMResponse().getStatus());
     assertEquals(initialSnapshotPurgeCount, getOmSnapshotIntMetrics().getNumSnapshotPurges());
     assertEquals(initialSnapshotPurgeFailCount + 1, getOmSnapshotIntMetrics().getNumSnapshotPurgeFails());
+  }
+
+  @Test
+  public void testNumSnapshotDeletedUnchangedOnPartialPurgeFailure() throws Exception {
+    // Purge s2 (latest) first so it completes before get(s1) throws.
+    List<String> snapshotKeys = createSnapshots(2);
+    markSnapshotsDeleted(snapshotKeys);
+    assertEquals(2, getOmMetrics().getNumSnapshotDeleted());
+
+    OMSnapshotPurgeRequest omSnapshotPurgeRequest =
+        preExecute(createPurgeKeysRequest(Arrays.asList(snapshotKeys.get(1), snapshotKeys.get(0))));
+
+    Table<String, SnapshotInfo> snapshotInfoTable = spy(getOmMetadataManager().getSnapshotInfoTable());
+    doThrow(new CodecException("Injected fault error.")).when(snapshotInfoTable).get(snapshotKeys.get(0));
+    doReturn(snapshotInfoTable).when(getOmMetadataManager()).getSnapshotInfoTable();
+
+    OMSnapshotPurgeResponse omSnapshotPurgeResponse = (OMSnapshotPurgeResponse)
+        omSnapshotPurgeRequest.validateAndUpdateCache(getOzoneManager(), 200L);
+
+    assertEquals(INTERNAL_ERROR, omSnapshotPurgeResponse.getOMResponse().getStatus());
+    // s2 was purged before the fault.
+    assertNull(snapshotInfoTable.get(snapshotKeys.get(1)));
+    assertEquals(2, getOmMetrics().getNumSnapshotDeleted());
   }
 
   // TODO: clean up: Do we this test after
