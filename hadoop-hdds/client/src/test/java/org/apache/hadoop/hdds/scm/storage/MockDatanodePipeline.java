@@ -55,7 +55,12 @@ import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.FilePositionCount;
 import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.io.WriteOption;
+import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.DataStreamReply;
+import org.apache.ratis.protocol.Message;
+import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.RoutingTable;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
@@ -113,7 +118,12 @@ public class MockDatanodePipeline {
     DataStreamOutput mockDataStreamOutput = spy(DataStreamOutput.class);
     doThrow(new UnsupportedOperationException()).
         when(mockDataStreamOutput).writeAsync(any(FilePositionCount.class), any(WriteOption[].class));
-    doThrow(new UnsupportedOperationException()).when(mockDataStreamOutput).getRaftClientReplyFuture();
+    // The Raft log entry closing the stream sets the BCSID of the block to its log index.
+    doAnswer(invocation -> {
+      final BlockID committed = new BlockID(blockID);
+      committed.setBlockCommitSequenceId(nextLogIndex.getAndIncrement());
+      return CompletableFuture.completedFuture(raftClientReply(buildPutBlockResponse(committed)));
+    }).when(mockDataStreamOutput).getRaftClientReplyFuture();
     doThrow(new UnsupportedOperationException()).when(mockDataStreamOutput).getWritableByteChannel();
     doReturn(CompletableFuture.completedFuture(dataStreamReply(0))).when(mockDataStreamOutput).closeAsync();
 
@@ -336,6 +346,17 @@ public class MockDatanodePipeline {
                     .setBlockLength(0)
                     .build())
             .build())
+        .build();
+  }
+
+  private static RaftClientReply raftClientReply(ContainerCommandResponseProto response) {
+    return RaftClientReply.newBuilder()
+        .setClientId(ClientId.randomId())
+        .setServerId(RaftPeerId.valueOf("dn"))
+        .setGroupId(RaftGroupId.randomId())
+        .setSuccess(true)
+        .setMessage(Message.valueOf(response.toByteString()))
+        .setCommitInfos(Collections.emptyList())
         .build();
   }
 

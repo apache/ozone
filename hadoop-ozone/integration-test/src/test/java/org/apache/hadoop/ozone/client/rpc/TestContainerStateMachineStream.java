@@ -26,12 +26,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -44,10 +47,13 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -178,17 +184,37 @@ public abstract class TestContainerStateMachineStream implements NonHATests.Test
     }
     assertCommittedOnAllDatanodes(info, 2 * size);
     validateData(keyName, data, client.getObjectStore(), volumeName, bucketName);
+
+    // The log index of the Raft log entry closing the stream is used as the BCSID
+    final OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(keyName).build();
+    final long bcsId = cluster().getOzoneManager().lookupKey(keyArgs).getLatestVersionLocations()
+        .getBlocksLatestVersionOnly().get(0).getBlockID().getBlockCommitSequenceId();
+    assertThat(bcsId).isPositive();
+    // The followers may apply the entry after the client is acknowledged
+    for (HddsDatanodeService dn : getDatanodeServices(cluster(), info.getPipeline())) {
+      GenericTestUtils.waitFor(() -> getBlockData(dn, info).getBlockCommitSequenceId() == bcsId, 100, 10_000);
+    }
   }
 
-  private void assertCommittedOnAllDatanodes(OmKeyLocationInfo info, long expectedLength) throws Exception {
+  private void assertCommittedOnAllDatanodes(OmKeyLocationInfo info, long expectedLength) {
     final Set<HddsDatanodeService> datanodes = getDatanodeServices(cluster(), info.getPipeline());
     for (HddsDatanodeService dn : datanodes) {
-      final OzoneContainer ozoneContainer = dn.getDatanodeStateMachine().getContainer();
-      final KeyValueHandler handler = (KeyValueHandler) ozoneContainer.getDispatcher()
-          .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
-      final Container<?> container = ozoneContainer.getContainerSet().getContainer(info.getContainerID());
-      assertEquals(expectedLength, handler.getBlockManager().getCommittedBlockLength(container, info.getBlockID()),
+      assertEquals(expectedLength, getBlockData(dn, info).getSize(),
           () -> "Unexpected committed block length on " + dn.getDatanodeDetails());
+    }
+  }
+
+  private static BlockData getBlockData(HddsDatanodeService dn, OmKeyLocationInfo info) {
+    final OzoneContainer ozoneContainer = dn.getDatanodeStateMachine().getContainer();
+    final KeyValueHandler handler = (KeyValueHandler) ozoneContainer.getDispatcher()
+        .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
+    final Container<?> container = ozoneContainer.getContainerSet().getContainer(info.getContainerID());
+    try {
+      // Without BCSID so that the BCSID is not verified
+      return handler.getBlockManager().getBlock(container, new BlockID(info.getContainerID(), info.getLocalID()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
   }
 }

@@ -303,12 +303,8 @@ public class TestBlockDataStreamOutput {
       int expectedPutBlocks = isStreamPutBlockWithoutRaftActive(config) ? 1 : 2;
       assertEquals(putBlockCount + expectedPutBlocks,
           metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
-      if (isStreamPutBlockWithoutRaftActive(config)) {
-        // No PutBlock went through Raft, so there is no log index to use as block commit sequence id.
-        assertEquals(0, entry.getBlockID().getBlockCommitSequenceId());
-      } else {
-        assertThat(entry.getBlockID().getBlockCommitSequenceId()).isPositive();
-      }
+      // Without Raft for PutBlock, the log index of the entry closing the stream is used as BCSID.
+      assertThat(entry.getBlockID().getBlockCommitSequenceId()).isPositive();
       validateData(client, keyName, data);
     }
   }

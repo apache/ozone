@@ -75,6 +75,18 @@ public interface BlockManager {
   void updateContainerBcsId(Container container, long bcsId) throws IOException;
 
   /**
+   * Sets the BCSID of a block whose PutBlock was committed through a data stream, i.e. without a Raft log entry,
+   * and advances the container BCSID.  It is called when the Raft log entry closing the stream is applied.
+   *
+   * @param container - Container of the block.
+   * @param blockID   - ID of the block.
+   * @param bcsId     - The log index of the entry closing the stream.
+   * @return the updated block data, or null if the container BCSID is already at or beyond the given bcsId,
+   *         i.e. the entry is re-applied on restart.
+   */
+  BlockData commitStreamBlockBcsId(Container container, BlockID blockID, long bcsId) throws IOException;
+
+  /**
    * Gets an existing block.
    *
    * @param container - Container from which block needs to be fetched.

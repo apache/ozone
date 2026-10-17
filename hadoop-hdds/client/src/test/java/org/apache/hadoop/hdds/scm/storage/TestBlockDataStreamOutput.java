@@ -174,6 +174,21 @@ class TestBlockDataStreamOutput {
   }
 
   @Test
+  void closeSetsBlockCommitSequenceIdFromStreamCommit() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+    BlockDataStreamOutput stream = createStream(pipeline, config);
+    byte[] data = randomBytes(300);
+    stream.write(ByteBuffer.wrap(data), 0, data.length);
+    assertEquals(0, stream.getBlockID().getBlockCommitSequenceId());
+    stream.close();
+
+    assertThat(stream.getBlockID().getBlockCommitSequenceId()).isPositive();
+    assertEquals(pipeline.getBlockID().getContainerBlockID(), stream.getBlockID().getContainerBlockID());
+  }
+
+  @Test
   void midStreamPutBlockCommandReleasesBuffers() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline();
     OzoneClientConfig config = createConfig();

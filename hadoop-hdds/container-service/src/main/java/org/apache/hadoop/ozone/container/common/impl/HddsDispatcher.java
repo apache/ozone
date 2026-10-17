@@ -491,6 +491,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       // updates the latest BCSID on every putBlock or putSmallFile
       // transaction over Ratis.
       container2BCSIDMap.computeIfPresent(containerId, (u, v) -> v = bcsID);
+    } else if (cmdType == Type.StreamInitWithPutBlock
+        && DispatcherContext.op(dispatcherContext) == DispatcherContext.Op.APPLY_TRANSACTION) {
+      // A container written only through data streams has no WriteChunk log entry to add it to the map on restart.
+      Objects.requireNonNull(container, "container == null");
+      Objects.requireNonNull(dispatcherContext.getContainer2BCSIDMap(), "container2BCSIDMap == null")
+          .put(container.getContainerData().getContainerID(), container.getBlockCommitSequenceId());
     }
   }
 

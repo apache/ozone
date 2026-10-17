@@ -175,6 +175,34 @@ public class TestBlockManagerImpl {
   }
 
   @ContainerTestVersionInfo.ContainerTest
+  public void testCommitStreamBlockBcsId(ContainerTestVersionInfo versionInfo) throws Exception {
+    initTest(versionInfo);
+    // A PutBlock committed through a data stream has no log index
+    blockManager.putBlock(keyValueContainer, blockData);
+    assertEquals(0, keyValueContainer.getContainerData().getBlockCommitSequenceId());
+
+    final BlockData committed = blockManager.commitStreamBlockBcsId(keyValueContainer, blockData.getBlockID(), 5);
+    assertEquals(5, committed.getBlockCommitSequenceId());
+    assertEquals(5, keyValueContainer.getContainerData().getBlockCommitSequenceId());
+    final BlockData fromGetBlockData = blockManager.getBlock(keyValueContainer, committed.getBlockID());
+    assertEquals(5, fromGetBlockData.getBlockCommitSequenceId());
+    assertEquals(blockData.getChunks().size(), fromGetBlockData.getChunks().size());
+    assertEquals(1, keyValueContainer.getContainerData().getBlockCount());
+    try (DBHandle db = BlockUtils.getDB(keyValueContainer.getContainerData(), config)) {
+      assertEquals(5, db.getStore().getMetadataTable().get(keyValueContainer.getContainerData().getBcsIdKey()));
+    }
+
+    // Re-applied on restart
+    assertNull(blockManager.commitStreamBlockBcsId(keyValueContainer, blockData.getBlockID(), 5));
+    assertEquals(5, keyValueContainer.getContainerData().getBlockCommitSequenceId());
+
+    final StorageContainerException e = assertThrows(StorageContainerException.class,
+        () -> blockManager.commitStreamBlockBcsId(keyValueContainer, new BlockID(1L, 100L), 6));
+    assertEquals(ContainerProtos.Result.NO_SUCH_BLOCK, e.getResult());
+    assertEquals(5, keyValueContainer.getContainerData().getBlockCommitSequenceId());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
   public void testPutAndGetBlock(ContainerTestVersionInfo versionInfo)
       throws Exception {
     initTest(versionInfo);

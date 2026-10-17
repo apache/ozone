@@ -425,6 +425,10 @@ public class KeyValueHandler extends Handler {
     String path = null;
     try {
       checkContainerOpen(kvContainer);
+      if (request.getCmdType() == Type.StreamInitWithPutBlock
+          && DispatcherContext.op(dispatcherContext) == DispatcherContext.Op.APPLY_TRANSACTION) {
+        return handleStreamCommitApplied(request, kvContainer, blockID, dispatcherContext.getLogIndex());
+      }
       path = chunkManager
           .streamInit(kvContainer, blockID);
     } catch (StorageContainerException ex) {
@@ -434,6 +438,24 @@ public class KeyValueHandler extends Handler {
     return getSuccessResponseBuilder(request)
         .setMessage(path)
         .build();
+  }
+
+  /**
+   * The Raft log entry closing a stream is applied after the PutBlock has been committed through the stream.
+   * Use its log index, which is the same on all the datanodes, as the BCSID of the block.
+   */
+  private ContainerCommandResponseProto handleStreamCommitApplied(ContainerCommandRequestProto request,
+      KeyValueContainer kvContainer, BlockID blockID, long logIndex) {
+    try {
+      final BlockData blockData = blockManager.commitStreamBlockBcsId(kvContainer, blockID, logIndex);
+      return blockData == null ? getSuccessResponse(request)
+          : putBlockResponseSuccess(request, blockData.getProtoBufMessage());
+    } catch (StorageContainerException ex) {
+      return ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ex) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("Failed to commit the BCSID of block " + blockID, ex, IO_EXCEPTION), request);
+    }
   }
 
   /**

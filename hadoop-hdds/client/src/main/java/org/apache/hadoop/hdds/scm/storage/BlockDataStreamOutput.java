@@ -61,6 +61,7 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.ratis.client.api.DataStreamOutput;
 import org.apache.ratis.io.StandardWriteOption;
 import org.apache.ratis.protocol.DataStreamReply;
+import org.apache.ratis.protocol.RaftClientReply;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -691,6 +692,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       try {
         handleFlush(true);
         dataStreamCloseReply.get();
+        if (putBlockWithoutRaft) {
+          updateBlockIDOnStreamCommitted();
+        }
       } catch (ExecutionException e) {
         handleExecutionException(e);
       } catch (InterruptedException ex) {
@@ -700,6 +704,33 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         cleanup(false);
       }
 
+    }
+  }
+
+  /**
+   * The datanodes have committed the PutBlock when the data stream is closed.  Then, the Raft log entry closing the
+   * stream is applied, which sets the BCSID of the block to its log index.  If the entry fails, the block keeps
+   * BCSID 0, which is still correct since the PutBlock has been committed on all the datanodes.
+   */
+  private void updateBlockIDOnStreamCommitted() throws InterruptedException {
+    try {
+      final RaftClientReply reply = out.getRaftClientReplyFuture().get();
+      if (!reply.isSuccess()) {
+        LOG.warn("Failed to set BCSID for {}: {}", blockID, reply, reply.getException());
+        return;
+      }
+      final ContainerCommandResponseProto response =
+          ContainerCommandResponseProto.parseFrom(reply.getMessage().getContent());
+      if (response.getResult() != ContainerProtos.Result.SUCCESS || !response.hasPutBlock()) {
+        LOG.warn("Failed to set BCSID for {}: {} {}", blockID, response.getResult(), response.getMessage());
+        return;
+      }
+      final BlockID responseBlockID = BlockID.getFromProtobuf(
+          response.getPutBlock().getCommittedBlockLength().getBlockID());
+      Preconditions.checkState(blockID.get().getContainerBlockID().equals(responseBlockID.getContainerBlockID()));
+      blockID.set(responseBlockID);
+    } catch (ExecutionException | IOException e) {
+      LOG.warn("Failed to set BCSID for {}", blockID, e);
     }
   }
 

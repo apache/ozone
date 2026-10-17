@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.BCSID_MISMATCH;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 
@@ -179,6 +180,33 @@ public class BlockManagerImpl implements BlockManager {
       db.getStore().getMetadataTable().put(containerData.getBcsIdKey(), bcsId);
     }
     container.updateBlockCommitSequenceId(bcsId);
+  }
+
+  @Override
+  public BlockData commitStreamBlockBcsId(Container container, BlockID blockID, long bcsId) throws IOException {
+    final KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+    if (bcsId <= containerData.getBlockCommitSequenceId()) {
+      LOG.debug("Container {} BCSID {} >= {}, ignoring the re-applied stream commit of block {}",
+          containerData.getContainerID(), containerData.getBlockCommitSequenceId(), bcsId, blockID);
+      return null;
+    }
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      Objects.requireNonNull(db, "db == null");
+      final String blockKey = containerData.getBlockKey(blockID.getLocalID());
+      final BlockData data = db.getStore().getBlockDataTable().get(blockKey);
+      if (data == null) {
+        throw new StorageContainerException("Block " + blockID + " committed through a data stream is not found"
+            + " in container " + containerData.getContainerID(), NO_SUCH_BLOCK);
+      }
+      data.setBlockCommitSequenceId(bcsId);
+      try (BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation()) {
+        db.getStore().getBlockDataTable().putWithBatch(batch, blockKey, data);
+        db.getStore().getMetadataTable().putWithBatch(batch, containerData.getBcsIdKey(), bcsId);
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
+      container.updateBlockCommitSequenceId(bcsId);
+      return data;
+    }
   }
 
   public long persistPutBlock(KeyValueContainer container,
