@@ -21,15 +21,19 @@ import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.QUOTA_EXCEEDED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,14 +41,22 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
+import javax.xml.bind.JAXBContext;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -53,15 +65,24 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmLCExpiration;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.hadoop.util.XMLUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
+import org.w3c.dom.Document;
 
 /**
  * Testing for PutBucketLifecycleConfiguration.
@@ -337,6 +358,17 @@ public class TestS3LifecycleConfigurationPut {
   public void testPutLifecycleConfigurationWithAbortDaysAfterInitiationOverflow() throws Exception {
     testInvalidLifecycleConfiguration(TestS3LifecycleConfigurationPut::withAbortDaysAfterInitiationOverflow,
         HTTP_BAD_REQUEST, INVALID_ARGUMENT.getCode());
+  }
+
+  @Test
+  public void testPutLifecycleConfigurationRejectsTransition() throws Exception {
+    // Ozone does not support lifecycle Transition actions. A rule containing one must be
+    // rejected instead of returning HTTP 200 for a rule Ozone can never enforce.
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> bucketEndpoint.put("bucket1", withTransition()));
+    assertEquals(HTTP_NOT_IMPLEMENTED, ex.getHttpCode());
+    assertEquals(NOT_IMPLEMENTED.getCode(), ex.getCode());
+    assertTrue(ex.getErrorMessage().contains("EC"));
   }
 
   private static InputStream onePrefix() {
@@ -806,6 +838,20 @@ public class TestS3LifecycleConfigurationPut {
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
 
+  private static InputStream withTransition() {
+    String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Rule>" +
+        "<ID>unsupported-transition</ID>" +
+        "<Prefix></Prefix>" +
+        "<Status>Enabled</Status>" +
+        "<Expiration><Date>2044-01-19T00:00:00Z</Date></Expiration>" +
+        "<Transition><Days>1</Days><StorageClass>EC</StorageClass></Transition>" +
+        "</Rule>" +
+        "</LifecycleConfiguration>";
+
+    return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+  }
+
   private static InputStream withAbortDaysAfterInitiationOverflow() {
     String xml = "<LifecycleConfiguration xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
         "<Rule>" +
@@ -820,4 +866,331 @@ public class TestS3LifecycleConfigurationPut {
 
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
+
+  @ParameterizedTest
+  @CsvSource({", OBJECT_STORE", "'', OBJECT_STORE", "owner, OBJECT_STORE",
+      ", FILE_SYSTEM_OPTIMIZED", "owner, FILE_SYSTEM_OPTIMIZED"})
+  public void testPutLifecycleReusesBucket(String expectedOwner, BucketLayout layout) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders requestHeaders = mock(HttpHeaders.class);
+    when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, layout);
+
+    try (Response response = endpoint.put("bucket1", onePrefix())) {
+      assertThat(response.getStatus()).isEqualTo(HTTP_OK);
+    }
+
+    verify(proxy).getBucketDetails("volume1", "bucket1");
+    ArgumentCaptor<OmLifecycleConfiguration> config = ArgumentCaptor.forClass(OmLifecycleConfiguration.class);
+    verify(proxy).setLifecycleConfiguration(config.capture());
+    assertThat(config.getValue().getVolume()).isEqualTo("volume1");
+    assertThat(config.getValue().getBucket()).isEqualTo("bucket1");
+    assertThat(config.getValue().getBucketLayout()).isEqualTo(layout);
+  }
+
+  @Test
+  public void testPutLifecycleOwnerMismatchPrecedesXmlValidation() throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders requestHeaders = mock(HttpHeaders.class);
+    when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("other-owner");
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, BucketLayout.OBJECT_STORE);
+    assertErrorResponse(ACCESS_DENIED, () -> endpoint.put("bucket1", null));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @CsvSource({", BUCKET_NOT_FOUND, NO_SUCH_BUCKET", "owner, BUCKET_NOT_FOUND, ACCESS_DENIED",
+      ", INTERNAL_ERROR, INTERNAL_ERROR", "owner, INTERNAL_ERROR, ACCESS_DENIED",
+      ", PERMISSION_DENIED, ACCESS_DENIED", "owner, PERMISSION_DENIED, ACCESS_DENIED",
+      "'', PERMISSION_DENIED, ACCESS_DENIED", ", VOLUME_NOT_FOUND, NO_SUCH_BUCKET",
+      "owner, VOLUME_NOT_FOUND, ACCESS_DENIED"})
+  public void testPutLifecycleLookupFailurePrecedesXmlValidation(
+      String expectedOwner, ResultCodes code, S3ErrorTable expected) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders requestHeaders = mock(HttpHeaders.class);
+    when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, BucketLayout.OBJECT_STORE);
+    when(proxy.getBucketDetails("volume1", "bucket1")).thenThrow(new OMException("Lookup failed", code));
+    assertErrorResponse(expected, () -> endpoint.put("bucket1", null));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @Test
+  public void testPutLifecycleMatchingOwnerStillValidatesXml() throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    HttpHeaders requestHeaders = mock(HttpHeaders.class);
+    when(requestHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("owner");
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, requestHeaders, BucketLayout.OBJECT_STORE);
+    assertErrorResponse(MALFORMED_XML, () -> endpoint.put("bucket1", null));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("versioningActions")
+  public void testRejectVersioningActions(
+      String action, String status, boolean namespace, String expectedElement) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<LifecycleConfiguration" + (namespace ? " xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\"" : "")
+        + "><Rule><ID>versioning</ID><Prefix>prefix/</Prefix><Status>" + status + "</Status>"
+        + "<AbortIncompleteMultipartUpload><DaysAfterInitiation>1</DaysAfterInitiation>"
+        + "</AbortIncompleteMultipartUpload>" + action + "</Rule></LifecycleConfiguration>";
+    OS3Exception exception = assertErrorResponse(MALFORMED_XML,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    assertThat(exception.getErrorMessage()).contains(expectedElement);
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  private static Stream<Arguments> versioningActions() {
+    String transition = "<NoncurrentVersionTransition><NoncurrentDays>1</NoncurrentDays>"
+        + "<StorageClass>GLACIER</StorageClass></NoncurrentVersionTransition>";
+    return Stream.of(
+        Arguments.of("<NoncurrentVersionExpiration><NoncurrentDays>1</NoncurrentDays></NoncurrentVersionExpiration>",
+            "NoncurrentVersionExpiration"),
+        Arguments.of("<NoncurrentVersionExpiration/>", "NoncurrentVersionExpiration"),
+        Arguments.of(
+            "<NoncurrentVersionExpiration xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\"/>",
+            "NoncurrentVersionExpiration"),
+        Arguments.of("<NoncurrentVersionTransition/>", "NoncurrentVersionTransition"),
+        Arguments.of(
+            "<NoncurrentVersionTransition xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\"/>",
+            "NoncurrentVersionTransition"),
+        Arguments.of(transition, "NoncurrentVersionTransition"),
+        Arguments.of(transition + transition, "NoncurrentVersionTransition"),
+        Arguments.of(
+            "<Expiration><Days>30</Days><ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker></Expiration>",
+            "ExpiredObjectDeleteMarker"),
+        Arguments.of(
+            "<Expiration><Days>30</Days><ExpiredObjectDeleteMarker>false</ExpiredObjectDeleteMarker></Expiration>",
+            "ExpiredObjectDeleteMarker"),
+        Arguments.of("<Expiration><Days>30</Days><ExpiredObjectDeleteMarker/></Expiration>",
+            "ExpiredObjectDeleteMarker"),
+        Arguments.of("<Expiration><Days>30</Days><ExpiredObjectDeleteMarker "
+            + "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\"/></Expiration>",
+            "ExpiredObjectDeleteMarker"),
+        Arguments.of("<Expiration><ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker></Expiration>",
+            "ExpiredObjectDeleteMarker"))
+        .flatMap(action -> Stream.of("Enabled", "Disabled")
+            .flatMap(status -> Stream.of(true, false)
+                .map(namespace -> Arguments.of(action.get()[0], status, namespace, action.get()[1]))));
+  }
+
+  @Test
+  public void testRejectedVersioningConfigurationPreservesExistingRules() throws Exception {
+    bucketEndpoint.put("bucket1", onePrefix());
+    String xml = "<LifecycleConfiguration><Rule><ID>replacement</ID><Prefix>replacement/</Prefix>"
+        + "<Status>Enabled</Status>"
+        + "<Expiration><Days>1</Days></Expiration></Rule><Rule><ID>unsupported</ID><Prefix>prefix/</Prefix>"
+        + "<Status>Enabled</Status>"
+        + "<NoncurrentVersionExpiration><NoncurrentDays>1</NoncurrentDays></NoncurrentVersionExpiration>"
+        + "</Rule></LifecycleConfiguration>";
+    OS3Exception exception = assertErrorResponse(MALFORMED_XML,
+        () -> bucketEndpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    assertThat(exception.getErrorMessage()).contains("NoncurrentVersionExpiration");
+    try (Response response = bucketEndpoint.get("bucket1")) {
+      S3LifecycleConfiguration configuration = (S3LifecycleConfiguration) response.getEntity();
+      assertThat(configuration.getRules()).hasSize(1);
+      S3LifecycleConfiguration.Rule rule = configuration.getRules().get(0);
+      assertThat(rule.getId()).isEqualTo("remove logs after 30 days");
+      assertThat(rule.getPrefix()).isEqualTo("prefix/");
+      assertThat(rule.getExpiration().getDays()).isEqualTo(30);
+      StringWriter xmlOutput = new StringWriter();
+      JAXBContext.newInstance(S3LifecycleConfiguration.class).createMarshaller().marshal(configuration, xmlOutput);
+      assertThat(xmlOutput.toString()).doesNotContain("NoncurrentVersion", "ExpiredObjectDeleteMarker");
+    }
+  }
+
+  @Test
+  public void testVersioningNamesInTextRemainSupported() throws Exception {
+    String xml = "<LifecycleConfiguration><Rule><ID>NoncurrentVersionExpiration</ID>"
+        + "<Prefix>NoncurrentVersionTransition/ExpiredObjectDeleteMarker/</Prefix><Status>Enabled</Status>"
+        + "<Expiration><Days>30</Days></Expiration>"
+        + "</Rule></LifecycleConfiguration>";
+    try (Response response = bucketEndpoint.put("bucket1",
+        new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)))) {
+      assertThat(response.getStatus()).isEqualTo(HTTP_OK);
+    }
+  }
+
+  @Test
+  public void testVersioningRuleStillChecksStatusAndOwner() throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<LifecycleConfiguration><Rule><Status>invalid</Status>"
+        + "<NoncurrentVersionExpiration/></Rule></LifecycleConfiguration>";
+    OS3Exception exception = assertErrorResponse(MALFORMED_XML,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    assertThat(exception.getErrorMessage()).contains("NoncurrentVersionExpiration");
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("other-owner");
+    assertErrorResponse(ACCESS_DENIED,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @MethodSource("unsupportedLifecycleElements")
+  public void testRejectUnsupportedLifecycleElements(
+      String elements, boolean namespace, String expectedElement) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<LifecycleConfiguration" + (namespace ? " xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\"" : "")
+        + "><Rule><ID>unsupported</ID><Status>Enabled</Status>"
+        + elements + "</Rule></LifecycleConfiguration>";
+    OS3Exception exception = assertErrorResponse(MALFORMED_XML,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    assertThat(exception.getErrorMessage()).contains(expectedElement);
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  private static Stream<Arguments> unsupportedLifecycleElements() {
+    String prefix = "<Prefix>prefix/</Prefix>";
+    String expiration = "<Expiration><Days>30</Days></Expiration>";
+    return Stream.of(
+        Arguments.of(prefix + expiration + "<UnknownElement/>", "UnknownElement"),
+        Arguments.of(prefix + "<Expiration><Days>30</Days><UnknownElement/></Expiration>", "UnknownElement"),
+        Arguments.of(prefix + "<Expiration><Days>30<UnknownElement/></Days></Expiration>", "UnknownElement"),
+        Arguments.of(prefix + "<AbortIncompleteMultipartUpload><DaysAfterInitiation>1</DaysAfterInitiation>"
+            + "<UnknownElement/></AbortIncompleteMultipartUpload>", "UnknownElement"),
+        Arguments.of(
+            expiration + "<Filter><Prefix>prefix/</Prefix><ObjectSizeGreaterThan>1</ObjectSizeGreaterThan></Filter>",
+            "ObjectSizeGreaterThan"),
+        Arguments.of(
+            expiration + "<Filter><Prefix>prefix/</Prefix><ObjectSizeLessThan>1000</ObjectSizeLessThan></Filter>",
+            "ObjectSizeLessThan"),
+        Arguments.of(expiration + "<Filter><And><Prefix>prefix/</Prefix><Tag><Key>key</Key><Value>value</Value></Tag>"
+            + "<ObjectSizeGreaterThan>1</ObjectSizeGreaterThan></And></Filter>", "ObjectSizeGreaterThan"),
+        Arguments.of(expiration + "<Filter><Tag><Key>key</Key><Value>value</Value><UnknownElement/></Tag></Filter>",
+            "UnknownElement"),
+        Arguments.of(prefix + "<Expiration><Days>30</Days><ExpiredObjectDeleteMarker>true</ExpiredObjectDeleteMarker>"
+            + "</Expiration>" + expiration, "ExpiredObjectDeleteMarker"),
+        Arguments.of(prefix + "<Expiration><Days>30</Days><Tag><Key>key</Key><Value>value</Value></Tag></Expiration>",
+            "Tag"),
+        Arguments.of(
+            prefix + "<Transition><Days>30</Days><StorageClass>GLACIER</StorageClass><UnknownElement/></Transition>",
+            "UnknownElement"))
+        .flatMap(elements -> Stream.of(
+            Arguments.of(elements.get()[0], false, elements.get()[1]),
+            Arguments.of(elements.get()[0], true, elements.get()[1])));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"<UnknownElement/>, UnknownElement", "<Prefix>prefix/</Prefix>, Prefix"})
+  public void testRejectUnsupportedRootElements(String element, String expectedElement) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<LifecycleConfiguration>" + element
+        + "<Rule><Prefix>prefix/</Prefix><Status>Enabled</Status><Expiration><Days>30</Days></Expiration>"
+        + "</Rule></LifecycleConfiguration>";
+    OS3Exception exception = assertErrorResponse(MALFORMED_XML,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    assertThat(exception.getErrorMessage()).contains(expectedElement);
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {
+      "<Rule xsi:nil=\"true\"><Prefix>prefix/</Prefix><Status>Enabled</Status>"
+          + "<Expiration><Days>30</Days></Expiration><UnknownElement/></Rule>",
+      "<Rule><Prefix>prefix/</Prefix><Status>Enabled</Status>"
+          + "<Expiration xsi:nil=\"true\"><Days>30</Days><UnknownElement/></Expiration></Rule>",
+      "<Rule><Prefix>prefix/</Prefix><Status>Enabled</Status>"
+          + "<Expiration xsi:type=\"xs:string\"><Days>30</Days><UnknownElement/></Expiration></Rule>"
+  })
+  public void testRejectUnsupportedElementsWithXmlTypeOverrides(String rule) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<LifecycleConfiguration xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+        + " xmlns:xs=\"http://www.w3.org/2001/XMLSchema\">" + rule + "</LifecycleConfiguration>";
+    OS3Exception exception = assertErrorResponse(MALFORMED_XML,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    assertThat(exception.getErrorMessage()).contains("UnknownElement");
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"Rule, false", "Rule, true", "lifecycleConfiguration, false", "lifecycleConfiguration, true"})
+  public void testRejectUnexpectedLifecycleRoot(String root, boolean namespace) throws Exception {
+    ClientProtocol proxy = mock(ClientProtocol.class);
+    BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers, BucketLayout.OBJECT_STORE);
+    String xml = "<" + root + (namespace ? " xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\"" : "")
+        + "></" + root + ">";
+    OS3Exception exception = assertErrorResponse(MALFORMED_XML,
+        () -> endpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    String message = "Unsupported or invalid lifecycle element: " + root;
+    assertThat(exception.getErrorMessage()).isEqualTo(message);
+    assertThat(exception.toXml()).contains("<Message>" + message + "</Message>");
+    verify(proxy, never()).setLifecycleConfiguration(any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testSupportedLifecycleElementPaths(boolean namespace) throws Exception {
+    String xml = "<LifecycleConfiguration" + (namespace ? " xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\"" : "")
+        + "><Rule><ID>and</ID><Status>Enabled</Status><Expiration><Days>30</Days></Expiration>"
+        + "<Filter><And><Prefix>prefix/</Prefix><Tag><Key>key</Key><Value>value</Value></Tag></And></Filter></Rule>"
+        + "<Rule><ID>prefix</ID><Status>Disabled</Status><Expiration><Date>2044-01-19T00:00:00Z</Date></Expiration>"
+        + "<Filter><Prefix>prefix/</Prefix></Filter></Rule>"
+        + "<Rule><ID>tag</ID><Status>Enabled</Status><Expiration><Days>60</Days></Expiration>"
+        + "<Filter><Tag><Key>key</Key><Value>value</Value></Tag></Filter></Rule>"
+        + "<Rule><ID>abort</ID><Status>Enabled</Status><Prefix>prefix/</Prefix>"
+        + "<AbortIncompleteMultipartUpload><DaysAfterInitiation>1</DaysAfterInitiation>"
+        + "</AbortIncompleteMultipartUpload></Rule></LifecycleConfiguration>";
+    try (Response response = bucketEndpoint.put("bucket1",
+        new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)))) {
+      assertEquals(HTTP_OK, response.getStatus());
+    }
+    try (Response response = bucketEndpoint.get("bucket1")) {
+      S3LifecycleConfiguration result = (S3LifecycleConfiguration) response.getEntity();
+      assertEquals(4, result.getRules().size());
+      assertEquals("value", result.getRules().get(0).getFilter().getAndOperator().getTags().get(0).getValue());
+      assertEquals("2044-01-19T00:00:00Z", result.getRules().get(1).getExpiration().getDate());
+      assertEquals("key", result.getRules().get(2).getFilter().getTag().getKey());
+      assertEquals(1, result.getRules().get(3).getAbortIncompleteMultipartUpload().getDaysAfterInitiation());
+    }
+  }
+
+  @Test
+  public void testLifecycleParserFailureWithoutMessage() throws Exception {
+    InputStream body = new InputStream() {
+      @Override
+      public int read() throws IOException {
+        throw new IOException();
+      }
+    };
+    OS3Exception exception = assertErrorResponse(MALFORMED_XML, () -> bucketEndpoint.put("bucket1", body));
+    assertThat(exception.getErrorMessage()).isEqualTo(MALFORMED_XML.getErrorMessage());
+    assertThat(exception.getResource()).isEqualTo("bucket1");
+  }
+
+  @Test
+  public void testMalformedLifecycleErrorMessageIsEscaped() throws Exception {
+    String xml = "<LifecycleConfiguration><Rule></LifecycleConfiguration>";
+    OS3Exception exception = assertErrorResponse(MALFORMED_XML,
+        () -> bucketEndpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))));
+    assertThat(exception.getErrorMessage()).contains("</Rule>");
+    Document error = XMLUtils.newSecureDocumentBuilderFactory().newDocumentBuilder()
+        .parse(new ByteArrayInputStream(exception.toXml().getBytes(StandardCharsets.UTF_8)));
+    assertThat(error.getElementsByTagName("Message").item(0).getTextContent()).isEqualTo(exception.getErrorMessage());
+  }
+
+  private BucketEndpoint newProtocolEndpoint(ClientProtocol proxy, HttpHeaders requestHeaders, BucketLayout layout)
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OzoneVolume volume = OzoneVolume.newBuilder(conf, proxy)
+        .setName("volume1").setAcls(Collections.emptyList()).build();
+    OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
+        .setVolumeName("volume1").setName("bucket1").setOwner("owner").setBucketLayout(layout).build();
+    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    ObjectStore store = mock(ObjectStore.class);
+    when(store.getS3Volume()).thenReturn(volume);
+    when(store.getClientProxy()).thenReturn(proxy);
+    OzoneClient client = mock(OzoneClient.class);
+    when(client.getObjectStore()).thenReturn(store);
+    when(client.getProxy()).thenReturn(proxy);
+    BucketEndpoint endpoint = EndpointBuilder.newBucketEndpointBuilder()
+        .setClient(client).setHeaders(requestHeaders).build();
+    endpoint.queryParamsForTest().set(S3Consts.QueryParams.LIFECYCLE, "");
+    return endpoint;
+  }
+
 }

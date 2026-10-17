@@ -389,6 +389,37 @@ public class TestRevokedSTSTokenCleanupService {
     }
   }
 
+  @Test
+  public void scansCurrentMetadataManagerAfterItIsReplaced() throws Exception {
+    // Installing a checkpoint replaces the OM metadata manager after the service has been created, so each run must
+    // scan the revoked STS token table of the current metadata manager rather than the original one.
+    final long expiredRevocationTimeMillis = testClock.millis() - TimeUnit.HOURS.toMillis(13);
+    revokedStsTokenTable.put("original-access-key-old", expiredRevocationTimeMillis);
+
+    final AtomicReference<OMRequest> capturedRequest = new AtomicReference<>();
+
+    try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
+      mockRatisSubmitAndCapture(ozoneManagerRatisUtilsMock, capturedRequest);
+
+      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = new RevokedSTSTokenCleanupService(
+          1, TimeUnit.HOURS, 1_000, ozoneManager);
+
+      final StringInMemoryTestTable<Long> newRevokedStsTokenTable = new StringInMemoryTestTable<>();
+      newRevokedStsTokenTable.put("original-access-key-new", expiredRevocationTimeMillis);
+      final OMMetadataManager newOmMetadataManager = mock(OMMetadataManager.class);
+      when(newOmMetadataManager.getS3RevokedStsTokenTable()).thenReturn(newRevokedStsTokenTable);
+      when(ozoneManager.getMetadataManager()).thenReturn(newOmMetadataManager);
+
+      revokedSTSTokenCleanupService.runPeriodicalTaskNow();
+
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(1);
+      final OMRequest omRequest = capturedRequest.get();
+      assertThat(omRequest).isNotNull();
+      assertThat(omRequest.getDeleteRevokedSTSTokensRequest().getOriginalAccessKeyIdList())
+          .containsExactly("original-access-key-new");
+    }
+  }
+
   private RevokedSTSTokenCleanupService createAndRunCleanupService() throws Exception {
     final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService =
         new RevokedSTSTokenCleanupService(1, TimeUnit.HOURS, 1_000, ozoneManager);

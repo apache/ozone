@@ -825,6 +825,8 @@ public class KeyLifecycleService extends BackgroundService {
         long numKeysExpired = 0;
         HashSet<String> deletedKeySetInCache = new HashSet();
         HashSet<String> keySetInCache = new HashSet();
+        // The cache is scanned separately before the table, so a cache key cannot represent table scan progress.
+        // Only advance lastScannedKey during table iteration to avoid skipping unprocessed table keys on resume.
         Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter = keyTable.cacheIterator();
         while (cacheIter.hasNext()) {
           Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry = cacheIter.next();
@@ -850,7 +852,6 @@ public class KeyLifecycleService extends BackgroundService {
                 break;
               }
             }
-            lastScannedKey = entry.getKey().getCacheKey();
           }
         }
 
@@ -1246,7 +1247,7 @@ public class KeyLifecycleService extends BackgroundService {
       OMRequest omRequest = OMRequest.newBuilder()
           .setCmdType(OzoneManagerProtocolProtos.Type.AbortExpiredMultiPartUploads)
           .setMultipartUploadsExpiredAbortRequest(abortRequest)
-          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT.serialize())
           .setClientId(clientId.toString())
           .build();
 
@@ -1393,7 +1394,7 @@ public class KeyLifecycleService extends BackgroundService {
 
         OMRequest omRequest = OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.SaveLifecycleScanState)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(clientId.toString())
             .setSaveLifecycleScanStateRequest(saveRequest)
             .build();
@@ -1460,7 +1461,7 @@ public class KeyLifecycleService extends BackgroundService {
           if (deleteKeysRequest.getSerializedSize() < ratisByteLimit) {
             OMRequest omRequestRaw = OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
-                .setVersion(ClientVersion.CURRENT_VERSION)
+                .setVersion(ClientVersion.CURRENT.serialize())
                 .setClientId(clientId.toString())
                 .setDeleteKeysRequest(deleteKeysRequest)
                 .build();
@@ -1588,7 +1589,7 @@ public class KeyLifecycleService extends BackgroundService {
         // send request out
         OMRequest omRequest = OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(clientId.toString())
             .setRenameKeyRequest(renameKeyRequest)
             .build();
@@ -1652,7 +1653,7 @@ public class KeyLifecycleService extends BackgroundService {
           OMRequest omRequest = OMRequest.newBuilder().setCreateDirectoryRequest(
                   CreateDirectoryRequest.newBuilder().setKeyArgs(keyArgs))
               .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
-              .setVersion(ClientVersion.CURRENT_VERSION)
+              .setVersion(ClientVersion.CURRENT.serialize())
               .setClientId(clientId.toString())
               .build();
           try {

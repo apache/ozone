@@ -1467,6 +1467,11 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
   }
 
   @Test
+  void testSetVerifyChecksum() throws Exception {
+    setVerifyChecksum(cluster, new Path(ROOT, "testSetVerifyChecksum"));
+  }
+
+  @Test
   public void testLoopInLinkBuckets() throws Exception {
     String linksVolume = UUID.randomUUID().toString();
 
@@ -1748,8 +1753,9 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     final long initialListStatusCount = omMetrics.getNumListStatus();
     FileStatus[] statusList = fs.listStatus(createPath("/"));
     assertEquals(1, statusList.length);
-    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 2);
-    assertEquals(initialListStatusCount + 2, omMetrics.getNumListStatus());
+    // One listing: the page is shorter than OM's limit, so OM reports it complete (HDDS-16943).
+    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 1);
+    assertEquals(initialListStatusCount + 1, omMetrics.getNumListStatus());
     assertEquals(fs.getFileStatus(path), statusList[0]);
 
     dirPath = RandomStringUtils.secure().nextAlphanumeric(5);
@@ -1760,8 +1766,10 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
 
     statusList = fs.listStatus(createPath("/"));
     assertEquals(2, statusList.length);
-    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 4);
-    assertEquals(initialListStatusCount + 4, omMetrics.getNumListStatus());
+    // Two listings: this suite caps OM listings at 2 entries (ozone.om.server.list.max.size), so the full
+    // 2-entry page may be followed by more and the client lists once more.
+    assertChange(initialStats, statistics, Statistic.OBJECTS_LIST.getSymbol(), 3);
+    assertEquals(initialListStatusCount + 3, omMetrics.getNumListStatus());
     for (Path p : paths) {
       assertThat(Arrays.asList(statusList)).contains(fs.getFileStatus(p));
     }
