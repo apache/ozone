@@ -20,15 +20,22 @@ package org.apache.hadoop.ozone;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mockStatic;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -48,11 +55,14 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,6 +70,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 
 /**
  * Test cases for mini ozone cluster.
@@ -82,6 +93,37 @@ public class TestMiniOzoneCluster {
   public void cleanup() {
     if (cluster != null) {
       cluster.shutdown();
+    }
+  }
+
+  @Test
+  void testSnapshotMetricsAfterOmRestart() throws Exception {
+    cluster = MiniOzoneCluster.newBuilder(conf).withoutDatanodes().build();
+    OmSnapshotInternalMetrics metrics = cluster.getOzoneManager().getOmSnapshotIntMetrics();
+    Field field = OmSnapshotInternalMetrics.class.getDeclaredField("sourceName");
+    field.setAccessible(true);
+    String sourceName = (String) field.get(metrics);
+    assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName));
+    metrics.incNumSnapshotPurges();
+
+    cluster.restartOzoneManager();
+
+    assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName));
+    assertCounter("NumSnapshotPurges", 1L, getMetrics(DefaultMetricsSystem.instance().getSource(sourceName)));
+  }
+
+  @Test
+  void testMetricsSystemShutdownOnLeak() throws Exception {
+    cluster = MiniOzoneCluster.newBuilder(conf).withoutDatanodes().build();
+    String sourceName = "TestMiniOzoneClusterLeakedMetrics";
+    DefaultMetricsSystem.instance().register(sourceName, "Test metrics", (MetricsSource) (collector, all) -> { });
+    try (MockedStatic<DefaultMetricsSystem> metricsSystem =
+        mockStatic(DefaultMetricsSystem.class, CALLS_REAL_METHODS)) {
+      AssertionError error = assertThrows(AssertionError.class, cluster::shutdown);
+      assertTrue(error.getMessage().contains(sourceName));
+      metricsSystem.verify(DefaultMetricsSystem::shutdown);
+    } finally {
+      DefaultMetricsSystem.instance().unregisterSource(sourceName);
     }
   }
 

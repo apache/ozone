@@ -360,9 +360,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
 
-    initMetrics();
-    initPerfMetrics();
-
+    // Check storage state before registering any metrics, so that a failed
+    // construction does not leak registered metrics sources.
     if (scmStorageConfig.getState() != StorageState.INITIALIZED) {
       String errMsg = "Please make sure you have run 'ozone scm --init' " +
           "command to generate all the required metadata to " +
@@ -373,6 +372,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       throw new SCMException("SCM not initialized due to storage config " +
           "failure.", ResultCodes.SCM_NOT_INITIALIZED);
     }
+
+    initMetrics();
+    initPerfMetrics();
 
     // Initialize Ratis if needed.
     // This is for the clusters which got upgraded from older version of Ozone.
@@ -1401,7 +1403,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * Initialize SCM metrics.
    */
   public void initMetrics() {
-    metrics = SCMMetrics.create(configuration);
+    metrics = SCMMetrics.create(getScmId(), configuration);
   }
 
   /**
@@ -1454,7 +1456,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   }
 
   private void registerMetricsSource(SCMMXBean scmMBean) {
-    scmContainerMetrics = SCMContainerMetrics.create(scmMBean);
+    scmContainerMetrics = SCMContainerMetrics.create(getScmId(), scmMBean);
   }
 
   private void unregisterMXBean() {

@@ -502,6 +502,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
       MiniOzoneHAClusterImpl cluster = new MiniOzoneHAClusterImpl(conf,
           scmConfigurator, omService, scmService, hddsDatanodes, path, getServices());
+      cluster.setMetricsLeakAssertEnabled(metricsLeakAssertEnabled);
       try {
         cluster.startServices();
       } catch (Exception e) {
@@ -991,7 +992,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    */
   public OzoneManager transferOMLeadershipToAnotherNode(OzoneManager currentLeader) throws Exception {
     // Get list of all OMs
-    List<OzoneManager> omList = getOzoneManagersList();
+    List<OzoneManager> omList = new ArrayList<>(getOzoneManagersList());
 
     // Remove current leader from list
     omList.remove(currentLeader);

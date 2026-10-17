@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.Iterator;
 import java.util.Map.Entry;
+import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -49,14 +50,17 @@ public class VolumeUtilizationMetrics implements MetricsSource {
   private static final String SOURCE = VolumeUtilizationMetrics.class.getSimpleName();
 
   private final OMMetadataManager metadataManager;
+  private final String sourceName;
 
   public VolumeUtilizationMetrics(OMMetadataManager metadataManager) {
     this.metadataManager = metadataManager;
+    sourceName = DefaultMetricsSystem.inMiniClusterMode() ? SOURCE + '-' + UUID.randomUUID() : SOURCE;
   }
 
   public static VolumeUtilizationMetrics create(OMMetadataManager metadataManager) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE, "Volume Utilization Metrics", new VolumeUtilizationMetrics(metadataManager));
+    VolumeUtilizationMetrics metrics = new VolumeUtilizationMetrics(metadataManager);
+    return ms.register(metrics.sourceName, "Volume Utilization Metrics", metrics);
   }
 
   @Override
@@ -82,7 +86,7 @@ public class VolumeUtilizationMetrics implements MetricsSource {
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE);
+    ms.unregisterSource(sourceName);
   }
 
   enum VolumeMetricsInfo implements MetricsInfo {

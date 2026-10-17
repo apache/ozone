@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,6 +45,8 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.junit.jupiter.api.AfterEach;
@@ -195,7 +199,16 @@ public class TestVolumeSet {
     assertEquals(readOnlyVolumePath, volSet.getFailedVolumesList().get(0)
         .getStorageDir());
     assertNumVolumes(volSet, 1, 1);
+
+    // The failed volume's VolumeInfoMetrics is registered on creation
+    // (HDDS-7086) and must be unregistered when the volume set shuts down.
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    String failedVolumeMetrics = VolumeInfoMetrics.class.getSimpleName()
+        + "-" + readOnlyVolumePath.getAbsolutePath();
+    assertNotNull(ms.getSource(failedVolumeMetrics));
+
     volSet.shutdown();
+    assertNull(ms.getSource(failedVolumeMetrics));
   }
 
   @Test

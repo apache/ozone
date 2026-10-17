@@ -160,8 +160,9 @@ public class TestGetDBUpdatesAuthorization {
   void accessDeniedWhenReconPrincipalNotConfigured() throws Exception {
     OzoneConfiguration noReconConf = authTestConfiguration();
     noReconConf.unset(OZONE_RECON_KERBEROS_PRINCIPAL_KEY);
+    // The shared cluster is still running, so its metrics must remain registered.
     MiniOzoneCluster denyCluster =
-        MiniOzoneCluster.newBuilder(noReconConf).setNumDatanodes(1).build();
+        MiniOzoneCluster.newBuilder(noReconConf).setNumDatanodes(1).setMetricsLeakAssertEnabled(false).build();
     try {
       denyCluster.waitForClusterToBeReady();
       UserGroupInformation reconLikeUser =

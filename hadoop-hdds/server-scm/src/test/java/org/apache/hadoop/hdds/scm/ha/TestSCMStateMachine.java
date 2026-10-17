@@ -93,7 +93,7 @@ public class TestSCMStateMachine {
   @BeforeEach
   void setUp() {
     StorageContainerManager scm = mock(StorageContainerManager.class);
-    metrics = SCMMetrics.create();
+    metrics = SCMMetrics.create("scm1");
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     datanodeProtocolServer = mock(SCMDatanodeProtocolServer.class);
     safeModeManager = mock(SCMSafeModeManager.class);
