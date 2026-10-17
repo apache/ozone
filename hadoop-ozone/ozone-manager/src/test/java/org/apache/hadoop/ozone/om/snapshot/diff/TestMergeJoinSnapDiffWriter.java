@@ -295,7 +295,7 @@ class TestMergeJoinSnapDiffWriter {
   @Test
   void testDependencyOrderingFallsBackWhenOverLimit() throws Exception {
     byte[] sig = signature("s");
-    SnapDiffJobStore store = spy(newStore(true, 1L));
+    SnapDiffJobStore store = spy(newStore(true, 1));
     try (SnapDiffJobStore ignored = store) {
       store.putToEdge(BUCKET_OBJECT_ID, 200L, nameBytes("parent"));
       store.putNewList(201L, entry(200L, "child1", false, sig));
@@ -340,10 +340,10 @@ class TestMergeJoinSnapDiffWriter {
   }
 
   private static SnapDiffJobStore newStore(boolean fso) throws IOException {
-    return newStore(fso, 1_000_000L);
+    return newStore(fso, 1_000_000);
   }
 
-  private static SnapDiffJobStore newStore(boolean fso, long maxInMemoryEntries) throws IOException {
+  private static SnapDiffJobStore newStore(boolean fso, int maxInMemoryEntries) throws IOException {
     return SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
         jobName(), fso, snapDiffReportCfh, null, maxInMemoryEntries);
   }
