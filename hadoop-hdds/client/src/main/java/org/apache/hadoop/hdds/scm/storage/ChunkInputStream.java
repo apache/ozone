@@ -67,6 +67,7 @@ public class ChunkInputStream extends InputStream
   private XceiverClientSpi xceiverClient;
   private final Supplier<Pipeline> pipelineSupplier;
   private final boolean verifyChecksum;
+  private final ChunkReader reader;
   private boolean allocated = false;
   // Buffers to store the chunk data read from the DN container
   private ByteBuffer[] buffers;
@@ -114,6 +115,7 @@ public class ChunkInputStream extends InputStream
     this.xceiverClientFactory = xceiverClientFactory;
     this.pipelineSupplier = pipelineSupplier;
     this.verifyChecksum = verifyChecksum;
+    this.reader = new ChunkReader(chunkInfo, verifyChecksum, this::readChunkPositioned);
     this.tokenSupplier = tokenSupplier;
     validators = ContainerProtocolCalls.toValidatorList(this::validateChunk);
   }
@@ -293,18 +295,10 @@ public class ChunkInputStream extends InputStream
     }
   }
 
-  /**
-   * Updates DatanodeBlockId which based on blockId.
-   */
-  private void updateDatanodeBlockId(Pipeline pipeline) throws IOException {
+  private DatanodeBlockID buildDatanodeBlockId(Pipeline pipeline) throws IOException {
     DatanodeDetails closestNode = pipeline.getClosestNode();
     int replicaIdx = pipeline.getReplicaIndex(closestNode);
-    datanodeBlockID = blockID.getDatanodeBlockIDProtobufBuilder(replicaIdx).build();
-  }
-
-  private DatanodeBlockID buildDatanodeBlockId(Pipeline pipeline) throws IOException {
-    updateDatanodeBlockId(pipeline);
-    return datanodeBlockID;
+    return blockID.getDatanodeBlockIDProtobufBuilder(replicaIdx).build();
   }
 
   /**
@@ -316,7 +310,7 @@ public class ChunkInputStream extends InputStream
     if (xceiverClientFactory != null && xceiverClient == null) {
       Pipeline pipeline = pipelineSupplier.get();
       xceiverClient = xceiverClientFactory.acquireClientForReadData(pipeline);
-      updateDatanodeBlockId(pipeline);
+      datanodeBlockID = buildDatanodeBlockId(pipeline);
     }
   }
 
@@ -399,21 +393,7 @@ public class ChunkInputStream extends InputStream
   }
 
   ChunkInfo getChunkInfo(long chunkRelativePosition, int toRead) {
-    final long adjustedOffset;
-    final long adjustedLen;
-    if (verifyChecksum) {
-      ChecksumBoundaries boundaries = computeChecksumBoundaries(chunkRelativePosition, toRead);
-      adjustedOffset = boundaries.offset;
-      adjustedLen = boundaries.length;
-    } else {
-      adjustedOffset = chunkRelativePosition;
-      adjustedLen = toRead;
-    }
-
-    return ChunkInfo.newBuilder(chunkInfo)
-        .setOffset(chunkInfo.getOffset() + adjustedOffset)
-        .setLen(adjustedLen)
-        .build();
+    return reader.getChunkInfo(chunkRelativePosition, toRead);
   }
 
   protected void readChunkDataIntoBuffers(ChunkInfo readChunkInfo)
@@ -433,77 +413,24 @@ public class ChunkInputStream extends InputStream
     allocated = true;
   }
 
-  /**
-   * Stateless positioned read of up to {@code dst.remaining()} bytes starting
-   * at {@code chunkRelativePosition} within this chunk. Unlike the buffered
-   * {@link #read} path, this does not read or mutate any of the instance's
-   * buffer/position state ({@code buffers}, {@code chunkPosition},
-   * {@code bufferOffsetWrtChunkData}, ...), so it is safe to call concurrently
-   * from multiple threads sharing the same stream.
-   *
-   * @param chunkRelativePosition start offset within this chunk
-   * @param dst destination buffer
-   * @return number of bytes copied into {@code dst}, or {@link #EOF} at EOF
-   */
   int readPositioned(long chunkRelativePosition, ByteBuffer dst) throws IOException {
-    if (!dst.hasRemaining()) {
-      return 0;
-    }
-    if (chunkRelativePosition < 0 || chunkRelativePosition >= length) {
-      return EOF;
-    }
-    final int toRead = (int) Math.min(dst.remaining(), length - chunkRelativePosition);
+    return reader.read(chunkRelativePosition, dst);
+  }
 
-    final ChunkInfo readChunkInfo = getChunkInfo(chunkRelativePosition, toRead);
-    final long adjustedOffset = readChunkInfo.getOffset() - chunkInfo.getOffset();
-
-    final long skip = chunkRelativePosition - adjustedOffset;
+  /** Read a range with a client reference owned by this request. */
+  private ByteBuffer[] readChunkPositioned(ChunkInfo range) throws IOException {
     if (xceiverClientFactory == null) {
       // for LocalChunkInputStream, which does not use a xceiver client, just read the chunk directly
-      return copyRange(readChunk(readChunkInfo), skip, toRead, dst);
+      return readChunk(range);
     }
-
     final Pipeline pipeline = pipelineSupplier.get();
-    final ContainerProtos.DatanodeBlockID bid = buildDatanodeBlockId(pipeline);
+    final DatanodeBlockID bid = buildDatanodeBlockId(pipeline);
     final XceiverClientSpi client = xceiverClientFactory.acquireClientForReadData(pipeline);
     try {
-      final ByteBuffer[] readBuffers = readChunk(readChunkInfo, client, bid, validators, tokenSupplier.get());
-      return copyRange(readBuffers, skip, toRead, dst);
+      return readChunk(range, client, bid, validators, tokenSupplier.get());
     } finally {
       xceiverClientFactory.releaseClientForReadData(client, false);
     }
-  }
-
-  /**
-   * Copy {@code toCopy} bytes from {@code src} buffers, skipping the first
-   * {@code skip} bytes, into {@code dst}. Operates on duplicates so the source
-   * buffers' positions are left untouched.
-   */
-  private static int copyRange(ByteBuffer[] src, long skip, int toCopy, ByteBuffer dst) {
-    long remainingSkip = skip;
-    int copied = 0;
-    for (ByteBuffer buffer : src) {
-      if (copied >= toCopy) {
-        break;
-      }
-      if (remainingSkip > 0) {
-        if (remainingSkip >= buffer.remaining()) {
-          remainingSkip -= buffer.remaining();
-          continue;
-        } else {
-          buffer.position(Math.toIntExact(buffer.position() + remainingSkip));
-          remainingSkip = 0;
-        }
-      }
-      int n = Math.min(buffer.remaining(), toCopy - copied);
-      if (n <= 0) {
-        continue;
-      }
-      buffer.limit(buffer.position() + n);
-      dst.put(buffer);
-      copied += n;
-    }
-    return copied;
   }
 
   /**
@@ -518,10 +445,7 @@ public class ChunkInputStream extends InputStream
 
   /**
    * Send RPC call to get the chunk from the container using an explicitly provided client.
-   * Used by the positioned-read path so callers hold a local reference to the client
-   * rather than re-reading the shared {@link #xceiverClient} field after the lock is released.
-   * Subclasses that do not use an xceiver client (e.g. local short-circuit reads) should
-   * override this method to ignore {@code client} and read through their own mechanism.
+   * Shared by sequential reads and request-owned positioned reads.
    */
   private static ByteBuffer[] readChunk(
       ChunkInfo chunk, XceiverClientSpi client, DatanodeBlockID blockID,
@@ -588,50 +512,6 @@ public class ChunkInputStream extends InputStream
       int bytesPerChecksum = checksumData.getBytesPerChecksum();
       int startIndex = (int) (relativeOffset / bytesPerChecksum);
       Checksum.verifyChecksum(byteStrings, checksumData, startIndex);
-    }
-  }
-
-  /**
-   * Return the offset and length of bytes that need to be read from the
-   * chunk file to cover the checksum boundaries covering the actual start and
-   * end of the chunk index to be read.
-   * For example, lets say the client is reading from index 120 to 450 in the
-   * chunk. And let's say checksum is stored for every 100 bytes in the chunk
-   * i.e. the first checksum is for bytes from index 0 to 99, the next for
-   * bytes from index 100 to 199 and so on. To verify bytes from 120 to 450,
-   * we would need to read from bytes 100 to 499 so that checksum
-   * verification can be done.
-   *
-   * @param startByteIndex the first byte index to be read by client
-   * @param dataLen number of bytes to be read from the chunk
-   * @return Adjusted (Chunk Offset, Chunk Length) which needs to be read
-   * from Container
-   */
-  private ChecksumBoundaries computeChecksumBoundaries(long startByteIndex, int dataLen) {
-
-    int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
-    // index of the last byte to be read from chunk, inclusively.
-    final long endByteIndex = startByteIndex + dataLen - 1;
-
-    long adjustedChunkOffset =  (startByteIndex / bytesPerChecksum)
-        * bytesPerChecksum; // inclusive
-    final long endIndex = ((endByteIndex / bytesPerChecksum) + 1)
-        * bytesPerChecksum; // exclusive
-    long adjustedChunkLen = Math.min(endIndex, length) - adjustedChunkOffset;
-    return new ChecksumBoundaries(adjustedChunkOffset, adjustedChunkLen);
-  }
-
-  /**
-   * Represents a byte range (offset and length) expanded to align with
-   * checksum chunk boundaries required for verification.
-   */
-  private static final class ChecksumBoundaries {
-    private final long offset;
-    private final long length;
-
-    private ChecksumBoundaries(long offset, long length) {
-      this.offset = offset;
-      this.length = length;
     }
   }
 
