@@ -27,11 +27,6 @@ on:
         description: "Test script to run from hadoop-ozone/dev-support/checks, without .sh extension"
         required: true
 
-      sha:
-        type: string
-        description: "Commit SHA to test"
-        required: true
-
       # OPTIONAL (ordered alphabetically)
       checkout-fetch-depth:
         type: number
@@ -108,6 +103,12 @@ on:
       script-args:
         type: string
         description: "Arguments for the test script, ratis-args are appended"
+        default: ''
+        required: false
+
+      sha:
+        type: string
+        description: "Commit SHA to test"
         default: ''
         required: false
 

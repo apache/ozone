@@ -75,6 +75,13 @@
       <useDefaultExcludes>true</useDefaultExcludes>
     </fileSet>
     <fileSet>
+      <directory>.mvn</directory>
+      <excludes>
+        <exclude>.develocity/**</exclude>
+      </excludes>
+      <useDefaultExcludes>true</useDefaultExcludes>
+    </fileSet>
+    <fileSet>
       <directory>.run</directory>
       <includes>
         <include>**/*</include>
