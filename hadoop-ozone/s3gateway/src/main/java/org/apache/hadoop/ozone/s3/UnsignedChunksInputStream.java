@@ -21,7 +21,12 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.eol;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.regex.Pattern;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 
 /**
  * Input stream implementation to read body of an unsigned chunked upload.
@@ -29,7 +34,6 @@ import java.util.Objects;
  * Currently, the only valid value of x-amz-content-sha256 header to indicate
  * transfer unsigned payload in multiple chunks is STREAMING-UNSIGNED-PAYLOAD-TRAILER.
  * Therefore, the input stream should work with chunked payloads with checksum trailer.
- * Nevertheless, this input stream also supports chunked upload without trailer.
  * </p>
  * <p>
  * Example chunk data:
@@ -38,6 +42,7 @@ import java.util.Objects;
  * &lt;65536-bytes&gt;\r\n
  * 0\r\n
  * x-amz-checksum-crc64nvme:2wstOANdZ/o=\r\n
+ * \r\n
  * </pre>
  * </p>
  * <p>
@@ -52,8 +57,8 @@ import java.util.Objects;
  * </p>
  *
  * <p>
- * Note that there is not actual trailer checksum verification taking place. The InputStream only
- * returns the actual chunk payload from chunked signatures format.
+ * This stream validates chunk and trailer framing, including the checksum encoding and length,
+ * and compares the trailer checksum with the decoded payload before reporting completion.
  * </p>
  *
  * Reference:
@@ -70,48 +75,40 @@ import java.util.Objects;
  */
 public class UnsignedChunksInputStream extends InputStream {
 
+  private static final Pattern CHUNK_SIZE_PATTERN = Pattern.compile("[0-9A-Fa-f]{1,16}");
+  private static final int MAX_LINE_LENGTH = 8 * 1024;
+
   private final InputStream originalStream;
+  private final String keyPath;
+  private final TrailerHeader trailerHeader;
+  private final TrailerChecksum payloadChecksum;
+  private long remainingData;
+  private boolean isFinalChunkEncountered;
+  private byte[] trailerChecksum;
 
-  /**
-   * Size of the chunk payload. If zero, the content length should be parsed to
-   * retrieve the subsequent chunk payload size.
-   */
-  private int remainingData = 0;
-
-  /**
-   * Every chunked uploads (multiple chunks) contains an additional final zero-byte
-   * chunk. This can be used as the end-of-file marker.
-   */
-  private boolean isFinalChunkEncountered = false;
-
-  public UnsignedChunksInputStream(InputStream inputStream) {
+  public UnsignedChunksInputStream(InputStream inputStream, String keyPath, TrailerHeader trailerHeader) {
     originalStream = inputStream;
+    this.keyPath = keyPath;
+    this.trailerHeader = Objects.requireNonNull(trailerHeader, "trailerHeader == null");
+    if (trailerHeader == TrailerHeader.NONE) {
+      throw new IllegalArgumentException("Unsigned chunked uploads require a checksum trailer");
+    }
+    this.payloadChecksum = trailerHeader.newChecksum();
   }
 
   @Override
   public int read() throws IOException {
-    if (isFinalChunkEncountered) {
+    if (isFinalChunkEncountered || !ensureChunkPayload()) {
       return -1;
     }
-    if (remainingData > 0) {
-      int curr = originalStream.read();
-      remainingData--;
-      if (remainingData == 0) {
-        //read the "\r\n" at the end of the data section
-        originalStream.read();
-        originalStream.read();
-      }
-      return curr;
-    } else {
-      remainingData = readContentLengthFromHeader();
-      if (remainingData <= 0) {
-        // since currently trailer checksum verification is not supported, we can
-        // stop reading after encountering the final zero-byte chunk.
-        isFinalChunkEncountered = true;
-        return -1;
-      }
-      return read();
+    int value = originalStream.read();
+    if (value == -1) {
+      throw invalidBody("Truncated chunk payload");
     }
+    payloadChecksum.update((byte) value);
+    remainingData--;
+    endChunkIfComplete();
+    return value;
   }
 
   @Override
@@ -122,70 +119,106 @@ public class UnsignedChunksInputStream extends InputStream {
           + len + " don't match the array length of " + b.length);
     } else if (len == 0) {
       return 0;
-    } else if (isFinalChunkEncountered) {
-      return -1;
     }
-    int currentOff = off;
-    int currentLen = len;
     int totalReadBytes = 0;
-    int realReadLen = 0;
-    int maxReadLen = 0;
-    do {
-      if (remainingData > 0) {
-        // The chunk payload size has been decoded, now read the actual chunk payload
-        maxReadLen = Math.min(remainingData, currentLen);
-        realReadLen = originalStream.read(b, currentOff, maxReadLen);
-        if (realReadLen == -1) {
-          break;
-        }
-        currentOff += realReadLen;
-        currentLen -= realReadLen;
-        totalReadBytes += realReadLen;
-        remainingData -= realReadLen;
-        if (remainingData == 0) {
-          //read the "\r\n" at the end of the data section
-          originalStream.read();
-          originalStream.read();
-        }
-      } else {
-        remainingData = readContentLengthFromHeader();
-        if (remainingData == 0) {
-          // there is always a final zero byte chunk so we can stop reading
-          // if we encounter this chunk
-          isFinalChunkEncountered = true;
-        }
-        if (isFinalChunkEncountered || remainingData == -1) {
-          break;
-        }
+    while (totalReadBytes < len && !isFinalChunkEncountered && ensureChunkPayload()) {
+      int readLength = originalStream.read(b, off + totalReadBytes,
+          (int) Math.min(remainingData, len - totalReadBytes));
+      if (readLength == -1) {
+        throw invalidBody("Truncated chunk payload");
       }
-    } while (currentLen > 0);
+      payloadChecksum.update(b, off + totalReadBytes, readLength);
+      totalReadBytes += readLength;
+      remainingData -= readLength;
+      endChunkIfComplete();
+    }
     return totalReadBytes > 0 ? totalReadBytes : -1;
   }
 
-  private int readContentLengthFromHeader() throws IOException {
-    int prev = -1;
-    int curr = 0;
-    StringBuilder buf = new StringBuilder();
+  private boolean ensureChunkPayload() throws IOException {
+    if (remainingData > 0) {
+      return true;
+    }
+    String size = readLine();
+    if (!CHUNK_SIZE_PATTERN.matcher(size).matches()) {
+      throw invalidBody("Invalid unsigned chunk size");
+    }
+    try {
+      remainingData = Long.parseLong(size, 16);
+    } catch (NumberFormatException ex) {
+      throw invalidBody("Invalid unsigned chunk size");
+    }
+    if (remainingData > 0) {
+      return true;
+    }
+    readTrailer();
+    isFinalChunkEncountered = true;
+    return false;
+  }
 
-    //read everything until the next \r\n
-    while (!eol(prev, curr) && curr != -1) {
-      int next = originalStream.read();
-      if (next != -1) {
-        buf.append((char) next);
+  private void endChunkIfComplete() throws IOException {
+    if (remainingData == 0 && (originalStream.read() != '\r' || originalStream.read() != '\n')) {
+      throw invalidBody("Invalid chunk data terminator");
+    }
+  }
+
+  /** Finish the zero-byte chunk and trailer after the caller consumes the decoded content length. */
+  public void verifyComplete() throws IOException {
+    if (!isFinalChunkEncountered && read() != -1) {
+      throw invalidBody("Decoded content length ended before the chunked stream");
+    }
+  }
+
+  /** @return the decoded checksum after successful trailer completion, or null before completion. */
+  public byte[] getTrailerChecksum() {
+    return trailerChecksum == null ? null : trailerChecksum.clone();
+  }
+
+  /** Check framing and decode the value, then compare the checksum only after the final terminator. */
+  private void readTrailer() throws IOException {
+    String trailer = readLine();
+    int separator = trailer.indexOf(':');
+    if (separator <= 0) {
+      throw invalidBody("Missing or invalid trailing checksum header");
+    }
+    String name = trailer.substring(0, separator).trim().toLowerCase(Locale.ROOT);
+    if (!trailerHeader.getHeaderName().equals(name)) {
+      throw invalidBody("Unexpected trailing header: " + name);
+    }
+    byte[] checksum = trailerHeader.decodeValue(trailer.substring(separator + 1).trim(), keyPath);
+    if (!readLine().isEmpty()) {
+      throw invalidBody("Invalid trailer terminator");
+    }
+    if (originalStream.read() != -1) {
+      throw invalidBody("Unexpected data after trailing checksum");
+    }
+    payloadChecksum.verify(checksum, keyPath);
+    trailerChecksum = checksum;
+  }
+
+  private String readLine() throws IOException {
+    StringBuilder line = new StringBuilder();
+    int previous = -1;
+    while (true) {
+      int current = originalStream.read();
+      if (current == -1) {
+        throw invalidBody("Chunked stream ended before completion");
       }
-      prev = curr;
-      curr = next;
+      line.append((char) current);
+      if (line.length() > MAX_LINE_LENGTH) {
+        throw invalidBody("Chunk or trailing header line is too long");
+      }
+      if (eol(previous, current)) {
+        line.setLength(line.length() - 2);
+        return line.toString();
+      }
+      previous = current;
     }
-    // Example of a single chunk data:
-    //  10000\r\n
-    //  <65536-bytes>\r\n
-    //
-    // 10000 will be read and decoded from base-16 representation to 65536, which is the size of
-    // the subsequent chunk payload.
-    String readString = buf.toString().trim();
-    if (readString.isEmpty()) {
-      return -1;
-    }
-    return Integer.parseInt(readString, 16);
+  }
+
+  private OS3Exception invalidBody(String message) {
+    OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, keyPath);
+    ex.setErrorMessage(message);
+    return ex;
   }
 }

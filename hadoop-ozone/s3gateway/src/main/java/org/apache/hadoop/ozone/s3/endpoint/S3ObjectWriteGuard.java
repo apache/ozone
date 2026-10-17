@@ -26,7 +26,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
+import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.ratis.util.function.CheckedRunnable;
 
 /**
@@ -120,7 +122,7 @@ class S3ObjectWriteGuard implements AutoCloseable {
       writtenLength += readLength;
     }
     try {
-      verifySignedChunksComplete(body);
+      verifyChunksComplete(body);
     } catch (IOException | RuntimeException ex) {
       recordTransferFailure(ex);
       throw ex;
@@ -128,10 +130,13 @@ class S3ObjectWriteGuard implements AutoCloseable {
     return writtenLength;
   }
 
-  private static void verifySignedChunksComplete(InputStream body) throws IOException {
-    SignedChunksInputStream signed = SignedChunksInputStream.unwrap(body);
-    if (signed != null) {
-      signed.verifyComplete();
+  static void verifyChunksComplete(InputStream body) throws IOException {
+    InputStream chunks = body instanceof MultiDigestInputStream
+        ? ((MultiDigestInputStream) body).getWrappedStream() : body;
+    if (chunks instanceof SignedChunksInputStream) {
+      ((SignedChunksInputStream) chunks).verifyComplete();
+    } else if (chunks instanceof UnsignedChunksInputStream) {
+      ((UnsignedChunksInputStream) chunks).verifyComplete();
     }
   }
 

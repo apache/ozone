@@ -27,6 +27,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.stream.Stream;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream.TrailerHeader;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -35,8 +37,10 @@ import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 import org.apache.hadoop.ozone.s3.signature.SignatureTestUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EmptySource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -87,11 +91,14 @@ public class TestSignedChunksInputStream {
       "false, false, true", "false, true, true", "true, false, true", "true, true, true"})
   void consumesFramingWithoutValidator(boolean buffered, boolean empty, boolean trailer) throws IOException {
     String payload = empty ? "" : "data";
+    String checksum = empty ? "AAAAAA==" : "rth90Q==";
     String body = (empty ? "" : "4;chunk-signature=" + FAKE_SIGNATURE + "\r\ndata\r\n")
         + "0;chunk-signature=" + FAKE_SIGNATURE + "\r\n"
-        + (trailer ? "x-amz-checksum-crc32c:sOO8/Q==\r\nx-amz-trailer-signature:" + FAKE_SIGNATURE + "\r\n" : "")
+        + (trailer ? "x-amz-checksum-crc32c:" + checksum + "\r\nx-amz-trailer-signature:"
+            + FAKE_SIGNATURE + "\r\n" : "")
         + "\r\n";
-    ByteArrayInputStream original = new ByteArrayInputStream((body + "after-trailer").getBytes(UTF_8));
+    String extra = trailer ? "" : "after-trailer";
+    ByteArrayInputStream original = new ByteArrayInputStream((body + extra).getBytes(UTF_8));
     try (SignedChunksInputStream stream = new SignedChunksInputStream(
         original, KEY_PATH, trailer ? TrailerHeader.CRC32C : TrailerHeader.NONE)) {
       if (buffered) {
@@ -102,7 +109,7 @@ public class TestSignedChunksInputStream {
         }
       }
       assertThat(stream.read()).isEqualTo(-1);
-      assertThat(IOUtils.toString(original, UTF_8)).isEqualTo("after-trailer");
+      assertThat(IOUtils.toString(original, UTF_8)).isEqualTo(extra);
     }
   }
 
@@ -117,14 +124,13 @@ public class TestSignedChunksInputStream {
       "malformed-header\r\nx-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n\r\n",
       "x-amz-checksum-sha256:checksum\r\nx-amz-trailer-signature:" + TRAILER_SIGNATURE + "\r\n\r\n"
   })
-  void toleratesMalformedTrailersWithoutValidator(String trailers) throws IOException {
+  void rejectsMalformedTrailersWithoutValidator(String trailers) throws IOException {
     String body = "4;chunk-signature=" + FAKE_SIGNATURE + "\r\ndata\r\n"
         + "0;chunk-signature=" + FAKE_SIGNATURE + "\r\n" + trailers;
     ByteArrayInputStream original = new ByteArrayInputStream(body.getBytes(UTF_8));
     try (SignedChunksInputStream stream = new SignedChunksInputStream(original, KEY_PATH, TrailerHeader.CRC32C)) {
-      assertThat(IOUtils.toString(stream, UTF_8)).isEqualTo("data");
-      assertThat(stream.read()).isEqualTo(-1);
-      assertThat(original.available()).isZero();
+      OS3Exception error = assertThrows(OS3Exception.class, () -> IOUtils.toByteArray(stream));
+      assertThat(error.getCode()).isEqualTo(S3ErrorTable.INVALID_REQUEST.getCode());
     }
   }
 
@@ -328,6 +334,70 @@ public class TestSignedChunksInputStream {
       int readLength = IOUtils.read(is, bytes, 0, 20);
       assertEquals(15, readLength);
       assertEquals("1234567890abcde", new String(bytes, UTF_8).substring(0, 15));
+    }
+  }
+
+  static Stream<Arguments> checksumCases() {
+    return Stream.of(
+        Arguments.of(TrailerHeader.CRC32, "y/Q5Jg=="),
+        Arguments.of(TrailerHeader.CRC32C, "4waSgw=="),
+        Arguments.of(TrailerHeader.CRC64NVME, "rosUhgp5mIg="),
+        Arguments.of(TrailerHeader.SHA1, "98O8HYCOBHMq32eZZczDTKeuNEE="),
+        Arguments.of(TrailerHeader.SHA256, "FeKw08M4keuw8e9gnsQZQgwg4yDOlMZfvIwzEkSOsiU="))
+        .flatMap(args -> Stream.of(false, true).flatMap(buffered -> Stream.of(false, true)
+            .map(verify -> Arguments.of(args.get()[0], args.get()[1], buffered, verify))));
+  }
+
+  @ParameterizedTest
+  @MethodSource("checksumCases")
+  void verifiesPayloadChecksum(TrailerHeader header, String value, boolean buffered, boolean verify)
+      throws IOException {
+    String payload = "123456789";
+    for (boolean correct : new boolean[]{true, false}) {
+      byte[] checksum = Base64.getDecoder().decode(value);
+      if (!correct) {
+        checksum[0] ^= 1;
+      }
+      String body = SignatureTestUtils.signedChunkedBodyWithTrailer(payload, header.getHeaderName(),
+          Base64.getEncoder().encodeToString(checksum));
+      try (SignedChunksInputStream stream = new SignedChunksInputStream(
+          new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, header)) {
+        if (verify) {
+          stream.attachValidator(new ChunksValidator(SignatureTestUtils.signingKey(),
+              SignatureTestUtils.signatureInfo().getDateTime(), SignatureTestUtils.signatureInfo().getCredentialScope(),
+              SignatureTestUtils.signatureInfo().getSignature(), KEY_PATH));
+        }
+        if (buffered) {
+          assertThat(IOUtils.readFully(stream, payload.length())).isEqualTo(payload.getBytes(UTF_8));
+        } else {
+          for (char expected : payload.toCharArray()) {
+            assertThat(stream.read()).isEqualTo(expected);
+          }
+        }
+        if (correct) {
+          stream.verifyComplete();
+          assertThat(stream.read()).isEqualTo(-1);
+          stream.verifyComplete();
+        } else {
+          OS3Exception error = assertThrows(OS3Exception.class, stream::verifyComplete);
+          assertThat(error.getCode()).isEqualTo(S3ErrorTable.BAD_DIGEST.getCode());
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @EmptySource
+  @ValueSource(strings = {"not-base64", "AAAA", "AAAAAAAAAAA="})
+  void rejectsMalformedChecksumWithValidSignature(String value) throws IOException {
+    String body = SignatureTestUtils.signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32c", value);
+    try (SignedChunksInputStream stream = new SignedChunksInputStream(
+        new ByteArrayInputStream(body.getBytes(UTF_8)), KEY_PATH, TrailerHeader.CRC32C)) {
+      stream.attachValidator(new ChunksValidator(SignatureTestUtils.signingKey(),
+          SignatureTestUtils.signatureInfo().getDateTime(), SignatureTestUtils.signatureInfo().getCredentialScope(),
+          SignatureTestUtils.signatureInfo().getSignature(), KEY_PATH));
+      OS3Exception error = assertThrows(OS3Exception.class, stream::verifyComplete);
+      assertThat(error.getCode()).isEqualTo(S3ErrorTable.INVALID_REQUEST.getCode());
     }
   }
 
