@@ -57,6 +57,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.USER
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -98,6 +99,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.SCMGetCertResponseProto;
@@ -395,11 +397,63 @@ final class TestSecureOzoneCluster {
             () -> securityClient.getCertificate("1"));
         assertThat(ioException).hasMessageContaining(cannotAuthMessage);
       }
+      assertScmIssuesCertificateOnlyToServiceUserOfRole();
     } finally {
       if (scm != null) {
         scm.stop();
       }
     }
+  }
+
+  /** SCM security protocol - a certificate is only issued to the service user of the requested role. */
+  private void assertScmIssuesCertificateOnlyToServiceUserOfRole() throws Exception {
+    String csr = newCsr(false);
+    HddsProtos.ScmNodeDetailsProto scmInfo = HddsProtos.ScmNodeDetailsProto.newBuilder()
+        .setClusterId(clusterId).setHostName("localhost").setScmNodeId(scmId).build();
+
+    UserGroupInformation testUser = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+        testUserPrincipal, testUserKeytab.getCanonicalPath());
+    try (SCMSecurityProtocolClientSideTranslatorPB securityClient = getScmSecurityClient(conf, testUser)) {
+      assertThatThrownBy(() -> securityClient.getOMCertificate(omInfo, csr))
+          .hasMessageContaining("is not allowed to request a OM certificate");
+      assertThatThrownBy(() -> securityClient.getDataNodeCertificate(
+          MockDatanodeDetails.randomDatanodeDetails().getProtoBufMessage(), csr))
+          .hasMessageContaining("is not allowed to request a DATANODE certificate");
+      // SCM role certificates are refused to non admins before the service user check.
+      assertThatThrownBy(() -> securityClient.getSCMCertificate(scmInfo, csr)).hasMessageContaining("Access denied");
+      assertThatThrownBy(() -> securityClient.getCertificate(HddsProtos.NodeDetailsProto.newBuilder()
+          .setUuid(omId).setClusterId(clusterId).setHostName("localhost").setNodeType(HddsProtos.NodeType.RECON)
+          .build(), csr))
+          .hasMessageContaining("is not allowed to request a RECON certificate");
+    }
+
+    UserGroupInformation omUser = UserGroupInformation.loginUserFromKeytabAndReturnUGI(
+        conf.get(OZONE_OM_KERBEROS_PRINCIPAL_KEY), conf.get(OZONE_OM_KERBEROS_KEYTAB_FILE_KEY));
+    try (SCMSecurityProtocolClientSideTranslatorPB securityClient = getScmSecurityClient(conf, omUser)) {
+      // OM gets a certificate for itself, but not one that can sign other certificates.
+      String caCsr = newCsr(true);
+      assertThatThrownBy(() -> securityClient.getOMCertificate(omInfo, caCsr))
+          .hasMessageContaining("Failed to verify the CSR");
+      assertThat(securityClient.getOMCertificate(omInfo, csr)).isNotEmpty();
+      // The service user of one role does not get a certificate of another role.
+      assertThatThrownBy(() -> securityClient.getDataNodeCertificate(
+          MockDatanodeDetails.randomDatanodeDetails().getProtoBufMessage(), csr))
+          .hasMessageContaining("is not allowed to request a DATANODE certificate");
+    }
+  }
+
+  private String newCsr(boolean ca) throws Exception {
+    CertificateSignRequest.Builder csrBuilder = new CertificateSignRequest.Builder()
+        .setKey(keyPair)
+        .setConfiguration(new SecurityConfig(conf))
+        .setScmID(scmId)
+        .setClusterID(clusterId)
+        .setSubject("test")
+        .setCA(ca)
+        .setDigitalSignature(true)
+        .setDigitalEncryption(true);
+    addIpAndDnsDataToBuilder(csrBuilder);
+    return csrBuilder.build().toEncodedFormat();
   }
 
   @Test

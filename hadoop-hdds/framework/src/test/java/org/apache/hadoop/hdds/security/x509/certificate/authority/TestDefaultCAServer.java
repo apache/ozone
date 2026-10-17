@@ -266,7 +266,8 @@ public class TestDefaultCAServer {
     ExecutionException execution = assertThrows(ExecutionException.class,
         () -> testCA.requestCertificate(caCsr, CertificateApprover.ApprovalType.TESTING_AUTOMATIC, OM,
             String.valueOf(System.nanoTime())).get());
-    assertThat(execution.getCause().getMessage()).contains("allowed for the SCM role only, not for OM");
+    // The leaf profile used for other roles rejects the CA constraint before the role check.
+    assertThat(execution.getCause().getMessage()).contains("Failed to verify the CSR");
     assertThat(caStore.getStoredCertificates()).isEmpty();
 
     X509Certificate scmCert = CertificateCodec.firstCertificateFrom(testCA.requestCertificate(caCsr,
