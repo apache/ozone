@@ -80,6 +80,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.ws.rs.HttpMethod;
@@ -211,12 +212,13 @@ class TestObjectPut {
   }
 
   @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testContentSha256(boolean streaming) throws Exception {
+  @CsvSource({"false, 0", "false, 32", "false, 64", "true, 0", "true, 32", "true, 64"})
+  void testContentSha256(boolean streaming, int uppercaseLength) throws Exception {
     doReturn(streaming).when(objectEndpoint).isDatastreamEnabled();
     doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
     String hash = DatatypeConverter.printHexBinary(
         MessageDigest.getInstance("SHA-256").digest(CONTENT.getBytes(StandardCharsets.UTF_8))).toLowerCase();
+    hash = hash.substring(0, uppercaseLength).toUpperCase(Locale.ROOT) + hash.substring(uppercaseLength);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(hash);
     assertSucceeds(() -> putObject(CONTENT));
     assertKeyContent(bucket, KEY_NAME, CONTENT);
