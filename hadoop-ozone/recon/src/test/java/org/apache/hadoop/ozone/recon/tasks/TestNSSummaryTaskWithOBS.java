@@ -20,25 +20,43 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Unit test for NSSummaryTaskWithOBS.
@@ -61,6 +79,161 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
     nSSummaryTaskWithOBS = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
         getReconOMMetadataManager(), threshold, 5, 20, 2000);
+  }
+
+  /**
+   * Bucket caching and multi-worker map replacement during reprocess. Nested so
+   * the cases are also discovered when the class is selected by name.
+   */
+  @Nested
+  class TestBucketCachingAndReplacement {
+
+    @Test
+    void testReprocessReusesBucketInfoForConsecutiveKeys() throws IOException {
+      ReconOMMetadataManager omMetadataManager = spy(getReconOMMetadataManager());
+      Table<String, OmBucketInfo> bucketTable = spy(getReconOMMetadataManager().getBucketTable());
+      doReturn(bucketTable).when(omMetadataManager).getBucketTable();
+      // Force the sorted, single-thread fallback, independently of existing SST files.
+      doReturn(null).when(omMetadataManager).getStore();
+      NSSummaryTaskWithOBS task = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(), omMetadataManager,
+          OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT, 1, 1, 2000);
+
+      getReconNamespaceSummaryManager().clearNSSummaryTable();
+
+      assertThat(task.reprocessWithOBS(omMetadataManager)).isTrue();
+
+      // Each bucket is contiguous in this sorted pass, so its keys share one lookup.
+      ArgumentCaptor<String> bucketKeyCaptor = ArgumentCaptor.forClass(String.class);
+      verify(bucketTable, atLeastOnce()).getSkipCache(bucketKeyCaptor.capture());
+      assertThat(bucketKeyCaptor.getAllValues()).doesNotHaveDuplicates();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReprocessMixedBuckets(boolean parallel) throws IOException {
+      ReconOMMetadataManager omMetadataManager = spy(getReconOMMetadataManager());
+      Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(getBucketLayout());
+      Table<String, OmBucketInfo> bucketTable = spy(omMetadataManager.getBucketTable());
+      doReturn(bucketTable).when(omMetadataManager).getBucketTable();
+      Set<Thread> lookupThreads = ConcurrentHashMap.newKeySet();
+      doAnswer(invocation -> {
+        lookupThreads.add(Thread.currentThread());
+        return invocation.callRealMethod();
+      }).when(bucketTable).getSkipCache(any(String.class));
+      String[] volumes = {"cache-volume-1", "cache-volume-1", "cache-volume-1", "cache-volume-2", "cache-volume-2"};
+      String[] buckets = {"bucket-a", "bucket-b", "bucket-c", "bucket-c", "missing"};
+      List<String> addedKeys = new ArrayList<>();
+      List<String> addedBuckets = new ArrayList<>();
+      int keysPerBucket = 20;
+      try {
+        for (int bucket = 0; bucket < buckets.length; bucket++) {
+          long objectId = 1000L + bucket;
+          if (bucket < buckets.length - 1) {
+            String bucketKey = omMetadataManager.getBucketKey(volumes[bucket], buckets[bucket]);
+            addedBuckets.add(bucketKey);
+            bucketTable.put(bucketKey, OmBucketInfo.newBuilder()
+                .setVolumeName(volumes[bucket]).setBucketName(buckets[bucket]).setObjectID(objectId)
+                .setBucketLayout(bucket == 1 ? BucketLayout.LEGACY : BucketLayout.OBJECT_STORE).build());
+          }
+          for (int key = 0; key < keysPerBucket; key++) {
+            String name = "key-" + key;
+            String dbKey = omMetadataManager.getOzoneKey(volumes[bucket], buckets[bucket], name);
+            addedKeys.add(dbKey);
+            keyTable.put(dbKey, buildOmKeyInfo(volumes[bucket], buckets[bucket], name, name,
+                2000L + bucket * keysPerBucket + key, objectId, key % 2 == 0 ? 500 : 2050));
+          }
+        }
+        if (parallel) {
+          omMetadataManager.getStore().flushDB();
+        } else {
+          doReturn(null).when(omMetadataManager).getStore();
+        }
+        getReconNamespaceSummaryManager().clearNSSummaryTable();
+        NSSummaryTaskWithOBS task = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
+            omMetadataManager, 1, 2, 4, 40);
+        assertThat(task.reprocessWithOBS(omMetadataManager)).isTrue();
+        if (parallel) {
+          assertThat(lookupThreads).hasSize(4).doesNotContain(Thread.currentThread());
+        } else {
+          assertThat(lookupThreads).containsExactly(Thread.currentThread());
+        }
+        int[] expectedHistogram = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
+        expectedHistogram[0] = keysPerBucket / 2;
+        expectedHistogram[2] = keysPerBucket / 2;
+        for (int bucket = 0; bucket < buckets.length; bucket++) {
+          NSSummary summary = getReconNamespaceSummaryManager().getNSSummary(1000L + bucket);
+          if (bucket == 1 || bucket == buckets.length - 1) {
+            assertThat(summary).isNull();
+          } else {
+            assertThat(summary).isNotNull();
+            assertThat(summary.getNumOfFiles()).isEqualTo(keysPerBucket);
+            assertThat(summary.getSizeOfFiles()).isEqualTo((500L + 2050) * keysPerBucket / 2);
+            assertThat(summary.getFileSizeBucket()).containsExactly(expectedHistogram);
+          }
+        }
+      } finally {
+        for (String key : addedKeys) {
+          keyTable.delete(key);
+        }
+        for (String bucket : addedBuckets) {
+          bucketTable.delete(bucket);
+        }
+      }
+    }
+
+    @Test
+    void testReprocessLowThresholdConservesData() throws IOException {
+      getReconNamespaceSummaryManager().clearNSSummaryTable();
+      ReconOMMetadataManager omMetadataManager = getReconOMMetadataManager();
+      Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(getBucketLayout());
+      List<String> addedKeys = new ArrayList<>();
+      int extraKeys = 40;
+      try {
+        for (int i = 0; i < extraKeys; i++) {
+          String keyName = "parallel-key-" + i;
+          String dbKey = omMetadataManager.getOzoneKey(VOL, BUCKET_ONE, keyName);
+          addedKeys.add(dbKey);
+          keyTable.put(dbKey, buildOmKeyInfo(VOL, BUCKET_ONE, keyName, keyName,
+              100L + i, BUCKET_ONE_OBJECT_ID, KEY_ONE_SIZE));
+        }
+        // SST bounds enable parallel iteration; ten-key batches give every worker multiple map replacements.
+        omMetadataManager.getStore().flushDB();
+        NSSummaryTaskWithOBS task = spy(new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
+            omMetadataManager, 1, 1, 4, 40));
+        Map<Thread, Integer> keysPerWorker = new ConcurrentHashMap<>();
+        doAnswer(invocation -> {
+          keysPerWorker.merge(Thread.currentThread(), 1, Integer::sum);
+          return invocation.callRealMethod();
+        }).when(task).handlePutKeyEventReprocess(any(OmKeyInfo.class), anyMap(), anyLong());
+
+        assertThat(task.reprocessWithOBS(omMetadataManager)).isTrue();
+        assertThat(keysPerWorker).hasSize(4).doesNotContainKey(Thread.currentThread());
+        assertThat(keysPerWorker.values()).allSatisfy(count -> assertThat(count).isGreaterThanOrEqualTo(10));
+
+        NSSummary bucketOne = getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID);
+        NSSummary bucketTwo = getReconNamespaceSummaryManager().getNSSummary(BUCKET_TWO_OBJECT_ID);
+        assertThat(bucketOne).isNotNull();
+        assertThat(bucketTwo).isNotNull();
+        assertThat(bucketOne.getNumOfFiles()).isEqualTo(3 + extraKeys);
+        assertThat(bucketTwo.getNumOfFiles()).isEqualTo(2);
+        assertThat(bucketOne.getSizeOfFiles())
+            .isEqualTo(KEY_ONE_SIZE * (1 + extraKeys) + KEY_TWO_OLD_SIZE + KEY_THREE_SIZE);
+        assertThat(bucketTwo.getSizeOfFiles()).isEqualTo(KEY_FOUR_SIZE + KEY_FIVE_SIZE);
+        int[] expectedBucketOne = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
+        expectedBucketOne[0] = 1 + extraKeys;
+        expectedBucketOne[1] = 1;
+        expectedBucketOne[40] = 1;
+        assertThat(bucketOne.getFileSizeBucket()).containsExactly(expectedBucketOne);
+        int[] expectedBucketTwo = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
+        expectedBucketTwo[0] = 1;
+        expectedBucketTwo[2] = 1;
+        assertThat(bucketTwo.getFileSizeBucket()).containsExactly(expectedBucketTwo);
+      } finally {
+        for (String key : addedKeys) {
+          keyTable.delete(key);
+        }
+      }
+    }
   }
 
   /**
