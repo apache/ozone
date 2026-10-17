@@ -49,7 +49,7 @@ Get bucket info with Ozone Shell to check the owner field
 
 List buckets with empty access id
     [setup]             Save AWS access key
-                        Execute     aws configure set aws_access_key_id ''
+                        Execute     ${AWS_CLI} configure set aws_access_key_id ''
     ${result} =         Execute AWSS3APICli and checkrc         list-buckets    255
                         Should contain            ${result}         The authorization header you provided is invalid
     [teardown]          Restore AWS access key

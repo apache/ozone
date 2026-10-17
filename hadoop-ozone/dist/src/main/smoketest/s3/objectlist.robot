@@ -33,7 +33,7 @@ Prepare Many Objects In Bucket
     FOR    ${i}    IN RANGE    ${count}
         Execute    echo "test-${i}" > /tmp/manyfiles/obj-${i}
     END
-    Execute    aws s3 cp /tmp/manyfiles s3://${BUCKET}/ --recursive --endpoint-url=${ENDPOINT_URL}
+    Execute    ${AWS_CLI} s3 cp /tmp/manyfiles s3://${BUCKET}/ --recursive --endpoint-url=${ENDPOINT_URL}
 
 *** Test Cases ***
 
