@@ -67,6 +67,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -483,6 +484,11 @@ public class TestECUnderReplicationHandler {
     }
     assertEquals(0, replicateCommand);
     assertEquals(1, reconstructCommand);
+    assertEquals(1, metrics.getEcReconstructionDecommissionTriggeredTotal());
+    assertEquals(0, metrics.getEcReconstructionGlobalLimitReachedTotal());
+    assertEquals(0, metrics.getEcDecommissionReconstructionFallbackInsufficientSourcesTotal());
+    assertEquals(0, metrics.getEcDecommissionReconstructionFallbackTargetOverloadedTotal());
+    assertEquals(0, metrics.getEcDecommissionReconstructionFallbackNoOpTotal());
   }
 
   @Test
@@ -514,6 +520,8 @@ public class TestECUnderReplicationHandler {
         .anyMatch(c -> c.getValue() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
         .noneMatch(c -> c.getValue() instanceof ReconstructECContainersCommand));
+    assertEquals(0, metrics.getEcReconstructionDecommissionTriggeredTotal());
+    assertEquals(1, metrics.getEcReconstructionGlobalLimitReachedTotal());
   }
 
   @Test
@@ -545,6 +553,7 @@ public class TestECUnderReplicationHandler {
         .anyMatch(c -> c.getValue() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
         .noneMatch(c -> c.getValue() instanceof ReconstructECContainersCommand));
+    assertEquals(1, metrics.getEcDecommissionReconstructionFallbackTargetOverloadedTotal());
   }
 
   @Test
@@ -582,6 +591,7 @@ public class TestECUnderReplicationHandler {
         .anyMatch(c -> c.getValue() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
         .noneMatch(c -> c.getValue() instanceof ReconstructECContainersCommand));
+    assertEquals(1, metrics.getEcDecommissionReconstructionFallbackTargetOverloadedTotal());
   }
 
   @Test
@@ -612,6 +622,105 @@ public class TestECUnderReplicationHandler {
         .anyMatch(c -> c.getValue() instanceof ReplicateContainerCommand));
     assertTrue(commandsSent.stream()
         .noneMatch(c -> c.getValue() instanceof ReconstructECContainersCommand));
+    assertEquals(1, metrics.getEcDecommissionReconstructionFallbackInsufficientSourcesTotal());
+  }
+
+  @Test
+  public void testUnderReplicationWithDecomNodesFallsBackWhenReconstructionNoOp()
+      throws IOException {
+    replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    DatanodeDetails decomNode = availableReplicas.stream()
+        .filter(r -> r.getReplicaIndex() == 1)
+        .findFirst().get().getDatanodeDetails();
+    when(replicationManager.isNodeHighlyLoaded(decomNode)).thenReturn(true);
+
+    AtomicInteger chooseCallCount = new AtomicInteger(0);
+    when(ecPlacementPolicy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong()))
+        .thenAnswer(invocation -> {
+          if (chooseCallCount.getAndIncrement() == 0) {
+            return emptyList();
+          }
+          int nodesRequired = invocation.getArgument(3);
+          List<DatanodeDetails> targets = new ArrayList<>();
+          for (int i = 0; i < nodesRequired; i++) {
+            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+          }
+          return targets;
+        });
+
+    ECUnderReplicationHandler ecURH =
+        new ECUnderReplicationHandler(ecPlacementPolicy, conf, replicationManager);
+    UnderReplicatedHealthResult result =
+        mock(UnderReplicatedHealthResult.class);
+    when(result.isUnrecoverable()).thenReturn(false);
+    when(result.getContainerInfo()).thenReturn(container);
+
+    ecURH.processAndSendCommands(availableReplicas, ImmutableList.of(),
+        result, remainingMaintenanceRedundancy);
+
+    assertEquals(1, metrics.getEcDecommissionReconstructionFallbackNoOpTotal());
+    assertEquals(0, metrics.getEcReconstructionDecommissionTriggeredTotal());
+    assertEquals(0, metrics.getEcReconstructionGlobalLimitReachedTotal());
+    assertEquals(0, metrics.getEcDecommissionReconstructionFallbackInsufficientSourcesTotal());
+    assertEquals(0, metrics.getEcDecommissionReconstructionFallbackTargetOverloadedTotal());
+    assertTrue(commandsSent.stream()
+        .anyMatch(c -> c.getValue() instanceof ReplicateContainerCommand));
+    assertTrue(commandsSent.stream()
+        .noneMatch(c -> c.getValue() instanceof ReconstructECContainersCommand));
+  }
+
+  @Test
+  public void testUnderReplicationWithDecomNodesRethrowsOnPartialReconstruction()
+      throws IOException {
+    replicationManager.getConfig().setEcDecommissionReconstructionEnabled(true);
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1),
+            Pair.of(DECOMMISSIONING, 2), Pair.of(IN_SERVICE, 3),
+            Pair.of(IN_SERVICE, 4), Pair.of(IN_SERVICE, 5));
+
+    DatanodeDetails decomNode = availableReplicas.stream()
+        .filter(r -> r.getReplicaIndex() == 1)
+        .findFirst().get().getDatanodeDetails();
+    when(replicationManager.isNodeHighlyLoaded(decomNode)).thenReturn(true);
+
+    when(ecPlacementPolicy.chooseDatanodes(any(), any(), any(), anyInt(), anyLong(), anyLong()))
+        .thenAnswer(invocation -> {
+          int nodesRequired = invocation.getArgument(3);
+          if (nodesRequired == 2) {
+            return singletonList(MockDatanodeDetails.randomDatanodeDetails());
+          }
+          int count = nodesRequired;
+          List<DatanodeDetails> targets = new ArrayList<>();
+          for (int i = 0; i < count; i++) {
+            targets.add(MockDatanodeDetails.randomDatanodeDetails());
+          }
+          return targets;
+        });
+
+    ECUnderReplicationHandler ecURH =
+        new ECUnderReplicationHandler(ecPlacementPolicy, conf, replicationManager);
+    UnderReplicatedHealthResult result =
+        mock(UnderReplicatedHealthResult.class);
+    when(result.isUnrecoverable()).thenReturn(false);
+    when(result.getContainerInfo()).thenReturn(container);
+
+    assertThrows(InsufficientDatanodesException.class, () ->
+        ecURH.processAndSendCommands(availableReplicas, ImmutableList.of(),
+            result, remainingMaintenanceRedundancy));
+
+    assertEquals(1, commandsSent.stream()
+        .filter(c -> c.getValue() instanceof ReconstructECContainersCommand)
+        .count());
+    assertEquals(0, commandsSent.stream()
+        .filter(c -> c.getValue() instanceof ReplicateContainerCommand)
+        .count());
+    assertEquals(0, metrics.getEcDecommissionReconstructionFallbackNoOpTotal());
+    assertEquals(0, metrics.getEcReconstructionDecommissionTriggeredTotal());
   }
 
   @Test

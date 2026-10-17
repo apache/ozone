@@ -503,12 +503,14 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
                   + "decommission indexes for container {}, using 1-1 "
                   + "replication.",
               container.containerID());
+          metrics.incrEcDecommissionReconstructionFallbackInsufficientSourcesTotal();
           break;
         }
         if (replicationManager.isReconstructionLimitReached()) {
           LOG.debug("Global reconstruction limit reached for container {}, "
               + "using 1-1 replication for decommission recovery.",
               container.containerID());
+          metrics.incrEcReconstructionGlobalLimitReachedTotal();
           break;
         }
         LOG.info("Source node {} is highly loaded, switching to "
@@ -519,12 +521,24 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
               new ArrayList<>(decomIndexes), sources, availableSourceNodes,
               excludedNodes, usedNodes);
           if (commandsSent > 0) {
+            metrics.incrEcReconstructionDecommissionTriggeredTotal();
             return commandsSent;
           }
+          metrics.incrEcDecommissionReconstructionFallbackNoOpTotal();
         } catch (CommandTargetOverloadedException e) {
           LOG.debug("Reconstruction throttled for decommissioning container "
                   + "{}, using 1-1 replication.",
               container.containerID(), e);
+          metrics.incrEcDecommissionReconstructionFallbackTargetOverloadedTotal();
+        } catch (InsufficientDatanodesException e) {
+          if (replicaCount.decommissioningOnlyIndexes(true).size()
+              < decomIndexes.size()) {
+            throw e;
+          }
+          LOG.debug("Reconstruction could not place targets for decommissioning "
+                  + "container {}, using 1-1 replication.",
+              container.containerID(), e);
+          metrics.incrEcDecommissionReconstructionFallbackNoOpTotal();
         }
         break;
       }
