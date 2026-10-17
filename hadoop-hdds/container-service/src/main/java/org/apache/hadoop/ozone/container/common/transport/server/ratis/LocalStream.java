@@ -64,7 +64,10 @@ class LocalStream implements StateMachine.DataStream {
     }
     return CompletableFuture.supplyAsync(() -> {
       try {
-        ((KeyValueStreamDataChannel) dataChannel).drainBuffers();
+        final KeyValueStreamDataChannel channel = (KeyValueStreamDataChannel) dataChannel;
+        channel.drainBuffers();
+        // Without a Raft log to replay, the data must be durable before the PutBlock is acknowledged.
+        channel.force(false);
         return command.apply(buffer);
       } catch (IOException e) {
         throw new CompletionException(e);

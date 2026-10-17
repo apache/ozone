@@ -120,6 +120,11 @@ public final class DispatcherContext {
       return this == READ_STATE_MACHINE_DATA;
     }
 
+    /** @return true if the PutBlock is committed through a data stream, i.e. without a Raft log entry. */
+    public boolean isStreamCommit() {
+      return this == STREAM_LINK || this == STREAM_COMMAND;
+    }
+
     public boolean validateToken() {
       switch (this) {
       case APPLY_TRANSACTION:
