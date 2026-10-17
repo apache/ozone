@@ -50,9 +50,9 @@ auto-removed. Without Docker the test is skipped.
 ## Notes
 
 - Non-secure S3G accepts any access key / secret.
-- Readiness is handled by the container: it waits for the S3 Gateway port and
-  then runs `ozone admin safemode wait` inside the container, so the cluster is
-  ready for S3 operations as soon as `start()` returns.
+- The container waits for the S3 Gateway port, then retries
+  `ozone admin safemode wait` until SCM leaves safe mode. The startup timeout
+  defaults to four minutes and can be changed with `withStartupTimeout(Duration)`.
 - `ozone local run` (needs
   [HDDS-15087](https://issues.apache.org/jira/browse/HDDS-15087)) would give a
   cleaner env-driven image later, but is not required for a working module.

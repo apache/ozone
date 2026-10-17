@@ -17,12 +17,8 @@
 
 package org.apache.ozone.testcontainers;
 
-import java.io.IOException;
 import java.time.Duration;
-import org.testcontainers.containers.Container;
-import org.testcontainers.containers.ContainerLaunchException;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.AbstractWaitStrategy;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
 import org.testcontainers.utility.DockerImageName;
@@ -39,9 +35,9 @@ import org.testcontainers.utility.DockerImageName;
  * provide a consistent set for the caller to sign requests with; the fluent
  * setters change those returned values, not the container itself.
  *
- * <p>Readiness: the container waits for the S3 Gateway port to listen and then
- * for SCM to leave safe mode ({@code ozone admin safemode wait}), so the cluster
- * is ready for S3 operations as soon as {@link #start()} returns.
+ * <p>Readiness: the container waits for the S3 Gateway port, then retries {@code ozone admin safemode wait}
+ * until SCM leaves safe mode. The startup timeout defaults to four minutes and can be changed with
+ * {@link #withStartupTimeout(Duration)}.
  *
  * <p><b>Incubating:</b> this module is new and its API may change in a future
  * release.
@@ -66,7 +62,7 @@ public class OzoneContainer extends GenericContainer<OzoneContainer> {
     withExposedPorts(S3G_PORT);
     waitingFor(new WaitAllStrategy()
         .withStrategy(Wait.forListeningPort())
-        .withStrategy(new SafeModeWaitStrategy())
+        .withStrategy(Wait.forSuccessfulCommand("ozone admin safemode wait -t 5"))
         .withStartupTimeout(Duration.ofMinutes(4)));
   }
 
@@ -102,26 +98,4 @@ public class OzoneContainer extends GenericContainer<OzoneContainer> {
     return region;
   }
 
-  /**
-   * Waits until SCM leaves safe mode by running {@code ozone admin safemode wait}
-   * inside the container, so the cluster is ready for S3 operations.
-   */
-  private static final class SafeModeWaitStrategy extends AbstractWaitStrategy {
-    @Override
-    protected void waitUntilReady() {
-      try {
-        Container.ExecResult result = waitStrategyTarget.execInContainer(
-            "ozone", "admin", "safemode", "wait", "-t", "120");
-        if (result.getExitCode() != 0) {
-          throw new ContainerLaunchException(
-              "Ozone did not leave safe mode: " + result.getStderr());
-        }
-      } catch (IOException e) {
-        throw new ContainerLaunchException("Failed to wait for Ozone readiness", e);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new ContainerLaunchException("Interrupted waiting for Ozone readiness", e);
-      }
-    }
-  }
 }
