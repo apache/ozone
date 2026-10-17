@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.isServiceUser;
+import static org.apache.hadoop.security.UserGroupInformation.createProxyUser;
+import static org.apache.hadoop.security.UserGroupInformation.createRemoteUser;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.net.InetSocketAddress;
@@ -24,6 +28,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -169,4 +174,16 @@ public class TestHddsServerUtil {
     assertEquals(200, addr.getPort());
   }
 
+  @Test
+  void testIsServiceUser() {
+    UserGroupInformation.setConfiguration(new OzoneConfiguration());
+    String principal = "om/_HOST@EXAMPLE.COM";
+    assertThat(isServiceUser(createRemoteUser("om/host1@EXAMPLE.COM"), principal)).isTrue();
+    for (String user : new String[] {"om@EXAMPLE.COM", "om/host1@OTHER.COM", "om/host1", "alice/om@EXAMPLE.COM"}) {
+      assertThat(isServiceUser(createRemoteUser(user), principal)).as(user).isFalse();
+    }
+    assertThat(isServiceUser(createProxyUser("om/host1@EXAMPLE.COM", createRemoteUser("alice")), principal)).isFalse();
+    // No user matches a principal that is not configured.
+    assertThat(isServiceUser(createRemoteUser("om/host1@EXAMPLE.COM"), "")).isFalse();
+  }
 }

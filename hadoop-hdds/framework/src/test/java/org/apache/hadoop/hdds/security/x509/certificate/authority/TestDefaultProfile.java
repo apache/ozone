@@ -34,13 +34,16 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
@@ -350,6 +353,18 @@ public class TestDefaultProfile {
         new JcaContentSignerBuilder(this.securityConfig.getSignatureAlgo());
     ContentSigner signer = csBuilder.build(keyPair.getPrivate());
     return p10Builder.build(signer);
+  }
+
+  /**
+   * Basic constraints, which make a certificate a CA, are accepted by the CA profile only.
+   */
+  @Test
+  void testBasicConstraintsOnlyInCAProfile() throws IOException {
+    Extension ca = new Extension(Extension.basicConstraints, true, new DEROctetString(new BasicConstraints(true)));
+
+    assertThat(new DefaultCAProfile().validateExtension(ca)).isTrue();
+    assertThat(defaultProfile.getSupportedExtensions()).doesNotContain(Extension.basicConstraints);
+    assertThat(defaultProfile.validateExtension(ca)).isFalse();
   }
 
   /**

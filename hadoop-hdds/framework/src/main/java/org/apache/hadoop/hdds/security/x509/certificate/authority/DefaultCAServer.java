@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.PKIProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
@@ -119,6 +120,7 @@ public class DefaultCAServer implements CertificateServer {
    */
   private PKIProfile profile;
   private CertificateApprover approver;
+  private CertificateApprover leafApprover;
   private CertificateStore store;
   private Lock lock;
   private BigInteger rootCertificateId;
@@ -156,6 +158,7 @@ public class DefaultCAServer implements CertificateServer {
     caRootX509Path = securityConfig.getCertificateLocation(componentName);
     this.config = securityConfig;
     this.approver = new DefaultApprover(profile, this.config);
+    this.leafApprover = new DefaultApprover(new DefaultProfile(), this.config);
 
     /* In future we will split this code to have different kind of CAs.
      * Right now, we have only self-signed CertificateServer.
@@ -210,7 +213,7 @@ public class DefaultCAServer implements CertificateServer {
     LocalDateTime beginDate = LocalDateTime.now();
     LocalDateTime endDate = expiryFor(beginDate, role);
 
-    CompletableFuture<Void> csrInspection = approver.inspectCSR(csr);
+    CompletableFuture<Void> csrInspection = getApprover(role).inspectCSR(csr);
     CompletableFuture<CertPath> certPathPromise = new CompletableFuture<>();
     // An inspection that has not completed is not an approval.
     if (!csrInspection.isDone()) {
@@ -254,6 +257,14 @@ public class DefaultCAServer implements CertificateServer {
     return certPathPromise;
   }
 
+  /**
+   * Only an SCM can be issued a CA certificate, by this CA whether it is the root CA or the intermediate CA of another
+   * SCM (HDDS-8286). The other roles get a leaf certificate whatever the profile of this CA.
+   */
+  private CertificateApprover getApprover(NodeType role) {
+    return role == NodeType.SCM ? approver : leafApprover;
+  }
+
   private LocalDateTime expiryFor(LocalDateTime beginDate, NodeType role) {
     // When issuing certificates for sub-ca use the max certificate duration similar to self-signed root certificate.
     if (role == NodeType.SCM) {
@@ -270,7 +281,7 @@ public class DefaultCAServer implements CertificateServer {
     X509Certificate xcert;
     try {
       Preconditions.checkState(!Strings.isNullOrEmpty(certSerialId));
-      xcert = approver.sign(config,
+      xcert = getApprover(role).sign(config,
           getPrivateKey(),
           getCACertificate(),
           Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant()),
