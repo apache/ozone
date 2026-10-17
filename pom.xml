@@ -2583,7 +2583,7 @@
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
         <configuration>
-          <excludesFile>dev-support/rat/rat-exclusions.txt</excludesFile>
+          <excludesFile>dev-support/rat/rat-exclusions</excludesFile>
         </configuration>
       </plugin>
       <plugin>
