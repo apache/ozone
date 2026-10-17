@@ -296,7 +296,8 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
           BlockDataStreamOutput blockDataStreamOutput =
               (BlockDataStreamOutput) currentStreamEntry
                   .getByteBufStreamOutput();
-          if (blockDataStreamOutput != null) {
+          // Without Raft, the PutBlock would be sent through the failed stream.
+          if (blockDataStreamOutput != null && !blockDataStreamOutput.isPutBlockWithoutRaft()) {
             blockDataStreamOutput.executePutBlock(false, false);
             blockDataStreamOutput.watchForCommit(false);
           }

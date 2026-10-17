@@ -811,6 +811,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     return xceiverClient == null;
   }
 
+  public boolean isPutBlockWithoutRaft() {
+    return putBlockWithoutRaft;
+  }
+
   private boolean needSync(long position) {
     if (syncSize > 0) {
       if (position - syncPosition >= syncSize) {

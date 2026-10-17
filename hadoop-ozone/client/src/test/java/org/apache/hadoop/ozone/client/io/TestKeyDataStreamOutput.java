@@ -117,8 +117,11 @@ class TestKeyDataStreamOutput {
    */
   private KeyDataStreamOutput createKeyStream(OzoneManagerProtocol omClient, MockDatanodePipeline... pipelines)
       throws Exception {
+    return createKeyStream(createConfig(), omClient, pipelines);
+  }
 
-    OzoneClientConfig config = createConfig();
+  private KeyDataStreamOutput createKeyStream(OzoneClientConfig config, OzoneManagerProtocol omClient,
+      MockDatanodePipeline... pipelines) throws Exception {
     ReplicationConfig replicationConfig = RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
 
     OmKeyInfo keyInfo = new OmKeyInfo.Builder()
@@ -267,6 +270,29 @@ class TestKeyDataStreamOutput {
     // allocateBlock should have been called (for the retry block)
     verify(omClient).allocateBlock(any(OmKeyArgs.class), anyLong(), any(ExcludeList.class));
     verify(omClient).commitKey(any(OmKeyArgs.class), anyLong());
+  }
+
+  @Test
+  void containerCloseWithoutRaftRetriesOnNewBlockWithoutWatch() throws Exception {
+    MockDatanodePipeline pipeline1 = new MockDatanodePipeline(new BlockID(1, 1));
+    MockDatanodePipeline pipeline2 = new MockDatanodePipeline(new BlockID(2, 2));
+    // The mid-stream PutBlock command at the flush boundary fails
+    pipeline1.failPutBlockAfter(0,
+        () -> new StorageContainerException("Container closed", ContainerProtos.Result.CLOSED_CONTAINER_IO));
+    OzoneManagerProtocol omClient = createOmClient(pipeline2);
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+
+    try (KeyDataStreamOutput stream = createKeyStream(config, omClient, pipeline1, pipeline2)) {
+      writeRandom(stream, 400);
+    }
+
+    verify(omClient).allocateBlock(any(OmKeyArgs.class), anyLong(), any(ExcludeList.class));
+    verify(omClient).commitKey(any(OmKeyArgs.class), anyLong());
+    assertEquals(1, pipeline1.getReceivedCommands().size());
+    assertEquals(0, pipeline1.getReceivedPutBlocks().size());
+    assertEquals(400, totalReceived(pipeline2));
+    assertEquals(0, pipeline1.getWatchForCommitCount() + pipeline2.getWatchForCommitCount());
   }
 
   @Test
