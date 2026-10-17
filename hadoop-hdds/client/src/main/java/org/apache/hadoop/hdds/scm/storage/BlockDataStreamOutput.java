@@ -144,6 +144,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private XceiverClientMetrics metrics;
   // buffers for which putBlock is yet to be executed
   private List<StreamBuffer> buffersForPutBlock;
+  // buffers for which the PutBlock is committed by the data stream close, when putBlockWithoutRaft
+  private List<StreamBuffer> buffersForClose;
   private boolean isDatastreamPipelineMode;
   // Whether PutBlock is committed through the data stream instead of the Raft log; fixed for the stream lifetime.
   private final boolean putBlockWithoutRaft;
@@ -354,7 +356,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         Thread.currentThread().interrupt();
         handleInterruptedException(ex, true);
       }
-      watchForCommit(true);
+      watchForCommitOrReleaseBuffers(true);
     }
   }
 
@@ -427,6 +429,18 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   /**
+   * A PutBlock committed through the data stream is on all the datanodes once acknowledged,
+   * so its buffers can be released without watching for commit.
+   */
+  private void watchForCommitOrReleaseBuffers(boolean bufferFull) throws IOException {
+    if (putBlockWithoutRaft) {
+      commitWatcher.adjustBuffers(0);
+    } else {
+      watchForCommit(bufferFull);
+    }
+  }
+
+  /**
    * @param close whether putBlock is happening as part of closing the stream
    * @param force true if no data was written since most recent putBlock and
    *            stream is being closed
@@ -473,6 +487,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       if (putBlockWithoutRaft) {
         // PutBlock is supposed to be committed after the data stream close so there
         // is no need to continue.
+        buffersForClose = byteBufferList;
         return;
       }
     } else if (putBlockWithoutRaft) {
@@ -556,8 +571,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
             setIoException(ioe);
             throw new CompletionException(ioe);
           }
-          // The command has no log index; use 0 as for the standalone protocol
-          // so that the buffers are released by the next watchForCommit.
+          // The command has no log index; use 0 as for the standalone protocol.
           commitWatcher.updateCommitInfoMap(0, byteBufferList);
         }, responseExecutor));
   }
@@ -677,7 +691,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
     CompletableFuture.allOf(putBlockFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
     CompletableFuture.allOf(putBlockCommandFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
-    watchForCommit(false);
+    watchForCommitOrReleaseBuffers(false);
     // just check again if the exception is hit while waiting for the
     // futures to ensure flush has indeed succeeded
 
@@ -691,8 +705,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     if (xceiverClientFactory != null && xceiverClient != null) {
       try {
         handleFlush(true);
-        dataStreamCloseReply.get();
+        final DataStreamReply closeReply = dataStreamCloseReply.get();
         if (putBlockWithoutRaft) {
+          if (buffersForClose != null && closeReply != null && closeReply.isSuccess()) {
+            commitWatcher.updateCommitInfoMap(0, buffersForClose);
+            commitWatcher.adjustBuffers(0);
+          }
           updateBlockIDOnStreamCommitted();
         }
       } catch (ExecutionException e) {

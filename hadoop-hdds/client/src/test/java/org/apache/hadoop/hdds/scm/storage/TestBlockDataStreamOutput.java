@@ -203,6 +203,50 @@ class TestBlockDataStreamOutput {
   }
 
   @Test
+  void closeWithoutRaftAcknowledgesAllData() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+    BlockDataStreamOutput stream = createStream(pipeline, config);
+    byte[] data = randomBytes(450);
+    stream.write(ByteBuffer.wrap(data), 0, data.length);
+    stream.close();
+
+    assertEquals(450, stream.getTotalAckDataLength(), "The data committed by the stream close should be acknowledged");
+    assertEquals(0, pipeline.getWatchForCommitCount());
+  }
+
+  @Test
+  void hsyncWithoutRaftDoesNotWatchForCommit() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
+      byte[] data = randomBytes(200);
+      stream.write(ByteBuffer.wrap(data), 0, data.length);
+      stream.hsync();
+      assertEquals(1, pipeline.getReceivedCommands().size());
+      assertEquals(200, stream.getTotalAckDataLength());
+    }
+    assertEquals(0, pipeline.getWatchForCommitCount());
+  }
+
+  @Test
+  void backPressureWithoutRaftDoesNotWatchForCommit() throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = createConfig();
+    config.setDatastreamPutBlockWithoutRaftEnabled(true);
+    // Window = 500B = 5 chunks. Writing 500B should trigger back-pressure.
+    byte[] data = randomBytes(500);
+    try (BlockDataStreamOutput stream = createStream(pipeline, config)) {
+      stream.write(ByteBuffer.wrap(data), 0, data.length);
+      assertEquals(400, stream.getTotalAckDataLength(), "The PutBlock at 400B should release its buffers");
+    }
+    assertEquals(0, pipeline.getWatchForCommitCount());
+    assertArrayEquals(data, pipeline.getAllReceivedData());
+  }
+
+  @Test
   void midStreamPutBlockFailsOnDatanodeWithoutCommandSupport() throws Exception {
     MockDatanodePipeline pipeline = new MockDatanodePipeline().withUnsupportedCommand();
     OzoneClientConfig config = createConfig();
