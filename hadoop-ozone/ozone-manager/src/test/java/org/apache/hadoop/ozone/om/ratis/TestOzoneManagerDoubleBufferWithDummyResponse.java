@@ -21,6 +21,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -36,6 +38,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -80,6 +83,27 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
   @AfterEach
   public void stop() {
     doubleBuffer.stop();
+  }
+
+  @Test
+  public void testMetricsAfterDoubleBufferRecreation() throws Exception {
+    String sourceName = OzoneManagerDoubleBufferMetrics.class.getSimpleName();
+    for (int i = 0; i < 2; i++) {
+      doubleBuffer.stop();
+      doubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
+          .setOmMetadataManager(omMetadataManager)
+          .setMaxUnFlushedTransactionCount(10000)
+          .build()
+          .start();
+
+      assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName));
+      OzoneManagerDoubleBufferMetrics metrics = doubleBuffer.getMetrics();
+      assertEquals(0, metrics.getTotalNumOfFlushOperations());
+      doubleBuffer.add(createDummyBucketResponse(UUID.randomUUID().toString()),
+          TermIndex.valueOf(term, trxId.incrementAndGet()));
+      waitFor(() -> metrics.getTotalNumOfFlushOperations() == 1, 100, 5000);
+      assertCounter("TotalNumOfFlushOperations", 1L, getMetrics(sourceName));
+    }
   }
 
   /**
