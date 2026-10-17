@@ -48,8 +48,11 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -201,6 +204,45 @@ public class TestOzoneManagerServiceProviderImpl {
     omMetadataManager.stop();
     reconOMMetadataManager.stop();
     reconTaskController.stop();
+  }
+
+  @Test
+  public void testUpdateReconOmDBWithUnreadableSnapshot(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+
+    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(dirOmMetadata);
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata);
+    RDBStore activeStore = (RDBStore) reconOMMetadataManager.getStore();
+
+    // A downloaded snapshot that RocksDB cannot open.
+    DBCheckpoint checkpoint = omMetadataManager.getStore().getCheckpoint(true);
+    FileUtils.writeStringToFile(checkpoint.getCheckpointLocation().resolve("CURRENT").toFile(), "MANIFEST-999999\n",
+        UTF_8);
+    ReconUtils reconUtilsMock = getMockReconUtils();
+    when(reconUtilsMock.getReconNodeDetails(any(OzoneConfiguration.class)))
+        .thenReturn(ReconTestUtils.getReconNodeDetails());
+    ReconTaskController reconTaskController = getMockTaskController();
+
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+        new OzoneManagerServiceProviderImpl(configuration,
+            reconOMMetadataManager, reconTaskController, reconUtilsMock, ozoneManagerProtocol,
+            reconContext, getMockTaskStatusUpdaterManager());
+    ozoneManagerServiceProvider.setReconSnapshotProvider(
+        newStubSnapshotProvider(omSnapshotDbParentDir, checkpoint.getCheckpointLocation(), false));
+
+    assertFalse(ozoneManagerServiceProvider.updateReconOmDBWithNewSnapshot());
+
+    // The snapshot that failed to open is deleted.
+    String[] snapshots = omSnapshotDbParentDir.list((dir, name) -> name.startsWith(RECON_OM_SNAPSHOT_DB + "_"));
+    assertNotNull(snapshots);
+    assertEquals(0, snapshots.length, String.join(", ", snapshots));
+
+    // The active DB is kept.
+    assertEquals(activeStore, reconOMMetadataManager.getStore());
+    assertFalse(activeStore.isClosed());
+    assertNotNull(reconOMMetadataManager.getVolumeTable().get("/sampleVol"));
+    omMetadataManager.stop();
+    reconOMMetadataManager.stop();
   }
 
   @Test
@@ -591,6 +633,61 @@ public class TestOzoneManagerServiceProviderImpl {
     assertEquals(1, metrics.getNumSnapshotRequests());
     omMetadataManager.stop();
     reconTaskControllerMock.stop();
+  }
+
+  @Test
+  public void testSyncDataFromOMWithUnreadableSnapshot(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+
+    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(dirOmMetadata);
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata);
+    DBStore activeStore = reconOMMetadataManager.getStore();
+
+    // A downloaded snapshot that RocksDB cannot open: its largest SST is truncated.
+    DBCheckpoint checkpoint = omMetadataManager.getStore().getCheckpoint(true);
+    File[] sstFiles = checkpoint.getCheckpointLocation().toFile().listFiles((dir, name) -> name.endsWith(".sst"));
+    assertNotNull(sstFiles);
+    assertTrue(sstFiles.length > 0);
+    File largestSst = Arrays.stream(sstFiles).max(Comparator.comparingLong(File::length)).get();
+    try (RandomAccessFile raf = new RandomAccessFile(largestSst, "rw")) {
+      raf.setLength(largestSst.length() / 2);
+    }
+
+    ReconUtils reconUtilsMock = getMockReconUtils();
+    when(reconUtilsMock.getReconNodeDetails(any(OzoneConfiguration.class)))
+        .thenReturn(ReconTestUtils.getReconNodeDetails());
+    ReconTaskController reconTaskController = getMockTaskController();
+    // Delta updates are rejected, so the sync falls back to a full snapshot.
+    OzoneManagerProtocol protocol = getMockOzoneManagerClient(new DBUpdates());
+    when(protocol.getDBUpdates(any(OzoneManagerProtocolProtos.DBUpdatesRequest.class)))
+        .thenThrow(new SequenceNumberNotFoundException());
+
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+        new OzoneManagerServiceProviderImpl(configuration, reconOMMetadataManager, reconTaskController,
+            reconUtilsMock, protocol, reconContext, getMockTaskStatusUpdaterManager());
+    ozoneManagerServiceProvider.setReconSnapshotProvider(
+        newStubSnapshotProvider(omSnapshotDbParentDir, checkpoint.getCheckpointLocation(), false));
+    OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
+
+    ozoneManagerServiceProvider.syncDataFromOM();
+
+    // The failed open is reported as a failed full snapshot.
+    assertEquals(1, metrics.getNumSnapshotRequests());
+    assertEquals(1, metrics.getNumSnapshotRequestsFailed());
+    assertFalse(reconContext.isHealthy().get());
+    assertTrue(reconContext.getErrors().contains(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED));
+
+    // The tasks are not reinitialized from a DB that was not installed.
+    verify(reconTaskController, never()).queueReInitializationEvent(any());
+
+    // The active DB is kept and the snapshot that failed to open is deleted.
+    assertEquals(activeStore, reconOMMetadataManager.getStore());
+    assertFalse(activeStore.isClosed());
+    String[] snapshots = omSnapshotDbParentDir.list((dir, name) -> name.startsWith(RECON_OM_SNAPSHOT_DB + "_"));
+    assertNotNull(snapshots);
+    assertEquals(0, snapshots.length, String.join(", ", snapshots));
+    omMetadataManager.stop();
+    reconOMMetadataManager.stop();
   }
 
   private ReconTaskController getMockTaskController() {

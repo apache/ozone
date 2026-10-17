@@ -110,7 +110,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     if (lastKnownOMSnapshot != null) {
       LOG.info("Last known snapshot for OM : {}",
           lastKnownOMSnapshot.getAbsolutePath());
-      initializeNewRdbStore(lastKnownOMSnapshot, true);
+      try {
+        initializeNewRdbStore(lastKnownOMSnapshot, true);
+      } catch (IOException ioEx) {
+        LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
+      }
     }
   }
 
@@ -121,13 +125,8 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
    * @param addCacheMetrics
    */
   private void initializeNewRdbStore(File dbFile, boolean addCacheMetrics) throws IOException {
-    try {
-      setStore(DBStoreBuilder.newBuilder(ozoneConfiguration, OMDBDefinition.get(), dbFile).build());
-      LOG.info("Created OM DB handle from snapshot at {}.",
-          dbFile.getAbsolutePath());
-    } catch (IOException ioEx) {
-      LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
-    }
+    setStore(DBStoreBuilder.newBuilder(ozoneConfiguration, OMDBDefinition.get(), dbFile).build());
+    LOG.info("Created OM DB handle from snapshot at {}.", dbFile.getAbsolutePath());
     if (getStore() != null) {
       initializeOmTables(TableCache.CacheType.FULL_CACHE, addCacheMetrics);
       omTablesInitialized = true;
@@ -153,6 +152,13 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     DBStore current = getStore();
     try {
       initializeNewRdbStore(newDbLocation, addCacheMetrics);
+    } catch (IOException e) {
+      if (current == getStore()) {
+        // Do not leave a snapshot that failed to open behind as the last known OM DB.
+        LOG.warn("Deleting OM snapshot db at {} that could not be opened.", newDbLocation.getAbsolutePath());
+        FileUtils.deleteQuietly(newDbLocation);
+      }
+      throw e;
     } finally {
       // Always close DBStore if it's replaced.
       if (current != null && current != getStore()) {

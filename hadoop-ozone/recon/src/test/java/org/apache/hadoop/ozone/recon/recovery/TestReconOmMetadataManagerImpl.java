@@ -17,8 +17,11 @@
 
 package org.apache.hadoop.ozone.recon.recovery;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -144,6 +147,36 @@ public class TestReconOmMetadataManagerImpl {
         newCheckpoint.getCheckpointLocation().toFile(), true);
     // Verify that the existing DB instance is closed.
     assertTrue(current.isClosed());
+  }
+
+  @Test
+  public void testUnreadableSnapshot() throws Exception {
+    OMMetadataManager omMetadataManager = getOMMetadataManager();
+    File reconOmDbDir = Files.createDirectory(temporaryFolder.resolve("reconOmDbDir")).toFile();
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir.getAbsolutePath());
+
+    // A snapshot that RocksDB cannot open: CURRENT names a missing MANIFEST.
+    File unreadable = omMetadataManager.getStore().getCheckpoint(true).getCheckpointLocation().toFile();
+    FileUtils.writeStringToFile(new File(unreadable, "CURRENT"), "MANIFEST-999999\n", UTF_8);
+    FileUtils.copyDirectory(unreadable, new File(reconOmDbDir, "om.snapshot.db_" + System.currentTimeMillis()));
+
+    // At startup the unreadable last known snapshot is skipped.
+    ReconOMMetadataManager reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
+    reconOMMetadataManager.start(configuration);
+    assertThat(reconOMMetadataManager.getStore()).isNull();
+
+    // A refresh to an unreadable snapshot fails and keeps the active DB.
+    reconOMMetadataManager.updateOmDB(omMetadataManager.getStore().getCheckpoint(true).getCheckpointLocation().toFile(),
+        true);
+    DBStore active = reconOMMetadataManager.getStore();
+    assertThatThrownBy(() -> reconOMMetadataManager.updateOmDB(unreadable, true)).isInstanceOf(IOException.class);
+    assertThat(unreadable).doesNotExist();
+    assertThat(reconOMMetadataManager.getStore()).isSameAs(active);
+    assertThat(active.isClosed()).isFalse();
+    assertThat(reconOMMetadataManager.getVolumeTable().get("/sampleVol")).isNotNull();
+    reconOMMetadataManager.stop();
+    omMetadataManager.stop();
   }
 
   /**
