@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
@@ -1223,11 +1222,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
     LOG.debug("Detect allocated but uncommitted blocks {} in key {}.",
         uncommitted, omKeyInfo.getKeyName());
-    OmKeyInfo pseudoKeyInfo = omKeyInfo.toBuilder()
-        .setObjectID(OBJECT_ID_RECLAIM_BLOCKS)
-        .build();
-    // This is a special marker to indicate that SnapshotDeletingService
-    // can reclaim this key's blocks unconditionally.
+    // The pseudo key keeps the object ID and the hsync metadata of the key, so callers wrap before they remove the
+    // latter. A block committed by an earlier hsync may be referenced by a snapshot, and key deletion retains the
+    // pseudo key while the previous snapshot holds an hsync'ed version of the key with this object ID. That version
+    // may not list the block itself, as an hsync between two snapshots can drop a block that the older one references.
+    OmKeyInfo pseudoKeyInfo = omKeyInfo.toBuilder().build();
     // TODO dataSize of pseudoKey is not real here
     List<OmKeyLocationInfoGroup> uncommittedGroups = new ArrayList<>();
     // version not matters in the current logic of keyDeletingService,
