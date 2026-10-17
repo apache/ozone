@@ -47,16 +47,12 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_REGEX_PATTERN;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.hasMultiChunksPayload;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.hasUnsignedPayload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.urlDecode;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateMultiChunksUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
@@ -128,6 +124,7 @@ import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.apache.hadoop.ozone.s3.util.ReadConsistencyContext;
+import org.apache.hadoop.ozone.s3.util.S3ContentSha256Type;
 import org.apache.hadoop.ozone.s3.util.S3GActionIamMapper;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -889,14 +886,15 @@ public abstract class EndpointBase {
   protected S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(
       InputStream body, long contentLength, String amzDecodedLength, String keyPath) throws OS3Exception {
     final String amzContentSha256Header = validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
+    final S3ContentSha256Type payloadType = S3ContentSha256Type.fromHeaderValue(amzContentSha256Header);
     final InputStream chunkInputStream;
     final long effectiveLength;
-    if (hasMultiChunksPayload(amzContentSha256Header)) {
+    if (payloadType.isStreaming()) {
       validateMultiChunksUpload(getHeaders(), amzDecodedLength, keyPath);
-      if (hasUnsignedPayload(amzContentSha256Header)) {
+      if (payloadType.isUnsigned()) {
         chunkInputStream = new UnsignedChunksInputStream(body);
       } else {
-        TrailerHeader trailerHeader = STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header)
+        TrailerHeader trailerHeader = payloadType == S3ContentSha256Type.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER
             ? TrailerHeader.fromHeader(getHeaders().getHeaderString(X_AMZ_TRAILER), keyPath) : TrailerHeader.NONE;
         chunkInputStream = new SignedChunksInputStream(body, keyPath, trailerHeader);
       }
@@ -914,16 +912,14 @@ public abstract class EndpointBase {
     // and Sha256Digest is used for "x-amz-content-sha256" header verification
     List<MessageDigest> digests = new ArrayList<>();
     digests.add(getMD5DigestInstance());
-    if (!hasUnsignedPayload(amzContentSha256Header) && !hasMultiChunksPayload(amzContentSha256Header)) {
+    if (!payloadType.isUnsigned() && !payloadType.isStreaming()) {
       digests.add(getSha256DigestInstance());
     }
     MultiDigestInputStream multiDigestInputStream =
         new MultiDigestInputStream(chunkInputStream, digests);
     // Header auth only: for a presigned (query) request the payload hash is not part of the signed
     // canonical request, so its seed signature cannot start the chunk signature chain.
-    boolean verifyChunkSignature = signatureInfo.isSignPayload()
-        && (STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header)
-        || STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header));
+    boolean verifyChunkSignature = signatureInfo.isSignPayload() && payloadType.isHmacSignedStreaming();
     return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength, verifyChunkSignature);
   }
 
