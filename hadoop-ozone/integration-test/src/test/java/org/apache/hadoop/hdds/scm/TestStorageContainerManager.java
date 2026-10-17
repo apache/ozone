@@ -688,9 +688,10 @@ public class TestStorageContainerManager {
       }
 
       cluster.restartStorageContainerManager(false);
-      scm = cluster.getStorageContainerManager();
+      StorageContainerManager restartedScm =
+          cluster.getStorageContainerManager();
 
-      ReplicationManager rm = scm.getReplicationManager();
+      ReplicationManager rm = restartedScm.getReplicationManager();
 
       NodeManager nodeManager = mock(NodeManager.class);
       setInternalState(rm, "nodeManager", nodeManager);
@@ -702,7 +703,16 @@ public class TestStorageContainerManager {
           new CloseContainerCommand(selectedContainer.getContainerID(),
               selectedContainer.getPipelineID(), false);
 
-      GenericTestUtils.waitFor(rm::shouldRun, 100, 30000);
+      // processAll cannot send the close command until ReplicationManager is ready
+      // and SCM has received the replica report.
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return rm.shouldRun() && !restartedScm.getContainerManager()
+              .getContainerReplicas(selectedContainer.containerID()).isEmpty();
+        } catch (ContainerNotFoundException e) {
+          return false;
+        }
+      }, 100, 30000);
       rm.processAll();
       verify(nodeManager).addDatanodeCommand(dnUuid, closeContainerCommand);
     }
