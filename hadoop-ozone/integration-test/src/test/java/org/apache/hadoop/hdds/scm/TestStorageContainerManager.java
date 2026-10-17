@@ -95,6 +95,7 @@ import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -146,6 +147,7 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
@@ -623,6 +625,39 @@ public class TestStorageContainerManager {
     } finally {
       scm.stop();
     }
+  }
+
+  @Test
+  void testStateMachineClosedByRatisTerminatesWithFailureStatus(@TempDir Path tempDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.resolve("scm-meta").toString());
+    StorageContainerManager.scmInit(conf, UUID.randomUUID().toString());
+    ExitUtils.disableSystemExit();
+    StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
+    try {
+      scm.start();
+      waitForStateMachineReady(scm);
+      scm.stop();
+      scm.join();
+      assertThat(ExitUtils.isTerminated()).isFalse();
+
+      scm = HddsTestUtils.getScmSimple(conf);
+      scm.start();
+      waitForStateMachineReady(scm);
+      SCMStateMachine stateMachine = scm.getScmHAManager().getRatisServer().getSCMStateMachine();
+      ExitUtils.ExitException exit = assertThrows(ExitUtils.ExitException.class, stateMachine::close);
+      assertThat(exit.getStatus()).isEqualTo(1);
+      assertThat(scm.isStopped()).isTrue();
+    } finally {
+      scm.stop();
+      ExitUtils.clear();
+    }
+  }
+
+  /** Waits until the datanode RPC server is started, so that stopping SCM releases its port. */
+  private static void waitForStateMachineReady(StorageContainerManager scm) throws Exception {
+    SCMStateMachine stateMachine = scm.getScmHAManager().getRatisServer().getSCMStateMachine();
+    GenericTestUtils.waitFor(stateMachine::getIsStateMachineReady, 100, 30_000);
   }
 
   /**
