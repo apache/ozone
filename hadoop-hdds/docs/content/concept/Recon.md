@@ -124,6 +124,10 @@ to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=http://pro
        * Stores the mapping (container, key) -> count
      * ContainerKeyCount table
        * Stores containerID -> no. of keys count within the container
+ * Container replica history is stored in `recon-container-replica-history.db`
+   under `ozone.recon.db.dir`. This database is independent of the databases
+   replaced during OM reprocess and SCM snapshot synchronization, so history for
+   departed datanodes survives those operations.
  
  * The following data is stored in the configured SQL database (default is Derby):
      * GlobalStats table
@@ -134,13 +138,17 @@ to the Prometheus endpoint like `ozone.recon.prometheus.http.endpoint=http://pro
      * ReconTaskStatus table
        * Keeps track of the status and last run timestamp of the registered OM and SCM 
        db tasks in the [Recon Task Framework](#task-framework)
-     * ContainerHistory table
-       * Stores ContainerReplica -> Datanode mapping with last known timestamp. This 
-       is used to determine the last known datanodes when a container is reported missing 
      * UnhealthyContainers table
        * Keeps track of all the Unhealthy Containers (MISSING, UNDER_REPLICATED,
        OVER_REPLICATED, MIS_REPLICATED) in the cluster at any given time
  
+
+On upgrade, Recon's versioned upgrade action migrates existing replica history from
+`recon-container-key.db` before finalizing the new version and starting its services.
+The migration streams the history through a temporary
+SST file and retains the source table. A durable completion marker prevents migration
+on subsequent starts; an incomplete migration is retried on the next start. Allow
+disk space for the new history database and the temporary SST file during migration.
 
 ## Notable configurations
 
