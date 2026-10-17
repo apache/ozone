@@ -9,7 +9,7 @@
 - **Author:** ASF Security team, via the threat-model-producer rubric (Scovetta
   rubric) at the Ozone PMC's request (path 3, confirmed siyao@ 2026-06-02).
 - **Status:** v1 — ratified by the Ozone PMC. Maintainer review complete (Siyao Meng / smengcl and Wei-Chiu Chuang / jojochuang, 2026-06/07); wave-1–3 answers folded.
-- **Revisions:** 2026-10, availability added (§4, §7, §8 item 7, §9, §10, §11a, §13).
+- **Revisions:** 2026-10, availability added (§4, §7, §8 item 7, §9, §10, §11a, §13); GDPR buckets (§9).
 - **Version binding:** versioned with the project; a report against version *N*
   is triaged against the model as it stood at *N*.
 - **Reporting cross-reference:** §8-violating findings go to
@@ -304,6 +304,7 @@ Per-boundary input trust (grouped by family):
   on the path it serves** — Ratis is not BFT, and while checksum + replica/container
   checks catch ordinary corruption, a peer that can forge consistently on its
   served path is out of model (§7). *(maintainer — smengcl, 2026-06-23.)*
+- **GDPR buckets are an erasure aid, not encryption at rest.** In a bucket created with `--enforcegdpr`, keys written with the GDPR flag are encrypted with a random per-key secret that the OM stores in the key's metadata and removes when the key is deleted, so the blocks of a deleted key cannot be read without that secret. This gives no confidentiality or integrity at rest: the secret is returned to anyone who can read the key, it stays in the Ratis log, in RocksDB files until compaction and in OM snapshots taken while the key existed (§10), and stored blocks are not authenticated (see the Byzantine datanode bullet above). Use TDE for confidentiality at rest (§8 item 6). Only keys written with the GDPR flag (`ozone sh key put` and `ozone sh key cp`) are encrypted; keys written through the S3 Gateway or ofs/o3fs into a GDPR bucket are not. *(maintainer, smengcl, 2026-10.)*
 - **No promise to withstand load by volume.** Request floods, connection exhaustion, and many concurrent requests whose cost the server already limits are outside §8 item 7. Limiting them is the operator's (§10). Concurrent requests whose cost the caller chooses are not load by volume and stay under §8 item 7. *(maintainer, smengcl, 2026-10.)*
 - **Resource use within granted limits is not an availability finding.** A user who fills their own quota, creates as many keys or buckets as they are allowed to, or runs listings within the server's page limits is using the service as authorized, provided the service keeps serving others (§8 item 7). Quotas are off by default and are the operator's control (§10). *(maintainer, smengcl, 2026-10.)*
 - **No availability guarantee against admins or service peers.** Admin commands and a compromised service peer can stop a service (§7). *(maintainer, smengcl, 2026-10.)*
