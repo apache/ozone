@@ -30,6 +30,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HE
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -255,6 +256,40 @@ public class TestPartUpload {
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
     when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "1234567890abcde"})
+  void testPartUploadWithUnsignedTrailer(String content) throws Exception {
+    String keyName = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+    configureUnsignedTrailer(content.length());
+    // The empty and multi-chunk bodies match botocore's CRC32 encoding.
+    String body = content.isEmpty() ? "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n\r\n"
+        : "a\r\n1234567890\r\n5\r\nabcde\r\n0\r\nx-amz-checksum-crc32:HydN+w==\r\n\r\n";
+
+    assertSucceeds(() -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, body));
+    assertContentLength(uploadID, keyName, content.length());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "1234567890abcde"})
+  void testPartUploadRejectsIncompleteUnsignedTrailer(String content) throws Exception {
+    String keyName = UUID.randomUUID().toString();
+    String uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, keyName);
+    configureUnsignedTrailer(content.length());
+    String body = (content.isEmpty() ? "" : "f\r\n" + content + "\r\n")
+        + "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n";
+
+    assertErrorResponse(S3ErrorTable.INVALID_REQUEST,
+        () -> put(rest, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, body));
+    assertNoParts(uploadID, keyName);
+  }
+
+  private void configureUnsignedTrailer(int contentLength) {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(STREAMING_UNSIGNED_PAYLOAD_TRAILER);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(contentLength));
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
   }
 
   private void configureSignedChunkHeaders(int contentLength) {
