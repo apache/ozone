@@ -267,6 +267,7 @@ abstract class ContainerStateMachineTests {
 
     final InOrder inOrder = inOrder(channel, dispatcher);
     inOrder.verify(channel).drainBuffers();
+    inOrder.verify(channel).force(false);
     inOrder.verify(dispatcher).dispatch(argThat(r -> r.getCmdType() == ContainerProtos.Type.PutBlock),
         argThat(c -> DispatcherContext.op(c) == DispatcherContext.Op.STREAM_COMMAND));
   }
