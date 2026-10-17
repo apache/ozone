@@ -368,7 +368,7 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
-   * Removes the Container matching with specified containerId.
+   * Removes the container matching the specified containerId and its recovering entry, if present.
    * @param containerId ID of the container to remove
    * @return If container is removed from containerMap returns true, otherwise
    * false
@@ -383,6 +383,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     if (markMissing) {
       missingContainerSet.add(containerId);
     }
+    removeRecoveringContainer(containerId);
     Container<?> removed = containerMap.remove(containerId);
     if (removeFromDB) {
       deleteFromContainerTable(containerId);
