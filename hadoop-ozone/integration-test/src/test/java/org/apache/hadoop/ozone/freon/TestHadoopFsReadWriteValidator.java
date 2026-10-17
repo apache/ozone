@@ -85,7 +85,8 @@ public abstract class TestHadoopFsReadWriteValidator implements NonHATests.TestC
 
     String rootPath = OZONE_URI_SCHEME + "://" + bucketName + "." + volumeName;
     String om = cluster().getConf().get(OZONE_OM_ADDRESS_KEY);
-    int exitCode = new Freon().getCmd().execute(
+    CommandLine cmd = new Freon().getCmd();
+    int exitCode = cmd.execute(
         "-D", OZONE_OM_ADDRESS_KEY + "=" + om,
         "dfsrw",
         "-n", String.valueOf(fileCount),
@@ -96,12 +97,20 @@ public abstract class TestHadoopFsReadWriteValidator implements NonHATests.TestC
     );
     assertEquals(0, exitCode, "Freon dfsrw command failed");
 
+    // -n counts operations, and --read-percent decides per operation whether it
+    // writes or reads one back, so how many of them wrote is drawn rather than
+    // fixed.  Each write takes a path of its own here, so the run leaves
+    // somewhere between one file and one per operation.
+    BaseFreonGenerator subject = (BaseFreonGenerator)
+        cmd.getParseResult().subcommand().commandSpec().userObject();
+    assertEquals(fileCount, subject.getSuccessCount());
+
     // verify all files were written with the requested size
     OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
     try (FileSystem fileSystem = FileSystem.get(URI.create(rootPath), conf)) {
       FileStatus[] files =
           fileSystem.listStatus(new Path(rootPath + "/" + prefix));
-      assertEquals(fileCount, files.length, "Unexpected number of files");
+      assertThat(files.length).isBetween(1, fileCount);
       Set<Long> checksums = new HashSet<>();
       for (FileStatus file : files) {
         assertEquals(fileSize, file.getLen(),
@@ -110,7 +119,7 @@ public abstract class TestHadoopFsReadWriteValidator implements NonHATests.TestC
       }
       // distinct content across threads, otherwise reading the wrong file would
       // still validate
-      assertEquals(fileCount, checksums.size(), "Files share their content");
+      assertEquals(files.length, checksums.size(), "Files share their content");
     }
   }
 
@@ -128,7 +137,9 @@ public abstract class TestHadoopFsReadWriteValidator implements NonHATests.TestC
   /**
    * Once a thread has written --max-files-per-thread files its paths wrap, so
    * the run keeps writing without leaving files it has no checksum for.  The
-   * wrap is layout independent, so one layout covers it.
+   * wrap is layout independent, so one layout covers it.  It is a pure write
+   * run: with reads drawn in, whether every path of the cycle got written at
+   * all would be a matter of chance, and the count below could not be exact.
    */
   @Test
   public void testPathsWrapAtMaxFilesPerThread() throws Exception {
@@ -154,6 +165,7 @@ public abstract class TestHadoopFsReadWriteValidator implements NonHATests.TestC
         "-t", "1",
         "-s", fileSize + "B",
         "--max-files-per-thread", String.valueOf(maxFilesPerThread),
+        "--read-percent", "0",
         "-p", prefix,
         "-r", rootPath
     );

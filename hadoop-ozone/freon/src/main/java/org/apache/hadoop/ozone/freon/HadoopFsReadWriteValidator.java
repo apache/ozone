@@ -49,6 +49,12 @@ import picocli.CommandLine.Option;
  * concurrent load, including in time-based (--duration) runs where paths are
  * reused.
  * <p>
+ * --read-percent tunes the mix: every operation of the run independently draws
+ * whether to write a file or to read one back, so a run can be made read-heavy
+ * or write-heavy without changing what any one read validates. -n therefore
+ * counts operations of both kinds rather than writes alone, and the split holds
+ * on average rather than exactly.
+ * <p>
  * CRC32 keeps the validation off the critical path of the measured throughput.
  * Successive writes of a path differ in the marker only, and markers less than
  * 2^32 apart never share a CRC32, so a stale read is always detected.
@@ -89,6 +95,15 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       defaultValue = "10000")
   private int maxFilesPerThread;
 
+  @Option(names = {"--read-percent"},
+      description = "Percentage of the operations that read a file back and validate it instead of writing one. "
+          + "0 only writes, 50 pairs a read with every write on average, and 90 makes the run read-heavy. Every "
+          + "operation draws on its own, so the split holds over a run rather than on any particular pair of "
+          + "operations. A read validates a file the thread wrote, picked at random; a thread that has written "
+          + "nothing yet has nothing to read and writes instead.",
+      defaultValue = "50")
+  private double readPercent;
+
   private ContentGenerator contentGenerator;
 
   private Timer writeTimer;
@@ -113,6 +128,11 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       throw new IllegalArgumentException(
           "--max-files-per-thread must be positive");
     }
+    // negated so that NaN, which fails every comparison, is rejected too
+    if (!(readPercent >= 0 && readPercent <= 100)) {
+      throw new IllegalArgumentException(
+          "--read-percent must be between 0 and 100");
+    }
 
     super.init();
 
@@ -129,7 +149,7 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       writeTimer = getMetrics().timer("file-write");
       readTimer = getMetrics().timer("file-read-validate");
 
-      runTests(this::writeAndValidate);
+      runTests(this::readOrWrite);
     } finally {
       org.apache.hadoop.hdds.utils.IOUtils.closeQuietly(fileSystem);
     }
@@ -137,11 +157,29 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
     return null;
   }
 
-  private void writeAndValidate(long counter) throws Exception {
+  /**
+   * One operation of the run, a read or a write, drawn per --read-percent. A
+   * thread that has written nothing yet has nothing to read back and writes.
+   */
+  private void readOrWrite(long counter) throws Exception {
     ThreadHistory history = threadHistory.get();
+    if (history.isEmpty() || !readsNext()) {
+      writeAndRecord(history, counter);
+    } else {
+      validateRandomFile(history);
+    }
+  }
+
+  /** Draws whether this operation reads, see --read-percent. */
+  private boolean readsNext() {
+    return ThreadLocalRandom.current().nextDouble(100) < readPercent;
+  }
+
+  private void writeAndRecord(ThreadHistory history, long counter)
+      throws Exception {
+    long marker = history.nextMarker();
     long fileId = counter % maxFilesPerThread;
     Path file = objectPath(fileId);
-    long marker = history.nextMarker();
 
     long checksum;
     try {
@@ -154,7 +192,14 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       throw e;
     }
     history.record(fileId, checksum);
+  }
 
+  /**
+   * Read back one of the files this thread wrote, picked at random, and verify
+   * that its content still matches the checksum of the latest write of that
+   * path.
+   */
+  private void validateRandomFile(ThreadHistory history) throws Exception {
     long readId = history.randomFileId();
     Path target = objectPath(readId);
     long expected = history.checksumOf(readId);
@@ -168,10 +213,13 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
   }
 
   /**
-   * Path of the file for the given counter. The thread sequence id is part of
-   * the path so each worker owns a private namespace; paths are reused once a
-   * thread has written --max-files-per-thread of them, and this keeps one
-   * thread from overwriting a file another thread is reading back.
+   * Path of the file for the given id. The thread sequence id is part of the
+   * path so each worker owns a private namespace, which keeps one thread from
+   * overwriting a file another thread is reading back. The id comes from the
+   * task counter, which the framework recycles within -n, so a time-based run
+   * writes over its paths rather than growing without bound; the modulo caps a
+   * count-based run at --max-files-per-thread distinct ids, and with it the
+   * checksums a thread has to remember.
    */
   private Path objectPath(long fileId) {
     return new Path(getRootPath() + "/" + generateObjectName(fileId)
@@ -250,6 +298,11 @@ public class HadoopFsReadWriteValidator extends HadoopBaseFreonGenerator
       if (checksums.remove(key) != null) {
         fileIds.remove(key);           // error path, so the scan is affordable
       }
+    }
+
+    /** Whether the thread has written anything it could read back yet. */
+    private boolean isEmpty() {
+      return fileIds.isEmpty();
     }
 
     private long randomFileId() {
