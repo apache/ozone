@@ -72,18 +72,24 @@ public class PipelineSyncTask extends ReconScmTask {
 
   @Override
   public void run() {
-    try {
-      while (canRun()) {
+    while (canRun()) {
+      try {
         initializeAndRunTask();
+      } catch (Exception e) {
+        LOG.error("Exception in Pipeline sync Thread.", e);
+        if (e instanceof InterruptedException) {
+          Thread.currentThread().interrupt();
+        }
+        taskStatusUpdater.setLastTaskRunStatus(-1);
+        taskStatusUpdater.recordRunCompletion();
+      }
+      try {
         Thread.sleep(interval);
-      }
-    } catch (Throwable t) {
-      LOG.error("Exception in Pipeline sync Thread.", t);
-      if (t instanceof InterruptedException) {
+      } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        LOG.info("Pipeline sync Thread interrupted.");
+        break;
       }
-      taskStatusUpdater.setLastTaskRunStatus(-1);
-      taskStatusUpdater.recordRunCompletion();
     }
   }
 

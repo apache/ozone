@@ -80,6 +80,13 @@ public class ContainerHealthTask extends ReconScmTask {
       long cycleStart = Time.monotonicNow();
       try {
         initializeAndRunTask();
+      } catch (Exception e) {
+        LOG.error("Error in ContainerHealthTask", e);
+        if (e instanceof InterruptedException) {
+          Thread.currentThread().interrupt();
+        }
+      }
+      try {
         long elapsed = Time.monotonicNow() - cycleStart;
         long sleepMs = Math.max(MIN_NEXT_RUN_INTERVAL_MS, interval - elapsed);
         if (sleepMs > 0) {
@@ -89,8 +96,6 @@ public class ContainerHealthTask extends ReconScmTask {
         Thread.currentThread().interrupt();
         LOG.info("ContainerHealthTask interrupted");
         break;
-      } catch (Exception e) {
-        LOG.error("Error in ContainerHealthTask", e);
       }
     }
   }

@@ -18,13 +18,20 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
@@ -75,6 +82,42 @@ public class TestContainerHealthTask {
     RuntimeException thrown =
         assertThrows(RuntimeException.class, task::runTask);
     assertEquals("processAll failed", thrown.getMessage());
+  }
+
+  @Test
+  public void testFailedRunWaitsForNextInterval() throws Exception {
+    ReconReplicationManager replicationManager = mock(ReconReplicationManager.class);
+    ReconStorageContainerManagerFacade reconScm = mock(ReconStorageContainerManagerFacade.class);
+    when(reconScm.getReplicationManager()).thenReturn(replicationManager);
+    CountDownLatch firstRun = new CountDownLatch(1);
+    CountDownLatch secondRun = new CountDownLatch(1);
+    AtomicInteger runs = new AtomicInteger();
+    AtomicReference<Thread> taskThread = new AtomicReference<>();
+    doAnswer(invocation -> {
+      taskThread.set(Thread.currentThread());
+      if (runs.incrementAndGet() == 1) {
+        firstRun.countDown();
+      } else {
+        secondRun.countDown();
+      }
+      throw new RuntimeException("processAll failed");
+    }).when(replicationManager).processAll();
+    ContainerHealthTask task =
+        new ContainerHealthTask(createTaskConfig(), createTaskStatusUpdaterManagerMock(), reconScm);
+
+    task.start();
+    try {
+      assertTrue(firstRun.await(10, TimeUnit.SECONDS));
+      assertFalse(secondRun.await(1, TimeUnit.SECONDS), "Failed sweeps must wait before retrying");
+    } finally {
+      task.stop();
+      Thread thread = taskThread.get();
+      if (thread != null) {
+        thread.interrupt();
+        thread.join(10_000);
+        assertFalse(thread.isAlive());
+      }
+    }
   }
 
   private ReconTaskConfig createTaskConfig() {
