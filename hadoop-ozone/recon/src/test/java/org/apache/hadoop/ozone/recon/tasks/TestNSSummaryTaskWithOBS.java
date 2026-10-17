@@ -54,6 +54,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -87,11 +89,12 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
   class TestBucketCachingAndReplacement {
 
     @Test
-    void testReprocessCachesBucketInfoPerWorker() throws IOException {
+    void testReprocessReusesBucketInfoForConsecutiveKeys() throws IOException {
       ReconOMMetadataManager omMetadataManager = spy(getReconOMMetadataManager());
       Table<String, OmBucketInfo> bucketTable = spy(getReconOMMetadataManager().getBucketTable());
       doReturn(bucketTable).when(omMetadataManager).getBucketTable();
-      // A single worker so every key shares one bucket cache.
+      // Force the sorted, single-thread fallback, independently of existing SST files.
+      doReturn(null).when(omMetadataManager).getStore();
       NSSummaryTaskWithOBS task = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(), omMetadataManager,
           OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT, 1, 1, 2000);
 
@@ -99,11 +102,83 @@ public class TestNSSummaryTaskWithOBS extends AbstractNSSummaryTaskTest {
 
       assertThat(task.reprocessWithOBS(omMetadataManager)).isTrue();
 
-      // The per-worker cache looks up each bucket at most once, regardless of how
-      // many keys or buckets the fixture holds, so no bucket key is fetched twice.
+      // Each bucket is contiguous in this sorted pass, so its keys share one lookup.
       ArgumentCaptor<String> bucketKeyCaptor = ArgumentCaptor.forClass(String.class);
       verify(bucketTable, atLeastOnce()).getSkipCache(bucketKeyCaptor.capture());
       assertThat(bucketKeyCaptor.getAllValues()).doesNotHaveDuplicates();
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void testReprocessMixedBuckets(boolean parallel) throws IOException {
+      ReconOMMetadataManager omMetadataManager = spy(getReconOMMetadataManager());
+      Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(getBucketLayout());
+      Table<String, OmBucketInfo> bucketTable = spy(omMetadataManager.getBucketTable());
+      doReturn(bucketTable).when(omMetadataManager).getBucketTable();
+      Set<Thread> lookupThreads = ConcurrentHashMap.newKeySet();
+      doAnswer(invocation -> {
+        lookupThreads.add(Thread.currentThread());
+        return invocation.callRealMethod();
+      }).when(bucketTable).getSkipCache(any(String.class));
+      String[] volumes = {"cache-volume-1", "cache-volume-1", "cache-volume-1", "cache-volume-2", "cache-volume-2"};
+      String[] buckets = {"bucket-a", "bucket-b", "bucket-c", "bucket-c", "missing"};
+      List<String> addedKeys = new ArrayList<>();
+      List<String> addedBuckets = new ArrayList<>();
+      int keysPerBucket = 20;
+      try {
+        for (int bucket = 0; bucket < buckets.length; bucket++) {
+          long objectId = 1000L + bucket;
+          if (bucket < buckets.length - 1) {
+            String bucketKey = omMetadataManager.getBucketKey(volumes[bucket], buckets[bucket]);
+            addedBuckets.add(bucketKey);
+            bucketTable.put(bucketKey, OmBucketInfo.newBuilder()
+                .setVolumeName(volumes[bucket]).setBucketName(buckets[bucket]).setObjectID(objectId)
+                .setBucketLayout(bucket == 1 ? BucketLayout.LEGACY : BucketLayout.OBJECT_STORE).build());
+          }
+          for (int key = 0; key < keysPerBucket; key++) {
+            String name = "key-" + key;
+            String dbKey = omMetadataManager.getOzoneKey(volumes[bucket], buckets[bucket], name);
+            addedKeys.add(dbKey);
+            keyTable.put(dbKey, buildOmKeyInfo(volumes[bucket], buckets[bucket], name, name,
+                2000L + bucket * keysPerBucket + key, objectId, key % 2 == 0 ? 500 : 2050));
+          }
+        }
+        if (parallel) {
+          omMetadataManager.getStore().flushDB();
+        } else {
+          doReturn(null).when(omMetadataManager).getStore();
+        }
+        getReconNamespaceSummaryManager().clearNSSummaryTable();
+        NSSummaryTaskWithOBS task = new NSSummaryTaskWithOBS(getReconNamespaceSummaryManager(),
+            omMetadataManager, 1, 2, 4, 40);
+        assertThat(task.reprocessWithOBS(omMetadataManager)).isTrue();
+        if (parallel) {
+          assertThat(lookupThreads).hasSize(4).doesNotContain(Thread.currentThread());
+        } else {
+          assertThat(lookupThreads).containsExactly(Thread.currentThread());
+        }
+        int[] expectedHistogram = new int[ReconConstants.NUM_OF_FILE_SIZE_BINS];
+        expectedHistogram[0] = keysPerBucket / 2;
+        expectedHistogram[2] = keysPerBucket / 2;
+        for (int bucket = 0; bucket < buckets.length; bucket++) {
+          NSSummary summary = getReconNamespaceSummaryManager().getNSSummary(1000L + bucket);
+          if (bucket == 1 || bucket == buckets.length - 1) {
+            assertThat(summary).isNull();
+          } else {
+            assertThat(summary).isNotNull();
+            assertThat(summary.getNumOfFiles()).isEqualTo(keysPerBucket);
+            assertThat(summary.getSizeOfFiles()).isEqualTo((500L + 2050) * keysPerBucket / 2);
+            assertThat(summary.getFileSizeBucket()).containsExactly(expectedHistogram);
+          }
+        }
+      } finally {
+        for (String key : addedKeys) {
+          keyTable.delete(key);
+        }
+        for (String bucket : addedBuckets) {
+          bucketTable.delete(bucket);
+        }
+      }
     }
 
     @Test

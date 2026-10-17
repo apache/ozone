@@ -108,7 +108,8 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       allWorkerMaps.put(Thread.currentThread(), workerMap);
       return workerMap;
     });
-    ThreadLocal<Map<String, OmBucketInfo>> bucketCaches = ThreadLocal.withInitial(HashMap::new);
+    // Cache only the last bucket, since keys within each iterator batch are sorted by volume and bucket.
+    ThreadLocal<OmBucketInfo> lastBucket = new ThreadLocal<>();
 
     // Divide threshold by worker count
     final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
@@ -125,15 +126,12 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         // continue to the next iteration.
         String volumeName = keyInfo.getVolumeName();
         String bucketName = keyInfo.getBucketName();
-        String bucketDBKey = omMetadataManager
-            .getBucketKey(volumeName, bucketName);
-        Map<String, OmBucketInfo> bucketCache = bucketCaches.get();
-        OmBucketInfo omBucketInfo = bucketCache.get(bucketDBKey);
-        if (omBucketInfo == null) {
+        OmBucketInfo omBucketInfo = lastBucket.get();
+        if (omBucketInfo == null || !volumeName.equals(omBucketInfo.getVolumeName())
+            || !bucketName.equals(omBucketInfo.getBucketName())) {
+          String bucketDBKey = omMetadataManager.getBucketKey(volumeName, bucketName);
           omBucketInfo = bucketTable.getSkipCache(bucketDBKey);
-          if (omBucketInfo != null) {
-            bucketCache.put(bucketDBKey, omBucketInfo);
-          }
+          lastBucket.set(omBucketInfo);
         }
 
         if (omBucketInfo != null && omBucketInfo.getBucketLayout() == BUCKET_LAYOUT) {
@@ -176,7 +174,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       // per-key operation on this (reused Recon pool) thread, so clear the
       // per-worker ThreadLocals here.
       workerMaps.remove();
-      bucketCaches.remove();
+      lastBucket.remove();
     }
     
     long keyEndTime = System.currentTimeMillis();
