@@ -224,7 +224,7 @@ class TestFullDiffSequentialReader {
     putKey(fromTable, "k3", keyInfo("c", 3L, 0L, 10L, 100L));
 
     SnapDiffJobStore store = spy(SnapDiffJobStore.open(db, codecRegistry, columnFamilyOptions,
-        "job" + JOB_ID.incrementAndGet(), false, snapDiffReportCfh, null, 2L));
+        "job" + JOB_ID.incrementAndGet(), false, snapDiffReportCfh, null, 2));
     try (SnapDiffJobStore ignored = store) {
       doAnswer(invocation -> invocation.callRealMethod()).when(store).spillDiffCandidates();
       doAnswer(invocation -> {
