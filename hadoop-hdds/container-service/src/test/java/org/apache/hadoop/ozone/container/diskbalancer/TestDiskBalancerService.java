@@ -79,6 +79,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This is a test class for DiskBalancerService.
@@ -444,11 +445,12 @@ public class TestDiskBalancerService {
     svc.shutdown();
   }
 
-  @Test
-  public void testInitialDiskBalancerInfoFallsBackToDefaultsForInvalidConfig() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"0", "NaN"})
+  public void testInitialDiskBalancerInfoFallsBackToDefaultsForInvalidConfig(String rawThreshold) throws Exception {
     File infoDir = tmpDir.resolve("diskBalancer-invalid-initial-info").toFile();
     OzoneConfiguration testConf = confWithDiskBalancerInfoDir(infoDir);
-    testConf.setDouble(DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_THRESHOLD, 0d);
+    testConf.set(DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_THRESHOLD, rawThreshold);
     testConf.setLong(DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_BANDWIDTH, 0L);
     testConf.setInt(DiskBalancerConfiguration.HDDS_DATANODE_DISK_BALANCER_PARALLEL_THREAD, 0);
     DiskBalancerInfo expected = new DiskBalancerInfo(DiskBalancerRunningStatus.STOPPED,
@@ -566,6 +568,9 @@ public class TestDiskBalancerService {
         Arguments.arguments(-1.0, true, null),
         Arguments.arguments(-0.001, true, null),
         Arguments.arguments(100.001, true, null),
+        Arguments.arguments(Double.NaN, true, null),
+        Arguments.arguments(Double.POSITIVE_INFINITY, true, null),
+        Arguments.arguments(Double.NEGATIVE_INFINITY, true, null),
         // Valid boundary values that should be accepted
         Arguments.arguments(0.001, false, 0.001),
         Arguments.arguments(99.999, false, 99.999),

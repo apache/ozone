@@ -181,9 +181,13 @@ public final class DiskBalancerConfiguration {
   public DiskBalancerConfiguration() {
   }
 
+  private static boolean isValidThreshold(double threshold) {
+    return Double.isFinite(threshold) && threshold > 0d && threshold < 100d;
+  }
+
   @PostConstruct
   public void validate() {
-    if (threshold <= 0d || threshold >= 100d) {
+    if (!isValidThreshold(threshold)) {
       LOG.warn(HDDS_DATANODE_DISK_BALANCER_THRESHOLD +
               " must be in the range 0 to 100 both exclusive and was set to {}. Defaulting to {}",
           threshold, DEFAULT_THRESHOLD);
@@ -271,7 +275,7 @@ public final class DiskBalancerConfiguration {
    * @param threshold a percentage value in the range (0 to 100) both exclusive
    */
   public void setThreshold(double threshold) {
-    if (threshold <= 0d || threshold >= 100d) {
+    if (!isValidThreshold(threshold)) {
       throw new IllegalArgumentException(
           "Threshold must be a percentage(double) in the range 0 to 100 both exclusive.");
     }
