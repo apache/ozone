@@ -46,7 +46,7 @@ public class OzoneContainer extends GenericContainer<OzoneContainer> {
 
   public static final int S3G_PORT = 9878;
 
-  private static final DockerImageName DEFAULT_IMAGE =
+  static final DockerImageName DEFAULT_IMAGE =
       DockerImageName.parse("apache/ozone:2.2.1-all-in-one");
 
   private static final String ACCESS_KEY = "testuser";

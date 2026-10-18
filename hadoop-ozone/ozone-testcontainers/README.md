@@ -30,14 +30,15 @@ Add `org.apache.ozone:ozone-testcontainers` as a test dependency, then:
 ```java
 try (OzoneContainer ozone = new OzoneContainer()) {
   ozone.start();
-  S3Client s3 = S3Client.builder()
+  try (S3Client s3 = S3Client.builder()
       .endpointOverride(URI.create(ozone.getS3Endpoint()))
       .credentialsProvider(StaticCredentialsProvider.create(
           AwsBasicCredentials.create(ozone.getAccessKey(), ozone.getSecretKey())))
       .region(Region.of(ozone.getRegion()))
       .forcePathStyle(true)
-      .build();
-  // ...
+      .build()) {
+    // ...
+  }
 }
 ```
 

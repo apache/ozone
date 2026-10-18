@@ -139,7 +139,7 @@ class TestOzoneContainer {
   /** CI sets {@code OZONE_IMAGE} to the ghcr.io mirror to avoid Docker Hub rate limits. */
   private static DockerImageName smokeTestImage() {
     String repository = System.getenv().getOrDefault("OZONE_IMAGE", "apache/ozone");
-    return DockerImageName.parse(repository + ":2.2.1-all-in-one").asCompatibleSubstituteFor("apache/ozone");
+    return DockerImageName.parse(repository + ":" + OzoneContainer.DEFAULT_IMAGE.getVersionPart());
   }
 
   private static ExecResult execResult(int exitCode) {
