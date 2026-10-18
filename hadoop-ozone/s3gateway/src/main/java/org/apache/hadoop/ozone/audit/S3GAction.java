@@ -24,6 +24,7 @@ public enum S3GAction implements AuditAction {
 
   //BucketEndpoint
   GET_BUCKET,
+  LIST_OBJECT_VERSIONS,
   CREATE_BUCKET,
   HEAD_BUCKET,
   DELETE_BUCKET,

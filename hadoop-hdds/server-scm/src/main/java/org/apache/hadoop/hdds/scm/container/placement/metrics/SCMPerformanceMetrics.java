@@ -29,6 +29,7 @@ import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.ConcurrentMutableRate;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -59,9 +60,12 @@ public final class SCMPerformanceMetrics implements MetricsSource {
   private MutableCounterLong deleteKeyBlocksSuccess;
   @Metric(about = "Total blocks taken in each key delete cycle failure.")
   private MutableCounterLong deleteKeyBlocksFailure;
+  private final ConcurrentMutableRate flushTransactionBufferLatencyNs;
 
   public SCMPerformanceMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
+    flushTransactionBufferLatencyNs = new ConcurrentMutableRate("FlushTransactionBufferLatencyNs",
+        "Latency of flushing the SCM HA transaction buffer to the DB in nanoseconds", true);
   }
 
   public static SCMPerformanceMetrics create() {
@@ -90,6 +94,7 @@ public final class SCMPerformanceMetrics implements MetricsSource {
     allocateBlockFailureLatencyNs.snapshot(recordBuilder, true);
     deleteKeyBlocksSuccess.snapshot(recordBuilder, true);
     deleteKeyBlocksFailure.snapshot(recordBuilder, true);
+    flushTransactionBufferLatencyNs.snapshot(recordBuilder, true);
   }
 
   public void updateAllocateBlockSuccessLatencyNs(long startNanos) {
@@ -124,6 +129,10 @@ public final class SCMPerformanceMetrics implements MetricsSource {
 
   public long getDeleteKeyFailedBlocks() {
     return deleteKeyBlocksFailure.value();
+  }
+
+  public void updateFlushTransactionBufferLatencyNs(long startNanos) {
+    flushTransactionBufferLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
 }
 

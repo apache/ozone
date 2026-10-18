@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -45,11 +47,14 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
 import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolClientSideImpl;
+import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolClientSideImpl;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EchoRPCRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SafeMode;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafeModeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -61,11 +66,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Tests admin authorization of two OM administrative RPCs that are only ever driven by admin
+ * Tests admin authorization of OM administrative RPCs that are only ever driven by admin
  * CLI tooling: refetchSecretKey() on the client protocol (mirrors the checkAdminUserPrivilege
  * gate used by transferLeadership/listOpenFiles), and getOMConfiguration() on the OM admin
  * protocol (mirrors the isAdmin check used by decommission()). Both must reject non-admin
- * callers and serve admins.
+ * callers and serve admins. bootstrap() on the OM inter service protocol carries the same
+ * isAdmin check and must reject non-admin callers.
  */
 public class TestOMAdminRpcAuthorization {
 
@@ -120,6 +126,19 @@ public class TestOMAdminRpcAuthorization {
           OMAdminProtocolClientSideImpl.createProxyForSingleOM(
               conf, user, cluster.getOzoneManager().getNodeDetails());
       return adminClient.getOMConfiguration();
+    });
+  }
+
+  private static void bootstrap(UserGroupInformation user) throws Exception {
+    OzoneConfiguration bootstrapConf = new OzoneConfiguration(conf);
+    bootstrapConf.setInt(OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 1);
+    user.doAs((PrivilegedExceptionAction<Void>) () -> {
+      try (OMInterServiceProtocolClientSideImpl interServiceClient =
+               new OMInterServiceProtocolClientSideImpl(bootstrapConf, user, null)) {
+        // Use the existing OM details to exercise authorization without introducing another OM.
+        interServiceClient.bootstrap(cluster.getOzoneManager().getNodeDetails());
+      }
+      return null;
     });
   }
 
@@ -196,6 +215,34 @@ public class TestOMAdminRpcAuthorization {
     assertFalse(omConfig.getCurrentPeerList().isEmpty());
   }
 
+  @Test
+  void listTenantWithoutRpcUserIsDenied() {
+    OMException ex = assertThrows(OMException.class, () -> cluster.getOzoneManager().listTenant());
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+  }
+
+  @Test
+  void listTenantAdminIsAllowed() throws Exception {
+    Server.Call call = mock(Server.Call.class);
+    when(call.getRemoteUser())
+        .thenReturn(UserGroupInformation.createUserForTesting("admin", new String[] {"admins"}));
+    Server.getCurCall().set(call);
+    try {
+      assertThat(cluster.getOzoneManager().listTenant().getTenantStateList()).isEmpty();
+    } finally {
+      Server.getCurCall().remove();
+    }
+  }
+
+  @Test
+  void bootstrapNonAdminIsDenied() {
+    UserGroupInformation nonAdmin =
+        UserGroupInformation.createUserForTesting("nonadmin", new String[] {"users"});
+    assertThatThrownBy(() -> bootstrap(nonAdmin))
+        .isInstanceOf(IOException.class)
+        .hasMessageContaining("Only administrators are authorized to perform bootstrap.");
+  }
+
   private static int echoRPC(UserGroupInformation user, boolean writeToRatis) throws Exception {
     return user.doAs((PrivilegedExceptionAction<Integer>) () -> {
       try (OzoneManagerProtocolClientSideTranslatorPB omClient = new OzoneManagerProtocolClientSideTranslatorPB(
@@ -236,6 +283,25 @@ public class TestOMAdminRpcAuthorization {
     try {
       OMResponse response = cluster.getOzoneManager().getOmServerProtocol().submitRequest(null, request);
       assertEquals(Status.ACCESS_DENIED, response.getStatus());
+    } finally {
+      Server.getCurCall().remove();
+    }
+  }
+
+  @Test
+  void forceExitSafeModeWithoutRpcUserIsDenied() throws Exception {
+    OMRequest request = OMRequest.newBuilder()
+        .setCmdType(Type.SetSafeMode)
+        .setClientId(ClientId.randomId().toString())
+        .setSetSafeModeRequest(SetSafeModeRequest.newBuilder().setSafeMode(SafeMode.FORCE_EXIT))
+        .build();
+
+    // The call context that OzoneManagerServiceGrpc sets up: a client ID, but no connection and so no user.
+    Server.getCurCall().set(new Server.Call(1, 1, null, null, RPC.RpcKind.RPC_PROTOCOL_BUFFER,
+        ClientId.randomId().toByteString().toByteArray()));
+    try {
+      OMResponse response = cluster.getOzoneManager().getOmServerProtocol().submitRequest(null, request);
+      assertEquals(Status.PERMISSION_DENIED, response.getStatus());
     } finally {
       Server.getCurCall().remove();
     }

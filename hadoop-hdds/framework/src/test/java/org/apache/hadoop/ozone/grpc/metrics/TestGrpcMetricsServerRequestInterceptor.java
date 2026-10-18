@@ -19,13 +19,17 @@ package org.apache.hadoop.ozone.grpc.metrics;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.grpc.Metadata;
 import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.SCMBlockLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.Type;
@@ -33,6 +37,7 @@ import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.User
 import org.apache.hadoop.metrics2.lib.MetricsAnnotations;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InOrder;
 
 /**
  * Tests for {@link GrpcMetricsServerRequestInterceptor}.
@@ -41,6 +46,9 @@ import org.junit.jupiter.api.Test;
  * {@code cmdType} as field 1 and a free-text {@code traceID} as field 2.
  */
 public class TestGrpcMetricsServerRequestInterceptor {
+
+  private static final SCMBlockLocationRequest REQUEST =
+      SCMBlockLocationRequest.newBuilder().setCmdType(Type.GetScmInfo).setTraceID("trace").build();
 
   private GrpcMetrics metrics;
   private ServerCall.Listener<Object> delegate;
@@ -97,5 +105,66 @@ public class TestGrpcMetricsServerRequestInterceptor {
     assertEquals(1, metrics.getUnknownMessagesReceived());
     assertEquals(0, metrics.getReceivedBytes());
     verify(delegate).onMessage(message);
+  }
+
+  @Test
+  public void testInterleavedCallsRecordTheirOwnTimes() {
+    GrpcMetrics mockMetrics = mock(GrpcMetrics.class);
+    AtomicLong now = new AtomicLong();
+    GrpcMetricsServerRequestInterceptor interceptor = new GrpcMetricsServerRequestInterceptor(mockMetrics, now::get);
+
+    now.set(100);
+    ServerCall.Listener<Object> first = startCall(interceptor);
+    now.set(200);
+    ServerCall.Listener<Object> second = startCall(interceptor);
+    now.set(250);
+    second.onMessage(REQUEST);
+    now.set(300);
+    first.onMessage(REQUEST);
+    now.set(400);
+    second.onComplete();
+    now.set(1000);
+    first.onComplete();
+
+    InOrder inOrder = inOrder(mockMetrics);
+    // second call: received at 200, started at 250, completed at 400
+    inOrder.verify(mockMetrics).addGrpcQueueTime(50);
+    inOrder.verify(mockMetrics).addGrpcProcessingTime(150);
+    // first call: received at 100, started at 300, completed at 1000
+    inOrder.verify(mockMetrics).addGrpcQueueTime(200);
+    inOrder.verify(mockMetrics).addGrpcProcessingTime(700);
+  }
+
+  @Test
+  public void testTimesAboveIntRangeAreNotTruncated() {
+    GrpcMetrics mockMetrics = mock(GrpcMetrics.class);
+    AtomicLong now = new AtomicLong();
+    ServerCall.Listener<Object> call = startCall(new GrpcMetricsServerRequestInterceptor(mockMetrics, now::get));
+
+    now.set(3_000_000_000L);
+    call.onMessage(REQUEST);
+    now.set(8_000_000_000L);
+    call.onComplete();
+
+    verify(mockMetrics).addGrpcQueueTime(3_000_000_000L);
+    verify(mockMetrics).addGrpcProcessingTime(5_000_000_000L);
+  }
+
+  @Test
+  public void testCallWithoutMessageRecordsNoTimes() {
+    GrpcMetrics mockMetrics = mock(GrpcMetrics.class);
+    ServerCall.Listener<Object> call = startCall(new GrpcMetricsServerRequestInterceptor(mockMetrics));
+
+    call.onComplete();
+
+    verify(mockMetrics, never()).addGrpcQueueTime(anyLong());
+    verify(mockMetrics, never()).addGrpcProcessingTime(anyLong());
+  }
+
+  @SuppressWarnings("unchecked")
+  private static ServerCall.Listener<Object> startCall(GrpcMetricsServerRequestInterceptor interceptor) {
+    ServerCallHandler<Object, Object> handler = mock(ServerCallHandler.class);
+    when(handler.startCall(any(), any())).thenReturn(mock(ServerCall.Listener.class));
+    return interceptor.interceptCall(mock(ServerCall.class), new Metadata(), handler);
   }
 }

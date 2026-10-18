@@ -2569,8 +2569,8 @@
     <value>OM/_HOST@REALM</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>
     <description>The OzoneManager service principal. Ex om/_HOST@REALM.COM
-      SCM allocates and deletes blocks only for this service user or an SCM admin, so the property must be set in the
-      configuration of SCM as well.
+      SCM issues an OM certificate only to this service user, and allocates and deletes blocks only for this service
+      user or an SCM admin, so the property must be set in the configuration of SCM as well.
     </description>
   </property>
   <property>
@@ -5267,6 +5267,8 @@
       dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
       own fully qualified hostname at startup. The _HOST placeholder
       allows using the same configuration setting on all Datanodes.
+      SCM issues a Datanode certificate only to this service user, so the
+      property must be set in the configuration of SCM as well.
     </description>
   </property>
   <property>

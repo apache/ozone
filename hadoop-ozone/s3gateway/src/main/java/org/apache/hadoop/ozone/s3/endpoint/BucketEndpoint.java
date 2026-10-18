@@ -105,6 +105,9 @@ public class BucketEndpoint extends BucketOperationHandler {
 
   @Override
   Response handleGetRequest(S3RequestContext context, String bucketName) throws IOException, OS3Exception {
+    if (isListObjectVersions()) {
+      context.setAction(S3GAction.LIST_OBJECT_VERSIONS);
+    }
     final String continueToken = isListObjectVersions() ? null : queryParams().get(QueryParams.CONTINUATION_TOKEN);
     final String delimiter = queryParams().containsKey(QueryParams.DELIMITER) ?
         queryParams().get(QueryParams.DELIMITER) : null;
