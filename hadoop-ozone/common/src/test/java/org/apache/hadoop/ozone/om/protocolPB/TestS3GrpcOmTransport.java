@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.protocolPB;
 
-import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
+import static org.apache.hadoop.ozone.ClientVersion.CURRENT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
@@ -167,7 +167,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -187,7 +187,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -212,7 +212,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -259,7 +259,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -302,7 +302,7 @@ public class TestS3GrpcOmTransport {
 
     OMRequest request = OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .build();
 
@@ -333,7 +333,7 @@ public class TestS3GrpcOmTransport {
 
     client.submitRequest(OMRequest.newBuilder()
         .setCmdType(Type.CreateVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .build());
 
@@ -361,7 +361,7 @@ public class TestS3GrpcOmTransport {
 
     client.submitRequest(OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
             .setReadConsistency(ReadConsistencyProto.LOCAL_LEASE)
@@ -392,7 +392,7 @@ public class TestS3GrpcOmTransport {
 
     client.submitRequest(OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setS3Authentication(S3Authentication.newBuilder()
             .setAccessId("access-id")
@@ -409,7 +409,7 @@ public class TestS3GrpcOmTransport {
 
     client.submitRequest(OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
             .setReadConsistency(ReadConsistencyProto.LINEARIZABLE_ALLOW_FOLLOWER))
@@ -436,7 +436,7 @@ public class TestS3GrpcOmTransport {
 
     client.submitRequest(OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setS3Authentication(S3Authentication.newBuilder()
             .setAccessId("access-id")
@@ -471,7 +471,7 @@ public class TestS3GrpcOmTransport {
 
     OMRequest request = OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .build();
     client.submitRequest(request);
@@ -509,7 +509,7 @@ public class TestS3GrpcOmTransport {
 
     client.submitRequest(OMRequest.newBuilder()
         .setCmdType(Type.ListVolume)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .build());
 
@@ -614,7 +614,7 @@ public class TestS3GrpcOmTransport {
     ServiceListRequest req = ServiceListRequest.newBuilder().build();
     return OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();

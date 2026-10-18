@@ -27,13 +27,8 @@ import javax.xml.bind.annotation.adapters.XmlAdapter;
  */
 public class IsoDateAdapter extends XmlAdapter<String, Instant> {
 
-  private DateTimeFormatter iso8861Formatter;
-
-  public IsoDateAdapter() {
-    iso8861Formatter =
-        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
-            .withZone(ZoneOffset.UTC);
-  }
+  private static final DateTimeFormatter ISO_8861_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSX")
+      .withZone(ZoneOffset.UTC);
 
   @Override
   public Instant unmarshal(String v) throws Exception {
@@ -42,6 +37,6 @@ public class IsoDateAdapter extends XmlAdapter<String, Instant> {
 
   @Override
   public String marshal(Instant v) throws Exception {
-    return iso8861Formatter.format(v);
+    return ISO_8861_FORMATTER.format(v);
   }
 }

@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -1253,6 +1254,18 @@ public interface ClientProtocol {
       long numEntries, boolean allowPartialPrefixes) throws IOException;
 
   /**
+   * List the status for a file or a directory and its contents, returning the
+   * full file status. Takes the same options as {@link #listStatusLight}.
+   *
+   * @param options Encapsulates volume, bucket, key, recursive, startKey,
+   *                numEntries, allowPartialPrefixes, and whether OM must reject
+   *                an OBJECT_STORE bucket.
+   * @return list of file status
+   */
+  List<OzoneFileStatus> listStatus(ListStatusLightOptions options)
+      throws IOException;
+
+  /**
    * Lightweight listStatus API.
    *
    * @param options Encapsulates volume, bucket, key, recursive, startKey,
@@ -1261,6 +1274,24 @@ public interface ClientProtocol {
    */
   List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
       throws IOException;
+
+  /**
+   * Like {@link #listStatus(ListStatusLightOptions)}, but also returns whether OM reported that no entries
+   * follow this page.
+   */
+  default ListStatusResult<OzoneFileStatus> listStatusPage(ListStatusLightOptions options)
+      throws IOException {
+    return ListStatusResult.unknown(listStatus(options));
+  }
+
+  /**
+   * Like {@link #listStatusLight(ListStatusLightOptions)}, but also returns whether OM reported that no
+   * entries follow this page.
+   */
+  default ListStatusResult<OzoneFileStatusLight> listStatusLightPage(ListStatusLightOptions options)
+      throws IOException {
+    return ListStatusResult.unknown(listStatusLight(options));
+  }
 
   /**
    * Lightweight listStatus API (convenience overload without listPrefix).
@@ -1638,6 +1669,14 @@ public interface ClientProtocol {
    * */
   void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
       throws IOException;
+
+  /**
+   * Set whether this client verifies checksums when reading. Overrides ozone.client.verify.checksum for this client
+   * only. Takes effect for input streams opened afterwards, streams that are already open may or may not pick it up.
+   * @param verifyChecksum false to skip checksum verification, e.g. when the application verifies its own checksums.
+   */
+  default void setVerifyChecksum(boolean verifyChecksum) {
+  }
 
   /**
    * Start the lease recovery of a file.

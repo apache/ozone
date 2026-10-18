@@ -36,13 +36,16 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
@@ -145,6 +148,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
@@ -226,8 +230,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     // this server interface, this should be removed and solved via new
     // annotated interceptors.
     boolean checkResponseForECRepConfig = false;
-    if (request.getVersion() <
-        ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue()) {
+    if (!ClientVersion.ERASURE_CODING_SUPPORT.isSupportedBy(request.getVersion())) {
       if (request.getCmdType() == GetContainer
           || request.getCmdType() == ListContainer
           || request.getCmdType() == GetContainerWithPipeline
@@ -417,6 +420,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   @SuppressWarnings("checkstyle:methodlength")
   public ScmContainerLocationResponse processRequest(
       ScmContainerLocationRequest request) throws ServiceException {
+    final ClientVersion clientVersion = ClientVersion.deserialize(request.getVersion());
     try {
       switch (request.getCmdType()) {
       case AllocateContainer:
@@ -424,7 +428,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setContainerResponse(allocateContainer(
-                request.getContainerRequest(), request.getVersion()))
+                request.getContainerRequest(), clientVersion))
             .build();
       case GetContainer:
         return ScmContainerLocationResponse.newBuilder()
@@ -446,7 +450,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setGetContainerWithPipelineResponse(getContainerWithPipeline(
                 request.getGetContainerWithPipelineRequest(),
-                request.getVersion()))
+                clientVersion))
             .build();
       case GetContainerWithPipelineBatch:
         return ScmContainerLocationResponse.newBuilder()
@@ -455,7 +459,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetContainerWithPipelineBatchResponse(
                 getContainerWithPipelineBatch(
                     request.getGetContainerWithPipelineBatchRequest(),
-                    request.getVersion()))
+                    clientVersion))
             .build();
       case GetExistContainerWithPipelinesInBatch:
         return ScmContainerLocationResponse.newBuilder()
@@ -464,7 +468,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setGetExistContainerWithPipelinesInBatchResponse(
                 getExistContainerWithPipelinesInBatch(
                     request.getGetExistContainerWithPipelinesInBatchRequest(),
-                    request.getVersion()))
+                    clientVersion))
             .build();
       case ListContainer:
         return ScmContainerLocationResponse.newBuilder()
@@ -478,7 +482,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setNodeQueryResponse(queryNode(request.getNodeQueryRequest(),
-                request.getVersion()))
+                clientVersion))
             .build();
       case SingleNodeQuery:
         return ScmContainerLocationResponse.newBuilder()
@@ -495,8 +499,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
                 request.getScmCloseContainerRequest()))
             .build();
       case AllocatePipeline:
-        if (scm.getLayoutVersionManager().needsFinalization() &&
-            !scm.getLayoutVersionManager().isAllowed(
+        if (!scm.getVersionManager().isAllowed(
                 HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT)
         ) {
           if (request.getPipelineRequest().getReplicationType() ==
@@ -511,14 +514,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setPipelineResponse(allocatePipeline(
-                request.getPipelineRequest(), request.getVersion()))
+                request.getPipelineRequest(), clientVersion))
             .build();
       case ListPipelines:
         return ScmContainerLocationResponse.newBuilder()
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setListPipelineResponse(listPipelines(
-                request.getListPipelineRequest(), request.getVersion()))
+                request.getListPipelineRequest(), clientVersion))
             .build();
       case ActivatePipeline:
         return ScmContainerLocationResponse.newBuilder()
@@ -623,7 +626,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setGetPipelineResponse(getPipeline(
-                request.getGetPipelineRequest(), request.getVersion()))
+                request.getGetPipelineRequest(), clientVersion))
             .build();
       case GetSafeModeRuleStatuses:
         final GetSafeModeRuleStatusesResponseProto proto = GetSafeModeRuleStatusesResponseProto.newBuilder()
@@ -681,7 +684,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setDatanodeUsageInfoResponse(getDatanodeUsageInfo(
                 request.getDatanodeUsageInfoRequest(),
-                request.getVersion()))
+                clientVersion))
             .build();
       case GetContainerCount:
         return ScmContainerLocationResponse.newBuilder()
@@ -703,7 +706,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           .setStatus(Status.OK)
           .setGetContainerReplicasResponse(getContainerReplicas(
               request.getGetContainerReplicasRequest(),
-              request.getVersion()))
+              clientVersion))
           .build();
       case GetFailedDeletedBlocksTransaction:
         return ScmContainerLocationResponse.newBuilder()
@@ -768,6 +771,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setSuppressContainerResponse(suppressContainer(request.getSuppressContainerRequest()))
             .build();
+      case GetPeerUpgradeStatus:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetPeerUpgradeStatusResponse(getPeerUpgradeStatus(request.getGetPeerUpgradeStatusRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -780,7 +789,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public GetContainerReplicasResponseProto getContainerReplicas(
-      GetContainerReplicasRequestProto request, int clientVersion)
+      GetContainerReplicasRequestProto request, ClientVersion clientVersion)
       throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> replicas
         = impl.getContainerReplicas(request.getContainerID(), clientVersion);
@@ -789,14 +798,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public ContainerResponseProto allocateContainer(ContainerRequestProto request,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
     ReplicationConfig replicationConfig = ReplicationConfig.fromProto(request.getReplicationType(), 
         request.getReplicationFactor(),
         request.getEcReplicationConfig()
     );
     ContainerWithPipeline cp = impl.allocateContainer(replicationConfig, request.getOwner());
     return ContainerResponseProto.newBuilder()
-        .setContainerWithPipeline(cp.getProtobuf(clientVersion))
+        .setContainerWithPipeline(cp.getProtobuf(clientVersion, currentVersions(cp)))
         .setErrorCode(ContainerResponseProto.Error.success)
         .build();
 
@@ -823,24 +832,24 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public GetContainerWithPipelineResponseProto getContainerWithPipeline(
       GetContainerWithPipelineRequestProto request,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
     ContainerWithPipeline container = impl
         .getContainerWithPipeline(request.getContainerID());
     return GetContainerWithPipelineResponseProto.newBuilder()
-        .setContainerWithPipeline(container.getProtobuf(clientVersion))
+        .setContainerWithPipeline(container.getProtobuf(clientVersion, currentVersions(container)))
         .build();
   }
 
   public GetContainerWithPipelineBatchResponseProto
       getContainerWithPipelineBatch(
       GetContainerWithPipelineBatchRequestProto request,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
     List<ContainerWithPipeline> containers = impl
         .getContainerWithPipelineBatch(request.getContainerIDsList());
     GetContainerWithPipelineBatchResponseProto.Builder builder =
         GetContainerWithPipelineBatchResponseProto.newBuilder();
     for (ContainerWithPipeline container : containers) {
-      builder.addContainerWithPipelines(container.getProtobuf(clientVersion));
+      builder.addContainerWithPipelines(container.getProtobuf(clientVersion, currentVersions(container)));
     }
     return builder.build();
   }
@@ -848,15 +857,29 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public GetExistContainerWithPipelinesInBatchResponseProto
       getExistContainerWithPipelinesInBatch(
       GetExistContainerWithPipelinesInBatchRequestProto request,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
     List<ContainerWithPipeline> containers = impl
         .getExistContainerWithPipelinesInBatch(request.getContainerIDsList());
     GetExistContainerWithPipelinesInBatchResponseProto.Builder builder =
         GetExistContainerWithPipelinesInBatchResponseProto.newBuilder();
     for (ContainerWithPipeline container : containers) {
-      builder.addContainerWithPipelines(container.getProtobuf(clientVersion));
+      builder.addContainerWithPipelines(container.getProtobuf(clientVersion, currentVersions(container)));
     }
     return builder.build();
+  }
+
+  private Map<DatanodeID, ComponentVersion> currentVersions(ContainerWithPipeline containerWithPipeline)
+      throws SCMException {
+    Map<DatanodeID, ComponentVersion> memberVersions = new HashMap<>();
+    for (DatanodeDetails dn : containerWithPipeline.getPipeline().getNodes()) {
+      DatanodeInfo live = scm.getScmNodeManager().getNode(dn.getID());
+      if (live == null) {
+        throw new SCMException("Failed to lookup datanode " + dn + " in NodeManager",
+            SCMException.ResultCodes.NO_SUCH_DATANODE);
+      }
+      memberVersions.put(live.getID(), live.getCurrentVersion());
+    }
+    return memberVersions;
   }
 
   public SCMListContainerResponseProto listContainer(
@@ -928,7 +951,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public NodeQueryResponseProto queryNode(
       StorageContainerLocationProtocolProtos.NodeQueryRequestProto request,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
 
     HddsProtos.NodeOperationalState opState = null;
     HddsProtos.NodeState nodeState = null;
@@ -978,7 +1001,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public PipelineResponseProto allocatePipeline(
       StorageContainerLocationProtocolProtos.PipelineRequestProto request,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
     Pipeline pipeline = impl.createReplicationPipeline(
         request.getReplicationType(), request.getReplicationFactor(),
         HddsProtos.NodePool.getDefaultInstance());
@@ -992,7 +1015,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public ListPipelineResponseProto listPipelines(
-      ListPipelineRequestProto request, int clientVersion)
+      ListPipelineRequestProto request, ClientVersion clientVersion)
       throws IOException {
     ListPipelineResponseProto.Builder builder = ListPipelineResponseProto
         .newBuilder();
@@ -1005,7 +1028,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public GetPipelineResponseProto getPipeline(
       GetPipelineRequestProto request,
-      int clientVersion) throws IOException {
+      ClientVersion clientVersion) throws IOException {
     GetPipelineResponseProto.Builder builder = GetPipelineResponseProto
         .newBuilder();
     Pipeline pipeline = impl.getPipeline(request.getPipelineID());
@@ -1093,6 +1116,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
     return QueryUpgradeFinalizationProgressResponseProto.newBuilder()
         .setStatus(response)
+        .build();
+  }
+
+  public StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusResponseProto getPeerUpgradeStatus(
+      StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusRequestProto request) throws IOException {
+
+    return StorageContainerLocationProtocolProtos.GetPeerUpgradeStatusResponseProto
+        .newBuilder()
+        .setScmSoftwareVersion(impl.getPeerUpgradeStatus().serialize())
         .build();
   }
 
@@ -1315,7 +1347,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
 
   public DatanodeUsageInfoResponseProto getDatanodeUsageInfo(
       StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto
-          request, int clientVersion) throws IOException {
+          request, ClientVersion clientVersion) throws IOException {
     List<HddsProtos.DatanodeUsageInfoProto> infoList;
 
     // get info by ip or uuid

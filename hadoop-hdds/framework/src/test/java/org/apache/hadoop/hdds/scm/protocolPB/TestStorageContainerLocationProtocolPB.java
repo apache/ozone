@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Modifier;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
@@ -54,5 +55,11 @@ public class TestStorageContainerLocationProtocolPB {
     assertFalse(StorageContainerLocationProtocol.class.isInterface());
     assertTrue(Modifier.isFinal(StorageContainerLocationProtocol.class.getModifiers()));
     assertTrue(StorageContainerLocationInternalInterface.class.isInterface());
+  }
+
+  @Test
+  public void testPeerUpgradeStatusIsFollowerReadable() {
+    assertTrue(StorageContainerLocationInternalInterface.FOLLOWER_READABLE_COMMAND_TYPES
+        .contains(Type.GetPeerUpgradeStatus));
   }
 }

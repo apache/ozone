@@ -149,7 +149,7 @@ public class ClientProtocolStub implements ClientProtocol {
     NavigableMap<Integer, Long> partSizes = bucket instanceof OzoneBucketStub
         ? ((OzoneBucketStub) bucket).getCompletedMultipartPartSizes(keyName)
         : Collections.emptyNavigableMap();
-    return new S3HeadObjectAttributes(key, partSizes);
+    return new S3HeadObjectAttributes(key, partSizes, bucket.getBucketLayout());
   }
 
   @Override
@@ -625,7 +625,7 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public OzoneManagerVersion getOmVersion() {
-    return OzoneManagerVersion.CURRENT;
+    return OzoneManagerVersion.SOFTWARE_VERSION;
   }
 
   @Override
@@ -706,6 +706,11 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options) throws IOException {
+    return null;
+  }
+
+  @Override
+  public List<OzoneFileStatus> listStatus(ListStatusLightOptions options) throws IOException {
     return null;
   }
 

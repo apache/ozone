@@ -59,7 +59,7 @@ import org.rocksdb.RocksDB;
  */
 public class TestTypedTable {
   private final List<String> families = Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
-      "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth");
+      "First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth");
 
   private RDBStore rdb;
   private final List<UncheckedAutoCloseable> closeables = new ArrayList<>();
@@ -229,6 +229,60 @@ public class TestTypedTable {
     runTestSingleKeyValue(empty, nonEmpty, table);
     runTestSingleKeyValue(nonEmpty, nonEmpty, table);
     runTestSingleKeyValue(nonEmpty, empty, table);
+  }
+
+  @Test
+  public void testGetProjectedCodecBuffer() throws Exception {
+    runTestGetProjected(StringCodec.get());
+  }
+
+  @Test
+  public void testGetProjectedByteArray() throws Exception {
+    final Codec<String> codec = CodecTestUtil.newCodecWithoutCodecBuffer(StringCodec.get());
+    assertFalse(codec.supportCodecBuffer());
+    runTestGetProjected(codec);
+  }
+
+  /**
+   * The two projections are tagged differently so that each assertion also pins down which path
+   * produced the value: the table cache, or a decode of the value read from the store.
+   */
+  void runTestGetProjected(Codec<String> valueCodec) throws Exception {
+    final TypedTable<String, String> table = newTypedTable(9, StringCodec.get(), valueCodec);
+
+    // A value larger than the initial buffer capacity, to exercise the capacity-retry loop.
+    final StringBuilder large = new StringBuilder();
+    for (int i = 0; i < TypedTable.BUFFER_SIZE_DEFAULT; i++) {
+      large.append('x');
+    }
+
+    table.put("inDb", "dbValue");
+    table.put("large", large.toString());
+    table.put("tombstoned", "gone");
+    table.addCacheEntry("inCache", "cachedValue", 1L);
+    table.addCacheEntry("tombstoned", 2L);
+
+    assertNull(getProjected(table, "absent"));
+    assertEquals("db:dbValue", getProjected(table, "inDb"));
+    assertEquals("db:" + large, getProjected(table, "large"));
+    assertEquals("cache:cachedValue", getProjected(table, "inCache"));
+    // Deleted in the cache, still in the store: the projection must not fall through to the store.
+    assertNull(getProjected(table, "tombstoned"));
+  }
+
+  @Test
+  public void testGetProjectedInMemoryTable() throws Exception {
+    final Table<String, String> table = new InMemoryTestTable<>();
+    table.put("key", "value");
+
+    // The Table default has no serialized value to project from, so it always uses fromCachedValue.
+    assertEquals("cache:value", getProjected(table, "key"));
+    assertNull(getProjected(table, "absent"));
+  }
+
+  static String getProjected(Table<String, String> table, String key) throws Exception {
+    return table.getProjected(key, value -> "cache:" + value,
+        buffer -> "db:" + StringCodec.get().fromCodecBuffer(buffer));
   }
 
   @Test

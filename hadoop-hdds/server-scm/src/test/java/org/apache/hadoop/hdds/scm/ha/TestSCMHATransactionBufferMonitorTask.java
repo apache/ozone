@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -94,9 +95,11 @@ public class TestSCMHATransactionBufferMonitorTask {
     deletedBlockLog = mock(DeletedBlockLogImpl.class);
     Clock clock = mock(Clock.class);
     when(clock.millis()).thenAnswer(invocation -> clockMillis.get());
+    when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getScmMetadataStore()).thenReturn(metadataStore);
     when(scm.getSystemClock()).thenReturn(clock);
     when(scm.getScmBlockManager()).thenReturn(blockManager);
+    when(scm.getPerfMetrics()).thenReturn(mock(SCMPerformanceMetrics.class));
     when(blockManager.getDeletedBlockLog()).thenReturn(deletedBlockLog);
 
     transactionBuffer = new SCMHADBTransactionBufferImpl(scm);

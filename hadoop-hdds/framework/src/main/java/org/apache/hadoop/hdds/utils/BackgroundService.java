@@ -152,7 +152,14 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Running background service : {}", serviceName);
       }
-      BackgroundTaskQueue tasks = getTasks();
+      final BackgroundTaskQueue tasks;
+      try {
+        tasks = getTasks();
+      } catch (RuntimeException e) {
+        // An exception escaping run() would cancel all future executions of this periodic task.
+        LOG.error("Failed to get tasks for background service {}. Will retry in the next interval.", serviceName, e);
+        return;
+      }
       if (tasks.isEmpty()) {
         // No task found, or some problems to init tasks
         // return and retry in next interval.

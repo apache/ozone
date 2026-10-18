@@ -281,7 +281,7 @@ public class TestDeadNodeHandler {
 
   /**
    * Verifies that DeadNodeHandler skips the event when the node is no longer DEAD, for example because it
-   * heartbeated again and became HEALTHY_READONLY before the event was handled.
+   * heartbeated again and became HEALTHY before the event was handled.
    */
   @Test
   public void testDeadNodeHandlerSkipsNodeThatIsNoLongerDead(
@@ -303,9 +303,9 @@ public class TestDeadNodeHandler {
             Arrays.asList(metaStorageReport)), null);
     datanode = nodeManager.getNode(datanode.getID());
 
-    // The DEAD_NODE event was fired, but the node heartbeated again and became HEALTHY_READONLY before
+    // The DEAD_NODE event was fired, but the node heartbeated again and became HEALTHY before
     // DeadNodeHandler processed it. The handler should see the current state and skip the event.
-    setNodeHealthState(datanode, HddsProtos.NodeState.HEALTHY_READONLY);
+    setNodeHealthState(datanode, HddsProtos.NodeState.HEALTHY);
     deadNodeHandler.onMessage(datanode, publisher);
 
     verify(publisher, times(0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode);
