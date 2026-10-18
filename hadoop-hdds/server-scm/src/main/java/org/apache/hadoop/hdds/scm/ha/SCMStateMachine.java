@@ -22,9 +22,8 @@ import static java.util.Objects.requireNonNull;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
+import java.time.Duration;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -32,14 +31,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMMetrics;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes;
+import org.apache.hadoop.hdds.scm.ha.invoker.ScmInvoker;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -75,24 +78,57 @@ public class SCMStateMachine extends BaseStateMachine {
       LoggerFactory.getLogger(SCMStateMachine.class);
 
   private StorageContainerManager scm;
-  private Map<RequestType, Object> handlers;
+  private Map<RequestType, ScmInvoker<?>> invokers;
   private SCMHADBTransactionBuffer transactionBuffer;
+  private final SCMMetrics metrics;
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
   private final boolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
+  // Interval for the fallback retry that starts the deferred datanode-server on
+  // a follower (see retryStartDNServerUntilReady).
+  private static final Duration DN_SERVER_START_RETRY_INTERVAL =
+      Duration.ofSeconds(1);
+  private static final Duration DN_SERVER_START_INITIAL_WARNING_DELAY = Duration.ofSeconds(30);
+  private static final Duration DN_SERVER_START_WARNING_INTERVAL = Duration.ofMinutes(5);
+  private final Duration dnServerStartRetryInterval;
+  private final LongSupplier monotonicClock;
+
+  // Periodically retries the deferred datanode-server start on a follower so an
+  // idle cluster (no new transactions, only Ratis heartbeats) still exits safe
+  // mode once catch-up becomes observable.
+  private ScheduledExecutorService dnServerStartRetryExecutor;
+  private ScheduledFuture<?> dnServerStartRetryFuture;
+  private long dnServerStartRetryAttempts;
+  private long dnServerStartRetryStartedAt;
+  private long dnServerStartNextWarningAt;
+
   private DBCheckpoint installingDBCheckpoint = null;
   private List<ManagedSecretKey> installingSecretKeys = null;
 
-  private AtomicLong currentLeaderTerm = new AtomicLong(-1L);
-  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean();
+  private AtomicBoolean isStateMachineReady = new AtomicBoolean();
+
+  // The leader's committed index captured when this SCM (re)joins as a
+  // follower. Catch-up is measured against this fixed target rather than the
+  // leader's live commit index, which on a busy cluster keeps advancing and
+  // would never be reached. Set only while not yet ready; -1 means uncaptured.
+  private volatile long leaderCommitIndexOnStart = -1L;
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
+    this(scm, buffer, DN_SERVER_START_RETRY_INTERVAL, Time::monotonicNow);
+  }
+
+  @VisibleForTesting
+  SCMStateMachine(final StorageContainerManager scm,
+      SCMHADBTransactionBuffer buffer, Duration retryInterval, LongSupplier monotonicClock) {
     this.scm = scm;
-    this.handlers = new EnumMap<>(RequestType.class);
+    this.invokers = new EnumMap<>(RequestType.class);
     this.transactionBuffer = buffer;
+    this.metrics = scm.getMetrics();
+    this.dnServerStartRetryInterval = retryInterval;
+    this.monotonicClock = monotonicClock;
     TransactionInfo latestTrxInfo = this.transactionBuffer.getLatestTrxInfo();
     if (!latestTrxInfo.isDefault()) {
       updateLastAppliedTermIndex(latestTrxInfo.getTerm(),
@@ -105,15 +141,32 @@ public class SCMStateMachine extends BaseStateMachine {
             .setNameFormat(scm.threadNamePrefix() + "SCMInstallSnapshot-%d")
             .build()
     );
+    this.dnServerStartRetryExecutor = HadoopExecutors.newScheduledThreadPool(1,
+        new ThreadFactoryBuilder()
+            .setNameFormat(scm.threadNamePrefix() + "SCMDNServerStartRetry-%d")
+            .setDaemon(true)
+            .build());
     isInitialized = true;
   }
 
+  // Used only by SCMRatisServerImpl.initialize() to bootstrap Ratis storage;
+  // there is no SCM instance or background work to start or stop.
   public SCMStateMachine() {
     isInitialized = false;
+    this.metrics = null;
+    this.dnServerStartRetryInterval = DN_SERVER_START_RETRY_INTERVAL;
+    this.monotonicClock = Time::monotonicNow;
   }
 
-  public void registerHandler(RequestType type, Object handler) {
-    handlers.put(type, handler);
+  private void addRatisEvent(String message) {
+    if (metrics != null) {
+      metrics.addRatisEvent(message);
+    }
+  }
+
+  public void registerInvoker(RequestType type,
+      ScmInvoker<?> invoker) {
+    invokers.put(type, invoker);
   }
 
   @Override
@@ -141,6 +194,7 @@ public class SCMStateMachine extends BaseStateMachine {
       final TransactionContext trx) {
     final CompletableFuture<Message> applyTransactionFuture =
         new CompletableFuture<>();
+    transactionBuffer.beginApplyingTransaction();
     try {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
@@ -162,40 +216,29 @@ public class SCMStateMachine extends BaseStateMachine {
         applyTransactionFuture.completeExceptionally(ex);
       }
 
-      // After previous term transactions are applied, still in safe mode,
-      // perform refreshAndValidate to update the safemode rule state.
-      if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
-        scm.getScmSafeModeManager().refreshAndValidate();
-      }
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
       transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
       updateLastAppliedTermIndex(appliedTermIndex);
+
+      transactionBuffer.flushIfPendingLimitReached();
+
+      // A restarted follower may catch up by applying data-carrying entries
+      // here rather than through notifyTermIndexUpdated, so check for catch-up
+      // in both places. No-op once the datanode protocol server has started.
+      tryStartDNServerAndRefreshSafeMode();
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
+    } finally {
+      transactionBuffer.endApplyingTransaction();
     }
     return applyTransactionFuture;
   }
 
   private Message process(final SCMRatisRequest request) throws Exception {
-    try {
-      final Object handler = handlers.get(request.getType());
-
-      if (handler == null) {
-        throw new IOException("No handler found for request type " +
-            request.getType());
-      }
-
-      final Object result = handler.getClass().getMethod(
-          request.getOperation(), request.getParameterTypes())
-          .invoke(handler, request.getArguments());
-      return SCMRatisResponse.encode(result);
-    } catch (NoSuchMethodException | SecurityException ex) {
-      throw new InvalidProtocolBufferException(ex.getMessage());
-    } catch (InvocationTargetException e) {
-      final Exception targetEx = (Exception) e.getTargetException();
-      throw targetEx != null ? targetEx : e;
-    }
+    final ScmInvoker<?> invoker = invokers.get(request.getType());
+    requireNonNull(invoker, "invoker == null");
+    return invoker.invokeLocal(request.getOperation(), request.getArguments());
   }
 
   @Override
@@ -210,7 +253,9 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
-    LOG.info("current leader SCM steps down.");
+    String message = "SCM " + scm.getScmId() + " steps down from being leader.";
+    LOG.info(message);
+    addRatisEvent(message);
 
     scm.getScmContext().updateLeaderAndTerm(false, 0);
     scm.getSCMServiceManager().notifyStatusChanged();
@@ -241,6 +286,8 @@ public class SCMStateMachine extends BaseStateMachine {
     final String leaderNodeId = leaderDetails.get().getNodeId();
     LOG.info("Received install snapshot notification from SCM leader: {} with "
         + "term index: {}", leaderAddress, firstTermIndexInLog);
+    addRatisEvent("Installing snapshot from SCM leader " + leaderNodeId +
+        ", term index: " + firstTermIndexInLog);
 
     CompletableFuture<TermIndex> future = CompletableFuture.supplyAsync(
         () -> {
@@ -282,19 +329,46 @@ public class SCMStateMachine extends BaseStateMachine {
       return;
     }
 
-    currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
-        .getInfo().getCurrentTerm());
+    final boolean isLeader = groupMemberId.getPeerId().equals(newLeaderId);
 
-    if (!groupMemberId.getPeerId().equals(newLeaderId)) {
-      LOG.info("leader changed, yet current SCM is still follower.");
+    if (!isLeader) {
+      // Follower: capture the (possibly new) leader's current committed index
+      // as the fixed catch-up target, then start the datanode protocol server
+      // if we are already caught up with it; otherwise applyTransaction /
+      // notifyTermIndexUpdated start it as catch-up completes. Set it always:
+      // getLeaderCommitIndex() returns -1 when the leader is not known yet,
+      // which isFollowerCaughtUp() treats as uncaptured and re-reads later.
+      if (!isStateMachineReady.get()) {
+        leaderCommitIndexOnStart = getLeaderCommitIndex();
+      }
+      tryStartDNServerAndRefreshSafeMode();
+      scheduleDNServerStartRetry();
+      String message = "Leader changed to " + newLeaderId +
+          ", current SCM " + scm.getScmId() + " is still follower.";
+      LOG.info(message);
+      addRatisEvent(message);
       return;
     }
 
-    LOG.info("current SCM becomes leader of term {}.", currentLeaderTerm);
+    long currentTerm = scm.getScmHAManager().getRatisServer().getDivision()
+        .getInfo().getCurrentTerm();
+    String message = "current SCM " + scm.getScmId() +
+        " becomes leader of term " + currentTerm;
+    LOG.info(message);
+    addRatisEvent(message);
 
-    scm.getScmContext().updateLeaderAndTerm(true,
-        currentLeaderTerm.get());
+    scm.getScmContext().updateLeaderAndTerm(true, currentTerm);
     scm.getSequenceIdGen().invalidateBatch();
+
+    // isLeader() is now true -> start the datanode protocol server for the new
+    // leader (a leader has applied all committed entries) and refresh safe mode.
+    tryStartDNServerAndRefreshSafeMode();
+
+    try {
+      transactionBuffer.flush();
+    } catch (Exception ex) {
+      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
+    }
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
@@ -315,23 +389,28 @@ public class SCMStateMachine extends BaseStateMachine {
       return lastAppliedIndex;
     }
 
-    long startTime = Time.monotonicNow();
+    transactionBuffer.beginApplyingTransaction();
+    try {
+      long startTime = Time.monotonicNow();
 
-    TransactionInfo latestTrxInfo = transactionBuffer.getLatestTrxInfo();
-    final TransactionInfo lastAppliedTrxInfo = TransactionInfo.valueOf(lastTermIndex);
+      TransactionInfo latestTrxInfo = transactionBuffer.getLatestTrxInfo();
+      final TransactionInfo lastAppliedTrxInfo = TransactionInfo.valueOf(lastTermIndex);
 
-    if (latestTrxInfo.compareTo(lastAppliedTrxInfo) < 0) {
-      transactionBuffer.updateLatestTrxInfo(lastAppliedTrxInfo);
-      transactionBuffer.setLatestSnapshot(lastAppliedTrxInfo.toSnapshotInfo());
-    } else {
-      lastAppliedIndex = latestTrxInfo.getTransactionIndex();
+      if (latestTrxInfo.compareTo(lastAppliedTrxInfo) < 0) {
+        transactionBuffer.updateLatestTrxInfo(lastAppliedTrxInfo);
+        transactionBuffer.setLatestSnapshot(lastAppliedTrxInfo.toSnapshotInfo());
+      } else {
+        lastAppliedIndex = latestTrxInfo.getTransactionIndex();
+      }
+
+      transactionBuffer.flush();
+
+      LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
+          lastAppliedIndex, Time.monotonicNow() - startTime);
+      return lastAppliedIndex;
+    } finally {
+      transactionBuffer.endApplyingTransaction();
     }
-
-    transactionBuffer.flush();
-
-    LOG.info("Current Snapshot Index {}, takeSnapshot took {} ms",
-        lastAppliedIndex, Time.monotonicNow() - startTime);
-    return lastAppliedIndex;
   }
 
   @Override
@@ -351,25 +430,187 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (transactionBuffer != null) {
-      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
+      transactionBuffer.beginApplyingTransaction();
+      try {
+        transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(term, index));
+      } finally {
+        transactionBuffer.endApplyingTransaction();
+      }
     }
 
-    if (currentLeaderTerm.get() == term) {
-      // Means all transactions before this term have been applied.
-      // This means after a restart, all pending transactions have been applied.
-      // Perform
-      // 1. Refresh Safemode rules state.
-      // 2. Start DN Rpc server.
-      if (!refreshedAfterLeaderReady.get()) {
-        refreshedAfterLeaderReady.set(true);
+    // As committed entries are applied (e.g. a restarted follower catching up),
+    // start the datanode protocol server once we are caught up with the leader's
+    // committed index. No-op once the server has already been started.
+    tryStartDNServerAndRefreshSafeMode();
+  }
+
+  /**
+   * Start the DatanodeProtocolServer and re-evaluate safe-mode rules, but only
+   * when this SCM is safe to accept datanode reports: it is the leader, or it
+   * is a follower whose state machine has caught up with the leader's committed
+   * log. Guarded by {@code isStateMachineReady} (CAS) so the non-idempotent
+   * {@code DatanodeProtocolServer.start()} runs exactly once.
+   *
+   * <p>In HA mode {@link StorageContainerManager#start()} deliberately does not
+   * start the datanode protocol server; it is deferred to here so datanode
+   * container reports are processed against the up-to-date container/pipeline
+   * state rather than a stale, mid-replay snapshot.
+   */
+  private synchronized void tryStartDNServerAndRefreshSafeMode() {
+    if (scm.isStopped() || isStateMachineReady.get()) {
+      return;
+    }
+    if (scm.getScmContext().isLeader() || isFollowerCaughtUp()) {
+      if (isStateMachineReady.compareAndSet(false, true)) {
+        // No further retry is needed. shutdown() lets the current retry, if
+        // this method was called by it, finish normally without cancellation.
+        dnServerStartRetryExecutor.shutdown();
+        scm.getDatanodeProtocolServer().start();
         scm.getScmSafeModeManager().refreshAndValidate();
       }
-      currentLeaderTerm.set(-1L);
     }
   }
 
-  public boolean isRefreshedAfterLeaderReady() {
-    return refreshedAfterLeaderReady.get();
+  /**
+   * Periodic fallback for the deferred datanode-server start on a follower. The
+   * Ratis callbacks ({@code applyTransaction}, {@code notifyTermIndexUpdated},
+   * {@code notifyLeaderChanged}) only fire on new activity, so on an idle
+   * cluster a restarted follower can miss the moment the leader's committed
+   * index becomes observable (it is not yet known when {@code notifyLeaderChanged}
+   * fires) and never start its datanode server, leaving it stuck in safe mode.
+   * This re-checks until the server starts. Starting stays
+   * gated by the same {@link #tryStartDNServerAndRefreshSafeMode()} predicate, so
+   * it cannot start the server before genuine catch-up.
+   */
+  private void retryStartDNServerUntilReady() {
+    try {
+      synchronized (this) {
+        if (!scm.isStopped() && !isStateMachineReady.get()) {
+          dnServerStartRetryAttempts++;
+          tryStartDNServerAndRefreshSafeMode();
+          logPendingDNServerStart();
+        }
+      }
+    } catch (Exception e) {
+      // Do not let a failed readiness check terminate the fallback. The
+      // finally block only schedules another attempt if startup is pending.
+      LOG.warn("Deferred datanode-server start retry failed", e);
+    } finally {
+      synchronized (this) {
+        dnServerStartRetryFuture = null;
+        scheduleDNServerStartRetry();
+      }
+    }
+  }
+
+  private void logPendingDNServerStart() {
+    if (scm.isStopped() || isStateMachineReady.get()) {
+      return;
+    }
+    long now = monotonicClock.getAsLong();
+    if (now >= dnServerStartNextWarningAt) {
+      long lastAppliedIndex = scm.getScmHAManager().getRatisServer().getDivision().getInfo().getLastAppliedIndex();
+      LOG.warn("Deferred datanode-server start is still waiting for follower catch-up: " +
+          "attempts={}, elapsed={}ms, lastAppliedIndex={}, leaderCommitIndexOnStart={}",
+          dnServerStartRetryAttempts, now - dnServerStartRetryStartedAt, lastAppliedIndex, leaderCommitIndexOnStart);
+      dnServerStartNextWarningAt = now + DN_SERVER_START_WARNING_INTERVAL.toMillis();
+    }
+  }
+
+  private synchronized void scheduleDNServerStartRetry() {
+    if (scm.isStopped() || isStateMachineReady.get() ||
+        dnServerStartRetryExecutor.isShutdown() || dnServerStartRetryFuture != null) {
+      return;
+    }
+    if (dnServerStartRetryAttempts == 0) {
+      dnServerStartRetryStartedAt = monotonicClock.getAsLong();
+      dnServerStartNextWarningAt = dnServerStartRetryStartedAt + DN_SERVER_START_INITIAL_WARNING_DELAY.toMillis();
+    }
+    dnServerStartRetryFuture = dnServerStartRetryExecutor.schedule(
+        this::retryStartDNServerUntilReady,
+        dnServerStartRetryInterval.toMillis(), TimeUnit.MILLISECONDS);
+  }
+
+  public void stopDNServerStartRetry() {
+    if (!isInitialized) {
+      return;
+    }
+    synchronized (this) {
+      dnServerStartRetryExecutor.shutdownNow();
+      dnServerStartRetryFuture = null;
+    }
+    HadoopExecutors.shutdown(dnServerStartRetryExecutor, LOG, 5, TimeUnit.SECONDS);
+  }
+
+  @VisibleForTesting
+  boolean isDNServerStartRetryStopped() {
+    return dnServerStartRetryExecutor.isShutdown();
+  }
+
+  @VisibleForTesting
+  boolean isDNServerStartRetryTerminated() {
+    return dnServerStartRetryExecutor.isTerminated();
+  }
+
+  /**
+   * @return true if this follower's last applied index has reached the leader's
+   * committed index captured when it (re)joined, i.e. all transactions the
+   * leader had committed at that point have been replayed. Comparing against a
+   * fixed target avoids chasing the leader's ever-advancing live commit index.
+   */
+  private boolean isFollowerCaughtUp() {
+    try {
+      long target = leaderCommitIndexOnStart;
+      if (target < 0) {
+        // Not captured at leader-change time yet; capture the leader's current
+        // commit index once here so we still compare against a fixed target.
+        target = getLeaderCommitIndex();
+        if (target < 0) {
+          // Normal transient condition during startup/catch-up; this is polled
+          // from multiple callbacks, so keep it at DEBUG to avoid log flooding.
+          LOG.debug("Leader commit index not available yet");
+          return false;
+        }
+        leaderCommitIndexOnStart = target;
+      }
+
+      long lastAppliedIndex = scm.getScmHAManager().getRatisServer()
+          .getDivision().getInfo().getLastAppliedIndex();
+      boolean caughtUp = lastAppliedIndex >= target;
+      if (caughtUp) {
+        LOG.info("Follower caught up with leader: lastAppliedIndex={}, leaderCommitOnStart={}",
+            lastAppliedIndex, target);
+      } else {
+        LOG.debug("Follower not caught up: lastAppliedIndex={}, leaderCommitOnStart={}",
+            lastAppliedIndex, target);
+      }
+      return caughtUp;
+    } catch (Exception e) {
+      LOG.warn("Failed to check follower catch-up status", e);
+      return false;
+    }
+  }
+
+  /**
+   * @return the leader's current committed index as seen by this SCM, or -1 if
+   * the leader or its commit info is not available yet.
+   */
+  private long getLeaderCommitIndex() {
+    RaftServer.Division division = scm.getScmHAManager()
+        .getRatisServer().getDivision();
+    RaftPeerId leaderId = division.getInfo().getLeaderId();
+    if (leaderId != null) {
+      for (RaftProtos.CommitInfoProto info : division.getCommitInfos()) {
+        if (info.getServer().getId().equals(leaderId.toByteString())) {
+          return info.getCommitIndex();
+        }
+      }
+    }
+    return -1L;
+  }
+
+  public boolean getIsStateMachineReady() {
+    return isStateMachineReady.get();
   }
 
   @Override
@@ -381,12 +622,15 @@ public class SCMStateMachine extends BaseStateMachine {
     // leader ready  in SCMContext.
     scm.getScmContext().setLeaderReady();
     scm.getSCMServiceManager().notifyStatusChanged();
-    scm.getFinalizationManager().onLeaderReady();
+    addRatisEvent("SCM " + scm.getScmId() +
+        " is ready to serve requests as the leader");
   }
 
   @Override
   public void notifyConfigurationChanged(long term, long index,
       RaftProtos.RaftConfigurationProto newRaftConfiguration) {
+    addRatisEvent("Configuration changed at term index (" + term + ", " + index +
+        ") to " + newRaftConfiguration.toString());
   }
 
   @Override
@@ -419,6 +663,7 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     LOG.info("{}: SCMStateMachine is reinitializing. newTermIndex = {}", getId(), termIndex);
+    addRatisEvent("reinitialize: " + termIndex);
 
     // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
     try {
@@ -449,6 +694,7 @@ public class SCMStateMachine extends BaseStateMachine {
       transactionBuffer.close();
       HadoopExecutors.
           shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
+      stopDNServerStartRetry();
     } else if (!scm.isStopped()) {
       scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
     }

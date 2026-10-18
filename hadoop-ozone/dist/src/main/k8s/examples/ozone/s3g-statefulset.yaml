@@ -41,15 +41,22 @@ spec:
         - s3g
         livenessProbe:
           httpGet:
-            path: /
+            path: /health/live
             port: 19878
           initialDelaySeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 19878
         envFrom:
         - configMapRef:
             name: config
         volumeMounts:
         - name: data
           mountPath: /data
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Delete
+    whenScaled: Retain
   volumeClaimTemplates:
   - metadata:
       name: data

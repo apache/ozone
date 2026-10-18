@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.snapshot;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -93,6 +94,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
         .getSnapshotDBKeysList();
     TransactionInfo transactionInfo = TransactionInfo.valueOf(context.getTermIndex());
     try {
+      List<String> purgedSnapshotsForLog = new ArrayList<>();
 
       // Each snapshot purge operation does three things:
       //  1. Update the deep clean flag for the next active snapshot (So that it can be
@@ -109,6 +111,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
               "Snapshot purge request.", snapTableKey);
           continue;
         }
+        purgedSnapshotsForLog.add(formatSnapshotForLog(fromSnapshot));
         SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);
         SnapshotInfo nextToNextSnapshot = nextSnapshot == null ? null : SnapshotUtils.getNextSnapshot(ozoneManager,
             snapshotChainManager, nextSnapshot);
@@ -133,8 +136,8 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
           transactionInfo);
 
       omSnapshotIntMetrics.incNumSnapshotPurges();
-      LOG.info("Successfully executed snapshotPurgeRequest: {{}} along with updating snapshots:{}.",
-          snapshotPurgeRequest, updatedSnapshotInfos);
+      LOG.info("Successfully executed snapshotPurgeRequest for snapshots: {} along with updating snapshots: {}.",
+          purgedSnapshotsForLog, updatedSnapshotInfos);
       if (LOG.isDebugEnabled()) {
         Map<String, String> auditParams = new LinkedHashMap<>();
         auditParams.put(AUDIT_PARAM_SNAPSHOT_DB_KEYS, snapshotDbKeys.toString());
@@ -254,5 +257,9 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       }
     }
     return snapshotInfo;
+  }
+
+  private static String formatSnapshotForLog(SnapshotInfo snapshotInfo) {
+    return snapshotInfo.getTableKey() + " (snapshotId='" + snapshotInfo.getSnapshotId() + "')";
   }
 }

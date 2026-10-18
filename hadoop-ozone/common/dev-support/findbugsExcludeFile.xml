@@ -25,8 +25,4 @@
     <Class name="org.apache.hadoop.ozone.security.TestGDPRSymmetricKey"/>
     <Bug pattern="DLS_DEAD_LOCAL_STORE" />
   </Match>
-  <Match>
-    <Class name="org.apache.hadoop.ozone.om.lock.TestOzoneManagerLock"/>
-    <Bug pattern="IMSE_DONT_CATCH_IMSE" />
-  </Match>
 </FindBugsFilter>

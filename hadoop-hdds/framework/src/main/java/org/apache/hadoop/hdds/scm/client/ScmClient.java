@@ -23,15 +23,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -53,15 +53,9 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
  * NOTE this is temporarily needed class. When SCM containers are full-fledged,
  * this interface will likely be removed.
  */
+@InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface ScmClient extends Closeable {
-  /**
-   * Creates a Container on SCM and returns the pipeline.
-   * @return ContainerInfo
-   * @throws IOException
-   */
-  ContainerWithPipeline createContainer(String owner) throws IOException;
-
   /**
    * Gets a container by Name -- Throws if the container does not exist.
    * @param containerId - Container ID
@@ -98,24 +92,6 @@ public interface ScmClient extends Closeable {
   void closeContainer(long containerId) throws IOException;
 
   /**
-   * Deletes an existing container.
-   * @param containerId - ID of the container.
-   * @param pipeline - Pipeline that represents the container.
-   * @param force - true to forcibly delete the container.
-   * @throws IOException
-   */
-  void deleteContainer(long containerId, Pipeline pipeline, boolean force)
-      throws IOException;
-
-  /**
-   * Deletes an existing container.
-   * @param containerId - ID of the container.
-   * @param force - true to forcibly delete the container.
-   * @throws IOException
-   */
-  void deleteContainer(long containerId, boolean force) throws IOException;
-
-  /**
    * Lists a range of containers and get their info.
    *
    * @param startContainerID start containerID.
@@ -146,43 +122,23 @@ public interface ScmClient extends Closeable {
       throws IOException;
 
   /**
-   * Read meta data from an existing container.
-   * @param containerID - ID of the container.
-   * @param pipeline - Pipeline where the container is located.
-   * @return ContainerInfo
+   * Lists a range of containers and get their info.
+   *
+   * @param startContainerID start containerID.
+   * @param count count must be {@literal >} 0.
+   * @param state Container of this state will be returned.
+   * @param replicationConfig container replication Config.
+   * @param suppressed container to be suppressed/unsuppressed from report
+   * @return a list of containers capped by max count allowed
+   * in "ozone.scm.container.list.max.count" and total number of containers.
    * @throws IOException
    */
-  ContainerDataProto readContainer(long containerID, Pipeline pipeline)
+  ContainerListResult listContainer(long startContainerID, int count,
+      HddsProtos.LifeCycleState state,
+      HddsProtos.ReplicationType replicationType,
+      ReplicationConfig replicationConfig,
+      Boolean suppressed)
       throws IOException;
-
-  /**
-   * Read meta data from an existing container.
-   * @param containerID - ID of the container.
-   * @return ContainerInfo
-   * @throws IOException
-   */
-  ContainerDataProto readContainer(long containerID)
-      throws IOException;
-
-  /**
-   * Gets the container size -- Computed by SCM from Container Reports.
-   * @param containerID - ID of the container.
-   * @return number of bytes used by this container.
-   * @throws IOException
-   */
-  long getContainerSize(long containerID) throws IOException;
-
-  /**
-   * Creates a Container on SCM and returns the pipeline.
-   * @param type - Replication Type.
-   * @param replicationFactor - Replication Factor
-   * @return ContainerInfo
-   * @throws IOException - in case of error.
-   */
-  @Deprecated
-  ContainerWithPipeline createContainer(HddsProtos.ReplicationType type,
-      HddsProtos.ReplicationFactor replicationFactor,
-      String owner) throws IOException;
 
   ContainerWithPipeline createContainer(ReplicationConfig replicationConfig, String owner) throws IOException;
 
@@ -320,11 +276,10 @@ public interface ScmClient extends Closeable {
   /**
    * Get the safe mode status of all rules.
    *
-   * @return map of rule statuses.
+   * @return list of rule statuses.
    * @throws IOException
    */
-  Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
-      throws IOException;
+  List<SafeModeRuleStatusProto> getSafeModeRuleStatuses() throws IOException;
 
   /**
    * Force SCM out of safe mode.
@@ -375,7 +330,9 @@ public interface ScmClient extends Closeable {
       Optional<Integer> moveReplicationTimeout,
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
-      Optional<String> excludeNodes) throws IOException;
+      Optional<String> excludeNodes,
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException;
 
   /**
    * Stop ContainerBalancer.
@@ -443,9 +400,11 @@ public interface ScmClient extends Closeable {
   List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException;
 
+  @Deprecated
   StatusAndMessages finalizeScmUpgrade(String upgradeClientID)
       throws IOException;
 
+  @Deprecated
   StatusAndMessages queryUpgradeFinalizationProgress(
       String upgradeClientID, boolean force, boolean readonly)
       throws IOException;
@@ -462,4 +421,15 @@ public interface ScmClient extends Closeable {
    * @throws IOException On error
    */
   void reconcileContainer(long containerID) throws IOException;
+
+  /**
+   * Suppress or unsuppress containers from reports.
+   * Suppressed containers are excluded from replication manager reports
+   * regardless of their health state.
+   *
+   * @param containerIds container IDs to suppress or unsuppress
+   * @param suppress true to suppress, false to unsuppress
+   * @throws IOException
+   */
+  List<Long> suppressContainers(List<Long> containerIds, boolean suppress) throws IOException;
 }

@@ -49,7 +49,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMSecurityProtocolProtos.Type;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
 import org.apache.hadoop.ipc_.RPC;
@@ -110,7 +110,10 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
       throws SCMSecurityException {
     if (resp.getStatus() != SCMSecurityProtocolProtos.Status.OK) {
       throw new SCMSecurityException(resp.getMessage(),
-          SCMSecurityException.ErrorCode.values()[resp.getStatus().ordinal()]);
+          // The protocol status was introduced with a longer name than the existing error code.
+          resp.getStatus() == SCMSecurityProtocolProtos.Status.GET_ROOT_CA_CERTIFICATE_FAILED
+              ? SCMSecurityException.ErrorCode.GET_ROOT_CA_CERT_FAILED
+              : SCMSecurityException.ErrorCode.valueOf(resp.getStatus().name()));
     }
     return resp;
   }

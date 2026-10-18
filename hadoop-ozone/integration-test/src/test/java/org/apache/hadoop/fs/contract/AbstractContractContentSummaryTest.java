@@ -18,7 +18,7 @@
 package org.apache.hadoop.fs.contract;
 
 import static org.apache.hadoop.fs.contract.ContractTestUtils.touch;
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.FileNotFoundException;
 import org.apache.hadoop.fs.ContentSummary;
@@ -57,6 +57,6 @@ public abstract class AbstractContractContentSummaryTest extends AbstractFSContr
 
     fs.mkdirs(parent);
 
-    intercept(FileNotFoundException.class, () -> fs.getContentSummary(nested));
+    assertThrows(FileNotFoundException.class, () -> fs.getContentSummary(nested));
   }
 }

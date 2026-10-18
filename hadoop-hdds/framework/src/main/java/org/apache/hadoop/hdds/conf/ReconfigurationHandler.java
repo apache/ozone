@@ -23,11 +23,13 @@ import static java.util.function.UnaryOperator.identity;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.BiConsumer;
 import java.util.function.UnaryOperator;
 import org.apache.hadoop.conf.Configuration;
@@ -51,6 +53,7 @@ public class ReconfigurationHandler extends ReconfigurableBase
   private final CheckedConsumer<String, IOException> requireAdminPrivilege;
   private final Map<String, UnaryOperator<String>> properties =
       new ConcurrentHashMap<>();
+  private final Set<String> prefixProperties = new ConcurrentSkipListSet<>();
 
   private final List<ReconfigurationChangeCallback> completeCallbacks = new ArrayList<>();
   private BiConsumer<ReconfigurationTaskStatus, Configuration> reconfigurationStatusListener;
@@ -122,6 +125,13 @@ public class ReconfigurationHandler extends ReconfigurableBase
     return this;
   }
 
+  public ReconfigurationHandler registerPrefix(String prefixProperty) {
+    prefixProperties.add(
+        prefixProperty.endsWith(".") ? prefixProperty : prefixProperty.concat(".")
+    );
+    return this;
+  }
+
   @Override
   protected Configuration getNewConf() {
     return new OzoneConfiguration();
@@ -129,7 +139,19 @@ public class ReconfigurationHandler extends ReconfigurableBase
 
   @Override
   public Set<String> getReconfigurableProperties() {
-    return unmodifiableSet(properties.keySet());
+    Set<String> reconfigureProperties = new HashSet<>(properties.keySet());
+    reconfigureProperties.addAll(prefixProperties);
+    return unmodifiableSet(reconfigureProperties);
+  }
+
+  @Override
+  public boolean isPropertyReconfigurable(String property) {
+    for (String prefixProperty : prefixProperties) {
+      if (property.startsWith(prefixProperty)) {
+        return true;
+      }
+    }
+    return properties.containsKey(property);
   }
 
   @Override

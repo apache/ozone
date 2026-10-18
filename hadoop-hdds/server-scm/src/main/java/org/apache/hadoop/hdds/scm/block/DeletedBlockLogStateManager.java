@@ -21,7 +21,9 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.ArrayList;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
 
@@ -29,31 +31,41 @@ import org.apache.hadoop.hdds.utils.db.Table;
  * DeletedBlockLogStateManager interface to
  * manage deleted blocks and record them in the underlying persist store.
  */
-public interface DeletedBlockLogStateManager {
+public interface DeletedBlockLogStateManager extends SCMHandler {
+
+  @Override
+  default RequestType getType() {
+    return RequestType.BLOCK;
+  }
+
   @Replicate
   void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
       DeletedBlocksTransactionSummary summary) throws IOException;
 
   @Replicate
-  void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs) throws IOException;
+  default void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs) throws IOException {
+    addTransactionsToDB(txs, null);
+  }
 
   @Replicate
   void removeTransactionsFromDB(ArrayList<Long> txIDs, DeletedBlocksTransactionSummary summary)
       throws IOException;
 
   @Replicate
-  void removeTransactionsFromDB(ArrayList<Long> txIDs)
-      throws IOException;
+  default void removeTransactionsFromDB(ArrayList<Long> txIDs) throws IOException {
+    removeTransactionsFromDB(txIDs, null);
+  }
 
   @Deprecated
   @Replicate
-  void increaseRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
-      throws IOException;
+  default void increaseRetryCountOfTransactionInDB(ArrayList<Long> txIDs) throws IOException {
+  }
 
   @Deprecated
   @Replicate
-  int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs)
-      throws IOException;
+  default int resetRetryCountOfTransactionInDB(ArrayList<Long> txIDs) throws IOException {
+    return 0;
+  }
 
   Table.KeyValueIterator<Long, DeletedBlocksTransaction> getReadOnlyIterator()
       throws IOException;
@@ -62,4 +74,5 @@ public interface DeletedBlockLogStateManager {
 
   void reinitialize(Table<Long, DeletedBlocksTransaction> deletedBlocksTXTable,
       Table<String, ByteString> statefulConfigTable);
+
 }

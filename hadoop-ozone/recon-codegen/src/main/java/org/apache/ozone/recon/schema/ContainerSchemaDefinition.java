@@ -17,6 +17,8 @@
 
 package org.apache.ozone.recon.schema;
 
+import static java.util.Collections.unmodifiableList;
+import static java.util.stream.Collectors.toList;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
@@ -25,6 +27,8 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.List;
 import javax.sql.DataSource;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
@@ -78,10 +82,26 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
             .primaryKey(CONTAINER_ID, CONTAINER_STATE))
         .constraint(DSL.constraint(UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
             .check(field(name(CONTAINER_STATE))
-                .in(UnHealthyContainerStates.values())))
+                .in(UnHealthyContainerStates.NAMES)))
         .execute();
-    dslContext.createIndex("idx_container_state")
-        .on(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME), DSL.field(name(CONTAINER_STATE)))
+    // Composite index (container_state, container_id) serves two query patterns:
+    //
+    // 1. COUNT(*)/GROUP-BY filtered by state:
+    //      WHERE container_state = ?
+    //    Derby uses the index prefix (container_state) — same efficiency as the old
+    //    single-column idx_container_state.
+    //
+    // 2. Paginated reads filtered by state + cursor:
+    //      WHERE container_state = ? AND container_id > ? ORDER BY container_id ASC
+    //    With the old single-column index Derby had to:
+    //      a) Scan ALL rows for the state (e.g. 200K), then
+    //      b) Sort them by container_id for every page call — O(n) per page.
+    //    With this composite index Derby jumps directly to (state, minId) and reads
+    //    the next LIMIT entries sequentially — O(1) per page, ~10–14× faster.
+    dslContext.createIndex("idx_state_container_id")
+        .on(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME),
+            DSL.field(name(CONTAINER_STATE)),
+            DSL.field(name(CONTAINER_ID)))
         .execute();
   }
 
@@ -105,6 +125,10 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     MIS_REPLICATED,
     ALL_REPLICAS_BAD,
     NEGATIVE_SIZE, // Added new state to track containers with negative sizes
-    REPLICA_MISMATCH
+    REPLICA_MISMATCH;
+
+    public static final List<String> NAMES = unmodifiableList(Arrays.stream(values())
+        .map(Enum::toString)
+        .collect(toList()));
   }
 }

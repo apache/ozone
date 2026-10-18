@@ -160,9 +160,7 @@ public class ReconGlobalMetricsService {
     if (deletedDirTable == null) {
       return deletedDirInsightInfo;
     }
-    try (
-        TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            keyIter = deletedDirTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> keyIter = deletedDirTable.iterator()) {
       boolean skipPrevKey = false;
       String lastKey = "";
       if (isNotBlank(prevKey)) {

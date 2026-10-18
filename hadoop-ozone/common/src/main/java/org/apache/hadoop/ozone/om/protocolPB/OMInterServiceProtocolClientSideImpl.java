@@ -22,7 +22,7 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
@@ -48,7 +48,7 @@ public class OMInterServiceProtocolClientSideImpl implements
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
-  private final HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider;
+  private final HadoopRpcOMFailoverProxyProvider<OMInterServiceProtocolPB> omFailoverProxyProvider;
 
   private final OMInterServiceProtocolPB rpcProxy;
 
@@ -58,7 +58,7 @@ public class OMInterServiceProtocolClientSideImpl implements
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
         OMInterServiceProtocolPB.class, ProtobufRpcEngine.class);
 
-    this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider(
+    this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider<>(
             conf, ugi, omServiceId, OMInterServiceProtocolPB.class);
 
     int maxFailovers = conf.getInt(

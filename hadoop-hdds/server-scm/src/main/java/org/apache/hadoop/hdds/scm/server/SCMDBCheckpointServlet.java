@@ -17,7 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import java.util.Collections;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_HTTP_AUTH_TYPE;
+
 import javax.servlet.ServletException;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -27,10 +28,10 @@ import org.slf4j.LoggerFactory;
 /**
  * Provides the current checkpoint Snapshot of the SCM DB. (tar.gz)
  *
- * When Ozone ACL is enabled (`ozone.acl.enabled`=`true`), only users/principals
- * configured in `ozone.administrator` (along with the user that starts OM,
- * which automatically becomes an Ozone administrator but not necessarily in
- * the config) are allowed to access this endpoint.
+ * When Ozone authorization is enabled (`ozone.authorization.enabled`=`true`),
+ * only users/principals configured in `ozone.administrator` (along with the
+ * user that starts SCM, which automatically becomes an Ozone administrator
+ * but not necessarily in the config) are allowed to access this endpoint.
  *
  * If Kerberos is enabled, the principal should be appended to
  * `ozone.administrator`, e.g. `scm/scm@EXAMPLE.COM`
@@ -56,9 +57,9 @@ public class SCMDBCheckpointServlet extends DBCheckpointServlet {
 
     initialize(scm.getScmMetadataStore().getStore(),
         scm.getMetrics().getDBCheckpointMetrics(),
-        false,
-        Collections.emptyList(),
-        Collections.emptyList(),
-        false);
+        scm.isAdminAuthorizationEnabled(),
+        scm.getScmAdminUsernames(),
+        scm.getScmAdminGroups(),
+        "kerberos".equals(scm.getConfiguration().get(HDDS_SCM_HTTP_AUTH_TYPE, "simple")));
   }
 }

@@ -120,8 +120,13 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   // be released from the buffer pool.
   private final StreamCommitWatcher commitWatcher;
 
+  // Futures of the PutBlock(s) sent through the Ratis write API, i.e. committed by the Raft log.
   private Queue<CompletableFuture<ContainerCommandResponseProto>>
       putBlockFutures = new LinkedList<>();
+
+  // Futures of the PutBlock(s) sent as data stream commands, i.e. committed without the Raft log.
+  private final Queue<CompletableFuture<DataStreamReply>>
+      putBlockCommandFutures = new LinkedList<>();
 
   private final List<DatanodeDetails> failedServers;
   private final Checksum checksum;
@@ -131,7 +136,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
-  private static final long SYNC_SIZE = 0; // TODO: disk sync is disabled for now
+  private final long syncSize;
   private long syncPosition = 0;
   private StreamBuffer currentBuffer;
   private XceiverClientMetrics metrics;
@@ -157,6 +162,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.isDatastreamPipelineMode = config.isDatastreamPipelineMode();
+    this.syncSize = config.getDataStreamSyncSize();
     this.blockID = new AtomicReference<>(blockID);
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
@@ -193,6 +199,14 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private DataStreamOutput setupStream(Pipeline pipeline) throws IOException {
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (!dn.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)) {
+        throw new IOException("RATIS_DATASTREAM port is missing for datanode "
+            + dn + " in pipeline " + pipeline.getId()
+            + "; datastream is disabled for this pipeline");
+      }
+    }
+
     // Execute a dummy WriteChunk request to get the path of the target file,
     // but does NOT write any data to it.
     ContainerProtos.WriteChunkRequestProto.Builder writeChunkRequest =
@@ -202,11 +216,15 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     // TODO: The datanode UUID is not used meaningfully, consider deprecating
     //  it or remove it completely if possible
     String id = pipeline.getFirstNode().getUuidString();
+    ContainerProtos.Type streamInitType = config.isDatastreamPutBlockWithoutRaftEnabled()
+        ? ContainerProtos.Type.StreamInitWithPutBlock
+        : ContainerProtos.Type.StreamInit;
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
-            .setCmdType(ContainerProtos.Type.StreamInit)
+            .setCmdType(streamInitType)
             .setContainerID(blockID.get().getContainerID())
-            .setDatanodeUuid(id).setWriteChunk(writeChunkRequest);
+            .setDatanodeUuid(id).setWriteChunk(writeChunkRequest)
+            .setWritePipelineVersion(pipeline.getWriteVersion());
 
     if (tokenString != null) {
       builder.setEncodedToken(tokenString);
@@ -310,6 +328,9 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         if (!putBlockFutures.isEmpty()) {
           putBlockFutures.remove().get();
         }
+        if (!putBlockCommandFutures.isEmpty()) {
+          putBlockCommandFutures.remove().get();
+        }
       } catch (ExecutionException e) {
         handleExecutionException(e);
       } catch (InterruptedException ex) {
@@ -407,6 +428,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       byteBufferList = null;
     }
     waitFuturesComplete();
+    if (close && config.isDatastreamPutBlockWithoutRaftEnabled()) {
+      // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
+      waitPutBlockCommandFuturesComplete();
+    }
     final BlockData blockData = containerBlockData.build();
     if (close) {
       // HDDS-12007 changed datanodes to ignore the following PutBlock request.
@@ -428,8 +453,15 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           }
         }
       });
+      if (config.isDatastreamPutBlockWithoutRaftEnabled()) {
+        // PutBlock is supposed to be committed after the data stream close so there
+        // is no need to continue.
+        return;
+      }
+    } else if (config.isDatastreamPutBlockWithoutRaftEnabled()) {
+      executePutBlockCommand(blockData, byteBufferList);
+      return;
     }
-
     try {
       XceiverClientReply asyncReply =
           putBlockAsync(xceiverClient, blockData, close, tokenString);
@@ -478,6 +510,57 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     }
   }
 
+  /**
+   * Commit a PutBlock in the middle of the stream by sending it as a data stream command,
+   * so that it does not go through the Raft log.  The command is ordered with the data written
+   * so far and the datanodes reply with the serialized {@link ContainerCommandResponseProto}.
+   *
+   * @param blockData the block metadata to commit
+   * @param byteBufferList the buffers covered by this PutBlock, to be released once it is acknowledged
+   */
+  private void executePutBlockCommand(BlockData blockData,
+      List<StreamBuffer> byteBufferList) throws IOException {
+    final ContainerCommandRequestProto putBlockRequest
+        = ContainerProtocolCalls.getPutBlockRequest(
+            xceiverClient.getPipeline(), blockData, false, tokenString);
+    final ByteBuffer command = ContainerCommandRequestMessage.toMessage(
+        putBlockRequest, null).getContent().asReadOnlyByteBuffer();
+    Preconditions.checkState(command.remaining() <= PUT_BLOCK_REQUEST_LENGTH_MAX,
+        "PutBlock command length %s > max %s", command.remaining(),
+        PUT_BLOCK_REQUEST_LENGTH_MAX);
+    RatisHelper.debug(command, "putBlockCommand", LOG);
+    metrics.incrPendingContainerOpsMetrics(ContainerProtos.Type.PutBlock);
+    putBlockCommandFutures.add(out.commandAsync(command)
+        .whenCompleteAsync((reply, e) -> {
+          metrics.decrPendingContainerOpsMetrics(ContainerProtos.Type.PutBlock);
+          try {
+            validatePutBlockCommandReply(reply, e);
+          } catch (IOException ioe) {
+            setIoException(ioe);
+            throw new CompletionException(ioe);
+          }
+          // The command has no log index; use 0 as for the standalone protocol
+          // so that the buffers are released by the next watchForCommit.
+          commitWatcher.updateCommitInfoMap(0, byteBufferList);
+        }, responseExecutor));
+  }
+
+  private void validatePutBlockCommandReply(DataStreamReply reply, Throwable e)
+      throws IOException {
+    if (e != null || reply == null || !reply.isSuccess()) {
+      throw new IOException("Failed to commit PutBlock for blockID " + blockID
+          + " through the data stream, reply=" + reply, e);
+    }
+    final ByteBuffer response = reply.nioBuffer();
+    if (!response.hasRemaining()) {
+      throw new IOException("Datanodes in pipeline "
+          + xceiverClient.getPipeline().getId() + " did not handle the PutBlock"
+          + " command for blockID " + blockID
+          + "; they may be running a version which does not support it");
+    }
+    validateResponse(ContainerCommandResponseProto.parseFrom(response));
+  }
+
   public static CompletableFuture<DataStreamReply> executePutBlockClose(
       ContainerCommandRequestProto putBlockRequest, int max,
       DataStreamOutput out) {
@@ -521,8 +604,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       if (!isClosed()) {
         handleFlush(false);
       }
-    } catch (Exception e) {
-
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      handleInterruptedException(e, false);
+    } catch (ExecutionException e) {
+      handleExecutionException(e);
     }
   }
 
@@ -532,6 +618,19 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       futures.clear();
     } catch (Exception e) {
       LOG.warn("Failed to write all chunks through stream: " + e);
+      throw new IOException(e);
+    }
+  }
+
+  private void waitPutBlockCommandFuturesComplete() throws IOException {
+    if (putBlockCommandFutures.isEmpty()) {
+      return;
+    }
+    try {
+      CompletableFuture.allOf(putBlockCommandFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
+      checkOpen();
+    } catch (Exception e) {
+      LOG.warn("Failed to commit PutBlock before stream close: " + e);
       throw new IOException(e);
     }
   }
@@ -560,6 +659,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       executePutBlock(true, true);
     }
     CompletableFuture.allOf(putBlockFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
+    CompletableFuture.allOf(putBlockCommandFutures.toArray(EMPTY_FUTURE_ARRAY)).get();
     watchForCommit(false);
     // just check again if the exception is hit while waiting for the
     // futures to ensure flush has indeed succeeded
@@ -647,9 +747,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private boolean needSync(long position) {
-    if (SYNC_SIZE > 0) {
-      // TODO: or position >= fileLength
-      if (position - syncPosition >= SYNC_SIZE) {
+    if (syncSize > 0) {
+      if (position - syncPosition >= syncSize) {
         syncPosition = position;
         return true;
       }

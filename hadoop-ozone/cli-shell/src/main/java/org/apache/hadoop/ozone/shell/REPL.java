@@ -32,8 +32,6 @@ import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
-import org.jline.widget.TailTipWidgets;
-import org.jline.widget.TailTipWidgets.TipType;
 import picocli.CommandLine;
 import picocli.shell.jline3.PicocliCommands;
 import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
@@ -44,7 +42,8 @@ import picocli.shell.jline3.PicocliCommands.PicocliCommandsFactory;
  */
 class REPL {
 
-  REPL(Shell shell, CommandLine cmd, PicocliCommandsFactory factory, List<String> lines) {
+  REPL(Shell shell, CommandLine cmd, PicocliCommandsFactory factory, List<String> lines,
+      List<String> welcomeLines) {
     Parser parser = new DefaultParser();
     Supplier<Path> workDir = () -> Paths.get(System.getProperty("user.dir"));
     TerminalBuilder terminalBuilder = TerminalBuilder.builder()
@@ -63,12 +62,10 @@ class REPL {
           .completer(registry.completer())
           .parser(parser)
           .variable(LineReader.LIST_MAX, 50)
+          // HDDS-15368: LineReader lists candidates only (no TailTipWidgets Status pane).
+          .option(LineReader.Option.AUTO_LIST, true)
+          .option(LineReader.Option.LIST_AMBIGUOUS, true)
           .build();
-
-      if (!Terminal.TYPE_DUMB.equals(terminal.getType()) && !Terminal.TYPE_DUMB_COLOR.equals(terminal.getType())) {
-        TailTipWidgets widgets = new TailTipWidgets(reader, registry::commandDescription, 5, TipType.COMPLETER);
-        widgets.enable();
-      }
 
       String prompt = shell.prompt() + "> ";
 
@@ -76,6 +73,8 @@ class REPL {
       if (batchSize > 0) {
         terminal.echo(true);
         reader.addCommandsInBuffer(lines);
+      } else {
+        printWelcome(terminal, welcomeLines);
       }
 
       for (int i = 0; batchSize == 0 || i < batchSize; i++) {
@@ -89,10 +88,27 @@ class REPL {
           return;
         } catch (Exception e) {
           registry.trace(e);
+        } finally {
+          printBlankLineBeforePrompt(terminal);
         }
       }
     } catch (Exception e) {
       shell.printError(e);
     }
+  }
+
+  private static void printBlankLineBeforePrompt(Terminal terminal) {
+    terminal.writer().println();
+    terminal.writer().flush();
+  }
+
+  private static void printWelcome(Terminal terminal, List<String> welcomeLines) {
+    if (welcomeLines == null || welcomeLines.isEmpty()) {
+      return;
+    }
+    for (String line : welcomeLines) {
+      terminal.writer().println(line);
+    }
+    terminal.writer().flush();
   }
 }

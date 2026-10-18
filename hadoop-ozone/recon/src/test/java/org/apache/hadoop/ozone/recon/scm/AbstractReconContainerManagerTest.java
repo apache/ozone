@@ -21,7 +21,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition.CONTAINERS;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.hadoop.hdds.scm.upgrade.ScmUpgradeTestUtils.mockVersionManager;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandomPipeline;
 import static org.mockito.Mockito.mock;
@@ -52,8 +52,8 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -73,6 +73,7 @@ public class AbstractReconContainerManagerTest {
   private OzoneConfiguration conf;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
+  private ReconContainerMetadataManager reconContainerMetadataManager;
   private DBStore store;
 
   @BeforeEach
@@ -89,13 +90,9 @@ public class AbstractReconContainerManagerTest {
     SCMStorageConfig scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    HDDSLayoutVersionManager layoutVersionManager = mock(HDDSLayoutVersionManager.class);
-    when(layoutVersionManager.getSoftwareLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    when(layoutVersionManager.getMetadataLayoutVersion())
-        .thenReturn(maxLayoutVersion());
+    ScmVersionManager versionManager = mockVersionManager();
     NodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig,
-        eventQueue, clusterMap, scmContext, layoutVersionManager);
+        eventQueue, clusterMap, scmContext, versionManager);
     pipelineManager = ReconPipelineManager.newReconPipelineManager(
         conf,
         nodeManager,
@@ -106,6 +103,7 @@ public class AbstractReconContainerManagerTest {
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
         Clock.system(ZoneId.systemDefault()), null);
 
+    reconContainerMetadataManager = mock(ReconContainerMetadataManager.class);
     containerManager = new ReconContainerManager(
         conf,
         store,
@@ -113,7 +111,7 @@ public class AbstractReconContainerManagerTest {
         pipelineManager,
         getScmServiceProvider(),
         mock(ContainerHealthSchemaManager.class),
-        mock(ReconContainerMetadataManager.class),
+        reconContainerMetadataManager,
         scmhaManager,
         sequenceIdGen,
         pendingOps);
@@ -137,6 +135,10 @@ public class AbstractReconContainerManagerTest {
     return containerManager;
   }
 
+  protected ReconContainerMetadataManager getReconContainerMetadataManager() {
+    return reconContainerMetadataManager;
+  }
+
   private StorageContainerServiceProvider getScmServiceProvider()
       throws IOException, TimeoutException {
     Pipeline pipeline = getRandomPipeline();
@@ -145,7 +147,7 @@ public class AbstractReconContainerManagerTest {
     ContainerID containerID = ContainerID.valueOf(100L);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
+            .setContainerID(containerID.getIdForTesting())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
@@ -154,6 +156,30 @@ public class AbstractReconContainerManagerTest {
             .build();
     ContainerWithPipeline containerWithPipeline =
         new ContainerWithPipeline(containerInfo, pipeline);
+
+    ContainerInfo closedContainerInfo =
+        new ContainerInfo.Builder()
+            .setContainerID(101L)
+            .setNumberOfKeys(10)
+            .setPipelineID(pipeline.getId())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+            .setOwner("test")
+            .setState(LifeCycleState.CLOSED)
+            .build();
+    ContainerWithPipeline closedContainerWithPipeline =
+        new ContainerWithPipeline(closedContainerInfo, pipeline);
+
+    ContainerInfo quasiClosedContainerInfo =
+        new ContainerInfo.Builder()
+            .setContainerID(102L)
+            .setNumberOfKeys(10)
+            .setPipelineID(pipeline.getId())
+            .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+            .setOwner("test")
+            .setState(LifeCycleState.QUASI_CLOSED)
+            .build();
+    ContainerWithPipeline quasiClosedContainerWithPipeline =
+        new ContainerWithPipeline(quasiClosedContainerInfo, pipeline);
 
     List<Long> containerList = new LinkedList<>();
     List<ContainerWithPipeline> verifiedContainerPipeline =
@@ -165,7 +191,7 @@ public class AbstractReconContainerManagerTest {
       ContainerID cID = ContainerID.valueOf(i);
       ContainerInfo cInfo =
           new ContainerInfo.Builder()
-              .setContainerID(cID.getId())
+              .setContainerID(cID.getIdForTesting())
               .setNumberOfKeys(10)
               .setPipelineID(pipeline.getId())
               .setReplicationConfig(
@@ -182,6 +208,10 @@ public class AbstractReconContainerManagerTest {
         StorageContainerServiceProvider.class);
     when(scmServiceProviderMock.getContainerWithPipeline(100L))
         .thenReturn(containerWithPipeline);
+    when(scmServiceProviderMock.getContainerWithPipeline(101L))
+        .thenReturn(closedContainerWithPipeline);
+    when(scmServiceProviderMock.getContainerWithPipeline(102L))
+        .thenReturn(quasiClosedContainerWithPipeline);
     when(scmServiceProviderMock
         .getExistContainerWithPipelinesInBatch(containerList))
         .thenReturn(verifiedContainerPipeline);
@@ -200,7 +230,7 @@ public class AbstractReconContainerManagerTest {
     pipelineManager.addPipeline(pipeline);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
+            .setContainerID(containerID.getIdForTesting())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
@@ -218,7 +248,7 @@ public class AbstractReconContainerManagerTest {
     pipelineManager.addPipeline(pipeline);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
-            .setContainerID(containerID.getId())
+            .setContainerID(containerID.getIdForTesting())
             .setNumberOfKeys(10)
             .setPipelineID(pipeline.getId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))

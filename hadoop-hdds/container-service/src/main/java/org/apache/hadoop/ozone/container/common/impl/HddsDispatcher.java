@@ -78,9 +78,9 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,9 +110,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final ContainerSet containerSet;
   private final StateContext context;
   private final float containerCloseThreshold;
-  private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
+  private final ProtocolMessageMetrics<Type> protocolMetrics;
   private OzoneProtocolMessageDispatcher<ContainerCommandRequestProto,
-      ContainerCommandResponseProto, ProtocolMessageEnum> dispatcher;
+      ContainerCommandResponseProto, Type> dispatcher;
   private String clusterId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
@@ -142,7 +142,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         new ProtocolMessageMetrics<>(
             "HddsDispatcher",
             "HDDS dispatcher metrics",
-            Type.values());
+            Type.class);
 
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("DatanodeClient",
@@ -175,7 +175,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case CLOSED_CONTAINER_IO:
     case DELETE_ON_OPEN_CONTAINER:
     case UNSUPPORTED_REQUEST:// Blame client for sending unsupported request.
+    case MALFORMED_REQUEST:// Blame client for sending malformed request.
     case CONTAINER_MISSING:
+    case CONTAINER_ALREADY_EXISTS:
       return true;
     default:
       return false;
@@ -224,7 +226,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
             == DispatcherContext.WriteChunkStage.WRITE_DATA)
-            || (cmdType == Type.StreamInit);
+            || (cmdType == Type.StreamInit)
+            || (cmdType == Type.StreamInitWithPutBlock);
     boolean isWriteCommitStage =
         (cmdType == Type.WriteChunk && dispatcherContext != null
             && dispatcherContext.getStage()
@@ -297,6 +300,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       if (container == null && ((isWriteStage || isCombinedStage)
           || cmdType == Type.PutSmallFile
           || cmdType == Type.PutBlock)) {
+
+        if (!ContainerUtils.isContainerCreatable(msg)) {
+          StorageContainerException sce = new StorageContainerException(
+              "ContainerID " + containerID + " does not exist",
+              ContainerProtos.Result.CONTAINER_NOT_FOUND);
+          audit(action, eventType, msg, dispatcherContext, AuditEventStatus.FAILURE, sce);
+          return ContainerUtils.logAndReturnError(LOG, sce, msg);
+        }
         // If container does not exist, create one for WriteChunk and
         // PutSmallFile request
         responseProto = createContainer(msg);
@@ -400,12 +411,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
                   .getMessage());
         }
         // For container to be moved to unhealthy state here, the container can
-        // only be in open or closing state.
+        // only be in open, closing, or recovering state.
         State containerState = container.getContainerData().getState();
         Preconditions.checkState(
             containerState == State.OPEN
                 || containerState == State.CLOSING
-                || containerState == State.RECOVERING);
+                || containerState == State.RECOVERING,
+            "Expected container %s to be in OPEN/CLOSING/RECOVERING state but was %s",
+            containerID, containerState);
         // mark and persist the container state to be unhealthy
         try {
           ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.WRITE_FAILURE,
@@ -804,13 +817,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   @Override
   public StateMachine.DataChannel getStreamDataChannel(
-          ContainerCommandRequestProto msg)
-          throws StorageContainerException {
+      ContainerCommandRequestProto msg,
+      CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock)
+      throws StorageContainerException {
     long containerID = msg.getContainerID();
     Container container = getContainer(containerID);
     if (container != null) {
       Handler handler = getHandler(getContainerType(container));
-      return handler.getStreamDataChannel(container, msg);
+      return handler.getStreamDataChannel(container, msg, putBlock);
     } else {
       throw new StorageContainerException(
               "ContainerID " + containerID + " does not exist",
@@ -839,6 +853,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       long containerID = msg.getContainerID();
       Container container = getContainer(containerID);
       long startTime = Time.monotonicNow();
+
+      // Increment operation count metrics
+      metrics.incContainerOpsMetrics(cmdType);
 
       if (DispatcherContext.op(dispatcherContext).validateToken()) {
         validateToken(msg);
@@ -909,6 +926,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     case CloseContainer   : return DNAction.CLOSE_CONTAINER;
     case GetCommittedBlockLength : return DNAction.GET_COMMITTED_BLOCK_LENGTH;
     case StreamInit       : return DNAction.STREAM_INIT;
+    case StreamInitWithPutBlock: return DNAction.STREAM_INIT_WITH_PUT_BLOCK;
     case FinalizeBlock    : return DNAction.FINALIZE_BLOCK;
     case Echo             : return DNAction.ECHO;
     case GetContainerChecksumInfo: return DNAction.GET_CONTAINER_CHECKSUM_INFO;

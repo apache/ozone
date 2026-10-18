@@ -23,7 +23,6 @@ import java.util.Map;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableQuantiles;
-import org.apache.hadoop.metrics2.lib.MutableStat;
 
 /**
  * The {@code PerformanceMetrics} class encapsulates a collection of related
@@ -32,7 +31,7 @@ import org.apache.hadoop.metrics2.lib.MutableStat;
  * snapshot their values for reporting.
  */
 public class PerformanceMetrics implements Closeable {
-  private final MutableStat stat;
+  private final ConcurrentMutableStat stat;
   private final List<MutableQuantiles> quantiles;
   private final MutableMinMax minMax;
 
@@ -70,7 +69,7 @@ public class PerformanceMetrics implements Closeable {
   public PerformanceMetrics(
       MetricsRegistry registry, String name, String description,
       String sampleName, String valueName, int[] intervals) {
-    stat = registry.newStat(name, description, sampleName, valueName, false);
+    stat = new ConcurrentMutableStat(name, description, sampleName, valueName, false);
     quantiles = MetricUtil.createQuantiles(registry, name, description, sampleName, valueName, intervals);
     minMax = new MutableMinMax(registry, name, description, valueName);
   }

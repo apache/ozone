@@ -17,16 +17,17 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.2.0-SNAPSHOT</version>
+    <version>2.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-freon</artifactId>
-  <version>2.2.0-SNAPSHOT</version>
+  <version>2.3.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone Freon</name>
   <description>Apache Ozone Freon</description>
 
   <properties>
     <classpath.skip>false</classpath.skip>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
   </properties>
 
   <dependencies>
@@ -44,19 +45,11 @@
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
-      <artifactId>jackson-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.google.protobuf</groupId>
-      <artifactId>protobuf-java</artifactId>
     </dependency>
     <dependency>
       <groupId>commons-codec</groupId>
@@ -79,6 +72,10 @@
       <artifactId>opentelemetry-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.opentelemetry</groupId>
+      <artifactId>opentelemetry-context</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
     </dependency>
@@ -87,16 +84,8 @@
       <artifactId>hadoop-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-hdfs</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpclient</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpcore</artifactId>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-cli-common</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -112,23 +101,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-container-service</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-interface-client</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-interface-server</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-server-framework</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-server-scm</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -151,24 +128,8 @@
       <artifactId>ozone-interface-client</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-interface-storage</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-manager</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ratis</groupId>
-      <artifactId>ratis-client</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ratis</groupId>
-      <artifactId>ratis-proto</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
@@ -179,36 +140,20 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-annotation-processing</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <!-- required for @MetaInfServices at compile-time, but not at runtime -->
       <groupId>org.kohsuke.metainf-services</groupId>
       <artifactId>metainf-services</artifactId>
       <scope>provided</scope>
     </dependency>
-
-    <!-- Test dependencies -->
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-common</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-container-service</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-server-framework</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-test-utils</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-reload4j</artifactId>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
   <build>
@@ -228,6 +173,11 @@
         <configuration>
           <annotationProcessorPaths>
             <path>
+              <groupId>org.apache.ozone</groupId>
+              <artifactId>hdds-annotation-processing</artifactId>
+              <version>${hdds.version}</version>
+            </path>
+            <path>
               <groupId>org.kohsuke.metainf-services</groupId>
               <artifactId>metainf-services</artifactId>
               <version>${metainf-services.version}</version>
@@ -240,12 +190,23 @@
           </annotationProcessorPaths>
           <annotationProcessors>
             <annotationProcessor>org.kohsuke.metainf_services.AnnotationProcessorImpl</annotationProcessor>
+            <annotationProcessor>org.apache.ozone.annotations.CliOptionStyleProcessor</annotationProcessor>
             <annotationProcessor>picocli.codegen.aot.graalvm.processor.NativeImageConfigGeneratorProcessor</annotationProcessor>
           </annotationProcessors>
-          <compilerArgs>
-            <arg>-Aproject=${project.groupId}/${project.artifactId}</arg>
-          </compilerArgs>
         </configuration>
+        <executions>
+          <execution>
+            <id>default-compile</id>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <compilerArgs>
+                <arg>-Aproject=${project.groupId}/${project.artifactId}</arg>
+              </compilerArgs>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -262,6 +223,8 @@
                     <bannedImport>org.apache.hadoop.hdds.conf.Config</bannedImport>
                     <bannedImport>org.apache.hadoop.hdds.conf.ConfigGroup</bannedImport>
                     <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
+                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator</bannedImport>
+                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator</bannedImport>
                     <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                   </bannedImports>
                 </restrictImports>

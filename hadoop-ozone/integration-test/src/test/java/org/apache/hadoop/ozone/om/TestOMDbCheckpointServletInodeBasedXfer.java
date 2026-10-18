@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -28,18 +29,23 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
-import static org.mockito.Mockito.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
@@ -53,11 +59,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -71,6 +81,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -83,34 +94,33 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
+import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotCache;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -119,10 +129,15 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
@@ -136,6 +151,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Class used for testing the OM DB Checkpoint provider servlet using inode based transfer logic.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Execution(ExecutionMode.SAME_THREAD)
 public class TestOMDbCheckpointServletInodeBasedXfer {
 
   private MiniOzoneCluster cluster;
@@ -153,28 +170,46 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestOMDbCheckpointServletInodeBasedXfer.class);
 
-  @BeforeEach
-  void init() throws Exception {
+  @BeforeAll
+  void initCluster() throws Exception {
     conf = new OzoneConfiguration();
     // ensure cache entries are not evicted thereby snapshot db's are not closed
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL,
         100, TimeUnit.MINUTES);
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    conf.setBoolean(OZONE_ACL_ENABLED, false);
+    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
+
+    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
+    cluster.waitForClusterToBeReady();
+    cluster.waitForPipelineTobeReady(ONE, 60_000);
+    client = cluster.newClient();
   }
 
   @AfterEach
+  void resumeServices() {
+    OzoneManager realOm = cluster.getOzoneManager();
+    realOm.getKeyManager().getSnapshotSstFilteringService().resume();
+    realOm.getKeyManager().getSnapshotDeletingService().resume();
+  }
+
+  @AfterAll
   void shutdown() {
     IOUtils.closeQuietly(client, cluster);
   }
 
-  private void setupCluster() throws Exception {
-    cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build();
-    conf.setBoolean(OZONE_ACL_ENABLED, false);
-    conf.set(OZONE_ADMINISTRATORS, OZONE_ADMINISTRATORS_WILDCARD);
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+  @BeforeEach
+  void init() {
+    setupOmSpy();
+  }
+
+  private void setupOmSpy() {
     OzoneManager normalOm = cluster.getOzoneManager();
     om = spy(normalOm);
+  }
+
+  private void setupCluster() {
+    setupOmSpy();
   }
 
   private void setupMocks() throws Exception {
@@ -237,7 +272,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .writeDBToArchive(any(), any(), any(), any(), any(), any(), anyBoolean());
+        .collectFilesFromDir(any(), any(), any(), anyBoolean(), any());
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .collectFilesFromDir(any(), any(), any(), anyBoolean(), any(), anyBoolean());
+    doCallRealMethod().when(omDbCheckpointServletMock).collectDbDataToTransfer(any(), any(), any());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
@@ -245,11 +283,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getBootstrapTempData());
     doCallRealMethod().when(omDbCheckpointServletMock).
         processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
-    doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock).getCompactionLogDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .transferSnapshotData(anySet(), any(), anyCollection(), anyCollection(), any(), any(), anyMap());
+        .collectSnapshotData(anySet(),  anyCollection(), anyCollection(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any(), any(), any());
   }
@@ -257,14 +294,20 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testTarballBatching(boolean includeSnapshots) throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol");
+    String bucketName = uniqueObjectName("buck");
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     setupClusterAndMocks(volumeName, bucketName, realCheckpoint, includeSnapshots);
     long maxFileSizeLimit = 4096;
-    om.getConfiguration().setLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, maxFileSizeLimit);
-    // Get the tarball.
-    omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    long previousMaxFileSizeLimit =
+        om.getConfiguration().getLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, Long.MAX_VALUE);
+    try {
+      om.getConfiguration().setLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, maxFileSizeLimit);
+      // Get the tarball.
+      omDbCheckpointServletMock.doGet(requestMock, responseMock);
+    } finally {
+      om.getConfiguration().setLong(OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY, previousMaxFileSizeLimit);
+    }
     String testDirName = folder.resolve("testDir").toString();
     String newDbDirName = testDirName + OM_KEY_PREFIX + OM_DB_NAME;
     File newDbDir = new File(newDbDirName);
@@ -285,11 +328,36 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     }
   }
 
+  @Test
+  public void testWriteDBToArchiveClosesFilesListStream() throws Exception {
+    OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
+
+    final Path dbDir = Files.createTempDirectory(folder, "dbdir-");
+    final AtomicBoolean closed = new AtomicBoolean(false);
+    final Stream<Path> stream = Stream.<Path>empty().onClose(() -> closed.set(true));
+
+    // Do not use CALLS_REAL_METHODS for java.nio.file.Files: internal/private static
+    // methods (eg Files.provider()) get intercepted too and Mockito will try to invoke
+    // them reflectively, which fails on JDK9+ without --add-opens.
+    try (MockedStatic<Files> files = mockStatic(Files.class)) {
+      files.when(() -> Files.exists(dbDir)).thenReturn(true);
+      files.when(() -> Files.list(dbDir)).thenReturn(stream);
+
+      OMDBArchiver archiver = new OMDBArchiver();
+      archiver.setTmpDir(folder);
+      boolean result = servlet.collectFilesFromDir(new HashSet<>(), dbDir,
+          new AtomicLong(Long.MAX_VALUE), true, archiver);
+      assertTrue(result);
+    }
+
+    assertTrue(closed.get(), "Files.list() stream should be closed to avoid FD leaks");
+  }
+
   @ParameterizedTest
   @ValueSource(booleans =  {true, false})
   public void testContentsOfTarballWithSnapshot(boolean includeSnapshot) throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol");
+    String bucketName = uniqueObjectName("buck");
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     setupClusterAndMocks(volumeName, bucketName, realCheckpoint, includeSnapshot);
     DBStore dbStore = om.getMetadataManager().getStore();
@@ -327,9 +395,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
             inodesFromOmDataDir, hardLinkMapFromOmData);
         numSnapshots++;
       }
+      populateInodesOfFilesInDirectory(dbStore, Paths.get(dbStore.getRocksDBCheckpointDiffer().getSSTBackupDir()),
+          inodesFromOmDataDir, hardLinkMapFromOmData);
     }
-    populateInodesOfFilesInDirectory(dbStore, Paths.get(dbStore.getRocksDBCheckpointDiffer().getSSTBackupDir()),
-        inodesFromOmDataDir, hardLinkMapFromOmData);
     Path hardlinkFilePath =
         newDbDir.toPath().resolve(OmSnapshotManager.OM_HARDLINK_FILE);
     Map<String, List<String>> hardlinkMapFromTarball = readFileToMap(hardlinkFilePath.toString());
@@ -348,11 +416,18 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertFalse(inodesFromTarball.isEmpty());
     assertTrue(inodesFromTarball.containsAll(inodesFromOmDataDir));
 
-    long actualYamlFiles = Files.list(newDbDir.toPath())
-        .filter(f -> f.getFileName().toString()
-            .endsWith(".yaml")).count();
-    assertEquals(numSnapshots, actualYamlFiles,
-        "Number of generated YAML files should match the number of snapshots.");
+    long actualYamlFiles;
+    try (Stream<Path> files = Files.list(newDbDir.toPath())) {
+      actualYamlFiles = files.filter(f -> f.getFileName().toString().endsWith(".yaml")).count();
+    }
+    if (includeSnapshot) {
+      assertThat(actualYamlFiles)
+          .as("Generated YAML files should include this test's snapshots.")
+          .isGreaterThanOrEqualTo(numSnapshots);
+    } else {
+      assertEquals(0, actualYamlFiles,
+          "Snapshot YAML files should not be included when snapshot data is disabled.");
+    }
 
     InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
         new InodeMetadataRocksDBCheckpoint(newDbDir.toPath());
@@ -383,8 +458,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
    */
   @Test
   public void testSnapshotDBConsistency() throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol");
+    String bucketName = uniqueObjectName("buck");
     AtomicReference<DBCheckpoint> realCheckpoint = new AtomicReference<>();
     setupClusterAndMocks(volumeName, bucketName, realCheckpoint, true);
     List<OzoneSnapshot> snapshots = new ArrayList<>();
@@ -419,49 +494,38 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Create dummy files: one SST, one non-SST
     Path sstFile = dbDir.resolve("test.sst");
     Files.write(sstFile, "sst content".getBytes(StandardCharsets.UTF_8)); // Write some content to make it non-empty
-
     Path nonSstFile = dbDir.resolve("test.log");
     Files.write(nonSstFile, "log content".getBytes(StandardCharsets.UTF_8));
     Set<String> sstFilesToExclude = new HashSet<>();
     AtomicLong maxTotalSstSize = new AtomicLong(1000000); // Sufficient size
-    Map<String, String> hardLinkFileMap = new java.util.HashMap<>();
+    OMDBArchiver omDbArchiver = new OMDBArchiver();
     Path tmpDir = folder.resolve("tmp");
     Files.createDirectories(tmpDir);
-    TarArchiveOutputStream mockArchiveOutputStream = mock(TarArchiveOutputStream.class);
+    omDbArchiver.setTmpDir(tmpDir);
+    OMDBArchiver omDbArchiverSpy = spy(omDbArchiver);
     List<String> fileNames = new ArrayList<>();
-    try (MockedStatic<Archiver> archiverMock = mockStatic(Archiver.class)) {
-      archiverMock.when(() -> Archiver.linkAndIncludeFile(any(), any(), any(), any())).thenAnswer(invocation -> {
-        // Get the actual mockArchiveOutputStream passed from writeDBToArchive
-        TarArchiveOutputStream aos = invocation.getArgument(2);
-        File sourceFile = invocation.getArgument(0);
-        String fileId = invocation.getArgument(1);
-        fileNames.add(sourceFile.getName());
-        aos.putArchiveEntry(new TarArchiveEntry(sourceFile, fileId));
-        aos.write(new byte[100], 0, 100); // Simulate writing
-        aos.closeArchiveEntry();
-        return 100L;
-      });
-      boolean success = omDbCheckpointServletMock.writeDBToArchive(
-          sstFilesToExclude, dbDir, maxTotalSstSize, mockArchiveOutputStream,
-              tmpDir, hardLinkFileMap, expectOnlySstFiles);
-      assertTrue(success);
-      verify(mockArchiveOutputStream, times(fileNames.size())).putArchiveEntry(any());
-      verify(mockArchiveOutputStream, times(fileNames.size())).closeArchiveEntry();
-      verify(mockArchiveOutputStream, times(fileNames.size())).write(any(byte[].class), anyInt(),
-          anyInt()); // verify write was called once
-
-      boolean containsNonSstFile = false;
-      for (String fileName : fileNames) {
-        if (expectOnlySstFiles) {
-          assertTrue(fileName.endsWith(".sst"), "File is not an SST File");
-        } else {
-          containsNonSstFile = true;
-        }
+    doAnswer((invocation) -> {
+      File sourceFile = invocation.getArgument(0);
+      fileNames.add(sourceFile.getName());
+      omDbArchiver.recordFileEntry(sourceFile, invocation.getArgument(1));
+      return null;
+    }).when(omDbArchiverSpy).recordFileEntry(any(), anyString());
+    boolean success =
+        omDbCheckpointServletMock.collectFilesFromDir(sstFilesToExclude, dbDir, maxTotalSstSize, expectOnlySstFiles,
+            omDbArchiverSpy);
+    assertTrue(success);
+    verify(omDbArchiverSpy, times(fileNames.size())).recordFileEntry(any(), anyString());
+    boolean containsNonSstFile = false;
+    for (String fileName : fileNames) {
+      if (expectOnlySstFiles) {
+        assertTrue(fileName.endsWith(".sst"), "File is not an SST File");
+      } else {
+        containsNonSstFile = true;
       }
+    }
 
-      if (!expectOnlySstFiles) {
-        assertTrue(containsNonSstFile, "SST File is not expected");
-      }
+    if (!expectOnlySstFiles) {
+      assertTrue(containsNonSstFile, "SST File is not expected");
     }
   }
 
@@ -486,15 +550,15 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
    */
   @Test
   public void testBootstrapOnFollowerConsistency() throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol");
+    String bucketName = uniqueObjectName("buck");
     setupCluster();
     om.getKeyManager().getSnapshotSstFilteringService().pause();
     om.getKeyManager().getSnapshotDeletingService().suspend();
     // Create test data and snapshots
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName);
     // Create key before first snapshot
-    TestDataUtil.createKey(bucket, "key1",
+    DataTestUtil.createKey(bucket, "key1",
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "data1".getBytes(StandardCharsets.UTF_8));
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot1");
@@ -750,17 +814,17 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
    */
   @Test
   public void testCheckpointIncludesSnapshotsFromFrozenState() throws Exception {
-    String volumeName = "vol" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "buck" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("vol");
+    String bucketName = uniqueObjectName("buck");
 
     setupCluster();
     om.getKeyManager().getSnapshotSstFilteringService().pause();
 
     // Create test data and snapshots
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName);
 
     // Create key before first snapshot
-    TestDataUtil.createKey(bucket, "key1",
+    DataTestUtil.createKey(bucket, "key1",
         ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
         "data1".getBytes(StandardCharsets.UTF_8));
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot1");
@@ -840,6 +904,50 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     }
   }
 
+
+  /**
+   * Verifies that when a file is deleted before/during transfer, the servlet
+   * gracefully skips it without failing (handles NoSuchFileException).
+   */
+  @Test
+  public void testCollectFilesFromDirSkipsDeletedFile() throws Exception {
+    OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
+    Path dbDir = Files.createTempDirectory(folder, "dbdir-");
+    Path sstFile1 = dbDir.resolve("file1.sst");
+    Path sstFile2 = dbDir.resolve("file2.sst");
+    Path sstFile3 = dbDir.resolve("file3.sst");
+    Files.write(sstFile1, "content1".getBytes(StandardCharsets.UTF_8));
+    Files.write(sstFile2, "content2".getBytes(StandardCharsets.UTF_8));
+    Files.write(sstFile3, "content3".getBytes(StandardCharsets.UTF_8));
+    List<Path> filesUnderDir = new ArrayList<>();
+    filesUnderDir.add(sstFile1);
+    filesUnderDir.add(sstFile2);
+    filesUnderDir.add(sstFile3);
+    // Delete file2 before transfer , same as pruner
+    Files.delete(sstFile2);
+    OMDBArchiver archiver = new OMDBArchiver();
+    Path tmpDir = folder.resolve("tmp-deleted-file-test");
+    Files.createDirectories(tmpDir);
+    archiver.setTmpDir(tmpDir);
+    OMDBArchiver archiverSpy = spy(archiver);
+
+    Set<String> sstFilesToExclude = new HashSet<>();
+    AtomicLong maxTotalSstSize = new AtomicLong(Long.MAX_VALUE);
+
+    doAnswer(invocation -> archiver.recordFileEntry(
+        invocation.getArgument(0), invocation.getArgument(1)))
+        .when(archiverSpy).recordFileEntry(any(), anyString());
+    boolean result = servlet.collectFilesFromDir(sstFilesToExclude, filesUnderDir.stream(),
+        maxTotalSstSize, true, archiverSpy, true);
+    assertTrue(result);
+    verify(archiverSpy, times(2)).recordFileEntry(any(), anyString());
+    // should throw exception when flag is set to false.
+    assertThrows(NoSuchFileException.class, () -> {
+      servlet.collectFilesFromDir(sstFilesToExclude, filesUnderDir.stream(),
+          maxTotalSstSize, true, archiverSpy, false);
+    });
+  }
+
   private void writeDummyKeyToDeleteTableOfSnapshotDB(OzoneSnapshot snapshotToModify, String bucketName,
       String volumeName, String keyName)
       throws IOException {
@@ -878,6 +986,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(any(), any(),
         eq(false), any(), any(), eq(false));
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any(), any(), any());
+    doCallRealMethod().when(omDbCheckpointServletMock).collectDbDataToTransfer(any(), any(), any());
     omDbCheckpointServletMock.initialize(spyDbStore, om.getMetrics().getDBCheckpointMetrics(),
         false,
         om.getOmAdminUsernames(), om.getOmAdminGroups(), false);
@@ -926,7 +1035,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         if (!trimmedLine.contains("\t")) {
           continue;
         }
-        int tabIndex = trimmedLine.indexOf("\t");
+        int tabIndex = trimmedLine.indexOf('\t');
         if (tabIndex > 0) {
           // value is the full path that needs to be constructed
           String value = trimmedLine.substring(0, tabIndex).trim();
@@ -942,6 +1051,52 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       Collections.sort(entry.getValue());
     }
     return dataMap;
+  }
+
+  /**
+   * Follower bootstrap must abort before streaming when the leader's SST estimate header
+   * implies more free space than is available (v2 inode-based checkpoint URL).
+   */
+  @ParameterizedTest
+  @ValueSource(booleans =  {true, false})
+  public void testBootstrapSnapshotDownloadAbortsWhenDiskSpaceBelowLeaderSstEstimate(boolean useInodeBasedTransfer)
+      throws Exception {
+    Path snapshotDir = folder.resolve("ratis-snap-space-v2-" + UUID.randomUUID());
+    Files.createDirectories(snapshotDir);
+    Path downloadTarget = folder.resolve("checkpoint-target-" + UUID.randomUUID() + ".tar");
+
+    long usable = Files.getFileStore(snapshotDir).getUsableSpace();
+    long estimatedSstBytes = Math.addExact(Math.min(usable, Long.MAX_VALUE / 4), 1_000_000);
+
+    OzoneConfiguration diskCheckConf = new OzoneConfiguration();
+    diskCheckConf.set(OZONE_OM_BOOTSTRAP_MIN_SPACE_KEY, "0B");
+    diskCheckConf.setBoolean(OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY, useInodeBasedTransfer);
+
+    Map<String, OMNodeDetails> peers = new HashMap<>();
+    OMNodeDetails leaderDetails = mock(OMNodeDetails.class);
+    String leaderId = "leader1";
+    peers.put(leaderId, leaderDetails);
+    URL checkpointUrl = mock(URL.class);
+    when(leaderDetails.getOMDBCheckpointEndpointUrl(anyBoolean(), anyBoolean(), eq(true)))
+        .thenReturn(checkpointUrl);
+
+    HttpURLConnection connection = mock(HttpURLConnection.class);
+    URLConnectionFactory connectionFactory = mock(URLConnectionFactory.class);
+    when(connectionFactory.openConnection(any(URL.class), anyBoolean())).thenReturn(connection);
+
+    ByteArrayOutputStream uploadBody = new ByteArrayOutputStream();
+    when(connection.getOutputStream()).thenReturn(uploadBody);
+    when(connection.getResponseCode()).thenReturn(HTTP_OK);
+    when(connection.getHeaderField(OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER))
+        .thenReturn(Long.toString(estimatedSstBytes));
+
+    try (OmRatisSnapshotProvider provider = new OmRatisSnapshotProvider(diskCheckConf,
+        snapshotDir.toFile(), peers, connectionFactory)) {
+      IOException ex = assertThrows(IOException.class,
+          () -> provider.downloadSnapshot(leaderId, downloadTarget.toFile()));
+      assertTrue(ex.getMessage().contains(OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER),
+          ex::getMessage);
+    }
   }
 
   private  void populateInodesOfFilesInDirectory(DBStore dbStore, Path dbLocation,
@@ -979,18 +1134,18 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   }
 
   private void writeData(String volumeName, String bucketName, boolean includeSnapshots) throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName);
     for (int i = 0; i < 10; i++) {
-      TestDataUtil.createKey(bucket, "key" + i,
+      DataTestUtil.createKey(bucket, "key" + i,
           ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
           "sample".getBytes(StandardCharsets.UTF_8));
       om.getMetadataManager().getStore().flushDB();
     }
     if (includeSnapshots) {
-      TestDataUtil.createKey(bucket, "keysnap1",
+      DataTestUtil.createKey(bucket, "keysnap1",
           ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
           "sample".getBytes(StandardCharsets.UTF_8));
-      TestDataUtil.createKey(bucket, "keysnap2",
+      DataTestUtil.createKey(bucket, "keysnap2",
           ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
           "sample".getBytes(StandardCharsets.UTF_8));
       client.getObjectStore().createSnapshot(volumeName, bucketName, "snapshot10");

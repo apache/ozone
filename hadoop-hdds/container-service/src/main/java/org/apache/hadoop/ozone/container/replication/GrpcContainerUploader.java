@@ -104,7 +104,7 @@ public class GrpcContainerUploader implements ContainerUploader {
       throws IOException {
     return new GrpcReplicationClient(target.getIpAddress(),
         target.getPort(Port.Name.REPLICATION).getValue(),
-        securityConfig, certClient, compression);
+        securityConfig, certClient);
   }
 
   /**

@@ -51,11 +51,14 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
@@ -151,6 +154,14 @@ public class OzoneBucket extends WithMetadata {
    * Bucket Owner.
    */
   private String owner;
+  /**
+   * Pending deletion bytes (Includes bytes retained by snapshots).
+   */
+  private long pendingDeleteBytes;
+  /**
+   * Pending deletion namespace (Includes keys retained by snapshots).
+   */
+  private long pendingDeleteNamespace;
 
   protected OzoneBucket(Builder builder) {
     super(builder);
@@ -167,6 +178,8 @@ public class OzoneBucket extends WithMetadata {
     }
     this.usedBytes = builder.usedBytes;
     this.usedNamespace = builder.usedNamespace;
+    this.pendingDeleteBytes = builder.pendingDeleteBytes;
+    this.pendingDeleteNamespace = builder.pendingDeleteNamespace;
     this.creationTime = Instant.ofEpochMilli(builder.creationTime);
     if (builder.modificationTime != 0) {
       this.modificationTime = Instant.ofEpochMilli(builder.modificationTime);
@@ -488,6 +501,16 @@ public class OzoneBucket extends WithMetadata {
         .createKey(volumeName, name, key, size, replicationConfig, keyMetadata, tags);
   }
 
+  public OzoneOutputStream createKey(String key, long size,
+      ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata,
+      Map<String, String> tags,
+      boolean derivedKeyPiggyBacking)
+      throws IOException {
+    return proxy
+        .createKey(volumeName, name, key, size, replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
+  }
+
   /**
    * This API allows to atomically update an existing key. The key read before invoking this API
    * should remain unchanged for this key to be written. This is controlled by the generation
@@ -498,7 +521,7 @@ public class OzoneBucket extends WithMetadata {
    *
    * @param keyName Existing key to rewrite. This must exist in the bucket.
    * @param size The size of the new key
-   * @param existingKeyGeneration The generation of the existing key which is checked for changes at key create
+   * @param existingKeyGeneration The positive generation of the existing key which is checked for changes at key create
    *                              and commit time.
    * @param replicationConfig The replication configuration for the key to be rewritten.
    * @param metadata custom key value metadata
@@ -508,6 +531,60 @@ public class OzoneBucket extends WithMetadata {
   public OzoneOutputStream rewriteKey(String keyName, long size, long existingKeyGeneration,
       ReplicationConfig replicationConfig, Map<String, String> metadata) throws IOException {
     return proxy.rewriteKey(volumeName, name, keyName, size, existingKeyGeneration, replicationConfig, metadata);
+  }
+
+  /**
+   * Creates a key only if it does not exist (S3 If-None-Match: * semantics).
+   *
+   * @param keyName Name of the key
+   * @param size Size of the data
+   * @param replicationConfig Replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream createKeyIfNotExists(String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    return proxy.createKeyIfNotExists(volumeName, name, keyName, size,
+        replicationConfig, metadata, tags);
+  }
+
+  public OzoneOutputStream createKeyIfNotExists(String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    return proxy.createKeyIfNotExists(volumeName, name, keyName, size,
+        replicationConfig, metadata, tags, derivedKeyPiggyBacking);
+  }
+
+  /**
+   * Rewrites a key only if its ETag matches (S3 If-Match semantics).
+   *
+   * @param keyName Name of the key
+   * @param size Size of the data
+   * @param expectedETag The ETag value the existing key must have
+   * @param replicationConfig Replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return OzoneOutputStream to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags)
+      throws IOException {
+    return proxy.rewriteKeyIfMatch(volumeName, name, keyName, size,
+        expectedETag, replicationConfig, metadata, tags);
+  }
+
+  public OzoneOutputStream rewriteKeyIfMatch(String keyName, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking)
+      throws IOException {
+    return proxy.rewriteKeyIfMatch(volumeName, name, keyName, size,
+        expectedETag, replicationConfig, metadata, tags, derivedKeyPiggyBacking);
   }
 
   /**
@@ -565,6 +642,85 @@ public class OzoneBucket extends WithMetadata {
         replicationConfig, keyMetadata, tags);
   }
 
+  public OzoneDataStreamOutput createStreamKey(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking)
+      throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKey(volumeName, name, key, size,
+        replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
+  }
+
+  /**
+   * Creates a key with datastream only if it does not exist already
+   * (S3 If-None-Match: * semantics).
+   *
+   * @param key Name of the key to be created.
+   * @param size Size of the data the key will point to.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata Custom key metadata.
+   * @param tags Tags used for S3 object tags
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags) throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKeyIfNotExists(volumeName, name, key, size,
+        replicationConfig, keyMetadata, tags);
+  }
+
+  public OzoneDataStreamOutput createStreamKeyIfNotExists(String key, long size,
+      ReplicationConfig replicationConfig, Map<String, String> keyMetadata,
+      Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKeyIfNotExists(volumeName, name, key, size,
+        replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
+  }
+
+  /**
+   * Rewrites a key with datastream only if its ETag matches
+   * (S3 If-Match semantics).
+   *
+   * @param key Name of the key to be rewritten.
+   * @param size Size of the data the key will point to.
+   * @param expectedETag The ETag value the existing key must have.
+   * @param replicationConfig Replication configuration.
+   * @param keyMetadata Custom key metadata.
+   * @param tags Tags used for S3 object tags
+   * @return OzoneDataStreamOutput to which the data has to be written.
+   * @throws IOException
+   */
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata, Map<String, String> tags)
+      throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.rewriteStreamKeyIfMatch(volumeName, name, key, size,
+        expectedETag, replicationConfig, keyMetadata, tags);
+  }
+
+  public OzoneDataStreamOutput rewriteStreamKeyIfMatch(String key, long size,
+      String expectedETag, ReplicationConfig replicationConfig,
+      Map<String, String> keyMetadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking)
+      throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.rewriteStreamKeyIfMatch(volumeName, name, key, size,
+        expectedETag, replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
+  }
+
   /**
    * Reads an existing key from the bucket.
    *
@@ -608,6 +764,14 @@ public class OzoneBucket extends WithMetadata {
 
   public long getUsedNamespace() {
     return usedNamespace;
+  }
+
+  public long getPendingDeleteBytes() {
+    return pendingDeleteBytes;
+  }
+
+  public long getPendingDeleteNamespace() {
+    return pendingDeleteNamespace;
   }
 
   /**
@@ -699,8 +863,9 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Deletes the given list of keys from the bucket.
    * @param keyList List of the key name to be deleted.
-   * @param quiet flag to not throw exception if delete fails
-   * @throws IOException
+   * @param quiet if true, per-key failures are returned in the result map instead of being thrown
+   * @return key name to error for each key that could not be deleted, empty if all keys were deleted
+   * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true
    */
   public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
     return proxy.deleteKeys(volumeName, name, keyList, quiet);
@@ -818,6 +983,14 @@ public class OzoneBucket extends WithMetadata {
         uploadID);
   }
 
+  public OzoneOutputStream createMultipartKey(String key, long size,
+                                              int partNumber, String uploadID,
+                                              boolean derivedKeyPiggyBacking)
+      throws IOException {
+    return proxy.createMultipartKey(volumeName, name, key, size, partNumber,
+        uploadID, derivedKeyPiggyBacking);
+  }
+
   /**
    * Create a part key for a multipart upload key.
    * @param key
@@ -833,6 +1006,12 @@ public class OzoneBucket extends WithMetadata {
             key, size, partNumber, uploadID);
   }
 
+  public OzoneDataStreamOutput createMultipartStreamKey(String key,
+      long size, int partNumber, String uploadID, boolean derivedKeyPiggyBacking) throws IOException {
+    return proxy.createMultipartStreamKey(volumeName, name,
+            key, size, partNumber, uploadID, derivedKeyPiggyBacking);
+  }
+
   /**
    * Complete Multipart upload. This will combine all the parts and make the
    * key visible in ozone.
@@ -846,6 +1025,27 @@ public class OzoneBucket extends WithMetadata {
       String uploadID, Map<Integer, String> partsMap) throws IOException {
     return proxy.completeMultipartUpload(volumeName, name, key, uploadID,
         partsMap);
+  }
+
+  /**
+   * Complete Multipart upload with conditional write support.
+   * This will combine all the parts and make the key visible in ozone,
+   * but only if the specified preconditions are met.
+   *
+   * @param key key name
+   * @param uploadID multipart upload ID
+   * @param partsMap map of part numbers to ETags
+   * @param expectedDataGeneration expected data generation for conditional write
+   *        (use OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS for If-None-Match: *)
+   * @param expectedETag expected ETag for conditional write (for If-Match)
+   * @return OmMultipartUploadCompleteInfo
+   * @throws IOException if precondition fails or other I/O error occurs
+   */
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key,
+      String uploadID, Map<Integer, String> partsMap,
+      Long expectedDataGeneration, String expectedETag) throws IOException {
+    return proxy.completeMultipartUpload(volumeName, name, key, uploadID,
+        partsMap, expectedDataGeneration, expectedETag);
   }
 
   /**
@@ -889,6 +1089,22 @@ public class OzoneBucket extends WithMetadata {
    */
   public OzoneFileStatus getFileStatus(String keyName) throws IOException {
     return proxy.getOzoneFileStatus(volumeName, name, keyName);
+  }
+
+  /**
+   * OzoneFS api to get file status for an entry.
+   *
+   * @param keyName Key name
+   * @param headOp  when true, request a metadata-only (type) check so the OM
+   *                skips the pipeline refresh and datanode sorting.
+   * @throws OMException if file does not exist
+   *                     if bucket does not exist
+   * @throws IOException if there is error in the db
+   *                     invalid arguments
+   */
+  public OzoneFileStatus getFileStatus(String keyName, boolean headOp)
+      throws IOException {
+    return proxy.getOzoneFileStatus(volumeName, name, keyName, headOp);
   }
 
   /**
@@ -1003,6 +1219,26 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Like {@link #listStatus(String, boolean, String, long)}, but also returns whether OM reported that no
+   * entries follow this page.
+   */
+  public ListStatusResult<OzoneFileStatus> listStatusPage(String keyName, boolean recursive,
+      String startKey, long numEntries) throws IOException {
+    return proxy.listStatusPage(
+        ListStatusLightOptions.of(volumeName, name, keyName, recursive, startKey, numEntries, false));
+  }
+
+  /**
+   * Like {@link #listStatusLight(String, boolean, String, long)}, but also returns whether OM reported that
+   * no entries follow this page.
+   */
+  public ListStatusResult<OzoneFileStatusLight> listStatusLightPage(String keyName, boolean recursive,
+      String startKey, long numEntries) throws IOException {
+    return proxy.listStatusLightPage(
+        ListStatusLightOptions.of(volumeName, name, keyName, recursive, startKey, numEntries, false));
+  }
+
+  /**
    * List the status for a file or a directory and its contents.
    *
    * @param keyName    Absolute path of the entry to be listed
@@ -1029,8 +1265,8 @@ public class OzoneBucket extends WithMetadata {
    *
    * @param prefix Optional string to filter for the selected keys.
    */
-  public OzoneMultipartUploadList listMultipartUploads(String prefix, 
-      String keyMarker, String uploadIdMarker, int maxUploads) 
+  public OzoneMultipartUploadList listMultipartUploads(String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads)
       throws IOException {
     return proxy.listMultipartUploads(volumeName, getName(), prefix, keyMarker, uploadIdMarker, maxUploads);
   }
@@ -1091,6 +1327,66 @@ public class OzoneBucket extends WithMetadata {
     proxy.deleteObjectTagging(volumeName, name, keyName);
   }
 
+  /**
+   * Gets the lifecycle configuration information.
+   * @return OzoneLifecycleConfiguration or exception is thrown.
+   * @throws IOException
+   */
+  @JsonIgnore
+  public OzoneLifecycleConfiguration getLifecycleConfiguration()
+      throws IOException {
+    return proxy.getLifecycleConfiguration(volumeName, name);
+  }
+
+  /**
+   * Sets the lifecycle configuration for this bucket.
+   * This operation will completely overwrite any existing lifecycle configuration on the bucket.
+   * If the bucket already has a lifecycle configuration, it will be replaced with the new one.
+   * 
+   * @param lifecycleConfiguration - lifecycle configuration info to be set.
+   * @throws IOException if there is an error setting the lifecycle configuration.
+   */
+  public void setLifecycleConfiguration(OmLifecycleConfiguration lifecycleConfiguration)
+      throws IOException {
+    proxy.setLifecycleConfiguration(lifecycleConfiguration);
+  }
+
+  /**
+   * Deletes existing lifecycle configuration.
+   * @throws IOException
+   */
+  public void deleteLifecycleConfiguration()
+      throws IOException {
+    proxy.deleteLifecycleConfiguration(volumeName, name);
+  }
+
+  /**
+   * Gets the bucketTags for this bucket.
+   * @return Tags for this bucket.
+   * @throws IOException
+   */
+  @JsonIgnore
+  public Map<String, String> getBucketTagging() throws IOException {
+    return proxy.getBucketTagging(volumeName, name);
+  }
+
+  /**
+   * Sets bucketTags on this bucket (replaces existing tag set).
+   * @param tags Tags to set on the bucket.
+   * @throws IOException
+   */
+  public void putBucketTagging(Map<String, String> tags) throws IOException {
+    proxy.putBucketTagging(volumeName, name, tags);
+  }
+
+  /**
+   * Removes all bucketTags from this bucket.
+   * @throws IOException
+   */
+  public void deleteBucketTagging() throws IOException {
+    proxy.deleteBucketTagging(volumeName, name);
+  }
+
   public void setSourcePathExist(boolean b) {
     this.sourcePathExist = b;
   }
@@ -1127,6 +1423,8 @@ public class OzoneBucket extends WithMetadata {
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
     private String owner;
+    private long pendingDeleteBytes;
+    private long pendingDeleteNamespace;
 
     protected Builder() {
     }
@@ -1220,6 +1518,16 @@ public class OzoneBucket extends WithMetadata {
 
     public Builder setOwner(String owner) {
       this.owner = owner;
+      return this;
+    }
+
+    public Builder setPendingDeleteBytes(long pendingDeleteBytes) {
+      this.pendingDeleteBytes = pendingDeleteBytes;
+      return this;
+    }
+
+    public Builder setPendingDeleteNamespace(long pendingDeleteNamespace) {
+      this.pendingDeleteNamespace = pendingDeleteNamespace;
       return this;
     }
 
@@ -1403,9 +1711,19 @@ public class OzoneBucket extends WithMetadata {
       }
 
       // 2. Get immediate children by listStatusLight method
-      List<OzoneFileStatusLight> statuses =
-          proxy.listStatusLight(volumeName, name, delimiterKeyPrefix, false,
-              startKey, listCacheSize, false);
+      // For STS auth, pass the original request prefix (if any) as listPrefix so OM
+      // checks LIST on that prefix instead of the internal traversal path.
+      final List<OzoneFileStatusLight> statuses = proxy.listStatusLight(
+          ListStatusLightOptions.builder()
+              .setVolumeName(volumeName)
+              .setBucketName(name)
+              .setKeyName(delimiterKeyPrefix)
+              .setRecursive(false)
+              .setStartKey(startKey)
+              .setNumEntries(listCacheSize)
+              .setAllowPartialPrefixes(false)
+              .setListPrefix(getKeyPrefix())
+              .build());
 
       if (addedKeyPrefix && !statuses.isEmpty()) {
         // previous round already include the startKey, so remove it
@@ -1644,9 +1962,19 @@ public class OzoneBucket extends WithMetadata {
       }
 
       // 2. Get immediate children by listStatus method.
-      List<OzoneFileStatusLight> statuses =
-          proxy.listStatusLight(volumeName, name, getDelimiterKeyPrefix(),
-              false, startKey, listCacheSize, false);
+      // For STS auth, pass the original request prefix (if any) as listPrefix so OM
+      // checks LIST on that prefix instead of the internal traversal path.
+      List<OzoneFileStatusLight> statuses = proxy.listStatusLight(
+          ListStatusLightOptions.builder()
+              .setVolumeName(volumeName)
+              .setBucketName(name)
+              .setKeyName(getDelimiterKeyPrefix())
+              .setRecursive(false)
+              .setStartKey(startKey)
+              .setNumEntries(listCacheSize)
+              .setAllowPartialPrefixes(false)
+              .setListPrefix(getKeyPrefix())
+              .build());
 
       if (!statuses.isEmpty()) {
         // If findFirstStartKey is false, indicates that the keyPrefix is an
@@ -1804,8 +2132,17 @@ public class OzoneBucket extends WithMetadata {
       startKey = startKey == null ? "" : startKey;
 
       // 1. Get immediate children of keyPrefix, starting with startKey
-      List<OzoneFileStatusLight> statuses = proxy.listStatusLight(volumeName,
-          name, keyPrefix, false, startKey, listCacheSize, true);
+      List<OzoneFileStatusLight> statuses = proxy.listStatusLight(
+          ListStatusLightOptions.builder()
+              .setVolumeName(volumeName)
+              .setBucketName(name)
+              .setKeyName(keyPrefix)
+              .setRecursive(false)
+              .setStartKey(startKey)
+              .setNumEntries(listCacheSize)
+              .setAllowPartialPrefixes(true)
+              .setListPrefix(getKeyPrefix())
+              .build());
 
       // 2. Special case: ListKey expects keyPrefix element should present in
       // the resultList, only if startKey is blank. If startKey is not blank

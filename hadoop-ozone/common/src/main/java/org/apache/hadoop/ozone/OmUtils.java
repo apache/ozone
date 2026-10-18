@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedHost;
 import static org.apache.hadoop.ozone.OzoneConsts.DOUBLE_SLASH_OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
@@ -38,6 +40,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto.READ_CONSISTENCY_UNSPECIFIED;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -78,6 +81,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -148,8 +152,8 @@ public final class OmUtils {
     final Optional<String> host = getHostNameFromConfigKeys(conf,
         OZONE_OM_ADDRESS_KEY);
 
-    return host.orElse(OZONE_OM_BIND_HOST_DEFAULT) + ":" +
-        getOmRpcPort(conf);
+    return getHostPortString(host.orElse(OZONE_OM_BIND_HOST_DEFAULT),
+        getOmRpcPort(conf));
   }
 
   /**
@@ -158,40 +162,26 @@ public final class OmUtils {
    * @param conf configuration
    * @param confKey configuration key to lookup address from
    * @return Target InetSocketAddress for the OM RPC server.
+   * @throws ConfigurationException if the configured host cannot be advertised
+   *         to the other OMs of the service
    */
   public static String getOmRpcAddress(ConfigurationSource conf,
       String confKey) {
     final Optional<String> host = getHostNameFromConfigKeys(conf, confKey);
 
     if (host.isPresent()) {
-      return host.get() + ":" + getPortNumberFromConfigKeys(conf, confKey)
-              .orElse(OZONE_OM_PORT_DEFAULT);
+      // Without a service and node suffix this is the non-HA OM's own RPC
+      // address, which defaults to a wildcard.
+      if (!OZONE_OM_ADDRESS_KEY.equals(confKey)) {
+        validateAdvertisedHost(confKey, host.get());
+      }
+      return getHostPortString(host.get(),
+          getPortNumberFromConfigKeys(conf, confKey)
+              .orElse(OZONE_OM_PORT_DEFAULT));
     } else {
       // The specified confKey is not set
       return null;
     }
-  }
-
-  /**
-   * Retrieve the socket address that should be used by clients to connect
-   * to OM.
-   * @param conf
-   * @return Target InetSocketAddress for the OM service endpoint.
-   */
-  public static InetSocketAddress getOmAddressForClients(
-      ConfigurationSource conf) {
-    final Optional<String> host = getHostNameFromConfigKeys(conf,
-        OZONE_OM_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      throw new IllegalArgumentException(
-          OZONE_OM_ADDRESS_KEY + " must be defined. See" +
-              " https://wiki.apache.org/hadoop/Ozone#Configuration for" +
-              " details on configuring Ozone.");
-    }
-
-    return NetUtils.createSocketAddr(
-        host.get() + ":" + getOmRpcPort(conf));
   }
 
   /**
@@ -228,8 +218,7 @@ public final class OmUtils {
    * @param omRequest OMRequest proto
    * @return True if its readOnly, false otherwise.
    */
-  public static boolean isReadOnly(
-      OzoneManagerProtocolProtos.OMRequest omRequest) {
+  public static boolean isReadOnly(OMRequest omRequest) {
     OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
     switch (cmdType) {
     case CheckVolumeAccess:
@@ -258,10 +247,12 @@ public final class OmUtils {
     case FinalizeUpgradeProgress:
     case PrepareStatus:
     case GetS3VolumeContext:
+    case GetCallerIdentity:
     case ListTenant:
     case TenantGetUserInfo:
     case TenantListUser:
     case ListSnapshot:
+    case SnapshotCount:
     case RefetchSecretKey:
     case RangerBGSync:
       // RangerBGSync is a read operation in the sense that it doesn't directly
@@ -272,6 +263,7 @@ public final class OmUtils {
     case SnapshotDiff:
     case CancelSnapshotDiff:
     case ListSnapshotDiffJobs:
+    case SubmitSnapshotDiff:
     case TransferLeadership:
     case SetSafeMode:
     case PrintCompactionLogDag:
@@ -279,8 +271,150 @@ public final class OmUtils {
       // keeping it here for compatibility
     case GetSnapshotInfo:
     case GetObjectTagging:
+    case GetBucketTagging:
+    case GetBucketDeletedBytes:
+      return true;
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    // Prepare and CancelPrepare are now no-ops, but still produce responses for compatability.
+    // They are marked as read-only since they don't modify state anymore.
+    case Prepare:
+    case CancelPrepare:
+    case QueryUpgradeStatus:
+    case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
+      return true;
+    case CreateVolume:
+    case SetVolumeProperty:
+    case DeleteVolume:
+    case CreateBucket:
+    case SetBucketProperty:
+    case DeleteBucket:
+    case CreateKey:
+    case RenameKey:
+    case RenameKeys:
+    case DeleteKey:
+    case DeleteKeys:
+    case CommitKey:
+    case AllocateBlock:
+    case InitiateMultiPartUpload:
+    case CommitMultiPartUpload:
+    case CompleteMultiPartUpload:
+    case AbortMultiPartUpload:
+    case GetS3Secret:
+    case AssumeRole:
+    case GetDelegationToken:
+    case RenewDelegationToken:
+    case CancelDelegationToken:
+    case CreateDirectory:
+    case CreateFile:
+    case RemoveAcl:
+    case SetAcl:
+    case AddAcl:
+    case PurgeKeys:
+    case RecoverTrash:
+      // RecoverTrash is deprecated by HDDS-11251. Keeping this in here
+      // As protobuf currently doesn't support deprecating enum fields
+      // TODO: Remove once migrated to proto3 and mark fields in proto
+      // as deprecated
+    case FinalizeUpgrade:
+    case StartFinalizeUpgrade:
+    case CompleteFinalizeUpgrade:
+    case DeleteOpenKeys:
+    case SetS3Secret:
+    case RevokeS3Secret:
+    case RevokeSTSToken:
+    case PurgeDirectories:
+    case PurgePaths:
+    case CreateTenant:
+    case DeleteTenant:
+    case TenantAssignUserAccessId:
+    case TenantRevokeUserAccessId:
+    case TenantAssignAdmin:
+    case TenantRevokeAdmin:
+    case SetRangerServiceVersion:
+    case CreateSnapshot:
+    case DeleteSnapshot:
+    case RenameSnapshot:
+    case SnapshotMoveDeletedKeys:
+    case SnapshotMoveTableKeys:
+    case SnapshotPurge:
+    case RecoverLease:
+    case SetTimes:
+    case AbortExpiredMultiPartUploads:
+    case SetSnapshotProperty:
+    case QuotaRepair:
+    case PutObjectTagging:
+    case DeleteObjectTagging:
+    case DeleteRevokedSTSTokens:
+    case PutBucketTagging:
+    case DeleteBucketTagging:
+    case SetLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
+    case SaveLifecycleScanState:
+      return false;
+    case UnknownCommand:
+      return false;
+    case EchoRPC:
+      return omRequest.getEchoRPCRequest().getReadOnly();
+    default:
+      LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
+      return false;
+    }
+  }
+
+  /**
+   * Checks if the OM request should be sent to the follower or leader.
+   * <p>
+   * Note that this method is not equivalent to {@link OmUtils#isReadOnly(OMRequest)}
+   * since there are cases that a "read" requests (ones that do not go through Ratis) requires
+   * to be sent to the leader.
+   * @param omRequest OMRequest proto
+   * @return True if the request should be sent to the follower.
+   */
+  public static boolean shouldSendToFollower(OMRequest omRequest) {
+    OzoneManagerProtocolProtos.Type cmdType = omRequest.getCmdType();
+    switch (cmdType) {
+    case CheckVolumeAccess:
+    case InfoVolume:
+    case ListVolume:
+    case InfoBucket:
+    case ListBuckets:
+    case LookupKey:
+    case ListKeys:
+    case ListKeysLight:
+    case ListTrash:
+      // ListTrash is deprecated by HDDS-11251. Keeping this in here
+      // As protobuf currently doesn't support deprecating enum fields
+      // TODO: Remove once migrated to proto3 and mark fields in proto
+      // as deprecated
+    case ListOpenFiles:
+    case ListMultiPartUploadParts:
+    case GetFileStatus:
+    case LookupFile:
+    case ListStatus:
+    case ListStatusLight:
+    case GetAcl:
+    case ListMultipartUploads:
+    case FinalizeUpgradeProgress:
+    case PrepareStatus:
+    case GetS3VolumeContext:
+    case GetCallerIdentity:
+    case ListTenant:
+    case TenantGetUserInfo:
+    case TenantListUser:
+    case ListSnapshot:
+    case SnapshotCount:
+    case RefetchSecretKey:
+    case GetKeyInfo:
+    case GetSnapshotInfo:
+    case GetObjectTagging:
+    case GetLifecycleConfiguration:
+    case GetLifecycleServiceStatus:
+    case GetBucketDeletedBytes:
+      return true;
+    case GetBucketTagging:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -315,6 +449,8 @@ public final class OmUtils {
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
     case FinalizeUpgrade:
+    case StartFinalizeUpgrade:
+    case CompleteFinalizeUpgrade:
     case Prepare:
     case CancelPrepare:
     case DeleteOpenKeys:
@@ -342,12 +478,37 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case AssumeRole:
+    case RevokeSTSToken:
+    case DeleteRevokedSTSTokens:
+    case PutBucketTagging:
+    case DeleteBucketTagging:
+    case ServiceList: // OM leader should have the most up-to-date OM service list info
+    case RangerBGSync: // Ranger Background Sync task is only run on leader
+    case SnapshotDiff:
+    case CancelSnapshotDiff:
+    case ListSnapshotDiffJobs:
+    case SubmitSnapshotDiff:
+    case PrintCompactionLogDag:
+      // Snapshot diff is a local to a single OM node so we should not send it arbitrarily
+      // to any OM nodes
+    case TransferLeadership: // Transfer leadership should be initiated by the leader
+    case SetSafeMode: // SafeMode should be initiated by the leader
+    case StartQuotaRepair:
+    case GetQuotaRepairStatus:
+      // Quota repair lifecycle request should be initiated by the leader
+    case DBUpdates: // We are currently only interested on the leader DB info
+    case SetLifecycleConfiguration:
+    case DeleteLifecycleConfiguration:
+    case SetLifecycleServiceStatus:
+    case SaveLifecycleScanState:
     case UnknownCommand:
+    case QueryUpgradeStatus:
       return false;
     case EchoRPC:
       return omRequest.getEchoRPCRequest().getReadOnly();
     default:
-      LOG.error("CmdType {} is not categorized as readOnly or not.", cmdType);
+      LOG.error("CmdType {} is not categorized to be sent to follower.", cmdType);
       return false;
     }
   }
@@ -362,7 +523,7 @@ public final class OmUtils {
           "This could possibly indicate a faulty JRE");
     }
   }
-
+  
   /**
    * Get a collection of all active omNodeIds (excluding decommissioned nodes)
    * for the given omServiceId.
@@ -484,7 +645,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" + addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTP_BIND_PORT_DEFAULT));
   }
 
   /**
@@ -510,8 +672,8 @@ public final class OmUtils {
 
     String hostName = bindHost.orElse(addressHost.orElse(omNodeHostAddr));
 
-    return hostName + ":" +
-        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT);
+    return getHostPortString(hostName,
+        addressPort.orElse(OZONE_OM_HTTPS_BIND_PORT_DEFAULT));
   }
 
   public static File createOMDir(String dirPath) {
@@ -969,9 +1131,10 @@ public final class OmUtils {
   public static boolean isBucketSnapshotIndicator(String key) {
     return key.startsWith(OM_SNAPSHOT_INDICATOR) && key.split("/").length == 2;
   }
-  
+
   public static List<List<String>> format(
-          List<ServiceInfo> nodes, int port, String leaderId, String leaderReadiness) {
+      List<ServiceInfo> nodes, int port, String leaderId,
+      String localNodeId, String localLeaderStatus) {
     List<List<String>> omInfoList = new ArrayList<>();
     // Ensuring OM's are printed in correct order
     List<ServiceInfo> omNodes = nodes.stream()
@@ -979,18 +1142,25 @@ public final class OmUtils {
         .sorted(Comparator.comparing(ServiceInfo::getHostname))
         .collect(Collectors.toList());
     for (ServiceInfo info : omNodes) {
-      // Printing only the OM's running
-      if (info.getNodeType() == HddsProtos.NodeType.OM) {
-        String role = info.getOmRoleInfo().getNodeId().equals(leaderId)
-                      ? "LEADER" : "FOLLOWER";
-        List<String> omInfo = new ArrayList<>();
-        omInfo.add(info.getHostname());
-        omInfo.add(info.getOmRoleInfo().getNodeId());
-        omInfo.add(String.valueOf(port));
-        omInfo.add(role);
-        omInfo.add(leaderReadiness);
-        omInfoList.add(omInfo);
+      String nodeId = info.getOmRoleInfo().getNodeId();
+      boolean isLeaderNode = nodeId.equals(leaderId);
+      boolean isLocalNode = nodeId.equals(localNodeId);
+      String role = info.getOmRoleInfo().getServerRole();
+
+      String displayValue;
+      if (isLeaderNode && isLocalNode) {
+        displayValue = localLeaderStatus;
+      } else {
+        displayValue = role;
       }
+
+      List<String> omInfo = new ArrayList<>();
+      omInfo.add(info.getHostname());
+      omInfo.add(nodeId);
+      omInfo.add(String.valueOf(port));
+      omInfo.add(role);
+      omInfo.add(displayValue);
+      omInfoList.add(omInfo);
     }
     return omInfoList;
   }
@@ -1004,7 +1174,10 @@ public final class OmUtils {
    */
   public static void resolveOmHost(String omHost, int omPort)
       throws IOException {
-    InetSocketAddress omHostAddress = NetUtils.createSocketAddr(omHost, omPort);
+    // Combine via getHostPortString so an IPv6 literal is bracketed; passing a
+    // bare ::1 to createSocketAddr fails with "not a valid host:port authority".
+    InetSocketAddress omHostAddress =
+        NetUtils.createSocketAddr(getHostPortString(omHost, omPort));
     if (omHostAddress.isUnresolved()) {
       throw new IOException(
           "Cannot resolve OM host " + omHost + " in the URI",
@@ -1019,5 +1192,11 @@ public final class OmUtils {
       LOG.error("Failure in resolving OM host address", e);
       throw e;
     }
+  }
+
+  public static boolean specifiedReadConsistency(OMRequest request) {
+    return request.hasReadConsistencyHint()
+        && request.getReadConsistencyHint().hasReadConsistency()
+        && request.getReadConsistencyHint().getReadConsistency() != READ_CONSISTENCY_UNSPECIFIED;
   }
 }

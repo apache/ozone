@@ -17,7 +17,7 @@
  */
 
 import { Pipeline } from "@/v2/types/pipelines.types";
-import { StorageReport } from "@/v2/types/overview.types";
+import { DatanodeStorageReport } from "@/v2/types/datanodeStorageReport.types";
 import { Option as MultiOption } from "@/v2/components/select/multiSelect";
 
 // Corresponds to HddsProtos.NodeState
@@ -35,12 +35,22 @@ export const DatanodeOpStateList = [
 ] as const;
 export type DatanodeOpState = typeof DatanodeOpStateList[number];
 
+export type DatanodeDiskInfo = {
+  storageUuid: string;
+  storageLocation: string;
+  capacity: number;
+  used: number;
+  remaining: number;
+  committed: number;
+  openContainerCount: number | null;
+}
+
 export type DatanodeResponse = {
   hostname: string;
   state: DatanodeState;
   opState: DatanodeOpState;
   lastHeartbeat: string;
-  storageReport: StorageReport;
+  storageReport: DatanodeStorageReport;
   pipelines: Pipeline[];
   containers: number;
   openContainers: number;
@@ -51,6 +61,7 @@ export type DatanodeResponse = {
   revision: string;
   buildDate: string;
   networkLocation: string;
+  disks?: DatanodeDiskInfo[];
 }
 
 export type DatanodesResponse = {
@@ -63,6 +74,7 @@ export type Datanode = {
   state: DatanodeState;
   opState: DatanodeOpState;
   lastHeartbeat: string;
+  storageReport: DatanodeStorageReport;
   storageUsed: number;
   storageTotal: number;
   storageRemaining: number;
@@ -77,6 +89,7 @@ export type Datanode = {
   revision: string;
   buildDate: string;
   networkLocation: string;
+  disks?: DatanodeDiskInfo[];
 }
 
 export type DatanodeDetails = {

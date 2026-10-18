@@ -26,7 +26,7 @@ import picocli.CommandLine;
 /**
  * Ozone Admin Command line tool.
  */
-@CommandLine.Command(name = "ozone admin",
+@CommandLine.Command(name = "ozone admin", aliases = "admin",
     description = "Developer tools for Ozone Admin operations",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)

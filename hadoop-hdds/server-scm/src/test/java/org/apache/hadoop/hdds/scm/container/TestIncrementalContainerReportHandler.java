@@ -26,7 +26,7 @@ import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
 import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.createMatchingDataChecksumForReplica;
 import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.createUniqueDataChecksumForReplica;
 import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.getContainerReportsProto;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.hadoop.hdds.scm.upgrade.ScmUpgradeTestUtils.mockVersionManager;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -81,12 +81,11 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -110,7 +109,7 @@ public class TestIncrementalContainerReportHandler {
   private DBStore dbStore;
 
   @BeforeEach
-  public void setup() throws IOException, InvalidStateTransitionException,
+  public void setup() throws IOException,
       TimeoutException {
     final OzoneConfiguration conf = new OzoneConfiguration();
     Path scmPath = Paths.get(testDir.getPath(), "scm-meta");
@@ -119,9 +118,7 @@ public class TestIncrementalContainerReportHandler {
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
-    when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
+    ScmVersionManager versionManager = mockVersionManager();
     this.nodeManager =
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
             scmContext, versionManager);
@@ -165,9 +162,9 @@ public class TestIncrementalContainerReportHandler {
 
     doAnswer(invocation -> {
       containerStateManager
-          .updateContainerState(((ContainerID)invocation
+          .updateContainerStateWithSequenceId(((ContainerID)invocation
                   .getArguments()[0]).getProtobuf(),
-              (HddsProtos.LifeCycleEvent)invocation.getArguments()[1]);
+              (HddsProtos.LifeCycleEvent)invocation.getArguments()[1], 0L);
       return null;
     }).when(containerManager).updateContainerState(
         any(ContainerID.class),
@@ -780,7 +777,7 @@ public class TestIncrementalContainerReportHandler {
           final long bcsId) {
     final ContainerReplicaProto.Builder replicaProto =
             ContainerReplicaProto.newBuilder()
-                    .setContainerID(containerId.getId())
+                    .setContainerID(containerId.getIdForTesting())
                     .setState(state)
                     .setOriginNodeId(originNodeId)
                     .setSize(5368709120L)

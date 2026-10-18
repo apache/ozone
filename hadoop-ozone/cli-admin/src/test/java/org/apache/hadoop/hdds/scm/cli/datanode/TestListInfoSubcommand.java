@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -100,14 +101,16 @@ public class TestListInfoSubcommand {
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
+      if (state == HddsProtos.NodeState.HEALTHY_READONLY) {
+        continue; // HEALTHY_READONLY is no longer a valid state and the protobuf definition is deprecated.
+      }
       p = Pattern.compile(
           "^Health State:\\s+" + state + "$", Pattern.MULTILINE);
       m = p.matcher(outContent.toString(DEFAULT_ENCODING));
       assertTrue(m.find());
     }
-    // Ensure the nodes are ordered by health state HEALTHY,
-    // HEALTHY_READONLY, STALE, DEAD
-    p = Pattern.compile(".+HEALTHY.+STALE.+DEAD.+HEALTHY_READONLY.+",
+    // Ensure the nodes are ordered by health state HEALTHY, STALE, DEAD
+    p = Pattern.compile(".+HEALTHY.+STALE.+DEAD.+",
         Pattern.DOTALL);
 
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
@@ -148,12 +151,15 @@ public class TestListInfoSubcommand {
 
     // Check all expected health states are present
     for (HddsProtos.NodeState state : HddsProtos.NodeState.values()) {
+      if (state == HddsProtos.NodeState.HEALTHY_READONLY) {
+        continue; // HEALTHY_READONLY is no longer a valid state and the protobuf definition is deprecated.
+      }
       assertTrue(healthStates.contains(state.toString()),
           "Expected health state: " + state + " but not found");
     }
 
-    // Check order: HEALTHY -> STALE -> DEAD -> HEALTHY_READONLY
-    List<String> expectedOrder = Arrays.asList("HEALTHY", "STALE", "DEAD", "HEALTHY_READONLY");
+    // Check order: HEALTHY -> STALE -> DEAD
+    List<String> expectedOrder = Arrays.asList("HEALTHY", "STALE", "DEAD");
     int lastIndex = -1;
     for (String state : healthStates) {
       int index = expectedOrder.indexOf(state);
@@ -182,7 +188,7 @@ public class TestListInfoSubcommand {
     Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
 
-    p = Pattern.compile(nodes.get(0).getNodeID().getUuid().toString(),
+    p = Pattern.compile(nodes.get(0).getNodeID().getUuid(),
         Pattern.MULTILINE);
     m = p.matcher(outContent.toString(DEFAULT_ENCODING));
     assertTrue(m.find());
@@ -357,6 +363,65 @@ public class TestListInfoSubcommand {
     assertTrue(output.contains("Healthy volume count:"), "Should display healthy volume count");
   }
 
+  @Test
+  public void testFailedVolumesFilter() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.Node> baseNodes = getNodeDetails();
+
+    List<HddsProtos.Node> nodes = new ArrayList<>();
+    // node 0: 1 failed volume
+    nodes.add(HddsProtos.Node.newBuilder(baseNodes.get(0))
+        .setTotalVolumeCount(4).setHealthyVolumeCount(3)
+        .addFailedVolumes("/data/disk2").build());
+    // node 1: healthy, no failed volumes
+    nodes.add(HddsProtos.Node.newBuilder(baseNodes.get(1))
+        .setTotalVolumeCount(4).setHealthyVolumeCount(4).build());
+    // node 2: 2 failed volumes
+    nodes.add(HddsProtos.Node.newBuilder(baseNodes.get(2))
+        .setTotalVolumeCount(6).setHealthyVolumeCount(4)
+        .addFailedVolumes("/data/disk1")
+        .addFailedVolumes("/data/disk5").build());
+    // node 3: healthy, no failed volumes
+    nodes.add(HddsProtos.Node.newBuilder(baseNodes.get(3))
+        .setTotalVolumeCount(4).setHealthyVolumeCount(4).build());
+
+    when(scmClient.queryNode(any(), any(), any(), any())).thenReturn(nodes);
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--nodes-with-failed-volumes");
+    cmd.execute(scmClient);
+    String output = outContent.toString(DEFAULT_ENCODING);
+
+    // Only 2 datanodes (those with failed volumes) should appear
+    Matcher m = Pattern.compile("^Datanode:", Pattern.MULTILINE)
+        .matcher(output);
+    int count = 0;
+    while (m.find()) {
+      count++;
+    }
+    assertEquals(2, count, "Only datanodes with failed volumes should be listed");
+    assertThat(output).contains("Failed volume");
+    assertThat(output).contains("/data/disk2");
+    assertThat(output).contains("/data/disk1");
+    assertThat(output).contains("/data/disk5");
+  }
+
+  @Test
+  public void testFailedVolumesFilterRejectsNodeId() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--nodes-with-failed-volumes",
+        "--id", nodes.get(0).getNodeID().getUuid());
+    CommandLine.ParameterException ex = assertThrows(
+        CommandLine.ParameterException.class, () -> cmd.execute(scmClient));
+    assertTrue(ex.getMessage().contains(
+        "--nodes-with-failed-volumes cannot be used with --id/--node-id"));
+  }
+
   private void validateOrdering(JsonNode root, String orderDirection) {
     for (int i = 0; i < root.size() - 1; i++) {
       long usedCurrent = root.get(i).get("used").asLong();
@@ -420,10 +485,6 @@ public class TestListInfoSubcommand {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.DECOMMISSIONING);
         builder.addNodeStates(HddsProtos.NodeState.DEAD);
-      } else if (i == 2) {
-        builder.addNodeOperationalStates(
-            HddsProtos.NodeOperationalState.IN_SERVICE);
-        builder.addNodeStates(HddsProtos.NodeState.HEALTHY_READONLY);
       } else {
         builder.addNodeOperationalStates(
             HddsProtos.NodeOperationalState.IN_SERVICE);

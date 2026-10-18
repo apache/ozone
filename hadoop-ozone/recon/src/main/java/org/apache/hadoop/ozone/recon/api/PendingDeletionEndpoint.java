@@ -26,7 +26,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsCompleteResponse;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +38,6 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/pendingDeletion")
 @Produces("application/json")
-@AdminOnly
 public class PendingDeletionEndpoint {
   private static final Logger LOG = LoggerFactory.getLogger(PendingDeletionEndpoint.class);
   private final ReconGlobalMetricsService reconGlobalMetricsService;
@@ -56,15 +55,21 @@ public class PendingDeletionEndpoint {
   }
 
   @GET
-  public Response getPendingDeletionByComponent(@QueryParam("component") String component) {
+  public Response getPendingDeletionByComponent(
+      @QueryParam("component")
+      String component,
+      @QueryParam("limit")
+      Integer limit
+  ) {
     if (component == null || component.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity("component query parameter is required").build();
     }
+
     final String normalizedComponent = component.trim().toLowerCase();
     switch (normalizedComponent) {
     case "dn":
-      return handleDataNodeMetrics();
+      return handleDataNodeMetrics(limit);
     case "scm":
       return handleScmPendingDeletion();
     case "om":
@@ -75,13 +80,18 @@ public class PendingDeletionEndpoint {
     }
   }
 
-  private Response handleDataNodeMetrics() {
-    DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics();
-    if (response.getStatus() == DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
-      return Response.ok(response).build();
-    } else {
-      return Response.accepted(response).build();
+  private Response handleDataNodeMetrics(Integer limit) {
+    if (null != limit && limit < 1) {
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Limit query parameter must be at-least 1").build();
     }
+
+    Object response = dataNodeMetricsService.getCollectedMetrics(limit);
+    if (response instanceof DataNodeMetricsCompleteResponse) {
+      DataNodeMetricsCompleteResponse completeResponse = (DataNodeMetricsCompleteResponse) response;
+      return Response.ok(completeResponse).build();
+    }
+    return Response.accepted(response).build();
   }
 
   private Response handleScmPendingDeletion() {

@@ -214,7 +214,11 @@ public class TestOmContainerLocationCache {
         .thenCallRealMethod();
     when(manager.acquireClient(argThat(matchEmptyPipeline()),
         anyBoolean())).thenCallRealMethod();
+    when(manager.acquireClient(argThat(matchEmptyPipeline()), anyBoolean(), anyBoolean()))
+        .thenCallRealMethod();
     when(manager.acquireClientForReadData(argThat(matchEmptyPipeline())))
+        .thenCallRealMethod();
+    when(manager.acquireClientForReadData(argThat(matchEmptyPipeline()), anyBoolean()))
         .thenCallRealMethod();
 
     when(manager.acquireClient(argThat(matchPipeline(DN1))))
@@ -241,7 +245,7 @@ public class TestOmContainerLocationCache {
 
   private static ArgumentMatcher<Pipeline> matchPipeline(DatanodeDetails dn) {
     return argument -> argument != null && !argument.getNodes().isEmpty()
-        && argument.getNodes().get(0).getUuid().equals(dn.getUuid());
+        && argument.getNodes().get(0).getID().equals(dn.getID());
   }
 
   private static ArgumentMatcher<Pipeline> matchEcPipeline() {

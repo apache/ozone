@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine.Server;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -64,11 +65,11 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
@@ -88,6 +89,8 @@ import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
 import org.apache.ratis.protocol.exceptions.LeaderSteppingDownException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.ReadException;
+import org.apache.ratis.protocol.exceptions.ReadIndexException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
@@ -110,6 +113,9 @@ import org.slf4j.LoggerFactory;
  */
 public final class OzoneManagerRatisServer {
   private static final Logger LOG = LoggerFactory.getLogger(OzoneManagerRatisServer.class);
+
+  /** Superseded by {@code ozone.om.ha.raft.server.retrycache.expirytime}, still honoured if set. */
+  private static final String RETRY_CACHE_TIMEOUT_DEPRECATED_KEY = "ozone.om.ratis.server.retry.cache.timeout";
 
   private final int port;
   private final RaftServer server;
@@ -223,10 +229,8 @@ public final class OzoneManagerRatisServer {
       // On regular startup, add all OMs to Ratis ring
       raftPeers.add(localRaftPeer);
 
-      for (Map.Entry<String, OMNodeDetails> peerInfo : peerNodes.entrySet()) {
-        String peerNodeId = peerInfo.getKey();
-        OMNodeDetails peerNode = peerInfo.getValue();
-        RaftPeer raftPeer = OzoneManagerRatisServer.createRaftPeer(peerNode, peerNodeId);
+      for (OMNodeDetails peerNode : peerNodes.values()) {
+        RaftPeer raftPeer = OzoneManagerRatisServer.createRaftPeer(peerNode);
 
         // Add other OM nodes belonging to the same OM service to the Ratis ring
         raftPeers.add(raftPeer);
@@ -245,27 +249,9 @@ public final class OzoneManagerRatisServer {
    * @throws ServiceException
    */
   public OMResponse submitRequest(OMRequest omRequest, boolean isWrite) throws ServiceException {
-    // In prepare mode, only prepare and cancel requests are allowed to go
-    // through.
-    if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
-      RaftClientRequest raftClientRequest = createRaftRequest(omRequest, isWrite);
-      RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
-      return createOmResponse(omRequest, raftClientReply);
-    } else {
-      LOG.info("Rejecting write request on OM {} because it is in prepare " +
-          "mode: {}", ozoneManager.getOMNodeId(),
-          omRequest.getCmdType().name());
-
-      String message = "Cannot apply write request " +
-          omRequest.getCmdType().name() + " when OM is in prepare mode.";
-      OMResponse.Builder omResponse = OMResponse.newBuilder()
-          .setMessage(message)
-          .setStatus(Status.NOT_SUPPORTED_OPERATION_WHEN_PREPARED)
-          .setCmdType(omRequest.getCmdType())
-          .setTraceID(omRequest.getTraceID())
-          .setSuccess(false);
-      return omResponse.build();
-    }
+    RaftClientRequest raftClientRequest = createRaftRequest(omRequest, isWrite);
+    RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
+    return createOmResponse(omRequest, raftClientReply);
   }
 
   private OMResponse createOmResponse(OMRequest omRequest,
@@ -431,42 +417,31 @@ public final class OzoneManagerRatisServer {
     }
   }
 
-  private static RaftPeer createRaftPeer(OMNodeDetails omNode) {
-    String nodeId = omNode.getNodeId();
-    RaftPeerId raftPeerId = RaftPeerId.valueOf(nodeId);
-    InetSocketAddress ratisAddr = new InetSocketAddress(
-        omNode.getHostAddress(), omNode.getRatisPort());
-    RaftPeerRole startRole = omNode.isRatisListener() ?
-        RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER;
-
-    return RaftPeer.newBuilder()
-        .setId(raftPeerId)
-        .setAddress(ratisAddr)
-        .setStartupRole(startRole)
-        .build();
-  }
-
   /**
-   * Helper method to create a RaftPeer from OMNodeDetails, handling unresolved hosts.
-   * @param omNode the OM node details
-   * @param nodeId the node ID to use
-   * @return the created RaftPeer
+   * Build a RaftPeer for the given OM node. The peer address is set from
+   * {@link OMNodeDetails#getRatisHostPortStr()} -- the configured host
+   * string (hostname or IP literal) paired with the Ratis port. The
+   * configured string is passed through verbatim; this method never
+   * resolves it into an {@link InetSocketAddress} (which would bake the
+   * resolved IP into the peer address).
+   * <p>
+   * Why this matters: Ratis hands the address string to gRPC's
+   * {@code NettyChannelBuilder.forTarget(...)}, whose default
+   * {@code DnsNameResolver} re-resolves hostnames on connection failure
+   * / refresh. If the address is a hostname, gRPC recovers automatically
+   * from peer pod restarts in environments like Kubernetes where DNS
+   * names are stable but IPs are not. If the operator configured an IP
+   * literal, gRPC of course uses that IP directly -- the invariant is
+   * "don't pre-resolve", not "must be a hostname". See HDDS-15514
+   * (DNS-refresh-on-failure for all RPC paths).
    */
-  private static RaftPeer createRaftPeer(OMNodeDetails omNode, String nodeId) {
-    RaftPeerId raftPeerId = RaftPeerId.valueOf(nodeId);
-    RaftPeer.Builder builder = RaftPeer.newBuilder()
-        .setId(raftPeerId)
-        .setStartupRole(omNode.isRatisListener() ? RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER);
-    
-    if (omNode.isHostUnresolved()) {
-      builder.setAddress(omNode.getRatisHostPortStr());
-    } else {
-      InetSocketAddress ratisAddr = new InetSocketAddress(
-          omNode.getInetAddress(), omNode.getRatisPort());
-      builder.setAddress(ratisAddr);
-    }
-    
-    return builder.build();
+  static RaftPeer createRaftPeer(OMNodeDetails omNode) {
+    return RaftPeer.newBuilder()
+        .setId(RaftPeerId.valueOf(omNode.getNodeId()))
+        .setAddress(omNode.getRatisHostPortStr())
+        .setStartupRole(omNode.isRatisListener()
+            ? RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER)
+        .build();
   }
 
   /**
@@ -501,7 +476,7 @@ public final class OzoneManagerRatisServer {
 
   /**
    * Create Write RaftClient request from OMRequest.
-   * @param omRequest
+   * @param omRequest OM request.
    * @return RaftClientRequest - Raft Client request which is submitted to
    * ratis server.
    */
@@ -514,8 +489,26 @@ public final class OzoneManagerRatisServer {
         .setMessage(
             Message.valueOf(
                 OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(isWrite ? RaftClientRequest.writeRequestType() : RaftClientRequest.readRequestType())
+        .setType(isWrite ? RaftClientRequest.writeRequestType() : getRaftReadRequestType(omRequest))
         .build();
+  }
+
+  private static RaftClientRequest.Type getRaftReadRequestType(OMRequest omRequest) {
+    if (!OmUtils.specifiedReadConsistency(omRequest)) {
+      // If there is no consistency hint, we simply follow the Raft server read option
+      return RaftClientRequest.readRequestType();
+    }
+    // Allow client to decide which read consistency semantic can be used
+    ReadConsistency readConsistency =
+        ReadConsistency.fromProto(omRequest.getReadConsistencyHint().getReadConsistency());
+    if (readConsistency.isLinearizable()) {
+      // Note that the linearizable request type might not be respected
+      // if the Raft server does not set the read option to LINEARIZABLE
+      return RaftClientRequest.readRequestType(false);
+    } else {
+      // This will do a leader-only read even if the Raft server read option is LINEARIZABLE
+      return RaftClientRequest.readRequestType(true);
+    }
   }
 
   private ClientId getClientId() {
@@ -542,7 +535,11 @@ public final class OzoneManagerRatisServer {
     }
     //cache hit
     try {
-      return getOMResponse(cacheEntry.getReplyFuture().get());
+      RaftClientReply reply = cacheEntry.getReplyFuture().get();
+      if (!reply.isSuccess()) {
+        return null;
+      }
+      return getOMResponse(reply);
     } catch (ExecutionException ex) {
       throw new ServiceException(ex.getMessage(), ex);
     } catch (InterruptedException ex) {
@@ -584,6 +581,16 @@ public final class OzoneManagerRatisServer {
         throw new ServiceException(new OMNotLeaderException(leaderSteppingDownException.getMessage()));
       }
 
+      ReadIndexException readIndexException = reply.getReadIndexException();
+      if (readIndexException != null) {
+        throw new ServiceException(readIndexException);
+      }
+
+      ReadException readException = reply.getReadException();
+      if (readException != null) {
+        throw new ServiceException(readException);
+      }
+
       StateMachineException stateMachineException =
           reply.getStateMachineException();
       if (stateMachineException != null) {
@@ -617,7 +624,7 @@ public final class OzoneManagerRatisServer {
 
   private OMResponse getOMResponse(RaftClientReply reply) throws ServiceException {
     try {
-      return OMRatisHelper.getOMResponseFromRaftClientReply(reply);
+      return OMRatisHelper.getOMResponseFromRaftClientReply(reply, getLeaderId());
     } catch (IOException ex) {
       if (ex.getMessage() != null) {
         throw new ServiceException(ex.getMessage(), ex);
@@ -653,6 +660,11 @@ public final class OzoneManagerRatisServer {
   }
 
   public boolean isLinearizableRead() {
+    // TODO: Currently we use LINEARIZABLE read option to imply
+    //  that we support follower reads although technically
+    //  linearizable leader-only read is also a valid configuration.
+    //  In the future, a separate configuration to check whether OM
+    //  supports follower read can be added.
     return readOption == Read.Option.LINEARIZABLE;
   }
 
@@ -724,13 +736,15 @@ public final class OzoneManagerRatisServer {
 
     setRaftRpcProperties(properties, conf);
 
-    setRaftRetryCacheProperties(properties, conf);
-
     setRaftSnapshotProperties(properties, conf);
 
     setRaftCloseThreshold(properties, conf);
 
     getOMHAConfigs(conf).forEach(properties::set);
+
+    // Must run after the ozone.om.ha.* copy above, which would otherwise override it.
+    setRaftRetryCacheProperties(properties, conf);
+
     return properties;
   }
 
@@ -819,13 +833,20 @@ public final class OzoneManagerRatisServer {
   }
 
   private static void setRaftRetryCacheProperties(RaftProperties properties, ConfigurationSource conf) {
-    // Set timeout for server retry cache entry
-    TimeUnit retryCacheTimeoutUnit = OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT.getUnit();
-    final TimeDuration retryCacheTimeout = TimeDuration.valueOf(conf.getTimeDuration(
-        OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_KEY,
-        OMConfigKeys.OZONE_OM_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DEFAULT.getDuration(), retryCacheTimeoutUnit),
-        retryCacheTimeoutUnit);
-    RaftServerConfigKeys.RetryCache.setExpiryTime(properties, retryCacheTimeout);
+    if (conf.get(RETRY_CACHE_TIMEOUT_DEPRECATED_KEY) == null) {
+      return;
+    }
+    final String currentKey = OZONE_OM_HA_PREFIX + "." + RaftServerConfigKeys.RetryCache.EXPIRY_TIME_KEY;
+    if (conf.isExplicitlySet(currentKey)) {
+      LOG.warn("{} is deprecated and ignored, because {} is set.", RETRY_CACHE_TIMEOUT_DEPRECATED_KEY, currentKey);
+      return;
+    }
+    // A value without a unit suffix is read as milliseconds, as the deprecated key always has been.
+    final TimeDuration timeout = TimeDuration.valueOf(
+        conf.getTimeDuration(RETRY_CACHE_TIMEOUT_DEPRECATED_KEY, 0, TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
+    // Spell out the resolved value, so it can be copied to the current key without changing meaning.
+    LOG.warn("{} is deprecated. Instead, use {} = {}.", RETRY_CACHE_TIMEOUT_DEPRECATED_KEY, currentKey, timeout);
+    RaftServerConfigKeys.RetryCache.setExpiryTime(properties, timeout);
   }
 
   private static void setRaftSnapshotProperties(RaftProperties properties, ConfigurationSource conf) {

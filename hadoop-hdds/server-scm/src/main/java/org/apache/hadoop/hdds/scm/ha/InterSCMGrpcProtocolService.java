@@ -35,6 +35,7 @@ import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
 import org.apache.ratis.thirdparty.io.grpc.netty.NettyServerBuilder;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
+import org.apache.ratis.thirdparty.io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,9 +57,30 @@ public class InterSCMGrpcProtocolService {
     this.port = conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
         ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
+    final long maxConnectionIdle = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_MAX_CONNECTION_IDLE,
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_MAX_CONNECTION_IDLE_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final long keepAliveTime = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIME,
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIME_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final long keepAliveTimeout = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIMEOUT,
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_KEEPALIVE_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final long permitKeepAliveTime = conf.getTimeDuration(
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME,
+        ScmConfigKeys.OZONE_SCM_HA_GRPC_SERVER_PERMIT_KEEPALIVE_TIME_DEFAULT,
+        TimeUnit.MILLISECONDS);
+
     NettyServerBuilder nettyServerBuilder =
         ((NettyServerBuilder) ServerBuilder.forPort(port))
-            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE);
+            .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
+            .maxConnectionIdle(maxConnectionIdle, TimeUnit.MILLISECONDS)
+            .keepAliveTime(keepAliveTime, TimeUnit.MILLISECONDS)
+            .keepAliveTimeout(keepAliveTimeout, TimeUnit.MILLISECONDS)
+            .permitKeepAliveTime(permitKeepAliveTime, TimeUnit.MILLISECONDS);
 
     InterSCMGrpcService service = new InterSCMGrpcService(scm);
     ServerBuilder b = nettyServerBuilder.addService(service);
@@ -74,6 +96,10 @@ public class InterSCMGrpcProtocolService {
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslServerContextBuilder, securityConfig.getGrpcSslProvider());
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
+        sslContextBuilder.protocols(securityConfig.getGrpcTlsProtocols());
+        sslContextBuilder.ciphers(
+            securityConfig.getGrpcTlsCiphers(),
+            SupportedCipherSuiteFilter.INSTANCE);
         nettyServerBuilder.sslContext(sslContextBuilder.build());
       } catch (Exception ex) {
         LOG.error("Unable to setup TLS for secure " +

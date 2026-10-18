@@ -39,12 +39,12 @@ import java.nio.ByteBuffer;
  */
 public final class CodecBufferCodec implements Codec<CodecBuffer> {
 
-  private static final Codec<CodecBuffer> DIRECT_INSTANCE = new CodecBufferCodec(true);
-  private static final Codec<CodecBuffer> NON_DIRECT_INSTANCE = new CodecBufferCodec(false);
+  private static final CodecBufferCodec DIRECT_INSTANCE = new CodecBufferCodec(true);
+  private static final CodecBufferCodec NON_DIRECT_INSTANCE = new CodecBufferCodec(false);
 
   private final CodecBuffer.Allocator allocator;
 
-  public static Codec<CodecBuffer> get(boolean direct) {
+  public static CodecBufferCodec get(boolean direct) {
     return direct ? DIRECT_INSTANCE : NON_DIRECT_INSTANCE;
   }
 

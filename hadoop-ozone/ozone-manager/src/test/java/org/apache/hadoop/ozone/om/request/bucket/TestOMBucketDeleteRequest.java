@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests OMBucketDeleteRequest class which handles DeleteBucket request.
  */
-public class TestOMBucketDeleteRequest extends TestBucketRequest {
+public class TestOMBucketDeleteRequest extends BucketRequestTests {
 
   @Test
   public void testPreExecute() throws Exception {

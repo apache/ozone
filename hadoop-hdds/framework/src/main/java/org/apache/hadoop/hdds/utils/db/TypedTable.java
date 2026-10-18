@@ -25,10 +25,12 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
@@ -39,9 +41,12 @@ import org.apache.hadoop.hdds.utils.db.cache.FullTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.PartialTableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.hdds.utils.db.cache.TableNoCache;
 import org.apache.ratis.util.Preconditions;
 import org.apache.ratis.util.function.CheckedBiFunction;
+import org.apache.ratis.util.function.CheckedFunction;
+import org.rocksdb.ByteBufferGetStatus;
 
 /**
  * Strongly typed table implementation.
@@ -217,6 +222,34 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   /**
+   * Same cache semantics as {@link #get(Object)}, except that a value read from the store is decoded
+   * by {@code fromPersistedValue} directly from the buffer it was read into, so the fields the caller
+   * does not need are never decoded and no VALUE object is built.
+   */
+  @Override
+  public <R> R getProjected(KEY key, Function<VALUE, R> fromCachedValue,
+      CheckedFunction<CodecBuffer, R, CodecException> fromPersistedValue)
+      throws RocksDatabaseException, CodecException {
+    final CacheResult<VALUE> cacheResult = cache.lookup(new CacheKey<>(key));
+
+    if (cacheResult.getCacheStatus() == EXISTS) {
+      return fromCachedValue.apply(cacheResult.getValue().getCacheValue());
+    } else if (cacheResult.getCacheStatus() == NOT_EXIST) {
+      return null;
+    } else if (supportCodecBuffer) {
+      return getFromTable(key, this::getFromTable, fromPersistedValue);
+    } else {
+      final byte[] valueBytes = rawTable.get(encodeKey(key));
+      if (valueBytes == null) {
+        return null;
+      }
+      try (CodecBuffer buffer = CodecBuffer.wrap(valueBytes)) {
+        return fromPersistedValue.apply(buffer);
+      }
+    }
+  }
+
+  /**
    * Skip checking cache and get the value mapped to the given key in byte
    * array or returns null if the key is not found.
    *
@@ -226,6 +259,15 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public VALUE getSkipCache(KEY key) throws RocksDatabaseException, CodecException {
     return getFromTable(key);
+  }
+
+  @Override
+  public List<VALUE> multiGetSkipCache(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return multiGetFromTable(keys);
   }
 
   /**
@@ -306,6 +348,143 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     }
   }
 
+  List<VALUE> multiGetFromTable(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    if (supportCodecBuffer) {
+      return multiGetFromTableWithCodecBuffer(keys);
+    }
+    return multiGetFromTableWithByteArray(keys);
+  }
+
+  List<VALUE> multiGetFromTableWithByteArray(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    List<byte[]> keyBytesList = new ArrayList<>(keys.size());
+    for (KEY key : keys) {
+      keyBytesList.add(encodeKey(key));
+    }
+    List<byte[]> valueBytesList = rawTable.multiGetSkipCache(keyBytesList);
+    List<VALUE> values = new ArrayList<>(keys.size());
+    for (byte[] valueBytes : valueBytesList) {
+      values.add(decodeValue(valueBytes));
+    }
+    return values;
+  }
+
+  List<VALUE> multiGetFromTableWithCodecBuffer(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    final int n = keys.size();
+    final List<CodecBuffer> keyBuffers = new ArrayList<>(n);
+    final List<ByteBuffer> keyByteBuffers = new ArrayList<>(n);
+    final List<CodecBuffer> valueBuffers = new ArrayList<>(n);
+    final List<ByteBuffer> valueByteBuffers = new ArrayList<>(n);
+    final int initialCapacity = bufferCapacity.get();
+    for (KEY key : keys) {
+      final CodecBuffer keyBuffer = keyCodec.toDirectCodecBuffer(key);
+      keyBuffers.add(keyBuffer);
+      keyByteBuffers.add(keyBuffer.asReadOnlyByteBuffer());
+      final CodecBuffer valueBuffer = CodecBuffer.allocateDirect(initialCapacity);
+      valueBuffers.add(valueBuffer);
+      addWritableValueByteBuffer(valueBuffer, initialCapacity, valueByteBuffers);
+    }
+
+    try {
+      final List<VALUE> values = new ArrayList<>(Collections.nCopies(n, null));
+      final List<Integer> retryIndices = new ArrayList<>();
+      final List<Integer> retrySizes = new ArrayList<>();
+      try {
+        applyMultiGetStatuses(rawTable.multiGetSkipCache(keyByteBuffers, valueByteBuffers),
+            valueBuffers, initialCapacity, values, retryIndices, retrySizes);
+        if (!retryIndices.isEmpty()) {
+          retryOversizedMultiGet(keyByteBuffers, retryIndices, retrySizes, values);
+          bufferCapacity.increase(Collections.max(retrySizes));
+        }
+        return values;
+      } finally {
+        IOUtils.closeQuietly(valueBuffers);
+      }
+    } finally {
+      IOUtils.closeQuietly(keyBuffers);
+    }
+  }
+
+  void applyMultiGetStatuses(List<ByteBufferGetStatus> statuses, List<CodecBuffer> valueBuffers,
+      int valueBufferCapacity, List<VALUE> values, List<Integer> retryIndices, List<Integer> retrySizes)
+      throws CodecException {
+    for (int i = 0; i < statuses.size(); i++) {
+      final ByteBufferGetStatus status = statuses.get(i);
+      final CodecBuffer valueBuffer = valueBuffers.get(i);
+      if (status.value == null) {
+        continue;
+      }
+      validateMultiGetStatus(status, null);
+      if (status.requiredSize > valueBufferCapacity) {
+        retryIndices.add(i);
+        retrySizes.add(status.requiredSize);
+      } else {
+        values.set(i, decodeFromMultiGetStatus(status, valueBuffer));
+      }
+    }
+  }
+
+  void retryOversizedMultiGet(List<ByteBuffer> keyByteBuffers, List<Integer> retryIndices,
+      List<Integer> retrySizes, List<VALUE> values) throws RocksDatabaseException, CodecException {
+    final int retryCount = retryIndices.size();
+    final List<ByteBuffer> retryKeyByteBuffers = new ArrayList<>(retryCount);
+    final List<CodecBuffer> retryValueBuffers = new ArrayList<>(retryCount);
+    final List<ByteBuffer> retryValueByteBuffers = new ArrayList<>(retryCount);
+    for (int j = 0; j < retryCount; j++) {
+      final int requiredSize = retrySizes.get(j);
+      retryKeyByteBuffers.add(keyByteBuffers.get(retryIndices.get(j)).duplicate());
+      final CodecBuffer valueBuffer = CodecBuffer.allocateDirect(requiredSize);
+      retryValueBuffers.add(valueBuffer);
+      addWritableValueByteBuffer(valueBuffer, requiredSize, retryValueByteBuffers);
+    }
+
+    try {
+      final List<ByteBufferGetStatus> retryStatuses =
+          rawTable.multiGetSkipCache(retryKeyByteBuffers, retryValueByteBuffers);
+      for (int j = 0; j < retryCount; j++) {
+        final int index = retryIndices.get(j);
+        final int expectedSize = retrySizes.get(j);
+        final ByteBufferGetStatus status = retryStatuses.get(j);
+        final CodecBuffer valueBuffer = retryValueBuffers.get(j);
+        if (status.value == null) {
+          continue;
+        }
+        validateMultiGetStatus(status, expectedSize);
+        values.set(index, decodeFromMultiGetStatus(status, valueBuffer));
+      }
+    } finally {
+      IOUtils.closeQuietly(retryValueBuffers);
+    }
+  }
+
+  static void addWritableValueByteBuffer(CodecBuffer valueBuffer, int capacity,
+      List<ByteBuffer> valueByteBuffers) {
+    valueBuffer.clear();
+    final ByteBuffer out = valueBuffer.asWritableByteBuffer();
+    out.position(0).limit(capacity);
+    valueByteBuffers.add(out);
+  }
+
+  static void validateMultiGetStatus(ByteBufferGetStatus status, Integer expectedSize) {
+    if (status.requiredSize < 0 || status.status.getCode() != org.rocksdb.Status.Code.Ok) {
+      throw new IllegalStateException("status = " + status.status.getCode()
+          + "; requiredSize = " + status.requiredSize);
+    }
+    if (expectedSize != null && expectedSize.intValue() != status.requiredSize) {
+      throw new IllegalStateException("status = " + status.status.getCode()
+          + "; expectedSize = " + expectedSize + ", actualSize = " + status.requiredSize);
+    }
+  }
+
+  VALUE decodeFromMultiGetStatus(ByteBufferGetStatus status, CodecBuffer valueBuffer)
+      throws CodecException {
+    valueBuffer.clear();
+    valueBuffer.put(status.value.asReadOnlyBuffer());
+    return valueCodec.fromCodecBuffer(valueBuffer);
+  }
+
   /**
    * Similar to {@link #getFromTable(CodecBuffer, CodecBuffer)} except that
    * this method use {@link RDBTable#getIfExist(ByteBuffer, ByteBuffer)}.
@@ -317,6 +496,13 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   private VALUE getFromTable(KEY key,
       CheckedBiFunction<CodecBuffer, CodecBuffer, Integer, RocksDatabaseException> get)
+      throws RocksDatabaseException, CodecException {
+    return getFromTable(key, get, valueCodec::fromCodecBuffer);
+  }
+
+  private <R> R getFromTable(KEY key,
+      CheckedBiFunction<CodecBuffer, CodecBuffer, Integer, RocksDatabaseException> get,
+      CheckedFunction<CodecBuffer, R, CodecException> decoder)
       throws RocksDatabaseException, CodecException {
     try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
       for (; ;) {
@@ -334,7 +520,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
           for (; ;) {
             if (required == outValue.readableBytes()) {
               // buffer size is big enough
-              return valueCodec.fromCodecBuffer(outValue);
+              return decoder.apply(outValue);
             }
             // buffer size too small, try increasing the capacity.
             if (!outValue.setCapacity(required)) {
@@ -377,17 +563,33 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void deleteWithBatch(BatchOperation batch, KEY key) throws CodecException {
-    rawTable.deleteWithBatch(batch, encodeKey(key));
-  }
-
-  @Override
-  public void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws CodecException {
-    rawTable.deleteRangeWithBatch(batch, encodeKey(beginKey), encodeKey(endKey));
+    if (supportCodecBuffer) {
+      CodecBuffer keyBuffer = null;
+      try {
+        keyBuffer = keyCodec.toDirectCodecBuffer(key);
+        // The buffers will be released after commit.
+        rawTable.deleteWithBatch(batch, keyBuffer);
+      } catch (Exception e) {
+        IOUtils.closeQuietly(keyBuffer);
+        throw e;
+      }
+    } else {
+      rawTable.deleteWithBatch(batch, encodeKey(key));
+    }
   }
 
   @Override
   public void deleteRange(KEY beginKey, KEY endKey) throws RocksDatabaseException, CodecException {
     rawTable.deleteRange(encodeKey(beginKey), encodeKey(endKey));
+  }
+
+  /**
+   * Clears the raw table directly: the default implementation would decode and re-encode the boundary keys,
+   * which can miss persisted keys whose bytes do not round-trip through the codec.
+   */
+  @Override
+  public void clear() throws RocksDatabaseException, CodecException {
+    rawTable.clear();
   }
 
   @Override
@@ -423,6 +625,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   public void addCacheEntry(CacheKey<KEY> cacheKey,
       CacheValue<VALUE> cacheValue) {
     // This will override the entry if there is already entry for this key.
+    TableCacheUpdateTracker.recordCacheUpdate(getName());
     cache.put(cacheKey, cacheValue);
   }
 

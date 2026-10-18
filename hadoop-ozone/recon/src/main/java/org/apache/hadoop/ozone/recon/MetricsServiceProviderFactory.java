@@ -92,7 +92,7 @@ public class MetricsServiceProviderFactory {
    * @return MetricsServiceProvider instance for Jmx
    */
   public MetricsServiceProvider getJmxMetricsServiceProvider(String endpoint) {
-    return new JmxServiceProviderImpl(reconUtils, endpoint, connectionFactory);
+    return new JmxServiceProviderImpl(reconUtils, endpoint, connectionFactory, configuration);
   }
 
   /**

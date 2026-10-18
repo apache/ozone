@@ -86,6 +86,9 @@ public abstract class TestSCMMXBean implements NonHATests.TestCase {
     double containerThreshold = (double) mbs.getAttribute(bean,
         "SafeModeCurrentContainerThreshold");
     assertEquals(scm.getCurrentContainerThreshold(), containerThreshold, 0);
+
+    String ratisEvents = (String) mbs.getAttribute(bean, "RatisEvents");
+    assertEquals(scm.getMetrics().getRatisEvents(), ratisEvents);
   }
 
   @Test

@@ -63,6 +63,44 @@ export type ContainerKeysResponse = {
   keys: KeyResponse[];
 }
 
+export type ContainersPaginationResponse = {
+  containers: Container[];
+  firstKey: number;
+  lastKey: number;
+  missingCount: number;
+  underReplicatedCount: number;
+  overReplicatedCount: number;
+  misReplicatedCount: number;
+  replicaMismatchCount: number;
+}
+
+export type QuasiClosedContainer = {
+  containerID: number;
+  pipelineID: string;
+  keys: number;
+  stateEnterTime: number;
+  expectedReplicaCount: number;
+  actualReplicaCount: number;
+  replicas: ContainerReplica[];
+}
+
+export type QuasiClosedContainersResponse = {
+  quasiClosedCount: number;
+  firstKey: number;
+  lastKey: number;
+  containers: QuasiClosedContainer[];
+}
+
+export type TabPaginationState = {
+  data: Container[];
+  loading: boolean;
+  firstKey: number;
+  lastKey: number;
+  currentMinContainerId: number;
+  pageHistory: number[];
+  hasNextPage: boolean;
+}
+
 export type ContainerTableProps = {
   loading: boolean;
   data: Container[];
@@ -71,6 +109,13 @@ export type ContainerTableProps = {
   selectedColumns: Option[];
   expandedRow: ExpandedRow;
   expandedRowSetter: (arg0: ExpandedRow) => void;
+  onNextPage: () => void;
+  onPrevPage: () => void;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  pageSize: number;
+  onPageSizeChange: (newSize: number) => void;
+  sinceColumnTitle?: string;
 }
 
 
@@ -87,10 +132,32 @@ export type ExpandedRowState = {
 
 export type ContainerState = {
   lastUpdated: number;
+  totalContainers: number;
   columnOptions: Option[];
-  missingContainerData: Container[];
-  underReplicatedContainerData: Container[];
-  overReplicatedContainerData: Container[];
-  misReplicatedContainerData: Container[];
-  mismatchedReplicaContainerData: Container[];
+  missingCount: number;
+  underReplicatedCount: number;
+  overReplicatedCount: number;
+  misReplicatedCount: number;
+  replicaMismatchCount: number;
+  quasiClosedCount: number;
+}
+
+
+export type ExportJobStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+
+export type ExportJob = {
+  jobId: string;
+  state: string;
+  status: ExportJobStatus;
+  queuePosition: number;
+  totalRecords: number;
+  estimatedTotal: number;
+  progressPercent: number;
+  fileName: string | null;
+  errorMessage: string | null;
+  submittedAt: number;
+  startedAt: number;
+  completedAt: number;
+  downloadCount: number;
+  downloadsRemaining: number;
 }

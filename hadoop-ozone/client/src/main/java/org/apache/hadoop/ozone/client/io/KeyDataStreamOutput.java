@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +60,7 @@ import org.slf4j.LoggerFactory;
  * TODO : currently not support multi-thread access.
  */
 public class KeyDataStreamOutput extends AbstractDataStreamOutput
-    implements KeyMetadataAware {
+    implements KeyCommitOutput {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDataStreamOutput.class);
@@ -74,13 +77,12 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
 
   private long clientID;
 
-  /**
-   * Indicates if an atomic write is required. When set to true,
-   * the amount of data written must match the declared size during the commit.
-   * A mismatch will prevent the commit from succeeding.
-   * This is essential for operations like S3 put to ensure atomicity.
-   */
-  private boolean atomicKeyCreation;
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+
+  @Override
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
+    this.preCommits = preCommits;
+  }
 
   @VisibleForTesting
   public List<BlockDataStreamOutputEntry> getStreamEntries() {
@@ -102,6 +104,26 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     return clientID;
   }
 
+  @VisibleForTesting
+  public KeyDataStreamOutput() {
+    super(null);
+    this.config = new OzoneClientConfig();
+    OmKeyInfo info = new OmKeyInfo.Builder().setKeyName("test").build();
+    blockDataStreamOutputEntryPool =
+        new BlockDataStreamOutputEntryPool(
+            config,
+            null,
+            null,
+            null, 0,
+            false, info,
+            false,
+            null,
+            0L);
+
+    this.writeOffset = 0;
+    this.clientID = 0L;
+  }
+
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public KeyDataStreamOutput(
       OzoneClientConfig config,
@@ -110,8 +132,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       OzoneManagerProtocol omClient, int chunkSize,
       String requestId, ReplicationConfig replicationConfig,
       String uploadID, int partNumber, boolean isMultipart,
-      boolean unsafeByteBufferConversion,
-      boolean atomicKeyCreation
+      boolean unsafeByteBufferConversion
   ) {
     super(HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval()));
@@ -132,7 +153,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     // encrypted bucket.
     this.writeOffset = 0;
     this.clientID = handler.getId();
-    this.atomicKeyCreation = atomicKeyCreation;
   }
 
   /**
@@ -276,8 +296,10 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
           BlockDataStreamOutput blockDataStreamOutput =
               (BlockDataStreamOutput) currentStreamEntry
                   .getByteBufStreamOutput();
-          blockDataStreamOutput.executePutBlock(false, false);
-          blockDataStreamOutput.watchForCommit(false);
+          if (blockDataStreamOutput != null) {
+            blockDataStreamOutput.executePutBlock(false, false);
+            blockDataStreamOutput.watchForCommit(false);
+          }
         } catch (IOException e) {
           LOG.error(
               "Failed to execute putBlock/watchForCommit. " +
@@ -425,11 +447,8 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       if (!isException()) {
         Preconditions.checkArgument(writeOffset == offset);
       }
-      if (atomicKeyCreation) {
-        long expectedSize = blockDataStreamOutputEntryPool.getDataSize();
-        Preconditions.checkArgument(expectedSize == offset,
-            String.format("Expected: %d and actual %d write sizes do not match",
-                expectedSize, offset));
+      for (CheckedRunnable<IOException> preCommit : preCommits) {
+        preCommit.run();
       }
       blockDataStreamOutputEntryPool.commitKey(offset);
     } finally {
@@ -437,8 +456,13 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     }
   }
 
+  @Override
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
     return blockDataStreamOutputEntryPool.getCommitUploadPartInfo();
+  }
+
+  public long getModificationTime() {
+    return blockDataStreamOutputEntryPool.getModificationTime();
   }
 
   @VisibleForTesting
@@ -466,7 +490,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     private boolean unsafeByteBufferConversion;
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
-    private boolean atomicKeyCreation = false;
 
     public Builder setMultipartUploadID(String uploadID) {
       this.multipartUploadID = uploadID;
@@ -518,11 +541,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       return this;
     }
 
-    public Builder setAtomicKeyCreation(boolean atomicKey) {
-      this.atomicKeyCreation = atomicKey;
-      return this;
-    }
-
     public KeyDataStreamOutput build() {
       return new KeyDataStreamOutput(
           clientConfig,
@@ -535,8 +553,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
           multipartUploadID,
           multipartNumber,
           isMultipartKey,
-          unsafeByteBufferConversion,
-          atomicKeyCreation);
+          unsafeByteBufferConversion);
     }
 
   }

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.client.io;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.STREAM_BLOCK_SUPPORT;
+import static org.apache.hadoop.hdds.HDDSVersion.STREAM_BLOCK_SUPPORT;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
@@ -103,11 +103,30 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
     // return true only if all DataNodes in the pipeline are on a version
     // that supports for reading a block by streaming chunks..
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (dn.getCurrentVersion() < STREAM_BLOCK_SUPPORT.toProtoValue()) {
+      if (!STREAM_BLOCK_SUPPORT.isSupportedBy(dn.getCurrentVersion())) {
         return false;
       }
     }
     return true;
   }
 
+  /**
+   * Create a new BlockInputStream for RATIS.
+   *
+   * @param blockInfo The blockInfo representing the block.
+   * @param pipeline The pipeline to be used for reading the block
+   * @param token The block Access Token
+   * @param xceiverFactory Factory to create the xceiver in the client
+   * @param refreshFunction Function to refresh the block location if needed
+   * @param config The client configuration
+   * @return BlockInputStream instance.
+   */
+  public BlockInputStream createBlockInputStream(BlockLocationInfo blockInfo,
+      Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
+      XceiverClientFactory xceiverFactory,
+      Function<BlockID, BlockLocationInfo> refreshFunction,
+      OzoneClientConfig config) throws IOException {
+
+    return new BlockInputStream(blockInfo, pipeline, token, xceiverFactory, refreshFunction, config);
+  }
 }

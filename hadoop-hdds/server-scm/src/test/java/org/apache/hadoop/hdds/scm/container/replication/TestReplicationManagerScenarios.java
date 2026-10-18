@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -56,19 +57,21 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.ozone.test.TestClock;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -109,7 +112,7 @@ public class TestReplicationManagerScenarios {
   private EventPublisher eventPublisher;
   private SCMContext scmContext;
   private NodeManager nodeManager;
-  private TestClock clock;
+  private MockClock clock;
 
   private static List<URI> getTestFiles() throws URISyntaxException {
     File[] fileList = (new File(TestReplicationManagerScenarios.class
@@ -182,7 +185,7 @@ public class TestReplicationManagerScenarios {
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
-    clock = new TestClock(Instant.now(), ZoneId.systemDefault());
+    clock = new MockClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps = new ContainerReplicaPendingOps(clock, null);
 
     when(containerManager.getContainerReplicas(any(ContainerID.class))).thenAnswer(
@@ -199,6 +202,14 @@ public class TestReplicationManagerScenarios {
           DatanodeDetails dn = invocation.getArgument(0);
           return NODE_STATUS_MAP.getOrDefault(dn, NodeStatus.inServiceHealthy());
         });
+
+    // Replication commands look up each involved datanode's apparent version,
+    // so return an info reporting the current version for every node.
+    DatanodeInfo defaultNodeInfo = mock(DatanodeInfo.class);
+    when(defaultNodeInfo.getLastKnownApparentVersion())
+        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(nodeManager.getNode(any(DatanodeID.class)))
+        .thenReturn(defaultNodeInfo);
 
     final HashMap<SCMCommandProto.Type, Integer> countMap = new HashMap<>();
     for (SCMCommandProto.Type type : SCMCommandProto.Type.values()) {
@@ -314,8 +325,8 @@ public class TestReplicationManagerScenarios {
   private void assertExpectations(Scenario scenario,
       ReplicationManagerReport report) {
     Expectation expectation = scenario.getExpectation();
-    for (ReplicationManagerReport.HealthState state :
-        ReplicationManagerReport.HealthState.values()) {
+    for (ContainerHealthState state :
+        ContainerHealthState.values()) {
       assertEquals(expectation.getExpected(state), report.getStat(state),
           "Test: " + scenario + ": Unexpected count for " + state);
     }
@@ -493,44 +504,68 @@ public class TestReplicationManagerScenarios {
   public static class Expectation {
 
     // The expected counts for each health state, as would be seen in the ReplicationManagerReport.
-    private Map<ReplicationManagerReport.HealthState, Integer> stateCounts = new HashMap<>();
+    private Map<ContainerHealthState, Integer> stateCounts = new HashMap<>();
     // The expected count for each queue after running the RM check phase.
     private int underReplicatedQueue = 0;
     private int overReplicatedQueue = 0;
 
     public void setUnderReplicated(int underReplicated) {
-      stateCounts.put(ReplicationManagerReport.HealthState.UNDER_REPLICATED, underReplicated);
+      stateCounts.put(ContainerHealthState.UNDER_REPLICATED, underReplicated);
     }
 
     public void setOverReplicated(int overReplicated) {
-      stateCounts.put(ReplicationManagerReport.HealthState.OVER_REPLICATED, overReplicated);
+      stateCounts.put(ContainerHealthState.OVER_REPLICATED, overReplicated);
     }
 
     public void setMisReplicated(int misReplicated) {
-      stateCounts.put(ReplicationManagerReport.HealthState.MIS_REPLICATED, misReplicated);
+      stateCounts.put(ContainerHealthState.MIS_REPLICATED, misReplicated);
     }
 
     public void setUnhealthy(int unhealthy) {
-      stateCounts.put(ReplicationManagerReport.HealthState.UNHEALTHY, unhealthy);
+      stateCounts.put(ContainerHealthState.UNHEALTHY, unhealthy);
     }
 
     public void setMissing(int missing) {
-      stateCounts.put(ReplicationManagerReport.HealthState.MISSING, missing);
+      stateCounts.put(ContainerHealthState.MISSING, missing);
     }
 
     public void setEmpty(int empty) {
-      stateCounts.put(ReplicationManagerReport.HealthState.EMPTY,  empty);
+      stateCounts.put(ContainerHealthState.EMPTY,  empty);
     }
 
     public void setQuasiClosedStuck(int quasiClosedStuck) {
-      stateCounts.put(ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK, quasiClosedStuck);
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK, quasiClosedStuck);
     }
 
     public void setOpenUnhealthy(int openUnhealthy) {
-      stateCounts.put(ReplicationManagerReport.HealthState.OPEN_UNHEALTHY, openUnhealthy);
+      stateCounts.put(ContainerHealthState.OPEN_UNHEALTHY, openUnhealthy);
     }
 
-    public int getExpected(ReplicationManagerReport.HealthState state) {
+    public void setQuasiClosedStuckUnderReplicated(int count) {
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED, count);
+    }
+
+    public void setQuasiClosedStuckOverReplicated(int count) {
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED, count);
+    }
+
+    public void setQuasiClosedStuckMissing(int count) {
+      stateCounts.put(ContainerHealthState.QUASI_CLOSED_STUCK_MISSING, count);
+    }
+
+    public void setUnhealthyUnderReplicated(int count) {
+      stateCounts.put(ContainerHealthState.UNHEALTHY_UNDER_REPLICATED, count);
+    }
+
+    public void setUnhealthyOverReplicated(int count) {
+      stateCounts.put(ContainerHealthState.UNHEALTHY_OVER_REPLICATED, count);
+    }
+
+    public void setMissingUnderReplicated(int count) {
+      stateCounts.put(ContainerHealthState.MISSING_UNDER_REPLICATED, count);
+    }
+
+    public int getExpected(ContainerHealthState state) {
       return stateCounts.getOrDefault(state, 0);
     }
 

@@ -18,11 +18,9 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
-import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
 
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeAction;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -33,16 +31,16 @@ import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
+import org.apache.hadoop.ozone.upgrade.DatanodeUpgradeActionForLayoutFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Upgrade Action for DataNode for update the table schema data of containerIds Table.
  */
-@UpgradeActionHdds(feature = WITNESSED_CONTAINER_DB_PROTO_VALUE, component = DATANODE, type = ON_FINALIZE)
+@DatanodeUpgradeActionForLayoutFeature(feature = WITNESSED_CONTAINER_DB_PROTO_VALUE)
 public class ContainerTableSchemaFinalizeAction
-    implements HDDSUpgradeAction<DatanodeStateMachine> {
+    implements DatanodeUpgradeAction {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerTableSchemaFinalizeAction.class);
@@ -61,7 +59,7 @@ public class ContainerTableSchemaFinalizeAction
     }
 
     try (BatchOperation batch = metadataStore.getStore().initBatchOperation();
-         TableIterator<ContainerID, ? extends Table.KeyValue<ContainerID, ContainerCreateInfo>> iterator =
+         TableIterator<ContainerID, Table.KeyValue<ContainerID, ContainerCreateInfo>> iterator =
              previousTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<ContainerID, ContainerCreateInfo> next = iterator.next();

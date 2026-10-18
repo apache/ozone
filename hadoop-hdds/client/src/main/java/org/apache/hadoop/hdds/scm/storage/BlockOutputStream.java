@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
+import static org.apache.hadoop.hdds.HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
@@ -187,16 +187,9 @@ public class BlockOutputStream extends OutputStream {
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
 
-    ContainerProtos.DatanodeBlockID.Builder blkIDBuilder =
-        ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(blockID.getContainerID())
-            .setLocalID(blockID.getLocalID())
-            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
-    if (replicationIndex > 0) {
-      blkIDBuilder.setReplicaIndex(replicationIndex);
-    }
-    this.containerBlockData = BlockData.newBuilder().setBlockID(
-        blkIDBuilder.build()).addMetadata(keyValue);
+    this.containerBlockData = BlockData.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicationIndex))
+        .addMetadata(keyValue);
     this.pipeline = pipeline;
     // tell DataNode I will send incremental chunk list
     this.supportIncrementalChunkList = canEnableIncrementalChunkList();
@@ -285,8 +278,8 @@ public class BlockOutputStream extends OutputStream {
     // that supports PutBlock piggybacking.
     for (DatanodeDetails dn : pipeline.getNodes()) {
       LOG.debug("dn = {}, version = {}", dn, dn.getCurrentVersion());
-      if (dn.getCurrentVersion() <
-              COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue()) {
+      if (!COMBINED_PUTBLOCK_WRITECHUNK_RPC.isSupportedBy(
+          dn.getCurrentVersion())) {
         return false;
       }
     }
@@ -597,7 +590,7 @@ public class BlockOutputStream extends OutputStream {
 
       // if block is full, send the eof
       boolean isBlockFull = (blockSize != -1 && flushPos == blockSize);
-      asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString);
+      asyncReply = putBlockAsync(xceiverClient, blockData, close || isBlockFull, tokenString, containerAutoCreate());
       CompletableFuture<ContainerCommandResponseProto> future = asyncReply.getResponse();
       flushFuture = future.thenApplyAsync(e -> {
         try {
@@ -964,7 +957,7 @@ public class BlockOutputStream extends OutputStream {
       }
 
       asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, tokenString, replicationIndex, blockData, close);
+          blockID.get(), data, tokenString, replicationIndex, blockData, close, containerAutoCreate());
       CompletableFuture<ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       validateFuture = respFuture.thenApplyAsync(e -> {
@@ -1158,6 +1151,18 @@ public class BlockOutputStream extends OutputStream {
       revisedChunkInfo.addMetadata(FULL_CHUNK_KV);
     }
     return revisedChunkInfo.build();
+  }
+
+  /**
+   * @return true when the DataNode may auto-create a missing container for this write.
+   */
+  protected boolean containerAutoCreate() {
+    return true;
+  }
+
+  @VisibleForTesting
+  public boolean isContainerAutoCreate() {
+    return containerAutoCreate();
   }
 
   private boolean isFullChunk(ChunkInfo chunkInfo) {

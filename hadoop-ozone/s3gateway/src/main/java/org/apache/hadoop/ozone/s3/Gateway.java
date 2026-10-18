@@ -33,9 +33,11 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.metrics.S3GatewayVersionMetrics;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.OzoneVersionInfo;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
@@ -45,6 +47,7 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.JvmPauseMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.bridge.SLF4JBridgeHandler;
 import picocli.CommandLine.Command;
 
 /**
@@ -61,15 +64,24 @@ public class Gateway extends GenericCli implements Callable<Void> {
   private S3GatewayHttpServer httpServer;
   /** Servlets and static content on separate port. */
   private BaseHttpServer contentServer;
+  private BaseHttpServer stsServer;
   private S3GatewayMetrics metrics;
+  private S3GatewayVersionMetrics versionMetrics;
   private NettyMetrics nettyMetrics;
 
   private final JvmPauseMonitor jvmPauseMonitor = newJvmPauseMonitor("S3G");
 
   public static void main(String[] args) throws Exception {
+    redirectJulToSlf4j();
     OzoneNetUtils.disableJvmNetworkAddressCacheIfRequired(
             new OzoneConfiguration());
     new Gateway().run(args);
+  }
+
+  @VisibleForTesting
+  static void redirectJulToSlf4j() {
+    SLF4JBridgeHandler.removeHandlersForRootLogger();
+    SLF4JBridgeHandler.install();
   }
 
   @Override
@@ -82,7 +94,9 @@ public class Gateway extends GenericCli implements Callable<Void> {
     setHttpBaseDir(OzoneConfigurationHolder.configuration());
     httpServer = new S3GatewayHttpServer(OzoneConfigurationHolder.configuration(), "s3gateway");
     contentServer = new S3GatewayWebAdminServer(OzoneConfigurationHolder.configuration(), "s3g-web");
+    stsServer = new S3STSHttpServer(OzoneConfigurationHolder.configuration(), "s3g-sts");
     metrics = S3GatewayMetrics.create(OzoneConfigurationHolder.configuration());
+    versionMetrics = S3GatewayVersionMetrics.create();
     nettyMetrics = NettyMetrics.create();
     start();
 
@@ -107,14 +121,17 @@ public class Gateway extends GenericCli implements Callable<Void> {
     jvmPauseMonitor.start();
     httpServer.start();
     contentServer.start();
+    stsServer.start();
   }
 
   public void stop() throws Exception {
     LOG.info("Stopping Ozone S3 gateway");
-    httpServer.stop();
-    contentServer.stop();
+    IOUtils.closeQuietly(httpServer, contentServer, stsServer);
     jvmPauseMonitor.stop();
     S3GatewayMetrics.unRegister();
+    if (versionMetrics != null) {
+      versionMetrics.unRegister();
+    }
     if (nettyMetrics != null) {
       nettyMetrics.unregister();
     }
@@ -143,7 +160,6 @@ public class Gateway extends GenericCli implements Callable<Void> {
     }
   }
 
-  @VisibleForTesting
   public InetSocketAddress getHttpAddress() {
     return this.httpServer.getHttpAddress();
   }

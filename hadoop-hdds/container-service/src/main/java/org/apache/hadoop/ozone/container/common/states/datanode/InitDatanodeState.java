@@ -17,13 +17,11 @@
 
 package org.apache.hadoop.ozone.container.common.states.datanode;
 
-import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
-import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReconAddressForDatanodes;
 
 import com.google.common.base.Strings;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -31,8 +29,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -76,12 +76,14 @@ public class InitDatanodeState implements DatanodeState,
    */
   @Override
   public DatanodeStateMachine.DatanodeStates call() throws Exception {
-    Collection<InetSocketAddress> addresses = null;
+    final Collection<HostAndPort> addresses;
+    final HostAndPort reconAddress;
     try {
-      addresses = getSCMAddressForDatanodes(conf);
-    } catch (IllegalArgumentException e) {
+      addresses = HddsServerUtil.getSCMAddressForDatanodes(conf);
+      reconAddress = getReconAddressForDatanodes(conf);
+    } catch (IllegalArgumentException | ConfigurationException e) {
       if (!Strings.isNullOrEmpty(e.getMessage())) {
-        LOG.error("Failed to get SCM addresses: {}", e.getMessage());
+        LOG.error("Failed to get SCM or Recon addresses: {}", e.getMessage());
       }
       return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
     }
@@ -90,8 +92,8 @@ public class InitDatanodeState implements DatanodeState,
       LOG.error("Null or empty SCM address list found.");
       return DatanodeStateMachine.DatanodeStates.SHUTDOWN;
     } else {
-      for (InetSocketAddress addr : addresses) {
-        if (addr.isUnresolved()) {
+      for (HostAndPort addr : addresses) {
+        if (addr.getAddress().isUnresolved()) {
           LOG.warn("One SCM address ({}) can't (yet?) be resolved. Postpone "
               + "initialization.", addr);
 
@@ -100,11 +102,10 @@ public class InitDatanodeState implements DatanodeState,
           return this.context.getState();
         }
       }
-      for (InetSocketAddress addr : addresses) {
+      for (HostAndPort addr : addresses) {
         connectionManager.addSCMServer(addr, context.getThreadNamePrefix());
         this.context.addEndpoint(addr);
       }
-      InetSocketAddress reconAddress = getReconAddresses(conf);
       if (reconAddress != null) {
         connectionManager.addReconServer(reconAddress,
             context.getThreadNamePrefix());

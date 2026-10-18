@@ -223,7 +223,7 @@ class TestOmSnapshotManager {
 
     snapshotChainManager.addSnapshot(first);
     snapshotChainManager.addSnapshot(second);
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     // create the first snapshot checkpoint
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first, rdbBatchOperation);
@@ -238,7 +238,7 @@ class TestOmSnapshotManager {
         firstSnapshot.getMetadataManager(), "store", firstSnapshotStore);
 
     // create second snapshot checkpoint (which will be used for eviction)
-    rdbBatchOperation = new RDBBatchOperation();
+    rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         second, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);
@@ -749,7 +749,7 @@ class TestOmSnapshotManager {
     when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
 
     // Create first checkpoint for the snapshot checkpoint
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);
@@ -758,7 +758,7 @@ class TestOmSnapshotManager {
     logCapturer.clearOutput();
 
     // Create checkpoint again for the same snapshot.
-    rdbBatchOperation = new RDBBatchOperation();
+    rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);

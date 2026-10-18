@@ -49,11 +49,14 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.security.OMCertificateClient;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.LifeCycle;
+import org.apache.ratis.util.TimeDuration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -71,6 +74,9 @@ public class TestOzoneManagerRatisServer {
   private OzoneManagerRatisServer omRatisServer;
   private String clientId = UUID.randomUUID().toString();
   private static final long RATIS_RPC_TIMEOUT = 500L;
+  private static final String CURRENT_RETRY_CACHE_KEY =
+      OMConfigKeys.OZONE_OM_HA_PREFIX + "." + RaftServerConfigKeys.RetryCache.EXPIRY_TIME_KEY;
+  private static final String DEPRECATED_RETRY_CACHE_KEY = "ozone.om.ratis.server.retry.cache.timeout";
   private OMMetadataManager omMetadataManager;
   private OzoneManager ozoneManager;
   private OMNodeDetails omNodeDetails;
@@ -143,6 +149,46 @@ public class TestOzoneManagerRatisServer {
     assertEquals(LifeCycle.State.RUNNING,
         omRatisServer.getServerState(),
         "Ratis Server should be in running state");
+  }
+
+  /**
+   * RaftPeer.address must preserve the configured host string
+   * verbatim -- not a Java-resolved {@code InetSocketAddress} form. When
+   * the operator configured a hostname, the hostname must survive into
+   * RaftPeer.address so gRPC's {@code DnsNameResolver} can re-resolve it
+   * on connection failure (Kubernetes pod restarts). When the operator
+   * configured an IP literal, that literal must survive too. The
+   * regression this test guards is "{@code createRaftPeer} pre-resolved
+   * a hostname into a numeric IP and handed the resolved form to
+   * RaftPeer," which would freeze the gRPC channel at that IP for the
+   * channel's lifetime.
+   */
+  @Test
+  public void testCreateRaftPeerUsesHostnameAddress() {
+    String hostname = "om-2.om.example.svc.cluster.local";
+    int rpcPort = 9862;
+    int ratisPort = 9872;
+    OMNodeDetails peer = new OMNodeDetails.Builder()
+        .setOMServiceId("test-service")
+        .setOMNodeId("om2")
+        .setHostAddress(hostname)
+        .setRpcPort(rpcPort)
+        .setRatisPort(ratisPort)
+        .build();
+
+    org.apache.ratis.protocol.RaftPeer raftPeer =
+        OzoneManagerRatisServer.createRaftPeer(peer);
+    String addr = raftPeer.getAddress();
+    assertEquals(hostname + ":" + ratisPort, addr,
+        "RaftPeer address must preserve the configured host string "
+            + "verbatim. The configured hostname must survive into "
+            + "RaftPeer so gRPC can re-resolve it -- pre-resolving into a "
+            + "numeric IP would freeze the channel at that IP for its "
+            + "lifetime.");
+    // Defensive: the configured hostname must not have been pre-resolved
+    // into a numeric IPv4 octet form before reaching RaftPeer.
+    String host = addr.substring(0, addr.lastIndexOf(':'));
+    assertThat(host).doesNotMatch("^\\d{1,3}(\\.\\d{1,3}){3}$");
   }
 
   @Test
@@ -234,5 +280,49 @@ public class TestOzoneManagerRatisServer {
     assertEquals(uuid, raftGroupId.getUuid());
     assertEquals(raftGroupId.toByteString().size(), 16);
     newOmRatisServer.stop();
+  }
+
+  @Test
+  public void testRetryCacheExpiryTime(@TempDir Path ratisDir) {
+    assertEquals(300_000, retryCacheExpiryMillis(new OzoneConfiguration(), ratisDir));
+
+    OzoneConfiguration currentKeyConf = new OzoneConfiguration();
+    currentKeyConf.set(CURRENT_RETRY_CACHE_KEY, "42s");
+    assertEquals(42_000, retryCacheExpiryMillis(currentKeyConf, ratisDir));
+
+    // The deprecated key must reach Ratis instead of being silently overwritten, and must warn.
+    LogCapturer logCapturer = LogCapturer.captureLogs(OzoneManagerRatisServer.class);
+    OzoneConfiguration deprecatedKeyConf = new OzoneConfiguration();
+    deprecatedKeyConf.set(DEPRECATED_RETRY_CACHE_KEY, "17s");
+    assertEquals(17_000, retryCacheExpiryMillis(deprecatedKeyConf, ratisDir));
+    assertThat(logCapturer.getOutput()).contains(deprecationWarning(17_000));
+
+    // A value without a unit suffix keeps the milliseconds the deprecated key was always read with,
+    // instead of falling back to the seconds Ratis would assume. The warning must name that resolved
+    // value, so copying it to the current key does not silently reinterpret it as seconds.
+    logCapturer.clearOutput();
+    OzoneConfiguration bareValueConf = new OzoneConfiguration();
+    bareValueConf.set(DEPRECATED_RETRY_CACHE_KEY, "600000");
+    assertEquals(600_000, retryCacheExpiryMillis(bareValueConf, ratisDir));
+    assertThat(logCapturer.getOutput()).contains(deprecationWarning(600_000));
+
+    // An explicitly set current key wins over the deprecated one, which is then reported as ignored.
+    logCapturer.clearOutput();
+    OzoneConfiguration bothKeysConf = new OzoneConfiguration();
+    bothKeysConf.set(CURRENT_RETRY_CACHE_KEY, "42s");
+    bothKeysConf.set(DEPRECATED_RETRY_CACHE_KEY, "17s");
+    assertEquals(42_000, retryCacheExpiryMillis(bothKeysConf, ratisDir));
+    assertThat(logCapturer.getOutput()).contains(DEPRECATED_RETRY_CACHE_KEY + " is deprecated and ignored, because "
+        + CURRENT_RETRY_CACHE_KEY + " is set.");
+  }
+
+  private static String deprecationWarning(long expectedMillis) {
+    return DEPRECATED_RETRY_CACHE_KEY + " is deprecated. Instead, use " + CURRENT_RETRY_CACHE_KEY + " = "
+        + TimeDuration.valueOf(expectedMillis, TimeUnit.MILLISECONDS) + ".";
+  }
+
+  private static long retryCacheExpiryMillis(OzoneConfiguration conf, Path ratisDir) {
+    RaftProperties properties = OzoneManagerRatisServer.newRaftProperties(conf, 9872, ratisDir.toString());
+    return RaftServerConfigKeys.RetryCache.expiryTime(properties).toLong(TimeUnit.MILLISECONDS);
   }
 }

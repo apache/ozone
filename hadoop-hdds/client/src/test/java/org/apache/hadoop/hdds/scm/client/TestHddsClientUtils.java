@@ -127,6 +127,13 @@ public class TestHddsClientUtils {
     assertEquals(port, scmAddr.getPort());
   }
 
+  private void checkScmClientAddr(String confKey, String value,
+      String expectedHost, int expectedPort) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(confKey, value);
+    checkAddr(conf, expectedHost, expectedPort);
+  }
+
   @Test
   public void testBlockClientFallbackToClientNoPort() {
     // When OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY is undefined it should
@@ -173,6 +180,58 @@ public class TestHddsClientUtils {
     assertEquals(scmHost.split(":")[0],
         socketAddress.getHostName());
     assertEquals(OZONE_SCM_CLIENT_PORT_DEFAULT, socketAddress.getPort());
+  }
+
+  @Test
+  public void testClientAddressIPv6() {
+    // Bracketed IPv6 literal with explicit port.
+    checkScmClientAddr(OZONE_SCM_CLIENT_ADDRESS_KEY, "[2001:db8::1]:9876",
+        "2001:db8:0:0:0:0:0:1", 9876);
+
+    // Bracketed IPv6 literal without port (host:port documents port as
+    // optional).
+    checkScmClientAddr(OZONE_SCM_CLIENT_ADDRESS_KEY, "[2001:db8::1]",
+        "2001:db8:0:0:0:0:0:1", OZONE_SCM_CLIENT_PORT_DEFAULT);
+  }
+
+  /**
+   * A bare literal used to resolve to the default port (HDDS-15773). It is
+   * rejected since HDDS-16308, because the same text also reads as a shorter
+   * host with the trailing group for a port.
+   */
+  @Test
+  public void testClientAddressRejectsBareIPv6Literal() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "2001:db8::1");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getScmAddressForClients(conf));
+
+    assertThat(e.getMessage())
+        .contains(OZONE_SCM_CLIENT_ADDRESS_KEY)
+        .contains("[2001:db8::1]");
+  }
+
+  @Test
+  public void testClientFallbackToScmNamesIPv6() {
+    // On the ozone.scm.names fallback path an inline port is ignored and the
+    // default client port is used instead (same semantics as
+    // testClientFallbackToScmNamesWithPort).
+    checkScmClientAddr(OZONE_SCM_NAMES, "[2001:db8::1]:300",
+        "2001:db8:0:0:0:0:0:1", OZONE_SCM_CLIENT_PORT_DEFAULT);
+  }
+
+  @Test
+  public void testClientFallbackToScmNamesRejectsBareIPv6Literal() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_NAMES, "2001:db8::1");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getScmAddressForClients(conf));
+
+    assertThat(e.getMessage())
+        .contains(OZONE_SCM_NAMES)
+        .contains("[2001:db8::1]");
   }
 
   @Test

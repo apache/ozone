@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.io.KeyDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
@@ -62,7 +63,30 @@ public class OzoneDataStreamOutputStub extends OzoneDataStreamOutput {
 
   @Override
   public OmMultipartCommitUploadPartInfo getCommitUploadPartInfo() {
-    return closed ? new OmMultipartCommitUploadPartInfo(partName,
-        getMetadata().get(OzoneConsts.ETAG)) : null;
+    final KeyDataStreamOutput keyDataStreamOutput = getKeyDataStreamOutput();
+    if (closed && keyDataStreamOutput != null) {
+      return new OmMultipartCommitUploadPartInfo(
+          partName, getMetadata().get(OzoneConsts.ETAG), keyDataStreamOutput.getModificationTime());
+    }
+    return null;
+  }
+
+  @Override
+  public long getModificationTime() {
+    final KeyDataStreamOutput keyDataStreamOutput = getKeyDataStreamOutput();
+    if (keyDataStreamOutput != null) {
+      return keyDataStreamOutput.getModificationTime();
+    }
+    throw new IllegalStateException(
+        "OutputStream is not a KeyDataStreamOutput: " + getByteBufStreamOutput().getClass());
+  }
+
+  @Override
+  public KeyDataStreamOutput getKeyDataStreamOutput() {
+    ByteBufferStreamOutput streamOutput = getByteBufStreamOutput();
+    if (streamOutput instanceof KeyDataStreamOutput) {
+      return (KeyDataStreamOutput) streamOutput;
+    }
+    return super.getKeyDataStreamOutput();
   }
 }

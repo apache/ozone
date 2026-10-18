@@ -18,22 +18,32 @@
 package org.apache.hadoop.hdds.security.x509.certificate.authority;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.security.KeyPair;
+import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultCAProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.profile.DefaultProfile;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
+import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.pkcs.PKCSObjectIdentifiers;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.asn1.x509.BasicConstraints;
 import org.bouncycastle.asn1.x509.ExtendedKeyUsage;
 import org.bouncycastle.asn1.x509.Extension;
 import org.bouncycastle.asn1.x509.Extensions;
@@ -135,6 +145,44 @@ public class TestDefaultProfile {
     assertFalse(approver.verifyPkcs10Request(csr));
   }
 
+  @Test
+  public void testInspectCsrCompletesWhenApproved() throws Exception {
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .setCA(false)
+        .setClusterID("ClusterID")
+        .setScmID("SCMID")
+        .setSubject("Ozone Cluster")
+        .setConfiguration(securityConfig)
+        .setKey(keyPair)
+        .build()
+        .generateCSR();
+    assertThat(approver.inspectCSR(csr)).isCompletedWithValue(null);
+  }
+
+  @Test
+  public void testInspectCsrStopsAtFirstFailure() throws Exception {
+    KeyPair newKeyPair = new HDDSKeyGenerator(securityConfig).generateKey();
+    KeyPair wrongKey = new KeyPair(keyPair.getPublic(), newKeyPair.getPrivate());
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("hadoop.apache.org")
+        .setCA(false)
+        .setClusterID("ClusterID")
+        .setScmID("SCMID")
+        .setSubject("Ozone Cluster")
+        .setConfiguration(securityConfig)
+        .setKey(wrongKey)
+        .build()
+        .generateCSR();
+    DefaultProfile profile = spy(new DefaultProfile());
+    CompletableFuture<Void> inspection = new DefaultApprover(profile, securityConfig).inspectCSR(csr);
+    assertThat(inspection).isCompletedExceptionally();
+    assertThatThrownBy(inspection::get).cause().isInstanceOf(SCMSecurityException.class)
+        .hasMessage("Failed to verify the CSR.");
+    // The signature check failed, so the subject is not inspected.
+    verify(profile, never()).validateRDN(any());
+  }
+
   /**
    * Tests that normal valid extensions work with the default profile.
    */
@@ -153,6 +201,48 @@ public class TestDefaultProfile {
         .build()
         .generateCSR();
     assertTrue(approver.verfiyExtensions(csr));
+  }
+
+  /**
+   * Tests that internal-suffix and single-label DNS names, which are not
+   * accepted by a public-suffix based validator, are accepted by
+   * the RFC 1123 based DnsNames validation.
+   */
+  @Test
+  public void testExtensionsWithInternalDnsNames() throws Exception {
+    PKCS10CertificationRequest csr = new CertificateSignRequest.Builder()
+        .addDnsName("scm1.lxd")
+        .addDnsName("datanode1")
+        .setCA(false)
+        .setClusterID("ClusterID")
+        .setScmID("SCMID")
+        .setSubject("Ozone Cluster")
+        .setConfiguration(securityConfig)
+        .setKey(keyPair)
+        .build()
+        .generateCSR();
+    assertTrue(approver.verfiyExtensions(csr));
+  }
+
+  /**
+   * Tests that a wildcard, an IP literal, or an empty dNSName are still
+   * rejected by the DnsNames validation.
+   */
+  @Test
+  public void testInvalidExtensionsWithDnsName() throws IOException,
+      OperatorCreationException {
+    Extensions dnsExtension = getSANExtension(GeneralName.dNSName,
+        "*.example.com", false);
+    PKCS10CertificationRequest csr = getInvalidCSR(keyPair, dnsExtension);
+    assertFalse(approver.verfiyExtensions(csr));
+
+    dnsExtension = getSANExtension(GeneralName.dNSName, "10.0.0.5", false);
+    csr = getInvalidCSR(keyPair, dnsExtension);
+    assertFalse(approver.verfiyExtensions(csr));
+
+    dnsExtension = getSANExtension(GeneralName.dNSName, "", false);
+    csr = getInvalidCSR(keyPair, dnsExtension);
+    assertFalse(approver.verfiyExtensions(csr));
   }
 
   /**
@@ -305,6 +395,18 @@ public class TestDefaultProfile {
         new JcaContentSignerBuilder(this.securityConfig.getSignatureAlgo());
     ContentSigner signer = csBuilder.build(keyPair.getPrivate());
     return p10Builder.build(signer);
+  }
+
+  /**
+   * Basic constraints, which make a certificate a CA, are accepted by the CA profile only.
+   */
+  @Test
+  void testBasicConstraintsOnlyInCAProfile() throws IOException {
+    Extension ca = new Extension(Extension.basicConstraints, true, new DEROctetString(new BasicConstraints(true)));
+
+    assertThat(new DefaultCAProfile().validateExtension(ca)).isTrue();
+    assertThat(defaultProfile.getSupportedExtensions()).doesNotContain(Extension.basicConstraints);
+    assertThat(defaultProfile.validateExtension(ca)).isFalse();
   }
 
   /**

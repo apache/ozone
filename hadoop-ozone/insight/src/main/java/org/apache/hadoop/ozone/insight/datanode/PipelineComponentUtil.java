@@ -68,7 +68,7 @@ public final class PipelineComponentUtil {
     Pipeline pipeline = pipelineSelection.get();
     for (DatanodeDetails datanode : pipeline.getNodes()) {
       Component dn =
-          new Component(Type.DATANODE, datanode.getUuid().toString(),
+          new Component(Type.DATANODE, datanode.getID().toString(),
               datanode.getHostName(), 9882);
       func.apply(dn);
     }

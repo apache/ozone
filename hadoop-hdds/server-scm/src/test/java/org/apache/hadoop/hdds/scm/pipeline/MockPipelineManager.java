@@ -50,9 +50,11 @@ import org.apache.hadoop.ozone.ClientVersion;
 public class MockPipelineManager implements PipelineManager {
 
   private final PipelineStateManager stateManager;
+  private final NodeManager nodeManager;
 
   public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager, NodeManager nodeManager)
       throws RocksDatabaseException, CodecException, DuplicatedPipelineIdException {
+    this.nodeManager = nodeManager;
     stateManager = PipelineStateManagerImpl
         .newBuilder().setNodeManager(nodeManager)
         .setRatisServer(scmhaManager.getRatisServer())
@@ -85,7 +87,7 @@ public class MockPipelineManager implements PipelineManager {
     }
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION));
+        ClientVersion.CURRENT));
     return pipeline;
   }
 
@@ -109,7 +111,7 @@ public class MockPipelineManager implements PipelineManager {
   public void addEcPipeline(Pipeline pipeline)
       throws IOException {
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION));
+        ClientVersion.CURRENT));
   }
 
   @Override
@@ -268,16 +270,6 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public int minHealthyVolumeNum(Pipeline pipeline) {
-    return 0;
-  }
-
-  @Override
-  public int minPipelineLimit(Pipeline pipeline) {
-    return 0;
-  }
-
-  @Override
   public void activatePipeline(final PipelineID pipelineID) {
   }
 
@@ -295,16 +287,6 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public void reinitialize(Table<PipelineID, Pipeline> pipelineStore) {
-  }
-
-  @Override
-  public void freezePipelineCreation() {
-
-  }
-
-  @Override
-  public void resumePipelineCreation() {
-
   }
 
   @Override
@@ -337,12 +319,23 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public boolean isPipelineCreationFrozen() {
-    return false;
+  public boolean checkSpaceAndRecordAllocation(Pipeline pipeline, ContainerID containerID) {
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (!nodeManager.checkSpaceAndRecordAllocation(nodeManager.getNode(dn.getID()), containerID)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
-  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
-    return false;
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    // For tests that do not care about this limit, return a large value.
+    return Integer.MAX_VALUE;
+  }
+
+  @Override
+  public SCMPipelineMetrics getMetrics() {
+    return null;
   }
 }

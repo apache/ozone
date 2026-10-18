@@ -18,7 +18,7 @@
 
 import React from 'react';
 import {vi} from 'vitest';
-import {fireEvent, render, screen} from '@testing-library/react';
+import {fireEvent, render, screen, within} from '@testing-library/react';
 
 import {DatanodeTableProps} from '@/v2/types/datanode.types';
 import DatanodesTable from '@/v2/components/tables/datanodesTable';
@@ -35,6 +35,7 @@ const defaultProps: DatanodeTableProps = {
   selectedColumns: [
     { label: 'Hostname', value: 'hostname' },
     { label: 'State', value: 'state' },
+    { label: 'Storage Used', value: 'storageUsed' }
   ],
   handleSelectionChange: vi.fn(),
 };
@@ -46,33 +47,43 @@ function getDataWith(name: string, state: "HEALTHY" | "STALE" | "DEAD", uuid: nu
     state: state,
     opState: 'IN_SERVICE',
     lastHeartbeat: 1728280581608,
+    storageReport: {
+      capacity: 125645656770,
+      used: 4096,
+      remaining: 114225606656,
+      reserved: 1256456566,
+      committed: 0,
+      filesystemCapacity: 150000000000,
+      filesystemUsed: 30000000000,
+      filesystemAvailable: 120000000000,
+    },
     storageUsed: 4096,
     storageTotal: 125645656770,
     storageCommitted: 0,
     storageRemaining: 114225606656,
     pipelines: [
       {
-          "pipelineID": "0f9f7bc0-505e-4428-b148-dd7eac2e8ac2",
-          "replicationType": "RATIS",
-          "replicationFactor": "THREE",
-          "leaderNode": "ozone-datanode-3.ozone_default"
+        pipelineID: "0f9f7bc0-505e-4428-b148-dd7eac2e8ac2",
+        replicationType: "RATIS",
+        replicationFactor: "THREE",
+        leaderNode: "ozone-datanode-3.ozone_default",
       },
       {
-          "pipelineID": "2c23e76e-3f18-4b86-9541-e48bdc152fda",
-          "replicationType": "RATIS",
-          "replicationFactor": "ONE",
-          "leaderNode": "ozone-datanode-1.ozone_default"
-      }
+        pipelineID: "2c23e76e-3f18-4b86-9541-e48bdc152fda",
+        replicationType: "RATIS",
+        replicationFactor: "ONE",
+        leaderNode: "ozone-datanode-1.ozone_default",
+      },
     ],
     containers: 8192,
     openContainers: 8182,
     leaderCount: 2,
-    version: '0.6.0-SNAPSHOT',
+    version: "0.6.0-SNAPSHOT",
     setupTime: 1728280539733,
-    revision: '3f9953c0fbbd2175ee83e8f0b4927e45e9c10ac1',
-    buildDate: '2024-10-06T16:41Z',
-    networkLocation: '/default-rack'
-  }
+    revision: "3f9953c0fbbd2175ee83e8f0b4927e45e9c10ac1",
+    buildDate: "2024-10-06T16:41Z",
+    networkLocation: "/default-rack",
+  };
 }
 
 describe('DatanodesTable Component', () => {
@@ -142,5 +153,59 @@ describe('DatanodesTable Component', () => {
     const checkboxes = document.querySelectorAll('input.ant-checkbox-input');
     expect(checkboxes[1]).toBeDisabled(); // HEALTHY node
     expect(checkboxes[2]).not.toBeDisabled(); // DEAD node
+  });
+
+  test('distinguishes unreported and zero open container counts', () => {
+    const datanode = {
+      ...getDataWith('ozone-datanode-1', 'HEALTHY', 1),
+      disks: [
+        {
+          storageUuid: 'disk-1',
+          storageLocation: '/disk1',
+          capacity: 1000,
+          used: 100,
+          remaining: 900,
+          committed: 0,
+          openContainerCount: null
+        },
+        {
+          storageUuid: 'disk-2',
+          storageLocation: '/disk2',
+          capacity: 1000,
+          used: 100,
+          remaining: 900,
+          committed: 0,
+          openContainerCount: 0
+        }
+      ]
+    };
+    render(<DatanodesTable {...defaultProps} data={[datanode]} />);
+
+    const expandButton = document.querySelector('.ant-table-row-expand-icon');
+    expect(expandButton).not.toBeNull();
+    fireEvent.click(expandButton as HTMLElement);
+
+    const diskTable = screen.getByTestId('dn-disks-1');
+    expect(within(diskTable).getByText('N/A')).toBeInTheDocument();
+    expect(within(diskTable).getByText('0')).toBeInTheDocument();
+  });
+
+  test('shows filesystem rows in storage tooltip when provided', async () => {
+    render(
+      <DatanodesTable
+        {...defaultProps}
+        data={[
+          getDataWith('ozone-datanode-1', 'HEALTHY', 1)
+        ]}
+      />
+    );
+
+    const storageBar = document.querySelector('.capacity-bar-v2');
+    expect(storageBar).not.toBeNull();
+    fireEvent.mouseOver(storageBar as HTMLElement);
+
+    expect(await screen.findByText('Filesystem Capacity')).toBeInTheDocument();
+    expect(screen.getByText('Filesystem Used')).toBeInTheDocument();
+    expect(screen.getByText('Filesystem Available')).toBeInTheDocument();
   });
 });

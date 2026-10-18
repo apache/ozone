@@ -103,6 +103,8 @@ public class OzoneAdmins {
 
   /**
    * Check ozone admin privilege, throws exception if not admin.
+   * Note: This method does NOT check if authorization is enabled.
+   * Callers should check authorization before calling this method.
    */
   public void checkAdminUserPrivilege(UserGroupInformation ugi)
       throws AccessControlException {

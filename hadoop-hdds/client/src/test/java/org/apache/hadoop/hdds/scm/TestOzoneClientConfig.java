@@ -91,4 +91,21 @@ class TestOzoneClientConfig {
     assertEquals(2 << 20, clientConfig.getStreamReadResponseDataSize());
     assertEquals(Duration.ofSeconds(5), clientConfig.getStreamReadTimeout());
   }
+
+  @Test
+  void testDatastreamPutBlockWithoutRaftEnabledDefault() {
+    OzoneClientConfig subject = new OzoneConfiguration()
+        .getObject(OzoneClientConfig.class);
+    assertFalse(subject.isDatastreamPutBlockWithoutRaftEnabled());
+  }
+
+  @Test
+  void testDatastreamPutBlockWithoutRaftConfigParsing() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.client.datastream.putblock.without.raft.enabled", true);
+
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+
+    assertTrue(subject.isDatastreamPutBlockWithoutRaftEnabled());
+  }
 }

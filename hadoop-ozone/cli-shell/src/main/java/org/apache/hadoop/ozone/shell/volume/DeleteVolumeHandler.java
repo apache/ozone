@@ -81,10 +81,10 @@ public class DeleteVolumeHandler extends VolumeHandler {
         if (!yes) {
           // Ask for user confirmation
           out().print("This command will delete volume recursively." +
-              "\nThere is no recovery option after using this command, " +
+              "%nThere is no recovery option after using this command, " +
               "and no trash for FSO buckets." +
-              "\nDelay is expected running this command." +
-              "\nEnter 'yes' to proceed': ");
+              "%nDelay is expected running this command." +
+              "%nEnter 'yes' to proceed': ");
           out().flush();
           Scanner scanner = new Scanner(new InputStreamReader(
               System.in, StandardCharsets.UTF_8));

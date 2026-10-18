@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.server;
 
 import com.google.protobuf.ServiceException;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.context.Scope;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -34,7 +36,7 @@ import org.slf4j.Logger;
  * It logs the message type/content on DEBUG/TRACING log for insight and create
  * a new span based on the tracing information.
  */
-public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
+public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE extends Enum<TYPE>> {
 
   private final String serviceName;
 
@@ -70,8 +72,8 @@ public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
       CheckedFunction<REQUEST, RESPONSE, ServiceException> methodCall,
       TYPE type,
       String traceId) throws ServiceException {
-    Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId);
-    try {
+    Span span = TracingUtil.importAndCreateSpan(type.toString(), traceId, SpanKind.SERVER);
+    try (Scope currentScope = span.makeCurrent()) {
       if (logger.isTraceEnabled()) {
         logger.trace(
             "[service={}] [type={}] request is received: <json>{}</json>",

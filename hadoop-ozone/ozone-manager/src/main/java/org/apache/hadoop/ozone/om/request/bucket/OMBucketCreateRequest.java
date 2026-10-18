@@ -92,9 +92,14 @@ public class OMBucketCreateRequest extends OMClientRequest {
     CreateBucketRequest createBucketRequest =
         getOmRequest().getCreateBucketRequest();
     BucketInfo bucketInfo = createBucketRequest.getBucketInfo();
-    // Verify resource name
-    OmUtils.validateBucketName(bucketInfo.getBucketName(),
-        ozoneManager.isStrictS3());
+
+    BucketLayout bucketLayout = BucketLayout.fromProto(bucketInfo.getBucketLayout());
+    boolean strict = ozoneManager.isStrictS3()
+        || bucketLayout == BucketLayout.OBJECT_STORE;
+
+    // OBS (Object Store) buckets must follow strict S3 bucket naming rules.
+    // FSO and LEGACY buckets are not strictly bound to S3 naming semantics.
+    OmUtils.validateBucketName(bucketInfo.getBucketName(), strict);
 
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
@@ -476,8 +481,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
   )
   public static OMRequest setDefaultBucketLayoutForOlderClients(OMRequest req,
       ValidationContext ctx) {
-    if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0) {
+    if (!ClientVersion.BUCKET_LAYOUT_SUPPORT.isSupportedBy(
+        req.getVersion())) {
       // Older client will default bucket layout to LEGACY to
       // make its operations backward compatible.
       return changeBucketLayout(req, BucketLayout.LEGACY);

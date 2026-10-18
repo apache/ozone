@@ -130,6 +130,14 @@ public final class OzoneConsts {
   public static final String OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST =
       "toExcludeSST";
 
+  /**
+   * Response header set by OM leader on full checkpoint responses with the
+   * estimated total uncompressed SST bytes (see OMDBCheckpointUtils); used by
+   * followers to pre-check disk space before streaming the tarball body.
+   */
+  public static final String OZONE_OM_CHECKPOINT_ESTIMATED_SST_BYTES_HEADER =
+      "X-Ozone-Om-Checkpoint-Estimated-Sst-Bytes";
+
   public static final String RANGER_OZONE_SERVICE_VERSION_KEY =
       "#RANGEROZONESERVICEVERSION";
 
@@ -198,6 +206,9 @@ public final class OzoneConsts {
    * Default SCM Datanode ID file name.
    */
   public static final String OZONE_SCM_DATANODE_ID_FILE_DEFAULT = "datanode.id";
+
+  public static final String
+      OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT = "diskBalancer.info";
 
   /**
    * The ServiceListJSONServlet context attribute where OzoneManager
@@ -302,6 +313,8 @@ public final class OzoneConsts {
   public static final String S3_GETSECRET_USER = "S3GetSecretUser";
   public static final String S3_SETSECRET_USER = "S3SetSecretUser";
   public static final String S3_REVOKESECRET_USER = "S3RevokeSecretUser";
+  public static final String S3_REVOKESTSTOKEN_USER = "S3RevokeSTSTokenUser";
+  public static final String S3_STS_TEMP_ACCESS_KEY_ID = "tempAccessKeyId";
   public static final String RENAMED_KEYS_MAP = "renamedKeysMap";
   public static final String UNRENAMED_KEYS_MAP = "unRenamedKeysMap";
   public static final String MULTIPART_UPLOAD_PART_NUMBER = "partNumber";
@@ -315,6 +328,9 @@ public final class OzoneConsts {
   public static final String TENANT = "tenant";
   public static final String USER_PREFIX = "userPrefix";
   public static final String REWRITE_GENERATION = "rewriteGeneration";
+  public static final String DELETED_KEY_SOURCE_TYPE = "deletedKeySourceType";
+  /** Sentinel generation used to request atomic create-if-not-exists(put if absent) semantics. */
+  public static final long EXPECTED_GEN_CREATE_IF_ABSENT = 0L;
   public static final String FROM_SNAPSHOT = "fromSnapshot";
   public static final String TO_SNAPSHOT = "toSnapshot";
   public static final String TOKEN = "token";
@@ -394,16 +410,10 @@ public final class OzoneConsts {
   public static final String TRANSACTION_INFO_KEY = "#TRANSACTIONINFO";
   public static final String TRANSACTION_INFO_SPLIT_KEY = "#";
 
-  public static final String PREPARE_MARKER_KEY = "#PREPAREDINFO";
-
   public static final String CONTAINER_DB_TYPE_ROCKSDB = "RocksDB";
 
   // An on-disk transient marker file used when replacing DB with checkpoint
   public static final String DB_TRANSIENT_MARKER = "dbInconsistentMarker";
-
-  // An on-disk marker file used to indicate that the OM is in prepare and
-  // should remain prepared even after a restart.
-  public static final String PREPARE_MARKER = "prepareMarker";
 
   public static final String OZONE_RATIS_SNAPSHOT_DIR = "snapshot";
 
@@ -431,13 +441,12 @@ public final class OzoneConsts {
   public static final String SCM_ROOT_CA = "scm";
   public static final String SCM_ROOT_CA_PREFIX = SCM_ROOT_CA + "@";
 
-  // Layout Version written into Meta Table ONLY during finalization.
-  public static final String LAYOUT_VERSION_KEY = "#LAYOUTVERSION";
-  // Key written to Meta Table to indicate a component undergoing finalization.
-  // Currently this is only used on SCM, but may be useful on OM if/when
-  // finalizing one layout feature per Ratis request is implemented in
-  // HDDS-4286.
-  public static final String FINALIZING_KEY = "#FINALIZING";
+  // Apparent Version written into Meta Table ONLY during finalization.
+  // The name "layout version" is kept for backwards compatibility.
+  public static final String APPARENT_VERSION_KEY = "#LAYOUTVERSION";
+  // Key written into the Meta table when finalization is needed and a finalization command has been received
+  // to trigger the process
+  public static final String FINALIZATION_IN_PROGRESS_KEY = "#FINALIZATION_IN_PROGRESS";
 
   // Kerberos constants
   public static final String KERBEROS_CONFIG_VALUE = "kerberos";

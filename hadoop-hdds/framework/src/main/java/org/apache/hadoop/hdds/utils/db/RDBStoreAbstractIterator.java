@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.slf4j.Logger;
@@ -40,9 +41,18 @@ abstract class RDBStoreAbstractIterator<RAW>
   // This is for schemas that use a fixed-length
   // prefix for each key.
   private final RAW prefix;
-
   private final IteratorType type;
+  private final AtomicBoolean isIteratorClosed = new AtomicBoolean(false);
+  // Defer positioning until the first iterator operation. Explicit positioning
+  // avoids a redundant seek, while ordinary iteration still starts at the table
+  // or prefix start through initializeIfNeeded().
+  private boolean initialized;
 
+  /**
+   * Constructor for RDBStoreAbstractIterator.
+   * Callers must ensure that the iterator is always obtained using try-with-resources
+   * or always closed in a finally block to ensure accurate refcounting.
+   */
   RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, IteratorType type) {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
@@ -89,6 +99,10 @@ abstract class RDBStoreAbstractIterator<RAW>
     }
   }
 
+  private boolean isDbClosed() {
+    return rocksDBTable != null && rocksDBTable.isClosed();
+  }
+
   private void setCurrentEntry() {
     if (rocksDBIterator.get().isValid()) {
       currentEntry = getKeyValue();
@@ -97,14 +111,27 @@ abstract class RDBStoreAbstractIterator<RAW>
     }
   }
 
+  private void initializeIfNeeded() {
+    if (!initialized) {
+      // Preserve the original start position for callers that iterate without
+      // explicitly positioning the iterator.
+      seekToFirst();
+    }
+  }
+
   @Override
   public final boolean hasNext() {
+    if (isDbClosed()) {
+      return false;
+    }
+    initializeIfNeeded();
     return rocksDBIterator.get().isValid() &&
         (prefix == null || startsWithPrefix(key()));
   }
 
   @Override
   public final Table.KeyValue<RAW, RAW> next() {
+    initializeIfNeeded();
     setCurrentEntry();
     if (currentEntry != null) {
       rocksDBIterator.get().next();
@@ -120,6 +147,7 @@ abstract class RDBStoreAbstractIterator<RAW>
     } else {
       seek0(prefix);
     }
+    initialized = true;
     setCurrentEntry();
   }
 
@@ -130,12 +158,14 @@ abstract class RDBStoreAbstractIterator<RAW>
     } else {
       throw new UnsupportedOperationException("seekToLast: prefix != null");
     }
+    initialized = true;
     setCurrentEntry();
   }
 
   @Override
   public final Table.KeyValue<RAW, RAW> seek(RAW key) {
     seek0(key);
+    initialized = true;
     setCurrentEntry();
     return currentEntry;
   }
@@ -145,6 +175,7 @@ abstract class RDBStoreAbstractIterator<RAW>
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
+    initializeIfNeeded();
     if (currentEntry != null) {
       delete(currentEntry.getKey());
     } else {
@@ -154,6 +185,8 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public void close() {
-    rocksDBIterator.close();
+    if (isIteratorClosed.compareAndSet(false, true)) {
+      rocksDBIterator.close();
+    }
   }
 }

@@ -141,8 +141,8 @@ const Datanodes: React.FC<{}> = () => {
 
   const loadData = () => {
     // Trigger both API hooks to refetch data
-    decommissionAPI.refetch();
-    datanodesAPI.refetch();
+    decommissionAPI.refetch().catch(() => {});
+    datanodesAPI.refetch().catch(() => {});
   };
 
   // Process data when both APIs have loaded
@@ -165,6 +165,7 @@ const Datanodes: React.FC<{}> = () => {
             ? COLUMN_UPDATE_DECOMMISSIONING
             : datanode.opState,
           lastHeartbeat: datanode.lastHeartbeat,
+          storageReport: datanode.storageReport,
           storageUsed: datanode.storageReport.used,
           storageTotal: datanode.storageReport.capacity,
           storageCommitted: datanode.storageReport.committed,
@@ -177,7 +178,8 @@ const Datanodes: React.FC<{}> = () => {
           setupTime: datanode.setupTime,
           revision: datanode.revision,
           buildDate: datanode.buildDate,
-          networkLocation: datanode.networkLocation
+          networkLocation: datanode.networkLocation,
+          disks: datanode.disks
         })
       );
 

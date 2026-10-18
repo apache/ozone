@@ -133,7 +133,7 @@ public class FetchMetrics {
     if (attr.isReadable()) {
       String attName = attr.getName();
       if (!"modelerType".equals(attName)) {
-        if (attName.indexOf("=") < 0 && attName.indexOf(":") < 0 && attName.indexOf(" ") < 0) {
+        if (attName.indexOf('=') < 0 && attName.indexOf(':') < 0 && attName.indexOf(' ') < 0) {
           Object value = null;
 
           try {

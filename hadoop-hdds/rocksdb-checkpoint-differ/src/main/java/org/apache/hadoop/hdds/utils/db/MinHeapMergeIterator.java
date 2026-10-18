@@ -55,7 +55,7 @@ public abstract class MinHeapMergeIterator<K, I extends Iterator<K> & Closeable,
     keys = new HashMap<>(numberOfIterators);
     iterators = IntStream.range(0, numberOfIterators).mapToObj(i -> (I) null).collect(Collectors.toList());
     this.initialized = false;
-    this.comparator = comparator;
+    this.comparator = Objects.requireNonNull(comparator, "comparator cannot be null");
   }
 
   protected abstract I getIterator(int idx) throws IOException;
@@ -109,7 +109,7 @@ public abstract class MinHeapMergeIterator<K, I extends Iterator<K> & Closeable,
     // Clear the keys list by setting all entries to null.
     keys.clear();
     // Advance all entries with the same key (from different files)
-    while (!minHeap.isEmpty() && Objects.equals(minHeap.peek().getCurrentKey(), currentKey)) {
+    while (!minHeap.isEmpty() && comparator.compare(minHeap.peek().getCurrentKey(), currentKey) == 0) {
       HeapEntry<K> entry = minHeap.poll();
       int idx = entry.index;
       // Set the key for the current entry in the keys list.

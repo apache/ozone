@@ -50,7 +50,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests create volume request.
  */
-public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
+public class TestOMVolumeCreateRequest extends OMVolumeRequestTests {
 
   @Test
   public void testPreExecute() throws Exception {

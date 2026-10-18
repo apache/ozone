@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.service;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
@@ -30,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -39,10 +41,13 @@ import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.protobuf.ServiceException;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -54,8 +59,14 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -67,6 +78,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
@@ -101,13 +113,14 @@ import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.OzoneTestBase;
-import org.apache.ozone.test.tag.Flaky;
+import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
@@ -246,6 +259,61 @@ class TestKeyDeletingService extends OzoneTestBase {
       }
     }
 
+    /**
+     * Test that verifies zero-sized keys (keys with no blocks) are not sent to SCM.
+     * The KeyDeletingService should filter out empty keys before calling SCM.
+     */
+    @Test
+    void checkIfDeleteServiceIsDeletingZeroSizedKeys()
+        throws IOException, TimeoutException, InterruptedException {
+      // Spy on the SCM client to verify it's not called for empty keys
+      ScmBlockLocationTestingClient scmClientSpy = Mockito.spy(scmBlockTestingClient);
+      // Create a KeyDeletingService with the spied client
+      KeyDeletingService testService = new KeyDeletingService(
+          om, scmClientSpy, 100, 10000, conf, 10, false);
+      // Create a BlockGroup with empty deleted blocks list (zero-sized key)
+      BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1/1")
+          .addAllDeletedBlocks(new ArrayList<>()).build();
+      Map<String, PurgedKey> blockGroups = Collections.singletonMap(
+          blockGroup.getGroupID(), 
+          new PurgedKey("vol", "buck", 1, blockGroup, "key1", 0, true));
+      // Process the key deletion
+      testService.processKeyDeletes(blockGroups, new HashMap<>(), new ArrayList<>(), null, null);
+      // Verify that SCM's deleteKeyBlocks was never called (empty keys are filtered out)
+      verify(scmClientSpy, never()).deleteKeyBlocks(any());
+      // Cleanup
+      testService.shutdown();
+    }
+
+    @Test
+    void checkIfDeleteServiceIsDeletingMixedSizedKeys()
+        throws IOException, TimeoutException, InterruptedException {
+      // Spy on the SCM client to verify it's not called for empty keys
+      ScmBlockLocationTestingClient scmClientSpy = Mockito.spy(scmBlockTestingClient);
+      // Create a KeyDeletingService with the spied client
+      KeyDeletingService testService = new KeyDeletingService(
+          om, scmClientSpy, 100, 10000, conf, 10, false);
+      // Create a BlockGroup with empty deleted blocks list (zero-sized key)
+      BlockGroup blockGroup1 = BlockGroup.newBuilder().setKeyName("key1/1")
+          .addAllDeletedBlocks(new ArrayList<>()).build();
+      //Create a BlockGroup with non-empty deleted blocks
+      List<DeletedBlock> deletedBlocks = Collections.singletonList(new DeletedBlock(new BlockID(1, 1),
+          1, 3, 1));
+      BlockGroup blockGroup2 = BlockGroup.newBuilder().setKeyName("key2/2")
+          .addAllDeletedBlocks(deletedBlocks).build();
+      Map<String, PurgedKey> blockGroups = new HashMap<>();
+
+      blockGroups.put(blockGroup1.getGroupID(), new PurgedKey("vol", "buck", 1, blockGroup1, "key1", 0, true));
+      blockGroups.put(blockGroup2.getGroupID(), new PurgedKey("vol", "buck", 1, blockGroup2, "key2", 0, true));
+
+      // Process the key deletion
+      testService.processKeyDeletes(blockGroups, new HashMap<>(), new ArrayList<>(), null, null);
+      // Verify that SCM's deleteKeyBlocks was called.
+      verify(scmClientSpy, times(1)).deleteKeyBlocks(any());
+      // Cleanup
+      testService.shutdown();
+    }
+
     @Test
     void checkDeletionForKeysWithMultipleVersions() throws Exception {
       final long initialDeletedCount = getDeletedKeyCount();
@@ -279,6 +347,45 @@ class TestKeyDeletingService extends OzoneTestBase {
       // blocks for deletion from the KeyDeletionService
       assertThat(scmBlockTestingClient.getNumberOfDeletedBlocks())
           .isGreaterThanOrEqualTo(initialDeletedBlockCount + 3);
+    }
+
+    @Test
+    void checkPurgedBytesMatchBlocksQueuedForDeletion() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String keyName = uniqueObjectName("key");
+      final long initialDeletedCount = getDeletedKeyCount();
+
+      // Create Volume and Bucket with versioning enabled
+      createVolumeAndBucket(volumeName, bucketName, true);
+
+      keyDeletingService.suspend();
+
+      // Create 2 versions of the same key, so the delete entry spans two version groups
+      OmKeyArgs firstVersion = createAndCommitKey(volumeName, bucketName, keyName, 1);
+      OmKeyArgs secondVersion = createAndCommitKey(volumeName, bucketName, keyName, 3);
+      writeClient.deleteKey(firstVersion);
+      // The delete has to reach RocksDB before getPendingDeletionKeys() can see it.
+      om.awaitDoubleBufferFlush();
+
+      // Both versions are queued for deletion, so the purged bytes must account for both.
+      long expectedPurgedBytes =
+          QuotaUtil.getReplicatedSize(firstVersion.getDataSize(), firstVersion.getReplicationConfig())
+              + QuotaUtil.getReplicatedSize(secondVersion.getDataSize(), secondVersion.getReplicationConfig());
+
+      Map<String, PurgedKey> purgedKeys =
+          keyManager.getPendingDeletionKeys((kv) -> true, Integer.MAX_VALUE).getPurgedKeys();
+      assertThat(purgedKeys).hasSize(1);
+      PurgedKey purgedKey = purgedKeys.values().iterator().next();
+      assertEquals(4, purgedKey.getBlockGroup().getDeletedBlocks().size(),
+          "the 1st version has 1 block and the 2nd version has 3");
+      assertEquals(expectedPurgedBytes, purgedKey.getPurgedBytes());
+
+      // Drain the key so it does not remain pending for the next test.
+      keyDeletingService.resume();
+      GenericTestUtils.waitFor(
+          () -> getDeletedKeyCount() >= initialDeletedCount + 1,
+          1000, 10000);
     }
 
     @Test
@@ -344,7 +451,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       // key1 belongs to snapshot, so it should not be deleted when
       // KeyDeletingService runs. But key2 can be reclaimed as it doesn't
       // belong to any snapshot scope.
-      List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+      List<Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
           = metadataManager.getDeletedTable().getRangeKVs(
           null, 100, ozoneKey1);
       assertThat(rangeKVs.size()).isGreaterThan(0);
@@ -551,7 +658,6 @@ class TestKeyDeletingService extends OzoneTestBase {
        of Snap3 should be empty.
      */
     @Test
-    @Flaky("HDDS-13880")
     void testSnapshotDeepClean() throws Exception {
       Table<String, SnapshotInfo> snapshotInfoTable =
           om.getMetadataManager().getSnapshotInfoTable();
@@ -613,23 +719,29 @@ class TestKeyDeletingService extends OzoneTestBase {
       keyDeletingService.resume();
       directoryDeletingService.resume();
 
+      // Hold the snap3 DB handle only while its tables are read: the handle keeps a snapshot DB read lock, and the
+      // OMDoubleBuffer flush thread needs a colliding write lock on the same stripe to purge snap2 below.
       try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
                om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
-        OmSnapshot snapshot3 = rcOmSnapshot.get();
-
         Table<String, RepeatedOmKeyInfo> snap3deletedTable =
-            snapshot3.getMetadataManager().getDeletedTable();
-
+            rcOmSnapshot.get().getMetadataManager().getDeletedTable();
         // 5 keys can be deep cleaned as it was stuck previously
         assertTableRowCount(snap3deletedTable, initialDeletedCount + 10, metadataManager);
-
-        writeClient.deleteSnapshot(volumeName, bucketName, snap2);
-        assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
-
-        assertTableRowCount(snap3deletedTable, initialDeletedCount, metadataManager);
-        assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
-        checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       }
+
+      writeClient.deleteSnapshot(volumeName, bucketName, snap2);
+      assertTableRowCount(snapshotInfoTable, initialSnapshotCount + 2, metadataManager);
+
+      // Re-fetch the deleted table: SnapshotCache may have closed and reloaded snap3 while no handle was held.
+      try (UncheckedAutoCloseableSupplier<OmSnapshot> rcOmSnapshot =
+               om.getOmSnapshotManager().getSnapshot(volumeName, bucketName, snap3)) {
+        Table<String, RepeatedOmKeyInfo> snap3deletedTable =
+            rcOmSnapshot.get().getMetadataManager().getDeletedTable();
+        assertTableRowCount(snap3deletedTable, initialDeletedCount, metadataManager);
+      }
+
+      assertTableRowCount(deletedTable, initialDeletedCount, metadataManager);
+      checkSnapDeepCleanStatus(snapshotInfoTable, volumeName, true);
       sstFilteringService.resume();
     }
 
@@ -792,6 +904,239 @@ class TestKeyDeletingService extends OzoneTestBase {
     }
   }
 
+  @Nested
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  class SnapshotDbHandleLifecycle {
+
+    @BeforeAll
+    void setup(@TempDir File testDir) throws Exception {
+      scmBlockTestingClient = new ScmBlockLocationTestingClient(null, null, 0);
+      createConfig(testDir);
+      createSubject();
+      keyDeletingService.shutdown();
+    }
+
+    @AfterAll
+    void cleanup() {
+      if (om.stop()) {
+        om.join();
+      }
+    }
+
+    @Test
+    @DisplayName("KeyDeletingService should close the snapshot DB handle before submitting an OM request")
+    void testSnapshotDbHandleClosedBeforeSubmit() throws Exception {
+      String volumeName = getTestName();
+      String bucketName = uniqueObjectName("bucket");
+      String snapshotName = uniqueObjectName("snap");
+      createVolumeAndBucket(volumeName, bucketName, false);
+      writeClient.createSnapshot(volumeName, bucketName, snapshotName);
+      om.awaitDoubleBufferFlush();
+
+      String snapshotKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName);
+      SnapshotInfo snapshotInfo = metadataManager.getSnapshotInfoTable().get(snapshotKey);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, snapshotInfo);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }, 100, 10000);
+      snapshotInfo.setDeepCleanedDeletedDir(true);
+      metadataManager.getSnapshotInfoTable().put(snapshotKey, snapshotInfo);
+
+      OzoneManager ozoneManager = Mockito.spy(om);
+      OmSnapshotManager omSnapshotManager = Mockito.spy(om.getOmSnapshotManager());
+      when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
+
+      AtomicBoolean snapshotDbHandleClosed = new AtomicBoolean();
+      doAnswer(invocation -> {
+        UncheckedAutoCloseableSupplier<OmSnapshot> delegate =
+            (UncheckedAutoCloseableSupplier<OmSnapshot>) invocation.callRealMethod();
+        return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
+          @Override
+          public OmSnapshot get() {
+            return delegate.get();
+          }
+
+          @Override
+          public void close() {
+            delegate.close();
+            snapshotDbHandleClosed.set(true);
+          }
+        };
+      }).when(omSnapshotManager).getActiveSnapshot(volumeName, bucketName, snapshotName);
+
+      AtomicBoolean requestSubmitted = new AtomicBoolean();
+      KeyDeletingService service = new KeyDeletingService(ozoneManager, scmBlockTestingClient, 10000,
+          100000, conf, 1, true) {
+        @Override
+        protected OzoneManagerProtocolProtos.OMResponse submitRequest(
+            OzoneManagerProtocolProtos.OMRequest omRequest) {
+          assertTrue(snapshotDbHandleClosed.get(), "Snapshot DB handle must be closed before submitting to Ratis");
+          requestSubmitted.set(true);
+          return OzoneManagerProtocolProtos.OMResponse.newBuilder()
+              .setCmdType(omRequest.getCmdType())
+              .setStatus(OzoneManagerProtocolProtos.Status.OK)
+              .setSuccess(true)
+              .build();
+        }
+      };
+      service.shutdown();
+
+      service.new KeyDeletingTask(snapshotInfo.getSnapshotId()).call();
+
+      assertTrue(requestSubmitted.get());
+    }
+  }
+
+  /**
+   * Regression test for HDDS-16118: {@link KeyDeletingService} must not hold a snapshot DB read lock
+   * while it submits a synchronous OM request. If it does, a snapshot purge being applied by the
+   * OMDoubleBuffer flush thread blocks on the colliding snapshot DB write lock, never releases its
+   * double-buffer permit, and the deep-clean submission then blocks forever waiting for that permit.
+   *
+   * <p>The scenario is forced deterministically by shrinking two knobs: a single double-buffer permit
+   * ({@code ozone.om.unflushed.transaction.max.count = 1}) and a single snapshot DB lock stripe
+   * ({@code ozone.om.lock.stripes.snapshot_db_lock = 1}), so any snapshot read lock collides with any
+   * snapshot write lock (the "different UUIDs, same stripe" case from the fix).
+   */
+  @Nested
+  @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+  class SnapshotDbHandlePermitDeadlock {
+
+    @BeforeAll
+    void setup(@TempDir File testDir) throws Exception {
+      scmBlockTestingClient = new ScmBlockLocationTestingClient(null, null, 0);
+      createConfig(testDir);
+      // A single double-buffer permit: one in-flight transaction exhausts the semaphore, so a stalled
+      // flush immediately blocks the next transaction application.
+      conf.setInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT, 1);
+      // A single snapshot DB lock stripe: a read lock on one snapshot and a write lock on another map
+      // to the same lock, guaranteeing the collision without hand-picking colliding UUIDs.
+      conf.setInt(OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX + "snapshot_db_lock", 1);
+      // Keep background deletion services out of the way; the test drives the flow by hand.
+      conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1, TimeUnit.HOURS);
+      conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.HOURS);
+      conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1, TimeUnit.HOURS);
+      createSubject();
+      keyDeletingService.shutdown();
+    }
+
+    @AfterAll
+    void cleanup() {
+      if (om.stop()) {
+        om.join();
+      }
+    }
+
+    @Test
+    @DisplayName("KeyDeletingService must not deadlock while a snapshot purge holds the double-buffer permit")
+    void testNoPermitExhaustionDeadlock() throws Exception {
+      String volumeName = getTestName();
+      String bucketName = uniqueObjectName("bucket");
+      createVolumeAndBucket(volumeName, bucketName, false);
+
+      // deepCleanSnapshot: KeyDeletingService deep-cleans it and holds its SNAPSHOT_DB read lock while
+      // it submits. purgeSnapshot: purged by the flush thread, which needs the colliding write lock.
+      String deepCleanSnapshotName = uniqueObjectName("snap");
+      writeClient.createSnapshot(volumeName, bucketName, deepCleanSnapshotName);
+      String purgeSnapshotName = uniqueObjectName("snap");
+      writeClient.createSnapshot(volumeName, bucketName, purgeSnapshotName);
+      om.awaitDoubleBufferFlush();
+
+      String deepCleanKey = SnapshotInfo.getTableKey(volumeName, bucketName, deepCleanSnapshotName);
+      SnapshotInfo deepCleanInfo = metadataManager.getSnapshotInfoTable().get(deepCleanKey);
+      GenericTestUtils.waitFor(() -> {
+        try {
+          return OmSnapshotManager.areSnapshotChangesFlushedToDB(metadataManager, deepCleanInfo);
+        } catch (IOException e) {
+          throw new UncheckedIOException(e);
+        }
+      }, 100, 10000);
+      // Make the snapshot eligible for deleted-key deep cleaning so the task reaches submitRequest.
+      deepCleanInfo.setDeepCleanedDeletedDir(true);
+      metadataManager.getSnapshotInfoTable().put(deepCleanKey, deepCleanInfo);
+
+      // Delete the purge snapshot so it can be purged. Background services are suspended, so it is not
+      // auto-purged; the test submits the purge itself.
+      writeClient.deleteSnapshot(volumeName, bucketName, purgeSnapshotName);
+      om.awaitDoubleBufferFlush();
+      String purgeKey = SnapshotInfo.getTableKey(volumeName, bucketName, purgeSnapshotName);
+      SnapshotInfo purgeInfo = metadataManager.getSnapshotInfoTable().get(purgeKey);
+      assertNotNull(purgeInfo);
+
+      CountDownLatch kdsAtSubmit = new CountDownLatch(1);
+      CountDownLatch kdsMayProceed = new CountDownLatch(1);
+      AtomicBoolean paused = new AtomicBoolean();
+      KeyDeletingService service = new KeyDeletingService(om, scmBlockTestingClient, 10000,
+          100000, conf, 1, true) {
+        @Override
+        protected OzoneManagerProtocolProtos.OMResponse submitRequest(
+            OzoneManagerProtocolProtos.OMRequest omRequest) throws ServiceException {
+          // Park on the first submission, while snapshot DB read locks acquired during the metadata
+          // scan are (pre-fix) still held. Post-fix the fix has already released them by now.
+          if (paused.compareAndSet(false, true)) {
+            kdsAtSubmit.countDown();
+            try {
+              kdsMayProceed.await();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new ServiceException(e);
+            }
+          }
+          return super.submitRequest(omRequest);
+        }
+      };
+      service.shutdown();
+
+      OzoneManagerDoubleBuffer doubleBuffer =
+          om.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
+      Semaphore permits = (Semaphore) HddsWhiteboxTestUtils.getInternalState(doubleBuffer, "unFlushedTransactions");
+
+      ExecutorService executor = Executors.newFixedThreadPool(2);
+      try {
+        // 1. Run the deep-clean task. It parks in submitRequest holding the snapshot DB read lock (pre-fix).
+        Future<?> kdsFuture = executor.submit(
+            () -> service.new KeyDeletingTask(deepCleanInfo.getSnapshotId()).call());
+        assertTrue(kdsAtSubmit.await(30, TimeUnit.SECONDS), "KeyDeletingTask never reached submitRequest");
+
+        // 2. Submit a snapshot purge. Applying it takes the single double-buffer permit; on the pre-fix
+        //    code its flush then blocks on the read lock still held above and never releases the permit.
+        AtomicBoolean purgeDone = new AtomicBoolean();
+        OzoneManagerProtocolProtos.OMRequest purgeOmRequest = OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.SnapshotPurge)
+            .setSnapshotPurgeRequest(OzoneManagerProtocolProtos.SnapshotPurgeRequest.newBuilder()
+                .addSnapshotDBKeys(purgeKey))
+            .setClientId(ClientId.randomId().toString())
+            .build();
+        Future<?> purgeFuture = executor.submit(() -> {
+          OzoneManagerRatisUtils.submitRequest(om, purgeOmRequest, ClientId.randomId(), 1L);
+          purgeDone.set(true);
+          return null;
+        });
+        // Wait until the purge has taken the permit (pre-fix it stays taken) or already completed (post-fix).
+        GenericTestUtils.waitFor(() -> permits.availablePermits() == 0 || purgeDone.get(), 50, 30000);
+
+        // 3. Release the deep-clean submission. It now needs the single permit.
+        kdsMayProceed.countDown();
+
+        // Pre-fix: the permit is held by the stalled purge, so the task blocks forever (deadlock).
+        // Post-fix: the purge released the permit, so the task completes.
+        try {
+          kdsFuture.get(60, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+          fail("Permit-exhaustion deadlock reproduced: KeyDeletingService held a snapshot DB read lock "
+              + "across its synchronous OM request while a snapshot purge held the only double-buffer permit.");
+        }
+        purgeFuture.get(60, TimeUnit.SECONDS);
+      } finally {
+        kdsMayProceed.countDown();
+        executor.shutdownNow();
+      }
+    }
+  }
+
   /**
    * Tests failure scenarios.
    */
@@ -836,7 +1181,7 @@ class TestKeyDeletingService extends OzoneTestBase {
             });
         BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1/1")
             .addAllDeletedBlocks(Collections.singletonList(new DeletedBlock(
-                new BlockID(1, 1), 1, 3))).build();
+                new BlockID(1, 1), 1, 3, 1))).build();
         Map<String, PurgedKey> blockGroups = Collections.singletonMap(blockGroup.getGroupID(), new PurgedKey("vol",
             "buck", 1, blockGroup, "key1", 30, true));
         List<String> renameEntriesToBeDeleted = Collections.singletonList("key2");
@@ -1027,6 +1372,7 @@ class TestKeyDeletingService extends OzoneTestBase {
       // wait for AOS deleted keys to be reclaimed and
       // snap2 to be deep cleaned.
       directoryDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       keyDeletingService.runPeriodicalTaskNow();
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 10, 100, 10000);
       // Verify last run AOS deletion metrics.
@@ -1045,6 +1391,8 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Delete snap1. Which also sets the snap2 to be deep cleaned.
       writeClient.deleteSnapshot(volumeName, bucketName, snap1);
+      // SnapshotDeletingService silently skips snap1 until its delete is flushed, and the 1h interval never retries.
+      om.awaitDoubleBufferFlush();
       keyManager.getSnapshotDeletingService().runPeriodicalTaskNow();
       // Wait for changes to the snap2 to be flushed.
       GenericTestUtils.waitFor(
@@ -1059,6 +1407,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // wait for snap2 to be deep cleaned.
       directoryDeletingService.runPeriodicalTaskNow();
+      om.awaitDoubleBufferFlush();
       keyDeletingService.runPeriodicalTaskNow();
       GenericTestUtils.waitFor(() -> getDeletedKeyCount() == 20, 100, 10000);
 
@@ -1110,18 +1459,19 @@ class TestKeyDeletingService extends OzoneTestBase {
     }
 
     private void customizeConfig() {
-      // Define a small Ratis limit to force multiple batches for testing
-      // The actual byte size of protobuf messages depends on content.
-      // A small value like 1KB or 2KB should ensure batching for ~10-20 keys.
-      final int testRatisLimitBytes = 1024; // 2 KB to encourage multiple batches, 90% of the actualRatisLimitBytes.
-      // Set the specific Ratis limit for this test
+      // Define a small Ratis limit to force multiple batches for testing.
+      // With 50 keys and 1024 bytes limit (90% = ~921 bytes effective), this
+      // produces ~7 batches, confirming the batching logic works correctly.
+      final int testRatisLimitBytes = 1024;
       conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
           testRatisLimitBytes, StorageUnit.BYTES);
+      // Use a very large service interval so the background thread never fires
+      // during the test, preventing concurrent processing with runPeriodicalTaskNow().
+      conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1, TimeUnit.DAYS);
     }
 
     @Test
     @DisplayName("Verify PurgeKeysRequest is batched according to Ratis byte limit")
-    @Flaky("HDDS-13661")
     void testPurgeKeysRequestBatching() throws Exception {
       keyDeletingService.suspend();
 
@@ -1135,20 +1485,19 @@ class TestKeyDeletingService extends OzoneTestBase {
         // Mock submitRequest to capture requests and return success
         mockedRatisUtils.when(() -> OzoneManagerRatisUtils.submitRequest(
                 any(OzoneManager.class),
-                requestCaptor.capture(), // Capture the OMRequest here
+                requestCaptor.capture(),
                 any(),
                 anyLong()))
-            .thenAnswer(invocation -> {
-              // Return a successful OMResponse for each captured request
-              return OzoneManagerProtocolProtos.OMResponse.newBuilder()
-                  .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
-                  .setStatus(OzoneManagerProtocolProtos.Status.OK)
-                  .build();
-            });
+            .thenAnswer(invocation -> OzoneManagerProtocolProtos.OMResponse.newBuilder()
+                .setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
+                .setStatus(OzoneManagerProtocolProtos.Status.OK)
+                .build());
 
-        final int numKeysToCreate = 50; // Create enough keys to ensure multiple batches
-        // Create and delete keys using the test-specific managers
+        final int numKeysToCreate = 50;
         createAndDeleteKeys(numKeysToCreate, 1);
+        // Wait for all delete operations to be flushed from the DoubleBuffer to
+        // RocksDB, so that getPendingDeletionKeys() can see all 50 entries.
+        om.awaitDoubleBufferFlush();
 
         keyDeletingService.resume();
 

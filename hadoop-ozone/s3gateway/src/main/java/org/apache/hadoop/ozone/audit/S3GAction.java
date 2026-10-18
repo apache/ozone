@@ -24,6 +24,7 @@ public enum S3GAction implements AuditAction {
 
   //BucketEndpoint
   GET_BUCKET,
+  LIST_OBJECT_VERSIONS,
   CREATE_BUCKET,
   HEAD_BUCKET,
   DELETE_BUCKET,
@@ -31,9 +32,14 @@ public enum S3GAction implements AuditAction {
   PUT_ACL,
   LIST_MULTIPART_UPLOAD,
   MULTI_DELETE,
+  GET_BUCKET_LOCATION,
+  GET_BUCKET_LIFECYCLE,
+  PUT_BUCKET_LIFECYCLE,
+  DELETE_BUCKET_LIFECYCLE,
 
   //RootEndpoint
   LIST_S3_BUCKETS,
+  LIST_DIRECTORY_BUCKETS,
 
   //ObjectEndpoint
   CREATE_MULTIPART_KEY,
@@ -50,11 +56,25 @@ public enum S3GAction implements AuditAction {
   CREATE_DIRECTORY,
   GENERATE_SECRET,
   REVOKE_SECRET,
+  GET_OBJECT_TORRENT,
   GET_OBJECT_TAGGING,
   PUT_OBJECT_TAGGING,
   DELETE_OBJECT_TAGGING,
-  PUT_OBJECT_ACL;
+  GET_BUCKET_TAGGING,
+  PUT_BUCKET_TAGGING,
+  DELETE_BUCKET_TAGGING,
+  GET_OBJECT_ACL,
+  PUT_OBJECT_ACL,
 
+  // STS endpoint
+  ASSUME_ROLE,
+  GET_CALLER_IDENTITY,
+
+  GET_OBJECT_ATTRIBUTES,
+
+  // bucket and object subresource operations that are not implemented
+  NOT_IMPLEMENTED;
+  
   @Override
   public String getAction() {
     return this.toString();

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.net;
 import java.util.Collection;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.ClientVersion;
 
 /**
  * The interface defines an inner node in a network topology.
@@ -92,16 +93,11 @@ public interface InnerNode extends Node {
       Collection<Node> excludedNodes, int ancestorGen);
 
   @Override
-  HddsProtos.NetworkNode toProtobuf(int clientVersion);
+  HddsProtos.NetworkNode toProtobuf(ClientVersion clientVersion);
 
   @Override
   boolean equals(Object o);
 
   @Override
   int hashCode();
-
-  static InnerNode fromProtobuf(
-      HddsProtos.InnerNode innerNode) {
-    return InnerNodeImpl.fromProtobuf(innerNode);
-  }
 }

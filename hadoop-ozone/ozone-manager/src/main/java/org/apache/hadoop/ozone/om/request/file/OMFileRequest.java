@@ -30,16 +30,13 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -54,9 +51,9 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.snapshot.diff.SnapshotDiffValueParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -159,6 +156,21 @@ public final class OMFileRequest {
   }
 
   /**
+   * Reads only the objectID of the directory stored under the given directory table key, without
+   * materializing an {@link OmDirectoryInfo}. The path walks below need each parent directory's
+   * objectID, but a full read also decodes and rebuilds the ACL list, the metadata map and the
+   * timestamps, which they discard.
+   *
+   * @return the directory's objectID, or null if there is no directory under that key.
+   */
+  private static Long getDirObjectId(OMMetadataManager omMetadataManager, String dbNodeName)
+      throws IOException {
+    return omMetadataManager.getDirectoryTable().getProjected(dbNodeName,
+        OmDirectoryInfo::getObjectID,
+        SnapshotDiffValueParser::parseDirectoryInfoObjectId);
+  }
+
+  /**
    * Verify any dir/key exist in the given path in the specified
    * volume/bucket by iterating through directory table.
    *
@@ -194,15 +206,18 @@ public final class OMFileRequest {
     // Get parent all acls including ACCESS and DEFAULT acls
     // The logic of specific inherited acl should be when creating dir/file
     List<OzoneAcl> acls = omBucketInfo.getAcls();
+    // Directory table key of the deepest existing directory on the path, i.e. the one the ACLs above
+    // are replaced with below; null means the path has no such directory and the bucket ACLs apply.
+    String aclParentDbKey = null;
 
     long lastKnownParentId = omBucketInfo.getObjectID();
-    String dbDirName = ""; // absolute path for trace logs
+    StringBuilder dbDirName = new StringBuilder(); // absolute path for trace logs
     // for better logging
     StringBuilder fullKeyPath = new StringBuilder(bucketKey);
     while (elements.hasNext()) {
       String fileName = elements.next().toString();
-      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
-      fullKeyPath.append(fileName);
+      fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX)
+          .append(fileName);
       if (!missing.isEmpty()) {
         // Add all the sub-dirs to the missing list except the leaf element.
         // For example, /vol1/buck1/a/b/c/d/e/f/file1.txt.
@@ -220,14 +235,14 @@ public final class OMFileRequest {
       // 3. Add 'sub-dir' to missing parents list
       String dbNodeName = omMetadataManager.getOzonePathKey(volumeId, bucketId,
               lastKnownParentId, fileName);
-      OmDirectoryInfo omDirInfo = omMetadataManager.getDirectoryTable().
-              get(dbNodeName);
-      if (omDirInfo != null) {
-        dbDirName += omDirInfo.getName() + OzoneConsts.OZONE_URI_DELIMITER;
+      final Long dirObjectId = getDirObjectId(omMetadataManager, dbNodeName);
+      if (dirObjectId != null) {
+        // dbNodeName ends with the directory's name, so fileName is what the stored name field holds.
+        dbDirName.append(fileName).append(OzoneConsts.OZONE_URI_DELIMITER);
         if (elements.hasNext()) {
           result = OMDirectoryResult.DIRECTORY_EXISTS_IN_GIVENPATH;
-          lastKnownParentId = omDirInfo.getObjectID();
-          acls = omDirInfo.getAcls();
+          lastKnownParentId = dirObjectId;
+          aclParentDbKey = dbNodeName;
           continue;
         } else {
           // Checked all the sub-dirs till the leaf node.
@@ -261,6 +276,15 @@ public final class OMFileRequest {
     LOG.trace("verifyFiles/Directories in Path : /{}/{}/{} : {}",
         volumeName, bucketName, keyName, result);
 
+    // Inherited ACLs come from the deepest existing directory on the path, so they are read once here
+    // instead of on every segment of the walk above.
+    if (aclParentDbKey != null) {
+      OmDirectoryInfo aclParent = omMetadataManager.getDirectoryTable().get(aclParentDbKey);
+      if (aclParent != null) {
+        acls = aclParent.getAcls();
+      }
+    }
+
     if (result == OMDirectoryResult.FILE_EXISTS_IN_GIVENPATH || result ==
             OMDirectoryResult.FILE_EXISTS) {
       return new OMPathInfoWithFSO(leafNodeName, lastKnownParentId, missing,
@@ -268,7 +292,7 @@ public final class OMFileRequest {
     }
 
     String dbDirKeyName = omMetadataManager.getOzoneDirKey(volumeName,
-            bucketName, dbDirName);
+        bucketName, dbDirName.toString());
     LOG.trace("Acls from parent {} are : {}", dbDirKeyName, acls);
 
     return new OMPathInfoWithFSO(leafNodeName, lastKnownParentId, missing,
@@ -680,24 +704,33 @@ public final class OMFileRequest {
       String dbNodeName = omMetadataMgr.getOzonePathKey(
               volumeId, omBucketInfo.getObjectID(),
               lastKnownParentId, fileName);
-      omDirInfo = omMetadataMgr.getDirectoryTable().get(dbNodeName);
 
-      if (omDirInfo != null) {
-        lastKnownParentId = omDirInfo.getObjectID();
-      } else if (!elements.hasNext() &&
-          (!keyName.endsWith(PATH_SEPARATOR_STR))) {
-        // If the requested keyName contains "/" at the end then we need to
-        // just check the directory table.
+      if (elements.hasNext()) {
+        // Intermediate path component: only its objectID is needed to resolve the next one.
+        final Long dirObjectId = getDirObjectId(omMetadataMgr, dbNodeName);
+        if (dirObjectId == null) {
+          // Missing intermediate directory and just return null;
+          // key not found in DB
+          return null;
+        }
+        lastKnownParentId = dirObjectId;
+        continue;
+      }
+
+      // Last path component: the whole directory is returned to the caller, so read it in full.
+      omDirInfo = omMetadataMgr.getDirectoryTable().get(dbNodeName);
+      if (omDirInfo == null) {
+        if (keyName.endsWith(PATH_SEPARATOR_STR)) {
+          // If the requested keyName contains "/" at the end then we need to
+          // just check the directory table.
+          return null;
+        }
         // reached last path component. Check file exists for the given path.
         OmKeyInfo omKeyInfo = OMFileRequest.getOmKeyInfoFromFileTable(false,
                 omMetadataMgr, dbNodeName, keyName);
         if (omKeyInfo != null) {
           return new OzoneFileStatus(omKeyInfo, scmBlockSize, false);
         }
-      } else {
-        // Missing intermediate directory and just return null;
-        // key not found in DB
-        return null;
       }
     }
 
@@ -744,22 +777,10 @@ public final class OMFileRequest {
   public static OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
       OmDirectoryInfo dirInfo, String keyName) {
 
-    return new OmKeyInfo.Builder()
-        .setParentObjectID(dirInfo.getParentObjectID())
-        .setKeyName(keyName)
-        .setAcls(dirInfo.getAcls())
-        .addAllMetadata(dirInfo.getMetadata())
+    return dirInfo.toKeyInfoBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setCreationTime(dirInfo.getCreationTime())
-        .setModificationTime(dirInfo.getModificationTime())
-        .setObjectID(dirInfo.getObjectID())
-        .setUpdateID(dirInfo.getUpdateID())
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.ONE))
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setOwnerName(dirInfo.getOwner())
+        .setKeyName(keyName)
         .build();
   }
 
@@ -786,16 +807,7 @@ public final class OMFileRequest {
    * @return omDirectoryInfo object
    */
   public static OmDirectoryInfo getDirectoryInfo(OmKeyInfo keyInfo) {
-    return OmDirectoryInfo.newBuilder()
-        .setParentObjectID(keyInfo.getParentObjectID())
-        .setAcls(keyInfo.getAcls())
-        .addAllMetadata(keyInfo.getMetadata())
-        .setCreationTime(keyInfo.getCreationTime())
-        .setModificationTime(keyInfo.getModificationTime())
-        .setObjectID(keyInfo.getObjectID())
-        .setUpdateID(keyInfo.getUpdateID())
-        .setName(OzoneFSUtils.getFileName(keyInfo.getKeyName()))
-        .build();
+    return keyInfo.toDirectoryInfoBuilder().build();
   }
 
   /**
@@ -914,11 +926,25 @@ public final class OMFileRequest {
         Table.KeyValue<String, OmDirectoryInfo>>
             iterator = dirTable.iterator(seekDirInDB)) {
 
-      if (iterator.hasNext()) {
+      while (iterator.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+        String dbKey = entry.getKey();
         OmDirectoryInfo dirInfo = entry.getValue();
-        return isImmediateChild(dirInfo.getParentObjectID(),
+        boolean isChild = isImmediateChild(dirInfo.getParentObjectID(),
             omKeyInfo.getObjectID());
+
+        if (!isChild) {
+          return false;
+        }
+
+        // If child found in DB, check if it's marked as deleted in cache
+        CacheValue<OmDirectoryInfo> cacheValue = dirTable.getCacheValue(new CacheKey<>(dbKey));
+        if (cacheValue != null && cacheValue.getCacheValue() == null) {
+          // Entry is in DB but marked for deletion in cache, ignore it and check next entry
+          continue;
+        }
+
+        return true;
       }
 
     }
@@ -955,14 +981,28 @@ public final class OMFileRequest {
     // Check fileTable entries for any sub paths.
     String seekFileInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>>
             iterator = fileTable.iterator(seekFileInDB)) {
 
-      if (iterator.hasNext()) {
+      while (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+        String dbKey = entry.getKey();
         OmKeyInfo fileInfo = entry.getValue();
-        return isImmediateChild(fileInfo.getParentObjectID(),
-            omKeyInfo.getObjectID()); // found a sub path file
+        boolean isChild = isImmediateChild(fileInfo.getParentObjectID(),
+            omKeyInfo.getObjectID());
+
+        if (!isChild) {
+          return false;
+        }
+
+        // If child found in DB, check if it's marked as deleted in cache
+        CacheValue<OmKeyInfo> cacheValue = fileTable.getCacheValue(new CacheKey<>(dbKey));
+        if (cacheValue != null && cacheValue.getCacheValue() == null) {
+          // Entry is in DB but marked for deletion in cache, ignore it and check next entry
+          continue;
+        }
+
+        return true; // found a sub path file
       }
     }
     return false; // no sub paths found
@@ -1013,7 +1053,6 @@ public final class OMFileRequest {
     if (StringUtils.isBlank(errMsg)) {
       errMsg = "Failed to find parent directory of " + keyName;
     }
-    OmDirectoryInfo omDirectoryInfo;
     while (pathComponents.hasNext()) {
       String nodeName = pathComponents.next().toString();
       boolean reachedLastPathComponent = !pathComponents.hasNext();
@@ -1022,15 +1061,14 @@ public final class OMFileRequest {
                       lastKnownParentId, nodeName);
 
 
-      omDirectoryInfo = omMetadataManager.
-              getDirectoryTable().get(dbNodeName);
-      if (omDirectoryInfo != null) {
+      final Long dirObjectId = getDirObjectId(omMetadataManager, dbNodeName);
+      if (dirObjectId != null) {
         if (reachedLastPathComponent) {
           throw new OMException("Can not create file: " + keyName +
                   " as there is already directory in the given path",
                   NOT_A_FILE);
         }
-        lastKnownParentId = omDirectoryInfo.getObjectID();
+        lastKnownParentId = dirObjectId;
       } else {
         // One of the sub-dir doesn't exists in DB. Immediate parent should
         // exists for committing the key, otherwise will fail the operation.

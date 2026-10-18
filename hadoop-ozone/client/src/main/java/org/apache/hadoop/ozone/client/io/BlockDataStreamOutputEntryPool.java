@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
@@ -55,9 +56,11 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
   private final OzoneClientConfig config;
   private int currentStreamIndex;
   private final OzoneManagerProtocol omClient;
-  private final OmKeyArgs keyArgs;
+  private final OmKeyArgs.Builder keyArgs;
+  private final Map<String, String> metadata = new HashMap<>();
   private final XceiverClientFactory xceiverClientFactory;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
+  private long modificationTime;
   private final long openID;
   private final ExcludeList excludeList;
   private List<StreamBuffer> bufferList;
@@ -83,7 +86,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
         .setReplicationConfig(replicationConfig).setDataSize(info.getDataSize())
         .setIsMultipartKey(isMultipart).setMultipartUploadID(uploadID)
         .setMultipartUploadPartNumber(partNumber)
-        .setSortDatanodesInPipeline(true).build();
+        .setSortDatanodesInPipeline(true);
     this.openID = openID;
     this.excludeList = createExcludeList();
     this.bufferList = new ArrayList<>();
@@ -163,12 +166,12 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
         throw new IOException("Hsync is unsupported for multipart keys.");
       } else {
         if (keyArgs.getLocationInfoList().isEmpty()) {
-          omClient.hsyncKey(keyArgs, openID);
+          omClient.hsyncKey(buildKeyArgs(), openID);
         } else {
           ContainerBlockID lastBLockId = keyArgs.getLocationInfoList().get(keyArgs.getLocationInfoList().size() - 1)
               .getBlockID().getContainerBlockID();
           if (!lastUpdatedBlockId.equals(lastBLockId)) {
-            omClient.hsyncKey(keyArgs, openID);
+            omClient.hsyncKey(buildKeyArgs(), openID);
             lastUpdatedBlockId = lastBLockId;
           }
         }
@@ -235,7 +238,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       LOG.debug("Allocating block with {}", excludeList);
     }
     OmKeyLocationInfo subKeyInfo =
-        omClient.allocateBlock(keyArgs, openID, excludeList);
+        omClient.allocateBlock(buildKeyArgs(), openID, excludeList);
     addKeyLocationInfo(subKeyInfo);
   }
 
@@ -251,9 +254,10 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       // partial key of a large file.
       if (keyArgs.getIsMultipartKey()) {
         commitUploadPartInfo =
-            omClient.commitMultipartUploadPart(keyArgs, openID);
+            omClient.commitMultipartUploadPart(buildKeyArgs(), openID);
+        modificationTime = commitUploadPartInfo.getModificationTime();
       } else {
-        omClient.commitKey(keyArgs, openID);
+        modificationTime = omClient.commitKey(buildKeyArgs(), openID);
       }
     } else {
       LOG.warn("Closing KeyDataStreamOutput, but key args is null");
@@ -302,6 +306,10 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
     return commitUploadPartInfo;
   }
 
+  public long getModificationTime() {
+    return modificationTime;
+  }
+
   public ExcludeList getExcludeList() {
     return excludeList;
   }
@@ -333,6 +341,11 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
 
   @Override
   public Map<String, String> getMetadata() {
-    return this.keyArgs.getMetadata();
+    return metadata;
+  }
+
+  private OmKeyArgs buildKeyArgs() {
+    keyArgs.addAllMetadata(metadata);
+    return keyArgs.build();
   }
 }

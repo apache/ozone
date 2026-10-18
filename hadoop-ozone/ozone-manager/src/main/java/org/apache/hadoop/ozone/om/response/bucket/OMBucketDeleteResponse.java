@@ -17,22 +17,17 @@
 
 package org.apache.hadoop.ozone.om.response.bucket;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for DeleteBucket request.
  */
-@CleanupTableInfo(cleanupTables = {BUCKET_TABLE, VOLUME_TABLE})
 public final class OMBucketDeleteResponse extends OMClientResponse {
 
   private String volumeName;
@@ -78,6 +73,14 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
       omMetadataManager.getVolumeTable().putWithBatch(batchOperation,
               omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
               omVolumeArgs);
+    }
+
+    // Delete lifecycle attached to that bucket.
+    try {
+      omMetadataManager.getLifecycleConfigurationTable().deleteWithBatch(
+          batchOperation, dbBucketKey);
+    } catch (IOException ex) {
+      // Do nothing if there is no lifecycle attached.
     }
   }
 

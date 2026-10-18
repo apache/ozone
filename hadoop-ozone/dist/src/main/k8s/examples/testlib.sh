@@ -50,6 +50,23 @@ wait_for_startup(){
    fi
 }
 
+wait_for_pipeline() {
+  retry assert_pipeline_exists
+}
+
+execute_command_in_container() {
+   CONTAINER="$1"
+   shift 1 #Remove first argument which was the container name
+
+   kubectl exec "${CONTAINER}" -- "$@"
+}
+
+assert_pipeline_exists() {
+   local count
+   count=$(execute_command_in_container scm-0 ozone admin pipeline list --state OPEN --filter-by-factor THREE --json | jq -r 'length')
+   [[ $count -gt 0 ]]
+}
+
 all_pods_are_running() {
    local -i running=$(kubectl get pod --field-selector status.phase=Running | grep -v 'STATUS' | wc -l)
    local -i all=$(kubectl get pod | grep -v 'STATUS' | wc -l)
@@ -76,14 +93,15 @@ pre_run_setup() {
 reset_k8s_env() {
    print_phase "Deleting existing k8s resources"
    #reset environment
-   kubectl delete statefulset --all
-   kubectl delete daemonset --all
-   kubectl delete deployment --all
-   kubectl delete service --all
-   kubectl delete configmap --all
-   kubectl delete pod --all
-   kubectl delete pvc --all
-   kubectl delete pv --all
+   local -r DEL_TIMEOUT="${RESET_TIMEOUT:-120s}"
+   kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found statefulset --all
+   kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found daemonset --all
+   kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found deployment --all
+   kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found service --all
+   kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found configmap --all
+   kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found pod --all
+   kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found pvc --all
+   kubectl delete --timeout="$DEL_TIMEOUT" --ignore-not-found pv --all
 }
 
 start_k8s_env() {
@@ -163,7 +181,7 @@ execute_robot_test() {
 
    kubectl exec -it "${CONTAINER}" -- bash -c 'rm -rf /tmp/report'
    kubectl exec -it "${CONTAINER}" -- bash -c 'mkdir -p  /tmp/report'
-   kubectl exec -it "${CONTAINER}" -- robot --nostatusrc -d /tmp/report ${ARGUMENTS[@]} || true
+   kubectl exec -it "${CONTAINER}" -- robot --nostatusrc -d /tmp/report ${ARGUMENTS[@]-} || true
    kubectl cp "${CONTAINER}":/tmp/report/output.xml "result/$CONTAINER-$RANDOM.xml" || true
 }
 

@@ -83,6 +83,7 @@ export const COLUMNS: ColumnsType<Bucket> = [
     title: 'Bucket',
     dataIndex: 'name',
     key: 'name',
+    fixed: 'left',
     sorter: (a: Bucket, b: Bucket) => a.name.localeCompare(b.name),
     defaultSortOrder: 'ascend' as const
   },
@@ -90,6 +91,7 @@ export const COLUMNS: ColumnsType<Bucket> = [
     title: 'Volume',
     dataIndex: 'volumeName',
     key: 'volumeName',
+    fixed: 'left',
     sorter: (a: Bucket, b: Bucket) => a.volumeName.localeCompare(b.volumeName),
     defaultSortOrder: 'ascend' as const
   },

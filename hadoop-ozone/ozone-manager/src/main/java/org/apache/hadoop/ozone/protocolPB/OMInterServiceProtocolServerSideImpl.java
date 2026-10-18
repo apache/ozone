@@ -17,10 +17,14 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
+
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocolPB.OMInterServiceProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -28,6 +32,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.BootstrapOMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.ErrorCode;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -63,12 +68,15 @@ public class OMInterServiceProtocolServerSideImpl implements
         .build();
 
     try {
+      if (ozoneManager.isAdminAuthorizationEnabled() && !ozoneManager.isAdmin(getRemoteUser())) {
+        throw new OMException("Only administrators are authorized to perform bootstrap.", PERMISSION_DENIED);
+      }
       omRatisServer.addOMToRatisRing(newOmNode);
     } catch (IOException ex) {
       return BootstrapOMResponse.newBuilder()
           .setSuccess(false)
           .setErrorCode(ErrorCode.RATIS_BOOTSTRAP_ERROR)
-          .setErrorMsg(ex.getMessage())
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
           .build();
     }
 

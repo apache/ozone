@@ -30,13 +30,18 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTest
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,9 +58,13 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.lang.reflect.Field;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -68,22 +77,35 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChecksumData;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -94,22 +116,33 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
+import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.Status;
+import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,6 +163,12 @@ public class TestKeyValueHandler {
   private static final String DUMMY_PATH = "dummy/dir/doesnt/exist";
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
+  // The checksum boundary readBlock aligns to when the chunk carries no checksums.
+  private static final long BYTES_PER_CHECKSUM = 1024 * 64;
+  // Deliberately not a multiple of BYTES_PER_CHECKSUM, so an offset past the end of the block can still have its
+  // checksum aligned floor inside the block.
+  private static final int BLOCK_SIZE = 1000;
+  private static final int GET_BLOCK_TEST_CHUNK_LEN = 1024;
 
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
@@ -356,18 +395,20 @@ public class TestKeyValueHandler {
   @ContainerLayoutTestInfo.ContainerTest
   public void testCloseInvalidContainer(ContainerLayoutVersion layoutVersion)
       throws IOException {
-    KeyValueHandler keyValueHandler = createKeyValueHandler(tempDir);
     conf = new OzoneConfiguration();
-    KeyValueContainerData kvData = new KeyValueContainerData(DUMMY_CONTAINER_ID,
-        layoutVersion,
-        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
-        UUID.randomUUID().toString());
-    kvData.setMetadataPath(tempDir.toString());
-    kvData.setDbFile(dbFile.toFile());
-    KeyValueContainer container = new KeyValueContainer(kvData, conf);
+    conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, layoutVersion.name());
+    HandlerWithVolumeSet handlerCtx = createKeyValueHandler(tempDir);
+    KeyValueHandler keyValueHandler = handlerCtx.getHandler();
+    ContainerSet containerSet = handlerCtx.getContainerSet();
+
+    long containerId = DUMMY_CONTAINER_ID + layoutVersion.getVersion();
     ContainerCommandRequestProto createContainerRequest =
-        createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID);
-    keyValueHandler.handleCreateContainer(createContainerRequest, container);
+        createContainerRequest(DATANODE_UUID, containerId);
+    keyValueHandler.handleCreateContainer(createContainerRequest, null);
+
+    KeyValueContainer container =
+        (KeyValueContainer) containerSet.getContainer(containerId);
+    KeyValueContainerData kvData = container.getContainerData();
 
     // Make the container state as invalid.
     kvData.setState(ContainerProtos.ContainerDataProto.State.INVALID);
@@ -376,12 +417,11 @@ public class TestKeyValueHandler {
     ContainerCommandRequestProto closeContainerRequest =
         ContainerProtos.ContainerCommandRequestProto.newBuilder()
             .setCmdType(ContainerProtos.Type.CloseContainer)
-            .setContainerID(DUMMY_CONTAINER_ID)
+            .setContainerID(containerId)
             .setDatanodeUuid(DATANODE_UUID)
             .setCloseContainer(ContainerProtos.CloseContainerRequestProto
                 .getDefaultInstance())
             .build();
-    dispatcher.dispatch(closeContainerRequest, null);
 
     // Closing invalid container should return error response.
     ContainerProtos.ContainerCommandResponseProto response =
@@ -688,6 +728,46 @@ public class TestKeyValueHandler {
   }
 
   @ContainerLayoutTestInfo.ContainerTest
+  public void testDeleteUnreferencedFailsWhenChunkDirCannotBeListed(
+      ContainerLayoutVersion layoutVersion) throws Exception {
+    KeyValueHandler keyValueHandler = new KeyValueHandler(conf,
+        DATANODE_UUID, newContainerSet(), mock(MutableVolumeSet.class),
+        mock(ContainerMetrics.class), c -> { },
+        new ContainerChecksumTreeManager(conf));
+    KeyValueContainer container = createContainerWithChunksPath(layoutVersion,
+        Files.createFile(tempDir.resolve("chunks-file")));
+
+    IOException exception = Assertions.assertThrows(IOException.class,
+        () -> keyValueHandler.deleteUnreferenced(container, 1L));
+
+    assertThat(exception)
+        .hasMessageContaining("Failed to list chunks under")
+        .hasMessageContaining("for unreferenced block 1")
+        .hasMessageContaining("in container " + DUMMY_CONTAINER_ID);
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testDeleteUnreferencedFailsWhenFileDeletionFails(
+      ContainerLayoutVersion layoutVersion) throws Exception {
+    FailingUnreferencedDeleteKeyValueHandler keyValueHandler =
+        new FailingUnreferencedDeleteKeyValueHandler(conf);
+    Path chunkDir = Files.createDirectory(tempDir.resolve("chunks"));
+    Path chunkFile = Files.createFile(chunkDir.resolve(
+        getUnreferencedChunkName(layoutVersion, 1L)));
+    KeyValueContainer container =
+        createContainerWithChunksPath(layoutVersion, chunkDir);
+
+    IOException exception = Assertions.assertThrows(IOException.class,
+        () -> keyValueHandler.deleteUnreferenced(container, 1L));
+
+    assertThat(exception)
+        .hasMessageContaining("Failed to delete unreferenced chunk/block")
+        .hasMessageContaining(chunkFile.toString())
+        .hasMessageContaining("in container " + DUMMY_CONTAINER_ID);
+    assertTrue(Files.exists(chunkFile));
+  }
+
+  @ContainerLayoutTestInfo.ContainerTest
   public void testUpdateContainerChecksum(ContainerLayoutVersion layoutVersion) throws Exception {
     conf = new OzoneConfiguration();
     KeyValueContainerData data = new KeyValueContainerData(123L, layoutVersion, GB,
@@ -802,7 +882,7 @@ public class TestKeyValueHandler {
 
     final KeyValueHandler kvHandler = new KeyValueHandler(conf,
         datanodeId, containerSet, volumeSet, null, metrics,
-        c -> icrReceived.incrementAndGet(), clock, new ContainerChecksumTreeManager(conf));
+        c -> icrReceived.incrementAndGet(), clock, new ContainerChecksumTreeManager(conf), null);
     kvHandler.setClusterID(clusterId);
 
     final ContainerCommandRequestProto createContainer =
@@ -909,7 +989,7 @@ public class TestKeyValueHandler {
         .build();
   }
 
-  private KeyValueHandler createKeyValueHandler(Path path) throws IOException {
+  private HandlerWithVolumeSet createKeyValueHandler(Path path) throws IOException {
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
 
@@ -936,6 +1016,901 @@ public class TestKeyValueHandler {
         conf.getObject(ContainerScannerConfiguration.class), controller);
     containerSet.registerOnDemandScanner(onDemandScanner);
 
-    return kvHandler;
+    return new HandlerWithVolumeSet(kvHandler, volumeSet, containerSet);
   }
+
+  /**
+   * EC/standalone writes reach the datanode with a null DispatcherContext, so KeyValueHandler
+   * fabricates one. Verify the client-supplied write pipeline version is carried onto that
+   * context for WriteChunk.
+   */
+  @Test
+  public void testWriteChunkCarriesWritePipelineVersionForEc() throws Exception {
+    Path testDir = Files.createTempDirectory("testWriteChunkEcVersion");
+    conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+
+    long containerID = ContainerTestHelper.getTestContainerID();
+    KeyValueContainer container = createOpenContainer(containerID,
+        handlerWithVolume.getVolumeSet(), handlerWithVolume.getContainerSet());
+    ChunkManager spyChunkManager = spyChunkManager(kvHandler);
+
+    BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+    ContainerCommandRequestProto request = ContainerTestHelper
+        .getWriteChunkRequest(MockPipeline.createSingleNodePipeline(), blockID, 1024)
+        .toBuilder()
+        .setWritePipelineVersion(HDDSVersion.ZDU.serialize())
+        .build();
+
+    kvHandler.handleWriteChunk(request, container, null);
+
+    ArgumentCaptor<DispatcherContext> captor = ArgumentCaptor.forClass(DispatcherContext.class);
+    verify(spyChunkManager).writeChunk(eq(container), any(), any(), any(ChunkBuffer.class), captor.capture());
+    assertEquals(HDDSVersion.ZDU, captor.getValue().getWriteVersion());
+  }
+
+  /**
+   * Same as {@link #testWriteChunkCarriesWritePipelineVersionForEc()} but for PutSmallFile.
+   */
+  @Test
+  public void testPutSmallFileCarriesWritePipelineVersionForEc() throws Exception {
+    Path testDir = Files.createTempDirectory("testPutSmallFileEcVersion");
+    conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+
+    long containerID = ContainerTestHelper.getTestContainerID();
+    KeyValueContainer container = createOpenContainer(containerID,
+        handlerWithVolume.getVolumeSet(), handlerWithVolume.getContainerSet());
+    ChunkManager spyChunkManager = spyChunkManager(kvHandler);
+
+    BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+    ContainerCommandRequestProto request = ContainerTestHelper
+        .getWriteSmallFileRequest(MockPipeline.createSingleNodePipeline(), blockID, 1024)
+        .toBuilder()
+        .setWritePipelineVersion(HDDSVersion.ZDU.serialize())
+        .build();
+
+    kvHandler.handlePutSmallFile(request, container, null);
+
+    ArgumentCaptor<DispatcherContext> captor = ArgumentCaptor.forClass(DispatcherContext.class);
+    verify(spyChunkManager).writeChunk(eq(container), any(), any(), any(ChunkBuffer.class), captor.capture());
+    assertEquals(HDDSVersion.ZDU, captor.getValue().getWriteVersion());
+  }
+
+  private static ChunkManager spyChunkManager(KeyValueHandler kvHandler) throws Exception {
+    Field field = KeyValueHandler.class.getDeclaredField("chunkManager");
+    field.setAccessible(true);
+    ChunkManager spy = spy((ChunkManager) field.get(kvHandler));
+    field.set(kvHandler, spy);
+    return spy;
+  }
+
+  private KeyValueContainer createOpenContainer(long containerID,
+      MutableVolumeSet volumeSet, ContainerSet containerSet) throws IOException {
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
+        (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(), DATANODE_UUID);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+    containerSet.addContainer(container);
+    return container;
+  }
+
+  private static class HandlerWithVolumeSet {
+    private final KeyValueHandler handler;
+    private final MutableVolumeSet volumeSet;
+    private final ContainerSet containerSet;
+    private final ContainerMetrics containerMetrics;
+
+    HandlerWithVolumeSet(KeyValueHandler handler, MutableVolumeSet volumeSet, ContainerSet containerSet) {
+      this(handler, volumeSet, containerSet, null);
+    }
+
+    HandlerWithVolumeSet(KeyValueHandler handler, MutableVolumeSet volumeSet,
+        ContainerSet containerSet, ContainerMetrics containerMetrics) {
+      this.handler = handler;
+      this.volumeSet = volumeSet;
+      this.containerSet = containerSet;
+      this.containerMetrics = containerMetrics;
+    }
+
+    KeyValueHandler getHandler() {
+      return handler;
+    }
+
+    MutableVolumeSet getVolumeSet() {
+      return volumeSet;
+    }
+
+    ContainerSet getContainerSet() {
+      return containerSet;
+    }
+
+    ContainerMetrics getContainerMetrics() {
+      return containerMetrics;
+    }
+  }
+
+  private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(Path path) throws IOException {
+    return createKeyValueHandlerWithVolumeSet(path, null);
+  }
+
+  private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(Path path, OzoneContainer ozoneContainer)
+      throws IOException {
+    ContainerMetrics.remove();
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    final ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(path.toString()).conf(conf)
+        .clusterID(CLUSTER_ID).datanodeUuid(DATANODE_UUID)
+        .volumeSet(volumeSet)
+        .build();
+    hddsVolume.format(CLUSTER_ID);
+    hddsVolume.createWorkingDir(CLUSTER_ID, null);
+    hddsVolume.createTmpDirs(CLUSTER_ID);
+    when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
+
+    final KeyValueHandler kvHandler = ContainerTestUtils.getKeyValueHandler(conf,
+        DATANODE_UUID, containerSet, volumeSet, containerMetrics,
+        new ContainerChecksumTreeManager(conf), ozoneContainer);
+    kvHandler.setClusterID(CLUSTER_ID);
+    hddsVolume.getVolumeInfoStats().unregister();
+    hddsVolume.getVolumeIOStats().unregister();
+
+    ContainerController controller = new ContainerController(containerSet,
+        Collections.singletonMap(ContainerType.KeyValueContainer, kvHandler));
+    OnDemandContainerScanner onDemandScanner = new OnDemandContainerScanner(
+        conf.getObject(ContainerScannerConfiguration.class), controller);
+    containerSet.registerOnDemandScanner(onDemandScanner);
+
+    return new HandlerWithVolumeSet(kvHandler, volumeSet, containerSet, containerMetrics);
+  }
+
+  private HddsDispatcher createGetBlockDispatcher(HandlerWithVolumeSet handlerWithVolume) throws IOException {
+    DatanodeDetails datanodeDetails =
+        MockDatanodeDetails.createDatanodeDetails(DatanodeID.fromUuidString(DATANODE_UUID));
+    StateContext context = ContainerTestUtils.getMockContext(datanodeDetails, conf);
+    HashMap<ContainerType, Handler> handlers = new HashMap<>();
+    handlers.put(ContainerType.KeyValueContainer, handlerWithVolume.getHandler());
+    return new HddsDispatcher(conf, handlerWithVolume.getContainerSet(), handlerWithVolume.getVolumeSet(), handlers,
+        context, handlerWithVolume.getContainerMetrics(), null);
+  }
+
+  private void writeTestBlockForGetBlock(
+      KeyValueHandler kvHandler, KeyValueContainer container, BlockID blockID) throws IOException {
+    BlockData blockData = new BlockData(blockID);
+    ChunkInfo chunkInfo = new ChunkInfo("chunk1", 0, GET_BLOCK_TEST_CHUNK_LEN);
+    blockData.addChunk(chunkInfo.getProtoBufMessage());
+    kvHandler.getBlockManager().putBlock(container, blockData);
+    ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.allocate(GET_BLOCK_TEST_CHUNK_LEN));
+    kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, data,
+        DispatcherContext.getHandleWriteChunk());
+  }
+
+  private static ContainerCommandRequestProto newGetBlockRequest(
+      long containerID, BlockID blockID, boolean requestShortCircuitAccess) {
+    ContainerProtos.GetBlockRequestProto.Builder getBlock = ContainerProtos.GetBlockRequestProto.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobuf());
+    if (requestShortCircuitAccess) {
+      getBlock.setRequestShortCircuitAccess(true);
+    }
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.GetBlock)
+        .setContainerID(containerID)
+        .setDatanodeUuid(DATANODE_UUID)
+        .setGetBlock(getBlock)
+        .build();
+  }
+
+  private static OzoneContainer mockOzoneContainerWithSCDomainSocket() {
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    XceiverServerSpi domainSocketServer = mock(XceiverServerSpi.class);
+    when(ozoneContainer.getReadDomainSocketChannel()).thenReturn(domainSocketServer);
+    when(domainSocketServer.isStarted()).thenReturn(true);
+    return ozoneContainer;
+  }
+
+  @Test
+  public void testGetBlockMetrics() throws Exception {
+    Path testDir = Files.createTempDirectory("testGetBlockMetrics");
+    try {
+      conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir,
+          mockOzoneContainerWithSCDomainSocket());
+      KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+      HddsDispatcher getBlockDispatcher = createGetBlockDispatcher(handlerWithVolume);
+
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainer container = createOpenContainer(containerID, handlerWithVolume.getVolumeSet(),
+          handlerWithVolume.getContainerSet());
+      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+      writeTestBlockForGetBlock(kvHandler, container, blockID);
+
+      ContainerCommandResponseProto response = getBlockDispatcher.dispatch(
+          newGetBlockRequest(containerID, blockID, false), null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      long blockMetadataBytes = response.getGetBlock().getBlockData().getSerializedSize();
+
+      MetricsRecordBuilder containerMetrics = getMetrics(
+          ContainerMetrics.STORAGE_CONTAINER_METRICS);
+      assertCounter("numGetBlock", 1L, containerMetrics);
+      assertCounter("bytesGetBlock", blockMetadataBytes, containerMetrics);
+      assertCounter("localBytesGetBlock", 0L, containerMetrics);
+
+      ContainerCommandRequestProto shortCircuitRequest = newGetBlockRequest(containerID, blockID, true);
+      response = getBlockDispatcher.dispatch(shortCircuitRequest, null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      assertTrue(response.getGetBlock().getShortCircuitAccessGranted());
+      try (RandomAccessFile blockFile = kvHandler.getBlockFile(shortCircuitRequest)) {
+        assertNotNull(blockFile);
+      }
+
+      containerMetrics = getMetrics(ContainerMetrics.STORAGE_CONTAINER_METRICS);
+      assertCounter("numGetBlock", 2L, containerMetrics);
+      assertCounter("bytesGetBlock", 2 * blockMetadataBytes, containerMetrics);
+      assertCounter("localBytesGetBlock", blockMetadataBytes, containerMetrics);
+    } finally {
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testReadBlockMetrics() throws Exception {
+    Path testDir = Files.createTempDirectory("testReadBlockMetrics");
+    RandomAccessFileChannel blockFile = null;
+    try {
+      conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+      KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+      MutableVolumeSet volumeSet = handlerWithVolume.getVolumeSet();
+      ContainerSet containerSet = handlerWithVolume.getContainerSet();
+
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainerData containerData = new KeyValueContainerData(
+          containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
+          (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+          DATANODE_UUID);
+      KeyValueContainer container = new KeyValueContainer(containerData, conf);
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+      containerSet.addContainer(container);
+
+      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+      BlockData blockData = new BlockData(blockID);
+      ChunkInfo chunkInfo = new ChunkInfo("chunk1", 0, 1024);
+      blockData.addChunk(chunkInfo.getProtoBufMessage());
+      kvHandler.getBlockManager().putBlock(container, blockData);
+
+      ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.allocate(1024));
+      kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, data,
+          DispatcherContext.getHandleWriteChunk());
+
+      ContainerCommandRequestProto readBlockRequest =
+          ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.ReadBlock)
+              .setContainerID(containerID)
+              .setDatanodeUuid(DATANODE_UUID)
+              .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+                  .setBlockID(blockID.getDatanodeBlockIDProtobuf())
+                  .setOffset(0)
+                  .setLength(1024)
+                  .build())
+              .build();
+
+      final AtomicInteger responseCount = new AtomicInteger(0);
+
+      StreamObserver<ContainerCommandResponseProto> streamObserver =
+          new StreamObserver<ContainerCommandResponseProto>() {
+            @Override
+            public void onNext(ContainerCommandResponseProto response) {
+              assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+              responseCount.incrementAndGet();
+            }
+
+            @Override
+            public void onError(Throwable t) {
+              fail("ReadBlock failed", t);
+            }
+
+            @Override
+            public void onCompleted() {
+            }
+          };
+
+      blockFile = new RandomAccessFileChannel();
+      ContainerCommandResponseProto response = kvHandler.readBlock(
+          readBlockRequest, container, blockFile, streamObserver);
+
+      assertNull(response, "ReadBlock should return null on success");
+      assertTrue(responseCount.get() > 0, "Should receive at least one response");
+
+      MetricsRecordBuilder containerMetrics = getMetrics(
+          ContainerMetrics.STORAGE_CONTAINER_METRICS);
+      assertCounter("bytesReadBlock", 1024L, containerMetrics);
+    } finally {
+      if (blockFile != null) {
+        blockFile.close();
+      }
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
+  }
+
+  /**
+   * An offset which is aligned to the checksum boundary but past the end of the block must be rejected before any
+   * data is streamed.
+   */
+  @Test
+  public void testReadBlockOutOfRangeAlignedOffset() throws Exception {
+    // BYTES_PER_CHECKSUM below is used when the chunk has no checksums, so this offset is checksum aligned.
+    ReadBlockResult result = readBlock(BLOCK_SIZE, BYTES_PER_CHECKSUM, 1024);
+    assertOutOfRange(result, BYTES_PER_CHECKSUM);
+  }
+
+  /**
+   * An offset past the end of the block whose checksum aligned floor still falls inside the block must be rejected
+   * as well, even though the aligned read itself would be in range.
+   */
+  @Test
+  public void testReadBlockOutOfRangeMisalignedSliver() throws Exception {
+    final long offset = BLOCK_SIZE + 500;
+    assertThat(offset - offset % BYTES_PER_CHECKSUM).isLessThan((long) BLOCK_SIZE);
+    ReadBlockResult result = readBlock(BLOCK_SIZE, offset, 1024);
+    assertOutOfRange(result, offset);
+  }
+
+  /**
+   * The first offset past the last byte of the block must be rejected.
+   */
+  @Test
+  public void testReadBlockOutOfRangeAtBlockSize() throws Exception {
+    ReadBlockResult result = readBlock(BLOCK_SIZE, BLOCK_SIZE, 1024);
+    assertOutOfRange(result, BLOCK_SIZE);
+  }
+
+  /**
+   * The last byte of the block is still in range, even if the requested length runs past the end of the block.
+   */
+  @Test
+  public void testReadBlockOutOfRangeLastByteInRange() throws Exception {
+    ReadBlockResult result = readBlock(BLOCK_SIZE, BLOCK_SIZE - 1, 1024);
+    // The offset is aligned down to the checksum boundary, so the whole block is streamed.
+    assertResponses(result, 0, BLOCK_SIZE);
+  }
+
+  private void assertOutOfRange(ReadBlockResult result, long offset) {
+    assertNull(result.getResponse(),
+        "ReadBlock must return null so the dispatcher does not scan the container");
+    assertThat(result.getDataResponses()).isEmpty();
+    assertEquals(1, result.getErrors().size(), "Exactly one onError is expected");
+    StatusRuntimeException sre = assertInstanceOf(StatusRuntimeException.class, result.getErrors().get(0));
+    assertEquals(Status.Code.OUT_OF_RANGE, sre.getStatus().getCode());
+    assertThat(sre.getStatus().getDescription())
+        .contains(String.valueOf(result.getBlockID().getContainerID()))
+        .contains(String.valueOf(result.getBlockID().getLocalID()))
+        .contains(String.valueOf(offset))
+        .contains(String.valueOf(BLOCK_SIZE));
+  }
+
+  /** A request rejected on the stream ends the call from the datanode side, so the block file must be closed there. */
+  @Test
+  public void testReadBlockErrorOnTheStreamClosesTheBlockFile() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      assertResponses(fixture.read(0, BLOCK_SIZE), 0, BLOCK_SIZE);
+      assertTrue(fixture.blockFile.isOpen(), "block file stays open on the stream after a successful read");
+      assertOutOfRange(fixture.read(BLOCK_SIZE, 1024), BLOCK_SIZE);
+      assertFalse(fixture.blockFile.isOpen(), "block file closed after OUT_OF_RANGE");
+    }
+  }
+
+  @Test
+  void testReadBlockResponseSize() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      for (int responseSize : new int[] {0, 64 * 1024 * 1024}) {
+        assertResponses(fixture.read(0, BLOCK_SIZE, responseSize), 0, BLOCK_SIZE);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testReadBlockWithoutResponseChecksums(boolean validateChecksums) throws Exception {
+    DatanodeConfiguration datanodeConfig = conf.getObject(DatanodeConfiguration.class);
+    datanodeConfig.setChunkDataValidationCheck(validateChecksums);
+    conf.setFromObject(datanodeConfig);
+    try (StreamFixture fixture = new StreamFixture()) {
+      long offset = 0;
+      for (int length : new int[] {3, 9}) {
+        ChunkInfo chunk = new ChunkInfo("chunk-" + offset, offset, length);
+        chunk.setChecksumData(new Checksum(ContainerProtos.ChecksumType.CRC32, 4)
+            .computeChecksum(ByteBuffer.wrap(writtenBytes(offset, length))));
+        fixture.appendChunk(chunk);
+        offset += length;
+      }
+      ContainerProtos.ReadBlockRequestProto.Builder request = ContainerProtos.ReadBlockRequestProto.newBuilder()
+          .setOffset(4).setLength(8).setResponseDataSize(4);
+      ReadBlockResult withChecksums = fixture.read(request);
+      assertResponses(withChecksums, 3, 9);
+      assertResponses(fixture.read(request.setIncludeChecksums(true)), 3, 9);
+      ReadBlockResult withoutChecksums = fixture.read(request.setIncludeChecksums(false));
+      assertNull(withoutChecksums.getResponse());
+      assertThat(withoutChecksums.getErrors()).isEmpty();
+      assertEquals(withChecksums.getDataResponses().size(), withoutChecksums.getDataResponses().size());
+      for (int i = 0; i < withChecksums.getDataResponses().size(); i++) {
+        ContainerProtos.ReadBlockResponseProto expected = withChecksums.getDataResponses().get(i).getReadBlock();
+        assertEquals(expected.toBuilder().clearChunkInfoList().build(),
+            withoutChecksums.getDataResponses().get(i).getReadBlock());
+      }
+
+      File file = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(
+          fixture.container.getContainerData(), fixture.blockID, "unused");
+      try (java.io.RandomAccessFile corrupt = new java.io.RandomAccessFile(file, "rw")) {
+        corrupt.seek(3);
+        corrupt.write(255);
+      }
+      ReadBlockResult corrupt = fixture.read(request);
+      if (validateChecksums) {
+        assertEquals(ContainerProtos.Result.IO_EXCEPTION, corrupt.getResponse().getResult());
+        assertThat(corrupt.getDataResponses()).isEmpty();
+      } else {
+        assertNull(corrupt.getResponse());
+        assertThat(corrupt.getErrors()).isEmpty();
+        assertEquals((byte) 255, corrupt.getDataResponses().get(0).getReadBlock().getData().byteAt(0));
+      }
+    }
+  }
+
+  /**
+   * A chunk boundary inside the response window that is not checksum aligned makes a response shorter than
+   * responseDataSize; the next response must continue from where the short one stopped.
+   */
+  @Test
+  public void testReadBlockResponseShorterThanResponseDataSize() throws Exception {
+    final int unit = (int) BYTES_PER_CHECKSUM;
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, unit);
+      fixture.appendChunk("chunk2", unit, 20);
+      fixture.appendChunk("chunk3", unit + 20, unit);
+      final long blockSize = 2L * unit + 20;
+      ReadBlockResult result = fixture.read(0, blockSize, 2 * unit);
+      assertResponses(result, 0, blockSize);
+      assertEquals(unit + 20, result.getDataResponses().get(0).getReadBlock().getData().size());
+    }
+  }
+
+  /** Each byte of the block is the low byte of its position. */
+  private static byte[] writtenBytes(long offset, int length) {
+    final byte[] bytes = new byte[length];
+    for (int i = 0; i < length; i++) {
+      bytes[i] = (byte) (offset + i);
+    }
+    return bytes;
+  }
+
+  /** Asserts a successful read of {@code totalLength} contiguous bytes from {@code firstOffset}. */
+  private static void assertResponses(ReadBlockResult result, long firstOffset, long totalLength) throws Exception {
+    assertNull(result.getResponse());
+    assertThat(result.getErrors()).isEmpty();
+    long offset = firstOffset;
+    for (ContainerCommandResponseProto response : result.getDataResponses()) {
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      assertEquals(offset, response.getReadBlock().getOffset());
+      final ByteString data = response.getReadBlock().getData();
+      assertArrayEquals(writtenBytes(offset, data.size()), data.toByteArray());
+      Checksum.validateChecksums(data.asReadOnlyByteBuffer(), offset, 0,
+          response.getReadBlock().getChunkInfoListList());
+      offset += data.size();
+    }
+    assertEquals(totalLength, offset - firstOffset, "total bytes delivered");
+  }
+
+  /**
+   * A real FILE_PER_BLOCK container with one block and one {@link RandomAccessFileChannel} standing in for the
+   * per-stream channel of GrpcXceiverService.
+   */
+  private final class StreamFixture implements AutoCloseable {
+    private final Path testDir = Files.createTempDirectory("testReadBlock");
+    private final KeyValueHandler kvHandler;
+    private final KeyValueContainer container;
+    private final BlockID blockID;
+    private final BlockData blockData;
+    private final RandomAccessFileChannel blockFile = new RandomAccessFileChannel();
+
+    StreamFixture() throws Exception {
+      try {
+        conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+        HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+        kvHandler = handlerWithVolume.getHandler();
+        MutableVolumeSet volumeSet = handlerWithVolume.getVolumeSet();
+        ContainerSet containerSet = handlerWithVolume.getContainerSet();
+
+        long containerID = ContainerTestHelper.getTestContainerID();
+        KeyValueContainerData containerData = new KeyValueContainerData(
+            containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
+            (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+            DATANODE_UUID);
+        container = new KeyValueContainer(containerData, conf);
+        container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+        containerSet.addContainer(container);
+
+        blockID = ContainerTestHelper.getTestBlockID(containerID);
+        blockData = new BlockData(blockID);
+      } catch (Exception e) {
+        close();
+        throw e;
+      }
+    }
+
+    /** Write one more chunk and re-put the block with it. */
+    void appendChunk(String name, long offset, int length) throws Exception {
+      appendChunk(new ChunkInfo(name, offset, length));
+    }
+
+    void appendChunk(ChunkInfo chunkInfo) throws Exception {
+      blockData.addChunk(chunkInfo.getProtoBufMessage());
+      ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.wrap(
+          writtenBytes(chunkInfo.getOffset(), (int) chunkInfo.getLen())));
+      kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, data,
+          DispatcherContext.getHandleWriteChunk());
+      kvHandler.getBlockManager().putBlock(container, blockData);
+    }
+
+    /** Read with one checksum unit per response. */
+    ReadBlockResult read(long offset, long length) {
+      return read(offset, length, (int) BYTES_PER_CHECKSUM);
+    }
+
+    ReadBlockResult read(long offset, long length, int responseDataSize) {
+      return read(ContainerProtos.ReadBlockRequestProto.newBuilder()
+          .setOffset(offset).setLength(length).setResponseDataSize(responseDataSize));
+    }
+
+    ReadBlockResult read(ContainerProtos.ReadBlockRequestProto.Builder readBlock) {
+      ContainerCommandRequestProto request = ContainerCommandRequestProto.newBuilder()
+          .setCmdType(ContainerProtos.Type.ReadBlock)
+          .setContainerID(container.getContainerData().getContainerID())
+          .setDatanodeUuid(DATANODE_UUID)
+          .setReadBlock(readBlock.setBlockID(blockID.getDatanodeBlockIDProtobuf()))
+          .build();
+      ReadBlockResult result = new ReadBlockResult(blockID);
+      result.setResponse(kvHandler.readBlock(request, container, blockFile, result));
+      return result;
+    }
+
+    @Override
+    public void close() throws IOException {
+      blockFile.close();
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
+  }
+
+  /**
+   * Reads a block of {@code blockSize} bytes from a real container through {@link Handler#readBlock},
+   * collecting the streamed responses and errors.
+   */
+  private ReadBlockResult readBlock(int blockSize, long offset, long length) throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, blockSize);
+      return fixture.read(offset, length);
+    }
+  }
+
+  /**
+   * Collects everything a single readBlock call produced: the streamed data responses, the errors and the response
+   * proto returned by the handler.
+   */
+  private static final class ReadBlockResult implements StreamObserver<ContainerCommandResponseProto> {
+    private final BlockID blockID;
+    private final List<ContainerCommandResponseProto> dataResponses = new ArrayList<>();
+    private final List<Throwable> errors = new ArrayList<>();
+    private ContainerCommandResponseProto response;
+
+    ReadBlockResult(BlockID blockID) {
+      this.blockID = blockID;
+    }
+
+    @Override
+    public void onNext(ContainerCommandResponseProto dataResponse) {
+      dataResponses.add(dataResponse);
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      errors.add(t);
+    }
+
+    @Override
+    public void onCompleted() {
+    }
+
+    BlockID getBlockID() {
+      return blockID;
+    }
+
+    List<ContainerCommandResponseProto> getDataResponses() {
+      return dataResponses;
+    }
+
+    List<Throwable> getErrors() {
+      return errors;
+    }
+
+    ContainerCommandResponseProto getResponse() {
+      return response;
+    }
+
+    void setResponse(ContainerCommandResponseProto response) {
+      this.response = response;
+    }
+  }
+
+  private KeyValueContainer createContainerWithChunksPath(
+      ContainerLayoutVersion layoutVersion, Path chunksPath) {
+    KeyValueContainerData data = new KeyValueContainerData(DUMMY_CONTAINER_ID,
+        layoutVersion, GB, PipelineID.randomId().toString(), DATANODE_UUID);
+    data.setChunksPath(chunksPath.toString());
+    return new KeyValueContainer(data, conf);
+  }
+
+  private static String getUnreferencedChunkName(
+      ContainerLayoutVersion layoutVersion, long localID) {
+    switch (layoutVersion) {
+    case FILE_PER_BLOCK:
+      return localID + ".block";
+    case FILE_PER_CHUNK:
+      return localID + "_chunk_0";
+    default:
+      throw new IllegalArgumentException(
+          "Unsupported container layout version " + layoutVersion);
+    }
+  }
+
+  private static final class FailingUnreferencedDeleteKeyValueHandler
+      extends KeyValueHandler {
+    private FailingUnreferencedDeleteKeyValueHandler(OzoneConfiguration conf) {
+      super(conf, DATANODE_UUID, newContainerSet(), mock(MutableVolumeSet.class),
+          mock(ContainerMetrics.class), c -> { },
+          new ContainerChecksumTreeManager(conf));
+    }
+
+    @Override
+    boolean deleteUnreferencedFile(File file) {
+      return false;
+    }
+  }
+
+  @Test
+  public void testReadBlockWithSmallChunks() throws Exception {
+    int[] chunkLens = {1, 1, 1, 1, 1};
+    Path testDir = Files.createTempDirectory("testReadBlock");
+    try {
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainerData containerData = new KeyValueContainerData(
+          containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
+          (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+          DATANODE_UUID);
+      KeyValueContainer container = new KeyValueContainer(containerData, conf);
+      BlockID blockID = ContainerTestHelper.getTestBlockID(container.getContainerData().getContainerID());
+      int totalLen = 0;
+      for (int len : chunkLens) {
+        totalLen += len;
+      }
+
+      byte[] rawData = new byte[totalLen];
+      new java.util.Random(16258).nextBytes(rawData);
+      writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
+      readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2, 2, 2, 2);
+    } finally {
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testReadBlockWithChunksNotMultipleOfBytesPerChecksum() throws Exception {
+    int[] chunkLens = {1024, 20, 4096};
+    Path testDir = Files.createTempDirectory("testReadBlock");
+    try {
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainerData containerData = new KeyValueContainerData(
+          containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
+          (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+          DATANODE_UUID);
+      KeyValueContainer container = new KeyValueContainer(containerData, conf);
+      BlockID blockID = ContainerTestHelper.getTestBlockID(container.getContainerData().getContainerID());
+      int totalLen = 0;
+      for (int len : chunkLens) {
+        totalLen += len;
+      }
+
+      byte[] rawData = new byte[totalLen];
+      new java.util.Random(16258).nextBytes(rawData);
+      writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
+      readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 2048, 2048, 1044, 3072);
+    } finally {
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testReadBlockMultipleResponse(boolean validateChecksums) throws Exception {
+    DatanodeConfiguration datanodeConfig = conf.getObject(DatanodeConfiguration.class);
+    datanodeConfig.setChunkDataValidationCheck(validateChecksums);
+    conf.setFromObject(datanodeConfig);
+    int[] chunkLens = {(1 << 20) + 10, 20, 4096};
+    Path testDir = Files.createTempDirectory("testReadBlock");
+    try {
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainerData containerData = new KeyValueContainerData(
+          containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
+          (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+          DATANODE_UUID);
+      KeyValueContainer container = new KeyValueContainer(containerData, conf);
+      BlockID blockID = ContainerTestHelper.getTestBlockID(container.getContainerData().getContainerID());
+      int totalLen = 0;
+      for (int len : chunkLens) {
+        totalLen += len;
+      }
+
+      byte[] rawData = new byte[totalLen];
+      new java.util.Random(16258).nextBytes(rawData);
+      writeBlock(handlerWithVolume, container, blockID, chunkLens, rawData);
+      readBlockAndVerify(handlerWithVolume, container, blockID, rawData, 20, (1 << 20) + 20, 0, (1 << 20) + 30 + 1024);
+    } finally {
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
+
+  }
+
+  /**
+   * Creates a container with the given chunk layout, generates random data,
+   * computes real CRC32 checksums, writes each chunk to disk, and persists
+   * the block metadata.
+   */
+  private void writeBlock(HandlerWithVolumeSet handlerWithVolume, KeyValueContainer container,
+      BlockID blockID, int[] chunkLens, byte[] rawData) throws Exception {
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+    MutableVolumeSet volumeSet = handlerWithVolume.getVolumeSet();
+    ContainerSet containerSet = handlerWithVolume.getContainerSet();
+
+    container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+    containerSet.addContainer(container);
+
+    int bytesPerChecksum = 1024;
+
+    BlockData blockData = new BlockData(blockID);
+
+    long offset = 0;
+    Checksum checksum = new Checksum(ContainerProtos.ChecksumType.CRC32, bytesPerChecksum);
+    for (int c = 0; c < chunkLens.length; c++) {
+      int len = chunkLens[c];
+      byte[] chunkBytes = new byte[len];
+      System.arraycopy(rawData, (int) offset, chunkBytes, 0, len);
+
+      ChunkBuffer chunkData = ChunkBuffer.wrap(ByteBuffer.wrap(chunkBytes));
+      ChecksumData checksumData = checksum.computeChecksum(chunkData);
+      chunkData.rewind();
+
+      ChunkInfo chunkInfo = new ChunkInfo("chunk" + (c + 1), offset, len);
+      chunkInfo.setChecksumData(checksumData);
+      blockData.addChunk(chunkInfo.getProtoBufMessage());
+
+      kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, chunkData,
+          DispatcherContext.getHandleWriteChunk());
+      offset += len;
+    }
+    kvHandler.getBlockManager().putBlock(container, blockData);
+  }
+
+  /**
+   * Reads the block at the given offset/length via
+   * {@link Handler#readBlock} and verifies that the response data
+   * matches the original bytes written by {@link #writeBlock}.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private void readBlockAndVerify(HandlerWithVolumeSet handlerWithVolume, KeyValueContainer container,
+      BlockID blockID, byte[] rawData, long readOffset, long length, long readBackOffset, long readBackLength)
+      throws Exception {
+    ContainerCommandRequestProto readBlockRequest =
+        ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.ReadBlock)
+            .setContainerID(container.getContainerData().getContainerID())
+            .setDatanodeUuid(DATANODE_UUID)
+            .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+                .setBlockID(blockID.getDatanodeBlockIDProtobuf())
+                .setOffset(readOffset)
+                .setLength(length)
+                .build())
+            .build();
+
+    @SuppressWarnings("unchecked")
+    StreamObserver<ContainerCommandResponseProto> streamObserver = mock(StreamObserver.class);
+    List<ContainerCommandResponseProto> capturedResponses = new java.util.ArrayList<>();
+    doAnswer(invocation -> {
+      capturedResponses.add(invocation.getArgument(0));
+      return null;
+    }).when(streamObserver).onNext(any(ContainerCommandResponseProto.class));
+
+    try (RandomAccessFileChannel blockFile = new RandomAccessFileChannel()) {
+      ContainerCommandResponseProto response = handlerWithVolume.getHandler().readBlock(
+          readBlockRequest, container, blockFile, streamObserver);
+
+      assertNull(response, "ReadBlock should return null on success");
+    }
+
+    assertFalse(capturedResponses.isEmpty(), "Should receive at least one response");
+    verify(streamObserver, atLeastOnce()).onNext(any());
+
+    int returnedDataLen = 0;
+    for (ContainerCommandResponseProto resp : capturedResponses) {
+      returnedDataLen += resp.getReadBlock().getData().size();
+    }
+    List<ContainerProtos.ChunkInfo> storedChunks = handlerWithVolume.getHandler().getBlockManager()
+        .getBlock(container, blockID).getChunks();
+    ByteBuffer allData = ByteBuffer.allocate(returnedDataLen);
+    long firstResponseOffset = capturedResponses.get(0).getReadBlock().getOffset();
+
+    for (ContainerCommandResponseProto resp : capturedResponses) {
+      assertEquals(ContainerProtos.Result.SUCCESS, resp.getResult());
+      assertTrue(resp.hasReadBlock());
+      long responseOffset = resp.getReadBlock().getOffset();
+      long responseEnd = responseOffset + resp.getReadBlock().getData().size();
+      List<ContainerProtos.ChunkInfo> overlapping = storedChunks.stream()
+          .filter(chunk -> chunk.getOffset() < responseEnd && chunk.getOffset() + chunk.getLen() > responseOffset)
+          .collect(java.util.stream.Collectors.toList());
+      assertEquals(overlapping, resp.getReadBlock().getChunkInfoListList());
+      Checksum.validateChecksums(resp.getReadBlock().getData().asReadOnlyByteBuffer(),
+          resp.getReadBlock().getOffset(), 0, resp.getReadBlock().getChunkInfoListList());
+      allData.put(resp.getReadBlock().getData().asReadOnlyByteBuffer());
+    }
+
+    assertEquals(readBackOffset, firstResponseOffset);
+    assertEquals(readBackLength, returnedDataLen);
+
+    // Verify the returned data matches the expected slice of the original data
+    allData.flip();
+    byte[] readBack = new byte[allData.remaining()];
+    allData.get(readBack);
+    for (int i = 0; i < readBack.length; i++) {
+      assertEquals(rawData[(int) firstResponseOffset + i], readBack[i],
+          "Data mismatch at returned byte index " + i);
+    }
+  }
+
+  @Test
+  void testReadBlockZeroLengthAndOversizedRange() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      assertResponses(fixture.read(1, 0), 1, 0);
+      assertResponses(fixture.read(1, Long.MAX_VALUE), 0, BLOCK_SIZE);
+    }
+  }
+
+  @Test
+  void testReadBlockUnexpectedEof() throws Exception {
+    try (StreamFixture fixture = new StreamFixture()) {
+      fixture.appendChunk("chunk1", 0, BLOCK_SIZE);
+      File file = ContainerLayoutVersion.FILE_PER_BLOCK.getChunkFile(
+          fixture.container.getContainerData(), fixture.blockID, "unused");
+      try (java.io.RandomAccessFile truncated = new java.io.RandomAccessFile(file, "rw")) {
+        truncated.setLength(BLOCK_SIZE - 1);
+      }
+      ReadBlockResult result = fixture.read(0, BLOCK_SIZE);
+      assertEquals(ContainerProtos.Result.IO_EXCEPTION, result.getResponse().getResult());
+      assertThat(result.getDataResponses()).isEmpty();
+    }
+  }
+
 }

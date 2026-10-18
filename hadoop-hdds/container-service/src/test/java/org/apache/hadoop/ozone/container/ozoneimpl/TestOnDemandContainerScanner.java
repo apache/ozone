@@ -65,7 +65,7 @@ import org.mockito.stubbing.Answer;
  */
 @MockitoSettings(strictness = Strictness.LENIENT)
 public class TestOnDemandContainerScanner extends
-    TestContainerScannersAbstract {
+    ContainerScannerTests {
 
   private OnDemandContainerScanner onDemandScanner;
   private static final String TEST_SCAN = "Test Scan";

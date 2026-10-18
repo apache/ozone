@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -37,7 +38,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
+import org.apache.hadoop.ozone.om.OmTestUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -83,8 +84,8 @@ public class TestOzoneManagerSnapshotProvider {
   public void testDownloadCheckpoint() throws Exception {
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -96,9 +97,7 @@ public class TestOzoneManagerSnapshotProvider {
 
     retVolumeinfo.createBucket(bucketName);
 
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
 
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 

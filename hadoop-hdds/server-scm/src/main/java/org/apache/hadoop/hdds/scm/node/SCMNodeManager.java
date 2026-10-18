@@ -21,13 +21,10 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
-import static org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy.hasEnoughSpace;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.math.RoundingMode;
 import java.net.InetAddress;
@@ -51,17 +48,20 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -73,6 +73,8 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOpsSubscriber;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -83,16 +85,16 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
-import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -116,7 +118,7 @@ import org.slf4j.LoggerFactory;
  * get functions in this file as a snap-shot of information that is inconsistent
  * as soon as you read it.
  */
-public class SCMNodeManager implements NodeManager {
+public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSubscriber {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMNodeManager.class);
@@ -125,21 +127,23 @@ public class SCMNodeManager implements NodeManager {
   private final VersionInfo version;
   private final CommandQueue commandQueue;
   private final SCMNodeMetrics metrics;
+  private final PendingContainerTracker pendingContainerTracker;
   // Node manager MXBean
   private ObjectName nmInfoBean;
-  private final OzoneConfiguration conf;
   private final SCMStorageConfig scmStorageConfig;
   private final NetworkTopology clusterMap;
   private final Function<String, String> nodeResolver;
   private final boolean useHostname;
   private final Map<String, Set<DatanodeID>> dnsToDnIdMap = new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
-  private final int heavyNodeCriteria;
-  private final HDDSLayoutVersionManager scmLayoutVersionManager;
+  private final int datanodePipelineLimit;
+  private final ScmVersionManager versionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
   private final Map<SCMCommandProto.Type,
       BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
+  private final NonWritableNodeFilter nonWritableNodeFilter;
+  private final int numContainerPerVolume;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -154,18 +158,33 @@ public class SCMNodeManager implements NodeManager {
   private static final String DNUUID = "UUID";
   private static final String VERSION = "VERSION";
 
+  // DecimalFormat is not thread-safe; keep one per thread and reuse across node-stats/JMX loops.
+  private static final ThreadLocal<DecimalFormat> ONE_DECIMAL_FORMAT =
+      ThreadLocal.withInitial(() -> {
+        DecimalFormat format = new DecimalFormat("#0.0");
+        format.setRoundingMode(RoundingMode.HALF_UP);
+        return format;
+      });
+  private static final ThreadLocal<DecimalFormat> TWO_DECIMAL_FORMAT =
+      ThreadLocal.withInitial(() -> {
+        DecimalFormat format = new DecimalFormat("#0.00");
+        format.setRoundingMode(RoundingMode.HALF_UP);
+        return format;
+      });
+
   /**
-   * Constructs SCM machine Manager.
+   * Constructs SCM machine Manager using {@link ScmVersionManager} (production SCM).
    */
+  @VisibleForTesting
   public SCMNodeManager(
       OzoneConfiguration conf,
       SCMStorageConfig scmStorageConfig,
       EventPublisher eventPublisher,
       NetworkTopology networkTopology,
       SCMContext scmContext,
-      HDDSLayoutVersionManager layoutVersionManager) {
+      ScmVersionManager versionManager) {
     this(conf, scmStorageConfig, eventPublisher, networkTopology, scmContext,
-        layoutVersionManager, hostname -> null);
+        versionManager, hostname -> null);
   }
 
   public SCMNodeManager(
@@ -174,19 +193,25 @@ public class SCMNodeManager implements NodeManager {
       EventPublisher eventPublisher,
       NetworkTopology networkTopology,
       SCMContext scmContext,
-      HDDSLayoutVersionManager layoutVersionManager,
+      ScmVersionManager versionManager,
       Function<String, String> nodeResolver) {
-    this.conf = conf;
     this.scmNodeEventPublisher = eventPublisher;
-    this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
-        layoutVersionManager, scmContext);
+    this.nodeStateManager = new NodeStateManager(conf, eventPublisher, networkTopology, scmContext);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;
-    this.scmLayoutVersionManager = layoutVersionManager;
+    this.versionManager = versionManager;
     LOG.info("Entering startup safe mode.");
     registerMXBean();
     this.metrics = SCMNodeMetrics.create(this);
+    this.pendingContainerTracker = new PendingContainerTracker(
+        (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+            ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES),
+        conf.getTimeDuration(
+            ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL,
+            ScmConfigKeys.OZONE_SCM_PENDING_CONTAINER_ROLL_INTERVAL_DEFAULT,
+            TimeUnit.MILLISECONDS),
+        this.metrics);
     this.clusterMap = networkTopology;
     this.nodeResolver = nodeResolver;
     this.useHostname = conf.getBoolean(
@@ -195,10 +220,15 @@ public class SCMNodeManager implements NodeManager {
     this.numPipelinesPerMetadataVolume =
         conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
-    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
-    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
+    this.datanodePipelineLimit = conf.getInt(
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
+    this.numContainerPerVolume = conf.getInt(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
     this.scmContext = scmContext;
     this.sendCommandNotifyMap = new HashMap<>();
+    this.nonWritableNodeFilter = new NonWritableNodeFilter(conf, pendingContainerTracker);
   }
 
   @Override
@@ -219,6 +249,11 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
+  @Override
+  public PendingContainerTracker getPendingContainerTracker() {
+    return pendingContainerTracker;
+  }
+
   protected NodeStateManager getNodeStateManager() {
     return nodeStateManager;
   }
@@ -233,9 +268,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public List<DatanodeDetails> getNodes(NodeStatus nodeStatus) {
-    return nodeStateManager.getNodes(nodeStatus)
-        .stream()
-        .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
+    return nodeStateManager.getNodes(nodeStatus);
   }
 
   /**
@@ -250,11 +283,9 @@ public class SCMNodeManager implements NodeManager {
    * @return List of Datanodes that are known to SCM in the requested states.
    */
   @Override
-  public List<DatanodeDetails> getNodes(
+  public List<DatanodeInfo> getNodes(
       NodeOperationalState opState, NodeState health) {
-    return nodeStateManager.getNodes(opState, health)
-        .stream()
-        .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
+    return nodeStateManager.getNodes(opState, health);
   }
 
   @Override
@@ -364,11 +395,9 @@ public class SCMNodeManager implements NodeManager {
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto) {
     return register(datanodeDetails, nodeReport, pipelineReportsProto,
-        LayoutVersionProto.newBuilder()
-            .setMetadataLayoutVersion(
-                scmLayoutVersionManager.getMetadataLayoutVersion())
-            .setSoftwareLayoutVersion(
-                scmLayoutVersionManager.getSoftwareLayoutVersion())
+        DatanodeVersionProto.newBuilder()
+            .setApparentVersion(versionManager.getApparentVersion().serialize())
+            .setSoftwareVersion(versionManager.getSoftwareVersion().serialize())
             .build());
   }
 
@@ -388,9 +417,8 @@ public class SCMNodeManager implements NodeManager {
   public RegisteredCommand register(
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
-      LayoutVersionProto layoutInfo) {
-    if (layoutInfo.getSoftwareLayoutVersion() !=
-        scmLayoutVersionManager.getSoftwareLayoutVersion()) {
+      DatanodeVersionProto dnVersionInfo) {
+    if (shouldFenceDatanode(datanodeDetails, dnVersionInfo)) {
       return RegisteredCommand.newBuilder()
           .setErrorCode(ErrorCode.errorNodeNotPermitted)
           .setDatanode(datanodeDetails)
@@ -420,7 +448,7 @@ public class SCMNodeManager implements NodeManager {
     if (!isNodeRegistered(datanodeDetails)) {
       try {
         clusterMap.add(datanodeDetails);
-        nodeStateManager.addNode(datanodeDetails, layoutInfo);
+        nodeStateManager.addNode(datanodeDetails, dnVersionInfo);
         // Check that datanode in nodeStateManager has topology parent set
         DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
         Preconditions.checkState(dn.getParent() != null);
@@ -445,10 +473,7 @@ public class SCMNodeManager implements NodeManager {
         if (updateDnsToDnIdMap(oldNode.getHostName(), oldNode.getIpAddress(),
             hostName, ipAddress, dnId)) {
           LOG.info("Updating datanode from {} to {}", oldNode, datanodeDetails);
-          clusterMap.update(oldNode, datanodeDetails);
-          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
-          DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
-          Preconditions.checkState(dn.getParent() != null);
+          DatanodeDetails dn = updateNodeAndTopology(oldNode, datanodeDetails, dnVersionInfo);
           processNodeReport(datanodeDetails, nodeReport);
           LOG.info("Updated datanode to: {}", dn);
           scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
@@ -456,7 +481,12 @@ public class SCMNodeManager implements NodeManager {
           LOG.info("Update the version for registered datanode {}, " +
               "oldVersion = {}, newVersion = {}.",
               datanodeDetails, oldNode.getVersion(), datanodeDetails.getVersion());
-          nodeStateManager.updateNode(datanodeDetails, layoutInfo);
+          updateNodeAndTopology(oldNode, datanodeDetails, dnVersionInfo);
+        } else if (oldNode.portsChanged(datanodeDetails)) {
+          // Refresh the stored node when its port set changes
+          LOG.info("Updating ports for registered datanode {}: {} -> {}",
+              datanodeDetails, oldNode.getPorts(), datanodeDetails.getPorts());
+          updateNodeAndTopology(oldNode, datanodeDetails, dnVersionInfo);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -468,6 +498,25 @@ public class SCMNodeManager implements NodeManager {
         .setDatanode(datanodeDetails)
         .setClusterID(this.scmStorageConfig.getClusterID())
         .build();
+  }
+
+  /**
+   * Replaces the record of an already registered datanode, in both the node state and the network
+   * topology. The topology has to be updated first: {@link NetworkTopology#update} sets the parent on
+   * the new node, and {@link NodeStateManager#updateNode} only picks it up because the stored
+   * {@link DatanodeInfo} is copied from that node afterwards. Updating the node state alone would
+   * leave the stale record in the topology and the stored node without a parent.
+   *
+   * @return the refreshed node as held by the node state manager
+   */
+  private DatanodeDetails updateNodeAndTopology(DatanodeInfo oldNode,
+      DatanodeDetails datanodeDetails, DatanodeVersionProto dnVersionInfo)
+      throws NodeNotFoundException {
+    clusterMap.update(oldNode, datanodeDetails);
+    nodeStateManager.updateNode(datanodeDetails, dnVersionInfo);
+    final DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
+    Preconditions.checkState(dn.getParent() != null);
+    return dn;
   }
 
   /**
@@ -543,6 +592,7 @@ public class SCMNodeManager implements NodeManager {
         "DatanodeDetails.");
     try {
       nodeStateManager.updateLastHeartbeatTime(datanodeDetails);
+      nodeStateManager.updateCurrentVersion(datanodeDetails);
       metrics.incNumHBProcessed();
       updateDatanodeOpState(datanodeDetails);
     } catch (NodeNotFoundException e) {
@@ -712,87 +762,84 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Process Layout Version report.
+   * Process version report.
    *
    * @param datanodeDetails
-   * @param layoutVersionReport
+   * @param versionReport
    */
   @Override
-  public void processLayoutVersionReport(DatanodeDetails datanodeDetails,
-                                LayoutVersionProto layoutVersionReport) {
+  public void processVersionReport(DatanodeDetails datanodeDetails,
+                                   DatanodeVersionProto versionReport) {
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Processing Layout Version report from [datanode={}]",
+      LOG.debug("Processing version report from [datanode={}]",
           datanodeDetails.getHostName());
     }
     if (LOG.isTraceEnabled()) {
       LOG.trace("HB is received from [datanode={}]: <json>{}</json>",
           datanodeDetails.getHostName(),
-          layoutVersionReport.toString().replaceAll("\n", "\\\\n"));
+          versionReport.toString().replaceAll("\n", "\\\\n"));
     }
 
     try {
-      nodeStateManager.updateLastKnownLayoutVersion(datanodeDetails,
-          layoutVersionReport);
+      nodeStateManager.updateLastKnownVersionInfo(datanodeDetails,
+          versionReport);
     } catch (NodeNotFoundException e) {
-      LOG.error("SCM trying to process Layout Version from an " +
+      LOG.error("SCM trying to process version from an " +
           "unregistered node {}.", datanodeDetails);
       return;
     }
 
-    sendFinalizeToDatanodeIfNeeded(datanodeDetails, layoutVersionReport);
+    sendFinalizeToDatanodeIfNeeded(datanodeDetails, versionReport);
   }
 
   protected void sendFinalizeToDatanodeIfNeeded(DatanodeDetails datanodeDetails,
-      LayoutVersionProto layoutVersionReport) {
-    // Software layout version is hardcoded to the SCM.
-    int scmSlv = scmLayoutVersionManager.getSoftwareLayoutVersion();
-    int dnSlv = layoutVersionReport.getSoftwareLayoutVersion();
-    int dnMlv = layoutVersionReport.getMetadataLayoutVersion();
+      DatanodeVersionProto versionReport) {
+    ComponentVersion dnSoftwareVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+        versionReport.getSoftwareVersion());
+    ComponentVersion dnApparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+        versionReport.getApparentVersion());
+    ComponentVersion scmSoftwareVersion = versionManager.getSoftwareVersion();
+    ComponentVersion scmApparentVersion = versionManager.getApparentVersion();
 
-    // A datanode with a larger software layout version is from a future
-    // version of ozone. It should not have been added to the cluster.
-    if (dnSlv > scmSlv) {
-      LOG.error("Invalid data node in the cluster : {}. " +
-              "DataNode SoftwareLayoutVersion = {}, SCM " +
-              "SoftwareLayoutVersion = {}",
-          datanodeDetails.getHostName(), dnSlv, scmSlv);
+    // All versions are validated when Datanodes register after they restart.
+    // After that, their apparent version should only increase, and their software version should remain constant.
+    if (shouldFenceDatanode(datanodeDetails, dnSoftwareVersion, dnApparentVersion)) {
+      LOG.error("Invalid datanode in the cluster : {}. " +
+              "Datanode software version = {}, " +
+              "Datanode apparent version = {}, " +
+              "SCM software version = {} " +
+              "SCM apparent version = {}",
+          datanodeDetails.getHostName(), dnSoftwareVersion, dnApparentVersion,
+          scmSoftwareVersion, scmApparentVersion);
+      return;
     }
 
-    if (FinalizationManager.shouldTellDatanodesToFinalize(
-        scmContext.getFinalizationCheckpoint())) {
-      // Because we have crossed the MLV_EQUALS_SLV checkpoint, SCM metadata
-      // layout version will not change. We can now compare it to the
-      // datanodes' metadata layout versions to tell them to finalize.
-      int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
+    if (!scmContext.isLeader() || versionManager.needsFinalization()) {
+      return;
+    }
 
-      // If the datanode mlv < scm mlv, it can not be allowed to be part of
-      // any pipeline. However it can be allowed to join the cluster
-      if (dnMlv < scmMlv) {
-        LOG.warn("Data node {} can not be used in any pipeline in the " +
-                "cluster. " + "DataNode MetadataLayoutVersion = {}, SCM " +
-                "MetadataLayoutVersion = {}",
-            datanodeDetails.getHostName(), dnMlv, scmMlv);
+    if (versionManager.getApparentVersion().equals(dnApparentVersion)) {
+      // If SCM and DN apparent version match, then the datanode is already finalized.
+      LOG.debug("Skip sending finalize command to datanode {} because its apparent version matches SCM's apparent " +
+          "version {}", datanodeDetails, versionManager.getApparentVersion());
+      return;
+    }
 
-        FinalizeNewLayoutVersionCommand finalizeCmd =
-            new FinalizeNewLayoutVersionCommand(true,
-                LayoutVersionProto.newBuilder()
-                    .setSoftwareLayoutVersion(dnSlv)
-                    .setMetadataLayoutVersion(dnSlv).build());
-        if (scmContext.isLeader()) {
-          try {
-            finalizeCmd.setTerm(scmContext.getTermOfLeader());
+    // Because the finalizationManager / versionManager says finalization is not needed it means any DN reporting a
+    // metadata layout version less than the SCM's metadata layout version can be finalized.
+    LOG.info("Sending finalize command to datanode {} with apparent version {} which is less than SCM's finalized " +
+        "apparent version {}", datanodeDetails, dnApparentVersion, scmApparentVersion);
 
-            // Send Finalize command to the data node. Its OK to
-            // send Finalize command multiple times.
-            scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
-                new CommandForDatanode<>(datanodeDetails,
-                    finalizeCmd));
-          } catch (NotLeaderException ex) {
-            LOG.warn("Skip sending finalize upgrade command since current SCM" +
-                " is not leader.", ex);
-          }
-        }
-      }
+    FinalizeVersionCommand finalizeCmd =
+        new FinalizeVersionCommand(scmSoftwareVersion.serialize());
+    try {
+      finalizeCmd.setTerm(scmContext.getTermOfLeader());
+      // Send Finalize command to the data node. It's OK to send Finalize command multiple times.
+      scmNodeEventPublisher.fireEvent(SCMEvents.DATANODE_COMMAND,
+          new CommandForDatanode<>(datanodeDetails,
+              finalizeCmd));
+    } catch (NotLeaderException ex) {
+      LOG.warn("Skip sending finalize upgrade command since current SCM is not leader.", ex);
     }
   }
 
@@ -887,7 +934,7 @@ public class SCMNodeManager implements NodeManager {
     try {
       int dnCount = getNodeQueuedCommandCount(datanodeDetails, cmdType);
       if (dnCount == -1) {
-        LOG.warn("No command count information for datanode {} and command {}" +
+        LOG.debug("No command count information for datanode {} and command {}" +
             ". Assuming zero", datanodeDetails, cmdType);
         dnCount = 0;
       }
@@ -966,12 +1013,9 @@ public class SCMNodeManager implements NodeManager {
 
     final List<DatanodeInfo> healthyNodes = nodeStateManager
         .getNodes(null, HEALTHY);
-    final List<DatanodeInfo> healthyReadOnlyNodes = nodeStateManager
-        .getNodes(null, HEALTHY_READONLY);
     final List<DatanodeInfo> staleNodes = nodeStateManager
         .getStaleNodes();
     final List<DatanodeInfo> datanodes = new ArrayList<>(healthyNodes);
-    datanodes.addAll(healthyReadOnlyNodes);
     datanodes.addAll(staleNodes);
 
     for (DatanodeInfo dnInfo : datanodes) {
@@ -995,8 +1039,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public List<DatanodeUsageInfo> getMostOrLeastUsedDatanodes(
       boolean mostUsed) {
-    List<DatanodeDetails> healthyNodes =
-        getNodes(IN_SERVICE, NodeState.HEALTHY);
+    final List<DatanodeInfo> healthyNodes = getNodes(IN_SERVICE, NodeState.HEALTHY);
 
     List<DatanodeUsageInfo> datanodeUsageInfoList =
         new ArrayList<>(healthyNodes.size());
@@ -1033,10 +1076,55 @@ public class SCMNodeManager implements NodeManager {
       usageInfo.setContainerCount(getContainerCount(dn));
       usageInfo.setPipelineCount(getPipeLineCount(dn));
       usageInfo.setReserved(getTotalReserved(dn));
+      SpaceUsageSource.Fixed fs = getTotalFilesystemUsage(dn);
+      if (fs != null) {
+        usageInfo.setFilesystemUsage(fs.getCapacity(), fs.getAvailable());
+      }
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
     return usageInfo;
+  }
+
+  @Override
+  public boolean checkSpaceAndRecordAllocation(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    return pendingContainerTracker.checkSpaceAndRecordAllocation(datanodeInfo, containerID);
+  }
+
+  @Override
+  public void recordAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    pendingContainerTracker.recordAllocation(datanodeInfo, containerID);
+  }
+  
+  @Override
+  public boolean hasAvailableSpace(DatanodeInfo datanodeInfo) {
+    return pendingContainerTracker.hasAvailableSpace(datanodeInfo);
+  }
+
+  @Override
+  public void removePendingAllocationForDatanode(DatanodeInfo datanodeInfo, ContainerID containerID) {
+    pendingContainerTracker.removePendingAllocation(
+        datanodeInfo.getPendingContainerAllocations(), containerID);
+  }
+
+  @Override
+  public void opAdded(ContainerReplicaOp op, ContainerID containerID) {
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {
+      DatanodeInfo dnInfo = getNode(op.getTarget().getID());
+      if (dnInfo != null) {
+        recordAllocationForDatanode(dnInfo, containerID);
+      }
+    }
+  }
+
+  @Override
+  public void opCompleted(ContainerReplicaOp op, ContainerID containerID, boolean timedOut) {
+    if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD && !timedOut) {
+      DatanodeInfo dnInfo = getNode(op.getTarget().getID());
+      if (dnInfo != null) {
+        removePendingAllocationForDatanode(dnInfo, containerID);
+      }
+    }
   }
 
   /**
@@ -1087,11 +1175,16 @@ public class SCMNodeManager implements NodeManager {
     for (NodeOperationalState opState : NodeOperationalState.values()) {
       Map<String, Integer> states = new HashMap<>();
       for (NodeState health : NodeState.values()) {
+        if (health == NodeState.HEALTHY_READONLY) {
+          // HEALTHY_READONLY is deprecated and can no longer occur in SCM, but it cannot be removed
+          // from the protobuf for compatibility reasons. Skip it here to avoid confusion.
+          continue;
+        }
         states.put(health.name(), 0);
       }
       nodes.put(opState.name(), states);
     }
-    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+    for (DatanodeInfo dni : getAllNodes()) {
       NodeStatus status = dni.getNodeStatus();
       nodes.get(status.getOperationalState().name())
           .compute(status.getHealth().name(), (k, v) -> v + 1);
@@ -1110,10 +1203,23 @@ public class SCMNodeManager implements NodeManager {
         nodeInfo.put(s.label + stat.name(), 0L);
       }
     }
-    nodeInfo.put("TotalCapacity", 0L);
-    nodeInfo.put("TotalUsed", 0L);
+    nodeInfo.put("TotalOzoneCapacity", 0L);
+    nodeInfo.put("TotalOzoneUsed", 0L);
+    // Raw filesystem totals across non-dead nodes. -1 means old (older version) DN did not send fs stats.
+    nodeInfo.put("TotalFilesystemCapacity", -1L);
+    nodeInfo.put("TotalFilesystemUsed", -1L);
+    nodeInfo.put("TotalFilesystemAvailable", -1L);
 
-    for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
+    long totalFsCapacity = 0L;
+    long totalFsAvailable = 0L;
+    /*
+    If any storage report is missing fs stats, this is a rolling upgrade scenario in which some older dn versions
+    aren't reporting fs stats. Better to not report aggregated fs stats at all in this case?
+     */
+    boolean fsPresent = false;
+    boolean fsMissing = false;
+
+    for (DatanodeInfo node : getAllNodes()) {
       String keyPrefix = "";
       NodeStatus status = node.getNodeStatus();
       if (status.isMaintenance()) {
@@ -1144,9 +1250,26 @@ public class SCMNodeManager implements NodeManager {
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDUsed.name(),
               (k, v) -> v + reportProto.getScmUsed());
         }
-        nodeInfo.compute("TotalCapacity", (k, v) -> v + reportProto.getCapacity());
-        nodeInfo.compute("TotalUsed", (k, v) -> v + reportProto.getScmUsed());
+        nodeInfo.compute("TotalOzoneCapacity", (k, v) -> v + reportProto.getCapacity());
+        nodeInfo.compute("TotalOzoneUsed", (k, v) -> v + reportProto.getScmUsed());
+
+        if (reportProto.hasFailed() && reportProto.getFailed()) {
+          continue;
+        }
+        if (reportProto.hasFsCapacity() && reportProto.hasFsAvailable()) {
+          fsPresent = true;
+          totalFsCapacity += reportProto.getFsCapacity();
+          totalFsAvailable += reportProto.getFsAvailable();
+        } else {
+          fsMissing = true;
+        }
       }
+    }
+    if (fsPresent && !fsMissing) {
+      // don't report aggregated fs stats if some storage reports did not have them
+      nodeInfo.put("TotalFilesystemCapacity", totalFsCapacity);
+      nodeInfo.put("TotalFilesystemUsed", totalFsCapacity - totalFsAvailable);
+      nodeInfo.put("TotalFilesystemAvailable", totalFsAvailable);
     }
     return nodeInfo;
   }
@@ -1154,7 +1277,7 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public Map<String, Map<String, String>> getNodeStatusInfo() {
     Map<String, Map<String, String>> nodes = new HashMap<>();
-    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
+    for (DatanodeInfo dni : getAllNodes()) {
       String hostName = dni.getHostName();
       DatanodeDetails.Port httpPort = dni.getPort(HTTP);
       DatanodeDetails.Port httpsPort = dni.getPort(HTTPS);
@@ -1233,9 +1356,7 @@ public class SCMNodeManager implements NodeManager {
       unit.replace(0, 2, "TB");
     }
 
-    DecimalFormat decimalFormat = new DecimalFormat("#0.0");
-    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-    String newValue = decimalFormat.format(value);
+    String newValue = ONE_DECIMAL_FORMAT.get().format(value);
     return newValue + unit.toString();
   }
 
@@ -1250,25 +1371,12 @@ public class SCMNodeManager implements NodeManager {
     String usedPercentage = "N/A";
     String nonUsedPercentage = "N/A";
     if (storageReports != null && !storageReports.isEmpty()) {
-      long capacity = 0;
-      long scmUsed = 0;
-      long remaining = 0;
-      for (StorageReportProto storageReport : storageReports) {
-        capacity += storageReport.getCapacity();
-        scmUsed += storageReport.getScmUsed();
-        remaining += storageReport.getRemaining();
-      }
-      long scmNonUsed = capacity - scmUsed - remaining;
-
-      DecimalFormat decimalFormat = new DecimalFormat("#0.00");
-      decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-
-      double usedPerc = ((double) scmUsed / capacity) * 100;
-      usedPerc = usedPerc > 100.0 ? 100.0 : usedPerc;
-      double nonUsedPerc = ((double) scmNonUsed / capacity) * 100;
-      nonUsedPerc = nonUsedPerc > 100.0 ? 100.0 : nonUsedPerc;
-      usedPercentage = decimalFormat.format(usedPerc);
-      nonUsedPercentage = decimalFormat.format(nonUsedPerc);
+      StorageReportTotals totals = sumStorageReports(storageReports);
+      long scmNonUsed = totals.capacity - totals.scmUsed - totals.remaining;
+      usedPercentage = formatStoragePercentage(
+          ((double) totals.scmUsed / totals.capacity) * 100);
+      nonUsedPercentage = formatStoragePercentage(
+          ((double) scmNonUsed / totals.capacity) * 100);
     }
 
     storagePercentage[0] = usedPercentage;
@@ -1276,41 +1384,83 @@ public class SCMNodeManager implements NodeManager {
     return storagePercentage;
   }
 
+  private static StorageReportTotals sumStorageReports(List<StorageReportProto> storageReports) {
+    long capacity = 0;
+    long scmUsed = 0;
+    long remaining = 0;
+    if (storageReports != null) {
+      for (StorageReportProto storageReport : storageReports) {
+        capacity += storageReport.getCapacity();
+        scmUsed += storageReport.getScmUsed();
+        remaining += storageReport.getRemaining();
+      }
+    }
+    return new StorageReportTotals(capacity, scmUsed, remaining);
+  }
+
+  private static String formatStoragePercentage(double percentage) {
+    double capped = percentage > 100.0 ? 100.0 : percentage;
+    return TWO_DECIMAL_FORMAT.get().format(capped);
+  }
+
   @Override
   public Map<String, String> getNodeStatistics() {
     Map<String, String> nodeStatistics = new HashMap<>();
-    // Statistics node usaged
-    nodeUsageStatistics(nodeStatistics);
+    List<DatanodeInfo> allNodes = getAllNodes();
+    NodeStorageAggregation storageAggregation = aggregateNodeStorage(allNodes);
+    // Statistics node usage
+    nodeUsageStatistics(nodeStatistics, storageAggregation);
     // Statistics node states
-    nodeStateStatistics(nodeStatistics);
+    nodeStateStatistics(nodeStatistics, allNodes);
     // Statistics node space
-    nodeSpaceStatistics(nodeStatistics);
+    nodeSpaceStatistics(nodeStatistics, storageAggregation);
     // Statistics node non-writable
-    nodeNonWritableStatistics(nodeStatistics);
+    nodeNonWritableStatistics(nodeStatistics, allNodes);
     // todo: Statistics of other instances
     return nodeStatistics;
   }
 
-  private void nodeUsageStatistics(Map<String, String> nodeStatics) {
-    if (nodeStateManager.getAllNodes().isEmpty()) {
-      return;
+  private NodeStorageAggregation aggregateNodeStorage(List<DatanodeInfo> allNodes) {
+    if (allNodes.isEmpty()) {
+      return null;
     }
-    float[] usages = new float[nodeStateManager.getAllNodes().size()];
-    float totalOzoneUsed = 0;
-    int i = 0;
-    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
-      String[] storagePercentage = calculateStoragePercentage(
-              dni.getStorageReports());
-      if (storagePercentage[0].equals("N/A")) {
-        usages[i++] = 0;
+    long capacityByte = 0;
+    long scmUsedByte = 0;
+    long remainingByte = 0;
+    long totalPending = 0;
+    float[] usages = new float[allNodes.size()];
+    int usageIndex = 0;
+    for (DatanodeInfo dni : allNodes) {
+      totalPending += dni.getPendingContainerAllocations().getCount();
+      List<StorageReportProto> storageReports = dni.getStorageReports();
+      if (storageReports != null && !storageReports.isEmpty()) {
+        StorageReportTotals nodeTotals = sumStorageReports(storageReports);
+        capacityByte += nodeTotals.capacity;
+        scmUsedByte += nodeTotals.scmUsed;
+        remainingByte += nodeTotals.remaining;
+        if (nodeTotals.capacity <= 0) {
+          usages[usageIndex++] = 0;
+        } else {
+          usages[usageIndex++] = Float.parseFloat(formatStoragePercentage(
+              ((double) nodeTotals.scmUsed / nodeTotals.capacity) * 100));
+        }
       } else {
-        float storagePerc = Float.parseFloat(storagePercentage[0]);
-        usages[i++] = storagePerc;
-        totalOzoneUsed = totalOzoneUsed + storagePerc;
+        usages[usageIndex++] = 0;
       }
     }
+    return new NodeStorageAggregation(capacityByte, scmUsedByte, remainingByte, totalPending, usages);
+  }
 
-    totalOzoneUsed /= nodeStateManager.getAllNodes().size();
+  private void nodeUsageStatistics(Map<String, String> nodeStatics, NodeStorageAggregation storageAggregation) {
+    if (storageAggregation == null) {
+      return;
+    }
+    float[] usages = storageAggregation.usages.clone();
+    float totalOzoneUsed = 0;
+    for (float usage : usages) {
+      totalOzoneUsed += usage;
+    }
+    totalOzoneUsed /= usages.length;
     Arrays.sort(usages);
     float median = usages[usages.length / 2];
     nodeStatics.put(UsageStatics.MEDIAN.getLabel(), String.valueOf(median));
@@ -1320,21 +1470,39 @@ public class SCMNodeManager implements NodeManager {
     nodeStatics.put(UsageStatics.MIN.getLabel(), String.valueOf(min));
 
     float dev = 0;
-    for (i = 0; i < usages.length; i++) {
-      dev += (usages[i] - totalOzoneUsed) * (usages[i] - totalOzoneUsed);
+    for (float usage : usages) {
+      dev += (usage - totalOzoneUsed) * (usage - totalOzoneUsed);
     }
     dev = (float) Math.sqrt(dev / usages.length);
-    DecimalFormat decimalFormat = new DecimalFormat("#0.00");
-    decimalFormat.setRoundingMode(RoundingMode.HALF_UP);
-    nodeStatics.put(UsageStatics.STDEV.getLabel(), decimalFormat.format(dev));
+    nodeStatics.put(UsageStatics.STDEV.getLabel(), TWO_DECIMAL_FORMAT.get().format(dev));
   }
 
-  private void nodeStateStatistics(Map<String, String> nodeStatics) {
-    int healthyNodeCount = nodeStateManager.getHealthyNodeCount();
-    int deadNodeCount = nodeStateManager.getDeadNodeCount();
-    int decommissioningNodeCount = nodeStateManager.getDecommissioningNodeCount();
-    int enteringMaintenanceNodeCount = nodeStateManager.getEnteringMaintenanceNodeCount();
-    int volumeFailuresNodeCount = nodeStateManager.getVolumeFailuresNodeCount();
+  private void nodeStateStatistics(Map<String, String> nodeStatics, List<DatanodeInfo> allNodes) {
+    int healthyNodeCount = 0;
+    int deadNodeCount = 0;
+    int decommissioningNodeCount = 0;
+    int enteringMaintenanceNodeCount = 0;
+    int volumeFailuresNodeCount = 0;
+
+    for (DatanodeInfo dni : allNodes) {
+      NodeStatus status = dni.getNodeStatus();
+      if (status.getHealth() == HEALTHY) {
+        healthyNodeCount++;
+      }
+      if (status.isDead()) {
+        deadNodeCount++;
+      }
+      if (status.isDecommissioning()) {
+        decommissioningNodeCount++;
+      }
+      if (status.isEnteringMaintenance()) {
+        enteringMaintenanceNodeCount++;
+      }
+      if (dni.getFailedVolumeCount() > 0) {
+        volumeFailuresNodeCount++;
+      }
+    }
+
     nodeStatics.put(StateStatistics.HEALTHY.getLabel(), String.valueOf(healthyNodeCount));
     nodeStatics.put(StateStatistics.DEAD.getLabel(), String.valueOf(deadNodeCount));
     nodeStatics.put(StateStatistics.DECOMMISSIONING.getLabel(), String.valueOf(decommissioningNodeCount));
@@ -1342,31 +1510,20 @@ public class SCMNodeManager implements NodeManager {
     nodeStatics.put(StateStatistics.VOLUME_FAILURES.getLabel(), String.valueOf(volumeFailuresNodeCount));
   }
 
-  private void nodeSpaceStatistics(Map<String, String> nodeStatics) {
-    if (nodeStateManager.getAllNodes().isEmpty()) {
+  private void nodeSpaceStatistics(Map<String, String> nodeStatics, NodeStorageAggregation storageAggregation) {
+    if (storageAggregation == null) {
       return;
     }
-    long capacityByte = 0;
-    long scmUsedByte = 0;
-    long remainingByte = 0;
-    for (DatanodeInfo dni : nodeStateManager.getAllNodes()) {
-      List<StorageReportProto> storageReports = dni.getStorageReports();
-      if (storageReports != null && !storageReports.isEmpty()) {
-        for (StorageReportProto storageReport : storageReports) {
-          capacityByte += storageReport.getCapacity();
-          scmUsedByte += storageReport.getScmUsed();
-          remainingByte += storageReport.getRemaining();
-        }
-      }
-    }
+    metrics.setTotalPendingContainerSlots(storageAggregation.totalPending);
 
-    long nonScmUsedByte = capacityByte - scmUsedByte - remainingByte;
+    long nonScmUsedByte = storageAggregation.capacityByte - storageAggregation.scmUsedByte
+        - storageAggregation.remainingByte;
     if (nonScmUsedByte < 0) {
       nonScmUsedByte = 0;
     }
-    String capacity = convertUnit(capacityByte);
-    String scmUsed = convertUnit(scmUsedByte);
-    String remaining = convertUnit(remainingByte);
+    String capacity = convertUnit(storageAggregation.capacityByte);
+    String scmUsed = convertUnit(storageAggregation.scmUsedByte);
+    String remaining = convertUnit(storageAggregation.remainingByte);
     String nonScmUsed = convertUnit(nonScmUsedByte);
     nodeStatics.put(SpaceStatistics.CAPACITY.getLabel(), capacity);
     nodeStatics.put(SpaceStatistics.SCM_USED.getLabel(), scmUsed);
@@ -1374,9 +1531,9 @@ public class SCMNodeManager implements NodeManager {
     nodeStatics.put(SpaceStatistics.NON_SCM_USED.getLabel(), nonScmUsed);
   }
 
-  private void nodeNonWritableStatistics(Map<String, String> nodeStatics) {
-    int nonWritableNodesCount = (int) getAllNodes().parallelStream()
-        .filter(new NonWritableNodeFilter(conf))
+  private void nodeNonWritableStatistics(Map<String, String> nodeStatics, List<DatanodeInfo> allNodes) {
+    int nonWritableNodesCount = (int) allNodes.parallelStream()
+        .filter(nonWritableNodeFilter)
         .count();
 
     nodeStatics.put("NonWritableNodes", String.valueOf(nonWritableNodesCount));
@@ -1386,10 +1543,9 @@ public class SCMNodeManager implements NodeManager {
 
     private final long blockSize;
     private final long minRatisVolumeSizeBytes;
-    private final long containerSize;
-    private final ConfigurationSource conf;
+    private final PendingContainerTracker tracker;
 
-    NonWritableNodeFilter(ConfigurationSource conf) {
+    NonWritableNodeFilter(ConfigurationSource conf, PendingContainerTracker tracker) {
       blockSize = (long) conf.getStorageSize(
           OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE,
           OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT,
@@ -1398,18 +1554,32 @@ public class SCMNodeManager implements NodeManager {
           ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
           ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
           StorageUnit.BYTES);
-      containerSize = (long) conf.getStorageSize(
-          ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-          ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
-          StorageUnit.BYTES);
-      this.conf = conf;
+      this.tracker = tracker;
     }
 
     @Override
     public boolean test(DatanodeInfo dn) {
       return !dn.getNodeStatus().isNodeWritable()
-          || (!hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, conf)
-          && !hasEnoughCommittedVolumeSpace(dn));
+          || (!hasEnoughSpaceForNode(dn) && !hasEnoughCommittedVolumeSpace(dn));
+    }
+
+    /**
+     * Returns true if the datanode has both an available data slot (via
+     * {@link PendingContainerTracker}) and sufficient Ratis metadata volume space.
+     */
+    private boolean hasEnoughSpaceForNode(DatanodeInfo dn) {
+      if (!tracker.hasAvailableSpace(dn)) {
+        return false;
+      }
+      if (minRatisVolumeSizeBytes <= 0) {
+        return true;
+      }
+      for (MetadataStorageReportProto report : dn.getMetadataStorageReports()) {
+        if (report.getRemaining() > minRatisVolumeSizeBytes) {
+          return true;
+        }
+      }
+      return false;
     }
 
     /**
@@ -1424,9 +1594,16 @@ public class SCMNodeManager implements NodeManager {
         }
       }
       LOG.debug("Datanode {} has no volumes with committed space >= {} bytes",
-          dnInfo.getID(), blockSize);
+          dnInfo, blockSize);
       return false;
     }
+  }
+
+  private record StorageReportTotals(long capacity, long scmUsed, long remaining) {
+  }
+
+  private record NodeStorageAggregation(long capacityByte, long scmUsedByte, long remainingByte, 
+      long totalPending, float[] usages) {
   }
 
   /**
@@ -1545,24 +1722,21 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  /**
-   * Returns the min of no healthy volumes reported out of the set
-   * of datanodes constituting the pipeline.
-   */
   @Override
-  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
-    List<Integer> volumeCountList = new ArrayList<>(dnList.size());
-    for (DatanodeDetails dn : dnList) {
-      try {
-        volumeCountList.add(nodeStateManager.getNode(dn).
-                getHealthyVolumeCount());
-      } catch (NodeNotFoundException e) {
-        LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-                dn.getID());
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    int min = Integer.MAX_VALUE;
+    for (DatanodeDetails dn : datanodes) {
+      final int pipelineLimit = pipelineLimit(dn);
+      if (pipelineLimit <= 0) {
+        return 0;
+      }
+
+      final int containerLimit = 1 + (numContainerPerVolume * getHealthyVolumeCount(dn) - 1) / pipelineLimit;
+      if (containerLimit < min) {
+        min = containerLimit;
       }
     }
-    Preconditions.checkArgument(!volumeCountList.isEmpty());
-    return Collections.min(volumeCountList);
+    return min;
   }
 
   @Override
@@ -1585,30 +1759,26 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public int pipelineLimit(DatanodeDetails dn) {
     try {
-      if (heavyNodeCriteria > 0) {
-        return heavyNodeCriteria;
+      if (datanodePipelineLimit > 0) {
+        return datanodePipelineLimit;
       } else if (nodeStateManager.getNode(dn).getHealthyVolumeCount() > 0) {
         return numPipelinesPerMetadataVolume *
             nodeStateManager.getNode(dn).getMetaDataVolumeCount();
       }
     } catch (NodeNotFoundException e) {
       LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-          dn.getID());
+          dn);
     }
     return 0;
   }
 
-  /**
-   * Returns the pipeline limit for set of datanodes.
-   */
-  @Override
-  public int minPipelineLimit(List<DatanodeDetails> dnList) {
-    List<Integer> pipelineCountList = new ArrayList<>(dnList.size());
-    for (DatanodeDetails dn : dnList) {
-      pipelineCountList.add(pipelineLimit(dn));
+  private int getHealthyVolumeCount(DatanodeDetails dn) {
+    try {
+      return nodeStateManager.getNode(dn).getHealthyVolumeCount();
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Failed to getHealthyVolumeCount, datanode {} not found.", dn);
+      return 0;
     }
-    Preconditions.checkArgument(!pipelineCountList.isEmpty());
-    return Collections.min(pipelineCountList);
   }
 
   @Override
@@ -1725,6 +1895,38 @@ public class SCMNodeManager implements NodeManager {
     return reserved;
   }
 
+  /**
+   * Compute aggregated raw filesystem capacity/available/used for a datanode
+   * from the storage reports.
+   */
+  public SpaceUsageSource.Fixed getTotalFilesystemUsage(DatanodeDetails datanodeDetails) {
+    final DatanodeInfo datanodeInfo;
+    try {
+      datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+    } catch (NodeNotFoundException exception) {
+      LOG.error("Node not found when calculating fs usage for {}.", datanodeDetails, exception);
+      return null;
+    }
+
+    long capacity = 0L;
+    long available = 0L;
+    boolean hasFsReport = false;
+    for (StorageReportProto r : datanodeInfo.getStorageReports()) {
+      if (r.hasFailed() && r.getFailed()) {
+        continue;
+      }
+      if (r.hasFsCapacity() && r.hasFsAvailable()) {
+        hasFsReport = true;
+        capacity += r.getFsCapacity();
+        available += r.getFsAvailable();
+      }
+    }
+    if (!hasFsReport) {
+      LOG.debug("Datanode {} does not have filesystem storage stats in its storage reports.", datanodeDetails);
+    }
+    return hasFsReport ? new SpaceUsageSource.Fixed(capacity, available, capacity - available) : null;
+  }
+
   @Override
   public void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command) {
     writeLock().lock();
@@ -1792,15 +1994,6 @@ public class SCMNodeManager implements NodeManager {
       LOG.warn("Cannot find node for uuid {}", id);
       return null;
     }
-  }
-
-  @Override
-  @Nullable
-  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
-    if (datanodeDetails == null) {
-      return null;
-    }
-    return getNode(datanodeDetails.getID());
   }
 
   /**
@@ -1879,21 +2072,6 @@ public class SCMNodeManager implements NodeManager {
     return nodeStateManager.getSkippedHealthChecks();
   }
 
-  /**
-   * @return  HDDSLayoutVersionManager
-   */
-  @VisibleForTesting
-  @Override
-  public HDDSLayoutVersionManager getLayoutVersionManager() {
-    return scmLayoutVersionManager;
-  }
-
-  @VisibleForTesting
-  @Override
-  public void forceNodesToHealthyReadOnly() {
-    nodeStateManager.forceNodesToHealthyReadOnly();
-  }
-
   private ReentrantReadWriteLock.WriteLock writeLock() {
     return lock.writeLock();
   }
@@ -1932,5 +2110,53 @@ public class SCMNodeManager implements NodeManager {
     } finally {
       writeLock().unlock();
     }
+  }
+
+  protected boolean shouldFenceDatanode(DatanodeDetails dnDetails, DatanodeVersionProto versionReport) {
+    if (versionReport == null || !versionReport.hasSoftwareVersion() || !versionReport.hasApparentVersion()) {
+      LOG.error("Datanode {} did not report its version. Not allowing it to join the cluster.", dnDetails);
+      return true;
+    }
+    ComponentVersion dnSoftwareVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+        versionReport.getSoftwareVersion());
+    ComponentVersion dnApparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+        versionReport.getApparentVersion());
+    return shouldFenceDatanode(dnDetails, dnSoftwareVersion, dnApparentVersion);
+  }
+
+  private boolean shouldFenceDatanode(DatanodeDetails dnDetails, ComponentVersion dnSoftwareVersion,
+                                        ComponentVersion dnApparentVersion) {
+    ComponentVersion scmSoftwareVersion = versionManager.getSoftwareVersion();
+    ComponentVersion scmApparentVersion = versionManager.getApparentVersion();
+
+    // DN software newer than SCM violates upgrade order. SCM must always be upgraded first.
+    if (!dnSoftwareVersion.isSupportedBy(scmSoftwareVersion)) {
+      LOG.error("Datanode {} has software version {} which is newer than SCM software version {}. " +
+          "SCM must be upgraded before datanodes.",
+          dnDetails, dnSoftwareVersion, scmSoftwareVersion);
+      return true;
+    }
+
+    // If DN software is older than SCM and SCM is finalized, the old DNs must be upgraded before rejoining.
+    if (!scmSoftwareVersion.isSupportedBy(dnSoftwareVersion) && !versionManager.needsFinalization()) {
+      LOG.error("Datanode {} has software version {} which is older than SCM software version {} and SCM is " +
+              "finalized. Datanode must be upgraded to join the cluster.",
+          dnDetails, dnSoftwareVersion, scmSoftwareVersion);
+      return true;
+    }
+
+    // DN apparent version cannot be higher than SCM apparent version. SCM must finalize first.
+    if (!versionManager.isAllowed(dnApparentVersion)) {
+      LOG.error("Datanode {} has apparent version {} which is higher than SCM apparent version {}. " +
+          "SCM must finalize before datanodes.",
+          dnDetails, dnApparentVersion, scmApparentVersion);
+      return true;
+    }
+
+    // Else, either:
+    // DN software is older than SCM but SCM is pre-finalized: expected since DNs are upgraded after SCM.
+    // DN software matches SCM and DN apparent version <= SCM apparent version: DN can register and will be given a
+    //  finalize command if needed.
+    return false;
   }
 }

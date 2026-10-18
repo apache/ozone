@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.client.rpc;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.ozone.client.rpc.TestOzoneRpcClientWithKeyLatestVersion.assertKeyContent;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.configureFSOptimizedPaths;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -36,8 +36,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -78,7 +78,7 @@ class TestReadRetries {
 
         String keyName = "a/b/c/" + UUID.randomUUID();
         byte[] content = RandomUtils.secure().randomBytes(128);
-        TestDataUtil.createKey(bucket, keyName,
+        DataTestUtil.createKey(bucket, keyName,
             RatisReplicationConfig.getInstance(THREE), content);
 
         // First, confirm the key info from the client matches the info in OM.

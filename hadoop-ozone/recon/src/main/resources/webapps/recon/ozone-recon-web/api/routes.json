@@ -1,4 +1,9 @@
 {
+  "/api/v1/containers/unhealthy/MISSING*": "/unhealthyMissing",
+  "/api/v1/containers/unhealthy/UNDER_REPLICATED*": "/unhealthyUnderReplicated",
+  "/api/v1/containers/unhealthy/OVER_REPLICATED*": "/unhealthyOverReplicated",
+  "/api/v1/containers/unhealthy/MIS_REPLICATED*": "/unhealthyMisReplicated",
+  "/api/v1/containers/unhealthy/REPLICA_MISMATCH*": "/unhealthyReplicaMismatch",
   "/api/v1/*": "/$1",
   "/containers/:id/keys": "/keys",
   "/utilization/fileCount": "/fileSizeCounts",
@@ -53,5 +58,10 @@
   "/keys/deletePending/dirs?limit=*": "/dirdeletePending",
   "/datanodes/decommission/info": "/decommissioninfo",
   "/datanodes/decommission/info/datanode?uuid=*": "/DatanodesDecommissionInfo",
-  "/datanodes/remove": "/datanodesRemove"
+  "/datanodes/remove": "/datanodesRemove",
+
+  "/storageDistribution": "/utilization",
+  "/pendingDeletion?component=dn&limit=*": "/pendingDeletionDN",
+  "/pendingDeletion?component=om": "/pendingDeletionOM",
+  "/pendingDeletion?component=scm": "/pendingDeletionSCM"
 }

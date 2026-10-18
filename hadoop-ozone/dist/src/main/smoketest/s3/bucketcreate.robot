@@ -32,14 +32,69 @@ ${BUCKET}             generated
 Create new bucket
     Create bucket
 
+Create bucket with maximum valid name length
+  ${randStr} =        Generate Random String     62    [LOWER]
+  ${bucket} =         Set Variable               b${randStr}
+                      Create bucket with name    ${bucket}
+
 Create bucket which already exists
     ${bucket} =         Create bucket
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket ${bucket}   255
-                        Should contain          ${result}           BucketAlreadyExists
+                        Should contain          ${result}           BucketAlreadyOwnedByYou
 
 Create bucket with invalid bucket name
     ${randStr} =        Generate Ozone String
     ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket invalid_bucket_${randStr}   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket with name too short
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket ab   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket with name too long
+    ${bucket} =         Evaluate    'a' * 64
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket ${bucket}   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket with all uppercase characters in bucket name
+    ${randStr} =        Generate Random String     8    [UPPER]
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket BUCKET${randStr}   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket with mixed uppercase characters in bucket name
+    ${randStr} =        Generate Random String     8    [LOWER]
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket BuCkEt-${randStr}   255
+                        Should contain          ${result}           InvalidBucketName
+
+
+Create bucket validate names must begin and end with a letter or number.
+    ${randStr} =        Generate Random String     8    [LOWER]
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket bucket-${randStr}-   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket validate names must not contain two adjacent periods.
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket test..bucket   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket validate names must not be formatted as an IP address (for example, 192.168.5.4).
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket 192.168.5.4   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket validate names must not contain leading dash
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket=-test   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket validate names must not contain leading period
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket .test   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket validate names must not contain trailing period
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket test.   255
+                        Should contain          ${result}           InvalidBucketName
+
+Create bucket validate names must not contain all numeric
+    ${randStr} =        Generate Random String     8    [NUMBERS]
+    ${result} =         Execute AWSS3APICli and checkrc         create-bucket --bucket ${randStr}   255
                         Should contain          ${result}           InvalidBucketName
 
 Create new bucket and check default group ACL

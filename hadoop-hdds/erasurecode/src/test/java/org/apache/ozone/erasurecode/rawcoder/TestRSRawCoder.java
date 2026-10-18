@@ -22,7 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 /**
  * Test the new raw Reed-solomon coder implemented in Java.
  */
-public class TestRSRawCoder extends TestRSRawCoderBase {
+public class TestRSRawCoder extends RSRawCoderTests {
 
   public TestRSRawCoder() {
     super(RSRawErasureCoderFactory.class, RSRawErasureCoderFactory.class);

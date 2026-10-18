@@ -21,7 +21,6 @@ services:
          args:
             - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
-      image: ozone-runner-om-ha:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
         - ../..:/opt/hadoop
@@ -36,7 +35,6 @@ services:
          args:
             - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
-      image: ozone-runner-om-ha:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -54,7 +52,6 @@ services:
          args:
             - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
-      image: ozone-runner-om-ha:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -72,7 +69,6 @@ services:
          args:
             - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
-      image: ozone-runner-om-ha:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop
@@ -90,7 +86,6 @@ services:
          args:
             - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
-      image: ozone-runner-om-ha:${OZONE_RUNNER_VERSION}
       privileged: true #required by the profiler
       volumes:
          - ../..:/opt/hadoop

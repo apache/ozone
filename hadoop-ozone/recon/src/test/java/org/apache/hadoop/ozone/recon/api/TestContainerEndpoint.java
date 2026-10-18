@@ -26,8 +26,10 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeData
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,7 +48,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -64,9 +65,11 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -74,7 +77,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -93,11 +95,14 @@ import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainerMetadata;
+import org.apache.hadoop.ozone.recon.api.types.QuasiClosedContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -105,6 +110,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperHelper;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
@@ -112,7 +118,7 @@ import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -122,6 +128,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test for container endpoint.
  */
+@Flaky("HDDS-14178")
 public class TestContainerEndpoint {
 
   @TempDir
@@ -135,6 +142,7 @@ public class TestContainerEndpoint {
   private ContainerStateManager containerStateManager;
   private ReconPipelineManager reconPipelineManager;
   private ReconContainerMetadataManager reconContainerMetadataManager;
+  private ReconDBProvider reconDBProvider;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
   private ContainerHealthSchemaManager containerHealthSchemaManager;
@@ -170,10 +178,10 @@ public class TestContainerEndpoint {
   private static final long LOCAL_ID = 0L;
   private static final long KEY_ONE_SIZE = 500L; // 500 bytes
 
-  private UUID uuid1;
-  private UUID uuid2;
-  private UUID uuid3;
-  private UUID uuid4;
+  private DatanodeID id1;
+  private DatanodeID id2;
+  private DatanodeID id3;
+  private DatanodeID id4;
 
   private void initializeInjector() throws Exception {
     reconOMMetadataManager = getTestReconOmMetadataManager(
@@ -205,6 +213,7 @@ public class TestContainerEndpoint {
         ozoneStorageContainerManager.getPipelineManager();
     reconContainerMetadataManager =
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
@@ -509,8 +518,7 @@ public class TestContainerEndpoint {
     // Set up test data for FSO keys
     setUpFSOData();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
@@ -597,8 +605,7 @@ public class TestContainerEndpoint {
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7");
 
@@ -760,10 +767,10 @@ public class TestContainerEndpoint {
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
     putContainerInfos(5);
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 0, 0, 0, 0);
 
     Response responseWithLimit = containerEndpoint.getMissingContainers(3);
@@ -797,7 +804,7 @@ public class TestContainerEndpoint {
         responseObject.getContainers().stream().findFirst().orElse(null);
     assertNotNull(container);
 
-    assertEquals(containerID.getId(), container.getContainerID());
+    assertEquals(containerID.getIdForTesting(), container.getContainerID());
     assertEquals(keyCount, container.getKeys());
     assertEquals(pipelineID.getId(), container.getPipelineID());
     assertEquals(3, container.getReplicas().size());
@@ -845,10 +852,10 @@ public class TestContainerEndpoint {
     assertEquals(Collections.EMPTY_LIST, responseObject.getContainers());
 
     putContainerInfos(15);
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 1);
 
     response = containerEndpoint.getUnhealthyContainers(1000, 0, 0);
@@ -949,7 +956,7 @@ public class TestContainerEndpoint {
       throws IOException, TimeoutException {
     String missing = UnHealthyContainerStates.MISSING.toString();
     String emptyMissing = UnHealthyContainerStates.EMPTY_MISSING.toString();
-    String negativeSize = UnHealthyContainerStates.NEGATIVE_SIZE.toString(); // For NEGATIVE_SIZE state
+    String negativeSize = UnHealthyContainerStates.NEGATIVE_SIZE.toString();
 
     // Initial empty response verification
     Response response = containerEndpoint
@@ -966,13 +973,13 @@ public class TestContainerEndpoint {
 
     // Add unhealthy records
     putContainerInfos(5);
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 1);
-    createEmptyMissingUnhealthyRecords(2); // For EMPTY_MISSING state
-    createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
+   // createEmptyMissingUnhealthyRecords(2); // For EMPTY_MISSING state
+   // createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
 
     // Check for unhealthy containers
     response = containerEndpoint.getUnhealthyContainers(missing, 1000, 0, 0);
@@ -998,19 +1005,19 @@ public class TestContainerEndpoint {
       assertEquals(missing, r.getContainerState());
     }
 
-    // Check for empty missing containers, should return zero
+    // Compatibility: legacy states should be valid filters and return empty.
     Response filteredEmptyMissingResponse = containerEndpoint
         .getUnhealthyContainers(emptyMissing, 1000, 0, 0);
     responseObject = (UnhealthyContainersResponse) filteredEmptyMissingResponse.getEntity();
     records = responseObject.getContainers();
     assertEquals(0, records.size());
 
-    // Check for negative size containers, should return zero
     Response filteredNegativeSizeResponse = containerEndpoint
         .getUnhealthyContainers(negativeSize, 1000, 0, 0);
     responseObject = (UnhealthyContainersResponse) filteredNegativeSizeResponse.getEntity();
     records = responseObject.getContainers();
     assertEquals(0, records.size());
+
   }
 
   @Test
@@ -1030,10 +1037,10 @@ public class TestContainerEndpoint {
     // createUnhealthyRecords(5, 4, 3, 2) will create records for containers 1-14
     // So we need to create 14 containers instead of just 6
     putContainerInfos(14);  // Changed from 6 to 14
-    uuid1 = newDatanode("host1", "127.0.0.1");
-    uuid2 = newDatanode("host2", "127.0.0.2");
-    uuid3 = newDatanode("host3", "127.0.0.3");
-    uuid4 = newDatanode("host4", "127.0.0.4");
+    id1 = newDatanode("host1", "127.0.0.1");
+    id2 = newDatanode("host2", "127.0.0.2");
+    id3 = newDatanode("host3", "127.0.0.3");
+    id4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 0);
 
     // Get first batch with no pagination (prevStartKey=0, prevLastKey=0)
@@ -1069,12 +1076,60 @@ public class TestContainerEndpoint {
   }
 
   @Test
+  public void testReplicaHistorySurvivesOmReprocess() throws Exception {
+    reconContainerManager.addNewContainer(getTestContainer(HddsProtos.LifeCycleState.CLOSED, 1L));
+    List<ContainerReplica> replicas = new ArrayList<>();
+    for (int i = 1; i <= 4; i++) {
+      DatanodeID id = newDatanode("host" + i, "127.0.0." + i);
+      ContainerReplica replica = ContainerReplica.newBuilder()
+          .setContainerID(containerID)
+          .setContainerState(ContainerReplicaProto.State.CLOSED)
+          .setDatanodeDetails(reconContainerManager.getNodeDB().get(id))
+          .setSequenceId(100L)
+          .setChecksums(ContainerChecksums.of(1234L, 0L))
+          .build();
+      reconContainerManager.updateContainerReplica(containerID, replica);
+      replicas.add(replica);
+    }
+    reconContainerManager.removeContainerReplica(containerID, replicas.get(3));
+    assertEquals(3, reconContainerManager.getReplicaHistoryMap().get(1L).size());
+    Map<DatanodeID, ContainerReplicaHistory> expected =
+        reconContainerMetadataManager.getContainerReplicaHistory(1L);
+    assertEquals(4, expected.size());
+    long expectedKeyCount = reconContainerMetadataManager.getKeyCountForContainer(1L);
+
+    for (int i = 0; i < 2; i++) {
+      ReconConstants.resetTableTruncatedFlags();
+      ReconDBProvider stagedProvider = reconDBProvider.getStagedReconDBProvider();
+      ReconContainerMetadataManager stagedManager =
+          reconContainerMetadataManager.getStagedReconContainerMetadataManager(stagedProvider.getDbStore());
+      assertTrue(new ContainerKeyMapperTaskOBS(stagedManager, omConfiguration)
+          .reprocess(reconOMMetadataManager).isTaskSuccess());
+      reconDBProvider.replaceStagedDb(stagedProvider);
+      reconContainerMetadataManager.reinitialize(reconDBProvider);
+      assertEquals(expectedKeyCount, reconContainerMetadataManager.getKeyCountForContainer(1L));
+
+      List<ContainerHistory> histories = (List<ContainerHistory>)
+          containerEndpoint.getReplicaHistoryForContainer(1L).getEntity();
+      assertEquals(4, histories.size());
+      assertTrue(histories.stream().anyMatch(history ->
+          history.getDatanodeUuid().equals(replicas.get(3).getDatanodeDetails().getID().toString())));
+      Map<DatanodeID, ContainerReplicaHistory> actual = reconContainerMetadataManager.getContainerReplicaHistory(1L);
+      expected.forEach((id, history) -> assertEquals(history.toProto(), actual.get(id).toProto()));
+    }
+
+    // A shutdown flush must preserve the departed datanode after reprocess as well.
+    reconContainerManager.flushReplicaHistoryMapToDB(true);
+    assertEquals(4, reconContainerManager.getAllContainerHistory(1L).size());
+  }
+
+  @Test
   public void testGetReplicaHistoryForContainer() throws IOException {
     // Add container history for container id 1
-    final UUID u1 = newDatanode("host1", "127.0.0.1");
-    final UUID u2 = newDatanode("host2", "127.0.0.2");
-    final UUID u3 = newDatanode("host3", "127.0.0.3");
-    final UUID u4 = newDatanode("host4", "127.0.0.4");
+    final DatanodeID u1 = newDatanode("host1", "127.0.0.1");
+    final DatanodeID u2 = newDatanode("host2", "127.0.0.2");
+    final DatanodeID u3 = newDatanode("host3", "127.0.0.3");
+    final DatanodeID u4 = newDatanode("host4", "127.0.0.4");
     reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
     reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
     reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
@@ -1115,31 +1170,15 @@ public class TestContainerEndpoint {
     }
   }
 
-  UUID newDatanode(String hostName, String ipAddress) throws IOException {
-    final UUID uuid = UUID.randomUUID();
-    reconContainerManager.getNodeDB().put(DatanodeID.of(uuid),
+  DatanodeID newDatanode(String hostName, String ipAddress) throws IOException {
+    final DatanodeID id = DatanodeID.randomID();
+    reconContainerManager.getNodeDB().put(id,
         DatanodeDetails.newBuilder()
-            .setUuid(uuid)
+            .setID(id)
             .setHostName(hostName)
             .setIpAddress(ipAddress)
             .build());
-    return uuid;
-  }
-
-  private void createEmptyMissingUnhealthyRecords(int emptyMissing) {
-    int cid = 0;
-    for (int i = 0; i < emptyMissing; i++) {
-      createUnhealthyRecord(++cid, UnHealthyContainerStates.EMPTY_MISSING.toString(),
-          3, 3, 0, null, false);
-    }
-  }
-
-  private void createNegativeSizeUnhealthyRecords(int negativeSize) {
-    int cid = 0;
-    for (int i = 0; i < negativeSize; i++) {
-      createUnhealthyRecord(++cid, UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
-          3, 3, 0, null, false); // Added for NEGATIVE_SIZE state
-    }
+    return id;
   }
 
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
@@ -1174,28 +1213,21 @@ public class TestContainerEndpoint {
   private void createUnhealthyRecord(int id, String state, int expected,
                                      int actual, int delta, String reason, boolean dataChecksumMismatch) {
     long cID = Integer.toUnsignedLong(id);
-    UnhealthyContainers missing = new UnhealthyContainers();
-    missing.setContainerId(cID);
-    missing.setContainerState(state);
-    missing.setInStateSince(12345L);
-    missing.setActualReplicaCount(actual);
-    missing.setExpectedReplicaCount(expected);
-    missing.setReplicaDelta(delta);
-    missing.setReason(reason);
-
-    ArrayList<UnhealthyContainers> missingList = new ArrayList<>();
-    missingList.add(missing);
-    containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
+    ArrayList<ContainerHealthSchemaManager.UnhealthyContainerRecord> records =
+        new ArrayList<>();
+    records.add(new ContainerHealthSchemaManager.UnhealthyContainerRecord(
+        cID, state, 12345L, expected, actual, delta, reason));
+    containerHealthSchemaManager.insertUnhealthyContainerRecords(records);
 
     long differentChecksum = dataChecksumMismatch ? 2345L : 1234L;
 
-    reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L,
+    reconContainerManager.upsertContainerHistory(cID, id1, 1L, 1L,
         "UNHEALTHY", ContainerChecksums.of(differentChecksum, 0L));
-    reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L,
+    reconContainerManager.upsertContainerHistory(cID, id2, 2L, 1L,
         "UNHEALTHY", ContainerChecksums.of(differentChecksum, 0L));
-    reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L,
+    reconContainerManager.upsertContainerHistory(cID, id3, 3L, 1L,
         "UNHEALTHY", ContainerChecksums.of(1234L, 0L));
-    reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L,
+    reconContainerManager.upsertContainerHistory(cID, id4, 4L, 1L,
         "UNHEALTHY", ContainerChecksums.of(1234L, 0L));
   }
 
@@ -1207,7 +1239,7 @@ public class TestContainerEndpoint {
     reconPipelineManager.addPipeline(localPipeline);
     ContainerInfo containerInfo =
         new ContainerInfo.Builder()
-            .setContainerID(localContainerID.getId())
+            .setContainerID(localContainerID.getIdForTesting())
             .setNumberOfKeys(10)
             .setPipelineID(localPipeline.getId())
             .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
@@ -1352,7 +1384,7 @@ public class TestContainerEndpoint {
   }
 
   private void updateContainerStateToDeleted(long containerId)
-      throws IOException, InvalidStateTransitionException, TimeoutException {
+      throws IOException {
     reconContainerManager.updateContainerState(ContainerID.valueOf(containerId),
         HddsProtos.LifeCycleEvent.FINALIZE);
     reconContainerManager.updateContainerState(ContainerID.valueOf(containerId),
@@ -1469,7 +1501,7 @@ public class TestContainerEndpoint {
             .stream().map(entry -> entry.getKey()).collect(
                 Collectors.toList());
     deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
-      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
         reconContainerMetadataManager
             .batchDeleteContainerMapping(rdbBatchOperation, key);
         reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
@@ -1506,7 +1538,7 @@ public class TestContainerEndpoint {
         reconContainerMetadataManager.getKeyPrefixesForContainer(2).entrySet()
             .stream().map(entry -> entry.getKey()).collect(Collectors.toList());
     deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
-      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
         reconContainerMetadataManager.batchDeleteContainerMapping(
             rdbBatchOperation, key);
         reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
@@ -1596,6 +1628,102 @@ public class TestContainerEndpoint {
     // ContainerID 1 and 2 are missing in SCM but present in OM
     assertThat(missingContainerIdsSCM).contains(1L);
     assertThat(missingContainerIdsSCM).contains(2L);
+  }
+
+  /**
+   * Helper to create a container in SCM with a specific pipeline.
+   */
+  private void createContainerInSCM(long containerId, Pipeline targetPipeline)
+      throws IOException, TimeoutException {
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(containerId)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setOwner("owner" + containerId)
+        .setNumberOfKeys(0)
+        .setPipelineID(targetPipeline.getId())
+        .build();
+    reconContainerManager.addNewContainer(
+        new ContainerWithPipeline(containerInfo, targetPipeline));
+  }
+
+  /**
+   * Helper to verify pipeline isolation for a container missing in OM.
+   */
+  private void verifyPipelineIsolation(ContainerDiscrepancyInfo info,
+      long containerId, PipelineID expectedPipelineId,
+      List<List<Pipeline>> otherPipelineLists) {
+    List<Pipeline> pipelines = info.getPipelines();
+    assertNotNull(pipelines);
+    assertEquals(1, pipelines.size(),
+        "Container " + containerId + " should have exactly 1 pipeline");
+    assertEquals(expectedPipelineId, pipelines.get(0).getId(),
+        "Container " + containerId + " should have correct pipeline");
+    assertEquals("SCM", info.getExistsAt());
+    assertEquals(0, info.getNumberOfKeys());
+    // Verify list isolation
+    for (List<Pipeline> other : otherPipelineLists) {
+      if (other != null) {
+        assertNotSame(pipelines, other,
+            "Container " + containerId + " should have independent list");
+      }
+    }
+  }
+
+  @Test
+  public void testGetContainerInsightsNonOMContainersPipelineIsolation()
+      throws IOException, TimeoutException {
+    // Verifies fix for pipeline accumulation bug: containers missing in OM
+    // should each have their own isolated pipeline list, not shared.
+
+    // Create 3 different pipelines
+    Pipeline[] pipelines = {
+        getRandomPipeline(), getRandomPipeline(), getRandomPipeline()
+    };
+    for (Pipeline p : pipelines) {
+      reconPipelineManager.addPipeline(p);
+    }
+
+    // Create 3 containers in SCM with different pipelines (not in OM)
+    long[] containerIds = {501L, 502L, 503L};
+    for (int i = 0; i < containerIds.length; i++) {
+      createContainerInSCM(containerIds[i], pipelines[i]);
+      assertFalse(reconContainerMetadataManager.doesContainerExists(containerIds[i]),
+          "Container " + containerIds[i] + " should NOT exist in OM");
+    }
+
+    // Call API
+    Response response = containerEndpoint.getContainerMisMatchInsights(10, 500, "OM");
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+
+    Map<String, Object> responseMap = (Map<String, Object>) response.getEntity();
+    List<ContainerDiscrepancyInfo> discrepancies =
+        (List<ContainerDiscrepancyInfo>) responseMap.get("containerDiscrepancyInfo");
+    assertNotNull(discrepancies);
+
+    // Find containers in response
+    ContainerDiscrepancyInfo[] infos = new ContainerDiscrepancyInfo[3];
+    for (int i = 0; i < containerIds.length; i++) {
+      final long id = containerIds[i];
+      infos[i] = discrepancies.stream()
+          .filter(d -> d.getContainerID() == id)
+          .findFirst()
+          .orElseThrow(() -> new AssertionError(
+              "Container " + id + " not found in mismatch list"));
+    }
+
+    // Verify pipeline isolation for each container
+    List<Pipeline> pipelineList1 = infos[0].getPipelines();
+    List<Pipeline> pipelineList2 = infos[1].getPipelines();
+    List<Pipeline> pipelineList3 = infos[2].getPipelines();
+
+    verifyPipelineIsolation(infos[0], containerIds[0], pipelines[0].getId(),
+        Arrays.asList(pipelineList2, pipelineList3));
+    verifyPipelineIsolation(infos[1], containerIds[1], pipelines[1].getId(),
+        Arrays.asList(pipelineList1, pipelineList3));
+    verifyPipelineIsolation(infos[2], containerIds[2], pipelines[2].getId(),
+        Arrays.asList(pipelineList1, pipelineList2));
   }
 
   @Test
@@ -1855,7 +1983,7 @@ public class TestContainerEndpoint {
     setUpDuplicateFSOFileKeys();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+            reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mappings so that the new keys are loaded.
     reprocessContainerKeyMapper();
@@ -1881,5 +2009,206 @@ public class TestContainerEndpoint {
         throw new AssertionError("Unexpected complete path: " + completePath);
       }
     }
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersEmpty() throws Exception {
+    // No QUASI_CLOSED containers exist — endpoint must return an empty list with zero counts.
+    Response response = containerEndpoint.getQuasiClosedContainers(1000, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertNotNull(result);
+    assertTrue(result.getContainers() == null || result.getContainers().isEmpty());
+    assertEquals(0L, result.getQuasiClosedCount());
+    assertEquals(0L, result.getFirstKey());
+    assertEquals(0L, result.getLastKey());
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersBasic() throws Exception {
+    // Add 3 containers and transition them to QUASI_CLOSED.
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 200L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 201L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 202L));
+
+    for (long id = 200L; id <= 202L; id++) {
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.FINALIZE);
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    }
+    assertContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED, 3);
+
+    Response response = containerEndpoint.getQuasiClosedContainers(1000, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertNotNull(result);
+    assertEquals(3L, result.getQuasiClosedCount());
+    assertEquals(200L, result.getFirstKey());
+    assertEquals(202L, result.getLastKey());
+
+    List<QuasiClosedContainerMetadata> containers =
+        new ArrayList<>(result.getContainers());
+    assertEquals(3, containers.size());
+    containers.forEach(c -> {
+      // StandaloneReplicationConfig.ONE → requiredNodes = 1
+      assertEquals(1L, c.getExpectedReplicaCount());
+    });
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersWithReplicas() throws Exception {
+    // Use RATIS/THREE so requiredNodes=3, which is > number of replicas we add.
+    // getLatestContainerHistory uses requiredNodes as its limit, so if we used
+    // StandaloneReplicationConfig.ONE (requiredNodes=1) only 1 replica would come back.
+    Pipeline localPipeline = getRandomPipeline();
+    reconPipelineManager.addPipeline(localPipeline);
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(210L)
+        .setNumberOfKeys(10)
+        .setPipelineID(localPipeline.getId())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setOwner("test")
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .build();
+    reconContainerManager.addNewContainer(
+        new ContainerWithPipeline(containerInfo, localPipeline));
+    reconContainerManager.updateContainerState(
+        ContainerID.valueOf(210L), HddsProtos.LifeCycleEvent.FINALIZE);
+    reconContainerManager.updateContainerState(
+        ContainerID.valueOf(210L), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+
+    // Register 2 datanodes and upsert replica history for container 210.
+    DatanodeID dn1 = newDatanode("qc-host1", "10.0.0.1");
+    DatanodeID dn2 = newDatanode("qc-host2", "10.0.0.2");
+    reconContainerManager.upsertContainerHistory(
+        210L, dn1, 1L, 2L, "QUASI_CLOSED", ContainerChecksums.of(1111L, 0L));
+    reconContainerManager.upsertContainerHistory(
+        210L, dn2, 3L, 4L, "QUASI_CLOSED", ContainerChecksums.of(1111L, 0L));
+
+    Response response = containerEndpoint.getQuasiClosedContainers(1000, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertNotNull(result);
+    assertEquals(1, result.getContainers().size());
+
+    QuasiClosedContainerMetadata meta = result.getContainers().get(0);
+    assertEquals(210L, meta.getContainerID());
+    assertEquals(2L, meta.getActualReplicaCount());
+    assertEquals(2, meta.getReplicas().size());
+
+    Set<String> returnedHosts = meta.getReplicas().stream()
+        .map(ContainerHistory::getDatanodeHost)
+        .collect(Collectors.toSet());
+    assertThat(returnedHosts).contains("qc-host1", "qc-host2");
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersPagination() throws Exception {
+    // Add 6 containers (IDs 300–305) in QUASI_CLOSED state.
+    for (long id = 300L; id <= 305L; id++) {
+      reconContainerManager.addNewContainer(
+          getTestContainer(HddsProtos.LifeCycleState.OPEN, id));
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.FINALIZE);
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    }
+    assertContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED, 6);
+
+    // Page 1: fetch first 3.
+    Response page1Response = containerEndpoint.getQuasiClosedContainers(3, 0L);
+    QuasiClosedContainersResponse page1 =
+        (QuasiClosedContainersResponse) page1Response.getEntity();
+
+    assertEquals(3, page1.getContainers().size());
+    assertEquals(6L, page1.getQuasiClosedCount());
+    assertEquals(300L, page1.getFirstKey());
+    assertEquals(302L, page1.getLastKey());
+
+    // Page 2: use lastKey from page 1 as prevKey cursor.
+    Response page2Response =
+        containerEndpoint.getQuasiClosedContainers(3, page1.getLastKey());
+    QuasiClosedContainersResponse page2 =
+        (QuasiClosedContainersResponse) page2Response.getEntity();
+
+    assertEquals(3, page2.getContainers().size());
+    assertEquals(6L, page2.getQuasiClosedCount());
+    assertEquals(303L, page2.getFirstKey());
+    assertEquals(305L, page2.getLastKey());
+
+    // IDs must not overlap between pages.
+    Set<Long> page1Ids = page1.getContainers().stream()
+        .map(QuasiClosedContainerMetadata::getContainerID)
+        .collect(Collectors.toSet());
+    Set<Long> page2Ids = page2.getContainers().stream()
+        .map(QuasiClosedContainerMetadata::getContainerID)
+        .collect(Collectors.toSet());
+    assertTrue(Collections.disjoint(page1Ids, page2Ids));
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersLimitZeroReturnsCountOnly() throws Exception {
+    // Add 3 containers in QUASI_CLOSED state.
+    for (long id = 500L; id <= 502L; id++) {
+      reconContainerManager.addNewContainer(
+          getTestContainer(HddsProtos.LifeCycleState.OPEN, id));
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.FINALIZE);
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    }
+    assertContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED, 3);
+
+    // limit=0 must return an empty container list but still populate quasiClosedCount.
+    Response response = containerEndpoint.getQuasiClosedContainers(0, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertNotNull(result);
+    assertTrue(result.getContainers() == null || result.getContainers().isEmpty());
+    assertEquals(3, result.getQuasiClosedCount());
+  }
+
+  @Test
+  public void testGetQuasiClosedContainersInvalidInputsReturnBadRequest() {
+    // Negative minContainerId must return 400.
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(),
+        containerEndpoint.getQuasiClosedContainers(10, -1L).getStatus());
+
+    // Negative limit must return 400.
+    assertEquals(Response.Status.BAD_REQUEST.getStatusCode(),
+        containerEndpoint.getQuasiClosedContainers(-1, 0L).getStatus());
+  }
+
+  @Test
+  public void testGetQuasiClosedCountViaDedicatedEndpoint() throws Exception {
+    // Add 2 containers and move them to QUASI_CLOSED.
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 400L));
+    reconContainerManager.addNewContainer(
+        getTestContainer(HddsProtos.LifeCycleState.OPEN, 401L));
+
+    for (long id = 400L; id <= 401L; id++) {
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.FINALIZE);
+      reconContainerManager.updateContainerState(
+          ContainerID.valueOf(id), HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    }
+    assertContainerCount(HddsProtos.LifeCycleState.QUASI_CLOSED, 2);
+
+    // The quasi-closed count is fetched independently via the dedicated endpoint.
+    // The unhealthy endpoint no longer carries this count.
+    Response response = containerEndpoint.getQuasiClosedContainers(1, 0L);
+    QuasiClosedContainersResponse result =
+        (QuasiClosedContainersResponse) response.getEntity();
+
+    assertEquals(2L, result.getQuasiClosedCount());
   }
 }

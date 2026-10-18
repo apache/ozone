@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -29,7 +30,6 @@ import java.util.concurrent.ExecutionException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -61,18 +61,40 @@ public class SCMSnapshotProvider {
     LOG.info("Initializing SCM Snapshot Provider");
     this.conf = conf;
     this.scmCertificateClient = scmCertificateClient;
-    // Create Ratis storage dir
+
+    // Get directory paths from configuration
     String scmRatisDirectory = SCMHAUtils.getSCMRatisDirectory(conf);
+    String scmSnapshotDirectory = SCMHAUtils.getSCMRatisSnapshotDirectory(conf);
 
     if (scmRatisDirectory == null || scmRatisDirectory.isEmpty()) {
       throw new IllegalArgumentException(HddsConfigKeys.OZONE_METADATA_DIRS +
           " must be defined.");
     }
-    HddsUtils.createDir(scmRatisDirectory);
 
-    // Create Ratis snapshot dir
-    scmSnapshotDir = HddsUtils.createDir(
-        SCMHAUtils.getSCMRatisSnapshotDirectory(conf));
+    if (scmSnapshotDirectory == null || scmSnapshotDirectory.isEmpty()) {
+      throw new IllegalArgumentException("SCM Ratis snapshot directory must be defined.");
+    }
+
+    // Ratis storage directory should already be created by SCMRatisServerImpl
+    // or by init/bootstrap commands. SCMSnapshotProvider is NOT responsible for creating it.
+    Path ratisPath = Paths.get(scmRatisDirectory);
+    if (!Files.isDirectory(ratisPath)) {
+      throw new IllegalStateException(
+          "Ratis storage directory does not exist: " + scmRatisDirectory
+          + ". Please run 'ozone scm --init' or 'ozone scm --bootstrap' first.");
+    }
+
+    // Ratis snapshot directory should already exist (created by --init or --bootstrap)
+    Path snapshotPath = Paths.get(scmSnapshotDirectory);
+    if (!Files.isDirectory(snapshotPath)) {
+      throw new IllegalStateException(
+          "Ratis snapshot directory does not exist: " + scmSnapshotDirectory
+          + ". Please run 'ozone scm --init' or 'ozone scm --bootstrap' first.");
+    }
+    this.scmSnapshotDir = snapshotPath.toFile();
+    LOG.info("Using Ratis snapshot directory at {}", scmSnapshotDirectory);
+
+    // Initialize peer nodes map
     if (peerNodes != null) {
       this.peerNodesMap = new HashMap<>();
       for (SCMNodeDetails peerNode : peerNodes) {

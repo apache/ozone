@@ -25,21 +25,16 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_KE
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 
 import com.google.common.base.Preconditions;
 import com.google.common.net.HostAndPort;
+import com.google.common.net.InetAddresses;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ServiceException;
 import jakarta.annotation.Nonnull;
@@ -47,6 +42,8 @@ import jakarta.annotation.Nullable;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.UndeclaredThrowableException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
@@ -58,12 +55,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import javax.management.ObjectName;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -146,6 +140,11 @@ public final class HddsUtils {
       String address = conf.getTrimmed(OZONE_SCM_CLIENT_ADDRESS_KEY);
       int port = -1;
 
+      // Only the bracket rule applies: SCM rewrites this property with its
+      // bound host, a wildcard by default, and a process sharing its
+      // configuration reads that back here.
+      validateHostPortAuthority(OZONE_SCM_CLIENT_ADDRESS_KEY, address);
+
       if (address == null) {
         // fall back to ozone.scm.names for non-ha
         Collection<String> scmAddresses =
@@ -163,6 +162,7 @@ public final class HddsUtils {
         }
 
         address = scmAddresses.iterator().next();
+        validateAdvertisedAddress(OZONE_SCM_NAMES, address);
 
         port = conf.getInt(OZONE_SCM_CLIENT_PORT_KEY,
             OZONE_SCM_CLIENT_PORT_DEFAULT);
@@ -173,7 +173,7 @@ public final class HddsUtils {
       }
 
       return Collections.singletonList(
-          NetUtils.createSocketAddr(getHostName(address).get() + ":" + port));
+          NetUtils.createSocketAddr(getHostPortString(getHostName(address).get(), port)));
     }
   }
 
@@ -211,7 +211,7 @@ public final class HddsUtils {
     if ((value == null) || value.isEmpty()) {
       return Optional.empty();
     }
-    String hostname = value.replaceAll("\\:[0-9]+$", "");
+    String hostname = HostAndPort.fromString(value).getHost();
     if (hostname.isEmpty()) {
       return Optional.empty();
     } else {
@@ -234,6 +234,222 @@ public final class HddsUtils {
     } else {
       return OptionalInt.of(port);
     }
+  }
+
+  /**
+   * Combine a host and port into a "host:port" string, wrapping the host in
+   * square brackets when it is an IPv6 literal (for example
+   * {@code [2001:db8::1]:9858}). A bare IPv6 literal joined to a port with a
+   * plain colon is ambiguous and cannot be parsed by Ratis/gRPC targets or
+   * URI-based address parsers.
+   *
+   * @param host a hostname, IPv4 literal, or (bracketed or bare) IPv6 literal
+   * @param port the port number
+   * @return the combined address, bracketed for IPv6 literals
+   */
+  public static String getHostPortString(String host, int port) {
+    return HostAndPort.fromParts(host, port).toString();
+  }
+
+  /**
+   * Rejects a host configured as an advertised endpoint that cannot identify
+   * this node to a peer. A wildcard ({@code 0.0.0.0}, {@code ::}) names every
+   * local interface instead of one reachable endpoint, a link-local literal is
+   * only meaningful on a single link, and the zone identifier of a scoped
+   * literal ({@code fe80::1%eth0}) names an interface on the host that wrote
+   * it, so it cannot be resolved by a peer nor encoded in the SAN extension of
+   * an X.509 certificate (see RFC-5280). A DNS name is accepted without being
+   * resolved, and so is loopback, which a single-host deployment legitimately
+   * advertises.
+   *
+   * @param key the property the host was configured under
+   * @param host a hostname or an IP literal, bracketed or not
+   * @throws ConfigurationException if the host cannot be advertised
+   */
+  public static void validateAdvertisedHost(String key, String host) {
+    if (host == null || host.isEmpty()) {
+      return;
+    }
+
+    // A host-only property can still be written with brackets, and the brackets
+    // are stripped on the way to the address, so unwrap them here or the
+    // literal inside escapes every check below.
+    final String literal = host.startsWith("[") && host.endsWith("]")
+        ? host.substring(1, host.length() - 1)
+        : host;
+
+    // Judged on the text, like HddsServerUtil.isScopedOrMaskingIPv6Address,
+    // because the scope makes the literal unresolvable here:
+    // InetAddresses.forString("fe80::1%eth0") throws unless this host happens
+    // to own an interface by that name.
+    if (literal.indexOf('%') >= 0 || literal.indexOf('/') >= 0) {
+      throw new ConfigurationException(String.format(
+          "%s = %s carries a zone identifier or prefix length, which cannot be advertised: it names an interface "
+              + "on this host, so a peer cannot resolve it and it cannot be encoded in an X.509 certificate.",
+          key, host));
+    }
+
+    if (!InetAddresses.isInetAddress(literal)) {
+      return;
+    }
+
+    final InetAddress address = InetAddresses.forString(literal);
+    if (address.isAnyLocalAddress()) {
+      throw new ConfigurationException(String.format(
+          "%s = %s is a wildcard address, which cannot be advertised. Configure the address this node is reachable "
+              + "at, and listen on every interface through the matching bind host property.",
+          key, host));
+    }
+    if (address.isLinkLocalAddress()) {
+      throw new ConfigurationException(String.format(
+          "%s = %s is a link-local address, which is only reachable on one link and cannot be advertised.",
+          key, host));
+    }
+  }
+
+  /**
+   * Rejects a configured advertised address, both for the textual form of its
+   * authority and for the host it names.
+   *
+   * @param key the property the address was configured under
+   * @param value host or host:port
+   * @throws ConfigurationException if the address cannot be advertised
+   * @see #validateAdvertisedHost(String, String)
+   */
+  public static void validateAdvertisedAddress(String key, String value) {
+    // The host first: a wildcard is rejected outright, so it must not be told
+    // to add brackets that leave it rejected anyway.
+    getHostName(value).ifPresent(host -> validateAdvertisedHost(key, host));
+    validateHostPortAuthority(key, value);
+  }
+
+  /**
+   * Rejects an advertised address configured under any of the given properties.
+   * A property holding a comma-separated list is checked entry by entry, and a
+   * property that is not set is skipped.
+   *
+   * @param conf the configuration to read
+   * @param keys the properties to check
+   * @throws ConfigurationException if any configured address cannot be advertised
+   * @see #validateAdvertisedAddress(String, String)
+   */
+  public static void validateAdvertisedAddressConfig(ConfigurationSource conf, String... keys) {
+    for (final String key : keys) {
+      for (final String value : conf.getTrimmedStringCollection(key)) {
+        validateAdvertisedAddress(key, value);
+      }
+    }
+  }
+
+  /**
+   * Rejects an unbracketed IPv6 literal configured under a property that a port
+   * may follow. Both readings of {@code 2001:db8::1:9862} are valid IPv6
+   * literals - the host {@code 2001:db8::1} on port 9862, or the whole literal
+   * on the property's default port - and nothing in the text tells them apart,
+   * so one of them is used silently. Brackets remove the ambiguity, and are
+   * needed for the single-colon form too, since a bare literal there is read as
+   * a host and a port.
+   *
+   * @param key the property the value was configured under
+   * @param value host or host:port
+   * @throws ConfigurationException if the host is an unbracketed IPv6 literal
+   */
+  private static void validateHostPortAuthority(String key, String value) {
+    if (value == null || value.isEmpty() || value.startsWith("[")) {
+      return;
+    }
+
+    final String host = HostAndPort.fromString(value).getHost();
+    final int lastColon = host.lastIndexOf(':');
+    if (lastColon < 0) {
+      return;
+    }
+
+    final String shorterHost = host.substring(0, lastColon);
+    final String trailingGroup = host.substring(lastColon + 1);
+    if (isPortNumber(trailingGroup) && InetAddresses.isInetAddress(shorterHost)) {
+      throw new ConfigurationException(String.format(
+          "%s = %s is an unbracketed IPv6 literal. Write %s for host %s with port %s, or %s to use the whole "
+              + "literal as the host.",
+          key, value, getHostPortString(shorterHost, Integer.parseInt(trailingGroup)), shorterHost, trailingGroup,
+          HostAndPort.fromHost(host)));
+    }
+    throw new ConfigurationException(String.format(
+        "%s = %s is an unbracketed IPv6 literal. Write %s; a port may follow this property, so the host has to be "
+            + "bracketed.",
+        key, value, HostAndPort.fromHost(host)));
+  }
+
+  private static boolean isPortNumber(String value) {
+    try {
+      final int port = Integer.parseInt(value);
+      return port > 0 && port <= 65535;
+    } catch (NumberFormatException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Parse a Ratis role string produced by
+   * {@code SCMRatisServerImpl.getRatisRoles()} into its constituent fields.
+   * The format is {@code [host]:port:ROLE:id:hostIP} where host and hostIP
+   * may be bracketed IPv6 literals.
+   *
+   * @param roleString the encoded role string
+   * @return a 5-element array: {host, port, role, id, hostIP}
+   */
+  public static String[] parseRatisRoleString(String roleString) {
+    Preconditions.checkArgument(roleString != null && !roleString.isEmpty(),
+        "Role string must not be null or empty");
+
+    // Parse from the right: the last field is hostIP (possibly bracketed),
+    // then id (uuid, no colons), then role (LEADER/FOLLOWER, no colons),
+    // and the remainder is host:port (which may be bracketed IPv6).
+    int idx = roleString.length();
+
+    // Field 5: hostIP — may be bracketed IPv6 like [2001:db8::1]
+    String hostIp;
+    if (roleString.charAt(idx - 1) == ']') {
+      int bracket = roleString.lastIndexOf('[');
+      Preconditions.checkArgument(bracket > 0,
+          "Malformed role string (unmatched bracket): %s", roleString);
+      hostIp = roleString.substring(bracket + 1, idx - 1);
+      Preconditions.checkArgument(roleString.charAt(bracket - 1) == ':',
+          "Malformed role string (expected ':' before '['): %s", roleString);
+      idx = bracket - 1;
+    } else {
+      int sep = roleString.lastIndexOf(':');
+      Preconditions.checkArgument(sep > 0,
+          "Malformed role string (expected host:port:role:id:hostIP): %s", roleString);
+      hostIp = roleString.substring(sep + 1);
+      idx = sep;
+    }
+
+    // Field 4: id (uuid or peer id, no colons)
+    int sep3 = roleString.lastIndexOf(':', idx - 1);
+    Preconditions.checkArgument(sep3 > 0,
+        "Malformed role string (cannot find id field): %s", roleString);
+    String id = roleString.substring(sep3 + 1, idx);
+    idx = sep3;
+
+    // Field 3: role (LEADER/FOLLOWER, no colons)
+    int sep2 = roleString.lastIndexOf(':', idx - 1);
+    Preconditions.checkArgument(sep2 > 0,
+        "Malformed role string (cannot find role field): %s", roleString);
+    String role = roleString.substring(sep2 + 1, idx);
+    idx = sep2;
+
+    // Remainder is host:port — use HostAndPort to parse safely
+    String hostPort = roleString.substring(0, idx);
+    Preconditions.checkArgument(!hostPort.isEmpty(),
+        "Malformed role string (empty host:port): %s", roleString);
+    HostAndPort hp = HostAndPort.fromString(hostPort);
+    Preconditions.checkArgument(hp.hasPort(),
+        "Malformed role string (missing port): %s", roleString);
+    String host = hp.getHost();
+    String port = String.valueOf(hp.getPort());
+
+    return new String[]{host, port, role, id, hostIp};
   }
 
   /**
@@ -267,124 +483,20 @@ public final class HddsUtils {
    * @return first port number component found from the given keys, or absent.
    * @throws IllegalArgumentException if any values are not in the 'host'
    *             or host:port format.
+   * @throws ConfigurationException if any value holds an unbracketed IPv6
+   *             literal, which cannot be told apart from a host and a port.
    */
   public static OptionalInt getPortNumberFromConfigKeys(
       ConfigurationSource conf, String... keys) {
     for (final String key : keys) {
       final String value = conf.getTrimmed(key);
+      validateHostPortAuthority(key, value);
       final OptionalInt hostPort = getHostPort(value);
       if (hostPort.isPresent()) {
         return hostPort;
       }
     }
     return OptionalInt.empty();
-  }
-
-  /**
-   * Retrieve the socket addresses of all storage container managers.
-   *
-   * @return A collection of SCM addresses
-   * @throws IllegalArgumentException If the configuration is invalid
-   */
-  public static Collection<InetSocketAddress> getSCMAddressForDatanodes(
-      ConfigurationSource conf) {
-
-    // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
-
-    if (getScmServiceId(conf) != null) {
-      List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
-      Collection<InetSocketAddress> scmAddressList =
-          new HashSet<>(scmNodeInfoList.size());
-      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
-        scmAddressList.add(
-            NetUtils.createSocketAddr(scmNodeInfo.getScmDatanodeAddress()));
-      }
-      return scmAddressList;
-    } else {
-      // fall back to OZONE_SCM_NAMES.
-      Collection<String> names =
-          conf.getTrimmedStringCollection(ScmConfigKeys.OZONE_SCM_NAMES);
-      if (names.isEmpty()) {
-        throw new IllegalArgumentException(ScmConfigKeys.OZONE_SCM_NAMES
-            + " need to be a set of valid DNS names or IP addresses."
-            + " Empty address list found.");
-      }
-
-      Collection<InetSocketAddress> addresses = new HashSet<>(names.size());
-      for (String address : names) {
-        Optional<String> hostname = getHostName(address);
-        if (!hostname.isPresent()) {
-          throw new IllegalArgumentException("Invalid hostname for SCM: "
-              + address);
-        }
-        int port = getHostPort(address)
-            .orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
-                OZONE_SCM_DATANODE_PORT_DEFAULT));
-        InetSocketAddress addr = NetUtils.createSocketAddr(hostname.get(),
-            port);
-        addresses.add(addr);
-      }
-
-      if (addresses.size() > 1) {
-        LOG.warn("When SCM HA is configured, configure {} appended with " +
-            "serviceId and nodeId. {} is deprecated.", OZONE_SCM_ADDRESS_KEY,
-            OZONE_SCM_NAMES);
-      }
-      return addresses;
-    }
-  }
-
-  /**
-   * Returns the SCM address for datanodes based on the service ID and the SCM addresses.
-   * @param conf Configuration
-   * @param scmServiceId SCM service ID
-   * @param scmNodeIds Requested SCM node IDs
-   * @return A collection with addresses of the request SCM node IDs.
-   * Null if there is any wrongly configured SCM address. Note that the returned collection
-   * might not be ordered the same way as the requested SCM node IDs
-   */
-  public static Collection<Pair<String, InetSocketAddress>> getSCMAddressForDatanodes(
-      ConfigurationSource conf, String scmServiceId, Set<String> scmNodeIds) {
-    Collection<Pair<String, InetSocketAddress>> scmNodeAddress = new HashSet<>(scmNodeIds.size());
-    for (String scmNodeId : scmNodeIds) {
-      String addressKey = ConfUtils.addKeySuffixes(
-          OZONE_SCM_ADDRESS_KEY, scmServiceId, scmNodeId);
-      String scmAddress = conf.get(addressKey);
-      if (scmAddress == null) {
-        LOG.warn("The SCM address configuration {} is not defined, return nothing", addressKey);
-        return null;
-      }
-
-      int scmDatanodePort = SCMNodeInfo.getPort(conf, scmServiceId, scmNodeId,
-          OZONE_SCM_DATANODE_ADDRESS_KEY, OZONE_SCM_DATANODE_PORT_KEY,
-          OZONE_SCM_DATANODE_PORT_DEFAULT);
-
-      String scmDatanodeAddressStr = SCMNodeInfo.buildAddress(scmAddress, scmDatanodePort);
-      InetSocketAddress scmDatanodeAddress = NetUtils.createSocketAddr(scmDatanodeAddressStr);
-      scmNodeAddress.add(Pair.of(scmNodeId, scmDatanodeAddress));
-    }
-    return scmNodeAddress;
-  }
-
-  /**
-   * Retrieve the socket addresses of recon.
-   *
-   * @return Recon address
-   * @throws IllegalArgumentException If the configuration is invalid
-   */
-  public static InetSocketAddress getReconAddresses(
-      ConfigurationSource conf) {
-    String name = conf.get(OZONE_RECON_ADDRESS_KEY);
-    if (StringUtils.isEmpty(name)) {
-      return null;
-    }
-    Optional<String> hostname = getHostName(name);
-    if (!hostname.isPresent()) {
-      throw new IllegalArgumentException("Invalid hostname for Recon: "
-          + name);
-    }
-    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
-    return NetUtils.createSocketAddr(hostname.get(), port);
   }
 
   /**
@@ -397,10 +509,13 @@ public final class HddsUtils {
    * @return the hostname (NB: may not be a FQDN)
    * @throws UnknownHostException if the hdds.datanode.dns.interface
    *    option is used and the hostname can not be determined
+   * @throws ConfigurationException if the configured hostname cannot be
+   *    advertised to SCM
    */
   public static String getHostName(ConfigurationSource conf)
       throws UnknownHostException {
     String name = conf.get(HDDS_DATANODE_HOST_NAME_KEY);
+    validateAdvertisedHost(HDDS_DATANODE_HOST_NAME_KEY, name);
     if (name == null) {
       String dnsInterface = conf.get(
           CommonConfigurationKeysPublic.HADOOP_SECURITY_DNS_INTERFACE_KEY);
@@ -440,7 +555,7 @@ public final class HddsUtils {
         .orElse(conf.getInt(HDDS_DATANODE_CLIENT_PORT_KEY,
             HDDS_DATANODE_CLIENT_PORT_DEFAULT));
 
-    return NetUtils.createSocketAddr(host + ":" + port);
+    return NetUtils.createSocketAddr(getHostPortString(host, port));
   }
 
   /**
@@ -473,6 +588,7 @@ public final class HddsUtils {
     case PutBlock:
     case PutSmallFile:
     case StreamInit:
+    case StreamInitWithPutBlock:
     case StreamWrite:
     case FinalizeBlock:
       return false;
@@ -530,7 +646,9 @@ public final class HddsUtils {
     case DeleteContainer:
     case ReadContainer:
     case UpdateContainer:
+    case GetContainerChecksumInfo:
     case ListBlock:
+    case Echo:
       return true;
     default:
       return false;
@@ -686,23 +804,6 @@ public final class HddsUtils {
   }
 
   /**
-   * Utility string formatter method to display SCM roles.
-   *
-   * @param nodes
-   * @return String
-   */
-  public static String format(List<String> nodes) {
-    StringBuilder sb = new StringBuilder();
-    for (String node : nodes) {
-      String[] x = node.split(":");
-      sb.append(String
-          .format("{ HostName : %s, Ratis Port : %s, Role : %s } ", x[0], x[1],
-              x[2]));
-    }
-    return sb.toString();
-  }
-
-  /**
    * Return Ozone service shutdown time out.
    * @param conf
    */
@@ -730,6 +831,9 @@ public final class HddsUtils {
     }
     if (t instanceof RemoteException) {
       t = ((RemoteException) t).unwrapRemoteException();
+    }
+    if (t instanceof UndeclaredThrowableException) {
+      t = ((UndeclaredThrowableException) t).getUndeclaredThrowable();
     }
     while (t != null) {
       if (t instanceof RpcException ||
@@ -985,5 +1089,27 @@ public final class HddsUtils {
       ConfigurationSource configuration) {
     String scmServiceId = getScmServiceId(configuration);
     return getSCMNodeIds(configuration, scmServiceId);
+  }
+
+  /**
+   * If {@code error} exposes an {@link AccessControlException} , returns one line error message.
+   */
+  public static String formatAccessControlExceptionLine(Throwable error) {
+    for (Throwable t = error; t != null; t = t.getCause()) {
+      if (t instanceof AccessControlException) {
+        return t.toString();
+      }
+    }
+    String msg = error != null ? error.getMessage() : null;
+    if (msg != null) {
+      String marker = AccessControlException.class.getName() + ": ";
+      int i = msg.indexOf(marker);
+      if (i >= 0) {
+        int end = msg.indexOf('\n', i);
+        String line = end < 0 ? msg.substring(i) : msg.substring(i, end);
+        return line.trim();
+      }
+    }
+    return null;
   }
 }

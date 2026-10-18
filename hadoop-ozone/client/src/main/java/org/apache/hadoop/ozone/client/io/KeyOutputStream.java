@@ -19,10 +19,12 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -49,8 +51,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io_.retry.RetryPolicies;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
@@ -74,7 +76,7 @@ import org.slf4j.LoggerFactory;
  * TODO : currently not support multi-thread access.
  */
 public class KeyOutputStream extends OutputStream
-    implements Syncable, KeyMetadataAware {
+    implements Syncable, KeyCommitOutput {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
@@ -96,13 +98,6 @@ public class KeyOutputStream extends OutputStream
   private long clientID;
   private StreamBufferArgs streamBufferArgs;
 
-  /**
-   * Indicates if an atomic write is required. When set to true,
-   * the amount of data written must match the declared size during the commit.
-   * A mismatch will prevent the commit from succeeding.
-   * This is essential for operations like S3 put to ensure atomicity.
-   */
-  private boolean atomicKeyCreation;
   private ContainerClientMetrics clientMetrics;
   private OzoneManagerVersion ozoneManagerVersion;
   private final Lock writeLock = new ReentrantLock();
@@ -110,6 +105,12 @@ public class KeyOutputStream extends OutputStream
 
   private final int maxConcurrentWritePerKey;
   private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+
+  @Override
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
+    this.preCommits = preCommits;
+  }
 
   @VisibleForTesting
   KeyOutputStreamSemaphore getRequestSemaphore() {
@@ -179,7 +180,6 @@ public class KeyOutputStream extends OutputStream
     this.isException = false;
     this.writeOffset = 0;
     this.clientID = b.getOpenHandler().getId();
-    this.atomicKeyCreation = b.getAtomicKeyCreation();
     this.streamBufferArgs = b.getStreamBufferArgs();
     this.clientMetrics = b.getClientMetrics();
     this.ozoneManagerVersion = b.ozoneManagerVersion;
@@ -532,7 +532,7 @@ public class KeyOutputStream extends OutputStream
         throw new UnsupportedOperationException("The replication factor = "
             + replication.getRequiredNodes() + " <= 1");
       }
-      if (ozoneManagerVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+      if (!OzoneManagerVersion.HBASE_SUPPORT.isSupportedBy(ozoneManagerVersion)) {
         throw new UnsupportedOperationException("Hsync API requires OM version "
             + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
             + ozoneManagerVersion);
@@ -649,11 +649,8 @@ public class KeyOutputStream extends OutputStream
       if (!isException) {
         Preconditions.checkArgument(writeOffset == offset);
       }
-      if (atomicKeyCreation) {
-        long expectedSize = blockOutputStreamEntryPool.getDataSize();
-        Preconditions.checkState(expectedSize == offset,
-            String.format("Expected: %d and actual %d write sizes do not match",
-                expectedSize, offset));
+      for (CheckedRunnable<IOException> preCommit : preCommits) {
+        preCommit.run();
       }
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
@@ -661,9 +658,14 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  synchronized OmMultipartCommitUploadPartInfo
+  @Override
+  public synchronized OmMultipartCommitUploadPartInfo
       getCommitUploadPartInfo() {
     return blockOutputStreamEntryPool.getCommitUploadPartInfo();
+  }
+
+  public long getModificationTime() {
+    return blockOutputStreamEntryPool.getModificationTime();
   }
 
   @VisibleForTesting
@@ -691,7 +693,6 @@ public class KeyOutputStream extends OutputStream
     private OzoneClientConfig clientConfig;
     private ReplicationConfig replicationConfig;
     private ContainerClientMetrics clientMetrics;
-    private boolean atomicKeyCreation = false;
     private StreamBufferArgs streamBufferArgs;
     private Supplier<ExecutorService> executorServiceSupplier;
     private OzoneManagerVersion ozoneManagerVersion;
@@ -790,11 +791,6 @@ public class KeyOutputStream extends OutputStream
       return this;
     }
 
-    public Builder setAtomicKeyCreation(boolean atomicKey) {
-      this.atomicKeyCreation = atomicKey;
-      return this;
-    }
-
     public Builder setClientMetrics(ContainerClientMetrics clientMetrics) {
       this.clientMetrics = clientMetrics;
       return this;
@@ -802,10 +798,6 @@ public class KeyOutputStream extends OutputStream
 
     public ContainerClientMetrics getClientMetrics() {
       return clientMetrics;
-    }
-
-    public boolean getAtomicKeyCreation() {
-      return atomicKeyCreation;
     }
 
     public Builder setExecutorServiceSupplier(Supplier<ExecutorService> executorServiceSupplier) {

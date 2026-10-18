@@ -35,6 +35,7 @@ public final class S3Consts {
   // Constants related to AWS Signature Version V4 calculation
   // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
   public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
+  public static final String X_AMZ_TRAILER = "x-amz-trailer";
 
   public static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
   public static final String STREAMING_UNSIGNED_PAYLOAD_TRAILER = "STREAMING-UNSIGNED-PAYLOAD-TRAILER";
@@ -50,6 +51,10 @@ public final class S3Consts {
 
   // Constants related to Range Header
   public static final String COPY_SOURCE_IF_PREFIX = "x-amz-copy-source-if-";
+  public static final String COPY_SOURCE_IF_MATCH =
+      COPY_SOURCE_IF_PREFIX + "match";
+  public static final String COPY_SOURCE_IF_NONE_MATCH =
+      COPY_SOURCE_IF_PREFIX + "none-match";
   public static final String COPY_SOURCE_IF_MODIFIED_SINCE =
       COPY_SOURCE_IF_PREFIX + "modified-since";
   public static final String COPY_SOURCE_IF_UNMODIFIED_SINCE =
@@ -71,8 +76,22 @@ public final class S3Consts {
 
   // Constants related to custom metadata
   public static final String CUSTOM_METADATA_HEADER_PREFIX = "x-amz-meta-";
+  /**
+   * Prefix for internal metadata keys that store remapped user x-amz-meta values
+   * colliding with system headers. Users must not set metadata keys with this prefix.
+   */
+  public static final String RESERVED_USER_METADATA_KEY_PREFIX = "ozone-s3-internal-";
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
   public static final String STORAGE_CONFIG_HEADER = "storage-config";
+  public static final String READ_CONSISTENCY_HEADER =
+      "x-ozone-read-consistency";
+  public static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
+      "x-ozone-local-lease-log-limit";
+  public static final String READ_CONSISTENCY_FOLLOWER_STALE =
+      "follower-stale";
+  public static final String READ_CONSISTENCY_FOLLOWER_LINEARIZABLE =
+      "follower-linearizable";
+  public static final String READ_CONSISTENCY_LEADER_ONLY = "leader-only";
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";
@@ -83,6 +102,7 @@ public final class S3Consts {
   public static final String TAG_COUNT_HEADER = "x-amz-tagging-count";
   public static final String AWS_TAG_PREFIX = "aws:";
 
+  // tag limit for object
   public static final int TAG_NUM_LIMIT = 10;
   public static final int TAG_KEY_LENGTH_LIMIT = 128;
   public static final int TAG_VALUE_LENGTH_LIMIT = 256;
@@ -91,10 +111,45 @@ public final class S3Consts {
   public static final Pattern TAG_REGEX_PATTERN = Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
   public static final String MP_PARTS_COUNT = "x-amz-mp-parts-count";
 
+  /** AWS S3 maximum number of keys per DeleteObjects request. */
+  public static final int S3_DELETE_OBJECTS_MAX_KEYS = 1000;
+
+  /** Version ID of an object in a bucket that never had versioning enabled. */
+  public static final String NULL_VERSION_ID = "null";
+
   // Bucket owner condition headers
   // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-owner-condition.html
   public static final String EXPECTED_BUCKET_OWNER_HEADER = "x-amz-expected-bucket-owner";
   public static final String EXPECTED_SOURCE_BUCKET_OWNER_HEADER = "x-amz-source-expected-bucket-owner";
+
+  public static final String CHECKSUM_HEADER = "Content-MD5";
+
+  // Conditional request headers
+  public static final String IF_NONE_MATCH_HEADER = "If-None-Match";
+  public static final String IF_MATCH_HEADER = "If-Match";
+  public static final String IF_MODIFIED_SINCE_HEADER = "If-Modified-Since";
+  public static final String IF_UNMODIFIED_SINCE_HEADER =
+      "If-Unmodified-Since";
+
+  // Constants related to S3 Express / ListDirectoryBuckets
+  public static final int MAX_DIRECTORY_BUCKETS_LIMIT = 1000;
+  // Maximum number of buckets per ListBuckets response page.
+  public static final int MAX_BUCKETS_LIMIT = 10000;
+  public static final String DEFAULT_S3_REGION = "us-east-1";
+  public static final String S3_EXPRESS_SERVICE = "s3express";
+
+  // tag limit for bucket
+  public static final int TAG_BUCKET_NUM_LIMIT = 50;
+
+  // Request header carrying the list of object attributes to return.
+  public static final String OBJECT_ATTRIBUTES_HEADER = "x-amz-object-attributes";
+
+  // Pagination headers for GetObjectAttributes ObjectParts.
+  public static final String MAX_PARTS_HEADER = "x-amz-max-parts";
+  public static final String PART_NUMBER_MARKER_HEADER = "x-amz-part-number-marker";
+
+  // Maximum number of parts returned in one GetObjectAttributes response.
+  public static final int GET_OBJECT_ATTRIBUTES_MAX_PARTS_LIMIT = 1000;
 
   //Never Constructed
   private S3Consts() {
@@ -117,7 +172,13 @@ public final class S3Consts {
     public static final String DELIMITER = "delimiter";
     public static final String ENCODING_TYPE = "encoding-type";
     public static final String KEY_MARKER = "key-marker";
+    public static final String FETCH_OWNER = "fetch-owner";
+    public static final String LIST_TYPE = "list-type";
+    // GetBucketLocation is not implemented
+    public static final String LOCATION = "location";
     public static final String MARKER = "marker";
+    public static final String MAX_DIRECTORY_BUCKETS = "max-directory-buckets";
+    public static final String MAX_BUCKETS = "max-buckets";
     public static final String MAX_KEYS = "max-keys";
     public static final String MAX_PARTS = "max-parts";
     public static final String MAX_UPLOADS = "max-uploads";
@@ -126,9 +187,49 @@ public final class S3Consts {
     public static final String PREFIX = "prefix";
     public static final String START_AFTER = "start-after";
     public static final String TAGGING = "tagging";
+    // GetObjectTorrent is not implemented
+    public static final String TORRENT = "torrent";
     public static final String UPLOAD_ID = "uploadId";
     public static final String UPLOAD_ID_MARKER = "upload-id-marker";
     public static final String UPLOADS = "uploads";
+    public static final String LIFECYCLE = "lifecycle";
+    public static final String ATTRIBUTES = "attributes";
+    public static final String VERSION_ID = "versionId";
+    public static final String VERSION_ID_MARKER = "version-id-marker";
+    public static final String VERSIONS = "versions";
+
+    // Subresources of S3 APIs that are not implemented. They are only recognized so that the
+    // request can be rejected with NotImplemented instead of falling through to another operation.
+    // See BucketOperationNotImplementedHandler and ObjectOperationNotImplementedHandler.
+    public static final String ABAC = "abac";
+    public static final String ACCELERATE = "accelerate";
+    public static final String ANALYTICS = "analytics";
+    public static final String ANNOTATION = "annotation";
+    public static final String CORS = "cors";
+    public static final String ENCRYPTION = "encryption";
+    public static final String INTELLIGENT_TIERING = "intelligent-tiering";
+    public static final String INVENTORY = "inventory";
+    public static final String LEGAL_HOLD = "legal-hold";
+    public static final String LOGGING = "logging";
+    public static final String METADATA_ANNOTATION_TABLE = "metadataAnnotationTable";
+    public static final String METADATA_CONFIGURATION = "metadataConfiguration";
+    public static final String METADATA_INVENTORY_TABLE = "metadataInventoryTable";
+    public static final String METADATA_JOURNAL_TABLE = "metadataJournalTable";
+    public static final String METADATA_TABLE = "metadataTable";
+    public static final String METRICS = "metrics";
+    public static final String NOTIFICATION = "notification";
+    public static final String OBJECT_LOCK = "object-lock";
+    public static final String OWNERSHIP_CONTROLS = "ownershipControls";
+    public static final String POLICY = "policy";
+    public static final String POLICY_STATUS = "policyStatus";
+    public static final String PUBLIC_ACCESS_BLOCK = "publicAccessBlock";
+    public static final String RENAME_OBJECT = "renameObject";
+    public static final String REPLICATION = "replication";
+    public static final String REQUEST_PAYMENT = "requestPayment";
+    public static final String RETENTION = "retention";
+    public static final String SESSION = "session";
+    public static final String VERSIONING = "versioning";
+    public static final String WEBSITE = "website";
 
     private QueryParams() {
       // no instances

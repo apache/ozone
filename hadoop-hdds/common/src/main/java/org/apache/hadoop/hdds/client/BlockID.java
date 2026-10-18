@@ -19,7 +19,7 @@ package org.apache.hadoop.hdds.client;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.Objects;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 
 /**
@@ -93,29 +93,29 @@ public class BlockID {
 
   public void appendTo(StringBuilder sb) {
     containerBlockID.appendTo(sb);
-    sb.append(" bcsId: ").append(blockCommitSequenceId);
-    sb.append(" replicaIndex: ").append(replicaIndex);
+    sb.append(" bcsId: ").append(blockCommitSequenceId)
+        .append(" replicaIndex: ").append(replicaIndex);
   }
 
   @JsonIgnore
-  public ContainerProtos.DatanodeBlockID getDatanodeBlockIDProtobuf() {
-    ContainerProtos.DatanodeBlockID.Builder blockID = getDatanodeBlockIDProtobufBuilder();
-    if (replicaIndex != null) {
-      blockID.setReplicaIndex(replicaIndex);
-    }
-    return blockID.build();
+  public DatanodeBlockID getDatanodeBlockIDProtobuf() {
+    return getDatanodeBlockIDProtobufBuilder(replicaIndex).build();
   }
 
   @JsonIgnore
-  public ContainerProtos.DatanodeBlockID.Builder getDatanodeBlockIDProtobufBuilder() {
-    return ContainerProtos.DatanodeBlockID.newBuilder().
-        setContainerID(containerBlockID.getContainerID())
+  public DatanodeBlockID.Builder getDatanodeBlockIDProtobufBuilder(Integer replicaIdx) {
+    final DatanodeBlockID.Builder b = DatanodeBlockID.newBuilder()
+        .setContainerID(containerBlockID.getContainerID())
         .setLocalID(containerBlockID.getLocalID())
         .setBlockCommitSequenceId(blockCommitSequenceId);
+    if (replicaIdx != null) {
+      b.setReplicaIndex(replicaIdx);
+    }
+    return b;
   }
 
   @JsonIgnore
-  public static BlockID getFromProtobuf(ContainerProtos.DatanodeBlockID blockID) {
+  public static BlockID getFromProtobuf(DatanodeBlockID blockID) {
     return new BlockID(blockID.getContainerID(),
         blockID.getLocalID(),
         blockID.getBlockCommitSequenceId(),

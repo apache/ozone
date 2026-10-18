@@ -29,7 +29,11 @@ export const DatanodeResponse = {
               "capacity": 125645656770,
               "used": 4096,
               "remaining": 114225606656,
-              "committed": 0
+              "reserved": 12564566,
+              "committed": 0,
+              "filesystemCapacity": 150000000000,
+              "filesystemUsed": 30000000000,
+              "filesystemAvailable": 120000000000,
           },
           "pipelines": [
               {
@@ -62,8 +66,12 @@ export const DatanodeResponse = {
           "storageReport": {
               "capacity": 125645656770,
               "used": 4096,
+              "reserved": 12564566,
               "remaining": 114225623040,
-              "committed": 0
+              "committed": 0,
+              "filesystemCapacity": 150000000000,
+              "filesystemUsed": 30000000000,
+              "filesystemAvailable": 120000000000,
           },
           "pipelines": [
               {
@@ -97,7 +105,11 @@ export const DatanodeResponse = {
               "capacity": 125645656770,
               "used": 4096,
               "remaining": 114225541120,
-              "committed": 0
+              "reserved": 12564566,
+              "committed": 0,
+              "filesystemCapacity": 150000000000,
+              "filesystemUsed": 30000000000,
+              "filesystemAvailable": 120000000000,
           },
           "pipelines": [
               {
@@ -125,7 +137,11 @@ export const DatanodeResponse = {
               "capacity": 125645656770,
               "used": 4096,
               "remaining": 114225573888,
-              "committed": 0
+              "reserved": 12564566,
+              "committed": 0,
+              "filesystemCapacity": 150000000000,
+              "filesystemUsed": 30000000000,
+              "filesystemAvailable": 120000000000,
           },
           "pipelines": [
               {
@@ -153,7 +169,11 @@ export const DatanodeResponse = {
               "capacity": 125645656770,
               "used": 4096,
               "remaining": 114225614848,
-              "committed": 0
+              "reserved": 125564566,
+              "committed": 0,
+              "filesystemCapacity": 150000000000,
+              "filesystemUsed": 30000000000,
+              "filesystemAvailable": 120000000000,
           },
           "pipelines": [
               {

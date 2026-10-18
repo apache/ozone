@@ -18,6 +18,8 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BAD_DIGEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_DIGEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_STORAGE_CLASS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_CHUNKED;
@@ -32,10 +34,14 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -58,6 +64,33 @@ public final class S3Utils {
     return URLEncoder.encode(str, UTF_8.name());
   }
 
+  /**
+   * Percent-encode a string for S3 {@code encoding-type=url} responses.
+   *
+   * <p>Unlike {@link URLEncoder} (application/x-www-form-urlencoded), AWS S3
+   * uses percent-encoding where spaces are {@code %20}, not {@code +}.
+   */
+  public static String s3urlEncode(String str)
+      throws UnsupportedEncodingException {
+    return urlEncode(str).replace("+", "%20");
+  }
+
+  /**
+   * Returns the persisted S3 {@code Content-Encoding} value, with {@code aws-chunked}
+   * removed per AWS semantics.
+   */
+  public static String normalizeContentEncoding(String contentEncoding) {
+    if (contentEncoding == null || contentEncoding.isEmpty()) {
+      return null;
+    }
+    String normalized = Arrays.stream(contentEncoding.split(","))
+        .map(String::trim)
+        .filter(value -> !value.isEmpty())
+        .filter(value -> !AWS_CHUNKED.equalsIgnoreCase(value))
+        .collect(Collectors.joining(", "));
+    return normalized.isEmpty() ? null : normalized;
+  }
+
   private S3Utils() {
     // no instances
   }
@@ -72,17 +105,23 @@ public final class S3Utils {
    *                                   config.
    * @param clientConfiguredReplConfig - Client side configured replication
    *                                   config.
+   * @param standardUsesClientDefault  - whether STANDARD resolves to a non-null
+   *                                   clientConfiguredReplConfig.
    * @return client resolved replication config.
    */
   public static ReplicationConfig resolveS3ClientSideReplicationConfig(
       String s3StorageTypeHeader, String s3StorageConfigHeader,
       ReplicationConfig clientConfiguredReplConfig,
-      ReplicationConfig bucketReplConfig)
+      ReplicationConfig bucketReplConfig, boolean standardUsesClientDefault)
       throws OS3Exception {
 
     // If user provided s3 storage type header is not null then map it
     // to ozone replication config
     if (!StringUtils.isEmpty(s3StorageTypeHeader)) {
+      if (standardUsesClientDefault && clientConfiguredReplConfig != null
+          && S3StorageType.STANDARD.name().equals(s3StorageTypeHeader)) {
+        return clientConfiguredReplConfig;
+      }
       return toReplicationConfig(s3StorageTypeHeader, s3StorageConfigHeader);
     }
 
@@ -109,6 +148,7 @@ public final class S3Utils {
   public static WebApplicationException wrapOS3Exception(OS3Exception ex) {
     return new WebApplicationException(ex.getErrorMessage(), ex,
         Response.status(ex.getHttpCode())
+            .type(MediaType.APPLICATION_XML_TYPE)
             .entity(ex.toXml())
             .build());
   }
@@ -147,7 +187,7 @@ public final class S3Utils {
       // We are only interested on "aws-chunked"
       boolean containsAwsChunked = Arrays.stream(contentEncoding.split(","))
           .map(String::trim)
-          .anyMatch(AWS_CHUNKED::equals);
+          .anyMatch(AWS_CHUNKED::equalsIgnoreCase);
       if (!containsAwsChunked) {
         OS3Exception ex = S3ErrorTable.newError(S3ErrorTable.INVALID_ARGUMENT, resource);
         ex.setErrorMessage("An error occurred (InvalidArgument) for multi chunks upload: " +
@@ -213,6 +253,20 @@ public final class S3Utils {
   }
 
   /**
+   * Normalizes an ETag header value by trimming whitespace and removing
+   * surrounding double quotes.
+   *
+   * @param value the raw header value
+   * @return the normalized ETag, or {@code null} if the input is null
+   */
+  public static String parseETag(String value) {
+    if (value == null) {
+      return null;
+    }
+    return stripQuotes(value.trim());
+  }
+
+  /**
    * Wraps the given string in double quotes.
    *
    * @param value the input string
@@ -220,6 +274,40 @@ public final class S3Utils {
    */
   public static String wrapInQuotes(String value) {
     return StringUtils.wrap(value, '\"');
+  }
+
+  /**
+   * Validates the Content-MD5 header against the actual MD5 hash.
+   *
+   * <p>Throws {@link org.apache.hadoop.ozone.s3.exception.S3ErrorTable#INVALID_DIGEST}
+   * when the Content-MD5 header is absent, contains an invalid Base64 string,
+   * or decodes to a byte array that is not exactly 16 bytes (i.e. not a valid
+   * MD5 digest).  Throws
+   * {@link org.apache.hadoop.ozone.s3.exception.S3ErrorTable#BAD_DIGEST}
+   * when the header is well-formed but does not match the computed hash.
+   *
+   * @param clientMD5 the base64-encoded MD5 from Content-MD5 header
+   * @param serverMD5 the hex-encoded MD5 hash of the data
+   * @param resource  the resource path for error messages
+   * @throws OS3Exception if the Content-MD5 is invalid or does not match
+   */
+  public static void validateContentMD5(String clientMD5, String serverMD5, String resource)
+      throws OS3Exception {
+    if (clientMD5 == null) {
+      throw newError(INVALID_DIGEST, resource);
+    }
+
+    try {
+      byte[] decoded = Base64.getDecoder().decode(clientMD5);
+      if (decoded.length != 16) {
+        throw newError(INVALID_DIGEST, resource);
+      }
+      if (!Hex.encodeHexString(decoded).equals(serverMD5)) {
+        throw newError(BAD_DIGEST, resource);
+      }
+    } catch (IllegalArgumentException ex) {
+      throw newError(INVALID_DIGEST, resource);
+    }
   }
 
 }

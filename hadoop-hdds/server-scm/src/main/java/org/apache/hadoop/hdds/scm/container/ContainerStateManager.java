@@ -19,13 +19,14 @@ package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -49,7 +50,7 @@ import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionExcepti
  * 4. The declaration should throw RaftException
  *
  */
-public interface ContainerStateManager {
+public interface ContainerStateManager extends SCMHandler {
 
   /* **********************************************************************
    * Container Life Cycle                                                 *
@@ -102,6 +103,16 @@ public interface ContainerStateManager {
    *
    */
   boolean contains(ContainerID containerID);
+
+  /**
+   * Get {@link ContainerID}s for the given optional lifeCycleState and healthState.
+   *
+   * @param start the start {@link ContainerID} (inclusive)
+   * @param count the size limit
+   * @return a list of {@link ContainerID};
+   */
+  List<ContainerID> getContainerIDs(LifeCycleState state, ContainerHealthState healthState, 
+       ContainerID start, int count);
 
   /**
    * Get {@link ContainerInfo}s.
@@ -159,31 +170,32 @@ public interface ContainerStateManager {
   void addContainer(ContainerInfoProto containerInfo)
       throws IOException;
 
-  /**
-   *
-   */
+  @Deprecated
   @Replicate
   void updateContainerState(HddsProtos.ContainerID id,
-                            HddsProtos.LifeCycleEvent event)
-      throws IOException, InvalidStateTransitionException;
+      HddsProtos.LifeCycleEvent event) throws IOException, InvalidStateTransitionException;
+
+  /**
+   * Updates container state with sequenceId synchronization for HA consistency.
+   * This method ensures that all SCM nodes have the same sequenceId when 
+   * state transitions occur.
+   */
+  @Replicate
+  void updateContainerStateWithSequenceId(HddsProtos.ContainerID id,
+                                          HddsProtos.LifeCycleEvent event,
+                                          Long sequenceId)
+      throws IOException;
 
 
   /**
-   * Bypasses the container state machine to change a container's state from DELETING or DELETED to CLOSED. This API was
-   * introduced to fix a bug (HDDS-11136), and should be used with care otherwise.
+   * Bypasses the container state machine to change a container's state from DELETING/DELETED to CLOSED/QUASI_CLOSED.
    *
-   * @see <a href="https://issues.apache.org/jira/browse/HDDS-11136">HDDS-11136</a>
    * @param id id of the container to transition
+   * @param targetState the target state (must be CLOSED or QUASI_CLOSED)
    * @throws IOException
    */
   @Replicate
-  void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID id) throws IOException;
-
-  /**
-   *
-   */
-  // Make this as @Replicate
-  void updateDeleteTransactionId(Map<ContainerID, Long> deleteTransactionMap)
+  void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID id, LifeCycleState targetState)
       throws IOException;
 
   /**
@@ -207,4 +219,20 @@ public interface ContainerStateManager {
    */
   void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException;
+
+  @Override
+  default RequestType getType() {
+    return RequestType.CONTAINER;
+  }
+
+  /**
+   * Update container info.
+   *
+   * @param containerInfo Updated container info proto
+   * @throws IOException
+   */
+  @Replicate
+  void updateContainerInfo(HddsProtos.ContainerInfoProto containerInfo)
+      throws IOException;
+
 }

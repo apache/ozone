@@ -36,7 +36,8 @@ public class ReconTaskReInitializationEvent implements ReconEvent {
   public enum ReInitializationReason {
     BUFFER_OVERFLOW,
     TASK_FAILURES,
-    MANUAL_TRIGGER
+    MANUAL_TRIGGER,
+    MANUAL_OM_DB_REBUILD
   }
 
   public ReconTaskReInitializationEvent(ReInitializationReason reason,

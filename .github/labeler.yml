@@ -13,9 +13,78 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Configuration for .github/workflows/label-pr.yml
+# Configuration for the component-labeler job in label-pr.yml.
+# Labels listed here are added based on the files changed in the pull request.
+# They are never removed, so labels applied manually are left alone.
 
-# This rule can be deleted once the container reconciliation feature branch is merged.
-container-reconciliation:
-- base-branch: HDDS-10239-container-reconciliation
+scm:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-hdds/server-scm/**'
 
+om:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-ozone/ozone-manager/**'
+          - 'hadoop-ozone/interface-storage/**'
+
+datanode:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-hdds/container-service/**'
+          - 'hadoop-ozone/datanode/**'
+
+recon:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-ozone/recon/**'
+          - 'hadoop-ozone/recon-codegen/**'
+          - 'hadoop-ozone/integration-test-recon/**'
+
+s3:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-ozone/s3gateway/**'
+          - 'hadoop-ozone/s3-secret-store/**'
+          - 'hadoop-ozone/integration-test-s3/**'
+
+client:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-hdds/client/**'
+          - 'hadoop-ozone/client/**'
+
+ofs:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-ozone/ozonefs*/**'
+
+command-line:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-hdds/cli-common/**'
+          - 'hadoop-ozone/cli-*/**'
+
+tools:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-ozone/tools/**'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-hdds/docs/**'
+          - '**/*.md'
+
+UI:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'hadoop-ozone/recon/src/main/resources/webapps/recon/**'
+
+CI:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - 'dev-support/ci/**'
+          - 'hadoop-hdds/dev-support/**'
+          - 'hadoop-ozone/dev-support/checks/**'

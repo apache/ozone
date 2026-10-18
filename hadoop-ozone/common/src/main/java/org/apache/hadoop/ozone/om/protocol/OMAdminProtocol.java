@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.protocol;
 
 import java.io.Closeable;
 import java.io.IOException;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.KerberosInfo;
@@ -41,10 +42,14 @@ public interface OMAdminProtocol extends Closeable {
   void decommission(OMNodeDetails removeOMNode) throws IOException;
 
   /**
-   * Requests compaction of a column family of om.db.
-   * @param columnFamily
+   * Requests compaction of a column family of om.db with the specified
+   * BottommostLevelCompaction option.
+   *
+   * @param columnFamily              column family name
+   * @param bottommostLevelCompaction rocksId of BottommostLevelCompaction
+   *                                  (0=kSkip, 1=kIfHaveCompactionFilter, 2=kForce, 3=kForceOptimized)
    */
-  void compactOMDB(String columnFamily) throws IOException;
+  void compactOMDB(String columnFamily, int bottommostLevelCompaction) throws IOException;
 
   /**
    * Triggers the Snapshot Defragmentation Service to run immediately.
@@ -53,4 +58,11 @@ public interface OMAdminProtocol extends Closeable {
    *         or if the task was triggered successfully (when noWait is true)
    */
   boolean triggerSnapshotDefrag(boolean noWait) throws IOException;
+
+  /**
+   * Returns the software version of this OM peer without contacting SCM.
+   * Intended for use by the OM leader to verify that all Ratis group members
+   * are running the same software version before accepting a finalize command.
+   */
+  OzoneManagerVersion getPeerUpgradeStatus() throws IOException;
 }

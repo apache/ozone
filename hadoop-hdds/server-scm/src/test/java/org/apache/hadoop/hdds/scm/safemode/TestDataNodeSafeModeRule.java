@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,6 +54,7 @@ public class TestDataNodeSafeModeRule {
   private EventQueue eventQueue;
   private NodeManager nodeManager;
   private SCMSafeModeManager mockSafeModeManager;
+  private SafeModeMetrics metrics;
 
   private void setup(int requiredDns) throws Exception {
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
@@ -65,6 +67,8 @@ public class TestDataNodeSafeModeRule {
     eventQueue = new EventQueue();
 
     mockSafeModeManager = mock(SCMSafeModeManager.class);
+    metrics = SafeModeMetrics.create();
+    when(mockSafeModeManager.getSafeModeMetrics()).thenReturn(metrics);
 
     rule = new DataNodeSafeModeRule(eventQueue, ozoneConfiguration, nodeManager, mockSafeModeManager);
     assertNotNull(rule);
@@ -94,6 +98,7 @@ public class TestDataNodeSafeModeRule {
         "SCM in safe mode. 1 DataNodes registered, 1 required."), 1000, 5000);
 
     assertTrue(rule.validate());
+    assertEquals(1, metrics.getCurrentRegisteredDatanodesCount().value());
   }
 
   @Test
@@ -120,7 +125,7 @@ public class TestDataNodeSafeModeRule {
         "SCM in safe mode. 2 DataNodes registered, 3 required."), 1000, 5000);
 
     assertFalse(rule.validate());
-
+    assertEquals(2, metrics.getCurrentRegisteredDatanodesCount().value());
     DatanodeDetails dd = MockDatanodeDetails.randomDatanodeDetails();
     NodeRegistrationContainerReport nodeReg = 
         new NodeRegistrationContainerReport(dd, null);
@@ -131,6 +136,7 @@ public class TestDataNodeSafeModeRule {
         "SCM in safe mode. 3 DataNodes registered, 3 required."), 1000, 5000);
 
     assertTrue(rule.validate());
+    assertEquals(3, metrics.getCurrentRegisteredDatanodesCount().value());
   }
 
   @Test

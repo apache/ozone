@@ -1,0 +1,398 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.local;
+
+import java.io.PrintWriter;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.time.format.DateTimeParseException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.cli.AbstractSubcommand;
+import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.TimeDurationUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.ITypeConverter;
+import picocli.CommandLine.Option;
+
+/**
+ * CLI entry point for local single-node Ozone.
+ */
+@Command(name = "ozone local",
+    description = "Run a single-node local Ozone cluster",
+    versionProvider = HddsVersionProvider.class,
+    mixinStandardHelpOptions = true,
+    subcommands = {
+        OzoneLocal.RunCommand.class
+    })
+public class OzoneLocal extends GenericCli {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OzoneLocal.class);
+
+  static final String ENV_DATA_DIR = "OZONE_LOCAL_DATA_DIR";
+  static final String ENV_FORMAT = "OZONE_LOCAL_FORMAT";
+  static final String ENV_DATANODES = "OZONE_LOCAL_DATANODES";
+  static final String ENV_HOST = "OZONE_LOCAL_HOST";
+  static final String ENV_BIND_HOST = "OZONE_LOCAL_BIND_HOST";
+  static final String ENV_SCM_PORT = "OZONE_LOCAL_SCM_PORT";
+  static final String ENV_OM_PORT = "OZONE_LOCAL_OM_PORT";
+  static final String ENV_S3G_ENABLED = "OZONE_LOCAL_S3G_ENABLED";
+  static final String ENV_S3G_PORT = "OZONE_LOCAL_S3G_PORT";
+  static final String ENV_RECON_ENABLED = "OZONE_LOCAL_RECON_ENABLED";
+  static final String ENV_RECON_PORT = "OZONE_LOCAL_RECON_PORT";
+  static final String ENV_EPHEMERAL = "OZONE_LOCAL_EPHEMERAL";
+  static final String ENV_STARTUP_TIMEOUT = "OZONE_LOCAL_STARTUP_TIMEOUT";
+
+  private static final String DEFAULT_DATA_DIR_VALUE = "${env:" + ENV_DATA_DIR
+      + ":-" + LocalOzoneClusterConfig.DEFAULT_DATA_DIR_VALUE + "}";
+  private static final String DEFAULT_FORMAT_VALUE = "${env:" + ENV_FORMAT
+      + ":-" + LocalOzoneClusterConfig.DEFAULT_FORMAT_MODE_VALUE + "}";
+  private static final String DEFAULT_DATANODES_VALUE = "${env:"
+      + ENV_DATANODES + ":-" + LocalOzoneClusterConfig.DEFAULT_DATANODES_VALUE
+      + "}";
+  private static final String DEFAULT_HOST_VALUE = "${env:" + ENV_HOST
+      + ":-" + LocalOzoneClusterConfig.DEFAULT_HOST + "}";
+  private static final String DEFAULT_BIND_HOST_VALUE = "${env:" + ENV_BIND_HOST + "}";
+  private static final String DEFAULT_SCM_PORT_VALUE = "${env:"
+      + ENV_SCM_PORT + ":-" + LocalOzoneClusterConfig.DEFAULT_PORT_VALUE
+      + "}";
+  private static final String DEFAULT_OM_PORT_VALUE = "${env:" + ENV_OM_PORT
+      + ":-" + LocalOzoneClusterConfig.DEFAULT_PORT_VALUE + "}";
+  private static final String DEFAULT_S3G_ENABLED_VALUE = "${env:"
+      + ENV_S3G_ENABLED + ":-"
+      + LocalOzoneClusterConfig.DEFAULT_S3G_ENABLED_VALUE + "}";
+  private static final String DEFAULT_S3G_PORT_VALUE = "${env:" + ENV_S3G_PORT
+      + ":-" + LocalOzoneClusterConfig.DEFAULT_PORT_VALUE + "}";
+  private static final String DEFAULT_RECON_ENABLED_VALUE = "${env:"
+      + ENV_RECON_ENABLED + ":-"
+      + LocalOzoneClusterConfig.DEFAULT_RECON_ENABLED_VALUE + "}";
+  private static final String DEFAULT_RECON_PORT_VALUE = "${env:"
+      + ENV_RECON_PORT + ":-" + LocalOzoneClusterConfig.DEFAULT_PORT_VALUE
+      + "}";
+  private static final String DEFAULT_EPHEMERAL_VALUE = "${env:"
+      + ENV_EPHEMERAL + ":-"
+      + LocalOzoneClusterConfig.DEFAULT_EPHEMERAL_VALUE + "}";
+  private static final String DEFAULT_STARTUP_TIMEOUT_VALUE = "${env:"
+      + ENV_STARTUP_TIMEOUT + ":-"
+      + LocalOzoneClusterConfig.DEFAULT_STARTUP_TIMEOUT_VALUE + "}";
+
+  public OzoneLocal() {
+    super();
+  }
+
+  OzoneLocal(CommandLine.IFactory factory) {
+    super(factory);
+  }
+
+  @Override
+  public void setConfigurationPath(String configPath) {
+    // Configuration records a classpath resource by its bare name and LocalOzoneCluster#userConfiguredSource
+    // compares names exactly, so a scheme-less path is absolutized: ./ozone-default.xml must stay a user
+    // choice. A scheme (file:, hdfs:) cannot collide and java.nio would mangle it into a literal path, so
+    // it passes through. fs.Path does the scheme check because it also rejects an empty value at parse.
+    if (new org.apache.hadoop.fs.Path(configPath).toUri().getScheme() == null) {
+      configPath = Paths.get(configPath).toAbsolutePath().normalize().toString();
+    }
+    super.setConfigurationPath(configPath);
+  }
+
+  @Override
+  public void printError(Throwable error) {
+    if (!(error instanceof StartupFailureException)) {
+      super.printError(error);
+      return;
+    }
+
+    super.printError(error.getCause());
+    String hint = startupFailureHint(LOG.isInfoEnabled(), isVerbose());
+    if (hint != null) {
+      err().println(hint);
+    }
+  }
+
+  static String startupFailureHint(boolean infoEnabled, boolean verbose) {
+    if (infoEnabled && verbose) {
+      return null;
+    }
+    if (!infoEnabled && !verbose) {
+      return "For more detail, re-run with `ozone --loglevel INFO local run` for service logs,"
+          + " or add --verbose for the full stack trace.";
+    }
+    if (!infoEnabled) {
+      return "For service logs, re-run with `ozone --loglevel INFO local run`.";
+    }
+    return "For the full stack trace, add --verbose.";
+  }
+
+  public static void main(String[] args) {
+    new OzoneLocal().run(args);
+  }
+
+  private static final class StartupFailureException extends Exception {
+
+    private StartupFailureException(Throwable cause) {
+      super(cause);
+    }
+  }
+
+  @Command(name = "run",
+      description = "Start SCM, OM, datanodes, and optional S3 Gateway and Recon in one local process")
+  static class RunCommand extends AbstractSubcommand implements Callable<Void> {
+
+    @Option(names = "--data-dir",
+        defaultValue = DEFAULT_DATA_DIR_VALUE,
+        description = "Persistent data directory for the local cluster")
+    private Path dataDir;
+
+    @Option(names = "--format",
+        converter = FormatModeConverter.class,
+        defaultValue = DEFAULT_FORMAT_VALUE,
+        description = "Storage init mode: if-needed, always, never")
+    private LocalOzoneClusterConfig.FormatMode formatMode;
+
+    @Option(names = "--datanodes",
+        defaultValue = DEFAULT_DATANODES_VALUE,
+        description = "Number of datanodes to start")
+    private int datanodes;
+
+    @Option(names = "--host",
+        defaultValue = DEFAULT_HOST_VALUE,
+        description = "Advertised host to write into local service addresses")
+    private String host;
+
+    @Option(names = "--bind-host",
+        defaultValue = DEFAULT_BIND_HOST_VALUE,
+        description = "Bind host for HTTP and RPC listeners (default: --host)")
+    private String bindHost;
+
+    @Option(names = "--scm-port",
+        defaultValue = DEFAULT_SCM_PORT_VALUE,
+        description = "SCM client RPC port (0 means auto-allocate)")
+    private int scmPort;
+
+    @Option(names = "--om-port",
+        defaultValue = DEFAULT_OM_PORT_VALUE,
+        description = "OM RPC port (0 means auto-allocate)")
+    private int omPort;
+
+    @Option(names = "--s3g-port",
+        defaultValue = DEFAULT_S3G_PORT_VALUE,
+        description = "S3 Gateway HTTP port (0 means auto-allocate)")
+    private int s3gPort;
+
+    @Option(names = "--s3g",
+        negatable = true,
+        defaultValue = DEFAULT_S3G_ENABLED_VALUE,
+        fallbackValue = "true",
+        description = "Enable S3 Gateway")
+    private boolean s3gEnabled;
+
+    @Option(names = "--recon-port",
+        defaultValue = DEFAULT_RECON_PORT_VALUE,
+        description = "Recon HTTP port (0 means auto-allocate)")
+    private int reconPort;
+
+    @Option(names = "--recon",
+        negatable = true,
+        defaultValue = DEFAULT_RECON_ENABLED_VALUE,
+        fallbackValue = "true",
+        description = "Enable Recon")
+    private boolean reconEnabled;
+
+    @Option(names = "--ephemeral",
+        negatable = true,
+        defaultValue = DEFAULT_EPHEMERAL_VALUE,
+        fallbackValue = "true",
+        description = "Delete the data directory on shutdown")
+    private boolean ephemeral;
+
+    @Option(names = "--startup-timeout",
+        converter = DurationConverter.class,
+        defaultValue = DEFAULT_STARTUP_TIMEOUT_VALUE,
+        description = "How long to wait for the local cluster to become ready")
+    private Duration startupTimeout;
+
+    @Override
+    public Void call() throws Exception {
+      LocalOzoneClusterConfig config = resolveConfig();
+      try (LocalOzoneRuntime runtime = createRuntime(config, getOzoneConf())) {
+        start(runtime);
+        printSummary(runtime, config);
+        awaitShutdown(runtime);
+      }
+      return null;
+    }
+
+    /** Wraps startup failures so {@link OzoneLocal#printError} can print the cause and then the hint. */
+    private void start(LocalOzoneRuntime runtime) throws Exception {
+      try {
+        runtime.start();
+      } catch (Exception ex) {
+        throw new StartupFailureException(ex);
+      }
+    }
+
+    LocalOzoneRuntime createRuntime(LocalOzoneClusterConfig config, OzoneConfiguration seedConfiguration) {
+      return new LocalOzoneCluster(config, seedConfiguration);
+    }
+
+    private void printSummary(LocalOzoneRuntime runtime, LocalOzoneClusterConfig config) {
+      PrintWriter writer = out();
+      writer.println("Local Ozone is running from " + config.getDataDir());
+      writer.println("SCM RPC: " + runtime.getDisplayHost() + ":" + runtime.getScmPort());
+      writer.println("OM RPC: " + runtime.getDisplayHost() + ":" + runtime.getOmPort());
+      if (config.isS3gEnabled()) {
+        writer.println("S3 endpoint: " + runtime.getS3Endpoint());
+        writer.println("Suggested local AWS settings:");
+        writer.println("AWS_ACCESS_KEY_ID=" + LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY);
+        writer.println("AWS_SECRET_ACCESS_KEY=" + LocalOzoneClusterConfig.LOCAL_S3_SECRET_KEY);
+        writer.println("AWS_REGION=" + LocalOzoneClusterConfig.LOCAL_S3_REGION);
+        writer.println("AWS_ENDPOINT_URL_S3=" + runtime.getS3Endpoint());
+        writer.println("Use path-style addressing (AWS CLI: aws configure set default.s3.addressing_style path).");
+        writer.println("With security off (the default), the S3 Gateway accepts any credentials.");
+      }
+      if (config.isReconEnabled()) {
+        writer.println("Recon endpoint: " + runtime.getReconEndpoint());
+      }
+      writer.println("Press Ctrl+C to stop.");
+      writer.flush();
+    }
+
+    /**
+     * Blocks until the JVM is asked to shut down (for example by Ctrl+C), closing the runtime from
+     * the shutdown hook before the JVM exits.
+     */
+    void awaitShutdown(LocalOzoneRuntime runtime) throws InterruptedException {
+      CountDownLatch stopped = new CountDownLatch(1);
+      Thread shutdownHook = new Thread(() -> {
+        try {
+          runtime.close();
+        } catch (Exception ex) {
+          LOG.warn("Failed to close ozone local runtime", ex);
+        } finally {
+          stopped.countDown();
+        }
+      }, "ozone-local-shutdown");
+      Runtime.getRuntime().addShutdownHook(shutdownHook);
+      try {
+        stopped.await();
+      } finally {
+        try {
+          Runtime.getRuntime().removeShutdownHook(shutdownHook);
+        } catch (IllegalStateException ignored) {
+          // JVM shutdown is already in progress.
+        }
+      }
+    }
+
+    LocalOzoneClusterConfig resolveConfig() {
+      if (datanodes < 1) {
+        throw new IllegalArgumentException(
+            "Datanode count for --datanodes must be at least 1.");
+      }
+      validatePort(scmPort, "--scm-port");
+      validatePort(omPort, "--om-port");
+      validatePort(s3gPort, "--s3g-port");
+      validatePort(reconPort, "--recon-port");
+      validateStartupTimeout();
+
+      return LocalOzoneClusterConfig.builder(dataDir)
+          .setFormatMode(formatMode)
+          .setDatanodes(datanodes)
+          .setHost(host)
+          .setBindHost(bindHost)
+          .setScmPort(scmPort)
+          .setOmPort(omPort)
+          .setS3gPort(s3gPort)
+          .setS3gEnabled(s3gEnabled)
+          .setReconPort(reconPort)
+          .setReconEnabled(reconEnabled)
+          .setEphemeral(ephemeral)
+          .setStartupTimeout(startupTimeout)
+          .build();
+    }
+
+    private void validateStartupTimeout() {
+      if (startupTimeout.isZero() || startupTimeout.isNegative()) {
+        throw new IllegalArgumentException(
+            "Startup timeout for --startup-timeout must be greater than zero.");
+      }
+    }
+
+    private static void validatePort(int value, String source) {
+      if (value < 0 || value > 65_535) {
+        throw new IllegalArgumentException("Port value for " + source
+            + " must be between 0 and 65535.");
+      }
+    }
+
+    private static final class FormatModeConverter
+        implements ITypeConverter<LocalOzoneClusterConfig.FormatMode> {
+
+      @Override
+      public LocalOzoneClusterConfig.FormatMode convert(String value) {
+        try {
+          return LocalOzoneClusterConfig.FormatMode.fromString(value);
+        } catch (IllegalArgumentException ex) {
+          // picocli's wrapper names the option but not the value, which may come from OZONE_LOCAL_FORMAT.
+          throw new CommandLine.TypeConversionException("Invalid format mode '" + value
+              + "'. Expected one of: if-needed, always, never.");
+        }
+      }
+    }
+
+    private static final class DurationConverter
+        implements ITypeConverter<Duration> {
+
+      @Override
+      public Duration convert(String value) {
+        String trimmed = value.trim();
+        try {
+          return Duration.parse(trimmed);
+        } catch (DateTimeParseException ignored) {
+          return parseHadoopStyleDuration(trimmed);
+        }
+      }
+
+      private static Duration parseHadoopStyleDuration(String value) {
+        if (LocalOzoneCluster.lacksTimeUnit(value)) {
+          throw new CommandLine.TypeConversionException("Missing time unit in '" + value
+              + "'. " + durationMessage());
+        }
+        try {
+          return TimeDurationUtil.getDuration("--startup-timeout", value,
+              TimeUnit.MILLISECONDS);
+        } catch (RuntimeException ex) {
+          throw new CommandLine.TypeConversionException("Invalid duration '" + value
+              + "'. " + durationMessage());
+        }
+      }
+
+      private static String durationMessage() {
+        return "Use ISO-8601 like PT2M or Hadoop-style values like 120s.";
+      }
+    }
+  }
+}

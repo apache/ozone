@@ -64,8 +64,8 @@ export const COLUMNS: ColumnsType<Pipeline> = [
     title: 'Pipeline ID',
     dataIndex: 'pipelineId',
     key: 'pipelineId',
+    fixed: 'left',
     sorter: (a: Pipeline, b: Pipeline) => a.pipelineId.localeCompare(b.pipelineId),
-
   },
   {
     title: 'Replication Type & Factor',

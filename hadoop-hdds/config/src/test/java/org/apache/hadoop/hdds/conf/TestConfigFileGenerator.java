@@ -47,14 +47,6 @@ public class TestConfigFileGenerator {
         .contains("<name>ozone.test.config.bind.host</name>");
 
     assertThat(generatedXml)
-        .as("annotation in ConfigurationExampleParent")
-        .contains("<name>ozone.test.config.secure</name>");
-
-    assertThat(generatedXml)
-        .as("annotation in ConfigurationExampleGrandParent")
-        .contains("<name>ozone.test.config.number</name>");
-
-    assertThat(generatedXml)
         .contains("<tag>MANAGEMENT</tag>");
   }
 }

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
@@ -25,6 +26,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +41,8 @@ public class TestSCMDatanodeProtocolServer {
     OzoneStorageContainerManager scm =
         mock(OzoneStorageContainerManager.class);
 
-    ReplicateContainerCommand command = ReplicateContainerCommand.forTest(1);
+    ReplicateContainerCommand command = ContainerTestUtils
+        .getReplicateContainerCommand(1, randomDatanodeDetails());
     command.setTerm(5L);
     command.setDeadline(1234L);
     StorageContainerDatanodeProtocolProtos.SCMCommandProto proto =

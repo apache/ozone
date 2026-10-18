@@ -83,8 +83,9 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
             "Number of replication requests skipped as the container is "
             + "already present"),
             supervisor.getReplicationSkippedCount())
-        .addGauge(Interns.info("maxReplicationStreams", "Maximum number of "
-            + "concurrent replication tasks which can run simultaneously"),
+        .addGauge(Interns.info("maxReplicationStreams", "Maximum pool size of "
+            + "the global replication handler executor (not total capacity "
+            + "when per-volume push replication thread pools are enabled)"),
             supervisor.getMaxReplicationStreams());
 
     Map<String, String> metricsMap = ReplicationSupervisor.getMetricsMap();

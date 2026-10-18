@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
  * Example configuration to test the configuration injection.
  */
 @ConfigGroup(prefix = "test.scm.client")
-public class SimpleConfiguration extends SimpleConfigurationParent {
+public class SimpleConfiguration extends ReconfigurableConfig {
 
   @Config(key = "test.scm.client.address",
       defaultValue = "localhost",

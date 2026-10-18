@@ -26,6 +26,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Collection;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
@@ -120,7 +121,7 @@ public final class ServerUtils {
     InetSocketAddress updatedAddr = new InetSocketAddress(addr.getHostString(),
         listenAddr.getPort());
     conf.set(addressKey,
-        addr.getHostString() + ":" + listenAddr.getPort());
+        HddsUtils.getHostPortString(addr.getHostString(), listenAddr.getPort()));
     return updatedAddr;
   }
 
@@ -252,6 +253,45 @@ public final class ServerUtils {
 
     throw new IllegalArgumentException(
         "Invalid configuration value for key: " + key);
+  }
+
+  /**
+   * Sets directory permissions based on configuration.
+   *
+   * @param dir The directory to set permissions on
+   * @param conf Configuration source
+   * @param permissionConfigKey The configuration key for permissions
+   */
+  public static void setDataDirectoryPermissions(File dir, ConfigurationSource conf,
+      String permissionConfigKey) {
+    if (dir == null || !dir.exists()) {
+      return;
+    }
+    // Don't attempt to set permissions on non-writable directories
+    // This allows volume initialization to fail naturally for read-only volumes
+    if (!dir.canWrite()) {
+      LOG.debug("Skipping permission setting for non-writable directory {}", dir);
+      return;
+    }
+
+    try {
+      String permissionValue = conf.get(permissionConfigKey);
+      if (permissionValue == null) {
+        LOG.warn("Permission configuration key {} not found, skipping permission " +
+            "setting for directory {}", permissionConfigKey, dir);
+        return;
+      }
+      String symbolicPermission = getSymbolicPermission(permissionValue);
+      Path path = dir.toPath();
+      Files.setPosixFilePermissions(path,
+          PosixFilePermissions.fromString(symbolicPermission));
+      LOG.debug("Set permissions {} on directory {} using config key {}",
+          symbolicPermission, dir, permissionConfigKey);
+    } catch (Exception e) {
+      LOG.warn("Failed to set directory permissions for {}: {}", dir,
+          e.getMessage());
+      // Don't throw exception to avoid failing startup, just log warning
+    }
   }
 
   /**

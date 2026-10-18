@@ -34,13 +34,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -56,10 +59,12 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -92,11 +97,26 @@ public class TestRatisPipelineProvider {
     init(maxPipelinePerNode, conf, testDir);
   }
 
+  public void initWithNodes(int maxPipelinePerNode, OzoneConfiguration conf, List<DatanodeDetails> nodes, int count)
+      throws Exception {
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+    nodeManager = new MockNodeManager(new NetworkTopologyImpl(new OzoneConfiguration()), nodes, false, count);
+    initializeCommonState(maxPipelinePerNode, conf);
+  }
+
   public void init(int maxPipelinePerNode, OzoneConfiguration conf, File dir) throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
-    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     nodeManager = new MockNodeManager(true, nodeCount);
+    initializeCommonState(maxPipelinePerNode, conf);
+  }
+
+  private void initializeCommonState(int maxPipelinePerNode, OzoneConfiguration conf) throws Exception {
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     nodeManager.setNumPipelinePerDatanode(maxPipelinePerNode);
+    long containerSize = (long) conf.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    nodeManager.setPendingContainerMaxSize(containerSize);
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
         maxPipelinePerNode);
@@ -136,14 +156,14 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(pipeline);
 
     Pipeline pipeline1 = provider.create(RatisReplicationConfig
         .getInstance(factor));
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     // New pipeline should not overlap with the previous created pipeline
@@ -185,7 +205,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto);
 
     factor = HddsProtos.ReplicationFactor.ONE;
@@ -194,7 +214,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline1, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto1 = pipeline1.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     stateManager.addPipeline(pipelineProto1);
     // With enough pipeline quote on datanodes, they should not share
     // the same set of datanodes.
@@ -241,6 +261,79 @@ public class TestRatisPipelineProvider {
     assertEquals(pipeline2.getNodeSet(), pipeline3.getNodeSet());
   }
 
+  private DatanodeDetails createDatanodeDetails(boolean supportRatisStreaming) {
+    Random random = ThreadLocalRandom.current();
+    String ipAddress = random.nextInt(256)
+        + "." + random.nextInt(256)
+        + "." + random.nextInt(256)
+        + "." + random.nextInt(256);
+
+    DatanodeDetails.Builder dn = DatanodeDetails.newBuilder()
+        .setID(DatanodeID.randomID())
+        .setHostName("localhost" + "-" + ipAddress)
+        .setIpAddress(ipAddress)
+        .setNetworkLocation(null)
+        .setPersistedOpState(HddsProtos.NodeOperationalState.IN_SERVICE)
+        .setPersistedOpStateExpiry(0);
+
+    for (DatanodeDetails.Port.Name name : DatanodeDetails.Port.Name.values()) {
+      if (!supportRatisStreaming && name == DatanodeDetails.Port.Name.RATIS_DATASTREAM) {
+        continue;
+      }
+      dn.addPort(DatanodeDetails.newPort(name, 0));
+    }
+    return dn.build();
+  }
+
+  @Test
+  public void testCreatePipelinePrioritizesRatisStreamingNodes() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    // Add 3 nodes WITH RATIS_DATASTREAM
+    for (int i = 0; i < 3; i++) {
+      nodes.add(createDatanodeDetails(true));
+    }
+    // Add 3 nodes WITHOUT RATIS_DATASTREAM
+    for (int i = 0; i < 3; i++) {
+      nodes.add(createDatanodeDetails(false));
+    }
+
+    initWithNodes(1, conf, nodes, 3);
+    Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    assertEquals(3, pipeline.getNodes().size());
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      assertTrue(dn.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM), 
+          "Pipeline should only contain datanodes with RATIS_DATASTREAM when available");
+    }
+  }
+
+  @Test
+  public void testCreatePipelineFallsBackWhenNotEnoughRatisStreamingNodes() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    // Add 2 nodes WITH RATIS_DATASTREAM
+    for (int i = 0; i < 2; i++) {
+      nodes.add(createDatanodeDetails(true));
+    }
+    // Add 1 node WITHOUT RATIS_DATASTREAM
+    nodes.add(createDatanodeDetails(false));
+
+    initWithNodes(1, conf, nodes, 3);
+    Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    assertEquals(3, pipeline.getNodes().size());
+    
+    long streamingNodeCount = pipeline.getNodes().stream()
+        .filter(dn -> dn.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM))
+        .count();
+    
+    assertEquals(2, streamingNodeCount, 
+        "Pipeline should contain exactly 2 nodes with RATIS_DATASTREAM as fallback was required");
+  }
+
   @Test
   public void testCreatePipelinesDnExclude() throws Exception {
 
@@ -274,7 +367,7 @@ public class TestRatisPipelineProvider {
     assertPipelineProperties(pipeline, factor, REPLICATION_TYPE,
         Pipeline.PipelineState.ALLOCATED);
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     nodeManager.addPipeline(pipeline);
     stateManager.addPipeline(pipelineProto);
 
@@ -365,6 +458,56 @@ public class TestRatisPipelineProvider {
     }
   }
 
+  @Test
+  public void testCreatePipelineWithDefaultLimit() throws Exception {
+    // Create conf without setting OZONE_DATANODE_PIPELINE_LIMIT
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
+
+    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
+
+    // MockNodeManager(true, 10) typically gives 8 healthy nodes in this test suite.
+    nodeManager = new MockNodeManager(true, nodeCount);
+    // Give a large quota in MockNodeManager so we don't fail early due to mock quota.
+    nodeManager.setNumPipelinePerDatanode(100);
+
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
+    stateManager = PipelineStateManagerImpl.newBuilder()
+        .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
+        .setRatisServer(scmhaManager.getRatisServer())
+        .setNodeManager(nodeManager)
+        .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
+        .build();
+
+    provider = new MockRatisPipelineProvider(nodeManager, stateManager, conf);
+
+    int healthyCount = nodeManager.getNodes(NodeStatus.inServiceHealthy()).size();
+    int defaultLimit = ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT;
+    assertEquals(2, defaultLimit);
+
+    // Max pipelines before exceeding per-DN default limit.
+    int maxPipelines = (healthyCount * defaultLimit)
+        / ReplicationFactor.THREE.getNumber();
+
+    // Create pipelines up to maxPipelines.
+    for (int i = 0; i < maxPipelines; i++) {
+      Pipeline p = provider.create(
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+          new ArrayList<>(), new ArrayList<>());
+      stateManager.addPipeline(p.getProtobufMessage(ClientVersion.CURRENT));
+    }
+
+    // Next pipeline creation should fail with default limit message.
+    SCMException ex = assertThrows(SCMException.class, () ->
+        provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            new ArrayList<>(), new ArrayList<>())
+    );
+
+    assertThat(ex.getMessage())
+        .contains("limit per datanode: " + defaultLimit)
+        .contains("replicationConfig: RATIS/THREE");
+  }
+
   @ParameterizedTest
   @CsvSource({ "1, 3", "2, 6"})
   public void testCreatePipelineThrowErrorWithDataNodeLimit(int limit, int pipelineCount) throws Exception {
@@ -376,7 +519,7 @@ public class TestRatisPipelineProvider {
     for (int i = 0; i < pipelineCount; i++) {
       stateManager.addPipeline(
           provider.create(RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
-              new ArrayList<>(), new ArrayList<>()).getProtobufMessage(ClientVersion.CURRENT_VERSION)
+              new ArrayList<>(), new ArrayList<>()).getProtobufMessage(ClientVersion.CURRENT)
       );
     }
 
@@ -403,7 +546,7 @@ public class TestRatisPipelineProvider {
         .setId(PipelineID.randomId())
         .build();
     HddsProtos.Pipeline pipelineProto = openPipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
 
     stateManager.addPipeline(pipelineProto);
     nodeManager.addPipeline(openPipeline);

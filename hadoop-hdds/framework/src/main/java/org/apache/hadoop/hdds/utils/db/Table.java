@@ -18,16 +18,20 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.TableCacheMetrics;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.ratis.util.function.CheckedFunction;
 
 /**
  * Interface for key-value store that stores ozone metadata. Ozone metadata is
@@ -64,6 +68,8 @@ public interface Table<KEY, VALUE> {
    * Check if a given key exists in Metadata store.
    * (Optimization to save on data deserialization)
    * A lock on the key / bucket needs to be acquired before invoking this API.
+   * Implementations may use fast existence checks internally, but the returned
+   * result must be definitive for the current table state.
    * @param key metadata key
    * @return true if the metadata store contains a key.
    */
@@ -90,6 +96,26 @@ public interface Table<KEY, VALUE> {
   }
 
   /**
+   * Skip checking cache and get the values mapped to the given keys. The
+   * returned list has the same size and order as {@code keys}; a missing key
+   * is represented by a null value.
+   *
+   * @param keys metadata keys
+   * @return values in the same order as {@code keys}
+   */
+  default List<VALUE> multiGetSkipCache(List<KEY> keys)
+      throws RocksDatabaseException, CodecException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<VALUE> values = new ArrayList<>(keys.size());
+    for (KEY key : keys) {
+      values.add(getSkipCache(key));
+    }
+    return values;
+  }
+
+  /**
    * Returns the value mapped to the given key in byte array or returns null
    * if the key is not found.
    *
@@ -104,15 +130,32 @@ public interface Table<KEY, VALUE> {
   }
 
   /**
+   * Returns a projection of the value mapped to the given key, i.e. only the fields the caller needs,
+   * or null if the key is not found. Implementations may decode {@code fromPersistedValue} straight
+   * from the serialized value instead of materializing the whole VALUE object.
+   * <p>
+   * {@code fromCachedValue} is applied to the cached object itself, without the defensive copy
+   * {@link #get} makes, so it must neither mutate nor retain it.
+   *
+   * @param key metadata key
+   * @param fromCachedValue extracts the projection from a value found in the cache
+   * @param fromPersistedValue extracts the projection from the serialized value read from the store
+   * @return the projection, or null if the key is not found.
+   */
+  default <R> R getProjected(KEY key, Function<VALUE, R> fromCachedValue,
+      CheckedFunction<CodecBuffer, R, CodecException> fromPersistedValue)
+      throws RocksDatabaseException, CodecException {
+    final VALUE value = get(key);
+    return value == null ? null : fromCachedValue.apply(value);
+  }
+
+  /**
    * Returns the value mapped to the given key in byte array or returns null
    * if the key is not found.
    *
-   * This method first checks using keyMayExist, if it returns false, we are
-   * 100% sure that key does not exist in DB, so it returns null with out
-   * calling db.get. If keyMayExist return true, then we use db.get and then
-   * return the value. This method will be useful in the cases where the
-   * caller is more sure that this key does not exist in DB and keyMayExist
-   * will help here.
+   * Implementations may use keyMayExist or similar fast-path checks
+   * internally, but the returned result must remain equivalent to a regular
+   * point lookup on the current table state.
    *
    * @param key metadata key
    * @return value in byte array or null if the key is not found.
@@ -135,20 +178,34 @@ public interface Table<KEY, VALUE> {
   void deleteWithBatch(BatchOperation batch, KEY key) throws CodecException;
 
   /**
-   * Deletes a range of keys from the metadata store as part of a batch operation.
-   * @param batch Batch operation to perform the delete operation.
-   * @param beginKey start metadata key, inclusive.
-   * @param endKey end metadata key, exclusive.
-   */
-  void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws CodecException;
-
-  /**
-   * Deletes a range of keys from the metadata store.
+   * Deletes a range of keys from this table.
    *
-   * @param beginKey start metadata key
-   * @param endKey end metadata key
+   * @param beginKey start key (inclusive)
+   * @param endKey end key (exclusive)
    */
   void deleteRange(KEY beginKey, KEY endKey) throws RocksDatabaseException, CodecException;
+
+  /**
+   * Deletes all entries from this table.
+   * Note: only entries in the underlying DB are deleted; the table cache
+   * (if any) is not affected. Callers must ensure the cache stays empty
+   * (or is separately invalidated) for the duration of this operation,
+   * e.g. by holding exclusive access to the table.
+   */
+  default void clear() throws RocksDatabaseException, CodecException {
+    final KEY beginKey;
+    final KEY endKey;
+    try (TableIterator<KEY, KEY> keyIterator = keyIterator()) {
+      if (!keyIterator.hasNext()) {
+        return;
+      }
+      beginKey = keyIterator.next();
+      keyIterator.seekToLast();
+      endKey = keyIterator.next();
+    }
+    deleteRange(beginKey, endKey);
+    delete(endKey);
+  }
 
   /** The same as iterator(null, KEY_AND_VALUE). */
   default KeyValueIterator<KEY, VALUE> iterator() throws RocksDatabaseException, CodecException {

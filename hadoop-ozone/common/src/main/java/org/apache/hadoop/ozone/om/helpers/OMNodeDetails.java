@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
@@ -182,14 +183,28 @@ public final class OMNodeDetails extends NodeDetails {
     }
   }
 
+  /**
+   * Returns v2 endpoint URL. Use {@link #getOMDBCheckpointEndpointUrl(boolean, boolean, boolean)}
+   * for configurable v1/v2 selection.
+   */
   public URL getOMDBCheckpointEndpointUrl(boolean isHttp, boolean flush)
       throws IOException {
+    return getOMDBCheckpointEndpointUrl(true, isHttp, flush);
+  }
+
+  /**
+   * @param useV2 when true use /v2/dbCheckpoint, when false use /dbCheckpoint
+   */
+  public URL getOMDBCheckpointEndpointUrl(boolean useV2, boolean isHttp,
+      boolean flush) throws IOException {
+    String path = useV2 ? OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2
+        : OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
     URL url;
     try {
       URIBuilder urlBuilder = new URIBuilder().
           setScheme(isHttp ? "http" : "https").
           setHost(isHttp ? getHttpAddress() : getHttpsAddress()).
-          setPath(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2).
+          setPath(path).
           addParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA, "true").
           addParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH,
               flush ? "true" : "false");

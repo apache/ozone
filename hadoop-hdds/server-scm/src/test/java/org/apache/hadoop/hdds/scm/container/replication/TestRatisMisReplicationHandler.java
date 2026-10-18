@@ -57,7 +57,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests the RatisReplicationHandling functionality.
  */
-public class TestRatisMisReplicationHandler extends TestMisReplicationHandler {
+public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
 
   @BeforeEach
   void setup(@TempDir File testDir) throws NodeNotFoundException,

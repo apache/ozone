@@ -30,8 +30,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
-import org.apache.hadoop.fs.FileSystemTestHelper;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -41,6 +39,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerLayoutTestInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * This class tests create/read .container files.
@@ -49,7 +48,8 @@ public class TestContainerDataYaml {
 
   private long testContainerID = 1234;
 
-  private static String testRoot = new FileSystemTestHelper().getTestRootDir();
+  @TempDir
+  private File testRoot;
 
   private static final long MAXSIZE = (long) StorageUnit.GB.toBytes(5);
   private static final Instant SCAN_TIME = Instant.now();
@@ -65,13 +65,10 @@ public class TestContainerDataYaml {
   }
 
   /**
-   * Creates a .container file. cleanup() should be called at the end of the
-   * test when container file is created.
+   * Creates a .container file.
    */
   private File createContainerFile(long containerID, int replicaIndex)
       throws IOException {
-    assertTrue(new File(testRoot).mkdirs());
-
     String containerPath = containerID + ".container";
 
     KeyValueContainerData keyValueContainerData = new KeyValueContainerData(
@@ -79,8 +76,8 @@ public class TestContainerDataYaml {
         UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     keyValueContainerData.setContainerDBType(CONTAINER_DB_TYPE);
-    keyValueContainerData.setMetadataPath(testRoot);
-    keyValueContainerData.setChunksPath(testRoot);
+    keyValueContainerData.setMetadataPath(testRoot.getAbsolutePath());
+    keyValueContainerData.setChunksPath(testRoot.getAbsolutePath());
     keyValueContainerData.updateDataScanTime(SCAN_TIME);
     keyValueContainerData.setSchemaVersion(
         VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion());
@@ -96,10 +93,6 @@ public class TestContainerDataYaml {
     assertTrue(containerFile.exists());
 
     return containerFile;
-  }
-
-  private void cleanup() {
-    FileUtil.fullyDelete(new File(testRoot));
   }
 
   @ContainerLayoutTestInfo.ContainerTest
@@ -127,9 +120,9 @@ public class TestContainerDataYaml {
     assertEquals(MAXSIZE, kvData.getMaxSize());
     assertTrue(kvData.lastDataScanTime().isPresent());
     assertEquals(SCAN_TIME.toEpochMilli(),
-                 kvData.lastDataScanTime().get().toEpochMilli());
+        kvData.lastDataScanTime().get().toEpochMilli());
     assertEquals(SCAN_TIME.toEpochMilli(),
-                 kvData.getDataScanTimestamp().longValue());
+        kvData.getDataScanTimestamp().longValue());
     assertEquals(VersionedDatanodeFeatures.SchemaV2.chooseSchemaVersion(),
         kvData.getSchemaVersion());
     assertEquals(7, kvData.getReplicaIndex());
@@ -143,7 +136,7 @@ public class TestContainerDataYaml {
     ContainerDataYaml.createContainerFile(kvData, containerFile);
 
     // Reading newly updated data from .container file
-    kvData =  (KeyValueContainerData) ContainerDataYaml.readContainerFile(
+    kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(
         containerFile);
 
     // verify data.
@@ -166,8 +159,6 @@ public class TestContainerDataYaml {
         kvData.lastDataScanTime().get().toEpochMilli());
     assertEquals(SCAN_TIME.toEpochMilli(),
         kvData.getDataScanTimestamp().longValue());
-
-    cleanup();
   }
 
   @ContainerLayoutTestInfo.ContainerTest
@@ -184,7 +175,6 @@ public class TestContainerDataYaml {
     assertThat(content)
         .withFailMessage("ReplicaIndex shouldn't be persisted if zero")
         .doesNotContain("replicaIndex");
-    cleanup();
   }
 
   @ContainerLayoutTestInfo.ContainerTest
@@ -234,7 +224,7 @@ public class TestContainerDataYaml {
   }
 
   /**
-   * Test to verify {@link ContainerUtils#verifyContainerFileChecksum(ContainerData,ConfigurationSource)}.
+   * Test to verify {@link ContainerUtils#verifyContainerFileChecksum(ContainerData, ConfigurationSource)}.
    */
   @ContainerLayoutTestInfo.ContainerTest
   public void testChecksumInContainerFile(ContainerLayoutVersion layout) throws IOException {
@@ -246,8 +236,6 @@ public class TestContainerDataYaml {
     // Read from .container file, and verify data.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
     ContainerUtils.verifyContainerFileChecksum(kvData, conf);
-
-    cleanup();
   }
 
   /**
@@ -265,12 +253,10 @@ public class TestContainerDataYaml {
     // file.
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml.readContainerFile(containerFile);
     assertEquals(0, kvData.getDataChecksum());
-
-    cleanup();
   }
 
   /**
-   * Test to verify {@link ContainerUtils#verifyContainerFileChecksum(ContainerData,ConfigurationSource)}.
+   * Test to verify {@link ContainerUtils#verifyContainerFileChecksum(ContainerData, ConfigurationSource)}.
    */
   @ContainerLayoutTestInfo.ContainerTest
   public void testChecksumInContainerFileWithReplicaIndex(
@@ -284,8 +270,6 @@ public class TestContainerDataYaml {
     KeyValueContainerData kvData = (KeyValueContainerData) ContainerDataYaml
         .readContainerFile(containerFile);
     ContainerUtils.verifyContainerFileChecksum(kvData, conf);
-
-    cleanup();
   }
 
   private KeyValueContainerData getKeyValueContainerData() throws IOException {

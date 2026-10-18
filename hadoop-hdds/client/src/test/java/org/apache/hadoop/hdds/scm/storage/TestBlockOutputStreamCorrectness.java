@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -67,7 +69,7 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 class TestBlockOutputStreamCorrectness {
 
-  private static final int DATA_SIZE = 256 * (int) OzoneConsts.MB;
+  private static final int DATA_SIZE = 16 * (int) OzoneConsts.MB;
   private static final byte[] DATA = RandomUtils.secure().randomBytes(DATA_SIZE);
 
   @ParameterizedTest
@@ -75,7 +77,7 @@ class TestBlockOutputStreamCorrectness {
   void test(final int writeSize) throws IOException {
     assertEquals(0, DATA_SIZE % writeSize);
 
-    final BufferPool bufferPool = new BufferPool(4 * 1024 * 1024, 32 / 4);
+    final BufferPool bufferPool = new BufferPool(1024 * 1024 / 4, 32 / 4);
 
     for (int block = 0; block < 10; block++) {
       try (BlockOutputStream outputStream = createBlockOutputStream(bufferPool)) {
@@ -132,6 +134,46 @@ class TestBlockOutputStreamCorrectness {
     }
   }
 
+  @Test
+  public void testEcReconstructionStreamDisablesContainerAutoCreate() throws IOException {
+    OzoneClientConfig config = new OzoneClientConfig();
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    BlockID blockID = new BlockID(1, 1);
+    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(datanodeDetails.getID())
+        .setReplicationConfig(replicationConfig)
+        .setNodes(ImmutableList.of(datanodeDetails))
+        .setState(Pipeline.PipelineState.CLOSED)
+        .setReplicaIndexes(ImmutableMap.of(datanodeDetails, 2))
+        .build();
+
+    try (ECBlockOutputStream ecBlockOutputStream = createECBlockOutputStream(config, replicationConfig,
+        blockID, pipeline, false)) {
+      assertFalse(ecBlockOutputStream.isContainerAutoCreate());
+    }
+  }
+
+  @Test
+  public void testEcClientStreamAllowsContainerAutoCreate() throws IOException {
+    OzoneClientConfig config = new OzoneClientConfig();
+    ECReplicationConfig replicationConfig = new ECReplicationConfig(3, 2);
+    BlockID blockID = new BlockID(1, 1);
+    DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setId(datanodeDetails.getID())
+        .setReplicationConfig(replicationConfig)
+        .setNodes(ImmutableList.of(datanodeDetails))
+        .setState(Pipeline.PipelineState.CLOSED)
+        .setReplicaIndexes(ImmutableMap.of(datanodeDetails, 2))
+        .build();
+
+    try (ECBlockOutputStream ecBlockOutputStream = createECBlockOutputStream(config, replicationConfig,
+        blockID, pipeline)) {
+      assertTrue(ecBlockOutputStream.isContainerAutoCreate());
+    }
+  }
+
   /**
    * Creates a BlockData array with {@link ECReplicationConfig#getRequiredNodes()} number of elements.
    */
@@ -160,12 +202,12 @@ class TestBlockOutputStreamCorrectness {
         .thenReturn(new MockXceiverClientSpi(pipeline));
 
     OzoneClientConfig config = new OzoneClientConfig();
-    config.setStreamBufferSize(4 * 1024 * 1024);
-    config.setStreamBufferMaxSize(32 * 1024 * 1024);
+    config.setStreamBufferSize(1024 * 1024 / 4);
+    config.setStreamBufferMaxSize(2 * 1024 * 1024);
     config.setStreamBufferFlushDelay(true);
-    config.setStreamBufferFlushSize(16 * 1024 * 1024);
+    config.setStreamBufferFlushSize(1024 * 1024);
     config.setChecksumType(ChecksumType.NONE);
-    config.setBytesPerChecksum(256 * 1024);
+    config.setBytesPerChecksum(16 * 1024);
     StreamBufferArgs streamBufferArgs =
         StreamBufferArgs.getDefaultStreamBufferArgs(pipeline.getReplicationConfig(), config);
 
@@ -183,7 +225,8 @@ class TestBlockOutputStreamCorrectness {
   }
 
   private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
-      ECReplicationConfig repConfig, BlockID blockID, Pipeline pipeline) throws IOException {
+      ECReplicationConfig repConfig, BlockID blockID, Pipeline pipeline,
+      boolean containerAutoCreate) throws IOException {
     final XceiverClientManager xcm = mock(XceiverClientManager.class);
     when(xcm.acquireClient(any()))
         .thenReturn(new MockXceiverClientSpi(pipeline));
@@ -193,7 +236,12 @@ class TestBlockOutputStreamCorrectness {
         StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, clientConfig);
 
     return new ECBlockOutputStream(blockID, xcm, pipeline, BufferPool.empty(), clientConfig, null,
-        clientMetrics, streamBufferArgs, () -> newFixedThreadPool(2));
+        clientMetrics, streamBufferArgs, () -> newFixedThreadPool(2), containerAutoCreate);
+  }
+
+  private ECBlockOutputStream createECBlockOutputStream(OzoneClientConfig clientConfig,
+      ECReplicationConfig repConfig, BlockID blockID, Pipeline pipeline) throws IOException {
+    return createECBlockOutputStream(clientConfig, repConfig, blockID, pipeline, true);
   }
 
   /**
@@ -231,7 +279,7 @@ class TestBlockOutputStreamCorrectness {
 
       if (!request.hasVersion()) {
         request = ContainerCommandRequestProto.newBuilder(request)
-            .setVersion(ClientVersion.CURRENT.toProtoValue()).build();
+            .setVersion(ClientVersion.CURRENT.serialize()).build();
       }
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()

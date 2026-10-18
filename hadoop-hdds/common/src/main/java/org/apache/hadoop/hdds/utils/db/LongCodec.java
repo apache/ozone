@@ -55,19 +55,20 @@ public final class LongCodec implements Codec<Long> {
 
   @Override
   public byte[] toPersistedFormat(Long object) {
-    if (object == null) {
-      return null;
-    }
-    return ByteBuffer.wrap(new byte[Long.BYTES]).putLong(object).array();
+    return object != null ? toByteArray(object) : null;
+  }
+
+  public byte[] toByteArray(long value) {
+    return ByteBuffer.wrap(new byte[Long.BYTES]).putLong(value).array();
   }
 
   @Override
-  public Long fromPersistedFormat(byte[] rawData) {
-    if (rawData != null) {
-      return ByteBuffer.wrap(rawData).getLong();
-    } else {
-      return null;
-    }
+  public Long fromPersistedFormat(byte[] bytes) {
+    return bytes != null ? fromByteArray(bytes) : null;
+  }
+
+  public long fromByteArray(byte[] bytes) {
+    return ByteBuffer.wrap(bytes).getLong();
   }
 
   @Override

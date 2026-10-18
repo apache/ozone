@@ -17,18 +17,22 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
+import static org.apache.hadoop.ozone.DataTestUtil.readFully;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.TestDataUtil.readFully;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -36,8 +40,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -49,6 +54,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -61,7 +67,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SstFilteringService;
@@ -71,6 +76,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
+import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -80,15 +86,21 @@ import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
 
 /**
  * Tests snapshot background services.
  */
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestSnapshotBackgroundServices {
   private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
@@ -105,8 +117,8 @@ public class TestSnapshotBackgroundServices {
   private OzoneClient client;
   private final AtomicInteger counter = new AtomicInteger();
 
-  @BeforeEach
-  public void init(TestInfo testInfo) throws Exception {
+  @BeforeAll
+  public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String omServiceId = "om-service-test1";
     OzoneManagerRatisServerConfig omRatisConf = conf.getObject(OzoneManagerRatisServerConfig.class);
@@ -120,66 +132,48 @@ public class TestSnapshotBackgroundServices {
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16, StorageUnit.KB);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY, 16, StorageUnit.KB);
-    if ("testSSTFilteringBackgroundService".equals(testInfo.getDisplayName())) {
-      conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, 1,
-          TimeUnit.SECONDS);
-    }
-    if ("testCompactionLogBackgroundService"
-        .equals(testInfo.getDisplayName())) {
-      conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED, 1,
-          TimeUnit.MILLISECONDS);
-    }
-    if ("testBackupCompactionFilesPruningBackgroundService"
-        .equals(testInfo.getDisplayName())) {
-      conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED, 1,
-          TimeUnit.MILLISECONDS);
-      conf.setTimeDuration(
-          OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 1,
-          TimeUnit.SECONDS);
-    }
-    if ("testSnapshotAndKeyDeletionBackgroundServices"
-        .equals(testInfo.getDisplayName())) {
-      conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1,
-          TimeUnit.SECONDS);
-      conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1,
-          TimeUnit.SECONDS);
-      conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED, 1,
-          TimeUnit.MILLISECONDS);
-      conf.setTimeDuration(
-          OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 3,
-          TimeUnit.SECONDS);
-      conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, 3,
-          TimeUnit.SECONDS);
-    }
+
+    // Used by: testSSTFilteringBackgroundService
+    conf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+
+    // Used by: testCompactionLogBackgroundService, testBackupCompactionFilesPruningBackgroundService,
+    //                                         testSnapshotAndKeyDeletionBackgroundServices
+    conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED, 1, TimeUnit.MILLISECONDS);
+
+    // Used by: testCompactionLogBackgroundService, testBackupCompactionFilesPruningBackgroundService
+    conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 3, TimeUnit.SECONDS);
+
+    // Used by: testSnapshotAndKeyDeletionBackgroundServices
+    conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    // Used by: testSnapshotAndKeyDeletionBackgroundServices
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
         SNAPSHOT_THRESHOLD);
     int numOfOMs = 3;
     cluster = MiniOzoneCluster.newHABuilder(conf)
-        .setOMServiceId("om-service-test1")
+        .setOMServiceId(omServiceId)
         .setNumOfOzoneManagers(numOfOMs)
-        .setNumOfActiveOMs(2)
+        .setNumOfActiveOMs(numOfOMs)
         .build();
-    if ("testBackupCompactionFilesPruningBackgroundService"
-        .equals(testInfo.getDisplayName())) {
-      cluster.
-          getOzoneManagersList()
-          .forEach(
-              TestSnapshotBackgroundServices
-                  ::suspendBackupCompactionFilesPruning);
-    }
+
     cluster.waitForClusterToBeReady();
     client = OzoneClientFactory.getRpcClient(omServiceId, conf);
     objectStore = client.getObjectStore();
+  }
+
+  @BeforeEach
+  public void setupTest() throws IOException, InterruptedException, TimeoutException {
+    recoverCluster();
+    stopFollowerOM(cluster.getOMLeader());
 
     volumeName = "volume" + counter.incrementAndGet();
     bucketName = "bucket" + counter.incrementAndGet();
-
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner("user" + counter.incrementAndGet())
         .setAdmin("admin" + counter.incrementAndGet())
         .build();
-
     objectStore.createVolume(volumeName, createVolumeArgs);
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
 
@@ -188,7 +182,32 @@ public class TestSnapshotBackgroundServices {
     ozoneBucket = retVolumeinfo.getBucket(bucketName);
   }
 
-  @AfterEach
+  private void recoverCluster() throws InterruptedException, TimeoutException, IOException {
+    for (OzoneManager ozoneManager : cluster.getOzoneManagersList()) {
+      if (!ozoneManager.isRunning()) {
+        cluster.restartOzoneManager(ozoneManager, false);
+      }
+
+      if (!ozoneManager.getMetadataManager().getStore().getRocksDBCheckpointDiffer().shouldRun()) {
+        resumeBackupCompactionFilesPruning(ozoneManager);
+      }
+    }
+    cluster.waitForClusterToBeReady();
+    cluster.waitForLeaderOM();
+  }
+
+  private void stopFollowerOM(OzoneManager leaderOM) throws TimeoutException, InterruptedException {
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      if (om != leaderOM && om.isRunning()) {
+        String omNodeId = om.getOMNodeId();
+        cluster.stopOzoneManager(omNodeId);
+        GenericTestUtils.waitFor(() -> !om.isRunning() && !om.isOmRpcServerRunning(), 100, 15000);
+        break;
+      }
+    }
+  }
+
+  @AfterAll
   public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
@@ -202,7 +221,7 @@ public class TestSnapshotBackgroundServices {
   public void testSnapshotAndKeyDeletionBackgroundServices()
       throws Exception {
     OzoneManager leaderOM = getLeaderOM();
-    OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
+    OzoneManager followerOM = getInactiveFollowerOM();
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
@@ -332,7 +351,7 @@ public class TestSnapshotBackgroundServices {
     long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
 
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
-    cluster.startInactiveOM(followerOM.getOMNodeId());
+    cluster.restartOzoneManager(followerOM, true);
     actionAfterStarting.run();
 
     // The recently started OM should be lagging behind the leader OM.
@@ -357,28 +376,41 @@ public class TestSnapshotBackgroundServices {
     }
   }
 
-  private OzoneManager getInactiveFollowerOM(OzoneManager leaderOM) {
-    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
-    if (cluster.isOMActive(followerNodeId)) {
-      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
-    }
-    return cluster.getOzoneManager(followerNodeId);
+  private OzoneManager getInactiveFollowerOM()
+      throws TimeoutException, InterruptedException {
+    // Wait for an inactive OM to be available
+    AtomicReference<OzoneManager> inactiveOM = new AtomicReference<>();
+    GenericTestUtils.waitFor(() -> {
+      Iterator<OzoneManager> iterator = cluster.getInactiveOM();
+      if (iterator.hasNext()) {
+        inactiveOM.set(iterator.next());
+        return true;
+      }
+      return false;
+    }, 100, 10000);
+    OzoneManager result = inactiveOM.get();
+    assertNotNull(result, "No inactive OM available");
+    return result;
   }
 
   private OzoneManager getLeaderOM() {
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
-    return cluster.getOzoneManager(leaderOMNodeId);
+    return cluster.getOMLeader();
   }
 
   @Test
   @DisplayName("testCompactionLogBackgroundService")
   @Flaky("HDDS-11672")
+  @Order(Integer.MAX_VALUE)
   public void testCompactionLogBackgroundService()
       throws IOException, InterruptedException, TimeoutException {
+
+    // reset to the default value to avoid side effects
+    cluster.restartOzoneManagersWithConfigCustomizer(config -> {
+      config.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 10, TimeUnit.MINUTES);
+    });
+
     OzoneManager leaderOM = getLeaderOM();
-    OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
+    OzoneManager followerOM = getInactiveFollowerOM();
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
@@ -409,6 +441,7 @@ public class TestSnapshotBackgroundServices {
         newLeaderOM.getMetadataManager().getStore()
             .getRocksDBCheckpointDiffer().getForwardCompactionDAG().nodes()
             .stream().map(CompactionNode::getFileName).collect(toSet()));
+
     assertEquals(leaderOM.getMetadataManager().getStore()
             .getRocksDBCheckpointDiffer().getForwardCompactionDAG().edges()
             .stream().map(edge ->
@@ -442,8 +475,14 @@ public class TestSnapshotBackgroundServices {
   @DisplayName("testBackupCompactionFilesPruningBackgroundService")
   public void testBackupCompactionFilesPruningBackgroundService()
       throws IOException, InterruptedException, TimeoutException {
+
+    cluster.getOzoneManagersList().stream()
+        .filter(OzoneManager::isRunning)
+        .forEach(TestSnapshotBackgroundServices::suspendBackupCompactionFilesPruning);
+
     OzoneManager leaderOM = getLeaderOM();
-    OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
+    OzoneManager followerOM = getInactiveFollowerOM();
+
 
     startInactiveFollower(leaderOM, followerOM,
         () -> suspendBackupCompactionFilesPruning(followerOM));
@@ -461,14 +500,27 @@ public class TestSnapshotBackgroundServices {
     createSnapshotsEachWithNewKeys(newLeaderOM);
 
     File sstBackupDir = getSstBackupDir(newLeaderOM);
-    File[] files = sstBackupDir.listFiles();
-    assertNotNull(files);
-    int numberOfSstFiles = files.length;
+    Set<String> existingCompactionInputs = getCompactionLogEntries(newLeaderOM).stream()
+        .flatMap(entry -> entry.getInputFileInfoList().stream())
+        .map(fileInfo -> fileInfo.getFileName())
+        .collect(toSet());
 
+    // Force a completed key-table compaction instead of relying on automatic compaction or a previous test.
+    CompactDBUtil.compactTable(newLeaderOM.getMetadataManager(), KEY_TABLE,
+        ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+    List<File> compactionInputs = getCompactionLogEntries(newLeaderOM).stream()
+        .flatMap(entry -> entry.getInputFileInfoList().stream())
+        .map(fileInfo -> fileInfo.getFileName())
+        .filter(fileName -> !existingCompactionInputs.contains(fileName))
+        .map(fileName -> new File(sstBackupDir, fileName + ROCKSDB_SST_SUFFIX))
+        .filter(File::exists)
+        .collect(toList());
+    assertFalse(compactionInputs.isEmpty(), "Expected new backup SST inputs from the completed compaction");
+
+    assertEquals(cluster.getOMLeader(), newLeaderOM);
     resumeBackupCompactionFilesPruning(newLeaderOM);
 
-    checkIfCompactionBackupFilesWerePruned(sstBackupDir,
-        numberOfSstFiles);
+    GenericTestUtils.waitFor(() -> compactionInputs.stream().noneMatch(File::exists), 1000, 10000);
 
     confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(newLeaderOM);
   }
@@ -496,7 +548,7 @@ public class TestSnapshotBackgroundServices {
   public void testSSTFilteringBackgroundService()
       throws IOException, InterruptedException, TimeoutException {
     OzoneManager leaderOM = getLeaderOM();
-    OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
+    OzoneManager followerOM = getInactiveFollowerOM();
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
@@ -531,17 +583,6 @@ public class TestSnapshotBackgroundServices {
     assertEquals(Collections.singletonList(
             SnapshotDiffReportOzone.getDiffReportEntry(SnapshotDiffReport.DiffType.CREATE, diffKey, null)),
         diff.getDiffList());
-  }
-
-  private static void checkIfCompactionBackupFilesWerePruned(
-      File sstBackupDir,
-      int numberOfSstFiles
-  ) throws TimeoutException, InterruptedException {
-    GenericTestUtils.waitFor(() -> {
-      int newNumberOfSstFiles = Objects.requireNonNull(
-          sstBackupDir.listFiles()).length;
-      return numberOfSstFiles > newNumberOfSstFiles;
-    }, 1000, 10000);
   }
 
   private static File getSstBackupDir(OzoneManager ozoneManager) {

@@ -114,7 +114,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // check if the directory already existed in OM
       checkDirectoryResult(keyName, pathInfoFSO.getDirectoryResult());
 
-      final OmBucketInfo bucketInfo = getBucketInfo(omMetadataManager,
+      final OmBucketInfo bucketInfo = getBucketInfoForUpdate(omMetadataManager,
           volumeName, bucketName);
 
       // add all missing parents to dir table
@@ -168,6 +168,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
           .setObjectID(pathInfoFSO.getLeafNodeObjectId())
           .setUpdateID(transactionLogIndex)
           .setParentID(pathInfoFSO.getLastKnownParentId())
+          // Source of truth is the value stamped onto the proto in preExecute
+          // (before Ratis). Never re-check MLV here in the replicated apply path.
+          .setSchemaVersion(multipartInfoInitiateRequest.getSchemaVersion())
           .build();
 
       omKeyInfo = new OmKeyInfo.Builder()
@@ -210,6 +213,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // Add to cache
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           multipartKey, multipartKeyInfo, transactionLogIndex);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), bucketInfo, transactionLogIndex);
 
       omClientResponse =
           new S3InitiateMultipartUploadResponseWithFSO(

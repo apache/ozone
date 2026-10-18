@@ -23,7 +23,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_HTTPS_ADDRESS
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_RANGER_SERVICE;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
-import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
+import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.security.authentication.util.KerberosName;
 import org.apache.ozone.test.GenericTestUtils;
@@ -37,7 +37,7 @@ class TestRangerClientMultiTenantAccessController extends MultiTenantAccessContr
 
   @Override
   protected MultiTenantAccessController createSubject() {
-    MutableConfigurationSource conf = new InMemoryConfiguration();
+    MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
 
     // Set up truststore
     System.setProperty("javax.net.ssl.trustStore",

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.hdds.StringUtils.bytes2String;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -28,13 +27,21 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.google.protobuf.ByteString;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -51,9 +58,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.rocksdb.ByteBufferGetStatus;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.rocksdb.Status;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,7 +76,7 @@ public class TestRDBTableStore {
   public static final int MAX_DB_UPDATES_SIZE_THRESHOLD = 80;
   private static int count = 0;
   private final List<String> families =
-      Arrays.asList(bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
+      Arrays.asList(StringUtils.bytes2String(RocksDB.DEFAULT_COLUMN_FAMILY),
           "First", "Second", "Third",
           "Fourth", "Fifth",
           "Sixth", "Seventh",
@@ -137,6 +146,7 @@ public class TestRDBTableStore {
       options.close();
     }
     CodecTestUtil.gc();
+    CodecBuffer.assertNoLeaks();
   }
 
   @Test
@@ -157,6 +167,94 @@ public class TestRDBTableStore {
     assertArrayEquals(value, readValue);
     Table<byte[], byte[]> secondTable = rdbStore.getTable("Second");
     assertTrue(secondTable.isEmpty());
+  }
+
+  @Test
+  public void multiGetSkipCache() throws Exception {
+    Table<byte[], byte[]> testTable = rdbStore.getTable("First");
+    byte[] key1 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] key2 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] missingKey = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] value1 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    byte[] value2 = RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
+    testTable.put(key1, value1);
+    testTable.put(key2, value2);
+
+    List<byte[]> values = testTable.multiGetSkipCache(Arrays.asList(key1, missingKey, key2));
+    assertEquals(3, values.size());
+    assertArrayEquals(value1, values.get(0));
+    assertNull(values.get(1));
+    assertArrayEquals(value2, values.get(2));
+    assertTrue(testTable.multiGetSkipCache(Collections.emptyList()).isEmpty());
+    assertTrue(testTable.multiGetSkipCache(null).isEmpty());
+  }
+
+  @Test
+  public void multiGetSkipCacheWithTypedTable() throws Exception {
+    byte[] smallKey = "small-key".getBytes(StandardCharsets.UTF_8);
+    byte[] largeKey1 = "large-key-1".getBytes(StandardCharsets.UTF_8);
+    byte[] largeKey2 = "large-key-2".getBytes(StandardCharsets.UTF_8);
+    byte[] emptyKey = "empty-key".getBytes(StandardCharsets.UTF_8);
+    byte[] smallValue = "small".getBytes(StandardCharsets.UTF_8);
+    byte[] largeValue1 = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 100];
+    byte[] largeValue2 = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 200];
+    Arrays.fill(largeValue1, (byte) 'a');
+    Arrays.fill(largeValue2, (byte) 'b');
+    Table<byte[], byte[]> writeTable = rdbStore.getTable("Second");
+    writeTable.put(smallKey, smallValue);
+    writeTable.put(largeKey1, largeValue1);
+    writeTable.put(largeKey2, largeValue2);
+    writeTable.put(emptyKey, new byte[0]);
+
+    Table<String, String> readTable = rdbStore.getTable("Second", StringCodec.get(), StringCodec.get());
+    List<String> values = readTable.multiGetSkipCache(
+        Arrays.asList("small-key", "large-key-1", "missing-key", "large-key-2", "empty-key"));
+    assertEquals(5, values.size());
+    assertEquals(new String(smallValue, StandardCharsets.UTF_8), values.get(0));
+    assertEquals(new String(largeValue1, StandardCharsets.UTF_8), values.get(1));
+    assertNull(values.get(2));
+    assertEquals(new String(largeValue2, StandardCharsets.UTF_8), values.get(3));
+    assertEquals("", values.get(4));
+  }
+
+  @Test
+  public void multiGetSkipCacheWarmsBufferCapacityHint() throws Exception {
+    byte[] largeKey = "warmup-large-key".getBytes(StandardCharsets.UTF_8);
+    byte[] largeValue = new byte[TypedTable.BUFFER_SIZE_DEFAULT + 100];
+    Arrays.fill(largeValue, (byte) 'x');
+    rdbStore.getTable("Second").put(largeKey, largeValue);
+
+    RDBTable spyTable = spy(rdbStore.getTable("Second"));
+    TypedTable<String, String> readTable = new TypedTable<>(spyTable, StringCodec.get(),
+        StringCodec.get(), CacheType.PARTIAL_CACHE);
+
+    readTable.multiGetSkipCache(Collections.singletonList("warmup-large-key"));
+    verify(spyTable, times(2)).multiGetSkipCache(anyList(), anyList());
+
+    clearInvocations(spyTable);
+    readTable.multiGetSkipCache(Collections.singletonList("warmup-large-key"));
+    verify(spyTable, times(1)).multiGetSkipCache(anyList(), anyList());
+  }
+
+  @Test
+  public void validateMultiGetStatusThrowsOnBadStatus() throws Exception {
+    ByteBuffer value = ByteBuffer.allocate(4);
+    ByteBufferGetStatus nonOk = newByteBufferGetStatus(
+        new Status(Status.Code.Corruption, Status.SubCode.None, "bad"), 10, value);
+    assertThrows(IllegalStateException.class, () -> TypedTable.validateMultiGetStatus(nonOk, null));
+
+    ByteBufferGetStatus negativeSize = newByteBufferGetStatus(
+        new Status(Status.Code.Incomplete, Status.SubCode.None, "too large"), -1, value);
+    assertThrows(IllegalStateException.class,
+        () -> TypedTable.validateMultiGetStatus(negativeSize, null));
+  }
+
+  private static ByteBufferGetStatus newByteBufferGetStatus(Status status, int requiredSize,
+      ByteBuffer value) throws Exception {
+    Constructor<ByteBufferGetStatus> constructor =
+        ByteBufferGetStatus.class.getDeclaredConstructor(Status.class, int.class, ByteBuffer.class);
+    constructor.setAccessible(true);
+    return constructor.newInstance(status, requiredSize, value);
   }
 
   @Test
@@ -636,23 +734,56 @@ public class TestRDBTableStore {
 
     // test start with a middle key
     startKey = StringUtils.string2Bytes(
-        bytes2String(samplePrefix) + "3");
+        StringUtils.bytes2String(samplePrefix) + "3");
     rangeKVs = testTable.getRangeKVs(startKey, blockCount, samplePrefix);
     assertEquals(2, rangeKVs.size());
 
     // test with a filter
-    final KeyPrefixFilter filter1 = KeyPrefixFilter.newFilter(bytes2String(samplePrefix) + "1");
+    final KeyPrefixFilter filter1 = KeyPrefixFilter.newFilter(StringUtils.bytes2String(samplePrefix) + "1");
     startKey = StringUtils.string2Bytes(
-        bytes2String(samplePrefix));
+        StringUtils.bytes2String(samplePrefix));
     rangeKVs = testTable.getRangeKVs(startKey, blockCount,
         samplePrefix, filter1);
     assertEquals(1, rangeKVs.size());
 
     // test start with a non-exist key
     startKey = StringUtils.string2Bytes(
-        bytes2String(samplePrefix) + 123);
+        StringUtils.bytes2String(samplePrefix) + 123);
     rangeKVs = testTable.getRangeKVs(startKey, 10, samplePrefix);
     assertEquals(0, rangeKVs.size());
+  }
+
+  @Test
+  public void testRangeKVsStartKeyInclusiveAndAbsent() throws Exception {
+    Table<byte[], byte[]> testTable = rdbStore.getTable("PrefixFour");
+    byte[] prefix = "p/".getBytes(StandardCharsets.UTF_8);
+    for (String suffix : new String[] {"a", "c", "e"}) {
+      byte[] key = ("p/" + suffix).getBytes(StandardCharsets.UTF_8);
+      testTable.put(key, key);
+    }
+    byte[] present = "p/c".getBytes(StandardCharsets.UTF_8);
+    byte[] absentMiddle = "p/b".getBytes(StandardCharsets.UTF_8);
+    byte[] absentPastEnd = "p/z".getBytes(StandardCharsets.UTF_8);
+
+    // Existing start key: the range starts at that key (inclusive).
+    List<Table.KeyValue<byte[], byte[]>> rangeKVs =
+        testTable.getRangeKVs(present, 10, prefix);
+    assertEquals(2, rangeKVs.size());
+    assertArrayEquals(present, rangeKVs.get(0).getKey());
+
+    // Absent start key with a later key under the prefix: seek lands on a
+    // different key, so the range is empty.
+    assertEquals(0, testTable.getRangeKVs(absentMiddle, 10, prefix).size());
+    // Absent start key past every key: seek lands on nothing, range is empty.
+    assertEquals(0, testTable.getRangeKVs(absentPastEnd, 10, prefix).size());
+
+    // Same checks with no prefix (whole-table range).
+    rangeKVs = testTable.getRangeKVs(present, 10, null);
+    assertEquals(2, rangeKVs.size());
+    assertArrayEquals(present, rangeKVs.get(0).getKey());
+    assertEquals(0, testTable.getRangeKVs(absentMiddle, 10, null).size());
+    // Absent start key past every key with no prefix: seek lands on nothing.
+    assertEquals(0, testTable.getRangeKVs(absentPastEnd, 10, null).size());
   }
 
   @Test
@@ -774,79 +905,6 @@ public class TestRDBTableStore {
         table.put(entry.getKey(), entry.getValue());
         LOG.info("put {}", entry);
       }
-    }
-  }
-
-  @Test
-  public void batchDeleteWithRange() throws Exception {
-    final Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth");
-    try (BatchOperation batch = rdbStore.initBatchOperation()) {
-
-      //given
-      String keyStr = RandomStringUtils.secure().next(10);
-      byte[] startKey = ("1-" + keyStr).getBytes(StandardCharsets.UTF_8);
-      byte[] keyInRange1 = ("2-" + keyStr).getBytes(StandardCharsets.UTF_8);
-      byte[] keyInRange2 = ("3-" + keyStr).getBytes(StandardCharsets.UTF_8);
-      byte[] endKey = ("4-" + keyStr).getBytes(StandardCharsets.UTF_8);
-      byte[] value =
-          RandomStringUtils.secure().next(10).getBytes(StandardCharsets.UTF_8);
-      testTable.put(startKey, value);
-      testTable.put(keyInRange1, value);
-      testTable.put(keyInRange2, value);
-      testTable.put(endKey, value);
-      assertNotNull(testTable.get(startKey));
-      assertNotNull(testTable.get(keyInRange1));
-      assertNotNull(testTable.get(keyInRange2));
-      assertNotNull(testTable.get(endKey));
-
-      //when
-      testTable.deleteRangeWithBatch(batch, startKey, endKey);
-      rdbStore.commitBatchOperation(batch);
-
-      //then
-      assertNull(testTable.get(startKey));
-      assertNull(testTable.get(keyInRange1));
-      assertNull(testTable.get(keyInRange2));
-      assertNotNull(testTable.get(endKey));
-    }
-  }
-
-  @Test
-  public void orderOfBatchOperations() throws Exception {
-    final Table<byte[], byte[]> testTable = rdbStore.getTable("Fifth");
-    try (BatchOperation batch = rdbStore.initBatchOperation()) {
-
-      //given
-      String keyStr = RandomStringUtils.secure().next(10);
-      byte[] startKey = ("1-" + keyStr).getBytes(StandardCharsets.UTF_8);
-      byte[] keyInRange1 = ("2-" + keyStr).getBytes(StandardCharsets.UTF_8);
-      byte[] endKey = ("3-" + keyStr).getBytes(StandardCharsets.UTF_8);
-      byte[] value1 = ("value1-" + RandomStringUtils.secure().next(10)).getBytes(StandardCharsets.UTF_8);
-      byte[] value2 = ("value2-" + RandomStringUtils.secure().next(10)).getBytes(StandardCharsets.UTF_8);
-      byte[] value3 = ("value3-" + RandomStringUtils.secure().next(10)).getBytes(StandardCharsets.UTF_8);
-
-      //when
-      testTable.putWithBatch(batch, startKey, value1);
-      testTable.putWithBatch(batch, keyInRange1, value1);
-      testTable.deleteWithBatch(batch, keyInRange1);
-      // ops map key should be <<startKey, endKey>, 1>
-      testTable.deleteRangeWithBatch(batch, startKey, endKey);
-      testTable.putWithBatch(batch, startKey, value2);
-      testTable.putWithBatch(batch, keyInRange1, value2);
-      // ops map key is <<startKey, keyInRange1>, 2>.
-      testTable.deleteRangeWithBatch(batch, startKey, keyInRange1);
-      testTable.putWithBatch(batch, endKey, value1);
-      testTable.putWithBatch(batch, endKey, value2);
-      // ops map key is <<startKey, endKey>, 3>.
-      testTable.deleteRangeWithBatch(batch, startKey, endKey);
-      testTable.putWithBatch(batch, startKey, value3);
-
-      rdbStore.commitBatchOperation(batch);
-
-      //then
-      assertEquals(bytes2String(value3), bytes2String(testTable.get(startKey)));
-      assertNull(testTable.get(keyInRange1));
-      assertEquals(bytes2String(value2), bytes2String(testTable.get(endKey)));
     }
   }
 }

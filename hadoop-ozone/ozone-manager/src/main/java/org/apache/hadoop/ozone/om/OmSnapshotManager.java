@@ -50,7 +50,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_CHECKPOINT_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TIMEOUT;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getSnapshotRootPath;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.checkSnapshotActive;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_PURGED_JOB_TABLE_NAME;
@@ -92,10 +91,13 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -109,6 +111,7 @@ import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
@@ -251,7 +254,7 @@ public final class OmSnapshotManager implements AutoCloseable {
         cacheCleanupServiceInterval, compactNonSnapshotDiffTables, ozoneManager.getMetadataManager().getLock());
 
     this.snapshotDiffManager = new SnapshotDiffManager(snapshotDiffDb,
-        ozoneManager, snapDiffJobCf, snapDiffReportCf,
+        ozoneManager, snapDiffJobCf, snapDiffReportCf, snapDiffPurgedJobCf,
         columnFamilyOptions, codecRegistry);
 
     diffCleanupServiceInterval = ozoneManager.getConfiguration()
@@ -283,12 +286,23 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   public static boolean isSnapshotPurged(SnapshotChainManager chainManager, OMMetadataManager omMetadataManager,
       UUID snapshotId, TransactionInfo transactionInfo) throws IOException {
+    boolean purgeFlushed = transactionInfo != null &&
+        isTransactionFlushedToDisk(omMetadataManager, transactionInfo);
     String tableKey = chainManager.getTableKey(snapshotId);
     if (tableKey == null) {
-      return true;
+      // Snapshot chain is rebuilt from DB on every OM restart (loadFromSnapshotInfoTable),
+      // but entries committed to the Raft log (but not yet flushed) after the restart
+      // are applied in addToDBBatch (skipping validateAndUpdateCache), so they never call
+      // addSnapshot(). This can affect any OM (leader or follower) after a restart.
+      //
+      // Need to fall back to transactionInfo. null means no purge has been recorded. Treat as active.
+      LOG.debug("snapshotId {} has null tableKey in SnapshotChainManager. "
+              + "transactionInfo={} purgeFlushed={}. Returning {}",
+          snapshotId, transactionInfo, purgeFlushed, purgeFlushed);
+      return purgeFlushed;
     }
-    return !omMetadataManager.getSnapshotInfoTable().isExist(tableKey) && transactionInfo != null &&
-        isTransactionFlushedToDisk(omMetadataManager, transactionInfo);
+    boolean inDB = omMetadataManager.getSnapshotInfoTable().isExist(tableKey);
+    return !inDB && purgeFlushed;
   }
 
   /**
@@ -370,8 +384,12 @@ public final class OmSnapshotManager implements AutoCloseable {
           }
           try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapshotLocalDataProvider =
                    snapshotLocalDataManager.getOmSnapshotLocalDataMeta(snapshotInfo)) {
+            final OmSnapshotLocalDataManager.SnapshotVersionsMeta snapshotMeta = snapshotLocalDataProvider.getMeta();
+            if (snapshotMeta == null) {
+              throw new OMException("Snapshot local metadata is missing for snapshotId: " + snapshotId, FILE_NOT_FOUND);
+            }
             snapshotMetadataManager = getSnapshotOmMetadataManager(snapshotInfo,
-                snapshotLocalDataProvider.getMeta().getVersion(), maxOpenSstFilesInSnapshotDb, conf);
+                snapshotMeta.getVersion(), maxOpenSstFilesInSnapshotDb, conf);
           }
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
@@ -409,7 +427,9 @@ public final class OmSnapshotManager implements AutoCloseable {
     // DiffReportEntry codec for Diff Report.
     registry.addCodec(SnapshotDiffReportOzone.DiffReportEntry.class,
         SnapshotDiffReportOzone.getDiffReportEntryCodec());
-    registry.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.getCodec());
+    registry.addCodec(SnapshotDiffJob.class, SnapshotDiffJob.codec());
+    registry.addCodec(OmKeyInfo.class, OmKeyInfo.getKeyTableCodec());
+    registry.addCodec(OmDirectoryInfo.class, OmDirectoryInfo.getCodec());
     return registry.build();
   }
 
@@ -583,7 +603,11 @@ public final class OmSnapshotManager implements AutoCloseable {
     String endKey = getLexicographicallyHigherString(prefix);
     LOG.debug("Deleting key range from {} - startKey: {}, endKey: {}",
         table.getName(), prefix, endKey);
-    table.deleteRangeWithBatch(batchOperation, prefix, endKey);
+    try (TableIterator<String, String> itr = table.keyIterator(prefix)) {
+      while (itr.hasNext()) {
+        table.deleteWithBatch(batchOperation, itr.next());
+      }
+    }
   }
 
   @VisibleForTesting
@@ -805,6 +829,7 @@ public final class OmSnapshotManager implements AutoCloseable {
   }
 
   @SuppressWarnings("parameternumber")
+  @Deprecated
   public SnapshotDiffResponse getSnapshotDiffReport(final String volume,
                                                     final String bucket,
                                                     final String fromSnapshot,
@@ -820,12 +845,12 @@ public final class OmSnapshotManager implements AutoCloseable {
     // Check if fromSnapshot and toSnapshot are equal.
     if (Objects.equals(fromSnapshot, toSnapshot)) {
       SnapshotDiffReportOzone diffReport = new SnapshotDiffReportOzone(
-          getSnapshotRootPath(volume, bucket).toString(), volume, bucket,
+          snapshotDiffManager.getSnapshotRootPath(volume, bucket).toString(), volume, bucket,
           fromSnapshot, toSnapshot, Collections.emptyList(), null);
       return new SnapshotDiffResponse(diffReport, DONE, 0L);
     }
 
-    int index = getIndexFromToken(token);
+    String index = validateToken(token);
     if (pageSize <= 0 || pageSize > maxPageSize) {
       pageSize = maxPageSize;
     }
@@ -835,15 +860,56 @@ public final class OmSnapshotManager implements AutoCloseable {
             fromSnapshot, toSnapshot, index, pageSize, forceFullDiff,
             disableNativeDiff);
 
-    // Check again to make sure that from and to snapshots are still active and
-    // were not deleted in between response generation.
-    // Ideally, snapshot diff and snapshot deletion should take an explicit lock
-    // to achieve the synchronization, but it would be complex and expensive.
-    // To avoid the complexity, we just check that snapshots are active
-    // before returning the response. It is like an optimistic lock to achieve
-    // similar behaviour and make sure client gets consistent response.
     validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
     return snapshotDiffReport;
+  }
+
+  public SnapshotDiffResponse getSnapshotDiffResponse(final String volume,
+                                                      final String bucket,
+                                                      final String fromSnapshot,
+                                                      final String toSnapshot,
+                                                      final String token,
+                                                      int pageSize)
+      throws IOException {
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
+
+    // Check if fromSnapshot and toSnapshot are equal.
+    if (Objects.equals(fromSnapshot, toSnapshot)) {
+      SnapshotDiffReportOzone diffReport = new SnapshotDiffReportOzone(
+          snapshotDiffManager.getSnapshotRootPath(volume, bucket).toString(), volume, bucket,
+          fromSnapshot, toSnapshot, Collections.emptyList(), null);
+      return new SnapshotDiffResponse(diffReport, DONE, 0L);
+    }
+
+    String index = validateToken(token);
+    if (pageSize <= 0 || pageSize > maxPageSize) {
+      pageSize = maxPageSize;
+    }
+
+    return snapshotDiffManager.getSnapshotDiffReport(volume, bucket,
+            fromSnapshot, toSnapshot, index, pageSize);
+  }
+
+  public SubmitSnapshotDiffResponse submitSnapshotDiff(final String volume,
+                                                       final String bucket,
+                                                       final String fromSnapshot,
+                                                       final String toSnapshot,
+                                                       boolean forceFullDiff,
+                                                       boolean disableNativeDiff)
+      throws IOException {
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
+
+    // Check if fromSnapshot and toSnapshot are equal.
+    if (Objects.equals(fromSnapshot, toSnapshot)) {
+      return new SubmitSnapshotDiffResponse("Cannot submit diff between same snapshots.");
+    }
+
+    SubmitSnapshotDiffResponse snapshotDiffResponse =
+        snapshotDiffManager.submitSnapshotDiff(volume, bucket,
+            fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
+
+    validateSnapshotsExistAndActive(volume, bucket, fromSnapshot, toSnapshot);
+    return snapshotDiffResponse;
   }
 
   public ListSnapshotDiffJobResponse getSnapshotDiffList(
@@ -949,24 +1015,18 @@ public final class OmSnapshotManager implements AutoCloseable {
     return inFlightSnapshotCount.get();
   }
 
-  private int getIndexFromToken(final String token) throws IOException {
+  private String validateToken(final String token) throws IOException {
     if (isBlank(token)) {
-      return 0;
+      return "";
     }
 
-    // Validate that token passed in the request is valid integer as of now.
-    // Later we can change it if we migrate to encrypted or cursor token.
-    try {
-      int index = Integer.parseInt(token);
-      if (index < 0) {
-        throw new IOException("Passed token is invalid. Resend the request " +
-            "with valid token returned in previous request.");
-      }
-      return index;
-    } catch (NumberFormatException exception) {
+    // Validate that the token passed in the request matches the expected format:
+    // <diffTypePrefix><20-digit-padded-index>. Update this logic if the token format changes in the future.
+    if (!token.matches("[0-9]+")) {
       throw new IOException("Passed token is invalid. " +
           "Resend the request with valid token returned in previous request.");
     }
+    return token;
   }
 
   private ManagedRocksDB createRocksDbForSnapshotDiff(

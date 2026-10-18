@@ -43,6 +43,8 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
   private final StorageType storageType;
   private final String storageLocation;
   private final long reserved;
+  private final long fsCapacity;
+  private final long fsAvailable;
 
   private StorageLocationReport(Builder builder) {
     this.id = builder.id;
@@ -55,6 +57,8 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     this.storageType = builder.storageType;
     this.storageLocation = builder.storageLocation;
     this.reserved = builder.reserved;
+    this.fsCapacity = builder.fsCapacity;
+    this.fsAvailable = builder.fsAvailable;
   }
 
   public long getUsableSpace() {
@@ -143,6 +147,14 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     return reserved;
   }
 
+  public long getFsCapacity() {
+    return fsCapacity;
+  }
+
+  public long getFsAvailable() {
+    return fsAvailable;
+  }
+
   private static StorageType getStorageType(StorageTypeProto proto) throws
       IOException {
     StorageType storageType;
@@ -186,6 +198,8 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
         .setFailed(isFailed())
         .setFreeSpaceToSpare(getFreeSpaceToSpare())
         .setReserved(getReserved())
+        .setFsCapacity(getFsCapacity())
+        .setFsAvailable(getFsAvailable())
         .build();
   }
 
@@ -240,6 +254,12 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     if (report.hasReserved()) {
       builder.setReserved(report.getReserved());
     }
+    if (report.hasFsCapacity()) {
+      builder.setFsCapacity(report.getFsCapacity());
+    }
+    if (report.hasFsAvailable()) {
+      builder.setFsAvailable(report.getFsAvailable());
+    }
     return builder.build();
   }
 
@@ -254,11 +274,16 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     if (failed) {
       sb.append(" failed");
     } else {
-      sb.append(" capacity=").append(capacity)
-          .append(" used=").append(scmUsed)
-          .append(" available=").append(remaining)
+      long fsUsed = fsCapacity - fsAvailable;
+      sb.append(" ozoneCapacity=").append(capacity)
+          .append(" ozoneUsed=").append(scmUsed)
+          .append(" ozoneAvailable=").append(remaining)
           .append(" minFree=").append(freeSpaceToSpare)
-          .append(" committed=").append(committed);
+          .append(" committed=").append(committed)
+          .append(" reserved=").append(reserved)
+          .append(" fsCapacity=").append(fsCapacity)
+          .append(" fsAvailable=").append(fsAvailable)
+          .append(" fsUsed=").append(fsUsed);
     }
 
     return sb.append(" }").toString();
@@ -287,6 +312,8 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     private StorageType storageType;
     private String storageLocation;
     private long reserved;
+    private long fsCapacity;
+    private long fsAvailable;
 
     /**
      * Sets the storageId.
@@ -403,6 +430,16 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
 
     public long getReserved() { 
       return reserved;
+    }
+
+    public Builder setFsCapacity(long fsCapacity) {
+      this.fsCapacity = fsCapacity;
+      return this;
+    }
+
+    public Builder setFsAvailable(long fsAvailable) {
+      this.fsAvailable = fsAvailable;
+      return this;
     }
 
     /**

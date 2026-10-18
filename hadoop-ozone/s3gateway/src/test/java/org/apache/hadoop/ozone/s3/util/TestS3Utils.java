@@ -17,13 +17,20 @@
 
 package org.apache.hadoop.ozone.s3.util;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
+import java.util.stream.Stream;
+import javax.ws.rs.core.MediaType;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -75,7 +82,10 @@ public class TestS3Utils {
       for (String s3StorageConfig : S3STORAGECONFIG) {
         for (ReplicationConfig clientReplConfig : REPLICATIONS) {
           for (ReplicationConfig bucketReplConfig: REPLICATIONS) {
-            args.add(Arguments.of(s3StorageType, s3StorageConfig, clientReplConfig, bucketReplConfig));
+            for (boolean standardUsesClientDefault : new boolean[] {false, true}) {
+              args.add(Arguments.of(s3StorageType, s3StorageConfig, clientReplConfig, bucketReplConfig,
+                  standardUsesClientDefault));
+            }
           }
         }
       }
@@ -86,11 +96,11 @@ public class TestS3Utils {
   @ParameterizedTest
   @MethodSource("validS3ReplicationConfigs")
   public void testValidResolveS3ClientSideReplicationConfig(String s3StorageType, String s3StorageConfig,
-      ReplicationConfig clientConfiguredReplConfig, ReplicationConfig bucketReplConfig)
-      throws OS3Exception {
+      ReplicationConfig clientConfiguredReplConfig, ReplicationConfig bucketReplConfig,
+      boolean standardUsesClientDefault) throws OS3Exception {
     ReplicationConfig replicationConfig = S3Utils
         .resolveS3ClientSideReplicationConfig(s3StorageType, s3StorageConfig,
-            clientConfiguredReplConfig, bucketReplConfig);
+            clientConfiguredReplConfig, bucketReplConfig, standardUsesClientDefault);
 
     final ReplicationConfig expectedReplConfig;
     if (!StringUtils.isEmpty(s3StorageType)) {
@@ -101,7 +111,8 @@ public class TestS3Utils {
           expectedReplConfig = EC32REPLICATIONCONFIG;
         }
       } else if (S3StorageType.STANDARD.name().equals(s3StorageType)) {
-        expectedReplConfig = RATIS3REPLICATIONCONFIG;
+        expectedReplConfig = standardUsesClientDefault && clientConfiguredReplConfig != null
+            ? clientConfiguredReplConfig : RATIS3REPLICATIONCONFIG;
       } else {
         expectedReplConfig = RATIS1REPLICATIONCONFIG;
       }
@@ -139,13 +150,76 @@ public class TestS3Utils {
       throws OS3Exception {
     OS3Exception exception = assertThrows(OS3Exception.class, () -> S3Utils.
         resolveS3ClientSideReplicationConfig(
-            s3StorageType, s3StorageConfig, clientConfiguredReplConfig, bucketReplConfig));
+            s3StorageType, s3StorageConfig, clientConfiguredReplConfig, bucketReplConfig, false));
     assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getCode(), exception.getCode());
   }
 
   @Test
   public void testGenerateCanonicalUserId() {
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, S3Utils.generateCanonicalUserId("ozone"));
+  }
+
+  @Test
+  public void testWrapOS3ExceptionContentType() {
+    OS3Exception exception = S3ErrorTable.newError(
+        S3ErrorTable.ACCESS_DENIED, "bucket");
+    assertEquals(MediaType.APPLICATION_XML_TYPE,
+        S3Utils.wrapOS3Exception(exception).getResponse().getMediaType());
+  }
+
+  static Stream<Arguments> wrongContentMD5Provider() throws Exception {
+    String serverMD5 = Hex.encodeHexString(
+        MessageDigest.getInstance("MD5").digest("bar".getBytes(StandardCharsets.UTF_8)));
+
+    byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest("wrong".getBytes(StandardCharsets.UTF_8));
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    String shortBase64 = Base64.getEncoder().encodeToString("hello".getBytes(StandardCharsets.UTF_8));
+
+    return Stream.of(
+        Arguments.of(null, serverMD5, S3ErrorTable.INVALID_DIGEST.getCode()),
+        Arguments.of("wrong-base64", serverMD5, S3ErrorTable.INVALID_DIGEST.getCode()),
+        Arguments.of(shortBase64, serverMD5, S3ErrorTable.INVALID_DIGEST.getCode()),
+        Arguments.of(wrongMd5Base64, serverMD5, S3ErrorTable.BAD_DIGEST.getCode())
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testValidateContentMD5WithInvalidInput(
+      String clientMD5, String serverMD5, String expectedErrorCode) {
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> S3Utils.validateContentMD5(clientMD5, serverMD5, "test-resource"));
+    assertEquals(expectedErrorCode, ex.getCode());
+  }
+
+  @Test
+  public void testValidateContentMD5WithValidInput() throws Exception {
+    byte[] md5Bytes = MessageDigest.getInstance("MD5").digest("bar".getBytes(StandardCharsets.UTF_8));
+    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
+    String md5Hex = Hex.encodeHexString(md5Bytes);
+
+    assertDoesNotThrow(() -> S3Utils.validateContentMD5(md5Base64, md5Hex, "test-resource"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("contentEncodingProvider")
+  public void testNormalizeContentEncoding(String input, String expected) {
+    assertEquals(expected, S3Utils.normalizeContentEncoding(input));
+  }
+
+  private static Stream<Arguments> contentEncodingProvider() {
+    return Stream.of(
+        Arguments.of(null, null),
+        Arguments.of("", null),
+        Arguments.of("gzip", "gzip"),
+        Arguments.of("deflate, gzip", "deflate, gzip"),
+        Arguments.of("gzip, aws-chunked", "gzip"),
+        Arguments.of("aws-chunked, gzip", "gzip"),
+        Arguments.of("aws-chunked", null),
+        Arguments.of("aws-chunked, aws-chunked", null),
+        Arguments.of("gzip, AWS-CHUNKED", "gzip"),
+        Arguments.of("Aws-Chunked", null));
   }
 
 }

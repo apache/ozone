@@ -53,7 +53,7 @@ public class TestFSODirectoryPathResolver {
         .thenAnswer(i -> {
           int dirId = Integer.parseInt(((String)i.getArgument(0))
                .split(OM_KEY_PREFIX)[3]);
-          Iterator<? extends Table.KeyValue<String, OmDirectoryInfo>> iterator =
+          Iterator<Table.KeyValue<String, OmDirectoryInfo>> iterator =
               dirMap
               .getOrDefault(dirId, Collections.emptyList()).stream()
               .map(children -> Table.newKeyValue(prefix + children + OM_KEY_PREFIX + "dir" + children,

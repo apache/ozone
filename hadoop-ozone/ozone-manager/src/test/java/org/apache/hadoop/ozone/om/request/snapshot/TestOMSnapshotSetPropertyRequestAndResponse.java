@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotSetPropertyResponse;
-import org.apache.hadoop.ozone.om.snapshot.TestSnapshotRequestAndResponse;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotRequestAndResponseTests;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
@@ -48,7 +48,7 @@ import org.junit.jupiter.api.Test;
  * Tests TestOMSnapshotSetPropertyRequest
  * TestOMSnapshotSetPropertyResponse class.
  */
-public class TestOMSnapshotSetPropertyRequestAndResponse extends TestSnapshotRequestAndResponse {
+public class TestOMSnapshotSetPropertyRequestAndResponse extends SnapshotRequestAndResponseTests {
   private String snapName;
   private long exclusiveSize;
   private long exclusiveSizeAfterRepl;

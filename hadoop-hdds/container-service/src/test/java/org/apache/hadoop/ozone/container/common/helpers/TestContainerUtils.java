@@ -24,10 +24,15 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type.ReadChunk;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -37,15 +42,23 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeInfoMetrics;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -100,6 +113,10 @@ public class TestContainerUtils {
   public void testDatanodeIDPersistent(@TempDir File tempDir) throws Exception {
     // Generate IDs for testing
     DatanodeDetails id1 = randomDatanodeDetails();
+    // `randomDatanodeDetails()` populates the current version to SOFTWARE_VERSION by default.
+    // Datanodes do not populate this value when persisting the proto, only when sending it over the wire,
+    // so override the setter to the default value to match what Datanodes actually persist internally.
+    id1.setCurrentVersion(HDDSVersion.DEFAULT_VERSION);
     try (MockedStatic<InetAddress> mockedStaticInetAddress = mockStatic(InetAddress.class)) {
       InetAddress mockedInetAddress = mock(InetAddress.class);
       mockedStaticInetAddress.when(() -> InetAddress.getByName(id1.getHostName()))
@@ -125,13 +142,13 @@ public class TestContainerUtils {
       // Read should return an empty value if file doesn't exist
       File nonExistFile = new File(tempDir, "non_exist.id");
       assertThrows(IOException.class,
-          () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile));
+          () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile, conf));
 
       // Read should fail if the file is malformed
       File malformedFile = new File(tempDir, "malformed.id");
       createMalformedIDFile(malformedFile);
       assertThrows(IOException.class,
-          () -> ContainerUtils.readDatanodeDetailsFrom(malformedFile));
+          () -> ContainerUtils.readDatanodeDetailsFrom(malformedFile, conf));
 
       // Test upgrade scenario - protobuf file instead of yaml
       File protoFile = new File(tempDir, "valid-proto.id");
@@ -139,11 +156,48 @@ public class TestContainerUtils {
         HddsProtos.DatanodeDetailsProto proto = id1.getProtoBufMessage();
         proto.writeTo(out);
       }
-      assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile));
+      assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile, conf));
 
-      id1.setInitialVersion(1);
+      id1.setInitialVersion(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
       assertWriteRead(tempDir, id1);
     }
+  }
+
+  @Test
+  public void testDatanodeIdRecovery(@TempDir File tempDir) throws IOException {
+    // 1. Setup storage directory and VERSION file
+    String datanodeUuid = UUID.randomUUID().toString();
+    File storageDir = new File(tempDir, "datanode-storage");
+    assertTrue(storageDir.mkdirs());
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, storageDir.getAbsolutePath());
+
+    File hddsSubDir = new File(storageDir, "hdds");
+    assertTrue(hddsSubDir.mkdirs());
+    File versionFile = new File(hddsSubDir, "VERSION");
+    DatanodeVersionFile dnVersionFile = new DatanodeVersionFile(
+        "storage-id", "cluster-id", datanodeUuid, System.currentTimeMillis(), 0);
+    dnVersionFile.createVersionFile(versionFile);
+
+    // 2. Simulate a corrupted/empty datanode.id file
+    File datanodeIdFile = new File(tempDir, "datanode.id");
+    assertTrue(datanodeIdFile.createNewFile());
+
+    assertEquals(0, datanodeIdFile.length(), "Datanode ID file should be empty initially");
+
+    // 3. Call readDatanodeDetailsFrom and verify recovery
+    DatanodeDetails recoveredDetails =
+        ContainerUtils.readDatanodeDetailsFrom(datanodeIdFile, conf);
+
+    // 4. Assertions
+    // Recovered UUID matches the one in the VERSION file
+    assertEquals(datanodeUuid, recoveredDetails.getUuidString());
+
+    // datanode.id file is recreated and is not empty
+    assertTrue(datanodeIdFile.length() > 0, "Datanode ID file should have been recreated with content");
+
+    // The recreated file can be read normally and contains the correct UUID
+    DatanodeDetails finalDetails = ContainerUtils.readDatanodeDetailsFrom(datanodeIdFile, conf);
+    assertEquals(datanodeUuid, finalDetails.getUuidString());
   }
 
   private void assertWriteRead(@TempDir File tempDir,
@@ -152,10 +206,23 @@ public class TestContainerUtils {
     File file = new File(tempDir, "valid-values.id");
     ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
 
-    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
+    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file, conf);
 
     assertDetailsEquals(details, read);
-    assertEquals(details.getCurrentVersion(), read.getCurrentVersion());
+    // currentVersion is updated by SCM for clients to consume. When unset for cases like persisting to the datanode,
+    // it should return DEFAULT_VERSION. This is an in-memory placeholder which is not written to the file.
+    assertEquals(HDDSVersion.DEFAULT_VERSION, read.getCurrentVersion());
+  }
+
+  @Test
+  public void writtenYamlOmitsCurrentVersion(@TempDir File tempDir) throws IOException {
+    DatanodeDetails details = randomDatanodeDetails();
+    details.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION);
+    File file = new File(tempDir, "no-current-version.id");
+    ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
+
+    String yaml = new String(Files.readAllBytes(file.toPath()), UTF_8);
+    assertThat(yaml).doesNotContain("currentVersion");
   }
 
   private void assertWriteReadWithChangedIpAddress(@TempDir File tempDir,
@@ -163,7 +230,7 @@ public class TestContainerUtils {
     // Write a single ID to the file and read it out
     File file = new File(tempDir, "valid-values.id");
     ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
-    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
+    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file, conf);
     assertEquals(details.getIpAddress(), read.getIpAddress());
     read.validateDatanodeIpAddress();
     assertEquals("127.0.0.1", read.getIpAddress());
@@ -186,5 +253,219 @@ public class TestContainerUtils {
     assertEquals(expected.getProtoBufMessage(), actual.getProtoBufMessage());
     assertEquals(expected.getInitialVersion(), actual.getInitialVersion());
     assertEquals(expected.getIpAddress(), actual.getIpAddress());
+  }
+
+  @Test
+  public void assertSpaceAvailabilityIncrementsSoftBandWhenBetweenReportedAndHard()
+      throws Exception {
+    HddsVolume volume = mock(HddsVolume.class);
+    VolumeInfoMetrics metrics = mock(VolumeInfoMetrics.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 100L, 900L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
+    when(volume.getVolumeInfoStats()).thenReturn(metrics);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    ContainerUtils.assertSpaceAvailability(1L, volume, 50);
+
+    verify(metrics).incNumWriteRequestsInSoftBandMinFreeSpace();
+    verify(metrics, never()).incNumWriteRequestsRejectedHardMinFreeSpace();
+  }
+
+  @Test
+  public void assertSpaceAvailabilityIncrementsHardRejectWhenHardLimitViolated() {
+    HddsVolume volume = mock(HddsVolume.class);
+    VolumeInfoMetrics metrics = mock(VolumeInfoMetrics.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 100L, 900L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
+    when(volume.getVolumeInfoStats()).thenReturn(metrics);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    StorageContainerException ex = assertThrows(StorageContainerException.class,
+        () -> ContainerUtils.assertSpaceAvailability(1L, volume, 80));
+    assertEquals(Result.DISK_OUT_OF_SPACE, ex.getResult());
+
+    verify(metrics).incNumWriteRequestsRejectedHardMinFreeSpace();
+    verify(metrics, never()).incNumWriteRequestsInSoftBandMinFreeSpace();
+  }
+
+  /**
+   * available(100) - hardSpare(30) = 70 == sizeRequested(70).
+   * The check is strict less-than, so the write passes at the exact boundary.
+   * The volume is still inside the soft band (available - softSpare = 0 < 70),
+   * so the soft-band metric fires.
+   */
+  @Test
+  public void assertSpaceAvailabilityPassesAtExactHardBoundary() throws Exception {
+    HddsVolume volume = mock(HddsVolume.class);
+    VolumeInfoMetrics metrics = mock(VolumeInfoMetrics.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 100L, 900L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
+    when(volume.getVolumeInfoStats()).thenReturn(metrics);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    // available(100) - hardSpare(30) = 70 == sizeRequested → passes (< not <=)
+    assertDoesNotThrow(() -> ContainerUtils.assertSpaceAvailability(1L, volume, 70));
+
+    verify(metrics).incNumWriteRequestsInSoftBandMinFreeSpace();
+    verify(metrics, never()).incNumWriteRequestsRejectedHardMinFreeSpace();
+  }
+
+  /**
+   * available(100) - hardSpare(30) = 70 < sizeRequested(71).
+   * One byte past the hard boundary; write must be rejected.
+   */
+  @Test
+  public void assertSpaceAvailabilityRejectsOneByteOverHardBoundary() {
+    HddsVolume volume = mock(HddsVolume.class);
+    VolumeInfoMetrics metrics = mock(VolumeInfoMetrics.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 100L, 900L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
+    when(volume.getVolumeInfoStats()).thenReturn(metrics);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    // available(100) - hardSpare(30) = 70 < 71 → rejected
+    StorageContainerException ex = assertThrows(StorageContainerException.class,
+        () -> ContainerUtils.assertSpaceAvailability(1L, volume, 71));
+    assertEquals(Result.DISK_OUT_OF_SPACE, ex.getResult());
+
+    verify(metrics).incNumWriteRequestsRejectedHardMinFreeSpace();
+    verify(metrics, never()).incNumWriteRequestsInSoftBandMinFreeSpace();
+  }
+
+  /**
+   * available(200) is well above both soft(100) and hard(30) spares.
+   * available - hardSpare = 170 > sizeRequested(50): write passes.
+   * available - softSpare = 100 > sizeRequested(50): not in soft band.
+   * Neither metric should fire.
+   */
+  @Test
+  public void assertSpaceAvailabilityFiresNoMetricWhenWellAboveBothLimits() throws Exception {
+    HddsVolume volume = mock(HddsVolume.class);
+    VolumeInfoMetrics metrics = mock(VolumeInfoMetrics.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 200L, 800L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
+    when(volume.getVolumeInfoStats()).thenReturn(metrics);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    // available(200) - hardSpare(30) = 170 > 50, and 200 - softSpare(100) = 100 > 50
+    ContainerUtils.assertSpaceAvailability(1L, volume, 50);
+
+
+    verify(metrics, never()).incNumWriteRequestsInSoftBandMinFreeSpace();
+    verify(metrics, never()).incNumWriteRequestsRejectedHardMinFreeSpace();
+  }
+
+  /**
+   * When VolumeInfoMetrics is null (volume not yet initialised or metrics disabled),
+   * assertSpaceAvailability must not throw NullPointerException on the soft-band path.
+   */
+  @Test
+  public void assertSpaceAvailabilityHandlesNullMetrics() {
+    HddsVolume volume = mock(HddsVolume.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 100L, 900L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
+    when(volume.getVolumeInfoStats()).thenReturn(null);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    assertDoesNotThrow(() -> ContainerUtils.assertSpaceAvailability(1L, volume, 50));
+  }
+
+  /**
+   * When VolumeInfoMetrics is null and the hard limit is violated,
+   * assertSpaceAvailability must throw DISK_OUT_OF_SPACE without NullPointerException
+   * when trying to increment the hard-reject metric.
+   */
+  @Test
+  public void assertSpaceAvailabilityHandlesNullMetricsOnHardReject() {
+    HddsVolume volume = mock(HddsVolume.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 100L, 900L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getVolumeInfoStats()).thenReturn(null);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    // available(100) - hardSpare(30) = 70 < 80 → hard reject; null metrics must not NPE
+    StorageContainerException ex = assertThrows(StorageContainerException.class,
+        () -> ContainerUtils.assertSpaceAvailability(1L, volume, 80));
+    assertEquals(Result.DISK_OUT_OF_SPACE, ex.getResult());
+  }
+
+  /**
+   * Exact soft boundary: available(150) - softSpare(100) == sizeRequested(50).
+   * The soft-band check is strict {@code <}, so at equality it must NOT fire.
+   * The hard check: 150 - 30 = 120 > 50, so the write passes.
+   */
+  @Test
+  public void assertSpaceAvailabilityNoSoftBandMetricAtExactSoftBoundary() throws Exception {
+    HddsVolume volume = mock(HddsVolume.class);
+    VolumeInfoMetrics metrics = mock(VolumeInfoMetrics.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 150L, 850L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
+    when(volume.getVolumeInfoStats()).thenReturn(metrics);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    // available(150) - softSpare(100) = 50 == sizeRequested(50): boundary is exclusive, no soft metric
+    ContainerUtils.assertSpaceAvailability(1L, volume, 50);
+
+    verify(metrics, never()).incNumWriteRequestsInSoftBandMinFreeSpace();
+    verify(metrics, never()).incNumWriteRequestsRejectedHardMinFreeSpace();
+  }
+
+  /**
+   * Zero-byte write: sizeRequested == 0 should always pass regardless of available space,
+   * and must not fire any metric.
+   */
+  @Test
+  public void assertSpaceAvailabilityNoMetricsForZeroSizeRequest() throws Exception {
+    HddsVolume volume = mock(HddsVolume.class);
+    VolumeInfoMetrics metrics = mock(VolumeInfoMetrics.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 100L, 900L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(100L);
+    when(volume.getVolumeInfoStats()).thenReturn(metrics);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    ContainerUtils.assertSpaceAvailability(1L, volume, 0);
+
+    verify(metrics, never()).incNumWriteRequestsInSoftBandMinFreeSpace();
+    verify(metrics, never()).incNumWriteRequestsRejectedHardMinFreeSpace();
+  }
+
+  /**
+   * When hard spare == soft spare the soft band is effectively disabled.
+   * A write that passes the hard check must not trigger the soft-band metric
+   * even though the usable space is tight.
+   * available(100) - spare(30) = 70 > 50: passes; soft band width = 0.
+   */
+  @Test
+  public void assertSpaceAvailabilityNoSoftBandWhenHardAndSoftSpareAreEqual() throws Exception {
+    HddsVolume volume = mock(HddsVolume.class);
+    VolumeInfoMetrics metrics = mock(VolumeInfoMetrics.class);
+    SpaceUsageSource.Fixed usage = new SpaceUsageSource.Fixed(1000L, 100L, 900L);
+    when(volume.getCurrentUsage()).thenReturn(usage);
+    when(volume.getFreeSpaceToSpare(1000L)).thenReturn(30L);
+    when(volume.getReportedFreeSpaceToSpare(1000L)).thenReturn(30L);  // same as hard → no soft band
+    when(volume.getVolumeInfoStats()).thenReturn(metrics);
+    when(volume.toString()).thenReturn("mockVolume");
+
+    ContainerUtils.assertSpaceAvailability(1L, volume, 50);
+
+    verify(metrics, never()).incNumWriteRequestsInSoftBandMinFreeSpace();
+    verify(metrics, never()).incNumWriteRequestsRejectedHardMinFreeSpace();
   }
 }

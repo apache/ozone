@@ -39,7 +39,7 @@ public class ListSnapshotDiffHandler extends Handler {
   private BucketUri snapshotPath;
 
   @CommandLine.Option(names = {"--job-status"},
-      description = "List jobs based on status.\n" +
+      description = "List jobs based on status.%n" +
       "Accepted values are: queued, in_progress, done, failed, rejected",
       defaultValue = "in_progress")
   private String jobStatus;

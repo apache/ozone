@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.function.Function;
 import org.apache.hadoop.fs.FSExceptionMessages;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -301,6 +302,17 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   }
 
   @Override
+  protected int readPositioned(long offset, ByteBuffer buffer) {
+    throw new UnsupportedOperationException("Use ECBlockInputStreamProxy for positioned reads");
+  }
+
+  @Override
+  public boolean hasCapability(String capability) {
+    return !StreamCapabilities.PREADBYTEBUFFER.equalsIgnoreCase(capability)
+        && super.hasCapability(capability);
+  }
+
+  @Override
   public synchronized int read(byte[] b, int off, int len) throws IOException {
     return read(ByteBuffer.wrap(b, off, len));
   }
@@ -434,6 +446,12 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       throw new IOException("Expected to read " + expectedRead + " but got EOF"
           + " from blockGroup " + stream.getBlockID() + " index "
           + currentStreamIndex() + 1);
+    }
+
+    if (actualRead != expectedRead) {
+      throw new IOException(String.format(
+          "Inconsistent read for blockID=%s index=%d expectedRead=%d actualRead=%d",
+          stream.getBlockID(), currentStreamIndex() + 1, expectedRead, actualRead));
     }
     return actualRead;
   }

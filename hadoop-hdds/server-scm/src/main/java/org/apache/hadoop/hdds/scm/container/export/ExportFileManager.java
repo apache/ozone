@@ -1,0 +1,230 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.hdds.scm.container.export;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileLock;
+import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Objects;
+import java.util.function.BooleanSupplier;
+import java.util.zip.GZIPOutputStream;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.server.ServerUtils;
+import org.apache.hadoop.hdds.utils.Archiver;
+import org.apache.hadoop.ozone.util.UUIDUtil;
+import org.apache.ratis.util.AtomicFileOutputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Manages on-disk paths and artifacts for container ID export jobs.
+ *
+ * <p>The export directory ({@code exportDirectory}, typically {@code {scm.db.dirs}/exports})
+ * uses the layout below. The manager gzip-compresses the archive ({@code .tar.gz}) so operators
+ * can stream entries with {@code zcat}.
+ *
+ * <p>While a job runs, part text files are written under {@code export_{jobId}/}. The archive is
+ * created only after all parts are written. The export manager writes
+ * {@code container-ids_{scope}_{jobStartTime}_job{jobId}.tar.gz.tmp} and atomically renames it to
+ * {@code .tar.gz} on close ({@link AtomicFileOutputStream}), so a partial {@code .tar.gz} is
+ * never visible. {@link #start()} acquires {@code in_use.lock} to exclude concurrent writers.
+ *
+ * <pre>
+ * {exportDirectory}/
+ * ├── in_use.lock
+ * ├── container-ids_{scope}_{jobStartTime}_job{jobId}.tar.gz
+ * ├── container-ids_{scope}_{jobStartTime}_job{jobId}.tar.gz.tmp
+ * └── export_{jobId}/
+ *     ├── container-ids_{scope}_{jobStartTime}_part001.txt
+ *     └── ...
+ * </pre>
+ *
+ * <p><b>Incomplete work</b> ({@code export_{jobId}/} and {@code .tar.gz.tmp}) is removed by
+ * {@link #cleanupFailedJob(ExportJob)} on failure or cancel, and by {@link #start()} for every
+ * leftover directory and temp file after SCM restart. Completed {@code .tar.gz} files are kept.
+ *
+ * <p><b>SCM restart:</b> {@link #start()} acquires the export directory lock and clears incomplete work.
+ */
+final class ExportFileManager {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ExportFileManager.class);
+
+  static final String EXPORT_SUBDIR = "exports";
+  static final String EXPORT_JOB_DIR_PREFIX = "export_";
+  static final String EXPORT_ARCHIVE_JOB_INFIX = "_job";
+  static final String EXPORT_ARCHIVE_SUFFIX = ".tar.gz";
+  static final String EXPORT_ARCHIVE_TMP_SUFFIX = EXPORT_ARCHIVE_SUFFIX + AtomicFileOutputStream.TMP_EXTENSION;
+  static final String EXPORT_LOCK_NAME = "in_use.lock";
+  private static final DateTimeFormatter EXPORT_JOB_START_TIME_FORMAT =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss").withZone(ZoneOffset.UTC);
+
+  private final String exportDirectory;
+  private FileLock exportDirectoryLock;
+
+  ExportFileManager(String exportDirectory) {
+    this.exportDirectory = Objects.requireNonNull(exportDirectory, "exportDirectory == null");
+  }
+
+  static String resolveExportDirectory(OzoneConfiguration conf) {
+    File scmDbDir = ServerUtils.getScmDbDir(conf);
+    return new File(scmDbDir, EXPORT_SUBDIR).getAbsolutePath();
+  }
+
+  String getExportDirectory() {
+    return exportDirectory;
+  }
+
+  void start() throws IOException {
+    Files.createDirectories(Paths.get(exportDirectory));
+    lock();
+    removeIncompleteWorkOnStartup();
+  }
+
+  private synchronized void lock() throws IOException {
+    if (exportDirectoryLock != null) {
+      return;
+    }
+    File lockFile = new File(exportDirectory, EXPORT_LOCK_NAME);
+    RandomAccessFile lockAccessFile = new RandomAccessFile(lockFile, "rws");
+    try {
+      FileLock lock = lockAccessFile.getChannel().tryLock();
+      if (lock == null) {
+        lockAccessFile.close();
+        throw new OverlappingFileLockException();
+      }
+      exportDirectoryLock = lock;
+      LOG.debug("Acquired container export directory lock {}", lockFile.getAbsolutePath());
+    } catch (OverlappingFileLockException | IOException e) {
+      lockAccessFile.close();
+      throw new IOException("Failed to lock container export directory " + exportDirectory, e);
+    }
+  }
+
+  synchronized void unlock() throws IOException {
+    if (exportDirectoryLock == null) {
+      return;
+    }
+    exportDirectoryLock.release();
+    exportDirectoryLock.channel().close();
+    exportDirectoryLock = null;
+  }
+
+  static String archiveFileName(ExportScope scope, String jobStartTime, ExportJob.Id jobId) {
+    return String.format("container-ids_%s_%s%s%s%s",
+        scope, jobStartTime, EXPORT_ARCHIVE_JOB_INFIX, jobId, EXPORT_ARCHIVE_SUFFIX);
+  }
+
+  void createJobDirectory(ExportJob.Id jobId) throws IOException {
+    Files.createDirectories(jobDirectory(jobId));
+  }
+
+  OutputStream newPartOutputStream(ExportJob.Id jobId, String partFileName) throws IOException {
+    return Files.newOutputStream(jobDirectory(jobId).resolve(partFileName));
+  }
+
+  void writeArchive(ExportJob job, BooleanSupplier isLeaderReady) throws IOException {
+    Path jobDir = jobDirectory(job.getId());
+    File[] parts = jobDir.toFile().listFiles((dir, name) -> name.endsWith(".txt"));
+    if (parts == null || parts.length == 0) {
+      throw new IOException("No part files found for " + job);
+    }
+    Arrays.sort(parts, Comparator.comparing(File::getName));
+    File archiveFile = new File(exportDirectory, job.getFileName());
+    try (AtomicFileOutputStream atomicOut = new AtomicFileOutputStream(archiveFile);
+         GZIPOutputStream gzipOut = new GZIPOutputStream(atomicOut);
+         ArchiveOutputStream<TarArchiveEntry> tarOut = Archiver.tar(gzipOut)) {
+      for (File part : parts) {
+        if (!isLeaderReady.getAsBoolean()) {
+          // close() would publish the partial archive; abort() discards the temp file instead.
+          atomicOut.abort();
+          throw new IOException("SCM lost leadership while archiving " + job);
+        }
+        Archiver.includeFile(part, part.getName(), tarOut);
+      }
+    }
+  }
+
+  void deleteJobDirectory(ExportJob.Id jobId) {
+    Path jobDir = jobDirectory(jobId);
+    if (Files.exists(jobDir) && !FileUtils.deleteQuietly(jobDir.toFile())) {
+      LOG.warn("Failed to delete container export job directory {}; it will be removed on next SCM start", jobDir);
+    }
+  }
+
+  static String formatJobStartTime(Instant jobStartTime) {
+    return EXPORT_JOB_START_TIME_FORMAT.format(jobStartTime);
+  }
+
+  void cleanupFailedJob(ExportJob job) {
+    FileUtils.deleteQuietly(jobDirectory(job.getId()).toFile());
+    File archive = new File(exportDirectory, job.getFileName());
+    FileUtils.deleteQuietly(archive);
+    FileUtils.deleteQuietly(AtomicFileOutputStream.getTemporaryFile(archive));
+  }
+
+  private Path jobDirectory(ExportJob.Id jobId) {
+    return Paths.get(exportDirectory, exportJobDirName(jobId));
+  }
+
+  private void removeIncompleteWorkOnStartup() {
+    File exportDir = new File(exportDirectory);
+    File[] children = exportDir.listFiles();
+    if (children != null) {
+      for (File child : children) {
+        if (child.isDirectory() && jobIdFromExportDirName(child.getName()) != null) {
+          FileUtils.deleteQuietly(child);
+          LOG.debug("Removed incomplete container export job directory: {}", child.getAbsolutePath());
+        }
+      }
+    }
+    File[] tempFiles = exportDir.listFiles((dir, fileName) -> fileName.endsWith(EXPORT_ARCHIVE_TMP_SUFFIX));
+    if (tempFiles != null) {
+      for (File tempFile : tempFiles) {
+        if (FileUtils.deleteQuietly(tempFile)) {
+          LOG.debug("Removed incomplete container export archive temp file: {}", tempFile.getName());
+        }
+      }
+    }
+  }
+
+  static String exportJobDirName(ExportJob.Id jobId) {
+    return EXPORT_JOB_DIR_PREFIX + jobId;
+  }
+
+  private static ExportJob.Id jobIdFromExportDirName(String dirName) {
+    if (!dirName.startsWith(EXPORT_JOB_DIR_PREFIX)) {
+      return null;
+    }
+    String jobId = dirName.substring(EXPORT_JOB_DIR_PREFIX.length());
+    return UUIDUtil.isValidUuidString(jobId) ? ExportJob.Id.of(jobId) : null;
+  }
+}

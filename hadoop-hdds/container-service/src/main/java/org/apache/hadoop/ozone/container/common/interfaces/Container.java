@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -194,6 +195,11 @@ public interface Container<CONTAINERDATA extends ContainerData> {
    */
   DataScanResult scanData(DataTransferThrottler throttler, Canceler canceler)
       throws InterruptedException;
+
+  /**
+   * Copy all the data of the container to the destination path.
+   */
+  void copyContainerDirectory(Path destPath) throws IOException;
 
   /** Acquire read lock. */
   void readLock();

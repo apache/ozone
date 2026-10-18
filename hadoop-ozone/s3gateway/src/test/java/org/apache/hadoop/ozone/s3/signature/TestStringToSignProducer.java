@@ -17,8 +17,11 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.REQUEST_TIME_TOO_SKEWED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
@@ -29,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -44,6 +48,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test string2sign creation.
@@ -51,7 +56,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestStringToSignProducer {
 
   private static final String DATETIME = StringToSignProducer.TIME_FORMATTER.
-          format(LocalDateTime.now());
+          format(LocalDateTime.now(ZoneOffset.UTC));
 
   @Test
   public void test() throws Exception {
@@ -73,8 +78,10 @@ public class TestStringToSignProducer {
         + "host;x-amz-content-sha256;x-amz-date;content-type\n"
         + "Content-SHA";
 
+    String credentialDate = DATETIME.substring(0, 8);
     String authHeader =
-        "AWS4-HMAC-SHA256 Credential=AKIAJWFJK62WUTKNFJJA/20181009/us-east-1"
+        "AWS4-HMAC-SHA256 Credential=AKIAJWFJK62WUTKNFJJA/" + credentialDate
+            + "/us-east-1"
             + "/s3/aws4_request, "
             + "SignedHeaders=host;x-amz-content-sha256;x-amz-date;"
             + "content-type, "
@@ -88,12 +95,8 @@ public class TestStringToSignProducer {
     Map<String, String> queryParameters = new HashMap<>();
 
     final SignatureInfo signatureInfo =
-        new AuthorizationV4HeaderParser(authHeader, DATETIME) {
-          @Override
-          public void validateDateRange(Credential credentialObj) {
-            //NOOP
-          }
-        }.parseSignature();
+        new AuthorizationV4HeaderParser(authHeader, DATETIME).parseSignature();
+    signatureInfo.setPayloadHash("Content-SHA");
     signatureInfo.setUnfilteredURI("/buckets");
 
     headers.fixContentType();
@@ -101,7 +104,6 @@ public class TestStringToSignProducer {
     final String signatureBase =
         StringToSignProducer.createSignatureBase(
             signatureInfo,
-            "http",
             "GET",
             headers,
             queryParameters);
@@ -111,9 +113,111 @@ public class TestStringToSignProducer {
 
     assertEquals("AWS4-HMAC-SHA256\n"
             + DATETIME + "\n"
-            + "20181009/us-east-1/s3/aws4_request\n"
+            + credentialDate + "/us-east-1/s3/aws4_request\n"
             + Hex.encode(md.digest()).toLowerCase(),
         signatureBase, "String to sign is invalid");
+  }
+
+  private static Stream<Arguments> testUrlEncodeInCanonicalRequestInput() {
+    return Stream.of(
+        arguments("/bucket/a+b*c~d/foo bar", "/bucket/a%2Bb%2Ac~d/foo%20bar"),
+        arguments("", ""),
+        arguments("/", "/"),
+        arguments("//", "//"),
+        arguments("/bucket/", "/bucket/"),
+        arguments("//bucket/key", "//bucket/key"),
+        arguments("/bucket//key/", "/bucket//key/"),
+        arguments("/bucket/a/.././b", "/bucket/a/.././b"),
+        arguments("bucket/key", "bucket/key"),
+        // A literal %2F in the decoded path corresponds to %252F in the wire path.
+        arguments("/bucket/a%2Fb", "/bucket/a%252Fb"),
+        arguments("/bucket/雪/😀", "/bucket/%E9%9B%AA/%F0%9F%98%80"),
+        arguments("/bucket/?#", "/bucket/%3F%23")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("testUrlEncodeInCanonicalRequestInput")
+  public void testUrlEncodeInCanonicalRequest(String uri, String expectedCanonicalUri) {
+    final Map<String, String> headers = new HashMap<>();
+    headers.put("host", "example.com");
+    headers.put("x-amz-content-sha256", UNSIGNED_PAYLOAD);
+    headers.put("x-amz-date", DATETIME);
+
+    final Map<String, String> queryParams = new HashMap<>();
+    queryParams.put("q+1*2~3", "v 4*5~6");
+
+    final String canonicalRequest = StringToSignProducer.buildCanonicalRequest(
+        "GET", uri, "host;x-amz-content-sha256;x-amz-date",
+        headers, queryParams, UNSIGNED_PAYLOAD);
+
+    assertEquals(
+        "GET\n"
+            + expectedCanonicalUri + "\n"
+            + "q%2B1%2A2~3=v%204%2A5~6\n"
+            + "host:example.com\n"
+            + "x-amz-content-sha256:" + UNSIGNED_PAYLOAD + "\n"
+            + "x-amz-date:" + DATETIME + "\n"
+            + "\n"
+            + "host;x-amz-content-sha256;x-amz-date\n"
+            + UNSIGNED_PAYLOAD,
+        canonicalRequest);
+  }
+
+  /**
+   * A client reaching the gateway over IPv6 signs the bracketed Host header as
+   * it sent it, so the string to sign has to carry that value through
+   * unchanged: splitting the address on its colons would produce a different
+   * canonical request and reject every request. Nothing in the signing path
+   * reads the Host today, so this pins that rather than guarding a change.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"[::1]:9878", "[2001:db8::1]:9878", "[::1]"})
+  public void testIPv6HostInStringToSign(String host) throws Exception {
+    String signedHeaders = "host;x-amz-content-sha256;x-amz-date";
+    String credentialScope = DATETIME.substring(0, 8)
+        + "/us-east-1/s3/aws4_request";
+    String authHeader = "AWS4-HMAC-SHA256 Credential=ozone/" + credentialScope
+        + ", SignedHeaders=" + signedHeaders
+        + ", Signature=db81b057718d7c1b3b8"
+        + "dffa29933099551c51d787b3b13b9e0f9ebed45982bf2";
+
+    MultivaluedMap<String, String> headerMap = new MultivaluedHashMap<>();
+    headerMap.putSingle("Authorization", authHeader);
+    headerMap.putSingle("Host", host);
+    headerMap.putSingle("X-Amz-Content-Sha256", "Content-SHA");
+    headerMap.putSingle("X-Amz-Date", DATETIME);
+
+    // Path style request: the bucket and key stay in the URI, as they do for a
+    // client that cannot use virtual host style against an address literal.
+    ContainerRequestContext context = setupContext(
+        new URI("http://" + host + "/mybucket/mykey"),
+        "GET",
+        headerMap,
+        new MultivaluedHashMap<>());
+    SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
+        authHeader, DATETIME).parseSignature();
+    signatureInfo.setPayloadHash("Content-SHA");
+    signatureInfo.setUnfilteredURI("/mybucket/mykey");
+
+    String canonicalRequest = "GET\n"
+        + "/mybucket/mykey\n"
+        + "\n"
+        + "host:" + host + "\n"
+        + "x-amz-content-sha256:Content-SHA\n"
+        + "x-amz-date:" + DATETIME + "\n"
+        + "\n"
+        + signedHeaders + "\n"
+        + "Content-SHA";
+    MessageDigest md = MessageDigest.getInstance("SHA-256");
+    md.update(canonicalRequest.getBytes(StandardCharsets.UTF_8));
+
+    assertEquals("AWS4-HMAC-SHA256\n"
+            + DATETIME + "\n"
+            + credentialScope + "\n"
+            + Hex.encode(md.digest()).toLowerCase(),
+        StringToSignProducer.createSignatureBase(signatureInfo, context),
+        "String to sign is invalid");
   }
 
   private ContainerRequestContext setupContext(
@@ -137,7 +241,7 @@ public class TestStringToSignProducer {
 
   private static Stream<Arguments> testValidateRequestHeadersInput() {
     String authHeader = "AWS4-HMAC-SHA256 Credential=ozone/"
-        + DATE_FORMATTER.format(LocalDate.now())
+        + DATE_FORMATTER.format(LocalDate.now(ZoneOffset.UTC))
         + "/us-east-1/s3/aws4_request, "
         + "SignedHeaders=content-type;host;x-amz-content-sha256;x-amz-date,"
         + " Signature=db81b057718d7c1b3b8"
@@ -160,17 +264,18 @@ public class TestStringToSignProducer {
         new MultivaluedHashMap<String, String>(headersMap1);
     headersMap3.remove("X-Amz-Date");
     headersMap3.putSingle("X-Amz-Date", LocalDateTime.now().toString());
-    // Expired X-Amz-Date
+    // Expired X-Amz-Date (more than 15 minutes in the past)
     MultivaluedMap<String, String> headersMap4 =
         new MultivaluedHashMap<String, String>(headersMap1);
     headersMap4.remove("X-Amz-Date");
     headersMap4.putSingle("X-Amz-Date", StringToSignProducer.TIME_FORMATTER.
-        format(LocalDateTime.now().minusDays(8)));
+        format(LocalDateTime.now(ZoneOffset.UTC).minusMinutes(16)));
+    // X-Amz-Date too far in the future (more than 15 minutes)
     MultivaluedMap<String, String> headersMap5 =
         new MultivaluedHashMap<String, String>(headersMap1);
     headersMap5.remove("X-Amz-Date");
     headersMap5.putSingle("X-Amz-Date", StringToSignProducer.TIME_FORMATTER.
-        format(LocalDateTime.now().plusDays(8)));
+        format(LocalDateTime.now(ZoneOffset.UTC).plusMinutes(16)));
     // Missing X-Amz-Content-Sha256
     MultivaluedMap<String, String> headersMap6 =
         new MultivaluedHashMap<String, String>(headersMap1);
@@ -178,10 +283,10 @@ public class TestStringToSignProducer {
 
     return Stream.of(
         arguments(headersMap1, "success"),
-        arguments(headersMap2, S3_AUTHINFO_CREATION_ERROR.getCode()),
-        arguments(headersMap3, S3_AUTHINFO_CREATION_ERROR.getCode()),
-        arguments(headersMap4, S3_AUTHINFO_CREATION_ERROR.getCode()),
-        arguments(headersMap5, S3_AUTHINFO_CREATION_ERROR.getCode()),
+        arguments(headersMap2, MALFORMED_HEADER.getCode()),
+        arguments(headersMap3, MALFORMED_HEADER.getCode()),
+        arguments(headersMap4, REQUEST_TIME_TOO_SKEWED.getCode()),
+        arguments(headersMap5, REQUEST_TIME_TOO_SKEWED.getCode()),
         arguments(headersMap6, S3_AUTHINFO_CREATION_ERROR.getCode())
     );
   }
@@ -198,12 +303,18 @@ public class TestStringToSignProducer {
         "GET",
         headerMap,
         new MultivaluedHashMap<>());
-    SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
-        headerMap.getFirst("Authorization"),
-        headerMap.getFirst("X-Amz-Date")).parseSignature();
-    signatureInfo.setUnfilteredURI("/");
     try {
+      SignatureInfo signatureInfo = new AuthorizationV4HeaderParser(
+          headerMap.getFirst("Authorization"),
+          headerMap.getFirst("X-Amz-Date")).parseSignature();
+      signatureInfo.setUnfilteredURI("/");
       StringToSignProducer.createSignatureBase(signatureInfo, context);
+    } catch (MalformedResourceException e) {
+      if (REQUEST_TIME_TOO_SKEWED.equals(e.getErrorCode())) {
+        actualResult = REQUEST_TIME_TOO_SKEWED.getCode();
+      } else {
+        actualResult = MALFORMED_HEADER.getCode();
+      }
     } catch (OS3Exception e) {
       actualResult = e.getCode();
     }
@@ -238,7 +349,7 @@ public class TestStringToSignProducer {
       String expectedResult) throws Exception {
     String actualResult = "success";
     String authHeader = "AWS4-HMAC-SHA256 Credential=ozone/"
-        + DATE_FORMATTER.format(LocalDate.now())
+        + DATE_FORMATTER.format(LocalDate.now(ZoneOffset.UTC))
         + "/us-east-1/s3/aws4_request, "
         + "SignedHeaders=" + signedHeaders + ", "
         + "Signature=db81b057718d7c1b3b" +

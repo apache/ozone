@@ -14,9 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-- name: 'default'
-  org_id: 1
-  folder: ''
-  type: 'file'
-  options:
-    folder: '/var/lib/grafana/dashboards'
+apiVersion: 1
+
+providers:
+  - name: 'default'
+    orgId: 1
+    folder: ''
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

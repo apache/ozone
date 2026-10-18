@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
@@ -159,6 +160,30 @@ public final class ReplicationTestUtil {
           MockDatanodeDetails.randomDatanodeDetails(), i.getLeft()));
     }
     return replicas;
+  }
+
+  /**
+   * Creates a single replica with a specific origin, operational state, replica state, and BCSID.
+   */
+  public static ContainerReplica createReplicaWithOriginAndSeqId(
+      ContainerID containerID, DatanodeID originNodeId,
+      HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState, long seqId) {
+    return createContainerReplica(containerID, 0, opState, replicaState, 123L, 1234L,
+        MockDatanodeDetails.randomDatanodeDetails(), originNodeId, seqId);
+  }
+
+  /**
+   * Adds {@code count} replicas with the given origin, operational state, replica state, and BCSID.
+   * to the provided set.
+   */
+  public static void addReplicasWithOriginAndSeqId(
+      Set<ContainerReplica> replicas, ContainerID containerID,
+      DatanodeID originNodeId, HddsProtos.NodeOperationalState opState,
+      ContainerReplicaProto.State replicaState, long seqId, int count) {
+    for (int i = 0; i < count; i++) {
+      replicas.add(createReplicaWithOriginAndSeqId(containerID, originNodeId, opState, replicaState, seqId));
+    }
   }
 
   public static ContainerReplica createContainerReplica(ContainerID containerID,
@@ -433,8 +458,8 @@ public final class ReplicationTestUtil {
       }
       List<DatanodeDetails> sources = invocationOnMock.getArgument(1);
       ContainerInfo containerInfo = invocationOnMock.getArgument(0);
-      ReplicateContainerCommand command = ReplicateContainerCommand
-          .toTarget(containerInfo.getContainerID(),
+      ReplicateContainerCommand command = ContainerTestUtils
+          .getReplicateContainerCommand(containerInfo.getContainerID(),
               invocationOnMock.getArgument(2));
       command.setReplicaIndex(invocationOnMock.getArgument(3));
       commandsSent.add(Pair.of(sources.get(0), command));

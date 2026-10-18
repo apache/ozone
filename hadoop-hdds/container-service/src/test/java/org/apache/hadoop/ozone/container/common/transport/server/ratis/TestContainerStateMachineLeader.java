@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 /**
  * Test class to ContainerStateMachine class for leader.
  */
-public class TestContainerStateMachineLeader extends TestContainerStateMachine {
+public class TestContainerStateMachineLeader extends ContainerStateMachineTests {
   public TestContainerStateMachineLeader() {
     super(true);
   }

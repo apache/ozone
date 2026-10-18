@@ -32,6 +32,15 @@ public class SnapshotDiffResponse {
   private final String reason;
   private SubStatus subStatus;
   private double progressPercent = 0.0;
+  private boolean isReportOnly = false;
+
+  public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
+                              final JobStatus jobStatus,
+                              final long waitTimeInMs,
+                              boolean isReportOnly) {
+    this(snapshotDiffReport, jobStatus, waitTimeInMs);
+    this.isReportOnly = isReportOnly;
+  }
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
                               final JobStatus jobStatus,
@@ -40,6 +49,15 @@ public class SnapshotDiffResponse {
     this.jobStatus = jobStatus;
     this.waitTimeInMs = waitTimeInMs;
     this.reason = StringUtils.EMPTY;
+  }
+
+  public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
+                              final JobStatus jobStatus,
+                              final long waitTimeInMs,
+                              final String reason,
+                              boolean isReportOnly) {
+    this(snapshotDiffReport, jobStatus, waitTimeInMs, reason);
+    this.isReportOnly = isReportOnly;
   }
 
   public SnapshotDiffResponse(final SnapshotDiffReportOzone snapshotDiffReport,
@@ -68,8 +86,16 @@ public class SnapshotDiffResponse {
     return reason;
   }
 
+  public SubStatus getSubStatus() {
+    return subStatus;
+  }
+
   public void setSubStatus(SubStatus subStatus) {
     this.subStatus = subStatus;
+  }
+
+  public double getProgressPercent() {
+    return progressPercent;
   }
 
   public void setProgressPercent(double progressPercent) {
@@ -90,26 +116,45 @@ public class SnapshotDiffResponse {
       } else {
         str.append("Unknown reason.");
       }
-      str.append("'. Please retry after ")
-          .append(waitTimeInMs)
-          .append(" ms.\n");
+
+      if (isReportOnly) {
+        str.append("'.\n Please resubmit the job without using the --get-report option.\n");
+      } else {
+        str.append("'. Please retry after ").append(waitTimeInMs).append(" ms.\n");
+      }
       break;
-    case CANCELLED:
-      str.append("Snapshot diff job has been CANCELLED.");
+    case REJECTED:
+      str.append("Snapshot diff job is REJECTED.\n");
+      if (isReportOnly) {
+        str.append(" Please resubmit the job without using the --get-report option.");
+      } else {
+        str.append(" Please retry after ").append(waitTimeInMs).append(" ms.\n");
+      }
+      break;
+    case NOT_FOUND:
+      if (isReportOnly) {
+        str.append("No snapshot diff job found. Job may not have been submitted or was removed during cleanup.\n" +
+            "Submit a new snapshot diff job without using the --get-report option.\n");
+
+      } else {
+        str.append("Invalid state for submit snapshot diff call");
+      }
       break;
     default:
       str.append("Snapshot diff job is ")
-          .append(jobStatus)
-          .append(". Please retry after ")
-          .append(waitTimeInMs)
-          .append(" ms.\n");
+          .append(jobStatus);
+      if (waitTimeInMs > 0L) {
+        str.append(". Please retry after ")
+            .append(waitTimeInMs)
+            .append(" ms");
+      }
+      str.append(".\n");
       if (subStatus != null) {
         str.append("SubStatus : ")
-            .append(subStatus);
-        if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS) ||
-            subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO)) {
-          str.append("Keys Processed Estimated Percentage : ")
-              .append(progressPercent);
+            .append(subStatus)
+            .append('\n');
+        if (subStatus.hasProgress()) {
+          str.append(String.format("Keys Processed Estimated Percentage : %.1f%n", progressPercent));
         }
       }
     }
@@ -125,7 +170,8 @@ public class SnapshotDiffResponse {
     DONE,
     REJECTED,
     FAILED,
-    CANCELLED;
+    CANCELLED,
+    NOT_FOUND;
 
     public JobStatusProto toProtobuf() {
       return JobStatusProto.valueOf(this.name());
@@ -143,8 +189,17 @@ public class SnapshotDiffResponse {
     SST_FILE_DELTA_DAG_WALK,
     SST_FILE_DELTA_FULL_DIFF,
     OBJECT_ID_MAP_GEN_OBS,
+    @Deprecated
     OBJECT_ID_MAP_GEN_FSO,
-    DIFF_REPORT_GEN;
+    DIFF_REPORT_GEN,
+    PATH_RESOLUTION_FSO,
+    OBJECT_ID_MAP_GEN_FSO_FILE,
+    OBJECT_ID_MAP_GEN_FSO_DIR;
+
+    public boolean hasProgress() {
+      return this == OBJECT_ID_MAP_GEN_OBS || this == OBJECT_ID_MAP_GEN_FSO || this == OBJECT_ID_MAP_GEN_FSO_FILE
+          || this == OBJECT_ID_MAP_GEN_FSO_DIR;
+    }
 
     public static SubStatus fromProtoBuf(OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus subStatusProto) {
       return SubStatus.valueOf(subStatusProto.name());

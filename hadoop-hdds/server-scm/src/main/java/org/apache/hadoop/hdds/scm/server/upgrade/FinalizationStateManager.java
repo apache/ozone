@@ -18,38 +18,28 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import java.io.IOException;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
+import org.apache.hadoop.hdds.scm.ha.SCMHandler;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
  * Manages the state of finalization in SCM.
  */
-public interface FinalizationStateManager {
+public interface FinalizationStateManager extends SCMHandler {
 
+  // TODO this will need a parameter for peer version info to validate.
   @Replicate
-  void addFinalizingMark() throws IOException;
-
-  @Replicate
-  void removeFinalizingMark() throws IOException;
-
-  @Replicate
-  void finalizeLayoutFeature(Integer layoutVersion)
-      throws IOException;
-
-  /**
-   * @param query The checkpoint to check for being crossed.
-   * @return true if SCM's disk state indicates this checkpoint has been
-   * crossed. False otherwise.
-   */
-  boolean crossedCheckpoint(FinalizationCheckpoint query);
-
-  FinalizationCheckpoint getFinalizationCheckpoint();
-
-  void setUpgradeContext(SCMUpgradeFinalizationContext context);
+  void finalizeUpgrade() throws IOException;
 
   /**
    * Called on snapshot installation.
    */
   void reinitialize(Table<String, String> newFinalizationStore)
       throws IOException;
+
+  @Override
+  default RequestType getType() {
+    return RequestType.FINALIZE;
+  }
 }

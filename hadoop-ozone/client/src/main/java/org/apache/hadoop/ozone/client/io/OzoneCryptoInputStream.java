@@ -18,10 +18,14 @@
 package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.base.Preconditions;
+import java.io.EOFException;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ReadOnlyBufferException;
 import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoStreamUtils;
+import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.scm.storage.PartInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +39,8 @@ public class OzoneCryptoInputStream extends CryptoInputStream
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneCryptoInputStream.class);
+
+  private static final int EOF = -1;
 
   private final long length;
   private final int bufferSize;
@@ -74,7 +80,7 @@ public class OzoneCryptoInputStream extends CryptoInputStream
   }
 
   @Override
-  public int read(byte[] b, int off, int len) throws IOException {
+  public synchronized int read(byte[] b, int off, int len) throws IOException {
     // CryptoInputStream reads hadoop.security.crypto.buffer.size number of
     // bytes (default 8KB) at a time. This needs to be taken into account
     // in calculating the numBytesToRead.
@@ -134,6 +140,109 @@ public class OzoneCryptoInputStream extends CryptoInputStream
       }
     }
     return numBytesRead;
+  }
+
+  @Override
+  public synchronized int read(ByteBuffer buf) throws IOException {
+    return super.read(buf);
+  }
+
+  @Override
+  public synchronized void seek(long pos) throws IOException {
+    super.seek(pos);
+  }
+
+  @Override
+  public synchronized long getPos() throws IOException {
+    return super.getPos();
+  }
+
+  @Override
+  public synchronized long skip(long n) throws IOException {
+    return super.skip(n);
+  }
+
+  @Override
+  public synchronized boolean seekToNewSource(long targetPos) throws IOException {
+    return super.seekToNewSource(targetPos);
+  }
+
+  @Override
+  public synchronized int read() throws IOException {
+    return super.read();
+  }
+
+  @Override
+  public synchronized int available() throws IOException {
+    return super.available();
+  }
+
+  /**
+   * Reads and decrypts at the given offset without moving the sequential cursor.
+   * This method needs no synchronization: CryptoInputStream uses separate buffers and a decryptor for each call.
+   */
+  @Override
+  public int read(long position, ByteBuffer dst) throws IOException {
+    if (position < 0) {
+      throw new EOFException("The given position is negative: " + position);
+    }
+    if (dst.isReadOnly()) {
+      throw new ReadOnlyBufferException();
+    }
+    if (!dst.hasRemaining()) {
+      return 0;
+    }
+    if (position >= length) {
+      return EOF;
+    }
+    int limit = dst.limit();
+    try {
+      dst.limit(dst.position() + (int) Math.min(dst.remaining(), length - position));
+      return super.read(position, dst);
+    } finally {
+      dst.limit(limit);
+    }
+  }
+
+  @Override
+  public void readFully(long position, ByteBuffer dst) throws IOException {
+    int bytesRead;
+    for (int readCount = 0; dst.hasRemaining(); readCount += bytesRead) {
+      bytesRead = read(position + readCount, dst);
+      if (bytesRead < 0) {
+        throw new EOFException(FSExceptionMessages.EOF_IN_READ_FULLY);
+      }
+      if (bytesRead == 0) {
+        throw new IOException("No progress reading at position " + (position + readCount));
+      }
+    }
+  }
+
+  @Override
+  public int read(long position, byte[] buffer, int offset, int len) throws IOException {
+    if (buffer == null) {
+      throw new IllegalArgumentException("Null buffer");
+    }
+    if (position < 0) {
+      throw new EOFException("position is negative: " + position);
+    }
+    return read(position, ByteBuffer.wrap(buffer, offset, len));
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer, int offset, int len) throws IOException {
+    if (buffer == null) {
+      throw new IllegalArgumentException("Null buffer");
+    }
+    if (position < 0) {
+      throw new EOFException("position is negative: " + position);
+    }
+    readFully(position, ByteBuffer.wrap(buffer, offset, len));
+  }
+
+  @Override
+  public void readFully(long position, byte[] buffer) throws IOException {
+    readFully(position, buffer, 0, buffer.length);
   }
 
   /**

@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateAction.UPDATE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.AdditionalAnswers.returnsElementsOf;
 import static org.mockito.BDDMockito.given;
@@ -42,7 +43,6 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
@@ -93,16 +93,17 @@ public class TestFileSizeCountTask {
     // Create separate task instances.
     fileSizeCountTaskOBS = new FileSizeCountTaskOBS(reconFileMetadataManager, configuration);
     fileSizeCountTaskFSO = new FileSizeCountTaskFSO(reconFileMetadataManager, configuration);
-    // Clear RocksDB table before each test.
-    try (TableIterator<FileSizeCountKey, ? extends Table.KeyValue<FileSizeCountKey, Long>> iterator = 
-         reconFileMetadataManager.getFileCountTable().iterator()) {
-      while (iterator.hasNext()) {
-        Table.KeyValue<FileSizeCountKey, Long> keyValue = iterator.next();
-        reconFileMetadataManager.getFileCountTable().delete(keyValue.getKey());
-      }
-    } catch (Exception e) {
-      // Ignore cleanup errors
-    }
+    reconFileMetadataManager.clearFileCountTable();
+  }
+
+  @Test
+  public void testClearFileCountTable() throws IOException {
+    FileSizeCountKey key = new FileSizeCountKey("vol1", "bucket1", 1024L);
+    reconFileMetadataManager.getFileCountTable().put(key, 1L);
+
+    reconFileMetadataManager.clearFileCountTable();
+
+    assertNull(reconFileMetadataManager.getFileSizeCount(key));
   }
 
   @Test

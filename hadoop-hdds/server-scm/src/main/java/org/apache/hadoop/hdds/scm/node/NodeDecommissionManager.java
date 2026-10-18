@@ -24,7 +24,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -106,7 +105,7 @@ public class NodeDecommissionManager {
 
         if (this.hostname == null) {
           throw new InvalidHostStringException("The string " + rawHostname +
-              " does not contain a value hostname or hostname:port definition");
+              " does not contain a valid hostname or hostname:port definition");
         }
       } catch (URISyntaxException e) {
         throw new InvalidHostStringException(
@@ -537,8 +536,7 @@ public class NodeDecommissionManager {
 
   private synchronized boolean checkIfMaintenancePossible(List<DatanodeDetails> dns, List<DatanodeAdminError> errors) {
     int numMaintenance = dns.size();
-    List<DatanodeDetails> validDns = dns.stream().collect(Collectors.toList());
-    Collections.copy(validDns, dns);
+    List<DatanodeDetails> validDns = new ArrayList<>(dns);
     int inServiceTotal = nodeManager.getNodeCount(NodeStatus.inServiceHealthy());
     for (DatanodeDetails dn : dns) {
       try {

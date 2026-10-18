@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocationList;
 
@@ -106,7 +107,7 @@ public class OmKeyLocationInfoGroup {
    * Use getLocationLists() instead.
    * @return a list of OmKeyLocationInfo
    */
-  public List<OmKeyLocationInfo> getLocationList() {
+  public List<OmKeyLocationInfo> createLocationList() {
     return locationVersionMap.values().stream().flatMap(List::stream)
         .collect(Collectors.toList());
   }
@@ -125,7 +126,7 @@ public class OmKeyLocationInfoGroup {
   }
 
   public KeyLocationList getProtobuf(boolean ignorePipeline,
-      int clientVersion) {
+      ClientVersion clientVersion) {
     KeyLocationList.Builder builder = KeyLocationList.newBuilder()
         .setVersion(version).setIsMultipartKey(isMultipartKey);
     List<OzoneManagerProtocolProtos.KeyLocation> keyLocationList =
@@ -185,16 +186,16 @@ public class OmKeyLocationInfoGroup {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("version:").append(version).append(' ');
-    sb.append("isMultipartKey:").append(isMultipartKey).append(' ');
+    sb.append("version:").append(version).append(' ')
+        .append("isMultipartKey:").append(isMultipartKey).append(' ');
     for (List<OmKeyLocationInfo> kliList : locationVersionMap.values()) {
       for (OmKeyLocationInfo kli: kliList) {
-        sb.append("conID ").append(kli.getContainerID());
-        sb.append(' ');
-        sb.append("locID ").append(kli.getLocalID());
-        sb.append(' ');
-        sb.append("bcsID ").append(kli.getBlockCommitSequenceId());
-        sb.append(" || ");
+        sb.append("conID ").append(kli.getContainerID())
+            .append(' ')
+            .append("locID ").append(kli.getLocalID())
+            .append(' ')
+            .append("bcsID ").append(kli.getBlockCommitSequenceId())
+            .append(" || ");
       }
     }
     return sb.toString();

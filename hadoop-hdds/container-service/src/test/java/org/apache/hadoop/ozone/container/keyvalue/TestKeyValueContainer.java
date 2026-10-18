@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_METADATA_DIR;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,14 +37,18 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -71,14 +76,18 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -92,12 +101,16 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.hadoop.util.DiskChecker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.LiveFileMetaData;
 
@@ -492,6 +505,68 @@ public class TestKeyValueContainer {
     }
   }
 
+  @ContainerTestVersionInfo.ContainerTest
+  public void testFailedImportCleanupMovesContainerBeforeDelete(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+
+    KeyValueContainer container = new KeyValueContainer(
+        keyValueContainerData, CONF) {
+      @Override
+      void deleteDirectory(File directory) throws IOException {
+        File deletedContainerDir = KeyValueContainerUtil.getTmpDirectoryPath(
+            getContainerData(), getContainerData().getVolume()).toFile();
+        if (directory.equals(deletedContainerDir)) {
+          throw new IOException("Injected tmp cleanup failure");
+        }
+        super.deleteDirectory(directory);
+      }
+    };
+    container.populatePathFields(scmId, containerVolume);
+
+    ContainerPacker<KeyValueContainerData> failingPacker =
+        new ContainerPacker<KeyValueContainerData>() {
+          @Override
+          public byte[] unpackContainerData(
+              Container<KeyValueContainerData> containerToUnpack,
+              InputStream inputStream, Path tmpDir, Path destContainerDir)
+              throws IOException {
+            Files.createDirectories(new File(containerToUnpack
+                .getContainerData().getChunksPath()).toPath());
+            Files.createDirectories(new File(containerToUnpack
+                .getContainerData().getMetadataPath()).toPath());
+            throw new IOException("Injected import failure");
+          }
+
+          @Override
+          public void pack(Container<KeyValueContainerData> containerToPack,
+              OutputStream destination) {
+          }
+
+          @Override
+          public byte[] unpackContainerDescriptor(InputStream inputStream) {
+            return null;
+          }
+        };
+
+    assertThrows(IOException.class, () -> container.importContainerData(
+        new ByteArrayInputStream(new byte[0]), failingPacker));
+
+    assertThat(new File(container.getContainerData().getContainerPath()))
+        .doesNotExist();
+    File deletedContainerDir = KeyValueContainerUtil.getTmpDirectoryPath(
+        container.getContainerData(), container.getContainerData().getVolume())
+        .toFile();
+    assertThat(deletedContainerDir).exists();
+    assertThat(new File(deletedContainerDir, OzoneConsts.STORAGE_DIR_CHUNKS))
+        .exists();
+    assertThat(new File(deletedContainerDir, OzoneConsts.CONTAINER_META_PATH))
+        .exists();
+  }
+
   private void checkContainerFilesPresent(KeyValueContainerData data,
       long expectedNumFilesInChunksDir) throws IOException {
     File chunksDir = new File(data.getChunksPath());
@@ -694,6 +769,35 @@ public class TestKeyValueContainer {
     assertNotNull(keyValueContainer.getContainerReport());
   }
 
+  /**
+   * When a container's metadata directory is missing (MISSING_METADATA_DIR detected by the scanner),
+   * markContainerUnhealthy must succeed without throwing. Writing a partial .container file with only
+   * the state field would lose other metadata and is more harmful than writing nothing. The in-memory
+   * UNHEALTHY state is sufficient for SCM to receive it via ICR and schedule deletion.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testMarkUnhealthyWithMissingMetadataDir(ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId);
+
+    // Simulate MISSING_METADATA_DIR using the same corruption helper used in scanner tests.
+    File metadataDir = new File(keyValueContainerData.getMetadataPath());
+    assertTrue(metadataDir.exists(), "Metadata dir should exist before corruption");
+    MISSING_METADATA_DIR.applyTo(keyValueContainer);
+
+    // markContainerUnhealthy must not throw even though the metadata dir is absent.
+    keyValueContainer.markContainerUnhealthy();
+
+    // In-memory state must be UNHEALTHY.
+    assertEquals(ContainerProtos.ContainerDataProto.State.UNHEALTHY,
+        keyValueContainer.getContainerState());
+
+    // Regression guards: if a future change adds mkdirs/persist logic, these catch it early.
+    assertFalse(metadataDir.exists(), "Metadata dir should not be recreated by markContainerUnhealthy");
+    assertFalse(keyValueContainer.getContainerFile().exists(),
+        "Container file should not be written when metadata dir is missing");
+  }
+
   @ContainerTestVersionInfo.ContainerTest
   public void testUpdateContainer(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -892,7 +996,7 @@ public class TestKeyValueContainer {
     long containerId = startContainerId;
 
     // Create containers on each volume and export all container on new volume
-    int count = 200;
+    int count = 10;
     long numberOfKeysToWrite = 500;
     KeyValueContainerData containerData;
     KeyValueContainer container;
@@ -962,8 +1066,6 @@ public class TestKeyValueContainer {
       // After moving away from using Table.loadFromFile(), no SST files are generated unless the db is force flushed
       assertEquals(0, fileMetaDataList1.size());
       hddsVolume.compactDb();
-      // Sleep a while to wait for compaction to complete
-      Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
       assertThat(fileMetaDataList2).hasSizeLessThanOrEqualTo(fileMetaDataList1.size());
@@ -974,6 +1076,49 @@ public class TestKeyValueContainer {
             new File(c.getContainerData().getContainerPath());
         FileUtils.deleteDirectory(directory);
       }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testAutoCompactionClosesCompactRangeOptions(boolean compactionFails) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
+    dc.setAutoCompactionSmallSstFileNum(1);
+    conf.setFromObject(dc);
+    DatanodeStoreSchemaThreeImpl store =
+        spy(new DatanodeStoreSchemaThreeImpl(conf, new File(folder, "compaction.db").getAbsolutePath(), false));
+    List<ManagedCompactRangeOptions> options = new ArrayList<>();
+    try {
+      for (long containerId = 1; containerId <= 2; containerId++) {
+        store.getBlockDataTable().put(DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(containerId) + 1,
+            new BlockData(new BlockID(containerId, 1)));
+        store.flushDB();
+      }
+      RDBStore rdbStore = spy((RDBStore) store.getStore());
+      RocksDatabase db = spy(rdbStore.getDb());
+      doReturn(rdbStore).when(store).getStore();
+      doReturn(db).when(rdbStore).getDb();
+      IOException failure = new IOException("Compaction failed");
+      doAnswer(invocation -> {
+        options.add(invocation.getArgument(3));
+        if (compactionFails) {
+          throw failure;
+        }
+        return invocation.callRealMethod();
+      }).when(db).compactRange(any(ColumnFamily.class), any(byte[].class), any(byte[].class),
+          any(ManagedCompactRangeOptions.class));
+
+      if (compactionFails) {
+        assertThat(assertThrows(IOException.class, store::compactionIfNeeded)).isSameAs(failure);
+      } else {
+        store.compactionIfNeeded();
+      }
+      assertThat(options).isNotEmpty().noneMatch(ManagedCompactRangeOptions::isOwningHandle);
+    } finally {
+      options.forEach(ManagedCompactRangeOptions::close);
+      // Preserve the column family options shared by datanode DBs.
+      store.stop();
     }
   }
 

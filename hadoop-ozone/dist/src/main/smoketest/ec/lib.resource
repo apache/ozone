@@ -24,6 +24,15 @@ Suite Setup         Get Security Enabled From Config
 ${SCM}       scm
 
 *** Keywords ***
+Count Datanodes In Service
+    ${actual} =    Execute    ozone admin datanode list --node-state HEALTHY --operational-state IN_SERVICE --json | jq -r 'length'
+    [return]       ${actual}
+
+Has Enough Datanodes
+    [arguments]    ${expected}
+    ${actual} =    Count Datanodes In Service
+    Should Be True    ${expected} <= ${actual}
+
 Prepare For Tests
     Execute             dd if=/dev/urandom of=/tmp/1mb bs=1048576 count=1
     Execute             dd if=/dev/urandom of=/tmp/2mb bs=1048576 count=2

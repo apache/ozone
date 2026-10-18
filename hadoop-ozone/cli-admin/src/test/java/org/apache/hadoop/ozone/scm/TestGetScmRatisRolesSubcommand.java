@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.admin.scm.GetScmRatisRolesSubcommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
@@ -58,6 +59,145 @@ public class TestGetScmRatisRolesSubcommand {
           "bigdata-ozone-online32 |    9894    |  LEADER  | e428ca07-b2a3-4756-bf9b-a4abb033c7d1");
       assertThat(capture.getOutput()).contains(
           "bigdata-ozone-online30 |    9894    | FOLLOWER | 41f90734-b3ee-4284-ad96-40a286654952");
+    }
+  }
+
+  @Test
+  public void testGetScmRolesNonRatisShortStringTable() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--table");
+
+    List<String> result = new ArrayList<>();
+    result.add("host:9894");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      assertThat(capture.getOutput())
+          .containsPattern("\\|\\s+host\\s+\\|\\s+9894\\s+\\|");
+    }
+  }
+
+  @Test
+  public void testGetScmRolesNonRatisShortStringJson() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+
+    List<String> result = new ArrayList<>();
+    result.add("host:9894");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      assertThat(JsonUtils.readTree(capture.getOutput())).isEqualTo(
+          JsonUtils.readTree("{\"host\":{\"address\":\"host:9894\"}}"));
+    }
+  }
+
+  @Test
+  public void testGetScmHARatisRolesIPv6() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--table");
+
+    List<String> result = new ArrayList<>();
+    result.add("[2001:db8::1]:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:[2001:db8:0:0:0:0:0:1]");
+    result.add("[2001:db8::2]:9894:FOLLOWER:61b1c8e5-da40-4567-8a17-96a0234ba14e:[2001:db8:0:0:0:0:0:2]");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      // Column widths depend on the rendered content, but the column order and
+      // the value in each one must not shift.
+      assertThat(capture.getOutput()).containsPattern(
+          "\\|\\s+2001:db8::1\\s+\\|\\s+9894\\s+\\|\\s+LEADER\\s+\\|"
+              + "\\s+e428ca07-b2a3-4756-bf9b-a4abb033c7d1\\s+\\|\\s+2001:db8:0:0:0:0:0:1\\s+\\|");
+      assertThat(capture.getOutput()).containsPattern(
+          "\\|\\s+2001:db8::2\\s+\\|\\s+9894\\s+\\|\\s+FOLLOWER\\s+\\|"
+              + "\\s+61b1c8e5-da40-4567-8a17-96a0234ba14e\\s+\\|\\s+2001:db8:0:0:0:0:0:2\\s+\\|");
+    }
+  }
+
+  @Test
+  public void testGetScmRatisRolesJson() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+
+    List<String> result = new ArrayList<>();
+    result.add("scm1.example.com:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:10.0.0.1");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      assertThat(JsonUtils.readTree(capture.getOutput())).isEqualTo(
+          JsonUtils.readTree("{\"scm1.example.com\":{"
+              + "\"address\":\"scm1.example.com:9894\","
+              + "\"raftPeerRole\":\"LEADER\","
+              + "\"ID\":\"e428ca07-b2a3-4756-bf9b-a4abb033c7d1\","
+              + "\"InetAddress\":\"10.0.0.1\"}}"));
+    }
+  }
+
+  @Test
+  public void testGetScmHARatisRolesIPv6Json() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+
+    List<String> result = new ArrayList<>();
+    result.add("[2001:db8::1]:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:[2001:db8:0:0:0:0:0:1]");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      // The address is a connectable target so it keeps its brackets; the
+      // resolved literal in InetAddress is a bare address and stays unbracketed.
+      assertThat(JsonUtils.readTree(capture.getOutput())).isEqualTo(
+          JsonUtils.readTree("{\"2001:db8::1\":{"
+              + "\"address\":\"[2001:db8::1]:9894\","
+              + "\"raftPeerRole\":\"LEADER\","
+              + "\"ID\":\"e428ca07-b2a3-4756-bf9b-a4abb033c7d1\","
+              + "\"InetAddress\":\"2001:db8:0:0:0:0:0:1\"}}"));
+    }
+  }
+
+  @Test
+  public void testGetScmRatisRolesDefaultOutputIsVerbatim() throws Exception {
+    GetScmRatisRolesSubcommand cmd = new GetScmRatisRolesSubcommand();
+    ScmClient client = mock(ScmClient.class);
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs();
+
+    List<String> result = new ArrayList<>();
+    result.add("scm1.example.com:9894:LEADER:e428ca07-b2a3-4756-bf9b-a4abb033c7d1:10.0.0.1");
+    result.add("[2001:db8::1]:9894:FOLLOWER:61b1c8e5-da40-4567-8a17-96a0234ba14e:[2001:db8:0:0:0:0:0:1]");
+
+    when(client.getScmRoles()).thenAnswer(invocation -> result);
+
+    try (GenericTestUtils.SystemOutCapturer capture =
+        new GenericTestUtils.SystemOutCapturer()) {
+      cmd.execute(client);
+      for (String role : result) {
+        assertThat(capture.getOutput()).contains(role);
+      }
     }
   }
 

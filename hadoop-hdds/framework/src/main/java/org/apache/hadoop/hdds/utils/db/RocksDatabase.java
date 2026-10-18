@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
 import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.rocksdb.ByteBufferGetStatus;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.Holder;
@@ -105,7 +106,7 @@ public final class RocksDatabase implements Closeable {
   }
 
   static String bytes2String(ByteBuffer bytes) {
-    return StringCodec.get().decode(bytes);
+    return StringCodec.get().decodeWithFallback(bytes);
   }
 
   static RocksDatabaseException toRocksDatabaseException(Object name, String op, RocksDBException e) {
@@ -238,34 +239,16 @@ public final class RocksDatabase implements Closeable {
     return isClosed.get();
   }
 
-  /**
-   * Represents a checkpoint of the db.
-   *
-   * @see ManagedCheckpoint
-   */
-  final class RocksCheckpoint implements Closeable {
-    private final ManagedCheckpoint checkpoint;
-
-    private RocksCheckpoint() {
-      this.checkpoint = ManagedCheckpoint.create(db);
-    }
-
-    public void createCheckpoint(Path path) throws RocksDatabaseException {
-      try (UncheckedAutoCloseable ignored = acquire()) {
-        checkpoint.get().createCheckpoint(path.toString());
-      } catch (RocksDBException e) {
-        closeOnError(e);
-        throw toRocksDatabaseException(this, "createCheckpoint " + path, e);
-      }
-    }
-
-    public long getLatestSequenceNumber() throws RocksDatabaseException {
-      return RocksDatabase.this.getLatestSequenceNumber();
-    }
-
-    @Override
-    public void close() throws RocksDatabaseException {
-      checkpoint.close();
+  /** @return the latest sequence number after the checkpoint is created. */
+  long createCheckpoint(Path path) throws RocksDatabaseException {
+    final String checkpointPath = path.toString();
+    try (UncheckedAutoCloseable ignored = acquire();
+        ManagedCheckpoint checkpoint = ManagedCheckpoint.create(db)) {
+      checkpoint.get().createCheckpoint(checkpointPath);
+      return db.get().getLatestSequenceNumber();
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      throw toRocksDatabaseException(this, "createCheckpoint " + checkpointPath, e);
     }
   }
 
@@ -299,36 +282,12 @@ public final class RocksDatabase implements Closeable {
       return handle;
     }
 
-    public void batchDelete(ManagedWriteBatch writeBatch, byte[] key)
+    public void batchDelete(ManagedWriteBatch writeBatch, ByteBuffer key)
         throws RocksDatabaseException {
       try (UncheckedAutoCloseable ignored = acquire()) {
         writeBatch.delete(getHandle(), key);
       } catch (RocksDBException e) {
         throw toRocksDatabaseException(this, "batchDelete key " + bytes2String(key), e);
-      }
-    }
-
-    public void batchDeleteRange(ManagedWriteBatch writeBatch, byte[] beginKey, byte[] endKey)
-        throws RocksDatabaseException {
-      try (UncheckedAutoCloseable ignored = acquire()) {
-        writeBatch.deleteRange(getHandle(), beginKey, endKey);
-      } catch (RocksDBException e) {
-        throw toRocksDatabaseException(this, "batchDeleteRange key " + bytes2String(beginKey) + " - " +
-            bytes2String(endKey), e);
-      }
-    }
-
-    public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
-        throws RocksDatabaseException {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("batchPut array key {}", bytes2String(key));
-        LOG.debug("batchPut array value {}", bytes2String(value));
-      }
-
-      try (UncheckedAutoCloseable ignored = acquire()) {
-        writeBatch.put(getHandle(), key, value);
-      } catch (RocksDBException e) {
-        throw toRocksDatabaseException(this, "batchPut key " + bytes2String(key), e);
       }
     }
 
@@ -420,7 +379,9 @@ public final class RocksDatabase implements Closeable {
   }
 
   private void waitAndClose() {
-    // wait till all access to rocks db is process to avoid crash while close
+    // Wait until all active operations (including open iterators) complete.
+    // Iterators acquired after DB close is triggered will fast-fail in
+    // hasNext(), so this loop is expected to complete quickly in practice.
     while (!counter.compareAndSet(0, Long.MIN_VALUE)) {
       try {
         Thread.currentThread().sleep(1);
@@ -451,7 +412,7 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  private UncheckedAutoCloseable acquire() throws RocksDatabaseException {
+  UncheckedAutoCloseable acquire() throws RocksDatabaseException {
     if (isClosed()) {
       throw new RocksDatabaseException("Rocks Database is closed");
     }
@@ -618,10 +579,6 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  RocksCheckpoint createCheckpoint() {
-    return new RocksCheckpoint();
-  }
-
   /**
    * - When the key definitely does not exist in the database,
    *   this method returns null.
@@ -648,8 +605,11 @@ public final class RocksDatabase implements Closeable {
   Supplier<Integer> keyMayExist(ColumnFamily family,
       ByteBuffer key, ByteBuffer out) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
+      // keyMayExist may advance the input ByteBuffer position in native code.
+      // Always pass a duplicate so callers can safely reuse the original key
+      // buffer for a follow-up point-get.
       final KeyMayExist result = db.get().keyMayExist(
-          family.getHandle(), key, out);
+          family.getHandle(), key.duplicate(), out);
       switch (result.exists) {
       case kNotExist: return null;
       case kExistsWithValue: return () -> result.valueLength;
@@ -700,6 +660,21 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
+  List<byte[]> multiGet(ColumnFamily family, List<byte[]> keys)
+      throws RocksDatabaseException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      return db.get().multiGetAsList(DEFAULT_READ_OPTION,
+          Collections.nCopies(keys.size(), family.getHandle()), keys);
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      final String message = "multiGet " + keys.size() + " keys from " + family;
+      throw toRocksDatabaseException(this, message, e);
+    }
+  }
+
   /**
    * Get the value mapped to the given key.
    *
@@ -725,6 +700,32 @@ public final class RocksDatabase implements Closeable {
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "get " + bytes2String(key) + " from " + family;
+      throw toRocksDatabaseException(this, message, e);
+    }
+  }
+
+  List<ByteBufferGetStatus> multiGet(ColumnFamily family, List<ByteBuffer> keys, List<ByteBuffer> values)
+      throws RocksDatabaseException {
+    if (keys == null || keys.isEmpty()) {
+      return Collections.emptyList();
+    }
+    try (UncheckedAutoCloseable ignored = acquire()) {
+      final List<ByteBufferGetStatus> statuses = db.get().multiGetByteBuffers(DEFAULT_READ_OPTION,
+          Collections.nCopies(keys.size(), family.getHandle()), keys, values);
+      if (LOG.isTraceEnabled()) {
+        for (ByteBufferGetStatus status: statuses) {
+          if (status.value != null) {
+            LOG.trace("multiGet: requiredSize={}, remaining={}",
+                status.requiredSize, status.value.asReadOnlyBuffer().remaining());
+          } else {
+            LOG.trace("multiGet: status={}", status.status);
+          }
+        }
+      }
+      return statuses;
+    } catch (RocksDBException e) {
+      closeOnError(e);
+      final String message = "multiGet " + keys.size() + " keys from " + family;
       throw toRocksDatabaseException(this, message, e);
     }
   }
@@ -794,17 +795,24 @@ public final class RocksDatabase implements Closeable {
 
   public ManagedRocksIterator newIterator(ColumnFamily family)
       throws RocksDatabaseException {
-    try (UncheckedAutoCloseable ignored = acquire()) {
-      return managed(db.get().newIterator(family.getHandle()));
+    final UncheckedAutoCloseable ref = acquire();
+    try {
+      return managed(db.get().newIterator(family.getHandle()), ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
     }
   }
 
   public ManagedRocksIterator newIterator(ColumnFamily family,
       boolean fillCache) throws RocksDatabaseException {
-    try (UncheckedAutoCloseable ignored = acquire();
-         ManagedReadOptions readOptions = new ManagedReadOptions()) {
+    final UncheckedAutoCloseable ref = acquire();
+    try (ManagedReadOptions readOptions = new ManagedReadOptions()) {
       readOptions.setFillCache(fillCache);
-      return managed(db.get().newIterator(family.getHandle(), readOptions));
+      return managed(db.get().newIterator(family.getHandle(), readOptions), ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
     }
   }
 
@@ -825,7 +833,7 @@ public final class RocksDatabase implements Closeable {
 
   public void delete(ColumnFamily family, byte[] key) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
-      db.get().delete(family.getHandle(), key);
+      db.get().delete(family.getHandle(), writeOptions, key);
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "delete " + bytes2String(key) + " from " + family;
@@ -846,7 +854,7 @@ public final class RocksDatabase implements Closeable {
   public void deleteRange(ColumnFamily family, byte[] beginKey, byte[] endKey)
       throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
-      db.get().deleteRange(family.getHandle(), beginKey, endKey);
+      db.get().deleteRange(family.getHandle(), writeOptions, beginKey, endKey);
     } catch (RocksDBException e) {
       closeOnError(e);
       final String message = "delete range " + bytes2String(beginKey) +
@@ -887,12 +895,12 @@ public final class RocksDatabase implements Closeable {
         String sstFileColumnFamily = StringUtils.bytes2String(liveFileMetaData.columnFamilyName());
         int lastLevel = getLastLevel();
 
-        // RocksDB #deleteFile API allows only to delete the last level of
-        // SST Files. Any level < last level won't get deleted and
-        // only last file of level 0 can be deleted
-        // and will throw warning in the rocksdb manifest.
-        // Instead, perform the level check here
-        // itself to avoid failed delete attempts for lower level files.
+        // Restrict deletion to files at the last level (and skip entirely when
+        // the last level is 0). The old RocksDB #deleteFile API could only
+        // delete last-level SST files (and the last file of level 0);
+        // deleteSstFileRange, used below, no longer has that limitation, but
+        // this method keeps the last-level restriction to preserve its existing
+        // pruning behavior.
         if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
           continue;
         }
@@ -903,6 +911,12 @@ public final class RocksDatabase implements Closeable {
         boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
             prefixForColumnFamily, firstDbKey, lastDbKey);
         if (!isKeyWithPrefixPresent) {
+          ColumnFamilyHandle handle = getColumnFamilyHandle(sstFileColumnFamily);
+          if (handle == null) {
+            LOG.warn("Skipping sst file deletion for {}: no handle found for column family {}",
+                liveFileMetaData.fileName(), sstFileColumnFamily);
+            continue;
+          }
           LOG.info("Deleting sst file: {} with start key: {} and end key: {} "
                   + "corresponding to column family {} from db: {}. "
                   + "Prefix for the column family: {}.",
@@ -911,7 +925,15 @@ public final class RocksDatabase implements Closeable {
               StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
               db.get().getName(),
               prefixForColumnFamily);
-          db.deleteFile(liveFileMetaData);
+          // deleteSstFileRange uses deleteFilesInRanges over this file's
+          // [smallestKey, largestKey]. It may also drop other files fully
+          // contained in that range, which is safe here: any such file's key
+          // range is a subset of this non-matching file's range. Because
+          // isKeyWithPrefixPresent is a monotone prefix-range test, a subset
+          // range cannot contain the prefix when the enclosing range does not,
+          // so every collaterally deleted file is likewise non-matching. This
+          // invariant holds only while isKeyWithPrefixPresent stays monotone.
+          db.deleteSstFileRange(handle, liveFileMetaData);
         }
       }
     }

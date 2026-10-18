@@ -139,8 +139,7 @@ public class FSOBucketHandler extends BucketHandler {
     Table<String, OmKeyInfo> keyTable = getOmMetadataManager().getFileTable();
     long keyDataSizeWithReplica = 0L;
 
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = keyTable.iterator()) {
+    try (TableIterator<String, Table.KeyValue<String, OmKeyInfo>> iterator = keyTable.iterator()) {
 
       String seekPrefix = OM_KEY_PREFIX +
           volumeId +

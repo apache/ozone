@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -69,9 +70,9 @@ public abstract class TestContainerReportWithKeys implements NonHATests.TestCase
 
   @Test
   public void testContainerReportKeyWrite() throws Exception {
-    final String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    final String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
-    final String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
+    final String volumeName = uniqueObjectName("volume");
+    final String bucketName = uniqueObjectName("bucket");
+    final String keyName = uniqueObjectName("key");
     final int keySize = 100;
 
     ObjectStore objectStore = client.getObjectStore();

@@ -37,7 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;

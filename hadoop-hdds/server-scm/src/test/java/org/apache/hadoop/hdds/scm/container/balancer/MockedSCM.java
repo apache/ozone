@@ -36,12 +36,14 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -58,20 +60,20 @@ import org.mockito.Mockito;
 
 /**
  * Class for test used for setting up testable StorageContainerManager.
- * Provides an access to {@link TestableCluster} and to necessary mocked instances
+ * Provides an access to {@link MockCluster} and to necessary mocked instances
  */
 public final class MockedSCM {
   private final StorageContainerManager scm;
-  private final TestableCluster cluster;
+  private final MockCluster cluster;
   private final MockNodeManager mockNodeManager;
   private final MockedReplicationManager mockedReplicaManager;
   private final MoveManager moveManager;
   private final ContainerManager containerManager;
   private MockedPlacementPolicies mockedPlacementPolicies;
 
-  public MockedSCM(@Nonnull TestableCluster testableCluster) {
+  public MockedSCM(@Nonnull MockCluster mockCluster) {
     scm = mock(StorageContainerManager.class);
-    cluster = testableCluster;
+    cluster = mockCluster;
     mockNodeManager = new MockNodeManager(cluster.getDatanodeToContainersMap());
     try {
       moveManager = mockMoveManager();
@@ -183,7 +185,7 @@ public final class MockedSCM {
     return scm;
   }
 
-  public @Nonnull TestableCluster getCluster() {
+  public @Nonnull MockCluster getCluster() {
     return cluster;
   }
 
@@ -199,7 +201,7 @@ public final class MockedSCM {
     return mockedPlacementPolicies.ecPlacementPolicy;
   }
 
-  private static @Nonnull ContainerManager mockContainerManager(@Nonnull TestableCluster cluster)
+  private static @Nonnull ContainerManager mockContainerManager(@Nonnull MockCluster cluster)
       throws ContainerNotFoundException {
     ContainerManager containerManager = mock(ContainerManager.class);
     Mockito
@@ -265,6 +267,11 @@ public final class MockedSCM {
       Mockito
           .when(mockedManager.manager.isContainerReplicatingOrDeleting(Mockito.any(ContainerID.class)))
           .thenReturn(false);
+
+      Mockito.when(mockedManager.manager.getContainerReplicationHealth(
+          Mockito.any(ContainerInfo.class), Mockito.anySet())).thenAnswer(invocationOnMock ->
+              new ContainerHealthResult.HealthyResult(
+                  invocationOnMock.getArgument(0, ContainerInfo.class)));
 
       Mockito
           .when(mockedManager.manager.getClock())

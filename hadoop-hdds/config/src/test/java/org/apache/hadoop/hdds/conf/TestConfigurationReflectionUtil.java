@@ -40,14 +40,6 @@ class TestConfigurationReflectionUtil {
             Optional.of(ConfigType.TIME),
             Optional.of("ozone.test.config.wait"),
             Optional.of("30m")),
-        arguments(ConfigurationExampleGrandParent.class, "number",
-            Optional.of(ConfigType.AUTO),
-            Optional.of("number"),
-            Optional.of("2")),
-        arguments(ConfigurationExample.class, "secure",
-            Optional.of(ConfigType.AUTO),
-            Optional.of("ozone.test.config.secure"),
-            Optional.of("true")),
         arguments(ConfigurationExample.class, "no-such-field",
             Optional.empty(),
             Optional.empty(),
@@ -90,8 +82,7 @@ class TestConfigurationReflectionUtil {
 
     String prefix = "ozone.test.config";
     assertEquals(ImmutableSet.of(
-        prefix + ".dynamic",
-        prefix + ".grandpa.dyna"
+        prefix + ".dynamic"
     ), props);
   }
 }

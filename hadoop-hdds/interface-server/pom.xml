@@ -17,15 +17,16 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>2.2.0-SNAPSHOT</version>
+    <version>2.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>hdds-interface-server</artifactId>
-  <version>2.2.0-SNAPSHOT</version>
+  <version>2.3.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone HDDS Server Interface</name>
   <description>Apache Ozone Distributed Data Store Server interface</description>
 
   <properties>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
     <!-- no testable code in this module -->
     <maven.test.skip>true</maven.test.skip>
     <!-- only generated code in this module -->
@@ -67,43 +68,49 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.xolstice.maven.plugins</groupId>
+        <groupId>io.github.ascopes</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
         <executions>
           <execution>
             <id>compile-proto-for-ratis</id>
             <goals>
-              <goal>compile</goal>
-              <goal>test-compile</goal>
-              <goal>compile-custom</goal>
-              <goal>test-compile-custom</goal>
+              <goal>generate</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${ratis-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <protoc kind="binary-maven">
+                <version>${ratis-thirdparty.protobuf.version}</version>
+              </protoc>
               <includes>
                 <include>InterSCMProtocol.proto</include>
                 <include>SCMUpdateProtocol.proto</include>
+                <include>SCMRatisProtocol.proto</include>
               </includes>
+              <incrementalCompilation>false</incrementalCompilation>
               <outputDirectory>target/generated-sources/proto-java-for-ratis</outputDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
-              <pluginId>grpc-java</pluginId>
-              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${ratis-thirdparty.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+              <plugins>
+                <plugin kind="binary-maven">
+                  <groupId>io.grpc</groupId>
+                  <artifactId>protoc-gen-grpc-java</artifactId>
+                  <version>${ratis-thirdparty.grpc.version}</version>
+                </plugin>
+              </plugins>
             </configuration>
           </execution>
           <execution>
             <id>compile-proto-${protobuf.version}</id>
             <goals>
-              <goal>compile</goal>
-              <goal>test-compile</goal>
+              <goal>generate</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <protoc kind="binary-maven">
+                <version>${protobuf.version}</version>
+              </protoc>
               <excludes>
                 <exclude>InterSCMProtocol.proto</exclude>
                 <exclude>SCMUpdateProtocol.proto</exclude>
+                <exclude>SCMRatisProtocol.proto</exclude>
               </excludes>
               <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf.version}</outputDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
             </configuration>
           </execution>
         </executions>
@@ -120,9 +127,21 @@
             <configuration>
               <target>
                 <!-- use grpc, guava, protobuf from ratis-thirdparty -->
-                <replace dir="target/generated-sources/proto-java-for-ratis" token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common" />
-                <replace dir="target/generated-sources/proto-java-for-ratis" token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf" />
-                <replace dir="target/generated-sources/proto-java-for-ratis" token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc" />
+                <replace token="com.google.common" value="org.apache.ratis.thirdparty.com.google.common">
+                  <fileset dir="${project.build.directory}/generated-sources/proto-java-for-ratis">
+                    <include name="**/*.java" />
+                  </fileset>
+                </replace>
+                <replace token="com.google.protobuf" value="org.apache.ratis.thirdparty.com.google.protobuf">
+                  <fileset dir="${project.build.directory}/generated-sources/proto-java-for-ratis">
+                    <include name="**/*.java" />
+                  </fileset>
+                </replace>
+                <replace token="io.grpc" value="org.apache.ratis.thirdparty.io.grpc">
+                  <fileset dir="${project.build.directory}/generated-sources/proto-java-for-ratis">
+                    <include name="**/*.java" />
+                  </fileset>
+                </replace>
               </target>
             </configuration>
           </execution>

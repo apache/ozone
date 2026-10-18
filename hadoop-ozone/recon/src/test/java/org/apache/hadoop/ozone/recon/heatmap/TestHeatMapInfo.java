@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -79,7 +78,6 @@ public class TestHeatMapInfo {
             .withContainerDB()
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
-            .addBinding(ContainerHealthSchemaManager.class)
             .build();
     heatMapUtil = reconTestInjector.getInstance(HeatMapUtil.class);
     auditRespStr = "{\n" +

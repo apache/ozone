@@ -63,8 +63,8 @@ import org.apache.hadoop.fs.ozone.OzoneFileSystem;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -132,7 +132,7 @@ public abstract class TestOmSnapshotFileSystem implements NonHATests.TestCase {
     writeClient = objectStore.getClientProxy().getOzoneManagerClient();
     ozoneManager = cluster().getOzoneManager();
 
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBuckets);
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBuckets);
     if (createLinkedBuckets) {
       linkedBucketMaps.put(bucket.getName(), bucket.getSourceBucket());
     }
@@ -320,7 +320,7 @@ public abstract class TestOmSnapshotFileSystem implements NonHATests.TestCase {
   private void createKey(OzoneBucket ozoneBucket, String key, int length)
       throws Exception {
 
-    byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, length);
+    byte[] input = DataTestUtil.createStringKey(ozoneBucket, key, length);
     // Read the key with given key name.
     readkey(ozoneBucket, key, length, input);
   }

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.FILE_COUNT_BY_SIZE;
-import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider.truncateTable;
 
 import java.io.IOException;
 import javax.inject.Inject;
@@ -108,7 +107,9 @@ public class ReconFileMetadataManagerImpl implements ReconFileMetadataManager {
 
   @Override
   public void clearFileCountTable() throws IOException {
-    truncateTable(fileCountTable);
+    if (fileCountTable != null) {
+      fileCountTable.clear();
+    }
     LOG.info("Successfully cleared file count table");
   }
 }

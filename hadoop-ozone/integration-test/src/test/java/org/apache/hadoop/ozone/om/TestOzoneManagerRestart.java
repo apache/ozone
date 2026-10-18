@@ -26,12 +26,12 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PARTIAL_RENAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_ALREADY_EXISTS;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -82,7 +82,7 @@ public class TestOzoneManagerRestart {
 
   @Test
   public void testRestartOMWithVolumeOperation() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
 
     ObjectStore objectStore = client.getObjectStore();
 
@@ -106,8 +106,8 @@ public class TestOzoneManagerRestart {
 
   @Test
   public void testRestartOMWithBucketOperation() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
 
     ObjectStore objectStore = client.getObjectStore();
 
@@ -136,13 +136,13 @@ public class TestOzoneManagerRestart {
 
   @Test
   public void testRestartOMWithKeyOperation() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
-    String key1 = "key1" + RandomStringUtils.secure().nextNumeric(5);
-    String key2 = "key2" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
+    String key1 = uniqueObjectName("key1");
+    String key2 = uniqueObjectName("key2");
 
-    String newKey1 = "key1new" + RandomStringUtils.secure().nextNumeric(5);
-    String newKey2 = "key2new" + RandomStringUtils.secure().nextNumeric(5);
+    String newKey1 = uniqueObjectName("key1new");
+    String newKey2 = uniqueObjectName("key2new");
 
     ObjectStore objectStore = client.getObjectStore();
 

@@ -39,19 +39,25 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
+import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
@@ -62,14 +68,19 @@ import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.CodecTestUtil;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectMetrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.net.DNSToSwitchMapping;
+import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.utils.ContainerCache;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -225,6 +236,11 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
   }
 
   @Override
+  public List<StorageContainerManager> getStorageContainerManagers() {
+    return singletonList(scm);
+  }
+
+  @Override
   public OzoneManager getOzoneManager() {
     return this.ozoneManager;
   }
@@ -243,7 +259,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
     }
     throw new IOException(
-        "Not able to find datanode with datanode Id " + dn.getUuid());
+        "Not able to find datanode with datanode Id " + dn.getID());
   }
 
   @Override
@@ -254,7 +270,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       }
     }
     throw new IOException(
-        "Not able to find datanode with datanode Id " + dn.getUuid());
+        "Not able to find datanode with datanode Id " + dn.getID());
   }
 
   @Override
@@ -381,6 +397,16 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       ManagedRocksObjectMetrics.INSTANCE.assertNoLeaks();
     } catch (Exception e) {
       LOG.error("Exception while shutting down the cluster.", e);
+    } finally {
+      resetStaticMappingIfConfigured(conf);
+    }
+  }
+
+  private static void resetStaticMappingIfConfigured(
+      OzoneConfiguration conf) {
+    if (StaticMapping.class.getName().equals(
+        conf.get(CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY))) {
+      StaticMapping.resetMap();
     }
   }
 
@@ -498,6 +524,7 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
     @Override
     public MiniOzoneCluster build() throws IOException {
+      validateDatanodeConfiguration();
       DefaultMetricsSystem.setMiniClusterMode(true);
       DatanodeStoreCache.setMiniClusterMode();
       initializeConfiguration();
@@ -518,6 +545,12 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
         cluster.setSecretKeyClient(secretKeyClient);
         if (startDataNodes) {
           cluster.startHddsDatanodes();
+        }
+
+        // Recreate the Ratis pipeline to prevent imbalanced node placement across racks
+        // caused by asynchronous DN registration.
+        if (racks != null && startDataNodes && numOfDatanodes >= HddsProtos.ReplicationFactor.THREE.getNumber()) {
+          resetPipelinesForRackAwareness(cluster);
         }
 
         prepareForNextBuild();
@@ -553,6 +586,33 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
     }
 
     /**
+     * Waits for all DNs to be healthy, then removes any pipelines that
+     * were created before the full rack topology was visible, and creates one
+     * fresh rack-aware pipeline directly (bypassing the background timer).
+     */
+    private void resetPipelinesForRackAwareness(MiniOzoneClusterImpl cluster)
+        throws IOException {
+      try {
+        cluster.waitForClusterToBeReady();
+      } catch (TimeoutException | InterruptedException e) {
+        throw new IOException(
+            "Timed out waiting for rack-aware cluster to be ready", e);
+      }
+      RatisReplicationConfig threeWay =
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      PipelineManager pm =
+          cluster.getStorageContainerManager().getPipelineManager();
+      for (Pipeline p : pm.getPipelines(threeWay)) {
+        if (!p.isClosed()) {
+          pm.closePipeline(p.getId());
+        }
+        pm.deletePipeline(p.getId());
+      }
+
+      pm.createPipeline(threeWay);
+    }
+
+    /**
      * Initializes the configuration required for starting MiniOzoneCluster.
      */
     protected void initializeConfiguration() throws IOException {
@@ -570,6 +630,40 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
       // pipeline.
       conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
           numOfDatanodes >= 3 ? 3 : 1);
+
+      configureHostAndRackTopology();
+    }
+
+    private void configureHostAndRackTopology() throws IOException {
+      if (racks == null && hosts == null) {
+        return;
+      }
+
+      StaticMapping.resetMap();
+      conf.setBoolean(HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME, true);
+
+      if (hosts == null) {
+        hosts = new String[racks.length];
+        for (int i = 0; i < racks.length; i++) {
+          hosts[i] = "host" + i + ".foo.com";
+        }
+      }
+
+      if (racks != null) {
+
+        if (hosts.length != racks.length) {
+          throw new IllegalArgumentException(
+              "The length of hosts [" + hosts.length
+                  + "] must match the length of racks [" + racks.length + "].");
+        }
+
+        conf.setClass(CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+            StaticMapping.class, DNSToSwitchMapping.class);
+
+        for (int i = 0; i < racks.length; i++) {
+          StaticMapping.addNodeToRack(hosts[i], racks[i]);
+        }
+      }
     }
 
     void removeConfiguration() {
@@ -621,6 +715,9 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
               .getLocalNodeDetails(), conf);
 
+      // Create Ratis snapshot directory for test environment
+      String snapshotDir = SCMHAUtils.getSCMRatisSnapshotDirectory(conf);
+      HddsUtils.createDir(snapshotDir);
     }
 
     void initializeOmStorage(OMStorage omStorage) throws IOException {
@@ -688,12 +785,44 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
 
       for (int i = 0; i < numOfDatanodes; i++) {
         OzoneConfiguration dnConf = dnFactory.apply(conf);
+        if (hosts != null) {
+          dnConf.set(HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY, hosts[i]);
+          initializeDatanodeIdentity(dnConf, hosts[i]);
+        }
 
         HddsDatanodeService datanode = new HddsDatanodeService(NO_ARGS);
+        dnConf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, conf.getStrings(ScmConfigKeys.OZONE_SCM_NAMES));
         datanode.setConfiguration(dnConf);
         hddsDatanodes.add(datanode);
       }
+
       return hddsDatanodes;
+    }
+
+    /**
+     * Seeds the datanode.id file for a Datanode with a synthetic hostname: such a hostname
+     * cannot be resolved, so the Datanode cannot discover its own IP address, which is a
+     * required field of the registration request.  The layout version is stamped as well,
+     * since a datanode.id file without a VERSION file marks the Datanode as an installation
+     * predating the upgrade framework, which would make it start pre-finalized.
+     */
+    private void initializeDatanodeIdentity(OzoneConfiguration dnConf, String hostName)
+        throws IOException {
+      DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()
+          .setID(DatanodeID.randomID())
+          .setHostName(hostName)
+          .setIpAddress("127.0.0.1")
+          .build();
+      datanodeDetails.setNetworkName(datanodeDetails.getUuidString());
+
+      DatanodeStorage layoutStorage = new DatanodeStorage(dnConf,
+          datanodeDetails.getUuidString(), HDDSVersion.SOFTWARE_VERSION.serialize());
+      if (layoutStorage.getState() != StorageState.INITIALIZED) {
+        layoutStorage.initialize();
+      }
+
+      String dnFilePath = HddsServerUtil.getDatanodeIdFilePath(dnConf);
+      ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, new File(dnFilePath), dnConf);
     }
 
     protected void configureSCM(boolean isHA) throws IOException {
@@ -705,6 +834,13 @@ public class MiniOzoneClusterImpl implements MiniOzoneCluster {
           localhostWithFreePort());
       conf.set(ScmConfigKeys.OZONE_SCM_HTTP_ADDRESS_KEY,
           localhostWithFreePort());
+      // Bind SCM servers to 127.0.0.1 instead of the default 0.0.0.0.
+      // Without this, the bind address (0.0.0.0) leaks into OZONE_SCM_NAMES
+      // via updateListenAddress/getSCMAddresses, causing DataNodes to connect
+      // to 0.0.0.0 which gets routed to unreachable addresses on VPN.
+      conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, "127.0.0.1");
+      conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY, "127.0.0.1");
+      conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, "127.0.0.1");
       conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
           "3s");
       conf.setInt(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, getFreePort());

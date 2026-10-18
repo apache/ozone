@@ -87,6 +87,9 @@ message ScmContainerLocationRequest {
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
   optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
   optional GetDeletedBlocksTxnSummaryRequestProto getDeletedBlocksTxnSummaryRequest = 50;
+  optional SCMListContainerIDsRequestProto scmListContainerIDsRequest = 51;
+  optional SuppressContainerRequestProto suppressContainerRequest = 52;
+  optional GetPeerUpgradeStatusRequestProto getPeerUpgradeStatusRequest = 53;
 }
 
 message ScmContainerLocationResponse {
@@ -145,6 +148,9 @@ message ScmContainerLocationResponse {
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
   optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
   optional GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummaryResponse = 50;
+  optional SCMListContainerIDsResponseProto scmListContainerIDsResponse = 51;
+  optional SuppressContainerResponseProto suppressContainerResponse = 52;
+  optional GetPeerUpgradeStatusResponseProto getPeerUpgradeStatusResponse = 53;
 
   enum Status {
     OK = 1;
@@ -202,6 +208,9 @@ enum Type {
   GetContainerBalancerStatusInfo = 44;
   ReconcileContainer = 45;
   GetDeletedBlocksTransactionSummary = 46;
+  ListContainerIDs = 47;
+  SuppressContainer = 48;
+  GetPeerUpgradeStatus = 49;
 }
 
 /**
@@ -291,6 +300,17 @@ message GetExistContainerWithPipelinesInBatchResponseProto {
   repeated ContainerWithPipeline containerWithPipelines = 1;
 }
 
+message SCMListContainerIDsRequestProto {
+  required uint32 count = 1;
+  optional ContainerID startContainerID = 2;
+  optional LifeCycleState state = 3;
+  optional string traceID = 4;
+}
+
+message SCMListContainerIDsResponseProto {
+  repeated ContainerID containerIDs = 1;
+}
+
 message SCMListContainerRequestProto {
   required uint32 count = 1;
   optional uint64 startContainerID = 2;
@@ -299,6 +319,7 @@ message SCMListContainerRequestProto {
   optional ReplicationFactor factor = 5;
   optional ReplicationType type = 6;
   optional ECReplicationConfig ecReplicationConfig = 7;
+  optional bool suppressed = 8;
 }
 
 message SCMListContainerResponseProto {
@@ -452,6 +473,7 @@ message GetPipelineResponseProto {
 }
 
 message GetContainerCountRequestProto {
+  optional LifeCycleState state = 1;
 }
 
 message GetContainerCountResponseProto {
@@ -570,6 +592,17 @@ message QueryUpgradeFinalizationProgressResponseProto {
   required hadoop.hdds.UpgradeFinalizationStatus status = 1;
 }
 
+// Request from an SCM leader to a peer SCM to read its local upgrade status.
+// The resulting status returned currently only contains the SCM's software version to use in pre-finalization
+// safety checks.
+message GetPeerUpgradeStatusRequestProto {
+}
+
+message GetPeerUpgradeStatusResponseProto {
+  // Serialized HDDSVersion.SOFTWARE_VERSION of the responding SCM binary.
+  optional int32 scmSoftwareVersion = 1;
+}
+
 message ContainerTokenSecretProto {
     required string ownerId = 1;
     required ContainerID containerId = 2;
@@ -603,6 +636,8 @@ message StartContainerBalancerRequestProto {
   optional bool networkTopologyEnable = 13;
   optional string includeNodes = 14;
   optional string excludeNodes = 15;
+  optional string excludeContainers = 16;
+  optional string includeContainers = 17;
 }
 
 message StartContainerBalancerResponseProto {
@@ -637,6 +672,9 @@ message ContainerBalancerStatusInfoProto {
   optional uint64 startedAt = 1;
   optional ContainerBalancerConfigurationProto configuration = 2;
   repeated ContainerBalancerTaskIterationStatusInfoProto iterationsStatusInfo = 3;
+  optional uint64 stoppedAt = 4;
+  optional string stopReason = 5;
+  optional string stopMessage = 6;
 }
 
 message ContainerBalancerTaskIterationStatusInfoProto {
@@ -651,6 +689,20 @@ message ContainerBalancerTaskIterationStatusInfoProto {
   repeated NodeTransferInfoProto sizeEnteringNodes = 9;
   repeated NodeTransferInfoProto sizeLeavingNodes = 10;
   optional int64 iterationDuration = 11;
+  repeated ContainerMoveFailureDetailProto containerMoveFailures = 12;
+}
+
+message ContainerMoveFailureDetailProto {
+  optional string reason = 1;
+  optional int64 count = 2;
+  repeated NodeFailureCountProto sourceFailureCounts = 3;
+  repeated NodeFailureCountProto targetFailureCounts = 4;
+}
+
+message NodeFailureCountProto {
+  optional string datanodeUuid = 1;
+  optional int64 count = 2;
+  optional string hostname = 3;
 }
 
 message NodeTransferInfoProto {
@@ -693,6 +745,16 @@ message ReconcileContainerRequestProto {
 }
 
 message ReconcileContainerResponseProto {
+}
+
+message SuppressContainerRequestProto {
+  repeated int64 containerIDs = 1;
+  optional bool suppress = 2;
+}
+
+message SuppressContainerResponseProto {
+  // Container IDs that failed to suppress or unsuppress. Empty if all succeeded.
+  repeated int64 failedContainerIDs = 1;
 }
 
 /**

@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -33,7 +32,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,8 +60,7 @@ public abstract class TestNode2PipelineMap implements NonHATests.TestCase {
   }
 
   @Test
-  public void testPipelineMap() throws IOException,
-      InvalidStateTransitionException, TimeoutException {
+  public void testPipelineMap() throws IOException {
 
     Set<ContainerID> set = pipelineManager
         .getContainersInPipeline(ratisContainer.getPipeline().getId());

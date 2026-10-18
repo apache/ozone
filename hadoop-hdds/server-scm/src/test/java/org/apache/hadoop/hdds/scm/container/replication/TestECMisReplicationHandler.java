@@ -57,7 +57,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 /**
  * Tests the ECMisReplicationHandling functionality.
  */
-public class TestECMisReplicationHandler extends TestMisReplicationHandler {
+public class TestECMisReplicationHandler extends MisReplicationHandlerTests {
   private static final int DATA = 3;
   private static final int PARITY = 2;
 

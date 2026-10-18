@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_INITIAL_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL;
@@ -25,7 +26,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.HddsDatanodeService.TESTING_DATANODE_VERSION_CURRENT;
-import static org.apache.hadoop.ozone.HddsDatanodeService.TESTING_DATANODE_VERSION_INITIAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR;
@@ -33,8 +33,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATAS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
-import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
+import static org.apache.ozone.test.GenericTestUtils.PortAllocator.localhostWithFreePort;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -45,10 +45,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 
 /**
@@ -60,16 +61,14 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
   private final int numDataVolumes;
   private final String reservedSpace;
-  private final Integer layoutVersion;
-  private final DatanodeVersion initialVersion;
-  private final DatanodeVersion currentVersion;
+  private final ComponentVersion apparentVersion;
+  private final HDDSVersion currentVersion;
 
   protected UniformDatanodesFactory(Builder builder) {
     numDataVolumes = builder.numDataVolumes;
-    layoutVersion = builder.layoutVersion;
+    apparentVersion = builder.apparentVersion;
     reservedSpace = builder.reservedSpace;
     currentVersion = builder.currentVersion;
-    initialVersion = builder.initialVersion != null ? builder.initialVersion : builder.currentVersion;
   }
 
   @Override
@@ -104,17 +103,20 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     Files.createDirectories(ratisDir);
     dnConf.set(HDDS_CONTAINER_RATIS_DATANODE_STORAGE_DIR, ratisDir.toString());
 
-    if (layoutVersion != null) {
-      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(
-          dnConf, UUID.randomUUID().toString(), layoutVersion);
+    if (apparentVersion != null) {
+      DatanodeStorage layoutStorage = new DatanodeStorage(
+          dnConf, UUID.randomUUID().toString(), apparentVersion.serialize());
+      layoutStorage.initialize();
+    } else {
+      // TODO HDDS-16206 workaround. Once that is resolved MiniOzoneCluster Datanodes should start with
+      //  SOFTWARE_VERSION by default.
+      DatanodeStorage layoutStorage = new DatanodeStorage(
+          dnConf, UUID.randomUUID().toString(), HDDSVersion.SOFTWARE_VERSION.serialize());
       layoutStorage.initialize();
     }
 
-    if (initialVersion != null) {
-      dnConf.setInt(TESTING_DATANODE_VERSION_INITIAL, initialVersion.toProtoValue());
-    }
     if (currentVersion != null) {
-      dnConf.setInt(TESTING_DATANODE_VERSION_CURRENT, currentVersion.toProtoValue());
+      dnConf.setInt(TESTING_DATANODE_VERSION_CURRENT, currentVersion.serialize());
     }
     dnConf.set(HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY, "1s");
     dnConf.set(HDDS_INITIAL_HEARTBEAT_INTERVAL, "500ms");
@@ -123,8 +125,9 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
   }
 
   private void configureDatanodePorts(ConfigurationTarget conf) {
-    conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, anyHostWithFreePort());
-    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, anyHostWithFreePort());
+    conf.set(HDDS_DATANODE_HOST_NAME_KEY, "127.0.0.1");
+    conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, localhostWithFreePort());
+    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, localhostWithFreePort());
     conf.setInt(HDDS_CONTAINER_IPC_PORT, getFreePort());
     conf.setInt(HDDS_CONTAINER_RATIS_IPC_PORT, getFreePort());
     conf.setInt(HDDS_CONTAINER_RATIS_ADMIN_PORT, getFreePort());
@@ -144,9 +147,8 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
     private int numDataVolumes = 1;
     private String reservedSpace;
-    private Integer layoutVersion;
-    private DatanodeVersion initialVersion;
-    private DatanodeVersion currentVersion;
+    private ComponentVersion apparentVersion;
+    private HDDSVersion currentVersion;
 
     /**
      * Sets the number of data volumes per datanode.
@@ -169,17 +171,12 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
       return this;
     }
 
-    public Builder setLayoutVersion(int layoutVersion) {
-      this.layoutVersion = layoutVersion;
+    public Builder setApparentVersion(ComponentVersion apparentVersion) {
+      this.apparentVersion = apparentVersion;
       return this;
     }
 
-    public Builder setInitialVersion(DatanodeVersion version) {
-      this.initialVersion = version;
-      return this;
-    }
-
-    public Builder setCurrentVersion(DatanodeVersion version) {
+    public Builder setCurrentVersion(HDDSVersion version) {
       this.currentVersion = version;
       return this;
     }

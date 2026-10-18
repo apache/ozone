@@ -38,7 +38,9 @@
 #
 declare -a pattern_array ignore_array
 
+declare -i match_count
 matched_files=""
+CHANGED_TEST_CLASSES=""
 ignore_array=(
     "^[^/]*.md" # exclude root docs
 )
@@ -136,7 +138,8 @@ function get_regexp_from_patterns() {
 #    ignore_array - array storing regexp patterns to be ignored
 # Output:
 #    match_count - number of matched files
-#    matched_files (appended) - list of matched files
+#    new_matched_files - list of matched files
+#    matched_files (appended) - cumulative list of all files matched so far
 function filter_changed_files() {
     local add_to_list="${1:-}"
 
@@ -146,17 +149,20 @@ function filter_changed_files() {
 
     verbosity::store_exit_on_error_status
 
-    match_count=$(echo "${CHANGED_FILES}" | grep -E "${match}" | grep -cEv "${ignore}")
+    new_matched_files=$(echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}")
+    match_count=0
+    if [[ -n "${new_matched_files}" ]]; then
+        match_count=$(echo "${new_matched_files}" | wc -l)
+    fi
 
     if [[ "${add_to_list}" == "true" ]]; then
-        local additional=$(echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}")
-        matched_files="${matched_files}$(echo -e "\n${additional}")"
+        matched_files="${matched_files}$(echo -e "\n${new_matched_files}")"
     fi
 
     echo
     echo "${match_count} changed files matching the '${match}' pattern, but ignoring '${ignore}':"
     echo
-    echo "${CHANGED_FILES}" | grep -E "${match}" | grep -Ev "${ignore}"
+    echo "${new_matched_files}"
     echo
 
     verbosity::restore_exit_on_error_status
@@ -201,6 +207,8 @@ function run_all_tests_if_environment_files_changed() {
     local ignore_array=(
         "^dev-support/ci/pr_title_check"
         "^dev-support/ci/find_test_class_project"
+        "^dev-support/ci/pr_body_config_doc.sh"
+        "^dev-support/ci/xml_to_md.py"
     )
     filter_changed_files
 
@@ -255,17 +263,62 @@ function get_count_doc_files() {
     start_end::group_end
 }
 
+function get_changed_test_classes() {
+    start_end::group_start "List changed test classes"
+    local pattern_array=(
+        "src/test/java/.*/Test.*\.java"
+        "src/test/java/org/apache/hadoop/fs/contract"
+        "src/test/java/org/apache/hadoop/fs/ozone/contract"
+        "src/test/java/org/apache/hadoop/tools/contract"
+    )
+    filter_changed_files true
+
+    local test_classes=""
+
+    if [[ -n "${new_matched_files}" ]]; then
+      # always run grouped integration tests
+      test_classes="org/apache/ozone/test/Test*"
+
+      local f
+      for f in ${new_matched_files}; do
+        if echo "$f" | grep -q -e '/fs/contract/' -e '/fs/ozone/contract/' -e '/tools/contract/'; then
+          # run all contract tests
+          test_classes="${test_classes},org/apache/hadoop/fs/ozone/contract/Test*"
+        else
+          test_classes="${test_classes},${f}"
+          # add WithFSO subclass (no problem if it does not exist)
+          if echo "$f" | grep -q 'hadoop-ozone/ozone-manager/src/test/java/org/apache/hadoop/ozone/om/re\(quest\|sponse\)' \
+              && ! echo "$f" | grep -q 'WithFSO'; then
+            local with_fso
+            with_fso=$(echo "$f" | sed 's/\.java/WithFSO.java/')
+            test_classes="${test_classes},${with_fso}"
+          fi
+        fi
+      done
+    fi
+
+    CHANGED_TEST_CLASSES=$(echo "${test_classes}" | sed -e 's@[^,]*/src/test/java/@@g')
+    readonly CHANGED_TEST_CLASSES
+    start_end::group_end
+}
+
 function get_count_integration_files() {
     start_end::group_start "Count integration test files"
     local pattern_array=(
+        "^hadoop-hdds/test-utils"
         "^hadoop-ozone/dev-support/checks/_mvn_unit_report.sh"
         "^hadoop-ozone/dev-support/checks/integration.sh"
         "^hadoop-ozone/dev-support/checks/junit.sh"
         "^hadoop-ozone/integration-test"
         "^hadoop-ozone/mini-cluster"
-        "^hadoop-ozone/fault-injection-test/mini-chaos-tests"
         "src/test/java"
         "src/test/resources"
+    )
+    local ignore_array=(
+        "src/test/java/.*/Test.*\.java"
+        "src/test/java/org/apache/hadoop/fs/contract"
+        "src/test/java/org/apache/hadoop/fs/ozone/contract"
+        "src/test/java/org/apache/hadoop/tools/contract"
     )
     filter_changed_files true
     COUNT_INTEGRATION_CHANGED_FILES=${match_count}
@@ -306,6 +359,9 @@ function get_count_robot_files() {
 function check_needs_build() {
     start_end::group_start "Check if build is needed"
     local pattern_array=(
+        "^.github/workflows/generate-config-doc.yml"
+        "^dev-support/ci/xml_to_md.py"
+        "^hadoop-ozone/dev-support/checks/_build.sh"
         "^hadoop-ozone/dev-support/checks/build.sh"
         "^hadoop-ozone/dev-support/checks/dependency.sh"
         "^hadoop-ozone/dist/src/main/license/update-jar-report.sh"
@@ -323,9 +379,11 @@ function check_needs_build() {
 }
 
 function check_needs_compile() {
-    start_end::group_start "Check if compile is needed"
+    start_end::group_start "Check if compile or javadoc is needed"
     local pattern_array=(
-        "^hadoop-ozone/dev-support/checks/build.sh"
+        "^hadoop-ozone/dev-support/checks/_build.sh"
+        "^hadoop-ozone/dev-support/checks/compile.sh"
+        "^hadoop-ozone/dev-support/checks/javadoc.sh"
         "src/..../java"
         "src/..../proto"
         "pom.xml"
@@ -397,6 +455,25 @@ function check_needs_docs() {
     fi
 }
 
+function check_needs_errorprone() {
+    start_end::group_start "Check if Error Prone is needed"
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/errorprone.sh"
+        "pom.xml"
+        "src/..../java"
+    )
+    local ignore_array=(
+        "^hadoop-ozone/dist"
+    )
+    filter_changed_files
+
+    if [[ ${match_count} != "0" ]]; then
+        add_basic_check errorprone
+    fi
+
+    start_end::group_end
+}
+
 function check_needs_findbugs() {
     start_end::group_start "Check if findbugs is needed"
     local pattern_array=(
@@ -445,6 +522,8 @@ function get_count_misc_files() {
     local pattern_array=(
         "^dev-support/ci/pr_title_check"
         "^dev-support/ci/find_test_class_project"
+        "^dev-support/ci/pr_body_config_doc.sh"
+        "^dev-support/ci/xml_to_md.py"
         "^.github"
         "^hadoop-hdds/dev-support/checkstyle"
         "^hadoop-ozone/dev-support/checks"
@@ -529,6 +608,12 @@ function set_outputs() {
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
     initialization::ga_output needs-kubernetes-tests "${kubernetes_tests_needed}"
+
+    if [[ "${integration_tests_needed}" == "true" ]]; then
+        initialization::ga_output test-classes ""
+    else
+        initialization::ga_output test-classes "${CHANGED_TEST_CLASSES}"
+    fi
 }
 
 check_for_full_tests_needed_label
@@ -557,6 +642,7 @@ run_all_tests_if_environment_files_changed
 get_count_all_files
 get_count_compose_files
 get_count_doc_files
+get_changed_test_classes
 get_count_integration_files
 get_count_kubernetes_files
 get_count_robot_files
@@ -571,6 +657,7 @@ check_needs_author
 check_needs_bats
 check_needs_checkstyle
 check_needs_docs
+check_needs_errorprone
 check_needs_findbugs
 check_needs_pmd
 calculate_test_types_to_run

@@ -343,6 +343,30 @@ public class TestOMNodeDetails {
   }
 
   /**
+   * Test getOMDBCheckpointEndpointUrl with useV2 parameter.
+   */
+  @Test
+  public void testGetOMDBCheckpointEndpointUrlUseV2() throws IOException {
+    OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
+        .setOMServiceId(OM_SERVICE_ID)
+        .setOMNodeId(OM_NODE_ID)
+        .setHostAddress(HOST_ADDRESS)
+        .setRpcPort(RPC_PORT)
+        .setRatisPort(RATIS_PORT)
+        .setHttpAddress(HOST_ADDRESS + ":9874")
+        .setHttpsAddress(HOST_ADDRESS + ":9875")
+        .build();
+
+    URL urlV2 = nodeDetails.getOMDBCheckpointEndpointUrl(true, true, false);
+    assertNotNull(urlV2);
+    assertTrue(urlV2.getPath().endsWith("/v2/dbCheckpoint"));
+
+    URL urlV1 = nodeDetails.getOMDBCheckpointEndpointUrl(false, true, false);
+    assertNotNull(urlV1);
+    assertTrue(urlV1.getPath().endsWith("/dbCheckpoint"));
+  }
+
+  /**
    * Test getOMNodeAddressFromConf.
    */
   @Test
@@ -425,5 +449,24 @@ public class TestOMNodeDetails {
 
     assertEquals("192.168.1.100", nodeDetails.getHostAddress());
     assertEquals(9873, nodeDetails.getRatisPort());
+  }
+
+  /**
+   * An advertised peer identity has to bracket an IPv6 literal, or a reader
+   * takes the last group of the address for the port.
+   */
+  @Test
+  public void testRpcAddressStringBracketsIPv6Literal() {
+    OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
+        .setOMServiceId(OM_SERVICE_ID)
+        .setOMNodeId(OM_NODE_ID)
+        .setRpcAddress(InetSocketAddress.createUnresolved("2001:db8::1", RPC_PORT))
+        .setRatisPort(RATIS_PORT)
+        .setHttpAddress(HTTP_ADDRESS)
+        .setHttpsAddress(HTTPS_ADDRESS)
+        .setIsListener(false)
+        .build();
+
+    assertEquals("[2001:db8::1]:" + RPC_PORT, nodeDetails.getRpcAddressString());
   }
 }

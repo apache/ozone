@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.ozone.ClientVersion;
 
 /**
  * Bundles datanode details with usage statistics.
@@ -33,6 +34,9 @@ public class DatanodeUsageInfo {
   private int containerCount;
   private int pipelineCount;
   private long reserved;
+  private boolean fsUsagePresent;
+  private long fsCapacity;
+  private long fsAvailable;
 
   /**
    * Constructs a DatanodeUsageInfo with DatanodeDetails and SCMNodeStat.
@@ -167,6 +171,12 @@ public class DatanodeUsageInfo {
     this.reserved = reserved; 
   }
 
+  public void setFilesystemUsage(long capacity, long available) {
+    this.fsUsagePresent = true;
+    this.fsCapacity = capacity;
+    this.fsAvailable = available;
+  }
+
   /**
    * Gets Comparator that compares two DatanodeUsageInfo on the basis of
    * their utilization values. Utilization is (capacity - remaining) divided
@@ -212,11 +222,11 @@ public class DatanodeUsageInfo {
    *
    * @return Protobuf HddsProtos.DatanodeUsageInfo
    */
-  public DatanodeUsageInfoProto toProto(int clientVersion) {
+  public DatanodeUsageInfoProto toProto(ClientVersion clientVersion) {
     return toProtoBuilder(clientVersion).build();
   }
 
-  private DatanodeUsageInfoProto.Builder toProtoBuilder(int clientVersion) {
+  private DatanodeUsageInfoProto.Builder toProtoBuilder(ClientVersion clientVersion) {
     DatanodeUsageInfoProto.Builder builder =
         DatanodeUsageInfoProto.newBuilder();
 
@@ -234,6 +244,10 @@ public class DatanodeUsageInfo {
     builder.setContainerCount(containerCount);
     builder.setPipelineCount(pipelineCount);
     builder.setReserved(reserved);
+    if (fsUsagePresent) {
+      builder.setFsCapacity(fsCapacity);
+      builder.setFsAvailable(fsAvailable);
+    }
     return builder;
   }
 }

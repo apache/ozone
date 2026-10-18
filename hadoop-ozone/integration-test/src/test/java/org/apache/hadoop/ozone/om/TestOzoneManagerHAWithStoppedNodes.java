@@ -18,8 +18,9 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.MiniOzoneHAClusterImpl.NODE_FAILURE_TIMEOUT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
+import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -65,12 +66,12 @@ import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
@@ -92,9 +93,13 @@ import org.slf4j.LoggerFactory;
  * @see TestOzoneManagerHAWithAllRunning
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
+public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(
       TestOzoneManagerHAWithStoppedNodes.class);
+
+  static {
+    setExtraClusterConfig(c -> c.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "2s"));
+  }
 
   /**
    * After restarting OMs we need to wait
@@ -122,7 +127,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   @Test
   void oneOMDown() throws Exception {
     getCluster().stopOzoneManager(1);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
+    waitForLeaderToBeReady();
 
     createVolumeTest(true);
     createKeyTest(true);
@@ -135,7 +140,6 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   void twoOMDown() throws Exception {
     getCluster().stopOzoneManager(1);
     getCluster().stopOzoneManager(2);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
     createVolumeTest(false);
     createKeyTest(false);
@@ -166,9 +170,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     // Stop leader OM, to see when the OM leader changes
     // multipart upload is happening successfully or not.
 
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFailoverProxyProvider(getObjectStore().getClientProxy());
+    final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider
+        = OmTestUtil.getFailoverProxyProvider(getObjectStore());
 
     // The omFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -176,7 +179,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     // Stop one of the ozone manager, to see when the OM leader changes
     // multipart upload is happening successfully or not.
     getCluster().stopOzoneManager(leaderOMNodeId);
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
+    waitForLeaderToBeReady();
 
     createMultipartKeyAndReadKey(ozoneBucket, keyName, uploadID);
 
@@ -234,21 +237,22 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
     ObjectStore objectStore = getObjectStore();
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFailoverProxyProvider(objectStore.getClientProxy());
-    String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+    final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider
+        = OmTestUtil.getFailoverProxyProvider(objectStore);
 
     createVolumeTest(true);
+    String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     // On stopping the current OM Proxy, the next connection attempt should
     // failover to a another OM proxy.
     getCluster().stopOzoneManager(firstProxyNodeId);
-    Thread.sleep(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT * 4);
+    waitForLeaderToBeReady();
 
     // Next request to the proxy provider should result in a failover
     createVolumeTest(true);
-    Thread.sleep(OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
+    GenericTestUtils.waitFor(
+        () -> !firstProxyNodeId.equals(omFailoverProxyProvider.getCurrentProxyOMNodeId()),
+        100, (int) (OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT * 5));
 
     // Get the new OM Proxy NodeId
     String newProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -267,10 +271,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     ObjectStore objectStore = getObjectStore();
     // Get the leader OM
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
-
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
     OzoneManager leaderOM = getCluster().getOzoneManager(leaderOMNodeId);
 
     // Get follower OM
@@ -280,8 +281,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     // Do some transactions so that the log index increases
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
+    String bucketName = uniqueObjectName("bucket");
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -335,6 +336,10 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
       createKey(ozoneBucket);
     }
 
+    GenericTestUtils.waitFor(() -> followerOM1.getOmRatisServer()
+        .getLastAppliedTermIndex().getIndex() > leaderOMSnaphsotIndex,
+        100, 200000);
+
     final long followerOM1LastAppliedIndexNew =
         followerOM1.getOmRatisServer().getLastAppliedTermIndex().getIndex();
     assertThat(followerOM1LastAppliedIndexNew).isGreaterThan(leaderOMSnaphsotIndex);
@@ -359,7 +364,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     // Stop leader OM, and then validate list parts.
     stopLeaderOM();
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
+    waitForLeaderToBeReady();
 
     validateListParts(ozoneBucket, keyName, uploadID, partsMap);
 
@@ -439,14 +444,13 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     OzoneManager ozoneManager = getCluster().getOMLeader();
 
-    KeyDeletingService keyDeletingService =
-        (KeyDeletingService) ozoneManager.getKeyManager().getDeletingService();
+    final KeyDeletingService keyDeletingService = ozoneManager.getKeyManager().getDeletingService();
 
     // Check on leader OM Count.
     GenericTestUtils.waitFor(() ->
-        keyDeletingService.getRunCount().get() >= 2, 10000, 120000);
+        keyDeletingService.getRunCount().get() >= 2, 1000, 120000);
     GenericTestUtils.waitFor(() ->
-        keyDeletingService.getDeletedKeyCount().get() == 4, 10000, 120000);
+        keyDeletingService.getDeletedKeyCount().get() == 4, 1000, 120000);
 
     // Check delete table is empty or not on all OMs.
     getCluster().getOzoneManagersList().forEach((om) -> {
@@ -460,7 +464,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
             return false;
           }
         },
-            10000, 120000);
+            1000, 120000);
       } catch (Exception ex) {
         fail("TestOzoneManagerHAKeyDeletion failed");
       }
@@ -482,9 +486,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     long waitBetweenRetries = getConf().getLong(
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFailoverProxyProvider(getObjectStore().getClientProxy());
+    final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider
+        = OmTestUtil.getFailoverProxyProvider(getObjectStore());
 
     // The omFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -501,7 +504,6 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
         omFailoverProxyProvider.getWaitTime());
   }
 
-  @Flaky("HDDS-11353")
   @Test
   void testOMHAMetrics() throws Exception {
     // Get leader OM
@@ -518,6 +520,11 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     getCluster().shutdownOzoneManager(leaderOM);
     getCluster().restartOzoneManager(leaderOM, true);
     waitForLeaderToBeReady();
+
+    // Do some writes so that the old leader can receive AppendEntries
+    // which will trigger notifyLeaderChanged, instead of relying on
+    // AppendEntries
+    setupBucket();
 
     // Get the new leader
     OzoneManager newLeaderOM = getCluster().getOMLeader();
@@ -584,7 +591,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     String userName = UserGroupInformation.getCurrentUser().getUserName();
     ObjectStore objectStore = getObjectStore();
 
-    String prefix = "vol-" + RandomStringUtils.secure().nextNumeric(10) + "-";
+    String prefix = uniqueObjectName("vol-") + "-";
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
         .setAdmin(userName)
@@ -602,7 +609,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     // Stop leader OM, and then validate list volumes for user.
     stopLeaderOM();
-    Thread.sleep(NODE_FAILURE_TIMEOUT * 2);
+    waitForLeaderToBeReady();
 
     validateVolumesList(expectedVolumes,
         objectStore.listVolumesByUser(userName, prefix, ""));
@@ -613,7 +620,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     // Create a volume, a bucket and a key
     String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
     String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = uniqueObjectName("volume");
     String bucketName = UUID.randomUUID().toString();
     String keyTo = UUID.randomUUID().toString();
 

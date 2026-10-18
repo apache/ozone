@@ -22,7 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.createPipelineCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteBlocksCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.deleteContainerCommand;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewLayoutVersionCommand;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.finalizeNewDatanodeVersionCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.refreshVolumeUsageInfo;
@@ -43,7 +43,6 @@ import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.TextFormat;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -59,7 +58,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
@@ -95,7 +94,7 @@ import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.RegisteredCommand;
@@ -130,7 +129,7 @@ public class SCMDatanodeProtocolServer implements
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
-  private ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics;
+  private ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type> protocolMessageMetrics;
 
   private final SCMContext scmContext;
 
@@ -231,7 +230,7 @@ public class SCMDatanodeProtocolServer implements
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsProto,
       PipelineReportsProto pipelineReportsProto,
-      LayoutVersionProto layoutInfo)
+      DatanodeVersionProto versionInfo)
       throws IOException {
     DatanodeDetails datanodeDetails = DatanodeDetails
         .getFromProtoBuf(extendedDatanodeDetailsProto);
@@ -242,7 +241,7 @@ public class SCMDatanodeProtocolServer implements
     // TODO : Return the list of Nodes that forms the SCM HA.
     RegisteredCommand registeredCommand = scm.getScmNodeManager()
         .register(datanodeDetails, nodeReport, pipelineReportsProto,
-            layoutInfo);
+            versionInfo);
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
       eventPublisher.fireEvent(CONTAINER_REPORT,
@@ -281,12 +280,12 @@ public class SCMDatanodeProtocolServer implements
     auditMap.append('[');
     for (SCMCommandProto cmd : cmds) {
       if (cmd.getCommandType().equals(deleteBlocksCommand)) {
-        auditMap.append("commandType: ").append(cmd.getCommandType());
-        auditMap.append(" deleteTransactionsCount: ")
-            .append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsCount());
-        auditMap.append(" cmdID: ").append(cmd.getDeleteBlocksCommandProto().getCmdId());
-        auditMap.append(" encodedToken: \"").append(cmd.getEncodedToken()).append('"');
-        auditMap.append(" deadlineMsSinceEpoch: ").append(cmd.getDeadlineMsSinceEpoch());
+        auditMap.append("commandType: ").append(cmd.getCommandType())
+            .append(" deleteTransactionsCount: ")
+            .append(cmd.getDeleteBlocksCommandProto().getDeletedBlocksTransactionsCount())
+            .append(" cmdID: ").append(cmd.getDeleteBlocksCommandProto().getCmdId())
+            .append(" encodedToken: \"").append(cmd.getEncodedToken()).append('"')
+            .append(" deadlineMsSinceEpoch: ").append(cmd.getDeadlineMsSinceEpoch());
       } else {
         auditMap.append(TextFormat.shortDebugString(cmd));
       }
@@ -420,11 +419,11 @@ public class SCMDatanodeProtocolServer implements
             .setSetNodeOperationalStateCommandProto(
                 ((SetNodeOperationalStateCommand)cmd).getProto())
             .build();
-    case finalizeNewLayoutVersionCommand:
+    case finalizeNewDatanodeVersionCommand:
       return builder
-            .setCommandType(finalizeNewLayoutVersionCommand)
-            .setFinalizeNewLayoutVersionCommandProto(
-                ((FinalizeNewLayoutVersionCommand)cmd).getProto())
+            .setCommandType(finalizeNewDatanodeVersionCommand)
+            .setFinalizeNewDatanodeVersionCommandProto(
+                ((FinalizeVersionCommand)cmd).getProto())
             .build();
     case refreshVolumeUsageInfo:
       return builder
@@ -438,7 +437,6 @@ public class SCMDatanodeProtocolServer implements
           .setReconcileContainerCommandProto(
               ((ReconcileContainerCommand)cmd).getProto())
           .build();
-
     default:
       throw new IllegalArgumentException("Scm command " +
           cmd.getType().toString() + " is not implemented");
@@ -492,11 +490,11 @@ public class SCMDatanodeProtocolServer implements
    * Get the ProtocolMessageMetrics for this server.
    * @return ProtocolMessageMetrics
    */
-  protected ProtocolMessageMetrics<ProtocolMessageEnum>
+  protected ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type>
         getProtocolMessageMetrics() {
     return ProtocolMessageMetrics
         .create("SCMDatanodeProtocol", "SCM Datanode protocol",
-            StorageContainerDatanodeProtocolProtos.Type.values());
+            StorageContainerDatanodeProtocolProtos.Type.class);
   }
 
   /**

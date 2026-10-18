@@ -17,13 +17,13 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.2.0-SNAPSHOT</version>
+    <version>2.3.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-recon</artifactId>
   <name>Apache Ozone Recon</name>
   <properties>
     <classpath.skip>false</classpath.skip>
-    <pnpm.version>8.15.7</pnpm.version>
+    <pnpm.version>10.28.2</pnpm.version>
   </properties>
   <dependencies>
     <dependency>
@@ -63,6 +63,18 @@
       <artifactId>commons-io</artifactId>
     </dependency>
     <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-anthropic</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-open-ai</artifactId>
+    </dependency>
+    <dependency>
       <groupId>info.picocli</groupId>
       <artifactId>picocli</artifactId>
     </dependency>
@@ -91,16 +103,16 @@
       <artifactId>javax.inject</artifactId>
     </dependency>
     <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-collections4</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-csv</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -121,6 +133,10 @@
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs-client</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-cli-common</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -194,8 +210,12 @@
       <artifactId>ratis-proto</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-servlet</artifactId>
+      <groupId>org.eclipse.jetty.ee8</groupId>
+      <artifactId>jetty-ee8-servlet</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.toolchain</groupId>
+      <artifactId>jetty-servlet-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.glassfish.hk2</groupId>
@@ -211,19 +231,11 @@
     </dependency>
     <dependency>
       <groupId>org.glassfish.jersey.core</groupId>
-      <artifactId>jersey-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.glassfish.jersey.core</groupId>
       <artifactId>jersey-server</artifactId>
     </dependency>
     <dependency>
       <groupId>org.jooq</groupId>
       <artifactId>jooq</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.reflections</groupId>
-      <artifactId>reflections</artifactId>
     </dependency>
     <dependency>
       <groupId>org.rocksdb</groupId>
@@ -251,6 +263,18 @@
       <artifactId>sqlite-jdbc</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.fasterxml.jackson.module</groupId>
+      <artifactId>jackson-module-jaxb-annotations</artifactId>
+      <scope>runtime</scope>
+      <exclusions>
+        <exclusion>
+          <!-- using jakarta.xml.bind instead -->
+          <groupId>javax.xml.bind</groupId>
+          <artifactId>jaxb-api</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
       <groupId>com.google.inject.extensions</groupId>
       <artifactId>guice-assistedinject</artifactId>
       <scope>runtime</scope>
@@ -275,6 +299,11 @@
       <artifactId>jersey-media-json-jackson</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-reload4j</artifactId>
+      <scope>runtime</scope>
+    </dependency>
 
     <!-- Test dependencies -->
     <dependency>
@@ -285,8 +314,19 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-test-utils</artifactId>
+      <artifactId>hdds-server-framework</artifactId>
       <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-scm</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -337,8 +377,10 @@
                 <restrictImports>
                   <reason>Only selected annotation processors are enabled, see configuration of maven-compiler-plugin.</reason>
                   <bannedImports>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                     <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
+                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator</bannedImport>
+                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator</bannedImport>
+                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                     <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
                   </bannedImports>
                 </restrictImports>
@@ -402,7 +444,7 @@
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
         <configuration>
-          <npmInheritsProxyConfigFromMaven>false</npmInheritsProxyConfigFromMaven>
+          <pnpmInheritsProxyConfigFromMaven>false</pnpmInheritsProxyConfigFromMaven>
           <installDirectory>target</installDirectory>
           <workingDirectory>${basedir}/src/main/resources/webapps/recon/ozone-recon-web</workingDirectory>
           <nodeVersion>v${nodejs.version}</nodeVersion>

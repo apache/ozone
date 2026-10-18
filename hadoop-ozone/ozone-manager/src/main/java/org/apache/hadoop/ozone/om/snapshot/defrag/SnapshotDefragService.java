@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot.defrag;
 import static java.nio.file.Files.createDirectories;
 import static org.apache.commons.io.file.PathUtils.deleteDirectory;
 import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
+import static org.apache.hadoop.hdds.utils.db.RDBCheckpointManager.RDB_CHECKPOINT_DIR_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_DEFRAG_LIMIT_PER_TASK_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT;
@@ -45,6 +46,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -57,19 +59,22 @@ import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.SstFileSetReader;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -88,7 +93,6 @@ import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.hadoop.util.Time;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
-import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
@@ -134,6 +138,8 @@ public class SnapshotDefragService extends BackgroundService
   private final List<UUID> lockIds;
   private final CompositeDeltaDiffComputer deltaDiffComputer;
   private final Path differTmpDir;
+  private final OmSnapshotInternalMetrics snapshotMetrics;
+  private final OMPerformanceMetrics perfMetrics;
 
   public SnapshotDefragService(long interval, TimeUnit unit, long serviceTimeout,
       OzoneManager ozoneManager, OzoneConfiguration configuration) throws IOException {
@@ -166,6 +172,8 @@ public class SnapshotDefragService extends BackgroundService
       LOG.debug("Snapshot defragmentation diff status: {}", status);
     }, false, !isRocksToolsNativeLibAvailable());
     this.lockIds = new ArrayList<>(1);
+    this.snapshotMetrics = ozoneManager.getOmSnapshotIntMetrics();
+    this.perfMetrics = ozoneManager.getPerfMetrics();
   }
 
   @Override
@@ -266,6 +274,7 @@ public class SnapshotDefragService extends BackgroundService
   @VisibleForTesting
   void performFullDefragmentation(DBStore checkpointDBStore, TablePrefixInfo prefixInfo,
       Set<String> incrementalTables) throws IOException {
+    long tablesCompacted = 0;
     for (String table : incrementalTables) {
       Table<String, CodecBuffer> checkpointTable = checkpointDBStore.getTable(table, StringCodec.get(),
           CodecBufferCodec.get(true));
@@ -295,7 +304,9 @@ public class SnapshotDefragService extends BackgroundService
         compactRangeOptions.setChangeLevel(true);
         checkpointDBStore.compactTable(table, compactRangeOptions);
       }
+      tablesCompacted++;
     }
+    snapshotMetrics.incNumSnapshotFullDefragTablesCompacted(tablesCompacted);
   }
 
   /**
@@ -367,7 +378,6 @@ public class SnapshotDefragService extends BackgroundService
    * @param previousSnapshotInfo information about the previous snapshot.
    * @param snapshotInfo information about the current snapshot for which
    *                     incremental defragmentation is performed.
-   * @param snapshotVersion the version of the snapshot to be processed.
    * @param checkpointStore the dbStore instance where data
    *                        updates are ingested after being processed.
    * @param bucketPrefixInfo table prefix information associated with buckets,
@@ -377,11 +387,12 @@ public class SnapshotDefragService extends BackgroundService
    */
   @VisibleForTesting
   void performIncrementalDefragmentation(SnapshotInfo previousSnapshotInfo, SnapshotInfo snapshotInfo,
-      int snapshotVersion, DBStore checkpointStore, TablePrefixInfo bucketPrefixInfo, Set<String> incrementalTables)
+      DBStore checkpointStore, TablePrefixInfo bucketPrefixInfo, Set<String> incrementalTables)
       throws IOException {
     // Map of delta files grouped on the basis of the tableName.
     Collection<Pair<Path, SstFileInfo>> allTableDeltaFiles = this.deltaDiffComputer.getDeltaFiles(
         previousSnapshotInfo, snapshotInfo, incrementalTables);
+    snapshotMetrics.incNumSnapshotIncDefragDeltaFilesProcessed(allTableDeltaFiles.size());
 
     Map<String, List<Path>> tableGroupedDeltaFiles = allTableDeltaFiles.stream()
         .collect(Collectors.groupingBy(pair -> pair.getValue().getColumnFamily(),
@@ -400,22 +411,18 @@ public class SnapshotDefragService extends BackgroundService
       for (Map.Entry<String, List<Path>> entry : tableGroupedDeltaFiles.entrySet()) {
         String table = entry.getKey();
         List<Path> deltaFiles = entry.getValue();
-        Path fileToBeIngested;
-        if (deltaFiles.size() == 1 && snapshotVersion > 0) {
-          // If there is only one delta file for the table and the snapshot version is also not 0 then the same delta
-          // file can reingested into the checkpointStore.
-          fileToBeIngested = deltaFiles.get(0);
-        } else {
-          Table<String, CodecBuffer> snapshotTable = snapshot.get().getMetadataManager().getStore()
-              .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
-          Table<String, CodecBuffer> previousSnapshotTable = previousSnapshot.get().getMetadataManager().getStore()
-              .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
-          String tableBucketPrefix = bucketPrefixInfo.getTablePrefix(table);
-          Pair<Path, Boolean> spillResult = spillTableDiffIntoSstFile(deltaFiles, snapshotTable,
-              previousSnapshotTable, tableBucketPrefix);
-          fileToBeIngested = spillResult.getValue() ? spillResult.getLeft() : null;
-          filesToBeDeleted.add(spillResult.getLeft());
-        }
+        // Delta candidates are live RocksDB SSTs selected at file granularity,
+        // not valid external SSTs containing an exact bucket-level delta. Always
+        // rebuild the logical delta, even when there is only one candidate file.
+        Table<String, CodecBuffer> snapshotTable = snapshot.get().getMetadataManager().getStore()
+            .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
+        Table<String, CodecBuffer> previousSnapshotTable = previousSnapshot.get().getMetadataManager().getStore()
+            .getTable(table, StringCodec.get(), CodecBufferCodec.get(true));
+        String tableBucketPrefix = bucketPrefixInfo.getTablePrefix(table);
+        Pair<Path, Boolean> spillResult = spillTableDiffIntoSstFile(deltaFiles, snapshotTable,
+            previousSnapshotTable, tableBucketPrefix);
+        Path fileToBeIngested = spillResult.getValue() ? spillResult.getLeft() : null;
+        filesToBeDeleted.add(spillResult.getLeft());
         if (fileToBeIngested != null) {
           if (!fileToBeIngested.toFile().exists()) {
             throw new IOException("Delta file does not exist: " + fileToBeIngested);
@@ -516,7 +523,7 @@ public class SnapshotDefragService extends BackgroundService
       RocksDBCheckpoint dbCheckpoint = new RocksDBCheckpoint(nextVersionPath);
       // Add a new version to the local data file.
       try (OmMetadataManagerImpl newVersionCheckpointMetadataManager =
-               OmMetadataManagerImpl.createCheckpointMetadataManager(conf, dbCheckpoint, true)) {
+               createDefragCheckpointMetadataManager(dbCheckpoint, true)) {
         RDBStore newVersionCheckpointStore = (RDBStore) newVersionCheckpointMetadataManager.getStore();
         snapshotLocalDataProvider.addSnapshotVersion(newVersionCheckpointStore);
         snapshotLocalDataProvider.commit();
@@ -538,6 +545,16 @@ public class SnapshotDefragService extends BackgroundService
     }
   }
 
+  @VisibleForTesting
+  OmMetadataManagerImpl createDefragCheckpointMetadataManager(
+      DBCheckpoint checkpoint, boolean readOnly) throws IOException {
+    // Defrag checkpoint DBs are transient and drop/recreate column families.
+    // Generic RocksDB metrics are not useful for them and can race with CF handle
+    // lifetime changes while the checkpoint is being rewritten.
+    return OmMetadataManagerImpl.createCheckpointMetadataManager(
+        conf, checkpoint, readOnly, false);
+  }
+
   /**
    * Creates a new checkpoint by modifying the metadata manager from a snapshot.
    * This involves generating a temporary checkpoint and truncating specified
@@ -557,20 +574,105 @@ public class SnapshotDefragService extends BackgroundService
       Set<String> incrementalColumnFamilies) throws IOException {
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot = omSnapshotManager.getActiveSnapshot(
         snapshotInfo.getVolumeName(), snapshotInfo.getBucketName(), snapshotInfo.getName())) {
-      DBCheckpoint checkpoint = snapshot.get().getMetadataManager().getStore().getCheckpoint(tmpDefragDir, true);
-      try (OmMetadataManagerImpl metadataManagerBeforeTruncate =
-               OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint, false)) {
-        DBStore dbStore = metadataManagerBeforeTruncate.getStore();
-        for (String table : metadataManagerBeforeTruncate.listTableNames()) {
-          if (!incrementalColumnFamilies.contains(table)) {
-            dbStore.dropTable(table);
+      DBStore snapshotStore = snapshot.get().getMetadataManager().getStore();
+      DBCheckpoint checkpoint = snapshotStore.getCheckpoint(tmpDefragDir, true);
+      if (checkpoint == null) {
+        deletePartialCheckpointDirs(snapshotStore.getDbLocation().getName());
+        throw new IOException("Failed to create checkpoint under " + tmpDefragDir + " for snapshot: "
+            + snapshotInfo.getTableKey() + " (ID: " + snapshotInfo.getSnapshotId() + ")");
+      }
+      Path checkpointLocation = checkpoint.getCheckpointLocation();
+      boolean checkpointSuccessful = false;
+      try {
+        try (OmMetadataManagerImpl metadataManagerBeforeTruncate =
+                 createDefragCheckpointMetadataManager(checkpoint, false)) {
+          DBStore dbStore = metadataManagerBeforeTruncate.getStore();
+          for (String table : metadataManagerBeforeTruncate.listTableNames()) {
+            if (!incrementalColumnFamilies.contains(table)) {
+              dbStore.dropTable(table);
+            }
+          }
+        } catch (Exception e) {
+          throw new IOException("Failed to prepare defrag checkpoint for snapshot: " + snapshotInfo.getSnapshotId(), e);
+        }
+        // This will recreate the column families in the checkpoint.
+        OmMetadataManagerImpl result = createDefragCheckpointMetadataManager(checkpoint, false);
+        checkpointSuccessful = true;
+        return result;
+      } finally {
+        if (!checkpointSuccessful && Files.exists(checkpointLocation)) {
+          try {
+            deleteDirectory(checkpointLocation);
+          } catch (IOException cleanupException) {
+            LOG.error("Failed to clean up checkpoint directory {} for snapshot: {} (ID: {}). " +
+                "Disk space may not be freed. Manual cleanup may be required.",
+                checkpointLocation, snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(),
+                cleanupException);
           }
         }
-      } catch (Exception e) {
-        throw new IOException("Failed to close checkpoint of snapshot: " + snapshotInfo.getSnapshotId(), e);
       }
-      // This will recreate the column families in the checkpoint.
-      return OmMetadataManagerImpl.createCheckpointMetadataManager(conf, checkpoint, false);
+    }
+  }
+
+  /**
+   * Deletes checkpoint directories left behind under {@link #tmpDefragDir} for the given source
+   * RocksDB name after {@link DBStore#getCheckpoint} failed to produce a checkpoint. The checkpoint
+   * directory name is only known to {@link org.apache.hadoop.hdds.utils.db.RDBCheckpointManager},
+   * so any leftover is located by its {@code <dbName>_} + {@code RDB_CHECKPOINT_DIR_PREFIX}
+   * naming convention rather than by an exact path.
+   */
+  private void deletePartialCheckpointDirs(String dbName) {
+    String prefix = dbName + "_" + RDB_CHECKPOINT_DIR_PREFIX;
+    try (Stream<Path> entries = Files.list(Paths.get(tmpDefragDir))) {
+      Iterator<Path> it = entries.iterator();
+      while (it.hasNext()) {
+        Path entry = it.next();
+        Path fileName = entry.getFileName();
+        if (fileName != null && fileName.toString().startsWith(prefix)) {
+          try {
+            deleteDirectory(entry);
+          } catch (IOException e) {
+            LOG.error("Failed to delete partial checkpoint directory {} under {}. " +
+                    "Disk space may not be freed. Manual cleanup may be required.",
+                entry, tmpDefragDir, e);
+          }
+        }
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to list entries under {} to delete partial checkpoint directories. " +
+          "Disk space may not be freed. Manual cleanup may be required.", tmpDefragDir, e);
+    }
+  }
+
+  /**
+   * Logs disk space usage and SST file count for the given directory.
+   *
+   * @param label a descriptive label for the log message (e.g., "Before defrag", "After defrag")
+   * @param snapshotInfo the snapshot being defragmented
+   * @param dir the directory to inspect
+   */
+  private void logDirStats(String label, SnapshotInfo snapshotInfo, Path dir) {
+    try (Stream<Path> files = Files.list(dir)) {
+      long totalSize = 0;
+      long sstFileCount = 0;
+      long totalFileCount = 0;
+      java.util.Iterator<Path> it = files.iterator();
+      while (it.hasNext()) {
+        Path file = it.next();
+        if (Files.isRegularFile(file)) {
+          long fileSize = Files.size(file);
+          totalSize += fileSize;
+          totalFileCount++;
+          if (file.toString().endsWith(SST_FILE_EXTENSION)) {
+            sstFileCount++;
+          }
+        }
+      }
+      LOG.trace("{} snapshot {} (ID: {}): dir={}, totalFiles={}, sstFiles={}, diskUsage={} bytes",
+          label, snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(),
+          dir, totalFileCount, sstFileCount, totalSize);
+    } catch (IOException e) {
+      LOG.trace("Failed to collect directory stats for {}: {}", dir, e.getMessage());
     }
   }
 
@@ -591,10 +693,21 @@ public class SnapshotDefragService extends BackgroundService
     if (snapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
       LOG.debug("Skipping defragmentation for non-active snapshot: {} (ID: {})",
           snapshotInfo.getName(), snapshotInfo.getSnapshotId());
+      snapshotMetrics.incNumSnapshotDefragSnapshotSkipped();
       return false;
     }
     Pair<Boolean, Integer> needsDefragVersionPair = needsDefragmentation(snapshotInfo);
     if (!needsDefragVersionPair.getLeft()) {
+      snapshotMetrics.incNumSnapshotDefragSnapshotSkipped();
+      int currentVersion = needsDefragVersionPair.getValue();
+      if (currentVersion > 0) {
+        try {
+          omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotId, currentVersion - 1);
+        } catch (IOException | IllegalArgumentException e) {
+          LOG.error("Failed to delete old checkpoint directories for snapshot: {} (ID: {})",
+              snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(), e);
+        }
+      }
       return false;
     }
     LOG.info("Defragmenting snapshot: {} (ID: {})", snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId());
@@ -606,20 +719,40 @@ public class SnapshotDefragService extends BackgroundService
     OmMetadataManagerImpl checkpointMetadataManager = createCheckpoint(checkpointSnapshotInfo,
         COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
     Path checkpointLocation = checkpointMetadataManager.getStore().getDbLocation().toPath();
+    boolean defragSuccessful = false;
     try {
       DBStore checkpointDBStore = checkpointMetadataManager.getStore();
+      if (LOG.isTraceEnabled()) {
+        Path snapshotDbDir = OmSnapshotManager.getSnapshotPath(
+            ozoneManager.getMetadataManager(), snapshotId, needsDefragVersionPair.getValue());
+        logDirStats("Before defrag", snapshotInfo, snapshotDbDir);
+      }
       TablePrefixInfo prefixInfo = ozoneManager.getMetadataManager().getTableBucketPrefix(snapshotInfo.getVolumeName(),
           snapshotInfo.getBucketName());
       // If first snapshot in the chain perform full defragmentation.
-      if (snapshotInfo.getPathPreviousSnapshotId() == null) {
+      boolean isFullDefrag = snapshotInfo.getPathPreviousSnapshotId() == null;
+      long defragStart = Time.monotonicNow();
+      if (isFullDefrag) {
         LOG.info("Performing full defragmentation for snapshot: {} (ID: {})", snapshotInfo.getTableKey(),
             snapshotInfo.getSnapshotId());
-        performFullDefragmentation(checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+        try {
+          performFullDefragmentation(checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+          perfMetrics.setSnapshotDefragServiceFullLatencyMs(Time.monotonicNow() - defragStart);
+        } catch (IOException e) {
+          snapshotMetrics.incNumSnapshotFullDefragFails();
+          throw e;
+        }
       } else {
         LOG.info("Performing incremental defragmentation for snapshot: {} (ID: {})", snapshotInfo.getTableKey(),
             snapshotInfo.getSnapshotId());
-        performIncrementalDefragmentation(checkpointSnapshotInfo, snapshotInfo, needsDefragVersionPair.getValue(),
-            checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+        try {
+          performIncrementalDefragmentation(checkpointSnapshotInfo, snapshotInfo, checkpointDBStore, prefixInfo,
+              COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+          perfMetrics.setSnapshotDefragServiceIncLatencyMs(Time.monotonicNow() - defragStart);
+        } catch (IOException e) {
+          snapshotMetrics.incNumSnapshotIncDefragFails();
+          throw e;
+        }
       }
       int previousVersion;
       // Acquire Content lock on the snapshot to ensure the contents of the table doesn't get changed.
@@ -628,19 +761,50 @@ public class SnapshotDefragService extends BackgroundService
         // Ingestion of incremental tables KeyTable/FileTable/DirectoryTable done now we need to just reingest the
         // remaining tables from the original snapshot.
         ingestNonIncrementalTables(checkpointDBStore, snapshotInfo, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+        if (LOG.isTraceEnabled()) {
+          logDirStats("After defrag", snapshotInfo, checkpointLocation);
+        }
         checkpointMetadataManager.close();
         checkpointMetadataManager = null;
         // Switch the snapshot DB location to the new version.
         previousVersion  = atomicSwitchSnapshotDB(snapshotId, checkpointLocation);
-        omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotId, previousVersion);
+        try {
+          omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotId, previousVersion);
+        } catch (IOException deleteException) {
+          LOG.error("Failed to delete old checkpoint directories for snapshot: {} (ID: {})",
+              snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(), deleteException);
+        }
+        defragSuccessful = true;
       } finally {
         snapshotContentLocks.releaseLock();
       }
       LOG.info("Completed defragmentation for snapshot: {} (ID: {}) in {} ms", snapshotInfo.getTableKey(),
           snapshotInfo.getSnapshotId(), Time.monotonicNow() - start);
+      snapshotMetrics.incNumSnapshotDefrag();
+      if (isFullDefrag) {
+        snapshotMetrics.incNumSnapshotFullDefrag();
+      } else {
+        snapshotMetrics.incNumSnapshotIncDefrag();
+      }
     } finally {
       if (checkpointMetadataManager != null) {
-        checkpointMetadataManager.close();
+        try {
+          checkpointMetadataManager.close();
+        } catch (IOException closeException) {
+          LOG.error("Failed to close checkpoint metadata manager for snapshot: {} (ID: {})",
+              snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(), closeException);
+        }
+      }
+      if (!defragSuccessful && checkpointLocation.toFile().exists()) {
+        try {
+          deleteDirectory(checkpointLocation);
+          LOG.info("Cleaned up failed checkpoint directory for snapshot: {} (ID: {})",
+              snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId());
+        } catch (IOException cleanupException) {
+          LOG.error("Failed to delete checkpoint directory {} for snapshot: {} (ID: {}). " +
+              "Disk space may not be freed. Manual cleanup may be required.",
+              checkpointLocation, snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(), cleanupException);
+        }
       }
     }
     return true;
@@ -684,6 +848,7 @@ public class SnapshotDefragService extends BackgroundService
           snapshotsDefraggedCount.getAndIncrement();
         }
       } catch (IOException e) {
+        snapshotMetrics.incNumSnapshotDefragFails();
         LOG.error("Exception while defragmenting snapshot: {}", snapshotId, e);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();

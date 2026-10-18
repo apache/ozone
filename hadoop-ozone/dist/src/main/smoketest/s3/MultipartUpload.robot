@@ -18,6 +18,7 @@ Documentation       S3 gateway test with aws cli
 Library             OperatingSystem
 Library             String
 Library             DateTime
+Library             ./presigned_url_helper.py
 Resource            ../commonlib.robot
 Resource            commonawslib.robot
 Resource            mpu_lib.robot
@@ -61,6 +62,38 @@ Test Multipart Upload With Adjusted Length
     Perform Multipart Upload    ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
     Verify Multipart Upload     ${BUCKET}    multipart/adjusted_length_${PREFIX}    /tmp/part1    /tmp/part2
 
+Test Multipart Upload Complete With Chunked Transfer Encoding
+    [Documentation]    Regression test for HDDS-14760. When CompleteMultipartUpload
+    ...                is sent with chunked transfer encoding (no Content-Length, as
+    ...                e.g. the AWS C++ SDK does with Expect: 100-continue), it must
+    ...                not be rejected as an empty part list (MalformedXML).
+    ${access_key} =     Execute    aws configure get aws_access_key_id
+    ${secret_key} =     Execute    aws configure get aws_secret_access_key
+    ${key} =            Set Variable    ${PREFIX}/chunkedCompleteKey
+    ${uploadID} =       Set Variable    ${EMPTY}
+    ${uploadID} =       Initiate MPU    ${BUCKET}    ${key}
+    ${eTag1} =          Upload MPU part    ${BUCKET}    ${key}    ${uploadID}    1    /tmp/part1
+    ${eTag2} =          Upload MPU part    ${BUCKET}    ${key}    ${uploadID}    2    /tmp/part2
+    ${body} =           Catenate    SEPARATOR=
+    ...                 <CompleteMultipartUpload>
+    ...                 <Part><PartNumber>1</PartNumber><ETag>${eTag1}</ETag></Part>
+    ...                 <Part><PartNumber>2</PartNumber><ETag>${eTag2}</ETag></Part>
+    ...                 </CompleteMultipartUpload>
+    Create File         /tmp/${PREFIX}-complete.xml    ${body}
+    ${presigned_url} =  Generate Presigned Complete Multipart Upload Url    ${access_key}    ${secret_key}    ${BUCKET}    ${key}    ${uploadID}    us-east-1    3600    ${ENDPOINT_URL}
+    ${result} =         Execute    curl -sS -v -X POST -H "Transfer-Encoding: chunked" -H "Content-Length:" -H "Content-Type: application/xml" --data-binary @/tmp/${PREFIX}-complete.xml "${presigned_url}" 2>&1
+    Should Contain      ${result}    > Transfer-Encoding: chunked
+    Should Not Contain  ${result}    > Content-Length:
+    # A success response carries <CompleteMultipartUploadResult>/<ETag>; an empty
+    # part list would instead be rejected with MalformedXML (the bucket/key alone
+    # are not success discriminators, since the key also appears in the
+    # <Resource> element of an error response).
+    Should Not Contain  ${result}    MalformedXML
+    Should Contain      ${result}    CompleteMultipartUploadResult
+    Should Contain      ${result}    ETag
+    [Teardown]          Run Keywords    Remove File    /tmp/${PREFIX}-complete.xml
+    ...                 AND    Run Keyword And Ignore Error    Abort MPU    ${BUCKET}    ${key}    ${uploadID}
+
 Overwrite Empty File
     Execute                     touch ${TEMP_DIR}/empty
     Execute AWSS3Cli            cp ${TEMP_DIR}/empty s3://${BUCKET}/empty_file_${PREFIX}
@@ -89,8 +122,7 @@ Test Multipart Upload Complete
 
 #complete multipart upload without any parts
     ${result} =         Execute AWSS3APICli and checkrc    complete-multipart-upload --upload-id ${uploadID} --bucket ${BUCKET} --key ${PREFIX}/multipartKey1    255
-                        Should contain    ${result}    InvalidRequest
-                        Should contain    ${result}    must specify at least one part
+                        Should contain    ${result}    MalformedXML
 
 #complete multipart upload
     ${resultETag} =     Complete MPU    ${BUCKET}    ${PREFIX}/multipartKey1    ${uploadID}    {ETag=${eTag1},PartNumber=1},{ETag=${eTag2},PartNumber=2}
@@ -405,3 +437,54 @@ Check Bucket Ownership Verification
     ${uploadID}=    Execute and checkrc                                            echo '${uploadID}' | jq -r '.UploadId'    0
 
     Execute AWSS3APICli with bucket owner check                                    abort-multipart-upload --bucket ${BUCKET} --key ${PREFIX}/mpu/aborttest --upload-id ${uploadID}  ${correct_owner}
+
+Test Multipart Upload Part with Content-MD5 header
+    # Create test file for multipart upload
+                                Execute                    echo "Multipart Upload Part Test" > /tmp/mpu_md5testfile
+    ${md5_hash} =               Execute                    md5sum /tmp/mpu_md5testfile | awk '{print $1}'
+    ${md5_base64} =             Execute                    openssl dgst -md5 -binary /tmp/mpu_md5testfile | base64
+
+    # Initialize multipart upload
+    ${uploadID} =               Initiate MPU               ${BUCKET}    ${PREFIX}/mpu/md5test/key1
+
+    # Upload part with correct Content-MD5 header
+    ${result} =                 Execute AWSS3APICli        upload-part --bucket ${BUCKET} --key ${PREFIX}/mpu/md5test/key1 --part-number 1 --body /tmp/mpu_md5testfile --upload-id ${uploadID} --content-md5 ${md5_base64}
+                                Should contain             ${result}    ETag
+    ${eTag1} =                  Execute and checkrc        echo '${result}' | jq -r '.ETag' | tr -d '"'    0
+                                Should Be Equal            ${eTag1}     ${md5_hash}
+
+    # List parts to verify upload
+    ${result} =                 Execute AWSS3APICli        list-parts --bucket ${BUCKET} --key ${PREFIX}/mpu/md5test/key1 --upload-id ${uploadID}
+    ${part_etag} =              Execute and checkrc        echo '${result}' | jq -r '.Parts[0].ETag' | tr -d '"'    0
+                                Should Be Equal            ${part_etag}    ${md5_hash}
+
+    # Complete the multipart upload
+    ${parts} =                  Set Variable               {ETag=\"${eTag1}\",PartNumber=1}
+                                Complete MPU               ${BUCKET}    ${PREFIX}/mpu/md5test/key1    ${uploadID}    ${parts}
+
+    # Verify the final object
+    ${result} =                 Execute AWSS3APICli        get-object --bucket ${BUCKET} --key ${PREFIX}/mpu/md5test/key1 /tmp/mpu_md5testfile.result
+    Compare files               /tmp/mpu_md5testfile       /tmp/mpu_md5testfile.result
+
+Test Multipart Upload Part with wrong Content-MD5 header
+    # Create test file for multipart upload
+                                Execute                    echo "Multipart Upload Part Wrong MD5 Test" > /tmp/mpu_md5testfile2
+
+    # Calculate wrong MD5 (from different content)
+    ${wrong_md5_hash} =         Execute                    echo -n "wrong content for mpu" | md5sum | awk '{print $1}'
+    ${wrong_md5_base64} =       Execute                    echo -n "wrong content for mpu" | openssl dgst -md5 -binary | base64
+
+    # Initialize multipart upload
+    ${uploadID} =               Initiate MPU               ${BUCKET}    ${PREFIX}/mpu/md5test/key2
+
+    # Upload part with wrong Content-MD5 header - should fail
+    ${result} =                 Execute AWSS3APICli and checkrc    upload-part --bucket ${BUCKET} --key ${PREFIX}/mpu/md5test/key2 --part-number 1 --body /tmp/mpu_md5testfile2 --upload-id ${uploadID} --content-md5 ${wrong_md5_base64}    255
+                                Should contain             ${result}    BadDigest
+
+    # Verify no parts were uploaded
+    ${result} =                 Execute AWSS3APICli        list-parts --bucket ${BUCKET} --key ${PREFIX}/mpu/md5test/key2 --upload-id ${uploadID}
+    ${parts_count} =            Execute and checkrc        echo '${result}' | jq -r '.Parts | length'    0
+                                Should Be Equal            ${parts_count}    0
+
+    # Abort the multipart upload (cleanup)
+                                Abort MPU                  ${BUCKET}    ${PREFIX}/mpu/md5test/key2    ${uploadID}

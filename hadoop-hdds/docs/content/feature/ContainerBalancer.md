@@ -53,10 +53,10 @@ ozone admin containerbalancer start [options]
 |-------------------------------------------------------| -------------------------------------------------------------------------------------------------------------------------------------- |
 | `-t`, `--threshold`                                   | The percentage deviation from the average utilization of the cluster after which a datanode will be rebalanced. Default is 10%.          |
 | `-i`, `--iterations`                                  | The maximum number of consecutive iterations the balancer will run for. Default is 10. Use -1 for infinite iterations.                 |
-| `-d`, `--maxDatanodesPercentageToInvolvePerIteration` | The maximum percentage of healthy, in-service datanodes that can be involved in balancing in one iteration. Default is 20%.      |
-| `-s`, `--maxSizeToMovePerIterationInGB`               | The maximum size of data in GB to be moved in one iteration. Default is 500GB.                                                         |
-| `-e`, `--maxSizeEnteringTargetInGB`                   | The maximum size in GB that can enter a target datanode in one iteration. Default is 26GB.                                             |
-| `-l`, `--maxSizeLeavingSourceInGB`                    | The maximum size in GB that can leave a source datanode in one iteration. Default is 26GB.                                             |
+| `-d`, `--max-datanodes-percentage-to-involve-per-iteration` | The maximum percentage of healthy, in-service datanodes that can be involved in balancing in one iteration. Default is 20%.      |
+| `-s`, `--max-size-to-move-per-iteration-in-gb`               | The maximum size of data in GB to be moved in one iteration. Default is 500GB.                                                         |
+| `-e`, `--max-size-entering-target-in-gb`                   | The maximum size in GB that can enter a target datanode in one iteration. Default is 26GB.                                             |
+| `-l`, `--max-size-leaving-source-in-gb`                    | The maximum size in GB that can leave a source datanode in one iteration. Default is 26GB.                                             |
 | `--balancing-iteration-interval-minutes`              | The interval in minutes between each iteration of the Container Balancer. Default is 70 minutes.                                       |
 | `--move-timeout-minutes`                              | The time in minutes to allow a single container to move from source to target. Default is 65 minutes.                                  |
 | `--move-replication-timeout-minutes`                  | The time in minutes to allow a single container's replication from source to target as part of a container move. Default is 50 minutes. |
@@ -77,6 +77,10 @@ To get a more detailed status, including the history of iterations:
 ```bash
 ozone admin containerbalancer status -v --history
 ```
+
+With `-v`/`--verbose`, when failures occur, a **Failed container moves** section lists each failure reason
+(e.g. `REPLICATION_FAIL_TIME_OUT`, `ITERATION_MOVE_TIMEOUT`, `PRE_MOVE_CONTAINER_NOT_FOUND` and more)
+with the total count and a per-datanode breakdown of which source and target nodes were involved.
 
 ### Stop
 
@@ -101,7 +105,7 @@ The Container Balancer can also be configured through the `ozone-site.xml` file.
 | `hdds.container.balancer.exclude.containers`           | A comma-separated list of container IDs to exclude from balancing.                                                                     | ""            |
 | `hdds.container.balancer.move.timeout`                 | The amount of time to allow a single container to move from source to target.                                                          | 65m           |
 | `hdds.container.balancer.move.replication.timeout`     | The amount of time to allow a single container's replication from source to target as part of a container move.                        | 50m           |
-| `hdds.container.balancer.balancing.iteration.interval` | The interval period between each iteration of Container Balancer.                                                                      | 70m           |
+| `hdds.container.balancer.balancing.iteration.interval` | The interval to wait between iterations. The balancer runs continuously, this wait lets SCM receive refreshed Datanode usage information before the next iteration starts.  | 3m            |
 | `hdds.container.balancer.include.datanodes`            | A comma-separated list of Datanode hostnames or IP addresses. Only the Datanodes specified in this list are balanced.                  | ""            |
 | `hdds.container.balancer.exclude.datanodes`            | A comma-separated list of Datanode hostnames or IP addresses. The Datanodes specified in this list are excluded from balancing.        | ""            |
 | `hdds.container.balancer.move.networkTopology.enable`  | Whether to take network topology into account when selecting a target for a source.                                                    | false         |

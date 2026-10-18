@@ -37,7 +37,6 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -77,7 +76,6 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -310,7 +308,6 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(OMDBInsightEndpoint.class)
-            .addBinding(ContainerHealthSchemaManager.class)
             .build();
     reconContainerMetadataManager =
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
@@ -330,11 +327,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         reconNamespaceSummaryManager,
         reconOMMetadataManager, ozoneConfiguration, 10);
     NSSummaryTaskWithOBS nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
-        reconNamespaceSummaryManager,
-        reconOMMetadataManager, 10);
+        reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     NSSummaryTaskWithFSO nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager,
-        reconOMMetadataManager, 10);
+        reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     reconNamespaceSummaryManager.clearNSSummaryTable();
     nSSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
@@ -924,21 +919,20 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testKeyCountsForValidAndInvalidKeyPrefix() throws IOException {
-    Timestamp now = new Timestamp(System.currentTimeMillis());
     ReconGlobalStatsManager statsManager = omdbInsightEndpoint.getReconGlobalStatsManager();
 
     // Insert valid key count with valid key prefix
-    insertGlobalStatsRecords(statsManager, now,
+    insertGlobalStatsRecords(statsManager,
         "openKeyTable" + "Count", 3L);
-    insertGlobalStatsRecords(statsManager, now,
+    insertGlobalStatsRecords(statsManager,
         "openFileTable" + "Count", 3L);
-    insertGlobalStatsRecords(statsManager, now,
+    insertGlobalStatsRecords(statsManager,
         "openKeyTable" + "ReplicatedDataSize", 150L);
-    insertGlobalStatsRecords(statsManager, now,
+    insertGlobalStatsRecords(statsManager,
         "openFileTable" + "ReplicatedDataSize", 150L);
-    insertGlobalStatsRecords(statsManager, now,
+    insertGlobalStatsRecords(statsManager,
         "openKeyTable" + "UnReplicatedDataSize", 50L);
-    insertGlobalStatsRecords(statsManager, now,
+    insertGlobalStatsRecords(statsManager,
         "openFileTable" + "UnReplicatedDataSize", 50L);
 
     Response openKeyInfoResp =
@@ -965,9 +959,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     globalStatsTable.delete("openFileTable" + "UnReplicatedDataSize");
 
     // Insert new record for a key with invalid prefix
-    insertGlobalStatsRecords(statsManager, now, "openKeyTable" + "InvalidPrefix",
+    insertGlobalStatsRecords(statsManager, "openKeyTable" + "InvalidPrefix",
         3L);
-    insertGlobalStatsRecords(statsManager, now, "openFileTable" + "InvalidPrefix",
+    insertGlobalStatsRecords(statsManager, "openFileTable" + "InvalidPrefix",
         3L);
 
     openKeyInfoResp =
@@ -987,26 +981,25 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
 
   @Test
   public void testKeysSummaryAttribute() throws IOException {
-    Timestamp now = new Timestamp(System.currentTimeMillis());
     ReconGlobalStatsManager statsManager = omdbInsightEndpoint.getReconGlobalStatsManager();
     // Insert records for replicated and unreplicated data sizes
-    insertGlobalStatsRecords(statsManager, now, "openFileTableReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, "openFileTableReplicatedDataSize",
         30L);
-    insertGlobalStatsRecords(statsManager, now, "openKeyTableReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, "openKeyTableReplicatedDataSize",
         30L);
-    insertGlobalStatsRecords(statsManager, now, "deletedTableReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, "deletedTableReplicatedDataSize",
         30L);
-    insertGlobalStatsRecords(statsManager, now, "openFileTableUnReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, "openFileTableUnReplicatedDataSize",
         10L);
-    insertGlobalStatsRecords(statsManager, now, "openKeyTableUnReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, "openKeyTableUnReplicatedDataSize",
         10L);
-    insertGlobalStatsRecords(statsManager, now, "deletedTableUnReplicatedDataSize",
+    insertGlobalStatsRecords(statsManager, "deletedTableUnReplicatedDataSize",
         10L);
 
     // Insert records for table counts
-    insertGlobalStatsRecords(statsManager, now, "openKeyTableCount", 3L);
-    insertGlobalStatsRecords(statsManager, now, "openFileTableCount", 3L);
-    insertGlobalStatsRecords(statsManager, now, "deletedTableCount", 3L);
+    insertGlobalStatsRecords(statsManager, "openKeyTableCount", 3L);
+    insertGlobalStatsRecords(statsManager, "openFileTableCount", 3L);
+    insertGlobalStatsRecords(statsManager, "deletedTableCount", 3L);
 
     // Call the API of Open keys to get the response
     Response openKeyInfoResp =
@@ -1040,8 +1033,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   }
 
   private void insertGlobalStatsRecords(ReconGlobalStatsManager statsManager,
-                                        Timestamp timestamp, String key,
-                                        long value) throws IOException {
+      String key, long value) throws IOException {
     GlobalStatsValue newRecord = new GlobalStatsValue(value);
     statsManager.getGlobalStatsTable().put(key, newRecord);
   }

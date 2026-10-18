@@ -26,11 +26,13 @@ import java.time.Duration;
 import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.ReconfigurationException;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -49,11 +51,13 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
     Set<String> expected = ImmutableSet.<String>builder()
         .add(OZONE_ADMINISTRATORS)
         .add(OZONE_READONLY_ADMINISTRATORS)
+        .add(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL)
         .addAll(new ReplicationManagerConfiguration()
             .reconfigurableProperties())
         .addAll(new WritableECContainerProviderConfig()
             .reconfigurableProperties())
         .addAll(new ScmConfig().reconfigurableProperties())
+        .addAll(new TracingConfig().reconfigurableProperties())
         .build();
 
     assertProperties(getSubject(), expected);
@@ -123,6 +127,19 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
         String.valueOf(newValue));
 
     assertEquals(newValue, blockDeletingService.getBlockDeleteTXNum());
+  }
+
+  @Test
+  void safeModeLogInterval() throws ReconfigurationException {
+
+    getSubject().reconfigurePropertyImpl(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, "30s");
+
+    assertEquals(
+        "30s",
+        cluster().getStorageContainerManager()
+            .getConfiguration()
+            .get(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL));
   }
 
 }

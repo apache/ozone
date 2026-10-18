@@ -46,10 +46,12 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.DecommissionUtils;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -63,6 +65,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeDiskInfo;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePipeline;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
@@ -160,6 +163,7 @@ public class NodeEndpoint {
           .setState(nodeState)
           .setPipelines(pipelines)
           .setLeaderCount(leaderCount.get())
+          .setDisks(getDisks(datanode))
           .build());
     });
 
@@ -174,14 +178,39 @@ public class NodeEndpoint {
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
     SCMNodeStat nodeStat =
         nodeManager.getNodeStat(datanode).get();
-    DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+    SpaceUsageSource.Fixed fsUsage = nodeManager.getTotalFilesystemUsage(datanode);
+    DatanodeStorageReport.Builder builder = DatanodeStorageReport.newBuilder()
         .setCapacity(nodeStat.getCapacity().get())
         .setUsed(nodeStat.getScmUsed().get())
         .setRemaining(nodeStat.getRemaining().get())
         .setCommitted(nodeStat.getCommitted().get())
-        .setMinimumFreeSpace(nodeStat.getFreeSpaceToSpare().get())
-        .build();
-    return storageReport;
+        .setReserved(nodeStat.getReserved().get())
+        .setMinimumFreeSpace(nodeStat.getFreeSpaceToSpare().get());
+
+    if (fsUsage != null) {
+      builder.setFilesystemCapacity(fsUsage.getCapacity())
+          .setFilesystemAvailable(fsUsage.getAvailable())
+          .setFilesystemUsed(fsUsage.getUsedSpace());
+    }
+    return builder.build();
+  }
+
+  private List<DatanodeDiskInfo> getDisks(DatanodeInfo datanode) {
+    List<DatanodeDiskInfo> disks = new ArrayList<>();
+    for (StorageReportProto report : datanode.getStorageReports()) {
+      DatanodeDiskInfo.Builder builder = DatanodeDiskInfo.newBuilder()
+          .setStorageUuid(report.getStorageUuid())
+          .setStorageLocation(report.getStorageLocation())
+          .setCapacity(report.getCapacity())
+          .setUsed(report.getScmUsed())
+          .setRemaining(report.getRemaining())
+          .setCommitted(report.getCommitted());
+      if (report.hasOpenContainerCount()) {
+        builder.setOpenContainerCount(report.getOpenContainerCount());
+      }
+      disks.add(builder.build());
+    }
+    return disks;
   }
 
   /**
@@ -349,7 +378,7 @@ public class NodeEndpoint {
     Response.ResponseBuilder builder = Response.status(Response.Status.OK);
     Map<String, Object> responseMap = new HashMap<>();
     Stream<HddsProtos.Node> allNodes = scmClient.queryNode(DECOMMISSIONING,
-        null, HddsProtos.QueryScope.CLUSTER, "", ClientVersion.CURRENT_VERSION).stream();
+        null, HddsProtos.QueryScope.CLUSTER, "", ClientVersion.CURRENT).stream();
     List<HddsProtos.Node> decommissioningNodes =
         DecommissionUtils.getDecommissioningNodesList(allNodes, uuid, ipAddress);
     String metricsJson = scmClient.getMetrics("Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics");

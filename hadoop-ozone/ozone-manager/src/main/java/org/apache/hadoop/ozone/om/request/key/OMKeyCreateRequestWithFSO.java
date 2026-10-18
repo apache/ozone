@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
@@ -122,6 +123,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
                 omMetadataManager, dbFileKey, keyName);
       }
       validateAtomicRewrite(dbFileInfo, keyArgs);
+      keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(
+          keyArgs, dbFileInfo);
 
       // Check if a file or directory exists with same key name.
       if (pathInfoFSO.getDirectoryResult() == DIRECTORY_EXISTS) {
@@ -173,7 +176,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               .collect(Collectors.toList());
       omFileInfo.appendNewBlocks(newLocationList, false);
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
       // check bucket and volume quota
       long preAllocatedSpace =
           newLocationList.size() * ozoneManager.getScmBlockSize() * repConfig
@@ -182,6 +185,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(omBucketInfo, numKeysCreated + 1L);
+      CreateKeyResponse.Builder createKeyResponseBuilder = CreateKeyResponse.newBuilder();
       perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       omBucketInfo.incrUsedNamespace(numKeysCreated);
 
@@ -197,14 +201,17 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               volumeId, bucketId, trxnLogIndex,
               missingParentInfos, null);
 
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
       // Prepare response. Sets user given full key name in the 'keyName'
       // attribute in response object.
-      int clientVersion = getOmRequest().getVersion();
-      omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
-              .setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
+      ClientVersion clientVersion = ClientVersion.deserialize(getOmRequest().getVersion());
+      createKeyResponseBuilder.setKeyInfo(omFileInfo.getNetworkProtobuf(keyName, clientVersion,
                   keyArgs.getLatestVersionLocation()))
               .setID(clientID)
-              .setOpenVersion(openVersion).build())
+              .setOpenVersion(openVersion);
+      omResponse.setCreateKeyResponse(createKeyResponseBuilder.build())
               .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponseWithFSO(omResponse.build(),
               omFileInfo, missingParentInfos, clientID,

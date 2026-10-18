@@ -208,7 +208,7 @@ public class OMException extends IOException {
     USER_MISMATCH, // Error code when requested user name passed is different
     // from remote user.
 
-    INVALID_PART, // When part name is not found or not matching with partname 
+    INVALID_PART, // When part name is not found or not matching with partname
     // in OM MPU partInfo.
 
     INVALID_PART_ORDER, // When list of parts mentioned to complete MPU are not
@@ -238,12 +238,19 @@ public class OMException extends IOException {
 
     DIRECTORY_NOT_EMPTY,
 
+    @Deprecated
     PERSIST_UPGRADE_TO_LAYOUT_VERSION_FAILED,
+    @Deprecated
     REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED,
+    @Deprecated
     UPDATE_LAYOUT_VERSION_FAILED,
+    @Deprecated
     LAYOUT_FEATURE_FINALIZATION_FAILED,
+    // Even though new OM servers do not support prepare for upgrade, clients may still encounter these result codes
+    // when talking to an older server, so they are left in place.
     PREPARE_FAILED,
     NOT_SUPPORTED_OPERATION_WHEN_PREPARED,
+
     NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
 
     TENANT_NOT_FOUND,
@@ -267,7 +274,7 @@ public class OMException extends IOException {
     UNAUTHORIZED,
 
     S3_SECRET_ALREADY_EXISTS,
-    
+
     INVALID_PATH,
     TOO_MANY_BUCKETS,
     KEY_UNDER_LEASE_RECOVERY,
@@ -275,5 +282,16 @@ public class OMException extends IOException {
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
 
     TOO_MANY_SNAPSHOTS,
+
+    ETAG_MISMATCH,
+
+    ETAG_NOT_AVAILABLE,
+
+    ATOMIC_WRITE_CONFLICT,
+
+    LIFECYCLE_CONFIGURATION_NOT_FOUND,
+    UPDATE_ID_NOT_MATCH,
+    REVOKED_TOKEN,
+    MALFORMED_POLICY_DOCUMENT
   }
 }

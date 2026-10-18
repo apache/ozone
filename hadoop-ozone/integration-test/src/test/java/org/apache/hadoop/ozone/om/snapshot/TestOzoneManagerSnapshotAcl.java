@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.FileSystem.FS_DEFAULT_NAME_KEY;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
@@ -50,6 +51,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -107,8 +109,10 @@ public class TestOzoneManagerSnapshotAcl {
   public static void init() throws Exception {
     UserGroupInformation.setLoginUser(ADMIN_UGI);
     final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_SNAPSHOT_RENAME_ALLOWED_KEY, true);
 
     final String omServiceId = "om-service-test-1"
         + RandomStringUtils.secure().nextNumeric(32);
@@ -273,8 +277,12 @@ public class TestOzoneManagerSnapshotAcl {
     final OmKeyArgs snapshotKeyArgs = getOmKeyArgs(true);
 
     // WHEN-THEN
-    assertDoesNotThrow(
-        () -> ozoneManager.lookupFile(snapshotKeyArgs));
+    if (bucketLayout == BucketLayout.OBJECT_STORE) {
+      assertLookupFileNotSupported(snapshotKeyArgs);
+    } else {
+      assertDoesNotThrow(
+          () -> ozoneManager.lookupFile(snapshotKeyArgs));
+    }
   }
 
   @ParameterizedTest
@@ -288,6 +296,16 @@ public class TestOzoneManagerSnapshotAcl {
 
     // when reading from snapshot, read disallowed.
     UserGroupInformation.setLoginUser(UGI2);
+
+    if (bucketLayout == BucketLayout.OBJECT_STORE) {
+      // HDDS-15951: the layout check runs before the ACL check, so the
+      // rejection wins over PERMISSION_DENIED on both the snapshot and the
+      // active file system.
+      assertLookupFileNotSupported(snapshotKeyArgs);
+      assertLookupFileNotSupported(keyArgs);
+      return;
+    }
+
     final OMException ex = assertThrows(OMException.class,
         () -> ozoneManager.lookupFile(snapshotKeyArgs));
 
@@ -296,6 +314,18 @@ public class TestOzoneManagerSnapshotAcl {
         ex.getResult());
     // when same user reads same key from active fs, read allowed.
     assertDoesNotThrow(() -> ozoneManager.lookupFile(keyArgs));
+  }
+
+  /**
+   * HDDS-15951 moved the OBJECT_STORE layout check for LookupFile from the file
+   * system client into OM, so OBS buckets - which have no file system semantics
+   * - are now rejected server-side, snapshots included.
+   */
+  private static void assertLookupFileNotSupported(OmKeyArgs keyArgs) {
+    final OMException ex = assertThrows(OMException.class,
+        () -> ozoneManager.lookupFile(keyArgs));
+    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION,
+        ex.getResult());
   }
 
   @ParameterizedTest

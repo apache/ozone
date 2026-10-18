@@ -31,5 +31,12 @@
       <url>https://repository.apache.org/content/repositories/snapshots</url>
       <blocked>true</blocked>
     </mirror>
+    <mirror>
+      <id>block-jboss</id>
+      <mirrorOf>repository.jboss.org</mirrorOf>
+      <name>Block access to JBoss</name>
+      <url>https://repository.jboss.org/nexus/content/groups/public</url>
+      <blocked>true</blocked>
+    </mirror>
   </mirrors>
 </settings>

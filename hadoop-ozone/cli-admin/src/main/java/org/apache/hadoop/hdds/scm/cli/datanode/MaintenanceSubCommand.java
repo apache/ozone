@@ -56,8 +56,8 @@ public class MaintenanceSubCommand extends ScmSubcommand {
     List<String> hosts = hostNameParams.getHostNames();
     List<DatanodeAdminError> errors =
         scmClient.startMaintenanceNodes(hosts, endInHours, force);
-    System.out.println("Entering maintenance mode on datanode(s):\n" +
-        String.join("\n", hosts));
+    System.out.println("Entering maintenance mode on datanode(s):");
+    hosts.forEach(System.out::println);
     showErrors(errors, "Some nodes could not start the maintenance workflow");
   }
 }

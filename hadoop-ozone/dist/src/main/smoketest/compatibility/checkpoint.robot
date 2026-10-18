@@ -20,7 +20,7 @@ Resource            setup.robot
 Test Timeout        5 minutes
 
 *** Variables ***
-${CHECKPOINT_V2_VERSION}    2.1.0
+${CHECKPOINT_V2_VERSION}    2.2.0
 ${OM_HOST}                  om
 ${OM_PORT}                  9874
 

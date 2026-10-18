@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.server.http;
 
 import static org.apache.hadoop.hdds.HddsUtils.createDir;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
@@ -35,9 +36,15 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTOR
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.net.InetAddresses;
+import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -46,7 +53,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.HddsConfServlet;
 import org.apache.hadoop.hdds.conf.HddsPrometheusConfig;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -56,20 +62,19 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
-import org.eclipse.jetty.webapp.WebAppContext;
+import org.apache.hadoop.security.ssl.SSLFactory;
+import org.eclipse.jetty.ee8.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Base class for HTTP server of the Ozone related components.
  */
-public abstract class BaseHttpServer {
+public abstract class BaseHttpServer implements AutoCloseable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseHttpServer.class);
   static final String PROMETHEUS_SINK = "PROMETHEUS_SINK";
-  private static final String JETTY_BASETMPDIR =
-      "org.eclipse.jetty.webapp.basetempdir";
   public static final String SERVER_DIR = "/webserver";
 
   private HttpServer2 httpServer;
@@ -84,6 +89,7 @@ public abstract class BaseHttpServer {
   private PrometheusMetricsSink prometheusMetricsSink;
 
   private boolean prometheusSupport;
+  private String jettyBaseTmpDir;
 
   public BaseHttpServer(MutableConfigurationSource conf, String name)
       throws IOException {
@@ -117,6 +123,11 @@ public abstract class BaseHttpServer {
         // Ozone config prefix must be set to avoid AuthenticationFilter
         // fall back to default one form hadoop.http.authentication.
         builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
+        // Without an explicit host, HttpServer2 expands _HOST in the SPNEGO
+        // principal to the host of its first endpoint, which is the bind
+        // address: a wildcard or interface-specific bind host does not name
+        // this node and matches no keytab entry.
+        builder.hostName(getSpnegoHost());
         if (httpAuthType.equals("kerberos")) {
           builder.setSecurityEnabled(true);
           builder.setUsernameConfKey(getSpnegoPrincipal());
@@ -139,11 +150,13 @@ public abstract class BaseHttpServer {
         builder.withoutDefaultApps();
       }
 
+      builder.allowAmbiguousUri(shouldAllowAmbiguousUri());
+      builder.allowEncodedDotSegments(shouldAllowEncodedDotSegments());
+
       httpServer = builder.build();
 
       // TODO move these to HttpServer2.addDefaultApps
       if (addDefaultApps) {
-        httpServer.addServlet("conf", "/conf", HddsConfServlet.class);
         httpServer.addServlet("logstream", "/logstream", LogStreamServlet.class);
       }
 
@@ -189,15 +202,33 @@ public abstract class BaseHttpServer {
         baseDir = getOzoneMetaDirPath(conf) + SERVER_DIR;
       }
       createDir(baseDir);
-      httpServer.getWebAppContext().setAttribute(JETTY_BASETMPDIR, baseDir);
+      WebAppContext webAppContext = httpServer.getWebAppContext();
+      // Jetty 9 used the "basetempdir" attribute, so each WebAppContext got its
+      // own uniquely named temp subdirectory under baseDir. Jetty 12 uses the
+      // temp directory as given, so point each server at its own subdirectory
+      // (named after the server) rather than at baseDir itself; otherwise every
+      // WebAppContext in the process would share one scratch dir -- the S3
+      // Gateway runs three servers (s3gateway, s3g-web, s3g-sts). Only Jetty
+      // scratch (e.g. unpacked webapp resources) lives here, kept out of baseDir
+      // where operator data under the metadata directory resides. Skip this when
+      // an operator set hadoop.http.temp.dir (already applied by build()), so
+      // that explicit configuration still wins as it did before Jetty 12.
+      if (webAppContext.getTempDirectory() == null) {
+        File tempDir = new File(baseDir, name);
+        createDir(tempDir.getPath());
+        webAppContext.setTempDirectory(tempDir);
+        // Jetty 12 deletes a non-persistent temp directory on stop; keep it so
+        // the subdirectory is reused across restarts instead of being recreated.
+        webAppContext.setPersistTempDirectory(true);
+      }
+      jettyBaseTmpDir = baseDir;
       LOG.info("HTTP server of {} uses base directory {}", name, baseDir);
     }
   }
 
   @VisibleForTesting
   public String getJettyBaseTmpDir() {
-    return httpServer.getWebAppContext().getAttribute(JETTY_BASETMPDIR)
-        .toString();
+    return jettyBaseTmpDir;
   }
 
   /**
@@ -222,7 +253,7 @@ public abstract class BaseHttpServer {
         builder.setFindPort(true);
       }
 
-      URI uri = URI.create("http://" + NetUtils.getHostPortString(httpAddr));
+      URI uri = newEndpointUri("http", httpAddr);
       builder.addEndpoint(uri);
       LOG.info("Starting Web-server for {} at: {}", name, uri);
     }
@@ -235,7 +266,7 @@ public abstract class BaseHttpServer {
         builder.setFindPort(true);
       }
 
-      URI uri = URI.create("https://" + NetUtils.getHostPortString(httpsAddr));
+      URI uri = newEndpointUri("https", httpsAddr);
       builder.addEndpoint(uri);
       LOG.info("Starting Web-server for {} at: {}", name, uri);
     }
@@ -280,6 +311,17 @@ public abstract class BaseHttpServer {
     return httpServer.getWebAppContext();
   }
 
+  /**
+   * Build a listener endpoint URI. Jetty reads the host and port straight off
+   * this URI, and an unbracketed IPv6 authority parses to a null host and a
+   * port of -1 without raising, which binds the server to every interface on
+   * an ephemeral port.
+   */
+  static URI newEndpointUri(String scheme, InetSocketAddress addr) {
+    return URI.create(scheme + "://"
+        + getHostPortString(addr.getHostName(), addr.getPort()));
+  }
+
   protected InetSocketAddress getBindAddress(String bindHostKey,
       String addressKey, String bindHostDefault, int bindPortdefault) {
     final Optional<String> bindHost =
@@ -294,7 +336,32 @@ public abstract class BaseHttpServer {
     String hostName = bindHost.orElse(addressHost.orElse(bindHostDefault));
 
     return NetUtils.createSocketAddr(
-        hostName + ":" + addressPort.orElse(bindPortdefault));
+        getHostPortString(hostName, addressPort.orElse(bindPortdefault)));
+  }
+
+  /**
+   * Returns the host that replaces {@code _HOST} in this server's SPNEGO
+   * principal: the host of the advertised address of an enabled scheme, HTTP
+   * before HTTPS, when it is a name, otherwise the canonical name of the local
+   * host.
+   */
+  protected String getSpnegoHost() throws UnknownHostException {
+    List<String> addressKeys = new ArrayList<>(2);
+    if (policy.isHttpEnabled()) {
+      addressKeys.add(getHttpAddressKey());
+    }
+    if (policy.isHttpsEnabled()) {
+      addressKeys.add(getHttpsAddressKey());
+    }
+    for (String addressKey : addressKeys) {
+      Optional<String> host = getHostNameFromConfigKeys(conf, addressKey);
+      // An IP literal, wildcard or not, names no host, so it falls back to the
+      // local name exactly as the default wildcard bind address did before.
+      if (host.isPresent() && !InetAddresses.isInetAddress(host.get())) {
+        return host.get();
+      }
+    }
+    return InetAddress.getLocalHost().getCanonicalHostName();
   }
 
   /**
@@ -328,19 +395,26 @@ public abstract class BaseHttpServer {
             .register("prometheus", "Hadoop metrics prometheus exporter",
                 prometheusMetricsSink);
       }
+      BuildInfoMetrics.create(name);
       updateConnectorAddress();
     }
 
   }
 
-  private boolean isEnabled() {
+  protected boolean isEnabled() {
     return conf.getBoolean(getEnabledKey(), true);
   }
 
   public void stop() throws Exception {
     if (httpServer != null) {
       httpServer.stop();
+      BuildInfoMetrics.unregister();
     }
+  }
+
+  @Override
+  public void close() throws Exception {
+    stop();
   }
 
   /**
@@ -352,36 +426,43 @@ public abstract class BaseHttpServer {
     int connIdx = 0;
     if (policy.isHttpEnabled()) {
       httpAddress = httpServer.getConnectorAddress(connIdx++);
-      String realAddress = NetUtils.getHostPortString(NetUtils.getConnectAddress(httpAddress));
+      InetSocketAddress connectAddress = NetUtils.getConnectAddress(httpAddress);
+      String realAddress = getHostPortString(connectAddress.getHostName(), connectAddress.getPort());
       conf.set(getHttpAddressKey(), realAddress);
       LOG.info("HTTP server of {} listening at http://{}", name, realAddress);
     }
 
     if (policy.isHttpsEnabled()) {
       httpsAddress = httpServer.getConnectorAddress(connIdx);
-      String realAddress = NetUtils.getHostPortString(NetUtils.getConnectAddress(httpsAddress));
+      InetSocketAddress connectAddress = NetUtils.getConnectAddress(httpsAddress);
+      String realAddress = getHostPortString(connectAddress.getHostName(), connectAddress.getPort());
       conf.set(getHttpsAddressKey(), realAddress);
       LOG.info("HTTPS server of {} listening at https://{}", name, realAddress);
     }
   }
 
-  public static HttpServer2.Builder loadSslConfToHttpServerBuilder(
-      HttpServer2.Builder builder, ConfigurationSource sslConf) {
-    return builder
+  public static void loadSslConfToHttpServerBuilder(HttpServer2.Builder builder, ConfigurationSource sslConf) {
+    builder
         .needsClientAuth(
             sslConf.getBoolean(OZONE_CLIENT_HTTPS_NEED_AUTH_KEY,
                 OZONE_CLIENT_HTTPS_NEED_AUTH_DEFAULT))
         .keyPassword(getPassword(sslConf, OZONE_SERVER_HTTPS_KEYPASSWORD_KEY))
-        .keyStore(sslConf.get("ssl.server.keystore.location"),
+        .keyStore(
+            sslConf.get(SSLFactory.SSL_SERVER_KEYSTORE_LOCATION),
             getPassword(sslConf, OZONE_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY),
-            sslConf.get(HddsConfigKeys.HDDS_HTTP_SERVER_KEYSTORE_TYPE,
-                HddsConfigKeys.HDDS_HTTP_SERVER_KEYSTORE_TYPE_DEFAULT))
-        .trustStore(sslConf.get("ssl.server.truststore.location"),
+            sslConf.get(
+                HddsConfigKeys.HDDS_HTTP_SERVER_KEYSTORE_TYPE,
+                HddsConfigKeys.HDDS_HTTP_SERVER_KEYSTORE_TYPE_DEFAULT)
+        )
+        .trustStore(
+            sslConf.get(SSLFactory.SSL_SERVER_TRUSTSTORE_LOCATION),
             getPassword(sslConf, OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY),
-            sslConf.get(HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE,
-                HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE_DEFAULT))
-        .excludeCiphers(
-            sslConf.get("ssl.server.exclude.cipher.list"));
+            sslConf.get(
+                HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE,
+                HddsConfigKeys.HDDS_HTTP_SERVER_TRUSTSTORE_TYPE_DEFAULT)
+        )
+        .includeCiphers(sslConf.get(SSLFactory.SSL_SERVER_INCLUDE_CIPHER_LIST))
+        .excludeCiphers(sslConf.get(SSLFactory.SSL_SERVER_EXCLUDE_CIPHER_LIST));
   }
 
   /**
@@ -483,6 +564,25 @@ public abstract class BaseHttpServer {
   /** Override to disable the default servlets. */
   protected boolean shouldAddDefaultApps() {
     return true;
+  }
+
+  /**
+   * Override to accept ambiguous URIs (e.g. empty path segments from "//").
+   * Needed by the S3 Gateway, whose object keys can contain such sequences
+   * that Jetty 12 rejects with 400 by default.
+   */
+  protected boolean shouldAllowAmbiguousUri() {
+    return false;
+  }
+
+  /**
+   * Override to accept percent-encoded "." and ".." path segments, in addition
+   * to {@link #shouldAllowAmbiguousUri()}. Needed by the S3 Gateway, whose
+   * object keys can contain such segments that Jetty 12 rejects with 400 by
+   * default.
+   */
+  protected boolean shouldAllowEncodedDotSegments() {
+    return false;
   }
 
 }

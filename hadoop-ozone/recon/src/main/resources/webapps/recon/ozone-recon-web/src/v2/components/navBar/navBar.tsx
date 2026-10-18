@@ -28,7 +28,8 @@ import {
   FolderOpenOutlined,
   InboxOutlined,
   LayoutOutlined,
-  PieChartOutlined
+  PieChartOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons';
 import {Link, useLocation} from 'react-router-dom';
 
@@ -36,6 +37,7 @@ import {Link, useLocation} from 'react-router-dom';
 import logo from '@/logo.png';
 import {showDataFetchError} from '@/utils/common';
 import {useApiData} from '@/v2/hooks/useAPIData.hook';
+import { CHATBOT_ENDPOINTS } from '@/v2/constants/chatbot.constants';
 
 import './navBar.less';
 
@@ -51,8 +53,8 @@ const NavBar: React.FC<NavBarProps> = ({
   onCollapse = () => { }
 }) => {
   const location = useLocation();
-  
-  const { data: disabledFeatures, error } = useApiData<string[]>(
+
+  const { data: disabledFeatures, success: disabledFeaturesLoaded } = useApiData<string[]>(
     '/api/v1/features/disabledFeatures',
     [],
     {
@@ -60,7 +62,19 @@ const NavBar: React.FC<NavBarProps> = ({
     }
   );
 
-  const isHeatmapEnabled = !disabledFeatures.includes('HEATMAP');
+  const { data: chatbotHealth, success: chatbotHealthLoaded } = useApiData<{
+    enabled: boolean;
+    llmClientAvailable: boolean;
+  }>(
+    CHATBOT_ENDPOINTS.HEALTH,
+    { enabled: false, llmClientAvailable: false },
+    {
+      retryAttempts: 0,
+    }
+  );
+
+  const isHeatmapEnabled = disabledFeaturesLoaded && !disabledFeatures.includes('HEATMAP');
+  const isChatbotEnabled = chatbotHealthLoaded && chatbotHealth.enabled;
 
   const menuItems = [(
     <Menu.Item key='/Overview'
@@ -120,15 +134,24 @@ const NavBar: React.FC<NavBarProps> = ({
       <Link to='/NamespaceUsage' />
     </Menu.Item>
   ), (
+    <Menu.Item key='/Capacity'
+      icon={<PieChartOutlined />}>
+      <span>Cluster Capacity</span>
+      <Link to='/Capacity' />
+    </Menu.Item>
+  ),(
     isHeatmapEnabled &&
     <Menu.Item key='/Heatmap'
       icon={<LayoutOutlined />}>
       <span>Heatmap</span>
-      <Link to={{
-        pathname: '/Heatmap',
-        state: { isHeatmapEnabled: isHeatmapEnabled }
-      }}
-      />
+      <Link to='/Heatmap' />
+    </Menu.Item>
+  ),(
+    isChatbotEnabled &&
+    <Menu.Item key='/Assistant'
+      icon={<ThunderboltOutlined />}>
+      <span>Recon AI</span>
+      <Link to='/Assistant' />
     </Menu.Item>
   )]
   return (

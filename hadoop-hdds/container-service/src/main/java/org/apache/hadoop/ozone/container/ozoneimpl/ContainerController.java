@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
@@ -208,6 +209,18 @@ public class ContainerController {
       final TarContainerPacker packer) throws IOException {
     return handlers.get(containerData.getContainerType())
         .importContainer(containerData, rawContainerStream, packer);
+  }
+
+  public Container importContainer(final ContainerData targetTempContainerData) throws IOException {
+    return handlers.get(targetTempContainerData.getContainerType()).importContainer(targetTempContainerData);
+  }
+
+  public void copyContainer(final ContainerData containerData,
+      final Path destinationPath) throws IOException {
+    handlers.get(containerData.getContainerType())
+        .copyContainer(
+            containerSet.getContainer(containerData.getContainerID()),
+            destinationPath);
   }
 
   public void exportContainer(final ContainerType type,

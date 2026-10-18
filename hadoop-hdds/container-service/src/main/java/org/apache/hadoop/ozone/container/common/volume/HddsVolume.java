@@ -25,14 +25,12 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import org.apache.commons.io.FileUtils;
@@ -51,6 +49,7 @@ import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.container.ozoneimpl.ScanTransientIOUtil;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.Time;
@@ -110,11 +109,6 @@ public class HddsVolume extends StorageVolume {
   private final AtomicBoolean dbLoaded = new AtomicBoolean(false);
   private final AtomicBoolean dbLoadFailure = new AtomicBoolean(false);
 
-  private final int volumeTestCount;
-  private final int volumeTestFailureTolerance;
-  private AtomicInteger volumeTestFailureCount;
-  private Queue<Boolean> volumeTestResultQueue;
-
   /**
    * Builder for HddsVolume.
    */
@@ -147,11 +141,6 @@ public class HddsVolume extends StorageVolume {
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
 
-      this.volumeTestCount = getDatanodeConfig().getVolumeIOTestCount();
-      this.volumeTestFailureTolerance = getDatanodeConfig().getVolumeIOFailureTolerance();
-      this.volumeTestFailureCount = new AtomicInteger(0);
-      this.volumeTestResultQueue = new LinkedList<>();
-
       initialize();
     } else {
       // Builder is called with failedVolume set, so create a failed volume
@@ -159,8 +148,6 @@ public class HddsVolume extends StorageVolume {
       this.setState(VolumeState.FAILED);
       volumeIOStats = null;
       volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
-      this.volumeTestCount = 0;
-      this.volumeTestFailureTolerance = 0;
     }
 
     LOG.info("HddsVolume: {}", getReport());
@@ -207,7 +194,7 @@ public class HddsVolume extends StorageVolume {
     StorageLocationReport.Builder builder = super.reportBuilder();
     if (!builder.isFailed()) {
       builder.setCommitted(getCommittedBytes())
-          .setFreeSpaceToSpare(getFreeSpaceToSpare(builder.getCapacity()));
+          .setFreeSpaceToSpare(getReportedFreeSpaceToSpare(builder.getCapacity()));
     }
     return builder;
   }
@@ -299,7 +286,7 @@ public class HddsVolume extends StorageVolume {
     VolumeCheckResult result = super.check(unused);
 
     if (isDbLoadFailure()) {
-      LOG.warn("Volume {} failed to access RocksDB: RocksDB parent directory is null, " +
+      LOG.error("Volume {} failed to access RocksDB: RocksDB parent directory is null, " +
           "the volume might not have been loaded properly.", getStorageDir());
       return VolumeCheckResult.FAILED;
     }
@@ -312,48 +299,99 @@ public class HddsVolume extends StorageVolume {
     // Check that per-volume RocksDB is present.
     File dbFile = new File(dbParentDir, CONTAINER_DB_NAME);
     if (!dbFile.exists() || !dbFile.canRead()) {
-      LOG.warn("Volume {} failed health check. Could not access RocksDB at " +
-          "{}", getStorageDir(), dbFile);
+      LOG.error("Volume {} failed health check. Could not access RocksDB at {}", getStorageDir(), dbFile);
       return VolumeCheckResult.FAILED;
     }
 
     return checkDbHealth(dbFile);
   }
 
+  /**
+   * Verifies the per-volume RocksDB's global state files (CURRENT, MANIFEST,
+   * OPTIONS) by opening the DB in secondary mode. A successful open implies
+   * those files are readable and internally consistent and that the
+   * referenced SST file names match what RocksDB expects.
+   *
+   * <p>This check intentionally does <b>not</b> read or checksum SST file
+   * contents or any individual key/value. Per-block / per-key integrity is
+   * verified by the container data scanner, which scans containers (and
+   * their RocksDB rows) on its own schedule.
+   *
+   * <p>The volume is only marked {@link VolumeCheckResult#FAILED} once the
+   * configured threshold of failures is exceeded, matching the parent class's
+   * intermittent-error tolerance. Open failures whose underlying RocksDB
+   * status is {@code IOError(NoSpace)} are not counted: {@code openAsSecondary}
+   * writes its info LOG into the disk-check directory, so an out-of-space
+   * failure there is unrelated to DB integrity. Any other status — permission
+   * denied, missing path, corruption, generic IO error — is still counted as
+   * a real failure.
+   */
   @VisibleForTesting
   public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
-    if (volumeTestCount == 0) {
+    if (!(getDiskCheckEnabled() && getDatanodeConfig().isRocksDbDiskCheckEnabled())) {
       return VolumeCheckResult.HEALTHY;
     }
 
-    final boolean isVolumeTestResultHealthy = true;
+    File secondaryDir = new File(getDiskCheckDir(), "rocksdb-secondary-" + Time.now());
+    try {
+      Files.createDirectories(secondaryDir.toPath());
+    } catch (IOException e) {
+      LOG.error("Failed to create secondary instance dir {} for volume {}", secondaryDir, getStorageDir(), e);
+
+      if (!isNoSpaceAvailable(e) && !ScanTransientIOUtil.isTooManyOpenFiles(e)) {
+        getIoTestSlidingWindow().add();
+      }
+
+      return getIoTestSlidingWindow().isExceeded()
+          ? VolumeCheckResult.FAILED
+          : VolumeCheckResult.HEALTHY;
+    }
+
     try (ManagedOptions managedOptions = new ManagedOptions();
-         ManagedRocksDB ignored = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
-      volumeTestResultQueue.add(isVolumeTestResultHealthy);
+         ManagedRocksDB ignored =
+             ManagedRocksDB.openAsSecondary(managedOptions, dbFile.toString(), secondaryDir.getPath())) {
+      // Do nothing. Only check if rocksdb is accessible.
+      LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}.", dbFile, getStorageDir());
     } catch (Exception e) {
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedException("Check of database for volume " + this + " interrupted.");
       }
-      LOG.warn("Could not open Volume DB located at {}", dbFile, e);
-      volumeTestResultQueue.add(!isVolumeTestResultHealthy);
-      volumeTestFailureCount.incrementAndGet();
+
+      // openAsSecondary writes its info LOG into secondaryDir. If that write
+      // fails because the disk is full, RocksDB surfaces the failure as
+      // IOError(NoSpace) (mapped from ENOSPC). That is unrelated to DB
+      // integrity, so don't count it against the sliding window. Any other
+      // status (permission denied, missing path, corruption, generic IO
+      // error) is still treated as a real failure.
+      if (ManagedRocksDB.isNoSpaceFailure(e)) {
+        LOG.warn("Skipping RocksDB health-check failure accounting for volume {}: " +
+            "secondary open returned IOError(NoSpace) for {}.", this, secondaryDir, e);
+      } else if (ScanTransientIOUtil.isTooManyOpenFiles(e)) {
+        LOG.warn("Skipping RocksDB health-check failure accounting for volume {}: " +
+            "secondary open hit file descriptor exhaustion for {}.", this, secondaryDir, e);
+      } else {
+        LOG.error("Could not open Volume DB located at {}", dbFile, e);
+        getIoTestSlidingWindow().add();
+      }
+    } finally {
+      try {
+        FileUtils.deleteDirectory(secondaryDir);
+      } catch (IOException e) {
+        LOG.warn("Failed to delete RocksDB secondary instance dir {}", secondaryDir, e);
+      }
     }
 
-    if (volumeTestResultQueue.size() > volumeTestCount
-        && (Boolean.TRUE.equals(volumeTestResultQueue.poll()) != isVolumeTestResultHealthy)) {
-      volumeTestFailureCount.decrementAndGet();
-    }
 
-    if (volumeTestFailureCount.get() > volumeTestFailureTolerance) {
+    if (getIoTestSlidingWindow().isExceeded()) {
       LOG.error("Failed to open the database at \"{}\" for HDDS volume {}: " +
-              "the last {} runs encountered {} out of {} tolerated failures.",
-          dbFile, this, volumeTestResultQueue.size(), volumeTestFailureCount.get(), volumeTestFailureTolerance);
+              "encountered more than the {} tolerated failures.",
+          dbFile, this, getIoTestSlidingWindow().getWindowSize());
       return VolumeCheckResult.FAILED;
     }
 
     LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}: " +
-            "the last {} runs encountered {} out of {} tolerated failures",
-        dbFile, this, volumeTestResultQueue.size(), volumeTestFailureTolerance, volumeTestFailureTolerance);
+            "encountered {} out of {} tolerated failures",
+        dbFile, this, getIoTestSlidingWindow().getNumEventsInWindow(), getIoTestSlidingWindow().getWindowSize());
     return VolumeCheckResult.HEALTHY;
   }
 
@@ -410,8 +448,20 @@ public class HddsVolume extends StorageVolume {
     return committedBytes.get();
   }
 
-  public long getFreeSpaceToSpare(long volumeCapacity) {
+  /**
+   * Minimum free space reported to SCM (heartbeat), from
+   * {@code hdds.datanode.volume.min.free.space.percent}.
+   */
+  public long getReportedFreeSpaceToSpare(long volumeCapacity) {
     return getDatanodeConfig().getMinFreeSpace(volumeCapacity);
+  }
+
+  /**
+   * Minimum free space enforced locally for writes (see
+   * {@code hdds.datanode.volume.min.free.space.hard.limit.percent}).
+   */
+  public long getFreeSpaceToSpare(long volumeCapacity) {
+    return getDatanodeConfig().getHardLimitMinFreeSpace(volumeCapacity);
   }
 
   @Override

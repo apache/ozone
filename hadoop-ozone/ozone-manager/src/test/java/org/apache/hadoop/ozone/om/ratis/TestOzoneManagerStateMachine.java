@@ -17,264 +17,1750 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
+import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.SIMPLE;
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.any;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.lock.OzoneManagerLock;
+import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
+import org.apache.hadoop.ozone.om.response.DummyOMClientResponse;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequestArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
+import org.apache.hadoop.ozone.protocolPB.RequestHandler;
+import org.apache.hadoop.ozone.security.STSTokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.exceptions.StateMachineException;
+import org.apache.ratis.protocol.RaftClientRequest;
+import org.apache.ratis.protocol.RaftGroupId;
+import org.apache.ratis.protocol.RaftGroupMemberId;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.LogProtoUtils;
+import org.apache.ratis.server.storage.RaftStorage;
+import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.statemachine.TransactionContext;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.ExitUtils;
-import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Class to test OzoneManagerStateMachine.
  */
 public class TestOzoneManagerStateMachine {
 
-  @TempDir
-  private Path tempDir;
-
-  private OzoneManagerStateMachine ozoneManagerStateMachine;
-  private OzoneManagerPrepareState prepareState;
-  private AuditLogger auditLogger;
+  private OzoneManager om;
+  private OzoneManagerDoubleBuffer doubleBuffer;
+  private RequestHandler handler;
+  private ExecutorService executor;
+  private OzoneManagerStateMachine sm;
+  private OMServiceManager serviceManager;
 
   @BeforeEach
-  public void setup() throws Exception {
-    OzoneManagerRatisServer ozoneManagerRatisServer =
-        mock(OzoneManagerRatisServer.class);
-    OzoneManager ozoneManager = mock(OzoneManager.class);
-    // Allow testing of prepare pre-append gate.
-    when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
-        .thenReturn(true);
-
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
-        tempDir.toAbsolutePath().toString());
-
-    OMMetadataManager omMetadataManager = new OmMetadataManagerImpl(conf,
-        ozoneManager);
-
-    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    auditLogger = mock(AuditLogger.class);
-
-    when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
-    prepareState = new OzoneManagerPrepareState(conf);
-    when(ozoneManager.getPrepareState()).thenReturn(prepareState);
-
-    when(ozoneManagerRatisServer.getOzoneManager()).thenReturn(ozoneManager);
-    when(ozoneManager.getTransactionInfo()).thenReturn(mock(TransactionInfo.class));
-    when(ozoneManager.getConfiguration()).thenReturn(conf);
-    final OmConfig omConfig = conf.getObject(OmConfig.class);
-    when(ozoneManager.getConfig()).thenReturn(omConfig);
-    ozoneManagerStateMachine =
-        new OzoneManagerStateMachine(ozoneManagerRatisServer, false);
-  }
-
-  static void assertTermIndex(long expectedTerm, long expectedIndex, TermIndex computed) {
-    assertEquals(expectedTerm, computed.getTerm());
-    assertEquals(expectedIndex, computed.getIndex());
-  }
-
-  @Test
-  public void testLastAppliedIndex() {
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
-    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastAppliedTermIndex());
-    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastNotifiedTermIndex());
-
-    // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 1);
-    assertTermIndex(0, 1, ozoneManagerStateMachine.getLastAppliedTermIndex());
-    assertTermIndex(0, 1, ozoneManagerStateMachine.getLastNotifiedTermIndex());
-
-    // call update last applied index
-    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(0, 2));
-    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(0, 3));
-
-    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
-    assertTermIndex(0, 1, ozoneManagerStateMachine.getLastNotifiedTermIndex());
-
-    // Conf/metadata transaction.
-    ozoneManagerStateMachine.notifyTermIndexUpdated(1L, 4L);
-
-    assertTermIndex(1, 4, ozoneManagerStateMachine.getLastAppliedTermIndex());
-    assertTermIndex(1, 4, ozoneManagerStateMachine.getLastNotifiedTermIndex());
-
-    // Add some apply transactions.
-    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(1L, 5L));
-    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(1L, 6L));
-
-    assertTermIndex(1, 6, ozoneManagerStateMachine.getLastAppliedTermIndex());
-    assertTermIndex(1, 4, ozoneManagerStateMachine.getLastNotifiedTermIndex());
-  }
-
-  @Test
-  public void testNotifyTermIndexPendingBufferUpdateIndex() {
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 0);
-    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastAppliedTermIndex());
-    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastNotifiedTermIndex());
-
-    // notifyTermIndex with skipping one of transaction which is from applyTransaction
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 2);
-    ozoneManagerStateMachine.notifyTermIndexUpdated(0, 3);
-    assertTermIndex(0, 0, ozoneManagerStateMachine.getLastAppliedTermIndex());
-    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastNotifiedTermIndex());
-
-    // applyTransaction update with missing transaction as above
-    ozoneManagerStateMachine.updateLastAppliedTermIndex(TermIndex.valueOf(0, 1));
-    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
-
-    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
-    assertTermIndex(0, 3, ozoneManagerStateMachine.getLastNotifiedTermIndex());
-  }
-
-  @Test
-  public void testPreAppendTransaction() throws Exception {
-    // Submit write request.
-    KeyArgs args = KeyArgs
-        .newBuilder()
-        .setVolumeName("volume")
-        .setBucketName("bucket")
-        .setKeyName("key")
-        .build();
-    OMRequest createKeyRequest = OMRequest.newBuilder()
-        .setCreateKeyRequest(CreateKeyRequest.newBuilder().setKeyArgs(args))
-        .setCmdType(Type.CreateKey)
-        .setClientId("123")
-        .setUserInfo(UserInfo
-            .newBuilder()
-            .setUserName("user")
-            .setHostName("localhost")
-            .setRemoteAddress("127.0.0.1"))
-        .build();
-    // Without prepare enabled, the txn should be returned unaltered.
-    TransactionContext submittedTrx = mockTransactionContext(createKeyRequest);
-    TransactionContext returnedTrx =
-        ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    assertSame(submittedTrx, returnedTrx);
-
-    assertEquals(PrepareStatus.NOT_PREPARED, prepareState.getState().getStatus());
-
-    // Submit prepare request.
-    OMRequest prepareRequest = OMRequest.newBuilder()
-        .setPrepareRequest(
-            PrepareRequest.newBuilder()
-                .setArgs(PrepareRequestArgs.getDefaultInstance()))
-        .setCmdType(Type.Prepare)
-        .setClientId("123")
-        .setUserInfo(UserInfo
-            .newBuilder()
-            .setUserName("user")
-            .setHostName("localhost")
-            .setRemoteAddress("127.0.0.1"))
-        .build();
-
-    submittedTrx = mockTransactionContext(prepareRequest);
-    returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    assertSame(submittedTrx, returnedTrx);
-
-    // Prepare should be started.
-    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
-        prepareState.getState().getStatus());
-
-    // Submitting a write request should now fail.
-    StateMachineException smEx =
-        assertThrows(StateMachineException.class,
-            () -> ozoneManagerStateMachine.preAppendTransaction(mockTransactionContext(createKeyRequest)),
-            "Expected StateMachineException to be thrown when submitting write request while prepared.");
-    assertFalse(smEx.leaderShouldStepDown());
-
-    Throwable cause = smEx.getCause();
-    OMException omException = assertInstanceOf(OMException.class, cause);
-    assertEquals(omException.getResult(), OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
-
-    // Should be able to prepare again without issue.
-    submittedTrx = mockTransactionContext(prepareRequest);
-    returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    assertSame(submittedTrx, returnedTrx);
-
-    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED, prepareState.getState().getStatus());
-
-    // Cancel prepare is handled in the cancel request apply txn step, not
-    // the pre-append state machine step, so it is tested in other classes.
-  }
-
-  @Test
-  public void testApplyTransactionExceptionAuditLog() throws Exception {
+  public void setup() {
     ExitUtils.disableSystemExit();
-    // submit a create volume request having null pointer exception
-    OzoneManagerProtocolProtos.VolumeInfo volInfo = OzoneManagerProtocolProtos.VolumeInfo.newBuilder()
-        .setAdminName("a").setOwnerName("a").setVolume("a").build();
-    OMRequest createVolRequest = OMRequest.newBuilder()
-        .setCreateVolumeRequest(OzoneManagerProtocolProtos.CreateVolumeRequest.newBuilder().setVolumeInfo(volInfo))
-        .setCmdType(Type.CreateVolume).setClientId("123")
-        .setUserInfo(UserInfo.newBuilder().setUserName("user").setHostName("localhost").setRemoteAddress("127.0.0.1"))
+    om = mock(OzoneManager.class);
+    doubleBuffer = mock(OzoneManagerDoubleBuffer.class);
+    handler = mock(RequestHandler.class);
+    executor = Executors.newSingleThreadExecutor();
+    serviceManager = mock(OMServiceManager.class);
+    when(om.getOMServiceManager()).thenReturn(serviceManager);
+    sm = new OzoneManagerStateMachine(om, doubleBuffer, handler, executor, null);
+  }
+
+  @AfterEach
+  public void tearDown() {
+    sm.stop();
+    Server.getCurCall().remove();
+    OzoneManager.setS3Auth(null);
+    OzoneManager.setStsTokenIdentifier(null);
+  }
+
+  @Test
+  public void testOzoneManagerThreadLocalsAreReviewedForRatisPropagation() {
+    List<String> threadLocalFields = Arrays.stream(OzoneManager.class.getDeclaredFields())
+        .filter(field -> ThreadLocal.class.isAssignableFrom(field.getType()))
+        .map(field -> field.getName())
+        .sorted()
+        .collect(Collectors.toList());
+
+    assertEquals(Arrays.asList("S3_AUTH", "STS_TOKEN"), threadLocalFields,
+        "Update OMThreadContext when adding request-scoped ThreadLocal fields to OzoneManager");
+  }
+
+  // --- startTransaction tests ---
+
+  @Test
+  public void testStartTransactionHappyPath() throws Exception {
+    RaftGroupId groupId = initializeStateMachine();
+    OMRequest omRequest = sampleWriteRequest();
+    RaftClientRequest clientRequest = buildClientRequest(groupId, omRequest);
+
+    TransactionContext trx = sm.startTransaction(clientRequest);
+
+    assertNotNull(trx);
+    assertNotNull(trx.getStateMachineContext());
+    assertInstanceOf(OMRequest.class, trx.getStateMachineContext());
+    assertNotNull(trx.getStateMachineLogEntry().getLogData());
+    assertNull(trx.getException());
+    verify(handler).validateRequest(any(OMRequest.class));
+  }
+
+  @Test
+  public void testStartTransactionValidationFailure() throws Exception {
+    RaftGroupId groupId = initializeStateMachine();
+    OMRequest omRequest = sampleWriteRequest();
+    RaftClientRequest clientRequest = buildClientRequest(groupId, omRequest);
+
+    OMException validationError = new OMException("request validation failed",
+        OMException.ResultCodes.INVALID_REQUEST);
+    doThrow(validationError).when(handler).validateRequest(any(OMRequest.class));
+
+    TransactionContext trx = sm.startTransaction(clientRequest);
+
+    assertNotNull(trx);
+    assertNotNull(trx.getException());
+    assertEquals(validationError, trx.getException());
+  }
+
+  @Test
+  public void testStartTransactionGroupIdMismatchThrows() throws Exception {
+    initializeStateMachine();
+    RaftGroupId wrongGroupId = RaftGroupId.randomId();
+    OMRequest omRequest = sampleWriteRequest();
+    RaftClientRequest clientRequest = buildClientRequest(wrongGroupId, omRequest);
+
+    assertThrows(IllegalArgumentException.class,
+        () -> sm.startTransaction(clientRequest));
+  }
+
+  // --- applyTransaction tests ---
+
+  @Test
+  public void testApplyTransactionHappyPath() throws Exception {
+    OMRequest request = sampleWriteRequest();
+    TransactionContext trx = mockTrx(request, 1, 5);
+
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
         .build();
-    TransactionContext submittedTrx = mockTransactionContext(createVolRequest);
-    Mockito.doAnswer((i) -> {
-      if (!((AuditMessage) i.getArgument(0)).getFormattedMessage().contains("Transaction=10") ||
-          !((AuditMessage) i.getArgument(0)).getFormattedMessage().contains("Command=CreateVolume")) {
-        Assertions.fail("transaction and command not found");
+
+    OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+    when(clientResponse.getOmLockDetails()).thenReturn(null);
+
+    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer)))
+        .thenReturn(clientResponse);
+
+    CompletableFuture<Message> future = sm.applyTransaction(trx);
+    Message result = future.get();
+
+    assertNotNull(result);
+    verify(doubleBuffer).acquireUnFlushedTransactions(1);
+  }
+
+  @Test
+  public void testApplyTransactionFollowerPath() throws Exception {
+    OMRequest request = sampleWriteRequest();
+    // Null context simulates follower: request deserialized from log data
+    TransactionContext trx = mockTrx(request, 1, 5, null);
+
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+
+    OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+    when(clientResponse.getOmLockDetails()).thenReturn(null);
+
+    when(handler.handleWriteRequest(any(OMRequest.class), any(), eq(doubleBuffer)))
+        .thenReturn(clientResponse);
+
+    CompletableFuture<Message> future = sm.applyTransaction(trx);
+    Message result = future.get();
+
+    assertNotNull(result);
+  }
+
+  @Test
+  public void testApplyTransactionBackpressureInterrupt() throws Exception {
+    OMRequest request = sampleWriteRequest();
+    TransactionContext trx = mockTrx(request, 1, 5);
+
+    doThrow(new InterruptedException("backpressure"))
+        .when(doubleBuffer).acquireUnFlushedTransactions(1);
+
+    CompletableFuture<Message> future = sm.applyTransaction(trx);
+
+    ExecutionException ex = assertThrows(ExecutionException.class, future::get);
+    assertInstanceOf(InterruptedException.class, ex.getCause());
+  }
+
+  @Test
+  public void testPauseRejectsApplyUntilUnpause() throws Exception {
+    OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
+        om, doubleBuffer, handler, executor, null) {
+      @Override
+      public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+        return doubleBuffer;
       }
-      // throw another exception to change to new exception to avoid terminate call
-      throw new OMException("test", OMException.ResultCodes.VOLUME_IS_REFERENCED);
-    }).when(auditLogger).logWrite(any());
-    CompletableFuture<Message> messageCompletableFuture = ozoneManagerStateMachine.applyTransaction(submittedTrx);
+    };
     try {
-      messageCompletableFuture.get();
-    } catch (Exception ex) {
-      // do nothing
+      OMRequest request = sampleWriteRequest();
+      TransactionContext trx = mockTrx(request, 1, 5);
+
+      OMResponse expectedResponse = OMResponse.newBuilder()
+          .setCmdType(Type.CreateKey)
+          .setStatus(Status.OK)
+          .setSuccess(true)
+          .build();
+      OMClientResponse clientResponse = mock(OMClientResponse.class);
+      when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+      when(clientResponse.getOmLockDetails()).thenReturn(null);
+
+      CountDownLatch handlerInvoked = new CountDownLatch(1);
+      doAnswer(invocation -> {
+        handlerInvoked.countDown();
+        return clientResponse;
+      }).when(handler).handleWriteRequest(eq(request), any(), eq(doubleBuffer));
+
+      testSm.pause();
+      CompletableFuture<Message> pausedFuture = testSm.applyTransaction(trx);
+      ExecutionException ex = assertThrows(ExecutionException.class, pausedFuture::get);
+      assertInstanceOf(IOException.class, ex.getCause());
+      assertFalse(handlerInvoked.await(200, TimeUnit.MILLISECONDS),
+          "apply should be rejected while state machine is paused");
+
+      testSm.unpause(5, 1);
+
+      CompletableFuture<Message> future = testSm.applyTransaction(trx);
+      assertTrue(handlerInvoked.await(2, TimeUnit.SECONDS),
+          "apply should continue after state machine unpause");
+      assertNotNull(future.get(2, TimeUnit.SECONDS));
+    } finally {
+      testSm.stop();
     }
   }
 
-  private TransactionContext mockTransactionContext(OMRequest request) {
-    RaftProtos.StateMachineLogEntryProto logEntry =
+  @Test
+  public void testApplyTransactionExecutorRejectDoesNotBlockPause() throws Exception {
+    ExecutorService rejectedExecutor = Executors.newSingleThreadExecutor();
+    rejectedExecutor.shutdownNow();
+    OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
+        om, doubleBuffer, handler, rejectedExecutor, null);
+    try {
+      OMRequest request = sampleWriteRequest();
+      TransactionContext trx = mockTrx(request, 1, 5);
+
+      CompletableFuture<Message> future = testSm.applyTransaction(trx);
+      ExecutionException ex = assertThrows(ExecutionException.class, future::get);
+      assertInstanceOf(RejectedExecutionException.class, ex.getCause());
+      verify(doubleBuffer).releaseUnFlushedTransactions(1);
+
+      ExecutorService pauseExecutor = Executors.newSingleThreadExecutor();
+      try {
+        Future<?> pauseFuture = pauseExecutor.submit(testSm::pause);
+        pauseFuture.get(2, TimeUnit.SECONDS);
+      } finally {
+        pauseExecutor.shutdownNow();
+      }
+    } finally {
+      testSm.stop();
+    }
+  }
+
+  @Test
+  public void testUnpauseKeepingOldDbFailsWhenApplyAboveItWasRejected() throws Exception {
+    OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
+        om, doubleBuffer, handler, executor, null) {
+      @Override
+      public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+        return doubleBuffer;
+      }
+    };
+    try {
+      OMRequest request = sampleWriteRequest();
+      // A rejected entry at or below the restored index is in the kept DB, so applies resume.
+      testSm.pause();
+      assertRejectedWhilePaused(testSm.applyTransaction(mockTrx(request, 1, 5)));
+      testSm.unpause(5, 1, true);
+
+      // Ratis never retries an entry above the restored index, so applies must stay rejected.
+      testSm.pause();
+      assertRejectedWhilePaused(testSm.applyTransaction(mockTrx(request, 1, 7)));
+      assertThatThrownBy(() -> testSm.unpause(6, 1, true))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("up to index 7");
+      assertRejectedWhilePaused(testSm.applyTransaction(mockTrx(request, 1, 8)));
+    } finally {
+      testSm.stop();
+    }
+  }
+
+  private static void assertRejectedWhilePaused(CompletableFuture<Message> future) {
+    ExecutionException ex = assertThrows(ExecutionException.class, future::get);
+    assertThat(ex.getCause()).isInstanceOf(IOException.class).hasMessageContaining("while state machine is paused");
+  }
+
+  @Test
+  public void testUnpauseChecksAppliesRejectedWhileRebuildingDoubleBuffer() {
+    OzoneManagerStateMachine testSm = new OzoneManagerStateMachine(
+        om, doubleBuffer, handler, executor, null) {
+      @Override
+      public OzoneManagerDoubleBuffer buildDoubleBufferForRatis() {
+        assertRejectedWhilePaused(applyTransaction(mockTrx(sampleWriteRequest(), 1, 7)));
+        return doubleBuffer;
+      }
+    };
+    try {
+      testSm.pause();
+      assertThatThrownBy(() -> testSm.unpause(6, 1, true))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("up to index 7");
+      assertRejectedWhilePaused(testSm.applyTransaction(mockTrx(sampleWriteRequest(), 1, 8)));
+    } finally {
+      testSm.stop();
+    }
+  }
+
+  // --- runCommand tests ---
+
+  @Test
+  public void testRunCommandHappyPath() throws Exception {
+    OMRequest request = sampleWriteRequest();
+    TermIndex ti = TermIndex.valueOf(1, 5);
+
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+
+    OMLockDetails lockDetails = mock(OMLockDetails.class);
+    when(lockDetails.toProtobufBuilder()).thenReturn(
+        OzoneManagerProtocolProtos.OMLockDetailsProto.newBuilder()
+            .setIsLockAcquired(true)
+            .setWaitLockNanos(100)
+            .setReadLockNanos(50)
+            .setWriteLockNanos(200));
+
+    OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+    when(clientResponse.getOmLockDetails()).thenReturn(lockDetails);
+
+    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer)))
+        .thenReturn(clientResponse);
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertNotNull(result);
+    assertTrue(result.getSuccess());
+    assertEquals(Status.OK, result.getStatus());
+    assertTrue(result.hasOmLockDetails());
+  }
+
+  @Test
+  public void testRunCommandNullLockDetails() throws Exception {
+    OMRequest request = sampleWriteRequest();
+    TermIndex ti = TermIndex.valueOf(1, 5);
+
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+
+    OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+    when(clientResponse.getOmLockDetails()).thenReturn(null);
+
+    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer)))
+        .thenReturn(clientResponse);
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertNotNull(result);
+    assertEquals(Status.OK, result.getStatus());
+    assertFalse(result.hasOmLockDetails());
+  }
+
+  @Test
+  public void testRunCommandIOException() throws Exception {
+    OMRequest request = sampleWriteRequest();
+    TermIndex ti = TermIndex.valueOf(1, 5);
+
+    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer)))
+        .thenThrow(new IOException("disk full"));
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertNotNull(result);
+    assertFalse(result.getSuccess());
+    verify(doubleBuffer).add(any(), eq(ti));
+  }
+
+  @Test
+  public void testRunCommandRuntimeExceptionTerminates() throws Exception {
+    OMRequest request = sampleWriteRequest();
+    TermIndex ti = TermIndex.valueOf(1, 5);
+
+    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer)))
+        .thenThrow(new NullPointerException("boom"));
+
+    // With ExitUtils.disableSystemExit(), terminate throws ExitException
+    // instead of calling System.exit(). The catch block in runCommand
+    // calls ExitUtils.terminate which throws ExitException.
+    assertThrows(ExitUtils.ExitException.class,
+        () -> sm.runCommand(request, ti));
+  }
+
+  @Test
+  public void testRunCommandSetsAndClearsStsThreadLocal() throws Exception {
+    when(om.isSecurityEnabled()).thenReturn(true);
+
+    final OMRequest request = sampleWriteRequest().toBuilder()
+        .setS3Authentication(stsS3Authentication())
+        .build();
+    final TermIndex ti = TermIndex.valueOf(1, 5);
+
+    final OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+
+    final OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+    when(clientResponse.getOmLockDetails()).thenReturn(null);
+
+    doAnswer(invocation -> {
+      assertNotNull(OzoneManager.getStsTokenIdentifier(),
+          "Expected STS ThreadLocal to be set during handler.handleWriteRequest");
+      assertEquals("tempAccessKeyId", OzoneManager.getStsTokenIdentifier().getTempAccessKeyId());
+      assertEquals("originalAccessKeyId", OzoneManager.getStsTokenIdentifier().getOriginalAccessKeyId());
+      assertEquals("roleArn", OzoneManager.getStsTokenIdentifier().getRoleArn());
+      assertEquals("sessionPolicy", OzoneManager.getStsTokenIdentifier().getSessionPolicy());
+      assertEquals("assumedRoleId", OzoneManager.getStsTokenIdentifier().getAssumedRoleId());
+      assertEquals("assumedRoleUserArn", OzoneManager.getStsTokenIdentifier().getAssumedRoleUserArn());
+      return clientResponse;
+    }).when(handler).handleWriteRequest(eq(request), any(), eq(doubleBuffer));
+
+    assertNull(OzoneManager.getStsTokenIdentifier(), "Expected STS ThreadLocal to be clear before runCommand");
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertNotNull(result);
+    assertTrue(result.getSuccess());
+    assertNull(OzoneManager.getStsTokenIdentifier(), "Expected STS ThreadLocal to be cleared after runCommand");
+  }
+
+  @Test
+  public void testRunCommandRestoresPreviousRequestContext() throws Exception {
+    OMRequest request = sampleWriteRequest();
+    TermIndex ti = TermIndex.valueOf(1, 5);
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+    OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+    when(clientResponse.getOmLockDetails()).thenReturn(null);
+    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer))).thenAnswer(invocation -> {
+      assertNull(Server.getCurCall().get());
+      assertNull(OzoneManager.getS3Auth());
+      assertNull(OzoneManager.getStsTokenIdentifier());
+      return clientResponse;
+    });
+
+    Server.Call previousCall = createCall("previous-user", "previous.example.com", new byte[] {10, 0, 0, 1});
+    S3Authentication previousS3Auth = S3Authentication.newBuilder().setAccessId("previous-access-id").build();
+    STSTokenIdentifier previousStsToken = mock(STSTokenIdentifier.class);
+    Server.getCurCall().set(previousCall);
+    OzoneManager.setS3Auth(previousS3Auth);
+    OzoneManager.setStsTokenIdentifier(previousStsToken);
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertTrue(result.getSuccess());
+    assertSame(previousCall, Server.getCurCall().get());
+    assertSame(previousS3Auth, OzoneManager.getS3Auth());
+    assertSame(previousStsToken, OzoneManager.getStsTokenIdentifier());
+  }
+
+  @Test
+  public void testRunCommandSetsStsThreadLocalWithLegacyResolvedFields() throws Exception {
+    when(om.isSecurityEnabled()).thenReturn(true);
+
+    final OMRequest request = sampleWriteRequest().toBuilder()
+        .setS3Authentication(legacyStsS3Authentication())
+        .build();
+    final TermIndex ti = TermIndex.valueOf(1, 5);
+
+    final OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+
+    final OMClientResponse clientResponse = mock(OMClientResponse.class);
+    when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
+    when(clientResponse.getOmLockDetails()).thenReturn(null);
+
+    doAnswer(invocation -> {
+      assertNotNull(OzoneManager.getStsTokenIdentifier(),
+          "Expected STS ThreadLocal to be set during handler.handleWriteRequest");
+      assertEquals("tempAccessKeyId", OzoneManager.getStsTokenIdentifier().getTempAccessKeyId());
+      assertEquals("originalAccessKeyId", OzoneManager.getStsTokenIdentifier().getOriginalAccessKeyId());
+      assertEquals("roleArn", OzoneManager.getStsTokenIdentifier().getRoleArn());
+      assertEquals("sessionPolicy", OzoneManager.getStsTokenIdentifier().getSessionPolicy());
+      assertEquals("", OzoneManager.getStsTokenIdentifier().getAssumedRoleId());
+      assertEquals("", OzoneManager.getStsTokenIdentifier().getAssumedRoleUserArn());
+      return clientResponse;
+    }).when(handler).handleWriteRequest(eq(request), any(), eq(doubleBuffer));
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertNotNull(result);
+    assertTrue(result.getSuccess());
+    assertNull(OzoneManager.getStsTokenIdentifier(), "Expected STS ThreadLocal to be cleared after runCommand");
+  }
+
+  @Test
+  public void testRunCommandMissingResolvedStsFieldsReturnsErrorResponse() throws Exception {
+    when(om.isSecurityEnabled()).thenReturn(true);
+
+    final OzoneManagerProtocolProtos.S3Authentication s3Auth =
+        OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+            .setAccessId("accessId")
+            .setSessionToken("sessionToken")
+            .build();
+
+    final OMRequest request = sampleWriteRequest().toBuilder()
+        .setS3Authentication(s3Auth)
+        .build();
+    final TermIndex ti = TermIndex.valueOf(1, 5);
+
+    OMResponse result = sm.runCommand(request, ti);
+
+    assertNotNull(result);
+    assertFalse(result.getSuccess());
+    assertEquals(Status.INVALID_TOKEN, result.getStatus());
+    assertNull(OzoneManager.getStsTokenIdentifier(), "Expected STS ThreadLocal to be cleared after runCommand");
+    verify(handler, never()).handleWriteRequest(any(), any(), any());
+  }
+
+  // --- processResponse tests ---
+
+  @Test
+  public void testProcessResponseSuccess() {
+    OMResponse response = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+
+    Message result = sm.processResponse(response);
+    assertNotNull(result);
+  }
+
+  @Test
+  public void testProcessResponseNonCriticalError() {
+    OMResponse response = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.KEY_NOT_FOUND)
+        .setSuccess(false)
+        .setMessage("key not found")
+        .build();
+
+    Message result = sm.processResponse(response);
+    assertNotNull(result);
+  }
+
+  @Test
+  public void testProcessResponseInternalErrorTerminates() {
+    OMResponse response = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.INTERNAL_ERROR)
+        .setSuccess(false)
+        .setMessage("internal error")
+        .build();
+
+    // terminate throws ExitException when system exit is disabled
+    assertThrows(ExitUtils.ExitException.class,
+        () -> sm.processResponse(response));
+  }
+
+  @Test
+  public void testProcessResponseMetadataErrorTerminates() {
+    OMResponse response = OMResponse.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setStatus(Status.METADATA_ERROR)
+        .setSuccess(false)
+        .setMessage("metadata error")
+        .build();
+
+    assertThrows(ExitUtils.ExitException.class,
+        () -> sm.processResponse(response));
+  }
+
+  // --- createErrorResponse tests ---
+
+  @Test
+  public void testCreateErrorResponse() {
+    OMRequest request = sampleWriteRequest();
+    IOException ex = new IOException("test error");
+    TermIndex ti = TermIndex.valueOf(1, 5);
+
+    OMResponse response = sm.createErrorResponse(request, ex, ti);
+
+    assertNotNull(response);
+    assertFalse(response.getSuccess());
+    assertEquals(Type.CreateKey, response.getCmdType());
+    assertEquals("test error", response.getMessage());
+    verify(doubleBuffer).add(any(), eq(ti));
+  }
+
+  @Test
+  public void testCreateErrorResponseNullMessage() {
+    OMRequest request = sampleWriteRequest();
+    IOException ex = new IOException((String) null);
+    TermIndex ti = TermIndex.valueOf(1, 5);
+
+    OMResponse response = sm.createErrorResponse(request, ex, ti);
+
+    assertNotNull(response);
+    assertFalse(response.getSuccess());
+    assertFalse(response.hasMessage());
+  }
+
+  // --- query tests ---
+
+  @Test
+  public void testQueryHappyPath() throws Exception {
+    OMRequest request = sampleReadRequest();
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.ServiceList)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+
+    when(handler.handleReadRequest(any(OMRequest.class)))
+        .thenReturn(expectedResponse);
+
+    Message queryMessage = Message.valueOf(
+        OMRatisHelper.convertRequestToByteString(request));
+    CompletableFuture<Message> future = sm.query(queryMessage);
+    Message result = future.get();
+
+    assertNotNull(result);
+    verify(handler).handleReadRequest(any(OMRequest.class));
+  }
+
+  @Test
+  public void testQueryIOException() {
+    // Garbage bytes that can't be parsed as OMRequest
+    Message badMessage = Message.valueOf("not-a-valid-protobuf");
+
+    CompletableFuture<Message> future = sm.query(badMessage);
+
+    ExecutionException ex = assertThrows(ExecutionException.class, future::get);
+    assertInstanceOf(IOException.class, ex.getCause());
+  }
+
+  @Test
+  public void testQueryInstallsAndRestoresCallerContext() throws Exception {
+    UserInfo userInfo = UserInfo.newBuilder()
+        .setUserName("ratis-user")
+        .setHostName("client.example.com")
+        .setRemoteAddress("10.20.30.40")
+        .build();
+    OMRequest request = sampleReadRequest().toBuilder()
+        .setUserInfo(userInfo)
+        .build();
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.ServiceList)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+    AtomicReference<UserGroupInformation> observedUser = new AtomicReference<>();
+    AtomicReference<InetAddress> observedAddress = new AtomicReference<>();
+    when(handler.handleReadRequest(any(OMRequest.class))).thenAnswer(invocation -> {
+      observedUser.set(Server.getRemoteUser());
+      observedAddress.set(Server.getRemoteIp());
+      return expectedResponse;
+    });
+
+    Server.Call previousCall = createCall("previous-user", "previous.example.com", new byte[] {10, 0, 0, 1});
+    Server.getCurCall().set(previousCall);
+
+    sm.query(Message.valueOf(OMRatisHelper.convertRequestToByteString(request))).get();
+
+    assertSame(previousCall, Server.getCurCall().get());
+    assertEquals("ratis-user", observedUser.get().getUserName());
+    assertEquals(SIMPLE, observedUser.get().getAuthenticationMethod());
+    assertNull(observedUser.get().getRealUser());
+    assertTrue(observedUser.get().getTokens().isEmpty());
+    assertNull(observedUser.get().getCredentials().getSecretKey(new Text("credential-key")));
+    assertEquals("10.20.30.40", observedAddress.get().getHostAddress());
+    assertEquals("client.example.com", observedAddress.get().getHostName());
+  }
+
+  @Test
+  public void testQueryReturnsResourceLockDetails() throws Exception {
+    OMRequest request = sampleReadRequest().toBuilder()
+        .setUserInfo(UserInfo.newBuilder().setUserName("ratis-user"))
+        .build();
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.ServiceList)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+    OzoneManagerLock lock = new OzoneManagerLock(new OzoneConfiguration());
+    when(handler.handleReadRequest(any(OMRequest.class))).thenAnswer(invocation -> {
+      lock.acquireReadLock(VOLUME_LOCK, "volume");
+      try {
+        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(1));
+        return expectedResponse;
+      } finally {
+        lock.releaseReadLock(VOLUME_LOCK, "volume");
+      }
+    });
+
+    OMResponse response;
+    try {
+      Message message = sm.query(Message.valueOf(
+          OMRatisHelper.convertRequestToByteString(request))).get();
+      response = OMRatisHelper.convertByteStringToOMResponse(message.getContent());
+    } finally {
+      lock.cleanup();
+    }
+
+    assertTrue(response.hasOmLockDetails());
+    assertTrue(response.getOmLockDetails().getWaitLockNanos() > 0);
+    assertTrue(response.getOmLockDetails().getReadLockNanos() > 0);
+    assertEquals(0, response.getOmLockDetails().getWriteLockNanos());
+  }
+
+  @Test
+  public void testQueryInstallsAndRestoresS3Context() throws Exception {
+    when(om.isSecurityEnabled()).thenReturn(true);
+    S3Authentication requestS3Auth = S3Authentication.newBuilder()
+        .setAccessId("temp-access-id")
+        .setSessionToken("session-token")
+        .setS3Action("GetObject")
+        .setResolvedStsSessionPolicy("session-policy")
+        .setResolvedStsRoleArn("role-arn")
+        .setResolvedStsOriginalAccessKeyId("original-access-id")
+        .setResolvedStsTempAccessKeyId("temp-access-id")
+        .setResolvedStsSecretKeyId(UUID.randomUUID().toString())
+        .build();
+    OMRequest request = sampleReadRequest().toBuilder()
+        .setS3Authentication(requestS3Auth)
+        .build();
+    OMResponse expectedResponse = OMResponse.newBuilder()
+        .setCmdType(Type.ServiceList)
+        .setStatus(Status.OK)
+        .setSuccess(true)
+        .build();
+    AtomicReference<S3Authentication> observedS3Auth = new AtomicReference<>();
+    AtomicReference<STSTokenIdentifier> observedStsToken = new AtomicReference<>();
+    when(handler.handleReadRequest(any(OMRequest.class))).thenAnswer(invocation -> {
+      observedS3Auth.set(OzoneManager.getS3Auth());
+      observedStsToken.set(OzoneManager.getStsTokenIdentifier());
+      return expectedResponse;
+    });
+
+    S3Authentication previousS3Auth = S3Authentication.newBuilder().setAccessId("previous-access-id").build();
+    STSTokenIdentifier previousStsToken = mock(STSTokenIdentifier.class);
+    OzoneManager.setS3Auth(previousS3Auth);
+    OzoneManager.setStsTokenIdentifier(previousStsToken);
+
+    sm.query(Message.valueOf(OMRatisHelper.convertRequestToByteString(request))).get();
+
+    assertSame(previousS3Auth, OzoneManager.getS3Auth());
+    assertSame(previousStsToken, OzoneManager.getStsTokenIdentifier());
+    assertEquals(requestS3Auth, observedS3Auth.get());
+    assertEquals("session-policy", observedStsToken.get().getSessionPolicy());
+    assertEquals("role-arn", observedStsToken.get().getRoleArn());
+    assertEquals("original-access-id", observedStsToken.get().getOriginalAccessKeyId());
+    assertEquals("temp-access-id", observedStsToken.get().getTempAccessKeyId());
+  }
+
+  @Test
+  public void testQueryRestoresContextAfterFailure() throws Exception {
+    when(om.isSecurityEnabled()).thenReturn(true);
+    S3Authentication requestS3Auth = S3Authentication.newBuilder()
+        .setAccessId("request-access-id")
+        .build();
+    OMRequest request = sampleReadRequest().toBuilder()
+        .setUserInfo(UserInfo.newBuilder().setUserName("request-user"))
+        .setS3Authentication(requestS3Auth)
+        .build();
+    when(handler.handleReadRequest(any(OMRequest.class)))
+        .thenThrow(new IllegalStateException("read failed"));
+
+    Server.Call previousCall = createCall("previous-user", "previous.example.com", new byte[] {10, 0, 0, 1});
+    S3Authentication previousS3Auth = S3Authentication.newBuilder().setAccessId("previous-access-id").build();
+    STSTokenIdentifier previousStsToken = mock(STSTokenIdentifier.class);
+    Server.getCurCall().set(previousCall);
+    OzoneManager.setS3Auth(previousS3Auth);
+    OzoneManager.setStsTokenIdentifier(previousStsToken);
+
+    assertThrows(IllegalStateException.class,
+        () -> sm.query(Message.valueOf(OMRatisHelper.convertRequestToByteString(request))));
+
+    assertSame(previousCall, Server.getCurCall().get());
+    assertSame(previousS3Auth, OzoneManager.getS3Auth());
+    assertSame(previousStsToken, OzoneManager.getStsTokenIdentifier());
+  }
+
+  // --- notifyTermIndexUpdated tests ---
+
+  @Test
+  public void testNotifyTermIndexSameIndexOk() {
+    sm.notifyTermIndexUpdated(1, 5);
+    // Same index should not throw
+    sm.notifyTermIndexUpdated(1, 5);
+
+    assertTermIndex(1, 5, sm.getLastNotifiedTermIndex());
+  }
+
+  @Test
+  public void testNotifyTermIndexDecreasingThrows() {
+    sm.notifyTermIndexUpdated(1, 5);
+
+    assertThrows(IllegalArgumentException.class,
+        () -> sm.notifyTermIndexUpdated(1, 4));
+  }
+
+  // --- updateLastAppliedTermIndex tests ---
+
+  @Test
+  public void testUpdateLastAppliedInSkipRange() {
+    sm.notifyTermIndexUpdated(0, 0);
+    // Skip index 1 (from applyTransaction), notify 2 and 3
+    sm.notifyTermIndexUpdated(0, 2);
+    sm.notifyTermIndexUpdated(0, 3);
+
+    assertTermIndex(0, 0, sm.getLastAppliedTermIndex());
+
+    // Update with index 1 which is in skip range [1, 3]
+    sm.updateLastAppliedTermIndex(TermIndex.valueOf(0, 1));
+
+    // Should jump to lastNotified (3)
+    assertTermIndex(0, 3, sm.getLastAppliedTermIndex());
+  }
+
+  @Test
+  public void testUpdateLastAppliedBelowSkipRange() {
+    sm.notifyTermIndexUpdated(0, 0);
+    // Notify consecutive: no skip
+    sm.notifyTermIndexUpdated(0, 1);
+
+    assertTermIndex(0, 1, sm.getLastAppliedTermIndex());
+
+    // Direct update
+    sm.updateLastAppliedTermIndex(TermIndex.valueOf(0, 2));
+    assertTermIndex(0, 2, sm.getLastAppliedTermIndex());
+  }
+
+  @Test
+  public void testLastAppliedIndexSequence() {
+    sm.notifyTermIndexUpdated(0, 0);
+    assertTermIndex(0, 0, sm.getLastAppliedTermIndex());
+    assertTermIndex(0, 0, sm.getLastNotifiedTermIndex());
+
+    // Consecutive notification advances both
+    sm.notifyTermIndexUpdated(0, 1);
+    assertTermIndex(0, 1, sm.getLastAppliedTermIndex());
+    assertTermIndex(0, 1, sm.getLastNotifiedTermIndex());
+
+    // Direct updates advance lastApplied but NOT lastNotified
+    sm.updateLastAppliedTermIndex(TermIndex.valueOf(0, 2));
+    sm.updateLastAppliedTermIndex(TermIndex.valueOf(0, 3));
+    assertTermIndex(0, 3, sm.getLastAppliedTermIndex());
+    assertTermIndex(0, 1, sm.getLastNotifiedTermIndex());
+
+    // Term change via notification advances both
+    sm.notifyTermIndexUpdated(1L, 4L);
+    assertTermIndex(1, 4, sm.getLastAppliedTermIndex());
+    assertTermIndex(1, 4, sm.getLastNotifiedTermIndex());
+
+    // More direct updates
+    sm.updateLastAppliedTermIndex(TermIndex.valueOf(1L, 5L));
+    sm.updateLastAppliedTermIndex(TermIndex.valueOf(1L, 6L));
+    assertTermIndex(1, 6, sm.getLastAppliedTermIndex());
+    assertTermIndex(1, 4, sm.getLastNotifiedTermIndex());
+  }
+
+  // --- takeSnapshot tests ---
+
+  @Test
+  public void testTakeSnapshotAlreadyCaughtUp() throws Exception {
+    // Notify incrementally so lastApplied advances via the
+    // "notified - applied == 1" fast path in notifyTermIndexUpdated.
+    // A single jump from -1 to 1 would set lastSkipped=0 without
+    // updating lastApplied, causing takeSnapshot to loop forever.
+    sm.notifyTermIndexUpdated(1, 0);
+    sm.notifyTermIndexUpdated(1, 1);
+    // lastApplied=1, lastSkipped=-1 → already caught up
+    assertTermIndex(1, 1, sm.getLastAppliedTermIndex());
+
+    OMMetadataManager metaMgr = mock(OMMetadataManager.class);
+    DBStore store = mock(DBStore.class);
+    when(om.getMetadataManager()).thenReturn(metaMgr);
+    when(metaMgr.getStore()).thenReturn(store);
+    stubPersistIfNewerAsAccepting();
+
+    long snapshotIndex = sm.takeSnapshot();
+
+    assertEquals(1, snapshotIndex);
+    verify(store).flushDB();
+    verify(om).setTransactionInfo(any(TransactionInfo.class));
+  }
+
+  /**
+   * Makes the mocked double buffer behave as if nothing newer were stored, so the candidate the
+   * state machine computes is the one that gets persisted and returned.
+   */
+  private void stubPersistIfNewerAsAccepting() throws IOException {
+    when(doubleBuffer.persistIfNewer(any(TransactionInfo.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+  }
+
+  /**
+   * The double buffer commits the transaction data and TRANSACTION_INFO_KEY in one batch and
+   * only advances the state machine's applied index afterwards, so a snapshot taken in that
+   * gap computes its index from a value that lags what is already durable. Writing it must not
+   * move the stored index backwards: the DB would then hold data its own watermark disclaims,
+   * and a restart would replay transactions the DB already contains. See HDDS-16092.
+   */
+  @Test
+  public void testTakeSnapshotDoesNotLowerPersistedTransactionInfo(@TempDir Path tmpDir)
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, tmpDir.toAbsolutePath().toString());
+    OzoneManager realishOm = mock(OzoneManager.class);
+    when(realishOm.getConfiguration()).thenReturn(conf);
+    when(realishOm.getConfig()).thenReturn(conf.getObject(OmConfig.class));
+    OMMetadataManager realMetaMgr = new OmMetadataManagerImpl(conf, realishOm);
+    try {
+      when(realishOm.getMetadataManager()).thenReturn(realMetaMgr);
+      // Not started: the flush daemon plays no part here, only the persist path does.
+      OzoneManagerDoubleBuffer realBuffer = OzoneManagerDoubleBuffer.newBuilder()
+          .setOmMetadataManager(realMetaMgr)
+          .setMaxUnFlushedTransactionCount(1)
+          .build();
+
+      // A batch committed transactions up to index 105 and is blocked before advancing the
+      // state machine's applied index, which still reads 100.
+      TransactionInfo flushed = TransactionInfo.valueOf(TermIndex.valueOf(1, 105));
+      realMetaMgr.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, flushed);
+
+      OzoneManagerStateMachine testSm =
+          new OzoneManagerStateMachine(realishOm, realBuffer, handler, executor, null);
+      testSm.updateLastAppliedTermIndex(TermIndex.valueOf(1, 100));
+
+      long snapshotIndex = testSm.takeSnapshot();
+
+      assertEquals(flushed,
+          realMetaMgr.getTransactionInfoTable().get(OzoneConsts.TRANSACTION_INFO_KEY),
+          "takeSnapshot must not lower the persisted transaction info");
+
+      // The in-memory copy is what getLatestSnapshot() reports to Ratis, so it must not
+      // disagree with the DB either.
+      ArgumentCaptor<TransactionInfo> published =
+          ArgumentCaptor.forClass(TransactionInfo.class);
+      verify(realishOm).setTransactionInfo(published.capture());
+      assertEquals(flushed, published.getValue());
+      assertEquals(105, snapshotIndex);
+    } finally {
+      realMetaMgr.stop();
+    }
+  }
+
+  /**
+   * The guard added for HDDS-16092 must not stop a snapshot from advancing the stored index
+   * when its own value is the newer one -- that is the whole point of the write.
+   */
+  @Test
+  public void testTakeSnapshotAdvancesPersistedTransactionInfo(@TempDir Path tmpDir)
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, tmpDir.toAbsolutePath().toString());
+    OzoneManager realishOm = mock(OzoneManager.class);
+    when(realishOm.getConfiguration()).thenReturn(conf);
+    when(realishOm.getConfig()).thenReturn(conf.getObject(OmConfig.class));
+    OMMetadataManager realMetaMgr = new OmMetadataManagerImpl(conf, realishOm);
+    try {
+      when(realishOm.getMetadataManager()).thenReturn(realMetaMgr);
+      // Not started: the flush daemon plays no part here, only the persist path does.
+      OzoneManagerDoubleBuffer realBuffer = OzoneManagerDoubleBuffer.newBuilder()
+          .setOmMetadataManager(realMetaMgr)
+          .setMaxUnFlushedTransactionCount(1)
+          .build();
+
+      realMetaMgr.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY,
+          TransactionInfo.valueOf(TermIndex.valueOf(1, 50)));
+
+      OzoneManagerStateMachine testSm =
+          new OzoneManagerStateMachine(realishOm, realBuffer, handler, executor, null);
+      testSm.updateLastAppliedTermIndex(TermIndex.valueOf(1, 100));
+
+      long snapshotIndex = testSm.takeSnapshot();
+
+      assertEquals(TransactionInfo.valueOf(TermIndex.valueOf(1, 100)),
+          realMetaMgr.getTransactionInfoTable().get(OzoneConsts.TRANSACTION_INFO_KEY));
+      assertEquals(100, snapshotIndex);
+    } finally {
+      realMetaMgr.stop();
+    }
+  }
+
+  /**
+   * With nothing stored yet the snapshot's value is the only candidate and must be written.
+   */
+  @Test
+  public void testTakeSnapshotWritesWhenNothingPersisted(@TempDir Path tmpDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, tmpDir.toAbsolutePath().toString());
+    OzoneManager realishOm = mock(OzoneManager.class);
+    when(realishOm.getConfiguration()).thenReturn(conf);
+    when(realishOm.getConfig()).thenReturn(conf.getObject(OmConfig.class));
+    OMMetadataManager realMetaMgr = new OmMetadataManagerImpl(conf, realishOm);
+    try {
+      when(realishOm.getMetadataManager()).thenReturn(realMetaMgr);
+      // Not started: the flush daemon plays no part here, only the persist path does.
+      OzoneManagerDoubleBuffer realBuffer = OzoneManagerDoubleBuffer.newBuilder()
+          .setOmMetadataManager(realMetaMgr)
+          .setMaxUnFlushedTransactionCount(1)
+          .build();
+
+      OzoneManagerStateMachine testSm =
+          new OzoneManagerStateMachine(realishOm, realBuffer, handler, executor, null);
+      testSm.updateLastAppliedTermIndex(TermIndex.valueOf(2, 7));
+
+      long snapshotIndex = testSm.takeSnapshot();
+
+      assertEquals(TransactionInfo.valueOf(TermIndex.valueOf(2, 7)),
+          realMetaMgr.getTransactionInfoTable().get(OzoneConsts.TRANSACTION_INFO_KEY));
+      assertEquals(7, snapshotIndex);
+    } finally {
+      realMetaMgr.stop();
+    }
+  }
+
+  @Test
+  public void testTakeSnapshotWaitsForFlush() throws Exception {
+    // Create a skip gap: notify 0, then skip to 3
+    sm.notifyTermIndexUpdated(1, 0);
+    sm.notifyTermIndexUpdated(1, 2);
+    sm.notifyTermIndexUpdated(1, 3);
+    // lastApplied=0, lastSkipped=1, so takeSnapshot will loop
+
+    when(om.isStopped()).thenReturn(false);
+    // On first awaitFlush, simulate the double buffer catching up
+    doAnswer(invocation -> {
+      // Simulate applyTransaction completing index 1
+      sm.updateLastAppliedTermIndex(TermIndex.valueOf(1, 1));
+      // This should jump to lastNotified=3 due to skip range
+      return null;
+    }).when(doubleBuffer).awaitFlush();
+
+    OMMetadataManager metaMgr = mock(OMMetadataManager.class);
+    DBStore store = mock(DBStore.class);
+    when(om.getMetadataManager()).thenReturn(metaMgr);
+    when(metaMgr.getStore()).thenReturn(store);
+    stubPersistIfNewerAsAccepting();
+
+    long snapshotIndex = sm.takeSnapshot();
+
+    assertEquals(3, snapshotIndex);
+    verify(doubleBuffer).awaitFlush();
+    verify(store).flushDB();
+  }
+
+  @Test
+  public void testTakeSnapshotOmStopped() {
+    when(om.isStopped()).thenReturn(true);
+
+    // Set lastSkippedIndex > lastApplied to enter the wait loop
+    sm.notifyTermIndexUpdated(0, 0);
+    sm.notifyTermIndexUpdated(0, 2);  // skips index 1
+
+    assertThrows(IOException.class, () -> sm.takeSnapshot());
+  }
+
+  @Test
+  public void testAwaitAppliedWaitsForFlush() throws Exception {
+    sm.notifyTermIndexUpdated(1, 0);
+    when(om.isStopped()).thenReturn(false);
+    doAnswer(invocation -> {
+      sm.updateLastAppliedTermIndex(TermIndex.valueOf(1, 2));
+      return null;
+    }).when(doubleBuffer).awaitFlush();
+
+    sm.awaitApplied(2);
+    assertTermIndex(1, 2, sm.getLastAppliedTermIndex());
+    verify(doubleBuffer).awaitFlush();
+
+    // Already applied: returns without waiting.
+    sm.awaitApplied(1);
+    verify(doubleBuffer).awaitFlush();
+  }
+
+  @Test
+  public void testAwaitAppliedOmStopped() {
+    when(om.isStopped()).thenReturn(true);
+    sm.notifyTermIndexUpdated(1, 0);
+
+    assertThrows(IOException.class, () -> sm.awaitApplied(1));
+  }
+
+  // --- loadSnapshotInfoFromDB tests ---
+
+  @Test
+  public void testLoadSnapshotInfoFromDBExists(@TempDir Path tmpDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, tmpDir.toAbsolutePath().toString());
+    OzoneManager realishOm = mock(OzoneManager.class);
+    when(realishOm.getConfiguration()).thenReturn(conf);
+    when(realishOm.getConfig()).thenReturn(conf.getObject(OmConfig.class));
+    OMMetadataManager realMetaMgr = new OmMetadataManagerImpl(conf, realishOm);
+    when(realishOm.getMetadataManager()).thenReturn(realMetaMgr);
+    when(realishOm.getTransactionInfo()).thenReturn(mock(TransactionInfo.class));
+
+    // Write a TransactionInfo to DB
+    TransactionInfo txnInfo = TransactionInfo.valueOf(TermIndex.valueOf(3, 42));
+    realMetaMgr.getTransactionInfoTable().put(OzoneConsts.TRANSACTION_INFO_KEY, txnInfo);
+
+    OzoneManagerStateMachine testSm =
+        new OzoneManagerStateMachine(realishOm, doubleBuffer, handler, executor, null);
+    testSm.loadSnapshotInfoFromDB();
+
+    assertTermIndex(3, 42, testSm.getLastAppliedTermIndex());
+    verify(realishOm).setTransactionInfo(any(TransactionInfo.class));
+  }
+
+  @Test
+  public void testLoadSnapshotInfoFromDBMissing(@TempDir Path tmpDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, tmpDir.toAbsolutePath().toString());
+    OzoneManager realishOm = mock(OzoneManager.class);
+    when(realishOm.getConfiguration()).thenReturn(conf);
+    when(realishOm.getConfig()).thenReturn(conf.getObject(OmConfig.class));
+    OMMetadataManager realMetaMgr = new OmMetadataManagerImpl(conf, realishOm);
+    when(realishOm.getMetadataManager()).thenReturn(realMetaMgr);
+
+    OzoneManagerStateMachine testSm =
+        new OzoneManagerStateMachine(realishOm, doubleBuffer, handler, executor, null);
+    // Should not throw when TransactionInfo is not found
+    testSm.loadSnapshotInfoFromDB();
+
+    // lastApplied should remain at default (0, -1)
+    assertTermIndex(0, -1, testSm.getLastAppliedTermIndex());
+  }
+
+  // --- notifyLeaderChanged tests ---
+
+  @Test
+  public void testNotifyLeaderChangedSameNode() {
+    RaftPeerId peerId = RaftPeerId.valueOf("om1");
+    RaftGroupId groupId = RaftGroupId.randomId();
+    RaftGroupMemberId memberId = RaftGroupMemberId.valueOf(peerId, groupId);
+
+    when(om.getConfiguration()).thenReturn(new OzoneConfiguration());
+    when(om.buildAuditMessageForSuccess(any(), any()))
+        .thenReturn(dummyAuditMessage());
+
+    sm.notifyLeaderChanged(memberId, peerId);
+
+    // Same node becomes leader → should warm up EDEK cache
+    verify(om).initializeEdekCache(any());
+    verify(om).omHAMetricsInit("om1");
+  }
+
+  @Test
+  public void testNotifyLeaderChangedDifferentNode() {
+    RaftPeerId localPeerId = RaftPeerId.valueOf("om1");
+    RaftPeerId leaderPeerId = RaftPeerId.valueOf("om2");
+    RaftGroupId groupId = RaftGroupId.randomId();
+    RaftGroupMemberId memberId = RaftGroupMemberId.valueOf(localPeerId, groupId);
+
+    when(om.buildAuditMessageForSuccess(any(), any()))
+        .thenReturn(dummyAuditMessage());
+
+    sm.notifyLeaderChanged(memberId, leaderPeerId);
+
+    // Different node is leader → should NOT warm up cache
+    verify(om, never()).initializeEdekCache(any());
+    verify(om).omHAMetricsInit("om2");
+  }
+
+  @Test
+  public void testNotifyLeaderChangedAuditParams() {
+    when(om.buildAuditMessageForSuccess(any(), any()))
+        .thenReturn(dummyAuditMessage());
+
+    RaftGroupId groupId = RaftGroupId.randomId();
+
+    // First leader change: previousLeader should be "NONE"
+    RaftPeerId leader1 = RaftPeerId.valueOf("om1");
+    sm.notifyLeaderChanged(
+        RaftGroupMemberId.valueOf(RaftPeerId.valueOf("om2"), groupId),
+        leader1);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<Map<String, String>> captor =
+        ArgumentCaptor.forClass(Map.class);
+    verify(om).buildAuditMessageForSuccess(
+        eq(OMSystemAction.LEADER_CHANGE), captor.capture());
+    Map<String, String> params = captor.getValue();
+    assertEquals("NONE", params.get("previousLeader"));
+    assertEquals("om1", params.get("newLeader"));
+
+    // Second leader change: previousLeader should be "om1"
+    RaftPeerId leader2 = RaftPeerId.valueOf("om3");
+    sm.notifyLeaderChanged(
+        RaftGroupMemberId.valueOf(RaftPeerId.valueOf("om2"), groupId),
+        leader2);
+
+    verify(om, times(2)).buildAuditMessageForSuccess(
+        eq(OMSystemAction.LEADER_CHANGE), captor.capture());
+    Map<String, String> params2 = captor.getValue();
+    assertEquals("om1", params2.get("previousLeader"));
+    assertEquals("om3", params2.get("newLeader"));
+  }
+
+  // --- notifyConfigurationChanged tests ---
+
+  @Test
+  public void testNotifyConfigurationChanged() {
+    RaftProtos.RaftPeerProto peer1 = RaftProtos.RaftPeerProto.newBuilder()
+        .setId(ByteString.copyFromUtf8("om1"))
+        .setAddress("host1:9862")
+        .build();
+    RaftProtos.RaftPeerProto peer2 = RaftProtos.RaftPeerProto.newBuilder()
+        .setId(ByteString.copyFromUtf8("om2"))
+        .setAddress("host2:9862")
+        .build();
+    RaftProtos.RaftPeerProto listener = RaftProtos.RaftPeerProto.newBuilder()
+        .setId(ByteString.copyFromUtf8("om3"))
+        .setAddress("host3:9862")
+        .build();
+    RaftProtos.RaftConfigurationProto config =
+        RaftProtos.RaftConfigurationProto.newBuilder()
+            .addPeers(peer1)
+            .addPeers(peer2)
+            .addListeners(listener)
+            .build();
+
+    sm.notifyConfigurationChanged(1, 5, config);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
+    verify(om).updatePeerList(captor.capture());
+    List<String> peerIds = captor.getValue();
+    assertEquals(3, peerIds.size());
+    assertTrue(peerIds.contains("om1"));
+    assertTrue(peerIds.contains("om2"));
+    assertTrue(peerIds.contains("om3"));
+  }
+
+  // --- notifySnapshotInstalled tests ---
+
+  @Test
+  public void testNotifySnapshotInstalledSuccess() {
+    RaftPeer localPeer = RaftPeer.newBuilder()
+        .setId("om1").setAddress("localhost:9862").build();
+
+    OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
+    RaftServer.Division division = mock(RaftServer.Division.class);
+    when(division.getPeer()).thenReturn(localPeer);
+    when(ratisServer.getServerDivision()).thenReturn(division);
+    when(om.getOmRatisServer()).thenReturn(ratisServer);
+
+    OmRatisSnapshotProvider snapshotProvider = mock(OmRatisSnapshotProvider.class);
+    when(om.getOmSnapshotProvider()).thenReturn(snapshotProvider);
+
+    sm.notifySnapshotInstalled(
+        RaftProtos.InstallSnapshotResult.SUCCESS, 100, localPeer);
+
+    verify(snapshotProvider).init();
+  }
+
+  @Test
+  public void testNotifySnapshotInstalledDifferentPeer() {
+    RaftPeer localPeer = RaftPeer.newBuilder()
+        .setId("om1").setAddress("localhost:9862").build();
+    RaftPeer remotePeer = RaftPeer.newBuilder()
+        .setId("om2").setAddress("remote:9862").build();
+
+    OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
+    RaftServer.Division division = mock(RaftServer.Division.class);
+    when(division.getPeer()).thenReturn(localPeer);
+    when(ratisServer.getServerDivision()).thenReturn(division);
+    when(om.getOmRatisServer()).thenReturn(ratisServer);
+
+    OmRatisSnapshotProvider snapshotProvider = mock(OmRatisSnapshotProvider.class);
+    when(om.getOmSnapshotProvider()).thenReturn(snapshotProvider);
+
+    sm.notifySnapshotInstalled(
+        RaftProtos.InstallSnapshotResult.SUCCESS, 100, remotePeer);
+
+    // Different peer, init() should NOT be called
+    verify(snapshotProvider, never()).init();
+  }
+
+  // --- notifyLeaderReady tests ---
+
+  @Test
+  public void testNotifyLeaderReady() {
+    OmSnapshotManager snapshotManager = mock(OmSnapshotManager.class);
+    when(om.getOmSnapshotManager()).thenReturn(snapshotManager);
+
+    sm.notifyLeaderReady();
+
+    verify(snapshotManager).resetInFlightSnapshotCount();
+    verify(serviceManager).notifyStatusChanged();
+  }
+
+  // --- getLatestSnapshot tests ---
+
+  @Test
+  public void testGetLatestSnapshot() {
+    TransactionInfo txnInfo = TransactionInfo.valueOf(TermIndex.valueOf(2, 10));
+    when(om.getTransactionInfo()).thenReturn(txnInfo);
+
+    SnapshotInfo snapshot = sm.getLatestSnapshot();
+
+    assertNotNull(snapshot);
+    assertEquals(2, snapshot.getTermIndex().getTerm());
+    assertEquals(10, snapshot.getTermIndex().getIndex());
+  }
+
+  // --- pause / stop / close lifecycle tests ---
+
+  @Test
+  public void testPauseStopsDoubleBuffer() {
+    sm.pause();
+
+    verify(doubleBuffer).stop();
+  }
+
+  @Test
+  public void testPauseAlreadyPaused() {
+    // First pause
+    sm.pause();
+    // Second pause should not throw
+    sm.pause();
+
+    verify(doubleBuffer, times(2)).stop();
+  }
+
+  @Test
+  public void testPauseWaitsForSnapshotDuringFlush() throws Exception {
+    initializeStateMachine();
+    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    when(om.getMetadataManager()).thenReturn(metadataManager);
+    when(metadataManager.getStore()).thenReturn(mock(DBStore.class));
+
+    CountDownLatch flushWaitReached = new CountDownLatch(1);
+    CountDownLatch releaseFlushWait = new CountDownLatch(1);
+    CountDownLatch snapshotWriteReached = new CountDownLatch(1);
+    CountDownLatch releaseSnapshotWrite = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      flushWaitReached.countDown();
+      awaitUninterruptibly(releaseFlushWait);
+      return null;
+    }).when(doubleBuffer).awaitFlush();
+    when(doubleBuffer.persistIfNewer(any(TransactionInfo.class))).thenAnswer(invocation -> {
+      snapshotWriteReached.countDown();
+      awaitUninterruptibly(releaseSnapshotWrite);
+      return invocation.getArgument(0);
+    });
+
+    AtomicReference<Thread> pauseThread = new AtomicReference<>();
+    ExecutorService pauseExecutor = Executors.newSingleThreadExecutor(runnable -> {
+      Thread thread = new Thread(runnable, "test-pause-during-snapshot");
+      pauseThread.set(thread);
+      return thread;
+    });
+    ExecutorService snapshotExecutor = Executors.newSingleThreadExecutor();
+    try {
+      Future<?> pauseFuture = pauseExecutor.submit(sm::pause);
+      assertTrue(flushWaitReached.await(5, TimeUnit.SECONDS));
+      Future<Long> snapshotFuture = snapshotExecutor.submit(sm::takeSnapshot);
+      assertTrue(snapshotWriteReached.await(5, TimeUnit.SECONDS));
+
+      releaseFlushWait.countDown();
+      waitFor(() -> pauseThread.get().getState() == Thread.State.BLOCKED, 10, 5000);
+      assertFalse(pauseFuture.isDone());
+
+      releaseSnapshotWrite.countDown();
+      snapshotFuture.get(5, TimeUnit.SECONDS);
+      pauseFuture.get(5, TimeUnit.SECONDS);
+    } finally {
+      releaseFlushWait.countDown();
+      releaseSnapshotWrite.countDown();
+      pauseExecutor.shutdownNow();
+      snapshotExecutor.shutdownNow();
+      pauseExecutor.awaitTermination(5, TimeUnit.SECONDS);
+      snapshotExecutor.awaitTermination(5, TimeUnit.SECONDS);
+    }
+  }
+
+  /**
+   * Reproduces the checkpoint-pause deadlock by holding the double-buffer
+   * flush callback immediately before it updates the last-applied index, then
+   * pausing the state machine while it waits for the flush thread to exit.
+   * Releasing the callback must allow both the index update and pause to finish.
+   */
+  @Test
+  public void testPauseWhileDoubleBufferUpdatesLastAppliedIndex(@TempDir Path tmpDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OMConfigKeys.OZONE_OM_DB_DIRS, tmpDir.toAbsolutePath().toString());
+    OzoneManager testOm = mock(OzoneManager.class);
+    when(testOm.getConfiguration()).thenReturn(conf);
+    when(testOm.getConfig()).thenReturn(conf.getObject(OmConfig.class));
+    OmMetadataManagerImpl metadataManager = new OmMetadataManagerImpl(conf, testOm);
+    when(testOm.getMetadataManager()).thenReturn(metadataManager);
+
+    CountDownLatch flushCallbackReached = new CountDownLatch(1);
+    CountDownLatch releaseFlushCallback = new CountDownLatch(1);
+    AtomicReference<OzoneManagerStateMachine> stateMachineRef = new AtomicReference<>();
+    OzoneManagerDoubleBuffer testDoubleBuffer = OzoneManagerDoubleBuffer.newBuilder()
+        .setOmMetadataManager(metadataManager)
+        .setUpdateLastAppliedIndex(termIndex -> {
+          flushCallbackReached.countDown();
+          awaitUninterruptibly(releaseFlushCallback);
+          stateMachineRef.get().updateLastAppliedTermIndex(termIndex);
+        })
+        .setMaxUnFlushedTransactionCount(10)
+        .build()
+        .start();
+    ExecutorService stateMachineExecutor = Executors.newSingleThreadExecutor();
+    OzoneManagerStateMachine testStateMachine = new OzoneManagerStateMachine(
+        testOm, testDoubleBuffer, mock(RequestHandler.class), stateMachineExecutor, null);
+    stateMachineRef.set(testStateMachine);
+
+    AtomicReference<Thread> pauseThread = new AtomicReference<>();
+    ExecutorService pauseExecutor = Executors.newSingleThreadExecutor(runnable -> {
+      Thread thread = new Thread(runnable, "test-state-machine-pause");
+      pauseThread.set(thread);
+      return thread;
+    });
+    Future<?> pauseFuture = null;
+    try {
+      OMResponse response = OMResponse.newBuilder()
+          .setCmdType(Type.CreateKey)
+          .setStatus(Status.OK)
+          .setSuccess(true)
+          .build();
+      testDoubleBuffer.add(new DummyOMClientResponse(response), TermIndex.valueOf(1, 1));
+      assertTrue(flushCallbackReached.await(5, TimeUnit.SECONDS));
+
+      pauseFuture = pauseExecutor.submit(testStateMachine::pause);
+      waitFor(() -> pauseThread.get() != null && pauseThread.get().getState() == Thread.State.WAITING, 10, 5000);
+
+      releaseFlushCallback.countDown();
+      pauseFuture.get(5, TimeUnit.SECONDS);
+      assertEquals(1, testStateMachine.getLastAppliedTermIndex().getIndex());
+    } finally {
+      releaseFlushCallback.countDown();
+      if (pauseFuture != null && !pauseFuture.isDone() && pauseThread.get() != null) {
+        pauseThread.get().interrupt();
+      }
+      pauseExecutor.shutdownNow();
+      pauseExecutor.awaitTermination(5, TimeUnit.SECONDS);
+      testStateMachine.stop();
+      metadataManager.stop();
+    }
+  }
+
+  @Test
+  public void testStopShutdownsResources() {
+    sm.stop();
+
+    verify(doubleBuffer).stop();
+    assertTrue(executor.isShutdown());
+  }
+
+  @Test
+  public void testCloseWhenOmRunning() {
+    when(om.isStopped()).thenReturn(false);
+
+    sm.close();
+
+    verify(om).shutDown(anyString());
+  }
+
+  @Test
+  public void testCloseWhenOmAlreadyStopped() {
+    when(om.isStopped()).thenReturn(true);
+
+    sm.close();
+
+    // stop() calls doubleBuffer.stop()
+    verify(doubleBuffer).stop();
+  }
+
+  // --- other utility method tests ---
+
+  @Test
+  public void testToStateMachineLogEntryString() {
+    OMRequest request = sampleWriteRequest();
+    RaftProtos.StateMachineLogEntryProto smEntry =
         RaftProtos.StateMachineLogEntryProto.newBuilder()
             .setLogData(OMRatisHelper.convertRequestToByteString(request))
             .build();
 
-    TransactionContext mockTrx = mock(TransactionContext.class);
-    when(mockTrx.getStateMachineLogEntry()).thenReturn(logEntry);
-    when(mockTrx.getStateMachineContext()).thenReturn(request);
-    RaftProtos.LogEntryProto logEntryProto = LogProtoUtils.toLogEntryProto(10, 10, 10);
-    when(mockTrx.getLogEntry()).thenReturn(logEntryProto);
+    String result = sm.toStateMachineLogEntryString(smEntry);
 
-    return mockTrx;
+    assertNotNull(result);
+    assertTrue(result.contains("CreateKey") || result.contains("create_key"),
+        "Expected result to contain command type, got: " + result);
+  }
+
+  @Test
+  public void testAwaitDoubleBufferFlush() throws Exception {
+    sm.awaitDoubleBufferFlush();
+
+    verify(doubleBuffer).awaitFlush();
+  }
+
+  // --- private helpers ---
+
+  private static void assertTermIndex(long expectedTerm, long expectedIndex, TermIndex computed) {
+    assertEquals(expectedTerm, computed.getTerm());
+    assertEquals(expectedIndex, computed.getIndex());
+  }
+
+  private static void awaitUninterruptibly(CountDownLatch latch) {
+    boolean interrupted = false;
+    while (true) {
+      try {
+        latch.await();
+        break;
+      } catch (InterruptedException ex) {
+        interrupted = true;
+      }
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  private OMRequest sampleWriteRequest() {
+    return OMRequest.newBuilder()
+        .setCmdType(Type.CreateKey)
+        .setClientId("test-client")
+        .setCreateKeyRequest(CreateKeyRequest.newBuilder()
+            .setKeyArgs(KeyArgs.newBuilder()
+                .setVolumeName("vol")
+                .setBucketName("bucket")
+                .setKeyName("key")))
+        .setUserInfo(UserInfo.newBuilder()
+            .setUserName("user")
+            .setHostName("localhost")
+            .setRemoteAddress("127.0.0.1"))
+        .build();
+  }
+
+  private OMRequest sampleReadRequest() {
+    return OMRequest.newBuilder()
+        .setCmdType(Type.ServiceList)
+        .setClientId("test-client")
+        .build();
+  }
+
+  private static Server.Call createCall(String userName, String hostName, byte[] address) throws IOException {
+    UserGroupInformation user = UserGroupInformation.createRemoteUser(userName);
+    InetAddress remoteAddress = InetAddress.getByAddress(hostName, address);
+    return new Server.Call(1, 0, null, null, RPC.RpcKind.RPC_PROTOCOL_BUFFER, new byte[0]) {
+      @Override
+      public UserGroupInformation getRemoteUser() {
+        return user;
+      }
+
+      @Override
+      public InetAddress getHostInetAddress() {
+        return remoteAddress;
+      }
+    };
+  }
+
+  private OzoneManagerProtocolProtos.S3Authentication stsS3Authentication() {
+    return OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+        .setAccessId("accessId")
+        .setSessionToken("sessionToken")
+        .setResolvedStsSessionPolicy("sessionPolicy")
+        .setResolvedStsRoleArn("roleArn")
+        .setResolvedStsOriginalAccessKeyId("originalAccessKeyId")
+        .setResolvedStsTempAccessKeyId("tempAccessKeyId")
+        .setResolvedStsSecretKeyId("secretKeyId")
+        .setResolvedStsAssumedRoleId("assumedRoleId")
+        .setResolvedStsAssumedRoleUserArn("assumedRoleUserArn")
+        .build();
+  }
+
+  private OzoneManagerProtocolProtos.S3Authentication legacyStsS3Authentication() {
+    return OzoneManagerProtocolProtos.S3Authentication.newBuilder()
+        .setAccessId("accessId")
+        .setSessionToken("sessionToken")
+        .setResolvedStsSessionPolicy("sessionPolicy")
+        .setResolvedStsRoleArn("roleArn")
+        .setResolvedStsOriginalAccessKeyId("originalAccessKeyId")
+        .setResolvedStsTempAccessKeyId("tempAccessKeyId")
+        .setResolvedStsSecretKeyId("secretKeyId")
+        .build();
+  }
+
+  private TransactionContext mockTrx(OMRequest request, long term, long index) {
+    return mockTrx(request, term, index, request);
+  }
+
+  private TransactionContext mockTrx(OMRequest request, long term, long index, Object context) {
+    RaftProtos.StateMachineLogEntryProto logEntry =
+        RaftProtos.StateMachineLogEntryProto.newBuilder()
+            .setLogData(OMRatisHelper.convertRequestToByteString(request))
+            .build();
+    TransactionContext trx = mock(TransactionContext.class);
+    when(trx.getStateMachineLogEntry()).thenReturn(logEntry);
+    when(trx.getStateMachineContext()).thenReturn(context);
+    RaftProtos.LogEntryProto logEntryProto = LogProtoUtils.toLogEntryProto(term, index, index);
+    when(trx.getLogEntry()).thenReturn(logEntryProto);
+    return trx;
+  }
+
+  private AuditMessage dummyAuditMessage() {
+    return new AuditMessage.Builder()
+        .forOperation(() -> "LEADER_CHANGE")
+        .withResult(AuditEventStatus.SUCCESS)
+        .build();
+  }
+
+  private RaftGroupId initializeStateMachine() throws IOException {
+    RaftGroupId groupId = RaftGroupId.randomId();
+    RaftServer server = mock(RaftServer.class);
+    RaftStorage storage = mock(RaftStorage.class);
+    sm.initialize(server, groupId, storage);
+    return groupId;
+  }
+
+  private RaftClientRequest buildClientRequest(
+      RaftGroupId groupId, OMRequest omRequest) {
+    return RaftClientRequest.newBuilder()
+        .setClientId(ClientId.randomId())
+        .setServerId(RaftPeerId.valueOf("om1"))
+        .setGroupId(groupId)
+        .setCallId(1L)
+        .setMessage(Message.valueOf(
+            OMRatisHelper.convertRequestToByteString(omRequest)))
+        .setType(RaftClientRequest.writeRequestType())
+        .build();
+  }
+
+  @Test
+  public void testRatisEventsRecording() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    OMMetrics metrics = OMMetrics.create(conf);
+    when(om.getMetrics()).thenReturn(metrics);
+    when(om.getOmSnapshotManager()).thenReturn(mock(OmSnapshotManager.class));
+    when(om.getConfiguration()).thenReturn(conf);
+    AuditMessage auditMessage = mock(AuditMessage.class);
+    when(auditMessage.getOp()).thenReturn("LEADER_CHANGE");
+    when(om.buildAuditMessageForSuccess(any(), any())).thenReturn(auditMessage);
+    sm.notifyLeaderReady();
+    assertTrue(metrics.getRatisEvents().contains("Ready to serve requests as the leader"));
+
+    RaftGroupMemberId groupMemberId = mock(RaftGroupMemberId.class);
+    when(groupMemberId.getPeerId()).thenReturn(RaftPeerId.valueOf("peer1"));
+    sm.notifyLeaderChanged(groupMemberId, RaftPeerId.valueOf("peer1"));
+    assertTrue(metrics.getRatisEvents().contains("Leader changed to peer1"));
+
+    sm.notifyConfigurationChanged(1, 1, RaftProtos.RaftConfigurationProto.getDefaultInstance());
+    assertTrue(metrics.getRatisEvents().contains("New peers [] added at term index "));
+
+    metrics.unRegister();
   }
 }

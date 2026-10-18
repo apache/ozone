@@ -26,6 +26,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
@@ -52,11 +56,15 @@ import org.apache.hadoop.io.ByteBufferPool;
 import org.apache.hadoop.io.ElasticByteBufferPool;
 import org.apache.hadoop.ozone.client.io.ECStreamTestUtil.TestBlockInputStream;
 import org.apache.hadoop.ozone.client.io.ECStreamTestUtil.TestBlockInputStreamFactory;
+import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
+import org.apache.ozone.erasurecode.rawcoder.RawErasureDecoder;
+import org.apache.ozone.erasurecode.rawcoder.util.CodecUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.MockedStatic;
 
 /**
  * Test for the ECBlockReconstructedStripeInputStream.
@@ -807,6 +815,40 @@ public class TestECBlockReconstructedStripeInputStream {
     }
   }
 
+  @Test
+  public void testDecoderReleasedOnClose() throws IOException {
+    // The stream must release its RawErasureDecoder on close so the decoder's
+    // native resources (e.g. ISA-L coder context) are not leaked. The decoder
+    // is created lazily in init() on the first read.
+    int chunkSize = repConfig.getEcChunkSize();
+    int blockLength = chunkSize * repConfig.getData();
+    ByteBuffer[] dataBufs = allocateBuffers(repConfig.getData(), chunkSize);
+    ECStreamTestUtil.randomFill(dataBufs, chunkSize, dataGen, blockLength);
+    ByteBuffer[] parity = generateParity(dataBufs, repConfig);
+    addDataStreamsToFactory(dataBufs, parity);
+
+    // Data index 1 is missing, so a read must build the decoder to reconstruct.
+    Map<DatanodeDetails, Integer> dnMap =
+        ECStreamTestUtil.createIndexMap(2, 3, 4, 5);
+    BlockLocationInfo keyInfo =
+        ECStreamTestUtil.createKeyInfo(repConfig, blockLength, dnMap);
+    streamFactory.setCurrentPipeline(keyInfo.getPipeline());
+
+    RawErasureDecoder spyDecoder =
+        spy(new RSRawErasureCoderFactory().createDecoder(repConfig));
+    ByteBuffer[] bufs = allocateByteBuffers(repConfig);
+    try (MockedStatic<CodecUtil> mocked = mockStatic(CodecUtil.class)) {
+      mocked.when(() -> CodecUtil.createRawDecoderWithFallback(any()))
+          .thenReturn(spyDecoder);
+      try (ECBlockReconstructedStripeInputStream ecBlockReconstructedStripeInputStream =
+          createInputStream(keyInfo)) {
+        // The read triggers init(), which creates the (spied) decoder.
+        ecBlockReconstructedStripeInputStream.read(bufs);
+      }
+    }
+    verify(spyDecoder).release();
+  }
+
   private ECBlockReconstructedStripeInputStream createInputStream(
       BlockLocationInfo keyInfo) {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
@@ -817,13 +859,8 @@ public class TestECBlockReconstructedStripeInputStream {
   }
 
   private void addDataStreamsToFactory(ByteBuffer[] data, ByteBuffer[] parity) {
-    List<ByteBuffer> dataStreams = new ArrayList<>();
-    for (ByteBuffer b : data) {
-      dataStreams.add(b);
-    }
-    for (ByteBuffer b : parity) {
-      dataStreams.add(b);
-    }
+    List<ByteBuffer> dataStreams = new ArrayList<>(Arrays.asList(data));
+    dataStreams.addAll(Arrays.asList(parity));
     streamFactory.setBlockStreamData(dataStreams);
   }
 

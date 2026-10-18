@@ -17,13 +17,15 @@
 
 package org.apache.hadoop.ozone;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SECURITY_CLIENT_DATANODE_DISK_BALANCER_PROTOCOL_ACL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL;
 
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience.Private;
 import org.apache.hadoop.hdds.annotation.InterfaceStability.Unstable;
+import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.ReconfigureProtocol;
 import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.Service;
@@ -40,10 +42,13 @@ public final class HddsPolicyProvider extends PolicyProvider {
       MemoizedSupplier.valueOf(HddsPolicyProvider::new);
 
   private static final List<Service> DN_SERVICES =
-      Collections.singletonList(
+      Arrays.asList(
           new Service(
               OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
-              ReconfigureProtocol.class)
+              ReconfigureProtocol.class),
+          new Service(
+              HDDS_SECURITY_CLIENT_DATANODE_DISK_BALANCER_PROTOCOL_ACL,
+              DiskBalancerProtocol.class)
       );
 
   private HddsPolicyProvider() {

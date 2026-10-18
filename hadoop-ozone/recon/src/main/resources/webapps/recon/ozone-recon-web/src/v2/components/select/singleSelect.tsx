@@ -76,6 +76,7 @@ const SingleSelect: React.FC<SingleSelectProps> = ({
       components={{
         ValueContainer
       }}
+      menuPortalTarget={document.body}
       placeholder={placeholder}
       onChange={(selected: ValueType<Option, false>) => {
         return onChange!(selected);

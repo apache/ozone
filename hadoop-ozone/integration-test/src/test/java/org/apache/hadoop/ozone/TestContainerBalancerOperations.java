@@ -25,13 +25,22 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -80,7 +89,7 @@ public class TestContainerBalancerOperations {
     Optional<Integer> iterations = Optional.of(10000);
     Optional<Integer> maxDatanodesPercentageToInvolvePerIteration =
         Optional.of(100);
-    Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
+    Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(6L);
     Optional<Long> maxSizeEnteringTargetInGB = Optional.of(6L);
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(6L);
     Optional<Integer> balancingInterval = Optional.of(70);
@@ -89,12 +98,14 @@ public class TestContainerBalancerOperations {
     Optional<Boolean> networkTopologyEnable = Optional.of(false);
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
+    Optional<String> excludeContainers = Optional.of("");
+    Optional<String> includeContainers = Optional.of("");
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers, includeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -116,7 +127,7 @@ public class TestContainerBalancerOperations {
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers, includeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -143,12 +154,23 @@ public class TestContainerBalancerOperations {
     //CLI option for iterations and balancing interval is not passed
     Optional<Integer> iterations = Optional.empty();
     Optional<Integer> balancingInterval = Optional.empty();
+    List<ContainerWithPipeline> createdContainers = new ArrayList<>(5);
+    for (int i = 0; i < 5; i++) {
+      createdContainers.add(containerBalancerClient.createContainer(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          OzoneConsts.OZONE));
+    }
+    String excludedContainersList = createdContainers.get(0).getContainerInfo().getContainerID() + ","
+        + createdContainers.get(1).getContainerInfo().getContainerID() + ","
+        + createdContainers.get(2).getContainerInfo().getContainerID();
+    String includedContainersList = createdContainers.get(3).getContainerInfo().getContainerID() + ","
+        + createdContainers.get(4).getContainerInfo().getContainerID();
 
     //CLI options are passed
     Optional<Double> threshold = Optional.of(0.1);
     Optional<Integer> maxDatanodesPercentageToInvolvePerIteration =
             Optional.of(100);
-    Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
+    Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(6L);
     Optional<Long> maxSizeEnteringTargetInGB = Optional.of(6L);
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(6L);
     Optional<Integer> moveTimeout = Optional.of(65);
@@ -156,12 +178,14 @@ public class TestContainerBalancerOperations {
     Optional<Boolean> networkTopologyEnable = Optional.of(true);
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
+    Optional<String> excludeContainers = Optional.of(excludedContainersList);
+    Optional<String> includeContainers = Optional.of(includedContainersList);
     containerBalancerClient.startContainerBalancer(threshold, iterations,
             maxDatanodesPercentageToInvolvePerIteration,
             maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
             maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
             moveReplicationTimeout, networkTopologyEnable, includeNodes,
-            excludeNodes);
+            excludeNodes, excludeContainers, includeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -169,7 +193,7 @@ public class TestContainerBalancerOperations {
 
     //If config value is not added in ozone-site.xml and CLI option is not passed
     //then it takes the default configuration
-    assertEquals(70, config.getBalancingInterval().toMinutes());
+    assertEquals(3, config.getBalancingInterval().toMinutes());
 
     //If config value is added in ozone-site.xml and CLI option is not passed
     //then it takes the value from ozone-site.xml
@@ -178,6 +202,10 @@ public class TestContainerBalancerOperations {
     //If config value is added in ozone-site.xml and CLI option is passed
     //then it takes the CLI option.
     assertEquals(100, config.getMaxDatanodesPercentageToInvolvePerIteration());
+
+    //Verifies that excluded and included containers passed via CLI overrides the default empty set
+    assertEquals(parseContainerIDs(excludedContainersList), config.getExcludeContainers());
+    assertEquals(parseContainerIDs(includedContainersList), config.getIncludeContainers());
 
     containerBalancerClient.stopContainerBalancer();
     running = containerBalancerClient.getContainerBalancerStatus();
@@ -198,7 +226,7 @@ public class TestContainerBalancerOperations {
     Optional<Integer> iterations = Optional.of(10000);
     Optional<Integer> maxDatanodesPercentageToInvolvePerIteration =
         Optional.of(100);
-    Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(1L);
+    Optional<Long> maxSizeToMovePerIterationInGB = Optional.of(6L);
     Optional<Long> maxSizeEnteringTargetInGB = Optional.of(6L);
     Optional<Long> maxSizeLeavingSourceInGB = Optional.of(6L);
     Optional<Integer> balancingInterval = Optional.of(70);
@@ -207,12 +235,14 @@ public class TestContainerBalancerOperations {
     Optional<Boolean> networkTopologyEnable = Optional.of(false);
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
+    Optional<String> excludeContainers = Optional.of("");
+    Optional<String> includeContainers = Optional.of("");
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers, includeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -222,5 +252,12 @@ public class TestContainerBalancerOperations {
 
     // Calling stop balancer again should not throw an exception
     assertDoesNotThrow(() -> containerBalancerClient.stopContainerBalancer());
+  }
+
+  private Set<ContainerID> parseContainerIDs(String containerList) {
+    return Arrays.stream(containerList.split(","))
+        .map(Long::parseLong)
+        .map(ContainerID::valueOf)
+        .collect(Collectors.toSet());
   }
 }

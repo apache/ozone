@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+import static org.apache.hadoop.hdds.HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
@@ -31,6 +31,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
@@ -52,7 +53,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -130,9 +130,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int adminPort;
   private int clientPort;
 
-  // TODO: https://issues.apache.org/jira/browse/HDDS-13558
-  @SuppressWarnings("PMD.SingularField")
-  private int dataStreamPort;
   private final RaftServer server;
   private final String name;
   private final List<ThreadPoolExecutor> chunkExecutors;
@@ -219,8 +216,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
 
-    if (DatanodeVersion.fromProtoValue(datanodeDetails.getInitialVersion())
-        .compareTo(SEPARATE_RATIS_PORTS_AVAILABLE) >= 0) {
+    if (SEPARATE_RATIS_PORTS_AVAILABLE.isSupportedBy(
+        datanodeDetails.getInitialVersion())) {
       adminPort = determinePort(
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT,
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT_DEFAULT);
@@ -247,18 +244,19 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private void setUpRatisStream(RaftProperties properties) {
     // set the datastream config
+    final int requestedPort;
     if (conf.getBoolean(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT,
         OzoneConfigKeys.
             HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT)) {
-      dataStreamPort = 0;
+      requestedPort = 0;
     } else {
-      dataStreamPort = conf.getInt(
+      requestedPort = conf.getInt(
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT,
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT);
     }
     RatisHelper.enableNettyStreaming(properties);
-    NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
+    NettyConfigKeys.DataStream.setPort(properties, requestedPort);
     int dataStreamAsyncRequestThreadPoolSize =
         ratisServerConfig.getStreamRequestThreads();
     RaftServerConfigKeys.DataStream.setAsyncRequestThreadPoolSize(properties,
@@ -563,23 +561,23 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       server.start();
 
       RaftServerRpc serverRpc = server.getServerRpc();
-      clientPort = getRealPort(serverRpc.getClientServerAddress(),
+      clientPort = updateDatanodePort(serverRpc.getClientServerAddress(),
           Port.Name.RATIS);
-      adminPort = getRealPort(serverRpc.getAdminServerAddress(),
+      adminPort = updateDatanodePort(serverRpc.getAdminServerAddress(),
           Port.Name.RATIS_ADMIN);
-      serverPort = getRealPort(serverRpc.getInetSocketAddress(),
+      serverPort = updateDatanodePort(serverRpc.getInetSocketAddress(),
           Port.Name.RATIS_SERVER);
       if (streamEnable) {
         DataStreamServerRpc dataStreamServerRpc =
             server.getDataStreamServerRpc();
-        dataStreamPort = getRealPort(dataStreamServerRpc.getInetSocketAddress(),
+        updateDatanodePort(dataStreamServerRpc.getInetSocketAddress(),
             Port.Name.RATIS_DATASTREAM);
       }
       isStarted = true;
     }
   }
 
-  private int getRealPort(InetSocketAddress address, Port.Name portName) {
+  private int updateDatanodePort(InetSocketAddress address, Port.Name portName) {
     int realPort = address.getPort();
     final Port port = DatanodeDetails.newPort(portName, realPort);
     datanodeDetails.setPort(port);
@@ -603,6 +601,11 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         LOG.error("Failed to close {}.", name, e);
       }
     }
+  }
+
+  @Override
+  public boolean isStarted() {
+    return isStarted;
   }
 
   @Override
@@ -660,7 +663,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerRatis." + request.getCmdType().name(),
-            request.getTraceID());
+            request.getTraceID(),
+            SpanKind.SERVER);
     try (Scope ignored = span.makeCurrent()) {
       RaftClientRequest raftClientRequest =
           createRaftClientRequest(request, pipelineID,

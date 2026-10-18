@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.scm.proxy.SecretKeyProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.io.retry.RetryProxy;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtocolTranslator;
 import org.apache.hadoop.ipc_.RPC;
@@ -98,7 +98,7 @@ public class SecretKeyProtocolClientSideTranslatorPB implements
       throws SCMSecretKeyException {
     if (resp.getStatus() != SCMSecretKeyProtocolProtos.Status.OK) {
       throw new SCMSecretKeyException(resp.getMessage(),
-          SCMSecretKeyException.ErrorCode.values()[resp.getStatus().ordinal()]);
+          SCMSecretKeyException.ErrorCode.valueOf(resp.getStatus().name()));
     }
     return resp;
   }

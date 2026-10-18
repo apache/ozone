@@ -27,9 +27,12 @@ public class OmMultipartCommitUploadPartInfo {
 
   private final String eTag;
 
-  public OmMultipartCommitUploadPartInfo(String partName, String eTag) {
+  private final long modificationTime;
+
+  public OmMultipartCommitUploadPartInfo(String partName, String eTag, long modificationTime) {
     this.partName = partName;
     this.eTag = eTag;
+    this.modificationTime = modificationTime;
   }
 
   public String getETag() {
@@ -38,5 +41,9 @@ public class OmMultipartCommitUploadPartInfo {
 
   public String getPartName() {
     return partName;
+  }
+
+  public long getModificationTime() {
+    return modificationTime;
   }
 }

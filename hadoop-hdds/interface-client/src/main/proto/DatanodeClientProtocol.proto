@@ -31,86 +31,65 @@ option java_generate_equals_and_hash = true;
 package hadoop.hdds.datanode;
 
 /**
- * Commands that are used to manipulate the state of containers on a datanode.
- *
- * These commands allow us to work against the datanode - from
- * StorageContainer Manager as well as clients.
- *
- *  1. CreateContainer - This call is usually made by Storage Container
- *     manager, when we need to create a new container on a given datanode.
- *
- *  2. ReadContainer - Allows end user to stat a container. For example
- *     this allows us to return the metadata of a container.
- *
- *  3. UpdateContainer - Updates a container metadata.
-
- *  4. DeleteContainer - This call is made to delete a container.
- *
- *  5. ListContainer - Returns the list of containers on this
- *     datanode. This will be used by tests and tools.
- *
- *  6. PutBlock - Given a valid container, creates a block.
- *
- *  7. GetBlock - Allows user to read the metadata of a block.
- *
- *  8. DeleteBlock - Deletes a given block.
- *
- *  9. ListBlock - Returns a list of blocks that are present inside
- *      a given container.
- *
- *  10. ReadChunk - Allows us to read a chunk.
- *
- *  11. DeleteChunk - Delete an unused chunk.
- *
- *  12. WriteChunk - Allows us to write a chunk
- *
- *  13. ListChunk - Given a Container/Block returns the list of Chunks.
- *
- *  14. CompactChunk - Re-writes a chunk based on Offsets.
- *
- *  15. PutSmallFile - A single RPC that combines both putBlock and WriteChunk.
- *
- *  16. GetSmallFile - A single RPC that combines both getBlock and ReadChunk.
- *
- *  17. CloseContainer - Closes an open container and makes it immutable.
- *
- *  18. CopyContainer - Copies a container from a remote machine.
- *
- *  19. FinalizeBlock - Finalize block request from client.
- *
- *  20. ReadBlock - Allows us to read a block.
+ Commands that are used to manipulate the state of containers on a datanode.
+ These commands allow us to work against the datanode from clients.
  */
-
 enum Type {
+  // This call is usually made by clients who will create a container
+  // which does not already exist with the first chunk write to that container.
   CreateContainer = 1;
+  // Allows end user to stat a container. For example this allows us to return the metadata of a container.
   ReadContainer = 2;
+  // Updates a container metadata.
   UpdateContainer = 3;
+  // This call is made to delete a container.
   DeleteContainer = 4;
+  // Returns the list of containers on this datanode. This will be used by tests and tools.
   ListContainer = 5;
 
+  // Given a valid container, creates a block.
   PutBlock = 6;
+  // Allows user to read the metadata of a block.
   GetBlock = 7;
+  // Deletes a given block.
   DeleteBlock = 8;
+  // Returns a list of blocks that are present inside a given container.
   ListBlock = 9;
 
+  // Allows us to read a chunk.
   ReadChunk = 10;
+  // Delete an unused chunk.
   DeleteChunk = 11;
+  // Allows us to write a chunk.
   WriteChunk = 12;
+  // Given a Container/Block returns the list of Chunks.
   ListChunk = 13;
+  // Re-writes a chunk based on Offsets.
   CompactChunk = 14;
 
-  /** Combines Block and Chunk Operation into Single RPC. */
+  // A single RPC that combines both putBlock and WriteChunk.
   PutSmallFile = 15;
+  // A single RPC that combines both getBlock and ReadChunk.
   GetSmallFile = 16;
+  // Closes an open container and makes it immutable.
   CloseContainer = 17;
+  // Returns the committed length of a block.
   GetCommittedBlockLength = 18;
 
+  // Initializes a stream for writing data.
   StreamInit = 19;
+  // Writes data to an initialized stream.
   StreamWrite = 20;
+  // Finalize block request from client.
   FinalizeBlock = 21;
+  // Echo request for testing and debugging purposes.
   Echo = 22;
+  // Retrieves checksum information for a container.
   GetContainerChecksumInfo = 23;
+  // Allows us to read a block
   ReadBlock = 24;
+  // Initializes a stream for writing data with PutBlock commited on close.
+  StreamInitWithPutBlock = 25;
 }
 
 
@@ -162,6 +141,7 @@ enum Result {
   IMPORT_CONTAINER_METADATA_FAILED = 46;
   BLOCK_ALREADY_FINALIZED = 47;
   CONTAINER_ID_MISMATCH = 48;
+  GET_SHORT_CIRCUIT_FD_FAILED = 49;
 }
 
 /**
@@ -220,8 +200,16 @@ message ContainerCommandRequestProto {
   optional   uint32 version = 24;
   optional   FinalizeBlockRequestProto finalizeBlock = 25;
   optional   EchoRequestProto echo = 26;
+
   optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
   optional   ReadBlockRequestProto readBlock = 28;
+  // Version that datanodes should use for this write operation.
+  // Set by SCM and forwarded by the client to the datanodes.
+  optional   uint32 writePipelineVersion = 29;
+
+  // clientId and callId are used to distinguish different requests from different local clients for shortCircuitRead
+  optional   bytes clientId = 100;
+  optional   uint64 callId = 101;
 }
 
 message ContainerCommandResponseProto {
@@ -255,6 +243,10 @@ message ContainerCommandResponseProto {
   optional   EchoResponseProto echo = 23;
   optional   GetContainerChecksumInfoResponseProto getContainerChecksumInfo = 24;
   optional   ReadBlockResponseProto readBlock = 25;
+
+  // clientId and callId are used to distinguish different requests from different local clients for shortCircuitRead
+  optional   bytes clientId = 100;
+  optional   uint64 callId = 101;
 }
 
 message ContainerDataProto {
@@ -349,6 +341,7 @@ message BlockData {
 message PutBlockRequestProto {
   required BlockData blockData = 1;
   optional bool eof = 2;
+  optional bool containerAutoCreate = 3;
 }
 
 message PutBlockResponseProto {
@@ -365,10 +358,12 @@ message FinalizeBlockResponseProto  {
 
 message GetBlockRequestProto  {
   required DatanodeBlockID blockID = 1;
+  optional bool requestShortCircuitAccess = 2 [default = false];
 }
 
 message GetBlockResponseProto  {
   required BlockData blockData = 1;
+  optional bool shortCircuitAccessGranted = 2 [default = false];
 }
 
 
@@ -403,12 +398,15 @@ message ReadBlockRequestProto {
   required uint64 offset = 2;
   optional uint64 length = 3;
   optional uint32 responseDataSize = 4;
+  optional bool includeChecksums = 5 [default = true];
 }
 
 message ReadBlockResponseProto {
-  required ChecksumData checksumData = 1;
+  reserved 1;
+  reserved "checksumData";
   required uint64 offset = 2;
   required bytes data = 3;
+  repeated ChunkInfo chunkInfoList = 4;
 }
 
 message EchoRequestProto {
@@ -464,6 +462,7 @@ message WriteChunkRequestProto  {
   optional ChunkInfo chunkData = 2;
   optional bytes data = 3;
   optional PutBlockRequestProto block = 4;
+  optional bool containerAutoCreate = 5;
 }
 
 message WriteChunkResponseProto {
@@ -544,6 +543,9 @@ enum CopyContainerCompressProto {
   ZSTD = 5;
 }
 
+// Deprecated: pull-based container replication has been removed. Retained for
+// protolock compatibility only; no longer implemented by datanodes.
+// Use SendContainerRequest / SendContainerResponse (push) instead.
 message CopyContainerRequestProto {
   required int64 containerID = 1;
   required uint64 readOffset = 2;
@@ -552,6 +554,7 @@ message CopyContainerRequestProto {
   optional CopyContainerCompressProto compression = 5;
 }
 
+// Deprecated: see CopyContainerRequestProto.
 message CopyContainerResponseProto {
   required int64 containerID = 1;
   required uint64 readOffset = 2;
@@ -606,8 +609,10 @@ service XceiverClientProtocolService {
 }
 
 service IntraDatanodeProtocolService {
-  // An intradatanode service to copy the raw container data between nodes
+  // Deprecated: pull-based replication has been removed; this RPC is no longer
+  // implemented and will return UNIMPLEMENTED if called.
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
+  // Push a container tar from a source datanode to a target datanode.
   rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
 }
 

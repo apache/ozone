@@ -19,7 +19,6 @@ package org.apache.ozone.rocksdiff;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.function.Function.identity;
-import static org.apache.commons.lang3.ArrayUtils.EMPTY_BYTE_ARRAY;
 import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
@@ -75,16 +74,17 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.Scheduler;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -692,14 +692,16 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     synchronized (this) {
       preconditionChecksForLoadAllCompactionLogs();
       addEntriesFromLogFilesToDagAndCompactionLogTable();
-      loadCompactionDagFromDB();
+      Set<String> referencedInputSstFiles = loadCompactionDagFromDB();
+      cleanupOrphanedSstBackupFiles(referencedInputSstFiles);
     }
   }
 
   /**
    * Read a compactionLofTable and create entries in the dags.
    */
-  private void loadCompactionDagFromDB() {
+  private Set<String> loadCompactionDagFromDB() {
+    Set<String> inputSstFilesFromCompactionLog = new HashSet<>();
     try (ManagedRocksIterator managedRocksIterator = new ManagedRocksIterator(
         activeRocksDB.get().newIterator(compactionLogTableCFHandle))) {
       managedRocksIterator.get().seekToFirst();
@@ -707,6 +709,8 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         byte[] value = managedRocksIterator.get().value();
         CompactionLogEntry compactionLogEntry =
             CompactionLogEntry.getFromProtobuf(CompactionLogEntryProto.parseFrom(value));
+        compactionLogEntry.getInputFileInfoList()
+            .forEach(inputFile -> inputSstFilesFromCompactionLog.add(inputFile.getFileName()));
         compactionDag.populateCompactionDAG(compactionLogEntry.getInputFileInfoList(),
             compactionLogEntry.getOutputFileInfoList(), compactionLogEntry.getDbSequenceNumber());
         // Add the compaction log entry to the prune queue so that the backup input sst files can be pruned.
@@ -722,6 +726,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         sstFilePruningMetrics.updateQueueSize(pruneQueue.size());
       }
     }
+    return inputSstFilesFromCompactionLog;
   }
 
   private void preconditionChecksForLoadAllCompactionLogs() {
@@ -1162,6 +1167,45 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   /**
+   * Removes SST files from the backup directory that were hard-linked during
+   * {@code onCompactionBegin} but never recorded in the compaction log because
+   * the compaction did not complete (for example, due to an OM crash/restart).
+   */
+  @VisibleForTesting
+  void cleanupOrphanedSstBackupFiles(Set<String> referencedInputSstFiles) {
+    Path sstBackupDirPath = Paths.get(sstBackupDir);
+    if (!Files.isDirectory(sstBackupDirPath)) {
+      return;
+    }
+
+    Set<String> orphanedFiles = new HashSet<>();
+    try (Stream<Path> pathStream = Files.list(sstBackupDirPath)) {
+      pathStream.filter(path -> path.getFileName().toString().endsWith(SST_FILE_EXTENSION))
+          .forEach(path -> {
+            String fileName = FilenameUtils.getBaseName(path.getFileName().toString());
+            if (!referencedInputSstFiles.contains(fileName)) {
+              orphanedFiles.add(fileName);
+            }
+          });
+    } catch (IOException e) {
+      LOG.warn("Failed to list SST backup directory " + sstBackupDir, e);
+    }
+
+    if (orphanedFiles.isEmpty()) {
+      return;
+    }
+
+    LOG.info("Removing orphaned SST backup files left by incomplete compactions: {}",
+        orphanedFiles);
+    try (UncheckedAutoCloseable ignored = getBootstrapStateLock().acquireReadLock()) {
+      removeSstFiles(orphanedFiles);
+    } catch (InterruptedException e) {
+      LOG.warn("Failed to remove orphaned SST backup files", e);
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  /**
    * Deletes the SST files from the backup directory if exists.
    */
   private void removeSstFiles(Set<String> sstFileNodes) {
@@ -1322,8 +1366,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
             // Prune file.sst => pruned.sst.tmp
             Files.deleteIfExists(prunedSSTFilePath);
-            removeValueFromSSTFile(managedOptions, envOptions, sstFilePath.toFile().getAbsolutePath(),
-                prunedSSTFilePath.toFile().getAbsolutePath());
+            removeValueFromSSTFile(managedOptions, sstFilePath.toFile().getAbsolutePath(), prunedSSTFilePath.toFile());
 
             // Move pruned.sst.tmp => file.sst and replace existing file atomically.
             try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireReadLock()) {
@@ -1363,26 +1406,20 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
-  private void removeValueFromSSTFile(ManagedOptions options, ManagedEnvOptions envOptions,
-      String sstFilePath, String prunedFilePath)
-      throws IOException {
-    try (ManagedRawSSTFileReader<Pair<byte[], Integer>> sstFileReader = new ManagedRawSSTFileReader<>(
-             options, sstFilePath, SST_READ_AHEAD_SIZE);
-         ManagedRawSSTFileIterator<Pair<byte[], Integer>> itr = sstFileReader.newIterator(
+  private void removeValueFromSSTFile(ManagedOptions options, String sstFilePath, File prunedFile) throws IOException {
+    try (ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader(options, sstFilePath, SST_READ_AHEAD_SIZE);
+         ManagedRawSSTFileIterator<Pair<CodecBuffer, Integer>> itr = sstFileReader.newIterator(
              keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
-         ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, options);) {
-      sstFileWriter.open(prunedFilePath);
+         RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(prunedFile);
+         CodecBuffer emptyCodecBuffer = CodecBuffer.getEmptyBuffer()) {
       while (itr.hasNext()) {
-        Pair<byte[], Integer> keyValue = itr.next();
+        Pair<CodecBuffer, Integer> keyValue = itr.next();
         if (keyValue.getValue() == 0) {
           sstFileWriter.delete(keyValue.getKey());
         } else {
-          sstFileWriter.put(keyValue.getKey(), EMPTY_BYTE_ARRAY);
+          sstFileWriter.put(keyValue.getKey(), emptyCodecBuffer);
         }
       }
-      sstFileWriter.finish();
-    } catch (RocksDBException ex) {
-      throw new RocksDatabaseException("Failed to write pruned entries for " + sstFilePath, ex);
     }
   }
 

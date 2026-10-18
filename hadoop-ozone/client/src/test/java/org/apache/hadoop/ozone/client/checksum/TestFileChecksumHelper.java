@@ -43,8 +43,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
+import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -90,11 +89,11 @@ public class TestFileChecksumHelper {
 
   @BeforeEach
   public void init() throws IOException {
-    ConfigurationSource config = new InMemoryConfiguration();
+    InMemoryConfigurationForTesting config = new InMemoryConfigurationForTesting();
     OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.CRC32C);
 
-    ((InMemoryConfiguration)config).setFromObject(clientConfig);
+    config.setFromObject(clientConfig);
 
     rpcClient = new RpcClient(config, null) {
 
@@ -142,13 +141,13 @@ public class TestFileChecksumHelper {
         .build();
   }
 
-  private BaseFileChecksumHelper checksumHelper(ReplicationType type, OzoneVolume mockVolume, OzoneBucket mockBucket,
+  private BaseFileChecksumHelper checksumHelper(ReplicationType type, String volumeName, String bucketName,
       int length, OzoneClientConfig.ChecksumCombineMode combineMode, RpcClient mockRpcClient, OmKeyInfo keyInfo)
       throws IOException {
     return type == ReplicationType.RATIS ? new ReplicatedFileChecksumHelper(
-        mockVolume, mockBucket, "dummy", length, combineMode, mockRpcClient)
+        volumeName, bucketName, "dummy", length, combineMode, mockRpcClient, keyInfo)
         : new ECFileChecksumHelper(
-        mockVolume, mockBucket, "dummy", length, combineMode, mockRpcClient, keyInfo);
+        volumeName, bucketName, "dummy", length, combineMode, mockRpcClient, keyInfo);
   }
 
   private Pipeline pipeline(ReplicationType type, List<DatanodeDetails> datanodeDetails) {
@@ -170,20 +169,15 @@ public class TestFileChecksumHelper {
     // test the file checksum of a file with an empty block.
     RpcClient mockRpcClient = mock(RpcClient.class);
     OmKeyInfo omKeyInfo = omKeyInfo(helperType, noCachedChecksum, new ArrayList<>());
-    OzoneVolume mockVolume = mock(OzoneVolume.class);
-    OzoneBucket mockBucket = mock(OzoneBucket.class);
     OzoneClientConfig.ChecksumCombineMode combineMode =
         OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
 
     OzoneManagerProtocol om = mock(OzoneManagerProtocol.class);
     when(mockRpcClient.getOzoneManagerClient()).thenReturn(om);
     when(om.lookupKey(any())).thenReturn(omKeyInfo);
-    when(mockVolume.getName()).thenReturn("vol1");
-    when(mockBucket.getName()).thenReturn("bucket1");
-
 
     BaseFileChecksumHelper helper =
-        checksumHelper(helperType, mockVolume, mockBucket, 10, combineMode, mockRpcClient, omKeyInfo);
+        checksumHelper(helperType, "vol1", "bucket1", 10, combineMode, mockRpcClient, omKeyInfo);
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
     assertInstanceOf(MD5MD5CRC32GzipFileChecksum.class, fileChecksum);
@@ -192,7 +186,7 @@ public class TestFileChecksumHelper {
 
     // test negative length
     helper =
-        checksumHelper(helperType, mockVolume, mockBucket, -1, combineMode, mockRpcClient, omKeyInfo);
+        checksumHelper(helperType, "vol1", "bucket1", -1, combineMode, mockRpcClient, omKeyInfo);
     helper.compute();
     assertNull(helper.getKeyLocationInfoList());
   }
@@ -232,16 +226,11 @@ public class TestFileChecksumHelper {
     when(mockRpcClient.getOzoneManagerClient()).thenReturn(om);
     when(om.lookupKey(any())).thenReturn(omKeyInfo);
 
-    OzoneVolume mockVolume = mock(OzoneVolume.class);
-    when(mockVolume.getName()).thenReturn("vol1");
-    OzoneBucket mockBucket = mock(OzoneBucket.class);
-    when(mockBucket.getName()).thenReturn("bucket1");
-
     OzoneClientConfig.ChecksumCombineMode combineMode =
         OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
 
     BaseFileChecksumHelper helper = checksumHelper(
-        helperType, mockVolume, mockBucket, 10, combineMode, mockRpcClient, omKeyInfo);
+        helperType, "vol1", "bucket1", 10, combineMode, mockRpcClient, omKeyInfo);
 
     helper.compute();
     FileChecksum fileChecksum = helper.getFileChecksum();
@@ -255,7 +244,7 @@ public class TestFileChecksumHelper {
         thenReturn(omKeyInfoWithChecksum);
 
     helper = checksumHelper(
-        helperType, mockVolume, mockBucket, 10, combineMode, mockRpcClient, omKeyInfo);
+        helperType, "vol1", "bucket1", 10, combineMode, mockRpcClient, omKeyInfo);
 
     helper.compute();
     fileChecksum = helper.getFileChecksum();
@@ -347,8 +336,10 @@ public class TestFileChecksumHelper {
       OzoneClientConfig.ChecksumCombineMode combineMode =
           OzoneClientConfig.ChecksumCombineMode.MD5MD5CRC;
 
+      OmKeyInfo keyInfo = rpcClient.getKeyInfo(
+          volume.getName(), bucket.getName(), keyName, false);
       ReplicatedFileChecksumHelper helper = new ReplicatedFileChecksumHelper(
-          volume, bucket, keyName, 10, combineMode, rpcClient);
+          volume.getName(), bucket.getName(), keyName, 10, combineMode, rpcClient, keyInfo);
 
       helper.compute();
       FileChecksum fileChecksum = helper.getFileChecksum();

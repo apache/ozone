@@ -46,4 +46,6 @@ execute_robot_test ${OM} debug/auditparser.robot
 
 execute_robot_test ${SCM} kinit.robot
 
+execute_robot_test ${SCM} debug/ozone-debug-kerberos.robot
+
 source "$COMPOSE_DIR/../common/replicas-test.sh"

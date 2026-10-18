@@ -18,30 +18,27 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.SCM_HA;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
-import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
-import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
+import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeAction;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.upgrade.UpgradeActionHdds;
+import org.apache.hadoop.ozone.upgrade.DatanodeUpgradeActionForLayoutFeature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Action to run upgrade flow for SCM HA exactly once.
  */
-@UpgradeActionHdds(feature = SCM_HA, component = DATANODE,
-    type = ON_FINALIZE)
+@DatanodeUpgradeActionForLayoutFeature(feature = SCM_HA)
 public class ScmHAFinalizeUpgradeActionDatanode
-    implements HDDSUpgradeAction<DatanodeStateMachine> {
+    implements DatanodeUpgradeAction {
   private static final Logger LOG =
       LoggerFactory.getLogger(ScmHAFinalizeUpgradeActionDatanode.class);
 
@@ -56,6 +53,7 @@ public class ScmHAFinalizeUpgradeActionDatanode
         if (volume instanceof HddsVolume) {
           HddsVolume hddsVolume = (HddsVolume) volume;
           if (!upgradeVolume(hddsVolume, hddsVolume.getClusterID())) {
+            LOG.error("Marking volume {} as failed", volume.getStorageDir().getAbsolutePath());
             volumeSet.failVolume(volume.getStorageDir().getAbsolutePath());
           }
         }

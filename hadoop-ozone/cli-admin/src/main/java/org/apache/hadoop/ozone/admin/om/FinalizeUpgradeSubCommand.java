@@ -42,18 +42,21 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import picocli.CommandLine;
 
 /**
- * Handler of ozone admin om finalizeUpgrade command.
+ * Handler of `ozone admin om finalizeUpgrade` command for new clients to finalize old servers that do not support the
+ * current `ozone admin upgrade finalize` command.
  */
 @CommandLine.Command(
     name = "finalizeupgrade",
     description = "Finalizes Ozone Manager's metadata changes and enables new "
-        + "features after a software upgrade.\n"
+        + "features after a software upgrade.%n"
         + "It is possible to specify the service ID for an HA environment, "
         + "or the Ozone manager host in a non-HA environment, if none provided "
         + "the default from configuration is being used if not ambiguous.",
     mixinStandardHelpOptions = true,
-    versionProvider = HddsVersionProvider.class
+    versionProvider = HddsVersionProvider.class,
+    hidden = true
 )
+@Deprecated
 public class FinalizeUpgradeSubCommand implements Callable<Void> {
 
   @CommandLine.Mixin

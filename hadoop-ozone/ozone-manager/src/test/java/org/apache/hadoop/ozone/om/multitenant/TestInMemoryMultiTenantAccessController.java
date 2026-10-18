@@ -20,14 +20,14 @@ package org.apache.hadoop.ozone.om.multitenant;
 import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
-import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
+import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 
 class TestInMemoryMultiTenantAccessController extends MultiTenantAccessControllerTests {
 
   @Override
   protected MultiTenantAccessController createSubject() {
-    MutableConfigurationSource conf = new InMemoryConfiguration();
+    MutableConfigurationSource conf = new InMemoryConfigurationForTesting();
     conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     return assertInstanceOf(InMemoryMultiTenantAccessController.class, MultiTenantAccessController.create(conf));
   }

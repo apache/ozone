@@ -49,7 +49,7 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
       if (dbStore != null) {
         currentBatchOperation = dbStore.initBatchOperation();
       } else {
-        currentBatchOperation = new RDBBatchOperation();
+        currentBatchOperation = RDBBatchOperation.newAtomicOperation();
       }
     }
     return currentBatchOperation;
@@ -99,6 +99,34 @@ public class SCMHADBTransactionBufferStub implements SCMHADBTransactionBuffer {
   @Override
   public AtomicReference<SnapshotInfo> getLatestSnapshotRef() {
     return null;
+  }
+
+  @Override
+  public void flushIfNeeded(long snapshotWaitTime) throws RocksDatabaseException {
+    flush();
+  }
+
+  @Override
+  public boolean flushIfPendingLimitReached() {
+    return false;
+  }
+
+  @Override
+  public void beginApplyingTransaction() {
+  }
+
+  @Override
+  public void endApplyingTransaction() {
+  }
+
+  @Override
+  public void lock() {
+    rwLock.readLock().lock();
+  }
+
+  @Override
+  public void unlock() {
+    rwLock.readLock().unlock();
   }
 
   @Override

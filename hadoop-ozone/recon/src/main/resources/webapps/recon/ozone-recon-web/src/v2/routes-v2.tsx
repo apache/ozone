@@ -26,7 +26,9 @@ const NamespaceUsage = lazy(() => import('@/v2/pages/namespaceUsage/namespaceUsa
 const Containers = lazy(() => import('@/v2/pages/containers/containers'));
 const Insights = lazy(() => import('@/v2/pages/insights/insights'));
 const OMDBInsights = lazy(() => import('@/v2/pages/insights/omInsights'));
+const Capacity = lazy(() => import('@/v2/pages/capacity/capacity'));
 const Heatmap = lazy(() => import('@/v2/pages/heatmap/heatmap'));
+const Assistant = lazy(() => import('@/v2/pages/assistant/assistant'));
 
 
 export const routesV2 = [
@@ -67,7 +69,15 @@ export const routesV2 = [
     component: OMDBInsights
   },
   {
+    path: '/Capacity',
+    component: Capacity
+  },
+  {
     path: '/Heatmap',
     component: Heatmap
+  },
+  {
+    path: '/Assistant',
+    component: Assistant
   }
 ];

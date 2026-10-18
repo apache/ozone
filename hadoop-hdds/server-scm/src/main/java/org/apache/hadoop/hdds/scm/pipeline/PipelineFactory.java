@@ -123,10 +123,6 @@ public class PipelineFactory {
     providers.get(type).close(pipeline);
   }
 
-  public void shutdown() {
-    providers.values().forEach(provider -> provider.shutdown());
-  }
-
   @VisibleForTesting
   public Map<ReplicationType, PipelineProvider> getProviders() {
     return providers;

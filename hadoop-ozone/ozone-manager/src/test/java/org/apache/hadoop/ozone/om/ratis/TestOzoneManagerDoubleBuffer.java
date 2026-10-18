@@ -106,8 +106,8 @@ class TestOzoneManagerDoubleBuffer {
 
   @BeforeEach
   public void setup() throws IOException {
-    OMMetrics omMetrics = OMMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
+    OMMetrics omMetrics = OMMetrics.create(ozoneConfiguration);
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         tempDir.getAbsolutePath());
 
@@ -456,7 +456,6 @@ class TestOzoneManagerDoubleBuffer {
     for (int i = 0; i < 3; i++) {
       tasks.add(waitFN(fn));
     }
-    Thread.sleep(2000);
 
     // Confirm not done.
     for (Future<Boolean> task : tasks) {
@@ -466,7 +465,6 @@ class TestOzoneManagerDoubleBuffer {
 
     // Add a fourth.
     tasks.add(waitFN(fn));
-    Thread.sleep(2000);
     assertEquals(4, fn.notifyFlush());
 
     // Confirm the initial ones are done,

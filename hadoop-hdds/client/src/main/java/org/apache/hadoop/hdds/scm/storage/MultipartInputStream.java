@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.fs.FSExceptionMessages;
-import org.apache.ratis.util.Preconditions;
 
 /**
  * A stream for accessing multipart streams.
@@ -39,7 +38,6 @@ public class MultipartInputStream extends ExtendedInputStream {
 
   // List of PartInputStream, one for each part of the key
   private final List<? extends PartInputStream> partStreams;
-  private final boolean isStreamBlockInputStream;
 
   // partOffsets[i] stores the index of the first data byte in
   // partStream w.r.t the whole key data.
@@ -49,7 +47,7 @@ public class MultipartInputStream extends ExtendedInputStream {
   // part[0]), partOffsets[1] = 200 and so on.
   private final long[] partOffsets;
 
-  private boolean closed;
+  private volatile boolean closed;
   // Index of the partStream corresponding to the current position of the
   // MultipartCryptoKeyInputStream.
   private int partIndex;
@@ -66,7 +64,6 @@ public class MultipartInputStream extends ExtendedInputStream {
 
     this.key = keyName;
     this.partStreams = Collections.unmodifiableList(inputStreams);
-    this.isStreamBlockInputStream = !inputStreams.isEmpty() && inputStreams.get(0) instanceof StreamBlockInputStream;
 
     // Calculate and update the partOffsets
     this.partOffsets = new long[inputStreams.size()];
@@ -74,9 +71,6 @@ public class MultipartInputStream extends ExtendedInputStream {
     long streamLength = 0L;
     for (PartInputStream partInputStream : inputStreams) {
       this.partOffsets[i++] = streamLength;
-      if (isStreamBlockInputStream) {
-        Preconditions.assertInstanceOf(partInputStream, StreamBlockInputStream.class);
-      }
       streamLength += partInputStream.getLength();
     }
     this.length = streamLength;
@@ -170,7 +164,9 @@ public class MultipartInputStream extends ExtendedInputStream {
     }
 
     // Reset the previous partStream's position
-    partStreams.get(prevPartIndex).seek(0);
+    if (prevPartIndex != partIndex) {
+      partStreams.get(prevPartIndex).seek(0);
+    }
 
     // Reset all the partStreams above the partIndex. We do this to reset
     // any previous reads which might have updated the higher part
@@ -184,25 +180,40 @@ public class MultipartInputStream extends ExtendedInputStream {
   }
 
   @Override
-  public boolean readFully(long position, ByteBuffer buffer) throws IOException {
-    if (!isStreamBlockInputStream) {
-      return false;
+  protected int readPositioned(long position, ByteBuffer buffer) throws IOException {
+    checkOpen();
+    if (!buffer.hasRemaining()) {
+      return 0;
     }
+    long pos = position;
+    int bytesRead = 0;
+    while (buffer.hasRemaining() && pos < length) {
+      int index = binarySearchOffsetIndex(partOffsets, pos);
+      PartInputStream part = partStreams.get(index);
+      long partPosition = pos - partOffsets[index];
+      final int n = part.read(partPosition, buffer);
+      if (n < 0) {
+        break;
+      }
+      if (n == 0) {
+        throw new IOException("No progress reading key " + key + " at position " + pos);
+      }
+      bytesRead += n;
+      pos += n;
+    }
+    return bytesRead == 0 ? EOF : bytesRead;
+  }
 
-    final long oldPos = getPos();
-    seek(position);
-    try {
-      read(new ByteBufferReader(buffer) {
-        @Override
-        int readImpl(InputStream inputStream) throws IOException {
-          return Preconditions.assertInstanceOf(inputStream, StreamBlockInputStream.class)
-              .readFully(getBuffer(), false);
-        }
-      });
-    } finally {
-      seek(oldPos);
+  static int binarySearchOffsetIndex(long[] offsets, long pos) {
+    final int idx = Arrays.binarySearch(offsets, pos);
+    if (idx >= 0) {
+      // exact match: pos falls exactly on the start of chunk/part idx
+      return idx;
     }
-    return true;
+    // binarySearch returns n = -insertionPoint - 1;
+    // insertionPoint is -n - 1
+    // the containing index is insertionPoint - 1.
+    return -idx - 2;
   }
 
   public synchronized void initialize() throws IOException {

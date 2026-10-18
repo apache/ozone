@@ -82,4 +82,6 @@ public interface SCMMXBean extends ServiceRuntimeInfo {
    * @return the SCM hostname for the datanode.
    */
   String getHostname();
+
+  String getRatisEvents();
 }

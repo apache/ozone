@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_CREATION;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,7 +46,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
-import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -94,7 +93,6 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -112,15 +110,13 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.net.StaticMapping;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -160,7 +156,6 @@ import org.slf4j.LoggerFactory;
  */
 public class TestStorageContainerManager {
   private static final int KEY_COUNT = 5;
-  private static final String LOCALHOST_IP = "127.0.0.1";
   private static final Logger LOG = LoggerFactory.getLogger(
       TestStorageContainerManager.class);
 
@@ -168,12 +163,17 @@ public class TestStorageContainerManager {
   @Test
   void test(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    configureTopology(conf);
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     configureBlockDeletion(conf);
     Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
+    String host = NetUtils.normalizeHostName(HddsUtils.getHostName(conf));
 
-    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build()) {
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .setHosts(new String[] {host})
+        .setRacks(new String[] {"/rack1"})
+        .build()) {
       cluster.waitForClusterToBeReady();
 
       // non-destructive test cases
@@ -264,7 +264,7 @@ public class TestStorageContainerManager {
         .getScmBlockManager().getDeletedBlockLog();
     assertEquals(0, delLog.getNumOfValidTransactions());
 
-    Map<String, OmKeyInfo> keyLocations = TestDataUtil.createKeys(cluster, KEY_COUNT);
+    Map<String, OmKeyInfo> keyLocations = DataTestUtil.createKeys(cluster, KEY_COUNT);
     // Wait for container report
     Thread.sleep(1000);
     for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -292,9 +292,9 @@ public class TestStorageContainerManager {
       Map<Long, List<DeletedBlock>> deletedBlocks = new HashMap<>();
       List<DeletedBlock> blocks = new ArrayList<>();
       blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()),
-          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
       blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()),
-          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
       deletedBlocks.put(containerID, blocks);
       addTransactions(cluster.getStorageContainerManager(), delLog,
           deletedBlocks);
@@ -437,7 +437,7 @@ public class TestStorageContainerManager {
           .getScmBlockManager().getSCMBlockDeletingService();
       delService.setBlockDeleteTXNum(limitSize);
 
-      Map<String, OmKeyInfo> keyLocations = TestDataUtil.createKeys(cluster, numKeys);
+      Map<String, OmKeyInfo> keyLocations = DataTestUtil.createKeys(cluster, numKeys);
       // Wait for container report
       Thread.sleep(5000);
       for (OmKeyInfo keyInfo : keyLocations.values()) {
@@ -480,7 +480,7 @@ public class TestStorageContainerManager {
     // on datanodes.
     Set<Long> containerNames = new HashSet<>();
     for (Map.Entry<String, OmKeyInfo> entry : keyLocations.entrySet()) {
-      entry.getValue().getLatestVersionLocations().getLocationList()
+      entry.getValue().getLatestVersionLocations().createLocationList()
           .forEach(loc -> containerNames.add(loc.getContainerID()));
     }
 
@@ -498,14 +498,15 @@ public class TestStorageContainerManager {
     Map<Long, List<DeletedBlock>> containerBlocks = Maps.newHashMap();
     for (OmKeyInfo info : keyLocations.values()) {
       List<OmKeyLocationInfo> list =
-          info.getLatestVersionLocations().getLocationList();
+          info.getLatestVersionLocations().createLocationList();
       list.forEach(location -> {
         if (containerBlocks.containsKey(location.getContainerID())) {
-          containerBlocks.get(location.getContainerID())
-              .add(new DeletedBlock(location.getBlockID(), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          containerBlocks.get(location.getContainerID()).add(new DeletedBlock(location.getBlockID(),
+              SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
         } else {
           List<DeletedBlock> blks = Lists.newArrayList();
-          blks.add(new DeletedBlock(location.getBlockID(), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+          blks.add(new DeletedBlock(location.getBlockID(),
+              SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
           containerBlocks.put(location.getContainerID(), blks);
         }
       });
@@ -603,17 +604,11 @@ public class TestStorageContainerManager {
     Path scmPath = tempDir.resolve("scm-meta");
 
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
-    scmStore.setClusterId(clusterId);
-    scmStore.setScmId(scmId);
-    scmStore.setSCMHAFlag(true);
-    // writes the version file properties
-    scmStore.initialize();
-    SCMRatisServerImpl.initialize(clusterId, scmId,
-        SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-            .getLocalNodeDetails(), conf);
+    // Use scmInit to initialize SCM properly (creates all required directories)
+    StorageContainerManager.scmInit(conf, clusterId);
+    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+    String scmId = scmStore.getScmId();
     StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
     try {
       scm.start();
@@ -647,17 +642,6 @@ public class TestStorageContainerManager {
     }
   }
 
-  private static void configureTopology(OzoneConfiguration conf) throws UnknownHostException {
-    String rackName = "/rack1";
-    conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-        StaticMapping.class, DNSToSwitchMapping.class);
-    StaticMapping.addNodeToRack(NetUtils.normalizeHostName(HddsUtils.getHostName(conf)),
-        rackName);
-    // In case of JDK17, the IP address is resolved to localhost mapped to 127.0.0.1 which is not in sync with JDK8
-    // and hence need to make following entry under HDDS-10132
-    StaticMapping.addNodeToRack(LOCALHOST_IP, rackName);
-  }
-
   @Test
   @SuppressWarnings("unchecked")
   public void testCloseContainerCommandOnRestart() throws Exception {
@@ -678,7 +662,7 @@ public class TestStorageContainerManager {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
-      TestDataUtil.createKeys(cluster, 10);
+      DataTestUtil.createKeys(cluster, 10);
       GenericTestUtils.waitFor(() ->
           cluster.getStorageContainerManager().getContainerManager()
               .getContainers() != null, 1000, 10000);
@@ -900,7 +884,7 @@ public class TestStorageContainerManager {
     KeyValueContainerData cData = getContainerMetadata(cluster, containerID);
     try (DBHandle db = BlockUtils.getDB(cData, cluster.getConf())) {
 
-      List<? extends Table.KeyValue<String, BlockData>> kvs =
+      List<Table.KeyValue<String, BlockData>> kvs =
           db.getStore().getBlockDataTable()
               .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
                   cData.containerPrefix(), cData.getUnprefixedKeyFilter());
@@ -922,7 +906,7 @@ public class TestStorageContainerManager {
         DatanodeStore ds = db.getStore();
         DatanodeStoreSchemaThreeImpl dnStoreImpl =
             (DatanodeStoreSchemaThreeImpl) ds;
-        List<? extends Table.KeyValue<String, DeletedBlocksTransaction>>
+        List<Table.KeyValue<String, DeletedBlocksTransaction>>
             txnsInTxnTable = dnStoreImpl.getDeleteTransactionTable()
             .getRangeKVs(cData.startKeyEmpty(), Integer.MAX_VALUE,
                 cData.containerPrefix());

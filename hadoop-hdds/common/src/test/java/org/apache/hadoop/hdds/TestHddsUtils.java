@@ -17,29 +17,33 @@
 
 package org.apache.hadoop.hdds;
 
-import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
 import static org.apache.hadoop.hdds.HddsUtils.processForLogging;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddress;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddressConfig;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedHost;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -47,6 +51,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Testing HddsUtils.
@@ -68,6 +73,122 @@ public class TestHddsUtils {
 
     assertEquals(Optional.empty(),
         HddsUtils.getHostName(":1234"));
+
+    assertEquals(Optional.of("::1"),
+        HddsUtils.getHostName("[::1]:9862"));
+
+    assertEquals(Optional.of("::1"),
+        HddsUtils.getHostName("::1"));
+
+    assertEquals(Optional.of("2001:db8::1"),
+        HddsUtils.getHostName("2001:db8::1"));
+
+    assertEquals(Optional.of("2001:db8::1"),
+        HddsUtils.getHostName("[2001:db8::1]:9862"));
+
+    assertEquals(Optional.of("2001:db8::1"),
+        HddsUtils.getHostName("[2001:db8::1]"));
+
+    // Malformed host:port input is rejected, matching getHostPort().
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.getHostName("a:b"));
+  }
+
+  @Test
+  void testGetHostPort() {
+    assertEquals(OptionalInt.of(9876), HddsUtils.getHostPort("0.0.0.0:9876"));
+    assertEquals(OptionalInt.of(9862), HddsUtils.getHostPort("localhost:9862"));
+    assertEquals(OptionalInt.of(9862), HddsUtils.getHostPort("[2001:db8::1]:9862"));
+    assertEquals(OptionalInt.empty(), HddsUtils.getHostPort("localhost"));
+  }
+
+  @Test
+  void testGetHostPortString() {
+    // Hostnames and IPv4 literals are joined with a plain colon.
+    assertEquals("host1:9858", HddsUtils.getHostPortString("host1", 9858));
+    assertEquals("1.2.3.4:9858", HddsUtils.getHostPortString("1.2.3.4", 9858));
+
+    // Bare IPv6 literals must be bracketed so the result is an unambiguous
+    // Ratis/gRPC target.
+    assertEquals("[2001:db8::1]:9858", HddsUtils.getHostPortString("2001:db8::1", 9858));
+    assertEquals("[::1]:9858", HddsUtils.getHostPortString("::1", 9858));
+
+    // Already-bracketed IPv6 literals keep a single pair of brackets.
+    assertEquals("[2001:db8::1]:9858", HddsUtils.getHostPortString("[2001:db8::1]", 9858));
+  }
+
+  @Test
+  void testGetDatanodeRpcAddressWithIPv6BindHost() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_CLIENT_BIND_HOST_KEY, "::");
+    conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, "[2001:db8::1]:100");
+
+    InetSocketAddress addr = HddsUtils.getDatanodeRpcAddress(conf);
+
+    assertEquals(InetAddress.getByName("::"), addr.getAddress());
+    assertEquals(100, addr.getPort());
+  }
+
+  @Test
+  void testParseRatisRoleStringIPv4() {
+    String input = "hostname1:9894:LEADER:peer-uuid-123:192.168.1.1";
+    String[] result = HddsUtils.parseRatisRoleString(input);
+    assertEquals("hostname1", result[0]);
+    assertEquals("9894", result[1]);
+    assertEquals("LEADER", result[2]);
+    assertEquals("peer-uuid-123", result[3]);
+    assertEquals("192.168.1.1", result[4]);
+  }
+
+  @Test
+  void testParseRatisRoleStringIPv6() {
+    String input = "[2001:db8::1]:9894:LEADER:peer1:[2001:db8:0:0:0:0:0:1]";
+    String[] result = HddsUtils.parseRatisRoleString(input);
+    assertEquals("2001:db8::1", result[0]);
+    assertEquals("9894", result[1]);
+    assertEquals("LEADER", result[2]);
+    assertEquals("peer1", result[3]);
+    assertEquals("2001:db8:0:0:0:0:0:1", result[4]);
+  }
+
+  @Test
+  void testParseRatisRoleStringIPv6Follower() {
+    String input = "[::1]:9894:FOLLOWER:abc-def:[0:0:0:0:0:0:0:1]";
+    String[] result = HddsUtils.parseRatisRoleString(input);
+    assertEquals("::1", result[0]);
+    assertEquals("9894", result[1]);
+    assertEquals("FOLLOWER", result[2]);
+    assertEquals("abc-def", result[3]);
+    assertEquals("0:0:0:0:0:0:0:1", result[4]);
+  }
+
+  @Test
+  void testParseRatisRoleStringEmptyHostIp() {
+    String input = "scm-host:9894:LEADER:uuid123:";
+    String[] result = HddsUtils.parseRatisRoleString(input);
+    assertEquals("scm-host", result[0]);
+    assertEquals("9894", result[1]);
+    assertEquals("LEADER", result[2]);
+    assertEquals("uuid123", result[3]);
+    assertEquals("", result[4]);
+  }
+
+  @Test
+  void testParseRatisRoleStringRejectsNull() {
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.parseRatisRoleString(null));
+  }
+
+  @Test
+  void testParseRatisRoleStringRejectsEmpty() {
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.parseRatisRoleString(""));
+  }
+
+  @Test
+  void testParseRatisRoleStringRejectsTooFewFields() {
+    assertThrows(IllegalArgumentException.class,
+        () -> HddsUtils.parseRatisRoleString("host:9894"));
   }
 
   static List<Arguments> validPaths() {
@@ -101,128 +222,6 @@ public class TestHddsUtils {
   void validatePathRejectsInvalidPath(String path, String ancestor) {
     assertThrows(IllegalArgumentException.class,
         () -> HddsUtils.validatePath(Paths.get(path), Paths.get(ancestor)));
-  }
-
-  @Test
-  void testGetSCMAddresses() {
-    final OzoneConfiguration conf = new OzoneConfiguration();
-    Collection<InetSocketAddress> addresses;
-    InetSocketAddress addr;
-    Iterator<InetSocketAddress> it;
-
-    // Verify valid IP address setup
-    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "1.2.3.4");
-    addresses = getSCMAddressForDatanodes(conf);
-    assertEquals(1, addresses.size());
-    addr = addresses.iterator().next();
-    assertEquals("1.2.3.4", addr.getHostName());
-    assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
-
-    // Verify valid hostname setup
-    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1");
-    addresses = getSCMAddressForDatanodes(conf);
-    assertEquals(1, addresses.size());
-    addr = addresses.iterator().next();
-    assertEquals("scm1", addr.getHostName());
-    assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
-
-    // Verify valid hostname and port
-    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234");
-    addresses = getSCMAddressForDatanodes(conf);
-    assertEquals(1, addresses.size());
-    addr = addresses.iterator().next();
-    assertEquals("scm1", addr.getHostName());
-    assertEquals(1234, addr.getPort());
-
-    final Map<String, Integer> hostsAndPorts = new HashMap<>();
-    hostsAndPorts.put("scm1", 1234);
-    hostsAndPorts.put("scm2", 2345);
-    hostsAndPorts.put("scm3", 3456);
-
-    // Verify multiple hosts and port
-    conf.setStrings(
-        ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234,scm2:2345,scm3:3456");
-    addresses = getSCMAddressForDatanodes(conf);
-    assertEquals(3, addresses.size());
-    it = addresses.iterator();
-    HashMap<String, Integer> expected1 = new HashMap<>(hostsAndPorts);
-    while (it.hasNext()) {
-      InetSocketAddress current = it.next();
-      assertTrue(expected1.remove(current.getHostName(),
-          current.getPort()));
-    }
-    assertThat(expected1).isEmpty();
-
-    // Verify names with spaces
-    conf.setStrings(
-        ScmConfigKeys.OZONE_SCM_NAMES, " scm1:1234, scm2:2345 , scm3:3456 ");
-    addresses = getSCMAddressForDatanodes(conf);
-    assertEquals(3, addresses.size());
-    it = addresses.iterator();
-    HashMap<String, Integer> expected2 = new HashMap<>(hostsAndPorts);
-    while (it.hasNext()) {
-      InetSocketAddress current = it.next();
-      assertTrue(expected2.remove(current.getHostName(),
-          current.getPort()));
-    }
-    assertThat(expected2).isEmpty();
-
-    // Verify empty value
-    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "");
-    assertThrows(IllegalArgumentException.class,
-        () -> getSCMAddressForDatanodes(conf),
-        "Empty value should cause an IllegalArgumentException");
-
-    // Verify invalid hostname
-    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "s..x..:1234");
-    assertThrows(IllegalArgumentException.class,
-        () -> getSCMAddressForDatanodes(conf),
-        "An invalid hostname should cause an IllegalArgumentException");
-
-    // Verify invalid port
-    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm:xyz");
-    assertThrows(IllegalArgumentException.class,
-        () -> getSCMAddressForDatanodes(conf),
-        "An invalid port should cause an IllegalArgumentException");
-
-    // Verify a mixed case (valid and invalid value both appears)
-    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234, scm:xyz");
-    assertThrows(IllegalArgumentException.class,
-        () -> getSCMAddressForDatanodes(conf),
-        "An invalid value should cause an IllegalArgumentException");
-  }
-
-  @Test
-  void testGetSCMAddressesWithHAConfig() {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    String scmServiceId = "scmserviceId";
-    String[] nodes = new String[]{"scm1", "scm2", "scm3"};
-    conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
-    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY + "." + scmServiceId,
-        "scm1,scm2,scm3");
-
-    int port = 9880;
-    List<String> expected = new ArrayList<>();
-    for (String nodeId : nodes) {
-      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
-          scmServiceId, nodeId), "scm");
-      conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
-          scmServiceId, nodeId), ++port);
-      expected.add("scm" + ":" + port);
-    }
-
-    Collection<InetSocketAddress> scmAddressList =
-        HddsUtils.getSCMAddressForDatanodes(conf);
-
-    assertNotNull(scmAddressList);
-    assertEquals(3, scmAddressList.size());
-
-    for (InetSocketAddress next : scmAddressList) {
-      expected.remove(next.getHostName() + ":" + next.getPort());
-    }
-
-    assertEquals(0, expected.size());
-
   }
 
   @Test
@@ -276,5 +275,184 @@ public class TestHddsUtils {
     assertEquals(processedConf.get("hdds.test.secret.key"), REDACTED_TEXT);
     /* Verify that non-sensitive properties retain their value */
     assertEquals(processedConf.get("ozone.normal.config"), ORIGINAL_VALUE);
+  }
+
+  @ParameterizedTest
+  @MethodSource("ambiguousIPv6Authorities")
+  void getPortNumberFromConfigKeysRejectsAmbiguousIPv6Authority(String value, String host, String port) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, value);
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getPortNumberFromConfigKeys(conf, OZONE_SCM_CLIENT_ADDRESS_KEY));
+
+    // Both readings have to be spelled out, since the configured text does not
+    // say which one was meant.
+    assertThat(e.getMessage())
+        .contains(OZONE_SCM_CLIENT_ADDRESS_KEY)
+        .contains(value)
+        .contains("[" + host + "]:" + port)
+        .contains("[" + value + "]");
+  }
+
+  static List<Arguments> ambiguousIPv6Authorities() {
+    return Arrays.asList(
+        Arguments.of("2001:db8::1:9862", "2001:db8::1", "9862"),
+        Arguments.of("fd00::1:2", "fd00::1", "2")
+    );
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"::1", "2001:db8::1", "2001:db8::1:abcd", "fe80::1%eth0"})
+  void getPortNumberFromConfigKeysRejectsBareIPv6Literal(String value) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, value);
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getPortNumberFromConfigKeys(conf, OZONE_SCM_CLIENT_ADDRESS_KEY));
+
+    assertThat(e.getMessage())
+        .contains(OZONE_SCM_CLIENT_ADDRESS_KEY)
+        .contains("[" + value + "]");
+  }
+
+  @ParameterizedTest
+  @MethodSource("unambiguousAuthorities")
+  void getPortNumberFromConfigKeysAcceptsUnambiguousAuthority(String value, OptionalInt expectedPort) {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, value);
+
+    assertEquals(expectedPort,
+        HddsUtils.getPortNumberFromConfigKeys(conf, OZONE_SCM_CLIENT_ADDRESS_KEY));
+  }
+
+  static List<Arguments> unambiguousAuthorities() {
+    return Arrays.asList(
+        Arguments.of("[2001:db8::1]:9862", OptionalInt.of(9862)),
+        Arguments.of("[2001:db8::1:9862]:9862", OptionalInt.of(9862)),
+        Arguments.of("[2001:db8::1]", OptionalInt.empty()),
+        Arguments.of("192.0.2.1:9862", OptionalInt.of(9862)),
+        Arguments.of("scm1.example.com:9862", OptionalInt.of(9862)),
+        Arguments.of("scm1.example.com", OptionalInt.empty())
+    );
+  }
+
+  /**
+   * A bind host names no port, so the bracket rule must leave it alone: an
+   * explicit IPv6 listener is configured as a bare {@code ::}.
+   */
+  @Test
+  void getHostNameFromConfigKeysAcceptsBareIPv6BindHost() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_BIND_HOST_KEY, "::");
+
+    assertEquals(Optional.of("::"),
+        HddsUtils.getHostNameFromConfigKeys(conf, OZONE_SCM_CLIENT_BIND_HOST_KEY));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"scm1.example.com", "192.0.2.1", "2001:db8::1", "localhost", "127.0.0.1", "::1"})
+  void validateAdvertisedHostAcceptsReachableHost(String host) {
+    assertDoesNotThrow(() -> validateAdvertisedHost(OZONE_SCM_CLIENT_ADDRESS_KEY, host));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0.0.0.0", "::", "169.254.1.1", "fe80::1", "fe80::1%eth0", "2001:db8::1/64",
+      "[::]", "[fe80::1]", "[fe80::1%eth0]"})
+  void validateAdvertisedHostRejectsUnadvertisableHost(String host) {
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> validateAdvertisedHost(OZONE_SCM_CLIENT_ADDRESS_KEY, host));
+
+    assertThat(e.getMessage())
+        .contains(OZONE_SCM_CLIENT_ADDRESS_KEY)
+        .contains(host);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0.0.0.0:9860", "[::]:9860", "[fe80::1%eth0]:9860"})
+  void validateAdvertisedAddressRejectsUnadvertisableHostWithPort(String value) {
+    assertThrows(ConfigurationException.class,
+        () -> validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, value));
+  }
+
+  @Test
+  void getHostNameRejectsUnadvertisableDatanodeHostname() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_HOST_NAME_KEY, "0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getHostName(conf));
+
+    assertThat(e.getMessage()).contains(HDDS_DATANODE_HOST_NAME_KEY);
+  }
+
+  @Test
+  void getHostNameAcceptsConfiguredDatanodeHostname() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HDDS_DATANODE_HOST_NAME_KEY, "dn1.example.com");
+
+    assertEquals("dn1.example.com", HddsUtils.getHostName(conf));
+  }
+
+  /**
+   * SCM rewrites its client address with the bound host, so a process that
+   * shares its configuration reads the wildcard back.
+   */
+  @Test
+  void getScmAddressForClientsAcceptsWildcardListenAddress() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_CLIENT_ADDRESS_KEY, "0.0.0.0:9860");
+
+    InetSocketAddress addr = HddsUtils.getScmAddressForClients(conf).iterator().next();
+
+    assertEquals("0.0.0.0", addr.getHostString());
+    assertEquals(9860, addr.getPort());
+  }
+
+  @Test
+  void getScmAddressForClientsRejectsUnadvertisableScmName() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_NAMES, "0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> HddsUtils.getScmAddressForClients(conf));
+
+    assertThat(e.getMessage()).contains(OZONE_SCM_NAMES);
+  }
+
+  /**
+   * A host that can never be advertised has to be named as such, rather than
+   * be asked for brackets that leave it rejected anyway.
+   */
+  @Test
+  void validateAdvertisedAddressReportsTheHostBeforeTheBrackets() {
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, "::"));
+
+    assertThat(e.getMessage()).contains("wildcard").doesNotContain("bracket");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"scm1.example.com", "192.0.2.1", "[2001:db8::1]:9860", "127.0.0.1:9860"})
+  void validateAdvertisedAddressAcceptsReachableAddress(String value) {
+    assertDoesNotThrow(() -> validateAdvertisedAddress(OZONE_SCM_CLIENT_ADDRESS_KEY, value));
+  }
+
+  @Test
+  void validateAdvertisedAddressConfigSkipsUnsetProperty() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    assertDoesNotThrow(() -> validateAdvertisedAddressConfig(conf, OZONE_SCM_CLIENT_ADDRESS_KEY));
+  }
+
+  @Test
+  void validateAdvertisedAddressConfigChecksEveryListEntry() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(OZONE_SCM_NAMES, "scm1.example.com,0.0.0.0");
+
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> validateAdvertisedAddressConfig(conf, OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_NAMES));
+
+    assertThat(e.getMessage()).contains(OZONE_SCM_NAMES).contains("0.0.0.0");
   }
 }

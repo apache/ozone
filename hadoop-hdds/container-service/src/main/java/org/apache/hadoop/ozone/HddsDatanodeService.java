@@ -19,16 +19,17 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX;
+import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.PER_VOLUME_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig.REPLICATION_STREAMS_LIMIT_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
@@ -38,9 +39,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -54,9 +53,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -64,10 +62,13 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.conf.TracingReconfigurationCallback;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.symmetric.DefaultSecretKeyClient;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
@@ -76,11 +77,13 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.DNCertificateClie
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
+import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.ScmNodeAddress;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
@@ -91,6 +94,9 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer;
+import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -116,6 +122,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       HddsDatanodeService.class);
 
   public static final String TESTING_DATANODE_VERSION_INITIAL = "testing.hdds.datanode.version.initial";
+  // TODO(HDDS-16044): TESTING_DATANODE_VERSION_CURRENT is unused until SCM-side version setting lands.
   public static final String TESTING_DATANODE_VERSION_CURRENT = "testing.hdds.datanode.version.current";
 
   private OzoneConfiguration conf;
@@ -242,14 +249,17 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       datanodeDetails = initializeDatanodeDetails();
       datanodeDetails.setHostName(hostname);
       serviceRuntimeInfo.setHostName(hostname);
+      serviceRuntimeInfo.setDatanodeUuid(datanodeDetails.getUuidString());
       datanodeDetails.validateDatanodeIpAddress();
       datanodeDetails.setVersion(
           HddsVersionInfo.HDDS_VERSION_INFO.getVersion());
       datanodeDetails.setSetupTime(Time.now());
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
-      TracingUtil.initTracing(
-          "HddsDatanodeService." + datanodeDetails.getID(), conf);
+      String tracingServiceName = "HddsDatanodeService." + datanodeDetails.getID();
+      TracingConfig tracingConfig = conf.getObject(TracingConfig.class);
+      TracingReconfigurationCallback tracingReconfigurationCallback =
+          TracingReconfigurationCallback.init(tracingServiceName, tracingConfig);
       LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
@@ -279,7 +289,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         LOG.info("Hdds Datanode login successful.");
       }
 
-      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+      DatanodeStorage layoutStorage = new DatanodeStorage(conf,
           datanodeDetails.getUuidString());
       if (layoutStorage.getState() != INITIALIZED) {
         layoutStorage.initialize();
@@ -299,24 +309,28 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
       reconfigurationHandler =
           new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
+              .register(tracingConfig)
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
                   this::reconfigDeletingServiceWorkers)
-              .register(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
-                  this::reconfigBlockDeletingServiceInterval)
               .register(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
                   this::reconfigBlockDeletingServiceTimeout)
               .register(REPLICATION_STREAMS_LIMIT_KEY,
-                  this::reconfigReplicationStreamsLimit);
+                  this::reconfigReplicationStreamsLimit)
+              .register(PER_VOLUME_STREAMS_LIMIT_KEY,
+                  this::reconfigPerVolumeStreamsLimit);
 
       scmServiceId = HddsUtils.getScmServiceId(conf);
+
       if (scmServiceId != null) {
-        reconfigurationHandler.register(OZONE_SCM_NODES_KEY + "." + scmServiceId,
-            this::reconfigScmNodes);
+        reconfigurationHandler
+            .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId))
+            .register(OZONE_SCM_NODES_KEY + "." + scmServiceId, this::reconfigScmNodes);
       }
 
       reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
+      reconfigurationHandler.registerCompleteCallback(tracingReconfigurationCallback);
 
       datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
           dnCertClient, secretKeyClient, this::terminateDatanode,
@@ -342,9 +356,12 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         LOG.error("HttpServer failed to start.", ex);
       }
 
+      DiskBalancerProtocol diskBalancerProtocol =
+          new DiskBalancerProtocolServer(datanodeStateMachine,
+              this::checkAdminPrivilege);
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
-          reconfigurationHandler);
+          reconfigurationHandler, diskBalancerProtocol);
 
       int clientRpcport = clientProtocolServer.getClientRpcAddress().getPort();
       serviceRuntimeInfo.setClientRpcPort(String.valueOf(clientRpcport));
@@ -396,13 +413,13 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
 
-    Map<String, StorageVolume> volumeMap = volumeSet.getVolumeMap();
+    List<StorageVolume> volumeList = volumeSet.getVolumesList();
 
-    for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
-      HddsVolume hddsVolume = (HddsVolume) entry.getValue();
-      boolean result = StorageVolumeUtil.checkVolume(hddsVolume, clusterId,
-          clusterId, conf, LOG, null);
+    for (StorageVolume storageVolume : volumeList) {
+      HddsVolume hddsVolume = (HddsVolume) storageVolume;
+      boolean result = StorageVolumeUtil.checkVolume(hddsVolume, clusterId, clusterId, conf, LOG, null);
       if (!result) {
+        LOG.error("Marking volume {} as failed", hddsVolume.getStorageDir().getPath());
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
       }
     }
@@ -455,15 +472,13 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     File idFile = new File(idFilePath);
     DatanodeDetails details;
     if (idFile.exists()) {
-      details = ContainerUtils.readDatanodeDetailsFrom(idFile);
+      details = ContainerUtils.readDatanodeDetailsFrom(idFile, conf);
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
       details = DatanodeDetails.newBuilder().setID(DatanodeID.randomID()).build();
       details.setInitialVersion(getInitialVersion());
     }
-    // Current version is always overridden to the latest
-    details.setCurrentVersion(getCurrentVersion());
     return details;
   }
 
@@ -571,6 +586,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
           }
         }
       }
+      IOUtils.close(LOG, reconfigurationHandler);
       if (datanodeStateMachine != null) {
         datanodeStateMachine.stopDaemon();
       }
@@ -665,6 +681,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
    */
   private void checkAdminPrivilege(String operation)
       throws IOException {
+    // Skip check if authorization is disabled
+    if (secConf == null || !secConf.isAuthorizationEnabled()) {
+      return;
+    }
+
     final UserGroupInformation ugi = getRemoteUser();
     admins.checkAdminUserPrivilege(ugi);
   }
@@ -689,12 +710,33 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   }
 
   private String reconfigReplicationStreamsLimit(String value) {
+    int poolSize = Integer.parseInt(value);
     getDatanodeStateMachine().getContainer().getReplicationServer()
-        .setPoolSize(Integer.parseInt(value));
+        .setPoolSize(poolSize);
+    getDatanodeStateMachine().getSupervisor()
+        .setReplicationMaxStreams(poolSize);
     return value;
   }
 
-  private String reconfigBlockDeletingServiceInterval(String value) {
+  private String reconfigPerVolumeStreamsLimit(String value) {
+    int newSize = Integer.parseInt(value);
+    Preconditions.checkArgument(newSize >= 1,
+        PER_VOLUME_STREAMS_LIMIT_KEY + " must be at least 1 but was %s",
+        value);
+    ReplicationConfig replicationConfig =
+        getDatanodeStateMachine().getSupervisor().getReplicationConfig();
+    if (!replicationConfig.isPerVolumeEnabled()) {
+      LOG.warn("Ignoring reconfiguration of {} to {} because per-volume "
+          + "replication is disabled", PER_VOLUME_STREAMS_LIMIT_KEY, value);
+      return value;
+    }
+    try {
+      getDatanodeStateMachine().getSupervisor().setPerVolumePoolSize(newSize);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to apply per-volume replication thread pool resize to "
+          + "{}: {}", value, e.getMessage(), e);
+      throw e;
+    }
     return value;
   }
 
@@ -739,12 +781,12 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     LOG.info("Reconfiguring SCM nodes for service ID {} with new SCM nodes {} and remove SCM nodes {}",
         scmServiceId, scmNodesIdsToAdd, scmNodesIdsToRemove);
 
-    Collection<Pair<String, InetSocketAddress>> scmToAdd = HddsUtils.getSCMAddressForDatanodes(
+    final List<ScmNodeAddress> scmToAdd = HddsServerUtil.getSCMAddressForDatanodes(
         getConf(), scmServiceId, scmNodesIdsToAdd);
     if (scmToAdd == null) {
       throw new IllegalStateException("Reconfiguration failed to get SCM address to add due to wrong configuration");
     }
-    Collection<Pair<String, InetSocketAddress>> scmToRemove = HddsUtils.getSCMAddressForDatanodes(
+    final List<ScmNodeAddress> scmToRemove = HddsServerUtil.getSCMAddressForDatanodes(
         getConf(), scmServiceId, scmNodesIdsToRemove);
     if (scmToRemove == null) {
       throw new IllegalArgumentException(
@@ -765,10 +807,10 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
 
     // Add the new SCM servers
-    for (Pair<String, InetSocketAddress> pair : scmToAdd) {
-      String scmNodeId = pair.getLeft();
-      InetSocketAddress scmAddress = pair.getRight();
-      if (scmAddress.isUnresolved()) {
+    for (ScmNodeAddress nodeAddress : scmToAdd) {
+      String scmNodeId = nodeAddress.getScmNodeId();
+      final HostAndPort scmAddress = nodeAddress.getHostAndPort();
+      if (scmAddress.getAddress().isUnresolved()) {
         LOG.warn("Reconfiguration failed to add SCM address {} for SCM service {} since it can't " +
             "be resolved, skipping", scmAddress, scmServiceId);
         continue;
@@ -784,9 +826,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
 
     // Remove the old SCM server
-    for (Pair<String, InetSocketAddress> pair : scmToRemove) {
-      String scmNodeId = pair.getLeft();
-      InetSocketAddress scmAddress = pair.getRight();
+    for (ScmNodeAddress nodeAddress : scmToRemove) {
+      String scmNodeId = nodeAddress.getScmNodeId();
+      final HostAndPort scmAddress = nodeAddress.getHostAndPort();
       try {
         connectionManager.removeSCMServer(scmAddress);
         context.removeEndpoint(scmAddress);
@@ -811,14 +853,8 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   /**
    * Returns the initial version of the datanode.
    */
-  private int getInitialVersion() {
-    return conf.getInt(TESTING_DATANODE_VERSION_INITIAL, DatanodeVersion.CURRENT_VERSION);
-  }
-
-  /**
-   * Returns the current version of the datanode.
-   */
-  private int getCurrentVersion() {
-    return conf.getInt(TESTING_DATANODE_VERSION_CURRENT, DatanodeVersion.CURRENT_VERSION);
+  private HDDSVersion getInitialVersion() {
+    return HDDSVersion.deserialize(
+        conf.getInt(TESTING_DATANODE_VERSION_INITIAL, HDDSVersion.SOFTWARE_VERSION.serialize()));
   }
 }

@@ -17,13 +17,34 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSCMAddressForDatanodes;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.isServiceUser;
+import static org.apache.hadoop.security.UserGroupInformation.createProxyUser;
+import static org.apache.hadoop.security.UserGroupInformation.createRemoteUser;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
+import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -43,17 +64,15 @@ public class TestHddsServerUtil {
     // First try a client address with just a host name. Verify it falls
     // back to the default port.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4");
-    InetSocketAddress addr = NetUtils.createSocketAddr(
-        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
-    assertEquals("1.2.3.4", addr.getHostString());
+    HostAndPort addr = SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeHostPortAddress();
+    assertEquals("1.2.3.4", addr.getHostName());
     assertEquals(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
 
     // Next try a client address with just a host name and port.
     // Verify the port is ignored and the default DataNode port is used.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
-    addr = NetUtils.createSocketAddr(
-        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
-    assertEquals("1.2.3.4", addr.getHostString());
+    addr = SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeHostPortAddress();
+    assertEquals("1.2.3.4", addr.getHostName());
     assertEquals(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
 
     // Set both OZONE_SCM_CLIENT_ADDRESS_KEY and
@@ -62,9 +81,8 @@ public class TestHddsServerUtil {
     // default.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "5.6.7.8");
-    addr = NetUtils.createSocketAddr(
-            SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
-    assertEquals("5.6.7.8", addr.getHostString());
+    addr = SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeHostPortAddress();
+    assertEquals("5.6.7.8", addr.getHostName());
     assertEquals(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
 
     // Set both OZONE_SCM_CLIENT_ADDRESS_KEY and
@@ -73,9 +91,8 @@ public class TestHddsServerUtil {
     // used.
     conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY, "1.2.3.4:100");
     conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY, "5.6.7.8:200");
-    addr = NetUtils.createSocketAddr(
-        SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeAddress());
-    assertEquals("5.6.7.8", addr.getHostString());
+    addr = SCMNodeInfo.buildNodeInfo(conf).get(0).getScmDatanodeHostPortAddress();
+    assertEquals("5.6.7.8", addr.getHostName());
     assertEquals(200, addr.getPort());
   }
 
@@ -169,4 +186,175 @@ public class TestHddsServerUtil {
     assertEquals(200, addr.getPort());
   }
 
+  /**
+   * Verify that a bind host holding an IPv6 literal, including the wildcard
+   * {@code ::}, yields a usable listener address.
+   */
+  @Test
+  void testBindAddressesAcceptIPv6BindHost() throws Exception {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, "::");
+    conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY, "::");
+    conf.set(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY, "::");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, "2001:db8::1");
+    conf.set(ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY, "2001:db8::1");
+
+    final InetAddress wildcard = InetAddress.getByName("::");
+    final InetAddress literal = InetAddress.getByName("2001:db8::1");
+
+    InetSocketAddress addr = HddsServerUtil.getScmClientBindAddress(conf);
+    assertEquals(wildcard, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getScmBlockClientBindAddress(conf);
+    assertEquals(wildcard, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getScmSecurityInetAddress(conf);
+    assertEquals(wildcard, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getScmDataNodeBindAddress(conf);
+    assertEquals(literal, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getReconDataNodeBindAddress(conf);
+    assertEquals(literal, addr.getAddress());
+    assertEquals(ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT, addr.getPort());
+  }
+
+  @Test
+  void testGetSCMAddresses() {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    Collection<HostAndPort> addresses;
+    HostAndPort addr;
+    Iterator<HostAndPort> it;
+
+    // Verify valid IP address setup
+    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "1.2.3.4");
+    addresses = getSCMAddressForDatanodes(conf);
+    assertEquals(1, addresses.size());
+    addr = addresses.iterator().next();
+    assertEquals("1.2.3.4", addr.getHostName());
+    assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
+
+    // Verify valid hostname setup
+    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1");
+    addresses = getSCMAddressForDatanodes(conf);
+    assertEquals(1, addresses.size());
+    addr = addresses.iterator().next();
+    assertEquals("scm1", addr.getHostName());
+    assertEquals(OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
+
+    // Verify valid hostname and port
+    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234");
+    addresses = getSCMAddressForDatanodes(conf);
+    assertEquals(1, addresses.size());
+    addr = addresses.iterator().next();
+    assertEquals("scm1", addr.getHostName());
+    assertEquals(1234, addr.getPort());
+
+    final Map<String, Integer> hostsAndPorts = new HashMap<>();
+    hostsAndPorts.put("scm1", 1234);
+    hostsAndPorts.put("scm2", 2345);
+    hostsAndPorts.put("scm3", 3456);
+
+    // Verify multiple hosts and port
+    conf.setStrings(
+        ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234,scm2:2345,scm3:3456");
+    addresses = getSCMAddressForDatanodes(conf);
+    assertEquals(3, addresses.size());
+    it = addresses.iterator();
+    HashMap<String, Integer> expected1 = new HashMap<>(hostsAndPorts);
+    while (it.hasNext()) {
+      HostAndPort current = it.next();
+      assertTrue(expected1.remove(current.getHostName(),
+          current.getPort()));
+    }
+    assertThat(expected1).isEmpty();
+
+    // Verify names with spaces
+    conf.setStrings(
+        ScmConfigKeys.OZONE_SCM_NAMES, " scm1:1234, scm2:2345 , scm3:3456 ");
+    addresses = getSCMAddressForDatanodes(conf);
+    assertEquals(3, addresses.size());
+    it = addresses.iterator();
+    HashMap<String, Integer> expected2 = new HashMap<>(hostsAndPorts);
+    while (it.hasNext()) {
+      HostAndPort current = it.next();
+      assertTrue(expected2.remove(current.getHostName(),
+          current.getPort()));
+    }
+    assertThat(expected2).isEmpty();
+
+    // Verify empty value
+    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "");
+    assertThrows(IllegalArgumentException.class,
+        () -> getSCMAddressForDatanodes(conf),
+        "Empty value should cause an IllegalArgumentException");
+
+    // Verify invalid hostname
+    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "s..x..:1234");
+    assertThrows(IllegalArgumentException.class,
+        () -> getSCMAddressForDatanodes(conf),
+        "An invalid hostname should cause an IllegalArgumentException");
+
+    // Verify invalid port
+    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm:xyz");
+    assertThrows(IllegalArgumentException.class,
+        () -> getSCMAddressForDatanodes(conf),
+        "An invalid port should cause an IllegalArgumentException");
+
+    // Verify a mixed case (valid and invalid value both appears)
+    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES, "scm1:1234, scm:xyz");
+    assertThrows(IllegalArgumentException.class,
+        () -> getSCMAddressForDatanodes(conf),
+        "An invalid value should cause an IllegalArgumentException");
+  }
+
+  @Test
+  void testGetSCMAddressesWithHAConfig() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String scmServiceId = "scmserviceId";
+    String[] nodes = new String[]{"scm1", "scm2", "scm3"};
+    conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
+    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY + "." + scmServiceId,
+        "scm1,scm2,scm3");
+
+    int port = 9880;
+    List<String> expected = new ArrayList<>();
+    for (String nodeId : nodes) {
+      conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY,
+          scmServiceId, nodeId), "scm");
+      conf.setInt(ConfUtils.addKeySuffixes(OZONE_SCM_DATANODE_PORT_KEY,
+          scmServiceId, nodeId), ++port);
+      expected.add("scm" + ":" + port);
+    }
+
+    Collection<HostAndPort> scmAddressList =
+        getSCMAddressForDatanodes(conf);
+
+    assertNotNull(scmAddressList);
+    assertEquals(3, scmAddressList.size());
+
+    for (HostAndPort next : scmAddressList) {
+      expected.remove(next.getHostAndPortString());
+    }
+
+    assertEquals(0, expected.size());
+
+  }
+
+  @Test
+  void testIsServiceUser() {
+    UserGroupInformation.setConfiguration(new OzoneConfiguration());
+    String principal = "om/_HOST@EXAMPLE.COM";
+    assertThat(isServiceUser(createRemoteUser("om/host1@EXAMPLE.COM"), principal)).isTrue();
+    for (String user : new String[] {"om@EXAMPLE.COM", "om/host1@OTHER.COM", "om/host1", "alice/om@EXAMPLE.COM"}) {
+      assertThat(isServiceUser(createRemoteUser(user), principal)).as(user).isFalse();
+    }
+    assertThat(isServiceUser(createProxyUser("om/host1@EXAMPLE.COM", createRemoteUser("alice")), principal)).isFalse();
+    // No user matches a principal that is not configured.
+    assertThat(isServiceUser(createRemoteUser("om/host1@EXAMPLE.COM"), "")).isFalse();
+  }
 }

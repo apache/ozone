@@ -344,7 +344,7 @@ public class TestParentAcl {
       OpenKeySession keySession = writeClient.createFile(keyArgs, true, false);
       keyArgs.setLocationInfoList(
           keySession.getKeyInfo().getLatestVersionLocations()
-              .getLocationList());
+              .createLocationList());
       writeClient.commitKey(keyArgs, keySession.getId());
     }
 

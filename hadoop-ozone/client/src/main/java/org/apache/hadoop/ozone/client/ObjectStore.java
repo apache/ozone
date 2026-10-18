@@ -28,7 +28,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
-import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -36,7 +35,9 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
@@ -49,7 +50,9 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
+import org.apache.hadoop.ozone.snapshot.SnapshotCountResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
@@ -83,7 +86,7 @@ public class ObjectStore {
    * @param proxy ClientProtocol proxy.
    */
   public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
-    this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
+    this.proxy = proxy;
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
     s3BucketLayout = OmUtils.validateBucketLayout(
         conf.getTrimmed(
@@ -621,6 +624,16 @@ public class ObjectStore {
   }
 
   /**
+   * Get bucket-wise snapshot count distribution from snapshotInfo table.
+   * @param bucketFilter optional filter, accepts either bucket or volume/bucket
+   * @return snapshot counts aggregated by bucket
+   * @throws IOException
+   */
+  public SnapshotCountResponse snapshotCount(String bucketFilter) throws IOException {
+    return proxy.snapshotCount(bucketFilter);
+  }
+
+  /**
    * An Iterator to iterate over {@link OzoneSnapshot} list.
    */
   private final class SnapshotIterator implements Iterator<OzoneSnapshot> {
@@ -699,6 +712,7 @@ public class ObjectStore {
    * @throws IOException in case of any exception while generating snapshot diff
    */
   @SuppressWarnings("parameternumber")
+  @Deprecated()
   public SnapshotDiffResponse snapshotDiff(String volumeName,
                                            String bucketName,
                                            String fromSnapshot,
@@ -710,6 +724,50 @@ public class ObjectStore {
       throws IOException {
     return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
         token, pageSize, forceFullDiff, disableNativeDiff);
+  }
+
+  /**
+   * Get the differences between two snapshots.
+   * @param volumeName Name of the volume to which the snapshot bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param token to get the index to return diff report from.
+   * @param pageSize maximum entries returned to the report.
+   * @return the difference report between two snapshots
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  public SnapshotDiffResponse snapshotDiff(String volumeName,
+                                           String bucketName,
+                                           String fromSnapshot,
+                                           String toSnapshot,
+                                           String token,
+                                           int pageSize)
+      throws IOException {
+    return proxy.snapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+        token, pageSize);
+  }
+
+  /**
+   * Submit snapshot diff job.
+   * @param volumeName Name of the volume to which the snapshot bucket belong
+   * @param bucketName Name of the bucket to which the snapshots belong
+   * @param fromSnapshot The name of the starting snapshot
+   * @param toSnapshot The name of the ending snapshot
+   * @param forceFullDiff request to force full diff, skipping DAG optimization
+   * @param disableNativeDiff request to force diff to perform diffs without native lib
+   * @return the result of submitting snapshot diff job.
+   * @throws IOException in case of any exception while generating snapshot diff
+   */
+  public SubmitSnapshotDiffResponse submitSnapshotDiff(String volumeName,
+                                                       String bucketName,
+                                                       String fromSnapshot,
+                                                       String toSnapshot,
+                                                       boolean forceFullDiff,
+                                                       boolean disableNativeDiff)
+      throws IOException {
+    return proxy.submitSnapshotDiff(volumeName, bucketName, fromSnapshot, toSnapshot,
+        forceFullDiff, disableNativeDiff);
   }
 
   /**
@@ -748,6 +806,40 @@ public class ObjectStore {
       String prevSnapshotDiffJob
   ) throws IOException {
     return new SnapshotDiffJobIterator(volumeName, bucketName, jobStatus, listAllStatus, prevSnapshotDiffJob);
+  }
+
+  /**
+   * Process the AssumeRole operation.
+   *
+   * @param roleArn                 The ARN of the role to assume
+   * @param roleSessionName         The session name (should be unique) for this operation
+   * @param durationSeconds         The duration in seconds for the token validity
+   * @param awsIamSessionPolicy     The AWS IAM JSON session policy
+   * @param requestId               The requestId from the STS endpoint
+   * @return AssumeRoleResponseInfo The AssumeRole response information containing temporary credentials
+   * @throws IOException            if an error occurs during the AssumeRole operation
+   */
+  public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy, String requestId) throws IOException {
+    return proxy.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy, requestId);
+  }
+
+  /**
+   * Returns the caller identity for the current S3-authenticated request.
+   * @return CallerIdentityInfo containing account, arn, and userId
+   * @throws IOException if an error occurs during the GetCallerIdentity operation
+   */
+  public CallerIdentityInfo getCallerIdentity() throws IOException {
+    return proxy.getCallerIdentity();
+  }
+
+  /**
+   * Revokes STS tokens for the given original access key ID.
+   * @param originalAccessKeyId     The original long-lived access key ID whose STS tokens to revoke
+   * @throws IOException            if an error occurs while revoking the STS token
+   */
+  public void revokeSTSToken(String originalAccessKeyId) throws IOException  {
+    proxy.revokeSTSToken(originalAccessKeyId);
   }
 
   /**

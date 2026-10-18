@@ -780,7 +780,7 @@ public final class OMRequestTestUtils {
     req.setBucketInfo(bucketInfo);
     return OMRequest.newBuilder()
         .setCreateBucketRequest(req)
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
         .setClientId(UUID.randomUUID().toString());
   }
@@ -1030,6 +1030,13 @@ public final class OMRequestTestUtils {
         omDirectoryInfo.getName());
     omMetadataManager.getDeletedDirTable().put(ozoneKey, omKeyInfo);
     omMetadataManager.getDirectoryTable().delete(ozoneKey);
+
+    String bucketKey = omMetadataManager.getBucketKey(volume, bucket);
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
+    if (omBucketInfo != null) {
+      omBucketInfo.decrUsedNamespace(1L, true);
+      omMetadataManager.getBucketTable().put(bucketKey, omBucketInfo);
+    }
     return ozoneKey;
   }
 
@@ -1374,7 +1381,8 @@ public final class OMRequestTestUtils {
               .setKey(deletedKey.getKey())
               .addAllKeyInfos(
                   deletedKey.getValue().stream()
-                  .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT_VERSION)).collect(Collectors.toList()))
+                      .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT))
+                      .collect(Collectors.toList()))
               .build();
       deletedMoveKeys.add(snapshotMoveKeyInfos);
     }
@@ -1386,7 +1394,7 @@ public final class OMRequestTestUtils {
               .setKey(deletedKey.getKey())
               .addAllKeyInfos(
                   deletedKey.getValue().stream()
-                      .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT_VERSION))
+                      .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT))
                       .collect(Collectors.toList()))
               .build();
       deletedDirMoveKeys.add(snapshotMoveKeyInfos);

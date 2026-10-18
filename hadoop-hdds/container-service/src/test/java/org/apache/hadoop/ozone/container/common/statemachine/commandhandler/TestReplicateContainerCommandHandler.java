@@ -23,15 +23,14 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
@@ -42,14 +41,13 @@ import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Test cases to verify {@link ReplicateContainerCommandHandler}.
  */
 public class TestReplicateContainerCommandHandler {
-  private OzoneConfiguration conf;
   private ReplicationSupervisor supervisor;
-  private ContainerReplicator downloadReplicator;
   private ContainerReplicator pushReplicator;
   private OzoneContainer ozoneContainer;
   private StateContext stateContext;
@@ -57,47 +55,52 @@ public class TestReplicateContainerCommandHandler {
 
   @BeforeEach
   public void setUp() {
-    conf = new OzoneConfiguration();
     supervisor = mock(ReplicationSupervisor.class);
-    downloadReplicator = mock(ContainerReplicator.class);
     pushReplicator = mock(ContainerReplicator.class);
     ozoneContainer = mock(OzoneContainer.class);
     connectionManager = mock(SCMConnectionManager.class);
     stateContext = mock(StateContext.class);
   }
 
+  /**
+   * Stubs {@link ReplicationSupervisor#addTask} and returns a captor for the
+   * {@link ReplicationTask} the handler submits.
+   */
+  private ArgumentCaptor<ReplicationTask> captureSubmittedTask() {
+    ArgumentCaptor<ReplicationTask> captor =
+        ArgumentCaptor.forClass(ReplicationTask.class);
+    doNothing().when(supervisor).addTask(captor.capture());
+    return captor;
+  }
+
   @Test
   public void testMetrics() {
     ReplicateContainerCommandHandler commandHandler =
-        new ReplicateContainerCommandHandler(conf, supervisor,
-            downloadReplicator, pushReplicator);
+        new ReplicateContainerCommandHandler(supervisor, pushReplicator);
     Map<SCMCommandProto.Type, CommandHandler> handlerMap = new HashMap<>();
     handlerMap.put(commandHandler.getCommandType(), commandHandler);
     CommandHandlerMetrics metrics = CommandHandlerMetrics.create(handlerMap);
     try {
       doNothing().when(supervisor).addTask(any());
-      DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
       DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
-      List<DatanodeDetails> sourceList = new ArrayList<>();
-      sourceList.add(source);
 
-      ReplicateContainerCommand command = ReplicateContainerCommand.fromSources(
-          1, sourceList);
+      ReplicateContainerCommand command =
+          ContainerTestUtils.getReplicateContainerCommand(1, target);
       commandHandler.handle(command, ozoneContainer, stateContext, connectionManager);
       String metricsName = ReplicationTask.METRIC_NAME;
       assertEquals(commandHandler.getMetricsName(), metricsName);
       when(supervisor.getReplicationRequestCount(metricsName)).thenReturn(1L);
       assertEquals(commandHandler.getInvocationCount(), 1);
 
-      commandHandler.handle(ReplicateContainerCommand.fromSources(2, sourceList),
+      commandHandler.handle(ContainerTestUtils.getReplicateContainerCommand(2, target),
           ozoneContainer, stateContext, connectionManager);
-      commandHandler.handle(ReplicateContainerCommand.fromSources(3, sourceList),
+      commandHandler.handle(ContainerTestUtils.getReplicateContainerCommand(3, target),
           ozoneContainer, stateContext, connectionManager);
-      commandHandler.handle(ReplicateContainerCommand.toTarget(4, target),
+      commandHandler.handle(
+          ContainerTestUtils.getReplicateContainerCommand(4, target),
           ozoneContainer, stateContext, connectionManager);
-      commandHandler.handle(ReplicateContainerCommand.toTarget(5, target),
-          ozoneContainer, stateContext, connectionManager);
-      commandHandler.handle(ReplicateContainerCommand.fromSources(6, sourceList),
+      commandHandler.handle(
+          ContainerTestUtils.getReplicateContainerCommand(5, target),
           ozoneContainer, stateContext, connectionManager);
 
       when(supervisor.getReplicationRequestCount(metricsName)).thenReturn(5L);
@@ -115,5 +118,28 @@ public class TestReplicateContainerCommandHandler {
     } finally {
       metrics.unRegister();
     }
+  }
+
+  /**
+   * The datanode follows the apparent version decided by SCM and carried in the
+   * command, without recomputing it. The submitted task should expose exactly
+   * the command's apparent version.
+   */
+  @Test
+  public void testApparentVersionTakenFromCommand() {
+    ArgumentCaptor<ReplicationTask> captor = captureSubmittedTask();
+
+    ReplicateContainerCommandHandler handler =
+        new ReplicateContainerCommandHandler(supervisor, pushReplicator);
+
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    ReplicateContainerCommand cmd = ReplicateContainerCommand.toTarget(
+        1, target, HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE);
+
+    handler.handle(cmd, ozoneContainer, stateContext, connectionManager);
+
+    ReplicationTask task = captor.getValue();
+    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE,
+        task.getApparentVersion());
   }
 }

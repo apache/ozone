@@ -23,6 +23,7 @@ import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.freon.TestDNRPCLoadGenerator;
 import org.apache.hadoop.ozone.freon.TestHadoopDirTreeGenerator;
+import org.apache.hadoop.ozone.freon.TestHadoopFsReadWriteValidator;
 import org.apache.hadoop.ozone.freon.TestHadoopNestedDirGenerator;
 import org.apache.hadoop.ozone.freon.TestHsyncGenerator;
 import org.apache.hadoop.ozone.freon.TestOmBucketReadWriteFileOps;
@@ -63,6 +64,14 @@ public abstract class FreonTests extends ClusterForTests<MiniOzoneCluster> {
 
   @Nested
   class HadoopDirTreeGenerator extends TestHadoopDirTreeGenerator {
+    @Override
+    public MiniOzoneCluster cluster() {
+      return getCluster();
+    }
+  }
+
+  @Nested
+  class HadoopFsReadWriteValidator extends TestHadoopFsReadWriteValidator {
     @Override
     public MiniOzoneCluster cluster() {
       return getCluster();

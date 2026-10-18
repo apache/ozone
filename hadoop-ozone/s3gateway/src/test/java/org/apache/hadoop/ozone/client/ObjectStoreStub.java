@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.client;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.mockito.Mockito.mock;
 
@@ -40,20 +37,20 @@ import org.apache.hadoop.util.Time;
  */
 public class ObjectStoreStub extends ObjectStore {
 
-  private static OzoneConfiguration conf = new OzoneConfiguration();
-  private Map<String, OzoneVolumeStub> volumes = new HashMap<>();
-  private Map<String, Boolean> bucketEmptyStatus = new HashMap<>();
+  private final Map<String, OzoneVolumeStub> volumes = new HashMap<>();
+  private final String s3VolumeName;
 
   public ObjectStoreStub() {
-    super(conf, mock(ClientProtocol.class));
+    this(new OzoneConfiguration(), mock(ClientProtocol.class));
   }
 
   public ObjectStoreStub(ConfigurationSource conf, ClientProtocol proxy) {
     super(conf, proxy);
+    s3VolumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
   }
 
   @Override
-  public void createVolume(String volumeName) throws IOException {
+  public void createVolume(String volumeName) {
     createVolume(volumeName,
         VolumeArgs.newBuilder()
             .setAdmin("root")
@@ -86,8 +83,7 @@ public class ObjectStoreStub extends ObjectStore {
   }
 
   @Override
-  public Iterator<? extends OzoneVolume> listVolumes(String volumePrefix)
-      throws IOException {
+  public Iterator<? extends OzoneVolume> listVolumes(String volumePrefix) {
     return volumes.values()
         .stream()
         .filter(volume -> volume.getName().startsWith(volumePrefix))
@@ -98,7 +94,7 @@ public class ObjectStoreStub extends ObjectStore {
 
   @Override
   public Iterator<? extends OzoneVolume> listVolumes(String volumePrefix,
-      String prevVolume) throws IOException {
+      String prevVolume) {
     return volumes.values()
         .stream()
         .filter(volume -> volume.getName().compareTo(prevVolume) > 0)
@@ -109,7 +105,7 @@ public class ObjectStoreStub extends ObjectStore {
 
   @Override
   public Iterator<? extends OzoneVolume> listVolumesByUser(String user,
-      String volumePrefix, String prevVolume) throws IOException {
+      String volumePrefix, String prevVolume) {
     return volumes.values()
         .stream()
         .filter(volume -> volume.getOwner().equals(user))
@@ -120,7 +116,7 @@ public class ObjectStoreStub extends ObjectStore {
   }
 
   @Override
-  public void deleteVolume(String volumeName) throws IOException {
+  public void deleteVolume(String volumeName) {
     volumes.remove(volumeName);
   }
 
@@ -128,41 +124,25 @@ public class ObjectStoreStub extends ObjectStore {
   public OzoneVolume getS3Volume() throws IOException {
     // Always return default S3 volume. This class will not be used for
     // multitenant testing.
-    String volumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
-    return getVolume(volumeName);
+    return getVolume(s3VolumeName);
   }
 
   @Override
   public void createS3Bucket(String s3BucketName) throws
       IOException {
-    if (!bucketEmptyStatus.containsKey(s3BucketName)) {
-      String volumeName = HddsClientUtils.getDefaultS3VolumeName(conf);
-      bucketEmptyStatus.put(s3BucketName, true);
-      if (!volumes.containsKey(volumeName)) {
-        createVolume(volumeName);
-      }
-      volumes.get(volumeName).createBucket(s3BucketName);
-    } else {
-      throw new OMException("", BUCKET_ALREADY_EXISTS);
+    if (!volumes.containsKey(s3VolumeName)) {
+      createVolume(s3VolumeName);
     }
+    volumes.get(s3VolumeName).createBucket(s3BucketName);
   }
 
   @Override
   public void deleteS3Bucket(String s3BucketName) throws
       IOException {
-    if (bucketEmptyStatus.containsKey(s3BucketName)) {
-      if (bucketEmptyStatus.get(s3BucketName)) {
-        bucketEmptyStatus.remove(s3BucketName);
-      } else {
-        throw new OMException("", BUCKET_NOT_EMPTY);
-      }
-    } else {
-      throw new OMException("", BUCKET_NOT_FOUND);
+    OzoneVolume volume = getS3Volume();
+    if (volume == null) {
+      throw new OMException("", VOLUME_NOT_FOUND);
     }
+    volume.deleteBucket(s3BucketName);
   }
-
-  public void setBucketEmptyStatus(String bucketName, boolean status) {
-    bucketEmptyStatus.computeIfPresent(bucketName, (k, v) -> status);
-  }
-
 }
