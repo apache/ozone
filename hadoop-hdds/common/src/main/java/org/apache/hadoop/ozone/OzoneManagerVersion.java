@@ -81,7 +81,7 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "system clients no longer need the client-side InfoBucket layout "
           + "check for listStatus"),
 
-  S3_OBJECT_TAGGING_WITH_VOLUME_CONTEXT(103,
+  S3_OBJECT_TAGGING_WITH_VOLUME_CONTEXT(102,
       "OzoneManager version that resolves S3 volume context for object tagging"),
 
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
