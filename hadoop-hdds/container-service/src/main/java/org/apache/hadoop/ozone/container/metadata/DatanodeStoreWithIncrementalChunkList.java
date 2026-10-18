@@ -188,7 +188,6 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
   private void putBlockWithPartialChunks(BatchOperation batch, long localID,
       BlockData data, KeyValueContainerData containerData) throws IOException {
     String blockKey = containerData.getBlockKey(localID);
-    BlockData blockData = getBlockDataTable().get(blockKey);
     if (data.getChunks().size() == 1) {
       // Case (3.1) replace/update the last chunk info table
       getLastChunkInfoTable().putWithBatch(
@@ -197,14 +196,16 @@ public class DatanodeStoreWithIncrementalChunkList extends AbstractDatanodeStore
       // and the chunk is not full, then add an empty block data to populate the block table.
       // This is required because some of the test code and utilities expect the block to be
       // present in the block data table, they don't check the last chunk info table.
-      if (blockData == null) {
+      // Only existence matters here, so skip decoding the (possibly long) chunk list.
+      if (!getBlockDataTable().isExist(blockKey)) {
         // populate blockDataTable with empty chunk list
-        blockData = new BlockData(data.getBlockID());
+        BlockData blockData = new BlockData(data.getBlockID());
         blockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
         blockData.setBlockCommitSequenceId(data.getBlockCommitSequenceId());
         getBlockDataTable().putWithBatch(batch, blockKey, blockData);
       }
     } else {
+      BlockData blockData = getBlockDataTable().get(blockKey);
       int lastChunkIndex = data.getChunks().size() - 1;
       // received more than one chunk this time
       List<ContainerProtos.ChunkInfo> lastChunkInfo =
