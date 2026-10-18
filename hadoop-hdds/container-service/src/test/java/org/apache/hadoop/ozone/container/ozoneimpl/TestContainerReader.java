@@ -51,8 +51,11 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.server.StartupProgress;
+import org.apache.hadoop.hdds.server.StartupProgressMXBean;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.DatanodeStartupPhase;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -272,6 +275,21 @@ public class TestContainerReader {
     }
 
     return blkNames;
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testContainerReaderProgress(ContainerTestVersionInfo versionInfo) throws Exception {
+    setup(versionInfo);
+    StartupProgress.Step step = new StartupProgress<>(DatanodeStartupPhase.class)
+        .addStep(DatanodeStartupPhase.LOADING_CONTAINERS, hddsVolume.getHddsRootDir().getPath());
+
+    new ContainerReader(volumeSet, hddsVolume, containerSet, conf, true, step).run();
+
+    assertEquals(2, containerSet.containerCount());
+    assertEquals(StartupProgressMXBean.Status.COMPLETE, step.getStatus());
+    assertEquals(2, step.getTotal());
+    assertEquals(2, step.getDone());
+    assertEquals(0, step.getRemainingTime());
   }
 
   @ContainerTestVersionInfo.ContainerTest
