@@ -865,10 +865,9 @@ public class KeyValueHandler extends Handler {
         }
       }
       final long numBytes = responseData.getSerializedSize();
+      metrics.incContainerBytesStats(Type.GetBlock, numBytes);
       if (shortCircuitGranted) {
         metrics.incContainerLocalBytesStats(Type.GetBlock, numBytes);
-      } else {
-        metrics.incContainerBytesStats(Type.GetBlock, numBytes);
       }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);

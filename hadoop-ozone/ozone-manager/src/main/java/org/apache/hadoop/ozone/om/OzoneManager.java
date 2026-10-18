@@ -93,6 +93,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLI
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SERVER_DEFAULT_REPLICATION_TYPE_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DETECTED_LOOP_IN_BUCKET_LINKS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FEATURE_NOT_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
@@ -102,6 +103,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_NOT_READY;
@@ -1417,7 +1419,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public UUID refetchSecretKey() throws IOException {
     checkAdminUserPrivilege("refetch secret key.");
-    secretKeyClient.refetchSecretKey();
+    try {
+      secretKeyClient.refetchSecretKey();
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
+    }
     return secretKeyClient.getCurrentSecretKey().getId();
   }
 
@@ -2716,13 +2722,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Returns the caller of a delegation token operation. With security enabled the call must carry an RPC user.
+   */
+  private UserGroupInformation getDelegationTokenCaller() throws IOException {
+    if (ProtobufRpcEngine.Server.getRemoteUser() == null && isSecurityEnabled()) {
+      throw new OMException("Delegation token operations require an RPC user."
+          + " Send the request over the OM RPC transport.", PERMISSION_DENIED);
+    }
+    return getRemoteUser();
+  }
+
+  /**
    * Returns authentication method used to establish the connection.
    *
    * @return AuthenticationMethod used to establish connection
    */
   private AuthenticationMethod getConnectionAuthenticationMethod()
       throws IOException {
-    UserGroupInformation ugi = getRemoteUser();
+    UserGroupInformation ugi = getDelegationTokenCaller();
     AuthenticationMethod authMethod = ugi.getAuthenticationMethod();
     if (authMethod == AuthenticationMethod.PROXY) {
       authMethod = ugi.getRealUser().getAuthenticationMethod();
@@ -2750,7 +2767,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         return null;
       }
 
-      UserGroupInformation ugi = getRemoteUser();
+      UserGroupInformation ugi = getDelegationTokenCaller();
       String user = ugi.getUserName();
       Text owner = new Text(user);
       Text realUser = null;
@@ -2786,7 +2803,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             + "kerberos or web authentication",
             INVALID_AUTH_METHOD);
       }
-      String renewer = getRemoteUser().getShortUserName();
+      String renewer = getDelegationTokenCaller().getShortUserName();
       expiryTime = delegationTokenMgr.renewToken(token, renewer);
 
     } catch (OMException oex) {
@@ -2814,7 +2831,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void cancelDelegationToken(Token<OzoneTokenIdentifier> token)
       throws OMException {
     try {
-      String canceller = getRemoteUser().getUserName();
+      String canceller = getDelegationTokenCaller().getUserName();
       final OzoneTokenIdentifier id = delegationTokenMgr.cancelToken(token, canceller);
       LOG.trace("Delegation token cancelled for dt: {}", id);
     } catch (OMException oex) {
@@ -3907,10 +3924,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       services.add(scmServiceInfoBuilder.build());
     }
     metrics.incNumGetServiceLists();
-    // For now there is no exception that can can happen in this call,
-    // so failure metrics is not handled. In future if there is any need to
-    // handle exception in this method, we need to incorporate
-    // metrics.incNumGetServiceListFails()
     AUDIT.logReadSuccess(
         buildAuditMessageForSuccess(OMAction.GET_SERVICE_LIST,
             new LinkedHashMap<>()));
@@ -4066,7 +4079,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("OM is not leader or not ready", INVALID_REQUEST);
     }
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     // Check Ozone admin privilege
     if (isAdminAuthorizationEnabled() && !isAdmin(ugi)) {
       throw new OMException("Only Ozone admins are allowed to trigger "
@@ -4106,7 +4119,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Note: Any OM (leader or follower) can run snapshot defrag
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     // Check Ozone admin privilege
     if (isAdminAuthorizationEnabled() && !isAdmin(ugi)) {
       throw new OMException("Only Ozone admins are allowed to trigger "
@@ -4220,7 +4233,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metrics.incNumTenantLists();
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (isAdminAuthorizationEnabled() && !isAdmin(ugi)) {
       final OMException omEx = new OMException(
           "Only Ozone admins are allowed to list tenants.", PERMISSION_DENIED);
@@ -4672,6 +4685,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       if (checkpointLocation == null) {
         throw new IOException("Cannot install checkpoint from leader " + leaderId + ": checkpointLocation is null");
       }
+      // The follower refuses appendEntries while this install is in progress, so its commit index is fixed.
+      // Apply up to it before installCheckpoint pauses the state machine, so that no committed entry is rejected.
+      long committedIndex = omRatisServer.getServerDivision().getRaftLog().getLastCommittedIndex();
+      omRatisServer.getOmStateMachine().awaitApplied(committedIndex);
       termIndex = installCheckpoint(leaderId, checkpointLocation);
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
@@ -4737,9 +4754,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       stopSecretManager();
       stopTrashEmptier();
       omSnapshotManager.invalidateCache();
-      // Pause the State Machine so that no new transactions can be applied.
-      // This action also clears the OM Double Buffer so that if there are any
-      // pending transactions in the buffer, they are discarded.
+      // Pause the State Machine. It flushes the transactions already applied and rejects new ones until unpause.
       omRatisServer.getOmStateMachine().pause();
     } catch (Exception e) {
       LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
@@ -4809,6 +4824,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omSnapshotManager.close();
     }
 
+    // Keeping the old DB returns null below, so Ratis does not reload the state machine.
+    boolean oldDbKept = lastAppliedIndex != checkpointTrxnInfo.getTransactionIndex();
     // Reload the OM DB store with the new checkpoint.
     // Restart (unpause) the state machine and update its last applied index
     // to the installed checkpoint's snapshot index.
@@ -4820,7 +4837,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         // obtains the last entry. Publish the position used to unpause. After a failed
         // DB replacement, these values still identify the restored pre-install state.
         setTransactionInfo(TransactionInfo.valueOf(term, lastAppliedIndex));
-        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term, oldDbKept);
         newMetadataManagerStarted = true;
         LOG.info("Reloaded OM state with Term: {} and Index: {}. Spend {} ms",
             term, lastAppliedIndex, Time.monotonicNow() - time);
@@ -4829,7 +4846,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         keyManager.start(configuration);
         startSecretManagerIfNecessary();
         startTrashEmptier(configuration);
-        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
+        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term, oldDbKept);
         LOG.info("OM DB is not stopped. Started services with Term: {} and " +
             "Index: {}", term, lastAppliedIndex);
       }
@@ -5356,7 +5373,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return;
     }
     
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!isAdmin(ugi)) {
       throw new OMException("Only Ozone admins are allowed to " + operation,
           PERMISSION_DENIED);
@@ -5376,7 +5393,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return;
     }
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!isAdmin(ugi) && !isReadOnlyAdmin(ugi) && !isReconUser(ugi)) {
       throw new OMException("Only Ozone admins, read-only admins and Recon are allowed to "
           + "access the OM metadata database via getDBUpdates.", PERMISSION_DENIED);
@@ -5520,6 +5537,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.warn("Bucket {} not found in volume {}", bucketName, volumeName);
       if (allowDanglingBuckets) {
         return null;
+      }
+
+      if (!visited.isEmpty() && (e.getResult() == VOLUME_NOT_FOUND || e.getResult() == BUCKET_NOT_FOUND)) {
+        throw new OMException("Cannot follow bucket link: linked source bucket does not exist", e, e.getResult());
       }
       throw e;
     }
@@ -5730,6 +5751,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("Enter safe mode is unsupported",
           INTERNAL_ERROR);
     case FORCE_EXIT:
+      // SCM sees this call as coming from the OM user, so the caller has to be checked here.
+      checkAdminUserPrivilege("force exit safe mode.");
       return getScmClient().getContainerClient().forceExitSafeMode();
     case GET:
       return getScmClient().getContainerClient().inSafeMode();

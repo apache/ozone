@@ -1943,6 +1943,54 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
+  void testListStatusDoesNotTriggerInfoBucket() throws Exception {
+    Path dir = new Path(bucketPath, "list-rpc-" + RandomStringUtils.secure().nextAlphanumeric(5));
+    ContractTestUtils.touch(fs, new Path(dir, "file"));
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    assertEquals(1, fs.listStatus(dir).length);
+    assertTrue(fs.listStatusIterator(dir).hasNext());
+
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(), "listStatus must not trigger InfoBucket");
+  }
+
+  @Test
+  void testListStatusRejectsObsBucket() throws Exception {
+    OzoneBucket obsBucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    DataTestUtil.createKey(obsBucket, "obs-key", "data".getBytes(StandardCharsets.UTF_8));
+    Path obsBucketPath = new Path(new Path(OZONE_URI_DELIMITER, obsBucket.getVolumeName()), obsBucket.getName());
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> fs.listStatus(obsBucketPath));
+    assertThat(exception.getMessage()).contains(obsBucket.getName());
+    assertThat(exception.getMessage()).contains("OBJECT_STORE");
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(), "listStatus must not trigger InfoBucket");
+  }
+
+  @Test
+  void testListStatusOrphanLinkBucketIsEmpty() throws Exception {
+    OzoneBucket sourceBucket = DataTestUtil.createVolumeAndBucket(client, bucketLayout);
+    OzoneVolume sourceVolume = objectStore.getVolume(sourceBucket.getVolumeName());
+    String linkBucketName = "orphan-link-" + RandomStringUtils.secure().nextNumeric(5);
+    createLinkBucket(sourceVolume.getName(), linkBucketName, sourceVolume.getName(), sourceBucket.getName());
+    sourceVolume.deleteBucket(sourceBucket.getName());
+    Path linkPath = new Path(new Path(OZONE_URI_DELIMITER, sourceVolume.getName()), linkBucketName);
+
+    assertEquals(0, fs.listStatus(linkPath).length);
+    assertFalse(fs.listStatusIterator(linkPath).hasNext());
+
+    // A bucket that does not exist still fails, unlike the orphan link.
+    Path missingBucket = new Path(new Path(OZONE_URI_DELIMITER, sourceVolume.getName()), "missing-bucket");
+    OMException exception = assertThrows(OMException.class, () -> fs.listStatus(missingBucket));
+    assertEquals(BUCKET_NOT_FOUND, exception.getResult());
+  }
+
+  @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);

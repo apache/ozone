@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.security.x509.certificate.authority.profile;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiPredicate;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -33,6 +34,14 @@ public class DefaultCAProfile extends DefaultProfile {
   private static final BiPredicate<Extension, PKIProfile>
       VALIDATE_BASIC_CONSTRAINTS = DefaultCAProfile::validateBasicExtensions;
 
+  // Basic constraints are accepted by the CA profile only.
+  private static final Map<ASN1ObjectIdentifier, BiPredicate<Extension, PKIProfile>> CA_EXTENSIONS_MAP =
+      new HashMap<>(EXTENSIONS_MAP);
+
+  static {
+    CA_EXTENSIONS_MAP.put(Extension.basicConstraints, VALIDATE_BASIC_CONSTRAINTS);
+  }
+
   private static boolean validateBasicExtensions(Extension ext,
       PKIProfile pkiProfile) {
     BasicConstraints constraints =
@@ -48,10 +57,7 @@ public class DefaultCAProfile extends DefaultProfile {
   @Override
   public Map<ASN1ObjectIdentifier,
       BiPredicate<Extension, PKIProfile>> getExtensionsMap() {
-    // Add basic constraint.
-    EXTENSIONS_MAP.putIfAbsent(Extension.basicConstraints,
-        VALIDATE_BASIC_CONSTRAINTS);
-    return EXTENSIONS_MAP;
+    return CA_EXTENSIONS_MAP;
   }
 
   @Override
