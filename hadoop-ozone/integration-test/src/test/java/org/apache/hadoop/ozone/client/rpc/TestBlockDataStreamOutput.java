@@ -186,6 +186,12 @@ public class TestBlockDataStreamOutput {
     return clientConfig;
   }
 
+  /** Whether PutBlock is committed through the data stream for this test cluster (config plus DN version). */
+  private static boolean isStreamPutBlockWithoutRaftActive(OzoneClientConfig config) {
+    return config.isDatastreamPutBlockWithoutRaftEnabled()
+        && HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT.isSupportedBy(DN_OLD_VERSION);
+  }
+
   static OzoneClient newClient(OzoneConfiguration conf,
                                OzoneClientConfig config) throws IOException {
     OzoneConfiguration copy = new OzoneConfiguration(conf);
@@ -218,7 +224,7 @@ public class TestBlockDataStreamOutput {
       testWrite(client, dataLength);
       // Forced container close before stream close relies on async PutBlock recovery;
       // that path is not used when PutBlock is committed only on data stream close.
-      if (!putBlockWithoutRaft) {
+      if (!isStreamPutBlockWithoutRaftActive(config)) {
         testWriteWithFailure(client, dataLength);
       }
     }
@@ -294,11 +300,10 @@ public class TestBlockDataStreamOutput {
       key.close();
       // Since data length is 500, first putBlock will be at 400 (flush boundary).
       // Close commits via WriteAsync PutBlock only when PutBlock does not go through the data stream.
-      int expectedPutBlocks = putBlockWithoutRaft ? 1 : 2;
-      assertEquals(
-          metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock),
-          putBlockCount + expectedPutBlocks);
-      if (putBlockWithoutRaft) {
+      int expectedPutBlocks = isStreamPutBlockWithoutRaftActive(config) ? 1 : 2;
+      assertEquals(putBlockCount + expectedPutBlocks,
+          metrics.getContainerOpCountMetrics(ContainerProtos.Type.PutBlock));
+      if (isStreamPutBlockWithoutRaftActive(config)) {
         // No PutBlock went through Raft, so there is no log index to use as block commit sequence id.
         assertEquals(0, entry.getBlockID().getBlockCommitSequenceId());
       } else {
