@@ -74,6 +74,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "client-side InfoBucket layout check for getFileChecksum"),
   ZDU(100, "OzoneManager version that supports zero downtime upgrade"),
 
+  S3_OBJECT_TAGGING_WITH_VOLUME_CONTEXT(103,
+      "OzoneManager version that resolves S3 volume context for object tagging"),
+
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
 
