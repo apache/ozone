@@ -23,6 +23,7 @@ import { setupServer } from 'msw/node';
 
 import NUMetadata from '@/v2/components/nuMetadata/nuMetadata';
 import { showDataFetchError } from '@/utils/common';
+import * as mockResponses from '@tests/mocks/namespaceUsageMocks/namespaceUsageResponseMocks';
 
 vi.mock('@/utils/common', async () => ({
   ...await vi.importActual('@/utils/common'),
@@ -30,12 +31,7 @@ vi.mock('@/utils/common', async () => ({
 }));
 
 const server = setupServer(
-  http.get('/api/v1/namespace/summary', () => HttpResponse.json({
-    status: 'OK',
-    type: 'ROOT',
-    objectInfo: {},
-    countStats: {}
-  }))
+  http.get('/api/v1/namespace/summary', () => HttpResponse.json(mockResponses.RootSummaryResponse))
 );
 
 describe('Namespace Usage metadata', () => {
@@ -47,11 +43,11 @@ describe('Namespace Usage metadata', () => {
   });
   afterAll(() => server.close());
 
-  test('hides quota rows and reports initialization when both responses are initializing', async () => {
+  test('hides quota rows and reports initialization once when both responses are initializing', async () => {
     server.use(
-      http.get('/api/v1/namespace/summary', () => HttpResponse.json({ status: 'INITIALIZING' })),
+      http.get('/api/v1/namespace/summary', () => HttpResponse.json(mockResponses.InitializingSummaryResponse)),
       http.get('/api/v1/namespace/quota', () => HttpResponse.json({
-        status: 'INITIALIZING', allowed: 0, used: 0
+        ...mockResponses.InitializingQuotaResponse, allowed: 0, used: 0
       }))
     );
 
@@ -62,22 +58,22 @@ describe('Namespace Usage metadata', () => {
     ));
     expect(screen.queryByText('Quota Allowed')).not.toBeInTheDocument();
     expect(screen.queryByText('Quota Used')).not.toBeInTheDocument();
-    expect(showDataFetchError).toHaveBeenCalledWith(
-      'The quota is currently initializing. Please wait a moment and try again later'
-    );
+    expect(showDataFetchError).toHaveBeenCalledTimes(1);
   });
 
   test.each([
-    ['INITIALIZING', 0, 0],
-    ['TYPE_NOT_APPLICABLE', 0, 0],
-    ['PATH_NOT_FOUND', 0, 0],
-    ['OK', -1, -1]
-  ])('hides quota rows for status %s with allowed %s and used %s', async (status, allowed, used) => {
-    server.use(http.get('/api/v1/namespace/quota', () => HttpResponse.json({ status, allowed, used })));
+    [mockResponses.InitializingQuotaResponse, 0, 0],
+    [mockResponses.Key1QuotaResponse, 0, 0],
+    [mockResponses.PathNotFoundQuotaResponse, 0, 0],
+    [mockResponses.RootQuotaResponse, -1, -1]
+  ])('hides quota rows for response %j with allowed %s and used %s', async (response, allowed, used) => {
+    server.use(http.get('/api/v1/namespace/quota', () => HttpResponse.json({
+      ...response, allowed, used
+    })));
 
     render(<NUMetadata path='/' />);
 
-    if (status === 'PATH_NOT_FOUND') {
+    if (response.status === 'PATH_NOT_FOUND') {
       await waitFor(() => expect(showDataFetchError).toHaveBeenCalledWith('Invalid Path: /'));
     } else {
       await screen.findByText('ROOT');
@@ -90,7 +86,9 @@ describe('Namespace Usage metadata', () => {
     [0, 0, '0 Bytes', '0 Bytes'],
     [1024, 512, '1 KB', '512 Bytes']
   ])('shows valid quota values including zero: allowed %s and used %s', async (allowed, used, allowedText, usedText) => {
-    server.use(http.get('/api/v1/namespace/quota', () => HttpResponse.json({ status: 'OK', allowed, used })));
+    server.use(http.get('/api/v1/namespace/quota', () => HttpResponse.json({
+      ...mockResponses.RootQuotaResponse, allowed, used
+    })));
 
     render(<NUMetadata path='/' />);
 

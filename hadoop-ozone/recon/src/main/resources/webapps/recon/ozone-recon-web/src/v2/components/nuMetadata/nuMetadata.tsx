@@ -352,7 +352,6 @@ const NUMetadata: React.FC<MetadataProps> = ({
       // Error checks for quota response
       if (quotaResponse.status === 'INITIALIZING') {
         quotaResponsePresent = false;
-        showDataFetchError(`The quota is currently initializing. Please wait a moment and try again later`);
       }
 
       if (quotaResponse.status === 'TYPE_NOT_APPLICABLE') {
