@@ -175,6 +175,7 @@ public class ReconStorageContainerManagerFacade
   private final ReconStorageContainerSyncHelper containerSyncHelper;
   private final ReconScmContainerSyncMetrics containerSyncMetrics;
   private final ExecutorService scmSnapshotExecutor;
+  private ScheduledExecutorService scmContainerSyncScheduler;
   private final Object scmSnapshotLock = new Object();
   private Future<?> scmSnapshotFuture;
   private ScmDbSnapshotSyncStatus scmSnapshotStatus =
@@ -587,7 +588,7 @@ public class ReconStorageContainerManagerFacade
           "Recon ScmDatanodeProtocol RPC server",
           getDatanodeProtocolServer().getDatanodeRpcAddress()));
     }
-    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1,
+    scmContainerSyncScheduler = Executors.newScheduledThreadPool(1,
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix +
                                                      "SyncSCMContainerInfo-%d")
             .build());
@@ -615,7 +616,7 @@ public class ReconStorageContainerManagerFacade
         TimeUnit.MILLISECONDS);
     LOG.debug("Started the SCM Container Info sync scheduler (interval={}ms, initialDelay={}ms).",
         syncInterval, syncInitialDelay);
-    scheduler.scheduleWithFixedDelay(() -> {
+    scmContainerSyncScheduler.scheduleWithFixedDelay(() -> {
       if (!isSyncDataFromSCMRunning.compareAndSet(false, true)) {
         LOG.debug("SCM container info sync is already running; skipping this cycle.");
         return;
@@ -661,6 +662,9 @@ public class ReconStorageContainerManagerFacade
    */
   @Override
   public void stop() {
+    if (scmContainerSyncScheduler != null) {
+      scmContainerSyncScheduler.shutdownNow();
+    }
     getDatanodeProtocolServer().stop();
     reconScmTasks.forEach(ReconScmTask::stop);
     try {

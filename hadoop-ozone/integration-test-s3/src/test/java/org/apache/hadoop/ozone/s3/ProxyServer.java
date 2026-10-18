@@ -209,11 +209,11 @@ public class ProxyServer {
         if (HOP_HEADERS.contains(headerName.toLowerCase(Locale.ENGLISH))) {
           continue;
         }
-        String headerValue = filterServerResponseHeader(clientRequest, serverResponse, headerName, field.getValue());
-        if (StringUtils.isBlank(headerValue)) {
+        HttpField filtered = filterServerResponseHeader(clientRequest, serverResponse, field);
+        if (filtered == null || StringUtils.isBlank(filtered.getValue())) {
           continue;
         }
-        proxyResponse.addHeader(headerName, headerValue);
+        proxyResponse.addHeader(headerName, filtered.getValue());
       }
     }
 

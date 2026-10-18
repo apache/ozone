@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.F
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.isNull;
@@ -39,6 +40,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -202,6 +204,20 @@ public class TestStorageVolumeChecker {
     checker.shutdownAndWait(0, TimeUnit.SECONDS);
   }
 
+  @Test
+  public void testCheckAllVolumesWithNoVolumes() throws Exception {
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeout(Duration.ofMinutes(10));
+    conf.setFromObject(dnConf);
+    StorageVolumeChecker checker = new StorageVolumeChecker(conf, new FakeTimer(), "");
+    try {
+      Set<? extends StorageVolume> failedVolumes = assertTimeoutPreemptively(Duration.ofSeconds(10),
+          () -> checker.checkAllVolumes(Collections.emptyList()));
+      assertThat(failedVolumes).isEmpty();
+    } finally {
+      checker.shutdownAndWait(0, TimeUnit.SECONDS);
+    }
+  }
 
   /**
    * Test {@link StorageVolumeChecker#checkAllVolumes} propagates
