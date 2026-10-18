@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -62,7 +63,7 @@ import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.apache.hadoop.util.Time;
-import org.apache.hadoop.util.concurrent.HadoopExecutors;
+import org.apache.hadoop.util.concurrent.HadoopScheduledThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -178,13 +179,16 @@ public class NodeStateManager implements Runnable, Closeable {
     Preconditions.checkState(staleNodeIntervalMs < deadNodeIntervalMs,
         OZONE_SCM_STALENODE_INTERVAL + " should be less than" +
             OZONE_SCM_DEADNODE_INTERVAL);
-    executorService = HadoopExecutors.newScheduledThreadPool(1,
+    ScheduledThreadPoolExecutor executor = new HadoopScheduledThreadPoolExecutor(1,
         new ThreadFactoryBuilder()
             .setDaemon(true)
             .setNameFormat(
                 scmContext.threadNamePrefix() + "SCMHeartbeatProcessor-%d")
             .build()
     );
+    // Drop the pending delayed health check on shutdown, otherwise close() waits for it to fire.
+    executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+    executorService = executor;
 
     skippedHealthChecks = 0;
     checkPaused = false; // accessed only from test functions
