@@ -2722,13 +2722,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Returns the caller of a delegation token operation. With security enabled the call must carry an RPC user.
+   */
+  private UserGroupInformation getDelegationTokenCaller() throws IOException {
+    if (ProtobufRpcEngine.Server.getRemoteUser() == null && isSecurityEnabled()) {
+      throw new OMException("Delegation token operations require an RPC user."
+          + " Send the request over the OM RPC transport.", PERMISSION_DENIED);
+    }
+    return getRemoteUser();
+  }
+
+  /**
    * Returns authentication method used to establish the connection.
    *
    * @return AuthenticationMethod used to establish connection
    */
   private AuthenticationMethod getConnectionAuthenticationMethod()
       throws IOException {
-    UserGroupInformation ugi = getRemoteUser();
+    UserGroupInformation ugi = getDelegationTokenCaller();
     AuthenticationMethod authMethod = ugi.getAuthenticationMethod();
     if (authMethod == AuthenticationMethod.PROXY) {
       authMethod = ugi.getRealUser().getAuthenticationMethod();
@@ -2756,7 +2767,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         return null;
       }
 
-      UserGroupInformation ugi = getRemoteUser();
+      UserGroupInformation ugi = getDelegationTokenCaller();
       String user = ugi.getUserName();
       Text owner = new Text(user);
       Text realUser = null;
@@ -2792,7 +2803,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             + "kerberos or web authentication",
             INVALID_AUTH_METHOD);
       }
-      String renewer = getRemoteUser().getShortUserName();
+      String renewer = getDelegationTokenCaller().getShortUserName();
       expiryTime = delegationTokenMgr.renewToken(token, renewer);
 
     } catch (OMException oex) {
@@ -2820,7 +2831,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void cancelDelegationToken(Token<OzoneTokenIdentifier> token)
       throws OMException {
     try {
-      String canceller = getRemoteUser().getUserName();
+      String canceller = getDelegationTokenCaller().getUserName();
       final OzoneTokenIdentifier id = delegationTokenMgr.cancelToken(token, canceller);
       LOG.trace("Delegation token cancelled for dt: {}", id);
     } catch (OMException oex) {
@@ -4068,7 +4079,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("OM is not leader or not ready", INVALID_REQUEST);
     }
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     // Check Ozone admin privilege
     if (isAdminAuthorizationEnabled() && !isAdmin(ugi)) {
       throw new OMException("Only Ozone admins are allowed to trigger "
@@ -4108,7 +4119,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Note: Any OM (leader or follower) can run snapshot defrag
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     // Check Ozone admin privilege
     if (isAdminAuthorizationEnabled() && !isAdmin(ugi)) {
       throw new OMException("Only Ozone admins are allowed to trigger "
@@ -4222,7 +4233,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metrics.incNumTenantLists();
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (isAdminAuthorizationEnabled() && !isAdmin(ugi)) {
       final OMException omEx = new OMException(
           "Only Ozone admins are allowed to list tenants.", PERMISSION_DENIED);
@@ -5362,7 +5373,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return;
     }
     
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!isAdmin(ugi)) {
       throw new OMException("Only Ozone admins are allowed to " + operation,
           PERMISSION_DENIED);
@@ -5382,7 +5393,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return;
     }
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!isAdmin(ugi) && !isReadOnlyAdmin(ugi) && !isReconUser(ugi)) {
       throw new OMException("Only Ozone admins, read-only admins and Recon are allowed to "
           + "access the OM metadata database via getDBUpdates.", PERMISSION_DENIED);

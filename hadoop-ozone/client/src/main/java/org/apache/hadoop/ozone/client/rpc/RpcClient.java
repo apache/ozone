@@ -1428,7 +1428,7 @@ public class RpcClient implements ClientProtocol {
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
         bucketName, keyName, size, replicationConfig, metadata, tags);
     builder.setOwnerName(ownerName);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openOutputStream(builder.build(), size);
   }
 
@@ -1471,7 +1471,7 @@ public class RpcClient implements ClientProtocol {
         bucketName, keyName, size, replicationConfig, metadata, tags);
     builder.setExpectedDataGeneration(
         OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openOutputStream(builder.build(), size);
   }
 
@@ -1497,7 +1497,7 @@ public class RpcClient implements ClientProtocol {
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
         bucketName, keyName, size, replicationConfig, metadata, tags);
     builder.setExpectedETag(expectedETag);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openOutputStream(builder.build(), size);
   }
 
@@ -1516,6 +1516,10 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
     return createOutputStream(openKey);
+  }
+
+  private boolean shouldPiggybackDerivedKey(boolean requested) {
+    return requested && OzoneManagerVersion.S3_DERIVED_KEY.isSupportedBy(omVersion);
   }
 
   private void validateObjectTagsSupport(Map<String, String> tags)
@@ -1578,7 +1582,7 @@ public class RpcClient implements ClientProtocol {
     OmKeyArgs.Builder builder = createStreamKeyArgsBuilder(
         volumeName, bucketName, keyName, size, replicationConfig, metadata,
         tags);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openDataStreamOutput(builder.build());
   }
 
@@ -1605,7 +1609,7 @@ public class RpcClient implements ClientProtocol {
         tags);
     builder.setExpectedDataGeneration(
         OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openDataStreamOutput(builder.build());
   }
 
@@ -1632,7 +1636,7 @@ public class RpcClient implements ClientProtocol {
         volumeName, bucketName, keyName, size, replicationConfig, metadata,
         tags);
     builder.setExpectedETag(expectedETag);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openDataStreamOutput(builder.build());
   }
 
@@ -2193,7 +2197,7 @@ public class RpcClient implements ClientProtocol {
         .setMultipartUploadPartNumber(partNumber)
         .setSortDatanodesInPipeline(sortDatanodesInPipeline)
         .setOwnerName(ownerName)
-        .setDerivedKeyPiggyBacking(derivedKeyPiggyBacking)
+        .setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking))
         .build();
     return ozoneManagerClient.openKey(keyArgs);
   }
