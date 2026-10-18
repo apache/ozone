@@ -17,10 +17,11 @@
 
 package org.apache.ozone.testcontainers;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
@@ -35,15 +36,18 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.Collections;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.wait.strategy.WaitStrategyTarget;
+import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.Bucket;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 
 /** Readiness tests and an S3 smoke test, which is skipped when Docker is unavailable. */
@@ -61,7 +65,9 @@ class TestOzoneContainer {
       ozone.awaitReady(target);
     }
 
-    verify(target, times(2)).execInContainer(any(String[].class));
+    ArgumentCaptor<String[]> command = ArgumentCaptor.forClass(String[].class);
+    verify(target, times(2)).execInContainer(command.capture());
+    assertArrayEquals(new String[] {"/bin/sh", "-c", "ozone admin safemode wait -t 5"}, command.getValue());
   }
 
   @Test
@@ -102,7 +108,7 @@ class TestOzoneContainer {
   void putGetThroughS3Gateway() {
     assumeTrue(DockerClientFactory.instance().isDockerAvailable(),
         "Docker is not available");
-    try (OzoneContainer ozone = new OzoneContainer()) {
+    try (OzoneContainer ozone = new OzoneContainer(smokeTestImage())) {
       ozone.start();
 
       try (S3Client s3 = S3Client.builder()
@@ -125,10 +131,15 @@ class TestOzoneContainer {
             s3.getObjectAsBytes(b -> b.bucket(bucket).key(key));
 
         assertEquals(body, got.asUtf8String());
-        assertTrue(s3.listBuckets().buckets().stream()
-            .anyMatch(b -> b.name().equals(bucket)));
+        assertThat(s3.listBuckets().buckets()).extracting(Bucket::name).contains(bucket);
       }
     }
+  }
+
+  /** CI sets {@code OZONE_IMAGE} to the ghcr.io mirror to avoid Docker Hub rate limits. */
+  private static DockerImageName smokeTestImage() {
+    String repository = System.getenv().getOrDefault("OZONE_IMAGE", "apache/ozone");
+    return DockerImageName.parse(repository + ":2.2.1-all-in-one").asCompatibleSubstituteFor("apache/ozone");
   }
 
   private static ExecResult execResult(int exitCode) {

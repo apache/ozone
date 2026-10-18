@@ -27,14 +27,13 @@ import org.testcontainers.utility.DockerImageName;
  * Testcontainers wrapper for a single-node Ozone with S3 Gateway, so JVM
  * integration tests can start Ozone the way they use the MinIO or LocalStack
  * modules. Wraps the all-in-one quickstart image (HDDS-14452 / ozone-docker#49),
- * which runs SCM + OM + datanode + S3 Gateway in one container and exposes S3G
- * on 9878.
+ * which runs SCM, OM, datanode, S3 Gateway, Recon and HttpFS in one container
+ * and exposes S3G on 9878.
  *
  * <p>Credentials: in non-secure mode S3G does not verify request signatures, so any secret / region is
  * accepted. The access key is still passed to OM as the Ozone user name, so it decides the owner of the
  * buckets and keys a test creates. {@link #getAccessKey()} / {@link #getSecretKey()} / {@link #getRegion()}
- * provide a consistent set for the caller to sign requests with; the fluent
- * setters change those returned values, not the container itself.
+ * provide a consistent set for the caller to sign requests with.
  *
  * <p>Readiness: the container waits for the S3 Gateway port, then retries {@code ozone admin safemode wait}
  * until SCM leaves safe mode. The startup timeout defaults to four minutes and can be changed with
@@ -50,9 +49,9 @@ public class OzoneContainer extends GenericContainer<OzoneContainer> {
   private static final DockerImageName DEFAULT_IMAGE =
       DockerImageName.parse("apache/ozone:2.2.1-all-in-one");
 
-  private String accessKey = "testuser";
-  private String secretKey = "testsecret";
-  private String region = "us-east-1";
+  private static final String ACCESS_KEY = "testuser";
+  private static final String SECRET_KEY = "testsecret";
+  private static final String REGION = "us-east-1";
 
   public OzoneContainer() {
     this(DEFAULT_IMAGE);
@@ -67,36 +66,21 @@ public class OzoneContainer extends GenericContainer<OzoneContainer> {
         .withStartupTimeout(Duration.ofMinutes(4)));
   }
 
-  public OzoneContainer withAccessKey(String value) {
-    this.accessKey = value;
-    return this;
-  }
-
-  public OzoneContainer withSecretKey(String value) {
-    this.secretKey = value;
-    return this;
-  }
-
-  public OzoneContainer withRegion(String value) {
-    this.region = value;
-    return this;
-  }
-
   /** @return S3 Gateway endpoint reachable from the host, e.g. http://localhost:32773 */
   public String getS3Endpoint() {
     return "http://" + getHost() + ":" + getMappedPort(S3G_PORT);
   }
 
   public String getAccessKey() {
-    return accessKey;
+    return ACCESS_KEY;
   }
 
   public String getSecretKey() {
-    return secretKey;
+    return SECRET_KEY;
   }
 
   public String getRegion() {
-    return region;
+    return REGION;
   }
 
 }

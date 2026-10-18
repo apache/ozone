@@ -21,21 +21,30 @@ raised on [HDDS-14893](https://issues.apache.org/jira/browse/HDDS-14893).
 
 ## Status
 
-**Early / not yet released.** The module is wired into the reactor
-(`hadoop-ozone/pom.xml`) and builds clean. The smoke test requires a running Docker
-daemon and is skipped automatically when Docker is unavailable.
+**Incubating, not yet released.** The API may change in a future release.
 
-## What it does
+## Usage
 
-- `OzoneContainer` wraps the all-in-one quickstart image
-  `apache/ozone:2.2.1-all-in-one`
-  ([HDDS-14452](https://issues.apache.org/jira/browse/HDDS-14452) /
-  `ozone-docker#49`), which runs SCM + OM + datanode + S3 Gateway in one
-  container and exposes S3G on 9878.
-- Exposes `getS3Endpoint()`, `getAccessKey()`, `getSecretKey()`, `getRegion()`.
-- `TestOzoneContainer` builds an AWS SDK v2 `S3Client`
-  (`endpointOverride` + `forcePathStyle` + static credentials) and runs
-  create bucket / put / get / list.
+Add `org.apache.ozone:ozone-testcontainers` as a test dependency, then:
+
+```java
+try (OzoneContainer ozone = new OzoneContainer()) {
+  ozone.start();
+  S3Client s3 = S3Client.builder()
+      .endpointOverride(URI.create(ozone.getS3Endpoint()))
+      .credentialsProvider(StaticCredentialsProvider.create(
+          AwsBasicCredentials.create(ozone.getAccessKey(), ozone.getSecretKey())))
+      .region(Region.of(ozone.getRegion()))
+      .forcePathStyle(true)
+      .build();
+  // ...
+}
+```
+
+The default image is the all-in-one quickstart image
+([HDDS-14452](https://issues.apache.org/jira/browse/HDDS-14452)); pass a different one with
+`new OzoneContainer(DockerImageName)`. See the `OzoneContainer` javadoc for credentials and
+readiness behavior.
 
 ## Run
 
@@ -43,16 +52,11 @@ daemon and is skipped automatically when Docker is unavailable.
 mvn -pl :ozone-testcontainers test
 ```
 
-With Docker running: create/put/get/list all pass and the container is
-auto-removed. Without Docker the test is skipped.
+The S3 smoke test needs a running Docker daemon and is skipped without one; the readiness
+unit tests always run.
 
 ## Notes
 
-- Non-secure S3G does not verify signatures, so any secret and region are accepted.
-  The access key is used as the Ozone user name (owner of buckets and keys).
-- The container waits for the S3 Gateway port, then retries
-  `ozone admin safemode wait` until SCM leaves safe mode. The startup timeout
-  defaults to four minutes and can be changed with `withStartupTimeout(Duration)`.
 - An image based on `ozone local run` (available since
   [HDDS-15087](https://issues.apache.org/jira/browse/HDDS-15087)) could replace the
   all-in-one image in a follow-up.
