@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -217,7 +218,7 @@ final class DiskBalancerSubCommandUtil {
       throw new IOException(String.format("host: %s(%s) %s port not found",
           details.getHostName(), details.getIpAddress(), Port.Name.CLIENT_RPC.name()));
     }
-    return details.getIpAddress() + ":" + port.getValue();
+    return HddsUtils.getHostPortString(details.getIpAddress(), port.getValue());
   }
 
   /**
@@ -237,7 +238,7 @@ final class DiskBalancerSubCommandUtil {
         .findFirst()
         .orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT); // Default port if not found
 
-    String addressPort = ipAddress + ":" + port;
+    String addressPort = HddsUtils.getHostPortString(ipAddress, port);
     if (hostname != null && !hostname.isEmpty() && !hostname.equals(ipAddress)) {
       return hostname + " (" + addressPort + ")";
     }

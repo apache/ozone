@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -1112,6 +1113,24 @@ public interface OzoneManagerProtocol
   List<OzoneFileStatusLight> listStatusLight(OmKeyArgs keyArgs,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException;
+
+  /**
+   * Like {@link #listStatus(OmKeyArgs, boolean, String, long, boolean)}, but also returns whether OM reported
+   * that no entries follow this page.
+   */
+  default ListStatusResult<OzoneFileStatus> listStatusPage(OmKeyArgs keyArgs, boolean recursive,
+      String startKey, long numEntries, boolean allowPartialPrefixes) throws IOException {
+    return ListStatusResult.unknown(listStatus(keyArgs, recursive, startKey, numEntries, allowPartialPrefixes));
+  }
+
+  /**
+   * Like {@link #listStatusLight(OmKeyArgs, boolean, String, long, boolean)}, but also returns whether OM
+   * reported that no entries follow this page.
+   */
+  default ListStatusResult<OzoneFileStatusLight> listStatusLightPage(OmKeyArgs keyArgs, boolean recursive,
+      String startKey, long numEntries, boolean allowPartialPrefixes) throws IOException {
+    return ListStatusResult.unknown(listStatusLight(keyArgs, recursive, startKey, numEntries, allowPartialPrefixes));
+  }
 
   /**
    * Add acl for Ozone object. Return true if acl is added successfully else

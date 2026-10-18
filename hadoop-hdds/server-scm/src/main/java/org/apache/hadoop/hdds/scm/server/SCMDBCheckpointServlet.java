@@ -17,7 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import java.util.Collections;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_SCM_HTTP_AUTH_TYPE;
+
 import javax.servlet.ServletException;
 import org.apache.hadoop.hdds.utils.DBCheckpointServlet;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -57,8 +58,8 @@ public class SCMDBCheckpointServlet extends DBCheckpointServlet {
     initialize(scm.getScmMetadataStore().getStore(),
         scm.getMetrics().getDBCheckpointMetrics(),
         scm.isAdminAuthorizationEnabled(),
-        Collections.emptyList(),
-        Collections.emptyList(),
-        false);
+        scm.getScmAdminUsernames(),
+        scm.getScmAdminGroups(),
+        "kerberos".equals(scm.getConfiguration().get(HDDS_SCM_HTTP_AUTH_TYPE, "simple")));
   }
 }

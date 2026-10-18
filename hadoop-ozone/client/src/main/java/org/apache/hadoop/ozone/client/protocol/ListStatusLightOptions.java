@@ -36,6 +36,9 @@ public final class ListStatusLightOptions {
   // When keyName is empty (root listing), this is the original S3/list
   // prefix for STS auth. Enables LIST check on this prefix instead of "*".
   private final String listPrefix;
+  // Set by file system clients: OM rejects the listing if the resolved bucket
+  // layout is OBJECT_STORE.
+  private final boolean requireFileSystemLayout;
 
   private ListStatusLightOptions(Builder b) {
     this.volumeName = b.volumeName;
@@ -46,6 +49,7 @@ public final class ListStatusLightOptions {
     this.numEntries = b.numEntries;
     this.allowPartialPrefixes = b.allowPartialPrefixes;
     this.listPrefix = b.listPrefix;
+    this.requireFileSystemLayout = b.requireFileSystemLayout;
   }
 
   public String getVolumeName() {
@@ -78,6 +82,10 @@ public final class ListStatusLightOptions {
 
   public String getListPrefix() {
     return listPrefix;
+  }
+
+  public boolean isRequireFileSystemLayout() {
+    return requireFileSystemLayout;
   }
 
   public static Builder builder() {
@@ -113,6 +121,7 @@ public final class ListStatusLightOptions {
     private long numEntries;
     private boolean allowPartialPrefixes;
     private String listPrefix;
+    private boolean requireFileSystemLayout;
 
     public Builder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
@@ -154,6 +163,11 @@ public final class ListStatusLightOptions {
       return this;
     }
 
+    public Builder setRequireFileSystemLayout(boolean requireFileSystemLayout) {
+      this.requireFileSystemLayout = requireFileSystemLayout;
+      return this;
+    }
+
     public ListStatusLightOptions build() {
       return new ListStatusLightOptions(this);
     }
@@ -169,7 +183,8 @@ public final class ListStatusLightOptions {
     }
     final ListStatusLightOptions that = (ListStatusLightOptions) o;
     return recursive == that.recursive && numEntries == that.numEntries &&
-        allowPartialPrefixes == that.allowPartialPrefixes && Objects.equals(volumeName, that.volumeName) &&
+        allowPartialPrefixes == that.allowPartialPrefixes &&
+        requireFileSystemLayout == that.requireFileSystemLayout && Objects.equals(volumeName, that.volumeName) &&
         Objects.equals(bucketName, that.bucketName) && Objects.equals(keyName, that.keyName) &&
         Objects.equals(startKey, that.startKey) && Objects.equals(listPrefix, that.listPrefix);
   }
@@ -177,6 +192,7 @@ public final class ListStatusLightOptions {
   @Override
   public int hashCode() {
     return Objects.hash(
-        volumeName, bucketName, keyName, recursive, startKey, numEntries, allowPartialPrefixes, listPrefix);
+        volumeName, bucketName, keyName, recursive, startKey, numEntries, allowPartialPrefixes, listPrefix,
+        requireFileSystemLayout);
   }
 }
