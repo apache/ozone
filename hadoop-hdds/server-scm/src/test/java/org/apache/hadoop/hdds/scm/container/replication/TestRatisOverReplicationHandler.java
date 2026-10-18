@@ -50,6 +50,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -429,9 +430,10 @@ public class TestRatisOverReplicationHandler {
     replicas.add(createContainerReplica(container.containerID(), 0,
         IN_SERVICE, State.CLOSED, sequenceID));
 
-    final ContainerReplica quasiClosedReplica =
-        createContainerReplica(container.containerID(), 0,
-            IN_SERVICE, State.QUASI_CLOSED, sequenceID - 1);
+    // a copy, as a replica on its origin datanode is kept
+    final ContainerReplica quasiClosedReplica = createContainerReplica(container.containerID(), 0, IN_SERVICE,
+        State.QUASI_CLOSED, 123L, 1234L, MockDatanodeDetails.randomDatanodeDetails(), DatanodeID.randomID(),
+        sequenceID - 1);
     replicas.add(quasiClosedReplica);
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 0);
@@ -442,6 +444,46 @@ public class TestRatisOverReplicationHandler {
 
     testProcessing(replicas, Collections.emptyList(),
         getOverReplicatedHealthResult(), 1);
+  }
+
+  @Test
+  public void testQuasiClosedReplicasOnOriginAreKept() throws IOException {
+    final long sequenceID = 20;
+    container = ReplicationTestUtil.createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.CLOSED, sequenceID);
+    final Set<ContainerReplica> replicas = createReplicas(container.containerID(), State.CLOSED, 0, 0, 0, 0);
+    final Set<ContainerReplica> quasiClosed = new HashSet<>();
+    for (int i = 0; i < 2; i++) {
+      quasiClosed.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
+          sequenceID - 1));
+    }
+    replicas.addAll(quasiClosed);
+
+    // only the fourth CLOSED replica is excess
+    final Set<Pair<DatanodeDetails, SCMCommand<?>>> commands =
+        testProcessing(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
+    assertThat(commands).extracting(Pair::getKey)
+        .doesNotContainAnyElementsOf(quasiClosed.stream().map(ContainerReplica::getDatanodeDetails)
+            .collect(Collectors.toList()));
+  }
+
+  @Test
+  public void testQuasiClosedContainerCountsLaggingReplicaOnOrigin() throws IOException {
+    final long sequenceID = 20;
+    container = ReplicationTestUtil.createContainerInfo(RATIS_REPLICATION_CONFIG, 1,
+        HddsProtos.LifeCycleState.QUASI_CLOSED, sequenceID);
+    final ContainerReplica original = createContainerReplica(container.containerID(), 0, IN_SERVICE,
+        State.QUASI_CLOSED, sequenceID);
+    final Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(original);
+    replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED, sequenceID));
+    replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
+        sequenceID - 1));
+    replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED, 123L, 1234L,
+        MockDatanodeDetails.randomDatanodeDetails(), original.getOriginDatanodeId(), sequenceID));
+
+    // one of the two replicas of the same origin is excess
+    testProcessing(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
   }
 
   @Test

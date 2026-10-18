@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManagerUtil;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
@@ -140,9 +141,8 @@ public class EmptyContainerHandler extends AbstractCheck {
       final Set<ContainerReplica> replicas) {
     return container.getState() == HddsProtos.LifeCycleState.CLOSED &&
         !replicas.isEmpty() &&
-        replicas.stream().allMatch(
-            r -> r.getState() == ContainerReplicaProto.State.CLOSED &&
-                r.isEmpty());
+        replicas.stream().allMatch(r -> r.isEmpty() && (r.getState() == ContainerReplicaProto.State.CLOSED
+            || ReplicationManagerUtil.isKeptOriginReplica(container, r)));
   }
 
   /**

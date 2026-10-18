@@ -598,9 +598,9 @@ public class TestRatisReplicationCheckHandler {
     ContainerInfo container = createContainerInfo(repConfig);
     Set<ContainerReplica> replicas
         = createReplicas(container.containerID(), State.CLOSED, 0, 0, 0);
-    ContainerReplica quasiClosed =
-        createContainerReplica(container.containerID(), 0,
-            IN_SERVICE, State.QUASI_CLOSED, container.getSequenceId() - 1);
+    // a copy, as a replica on its origin datanode is kept
+    ContainerReplica quasiClosed = createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
+        123L, 1234L, MockDatanodeDetails.randomDatanodeDetails(), DatanodeID.randomID(), container.getSequenceId() - 1);
     replicas.add(quasiClosed);
     requestBuilder.setContainerReplicas(replicas)
         .setContainerInfo(container);
@@ -623,6 +623,27 @@ public class TestRatisReplicationCheckHandler {
         ContainerHealthState.OVER_REPLICATED));
     assertEquals(0, report.getStat(
         ContainerHealthState.UNDER_REPLICATED));
+  }
+
+  @Test
+  public void testQuasiClosedReplicasOnOriginAreNotExcess() {
+    ContainerInfo container = createContainerInfo(repConfig);
+    Set<ContainerReplica> replicas = createReplicas(container.containerID(), State.CLOSED, 0, 0, 0);
+    for (int i = 0; i < 2; i++) {
+      replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE, State.QUASI_CLOSED,
+          container.getSequenceId() - 1));
+    }
+    requestBuilder.setContainerReplicas(replicas).setContainerInfo(container);
+    assertEquals(HealthState.HEALTHY, healthCheck.checkHealth(requestBuilder.build()).getHealthState());
+    assertFalse(healthCheck.handle(requestBuilder.build()));
+    assertEquals(0, repQueue.overReplicatedQueueSize());
+
+    // with a fourth CLOSED replica only that one is excess
+    replicas.addAll(createReplicas(container.containerID(), State.CLOSED, 0));
+    requestBuilder.setContainerReplicas(replicas);
+    ContainerHealthResult result = healthCheck.checkHealth(requestBuilder.build());
+    assertEquals(HealthState.OVER_REPLICATED, result.getHealthState());
+    assertEquals(1, ((OverReplicatedHealthResult) result).getExcessRedundancy());
   }
 
   /**

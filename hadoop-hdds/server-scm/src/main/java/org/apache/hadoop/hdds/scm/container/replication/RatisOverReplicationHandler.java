@@ -84,7 +84,10 @@ public class RatisOverReplicationHandler
     // replicated with a HEALTHY and STALE replica, and we decide to delete the
     // HEALTHY one, and then the STALE ones goes away, we will lose them both.
     // To avoid this, we will filter out any non-healthy replicas first.
+    // Replicas that are kept on their origin datanode are not counted, so they do not make the container look over
+    // replicated.
     Set<ContainerReplica> healthyReplicas = replicas.stream()
+        .filter(r -> !ReplicationManagerUtil.isKeptOriginReplica(containerInfo, r))
         .filter(r -> {
           try {
             return replicationManager.getNodeStatus(r.getDatanodeDetails())

@@ -185,7 +185,10 @@ public class RatisReplicationCheckHandler extends AbstractCheck {
 
   public ContainerHealthResult checkHealth(ContainerCheckRequest request) {
     ContainerInfo container = request.getContainerInfo();
-    Set<ContainerReplica> replicas = request.getContainerReplicas();
+    // Replicas kept on their origin datanode are not counted.
+    Set<ContainerReplica> replicas = request.getContainerReplicas().stream()
+        .filter(r -> !ReplicationManagerUtil.isKeptOriginReplica(container, r))
+        .collect(Collectors.toSet());
     List<ContainerReplicaOp> replicaPendingOps = request.getPendingOps();
     // Note that this setting is minReplicasForMaintenance. For EC the variable
     // is defined as remainingRedundancy which is subtly different.

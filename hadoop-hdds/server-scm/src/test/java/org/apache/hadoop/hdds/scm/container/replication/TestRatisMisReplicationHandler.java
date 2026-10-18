@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -133,6 +134,16 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
             .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0),
                     Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
     testMisReplication(availableReplicas, Collections.emptyList(), 0, 1, 0);
+  }
+
+  @Test
+  public void testMisReplicationWithQuasiClosedReplicaOnOrigin() throws IOException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
+    // a replica kept on its origin datanode does not make the container over replicated
+    availableReplicas.add(ReplicationTestUtil.createContainerReplica(ContainerID.valueOf(1), 0, IN_SERVICE,
+        State.QUASI_CLOSED, 1));
+    testMisReplication(availableReplicas, Collections.emptyList(), 0, 1, 1);
   }
 
   @Test

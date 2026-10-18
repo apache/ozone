@@ -156,6 +156,11 @@ public final class ReplicationManagerUtil {
           });
     }
     for (ContainerReplica r : replicas) {
+      if (isKeptOriginReplica(container, r)) {
+        // A kept replica is not counted for placement, and its host cannot receive a new replica.
+        excludedNodes.add(r.getDatanodeDetails());
+        continue;
+      }
       if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
         if (container.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED) {
           // any unique UNHEALTHY will get added as used nodes in the catch-all at the end of the loop
@@ -333,7 +338,7 @@ public final class ReplicationManagerUtil {
           r.getState() == ContainerReplicaProto.State.QUASI_CLOSED) {
         // a quasi_closed replica is a candidate only if its seq id is less
         // than the container's
-        if (r.getSequenceId() < containerInfo.getSequenceId()) {
+        if (r.getSequenceId() < containerInfo.getSequenceId() && !isKeptOriginReplica(containerInfo, r)) {
           deleteCandidates.add(r);
         }
       } else if (r.getState() == ContainerReplicaProto.State.UNHEALTHY) {
@@ -354,6 +359,18 @@ public final class ReplicationManagerUtil {
       return !nonUniqueOrigins.isEmpty() ? nonUniqueOrigins : null;
     }
     return null;
+  }
+
+  /**
+   * A QUASI_CLOSED replica of a CLOSED container is kept while it is on its origin datanode, even if its sequence ID
+   * differs from the container's. A copy reports the origin of the replica it was made from, so only the replica on its
+   * origin datanode is known to hold that origin's data.
+   */
+  public static boolean isKeptOriginReplica(ContainerInfo container, ContainerReplica replica) {
+    return container.getState() == HddsProtos.LifeCycleState.CLOSED
+        && replica.getState() == ContainerReplicaProto.State.QUASI_CLOSED
+        && replica.getSequenceId() != container.getSequenceId()
+        && replica.getDatanodeDetails().getID().equals(replica.getOriginDatanodeId());
   }
 
   /**

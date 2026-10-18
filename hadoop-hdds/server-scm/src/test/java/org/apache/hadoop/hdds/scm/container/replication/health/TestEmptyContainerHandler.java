@@ -138,6 +138,30 @@ public class TestEmptyContainerHandler {
     assertAndVerify(request, true, 3, 1);
   }
 
+  @Test
+  public void testEmptyClosedRatisContainerWithQuasiClosedReplicaOnOrigin() throws IOException {
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(ratisReplicationConfig, 1, CLOSED, 0L, 123L);
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil.createReplicas(containerInfo.containerID(),
+        ContainerReplicaProto.State.CLOSED, 0L, 123L, 0, 0, 0);
+    DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
+    ContainerReplica onOrigin = ReplicationTestUtil.createContainerReplica(containerInfo.containerID(), 0,
+        HddsProtos.NodeOperationalState.IN_SERVICE, ContainerReplicaProto.State.QUASI_CLOSED, 10L, 123L,
+        dn, dn.getID(), containerInfo.getSequenceId() - 1);
+    containerReplicas.add(onOrigin);
+    ContainerCheckRequest.Builder builder = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setContainerInfo(containerInfo);
+
+    // not empty yet
+    assertAndVerify(builder.setContainerReplicas(containerReplicas)
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit())).build(), false, 0, 0);
+
+    containerReplicas.remove(onOrigin);
+    containerReplicas.add(onOrigin.toBuilder().setKeyCount(0).setEmpty(true).build());
+    assertAndVerify(builder.setContainerReplicas(containerReplicas)
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit())).build(), true, 4, 1);
+  }
+
   /**
    * Handler should return false when key count is 0 but the container is not
    * in CLOSED state.

@@ -137,8 +137,8 @@ abstract class AbstractContainerReportHandler {
     }
 
     if (isHealthy(replicaProto.getState())) {
-      if (containerInfo.getSequenceId() <
-          replicaProto.getBlockCommitSequenceId()) {
+      if (containerInfo.getState() != HddsProtos.LifeCycleState.CLOSED &&
+          containerInfo.getSequenceId() < replicaProto.getBlockCommitSequenceId()) {
         containerInfo.updateSequenceId(
             replicaProto.getBlockCommitSequenceId());
       }

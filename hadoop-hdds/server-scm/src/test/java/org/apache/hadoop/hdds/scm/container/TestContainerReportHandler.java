@@ -1183,6 +1183,27 @@ public class TestContainerReportHandler {
     assertEquals(1, containerManager.getContainerReplicas(containerOne.containerID()).size());
   }
 
+  @Test
+  public void testReportDoesNotRaiseSequenceIdOfClosedContainer() throws NodeNotFoundException, IOException {
+    final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
+    final DatanodeDetails datanodeOne = nodeManager.getNodes(NodeStatus.inServiceHealthy()).iterator().next();
+    final ContainerInfo closed = getContainer(LifeCycleState.CLOSED);
+    final ContainerInfo quasiClosed = getContainer(LifeCycleState.QUASI_CLOSED);
+    nodeManager.setContainers(datanodeOne, Stream.of(closed.containerID(), quasiClosed.containerID())
+        .collect(Collectors.toSet()));
+    containerStateManager.addContainer(closed.getProtobuf());
+    containerStateManager.addContainer(quasiClosed.getProtobuf());
+
+    for (ContainerInfo container : new ContainerInfo[] {closed, quasiClosed}) {
+      reportHandler.onMessage(new ContainerReportFromDatanode(datanodeOne, getContainerReportsProto(
+          container.containerID(), ContainerReplicaProto.State.QUASI_CLOSED, datanodeOne.getUuidString(),
+          200L, 10L, 20000L, 0)), publisher);
+    }
+
+    assertEquals(10000L, containerManager.getContainer(closed.containerID()).getSequenceId());
+    assertEquals(20000L, containerManager.getContainer(quasiClosed.containerID()).getSequenceId());
+  }
+
   /**
    * Test resurrection of DELETED container to QUASI_CLOSED state when a non-empty
    * QUASI_CLOSED replica with matching bcsId is reported.

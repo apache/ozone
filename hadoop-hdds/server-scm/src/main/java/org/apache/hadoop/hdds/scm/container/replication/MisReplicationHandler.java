@@ -109,6 +109,9 @@ public abstract class MisReplicationHandler implements
       ContainerHealthResult result, int remainingMaintenanceRedundancy)
       throws IOException {
     ContainerInfo container = result.getContainerInfo();
+    replicas = replicas.stream()
+        .filter(r -> !ReplicationManagerUtil.isKeptOriginReplica(container, r))
+        .collect(Collectors.toSet());
     if (!pendingOps.isEmpty()) {
       LOG.info("Skipping Mis-Replication for Container {}, " +
                "as there are still some pending ops for the container: {}",

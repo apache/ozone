@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -362,6 +363,39 @@ public class TestReplicationManagerUtil {
     assertThat(excludedAndUsedNodes.getExcludedNodes()).contains(remove.getDatanodeDetails());
     assertThat(excludedAndUsedNodes.getExcludedNodes()).contains(pendingDelete);
     assertThat(excludedAndUsedNodes.getExcludedNodes()).contains(fullDn);
+  }
+
+  @Test
+  public void testQuasiClosedReplicaOnOriginIsNotSelectedForDelete() throws NodeNotFoundException {
+    final long sequenceId = 20;
+    final ContainerInfo container = ReplicationTestUtil.createContainerInfo(RatisReplicationConfig.getInstance(
+        HddsProtos.ReplicationFactor.THREE), 1, HddsProtos.LifeCycleState.CLOSED, sequenceId);
+    final Set<ContainerReplica> replicas = new HashSet<>();
+    for (int i = 0; i < 2; i++) {
+      replicas.add(createContainerReplica(container.containerID(), 0, IN_SERVICE,
+          ContainerReplicaProto.State.CLOSED, sequenceId));
+    }
+    final ContainerReplica onOrigin = createContainerReplica(container.containerID(), 0, IN_SERVICE,
+        ContainerReplicaProto.State.QUASI_CLOSED, sequenceId - 1);
+    final ContainerReplica copy = createContainerReplica(container.containerID(), 0, IN_SERVICE,
+        ContainerReplicaProto.State.QUASI_CLOSED, 123L, 1234L, MockDatanodeDetails.randomDatanodeDetails(),
+        onOrigin.getOriginDatanodeId(), sequenceId - 1);
+    replicas.add(onOrigin);
+    replicas.add(copy);
+
+    assertThat(ReplicationManagerUtil.selectUnhealthyReplicasForDelete(container, replicas, 0,
+        dn -> NodeStatus.inServiceHealthy())).containsExactly(copy);
+
+    replicas.remove(copy);
+    assertNull(ReplicationManagerUtil.selectUnhealthyReplicasForDelete(container, replicas, 0,
+        dn -> NodeStatus.inServiceHealthy()));
+
+    // the datanode of the kept replica is excluded, not used, for placement
+    when(replicationManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
+    ReplicationManagerUtil.ExcludedAndUsedNodes nodes = ReplicationManagerUtil.getExcludedAndUsedNodes(container,
+        new ArrayList<>(replicas), new HashSet<>(), new ArrayList<>(), replicationManager);
+    assertThat(nodes.getExcludedNodes()).containsExactly(onOrigin.getDatanodeDetails());
+    assertThat(nodes.getUsedNodes()).hasSize(2).doesNotContain(onOrigin.getDatanodeDetails());
   }
 
 }

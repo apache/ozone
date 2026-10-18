@@ -519,9 +519,10 @@ public class TestReplicationManager {
         ContainerID.valueOf(1), 0, IN_SERVICE,
         ContainerReplicaProto.State.CLOSED, sequenceId);
 
+    // a copy, as a replica on its origin datanode is kept
     final ContainerReplica quasiCloseReplica = createContainerReplica(
-        ContainerID.valueOf(1), 0, IN_SERVICE,
-        ContainerReplicaProto.State.QUASI_CLOSED, sequenceId - 5);
+        ContainerID.valueOf(1), 0, IN_SERVICE, ContainerReplicaProto.State.QUASI_CLOSED, 123L, 1234L,
+        MockDatanodeDetails.randomDatanodeDetails(), DatanodeID.randomID(), sequenceId - 5);
 
     Set<ContainerReplica> replicas = new HashSet<>();
     replicas.add(replicaOne);
