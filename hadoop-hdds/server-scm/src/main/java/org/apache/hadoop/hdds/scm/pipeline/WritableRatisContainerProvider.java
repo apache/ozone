@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -162,15 +163,20 @@ public class WritableRatisContainerProvider
           excludeList, Pipeline.PipelineState.OPEN);
       if (client != null) {
         // Try pipelines with a replica on the writer's datanode first, like the HDFS first replica.
+        // Among those, prefer pipelines led by that datanode, since Ratis writes go through the leader.
+        List<Pipeline> leaderPipelines = new ArrayList<>();
         List<Pipeline> localPipelines = new ArrayList<>();
         for (Pipeline pipeline : availablePipelines) {
-          if (pipeline.getNodes().contains(client)) {
+          if (client.getID().equals(pipeline.getLeaderId())) {
+            leaderPipelines.add(pipeline);
+          } else if (pipeline.getNodes().contains(client)) {
             localPipelines.add(pipeline);
           }
         }
-        if (!localPipelines.isEmpty()) {
-          availablePipelines.removeAll(localPipelines);
-          ContainerInfo containerInfo = selectContainer(localPipelines, req, owner, excludeList);
+        availablePipelines.removeAll(leaderPipelines);
+        availablePipelines.removeAll(localPipelines);
+        for (List<Pipeline> preferred : Arrays.asList(leaderPipelines, localPipelines)) {
+          ContainerInfo containerInfo = selectContainer(preferred, req, owner, excludeList);
           if (containerInfo != null) {
             return containerInfo;
           }

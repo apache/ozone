@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -113,6 +114,25 @@ class TestWritableRatisContainerProvider {
         createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, client);
 
     assertSame(localContainer, container);
+    verifyPipelineNotCreated();
+  }
+
+  @RepeatedTest(100)
+  void prefersPipelineLedByClientDatanode() throws Exception {
+    DatanodeDetails client = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline followerPipeline = MockPipeline.createPipeline(Arrays.asList(client,
+        MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails()));
+    pipelineHasContainer(followerPipeline);
+    Pipeline leaderPipeline = MockPipeline.createPipeline(Arrays.asList(client,
+        MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails()))
+        .toBuilder().setLeaderId(client.getID()).build();
+    ContainerInfo leaderContainer = pipelineHasContainer(leaderPipeline);
+    existingPipelines(followerPipeline, leaderPipeline);
+
+    ContainerInfo container =
+        createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, client);
+
+    assertSame(leaderContainer, container);
     verifyPipelineNotCreated();
   }
 
