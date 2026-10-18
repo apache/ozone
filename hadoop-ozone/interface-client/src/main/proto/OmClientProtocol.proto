@@ -200,6 +200,9 @@ message OMRequest {
 
   optional ReadConsistencyHint readConsistencyHint = 7;
 
+  // Resolve the S3 volume from the request authentication context.
+  optional bool assumeS3Context = 8;
+
   optional CreateVolumeRequest              createVolumeRequest            = 11;
   optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
   optional CheckVolumeAccessRequest         checkVolumeAccessRequest       = 13;
@@ -2598,8 +2601,6 @@ message PutObjectTaggingResponse {
 
 message GetObjectTaggingRequest {
   required KeyArgs keyArgs = 1;
-  // Resolve the S3 volume from the request authentication context.
-  optional bool assumeS3Context = 2;
 }
 
 message GetObjectTaggingResponse {

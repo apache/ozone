@@ -2898,10 +2898,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     GetObjectTaggingRequest req =
         GetObjectTaggingRequest.newBuilder()
             .setKeyArgs(keyArgs)
-            .setAssumeS3Context(assumeS3Context)
             .build();
 
     OMRequest omRequest = createOMRequest(Type.GetObjectTagging)
+        .setAssumeS3Context(assumeS3Context)
         .setGetObjectTaggingRequest(req)
         .build();
 

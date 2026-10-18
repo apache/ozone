@@ -208,8 +208,7 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
         .build(), true);
 
     verify(omTransport).submitRequest(captor.capture());
-    assertThat(captor.getValue().getGetObjectTaggingRequest()
-        .getAssumeS3Context()).isTrue();
+    assertThat(captor.getValue().getAssumeS3Context()).isTrue();
   }
 
   @Test
