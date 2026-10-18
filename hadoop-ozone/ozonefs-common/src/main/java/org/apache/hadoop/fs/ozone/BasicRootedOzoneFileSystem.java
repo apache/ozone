@@ -1130,7 +1130,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       long start, long len)
       throws IOException {
     if (fileStatus instanceof LocatedFileStatus) {
-      return ((LocatedFileStatus) fileStatus).getBlockLocations();
+      return BasicOzoneFileSystem.getBlockLocationsInRange((LocatedFileStatus) fileStatus, start, len);
     } else {
       return super.getFileBlockLocations(fileStatus, start, len);
     }
