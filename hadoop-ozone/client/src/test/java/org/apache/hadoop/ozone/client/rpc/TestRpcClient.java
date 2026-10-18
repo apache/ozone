@@ -30,6 +30,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -41,12 +45,22 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.event.Level;
 
 /**
@@ -342,6 +356,139 @@ public class TestRpcClient {
     }
   }
 
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, names = {
+      "ATOMIC_CREATE_IF_NOT_EXISTS", "S3_BUCKET_TAGGING_API", "GET_FILE_STATUS_REJECTS_OBS", "UNKNOWN_VERSION"
+  })
+  public void testBucketTaggingVersionChecks(OzoneManagerVersion version) throws IOException {
+    List<Type> requests = new LinkedList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) {
+        OMResponse.Builder response = OMResponse.newBuilder()
+            .setCmdType(request.getCmdType()).setSuccess(true).setStatus(Status.OK);
+        if (request.getCmdType() == Type.ServiceList) {
+          response.setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(om(version).getProtobuf()));
+        } else {
+          requests.add(request.getCmdType());
+        }
+        return response.build();
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      List<Executable> operations = Arrays.asList(
+          () -> assertThat(client.getBucketTagging("volume1", "bucket1")).isEmpty(),
+          () -> client.putBucketTagging("volume1", "bucket1", Collections.singletonMap("tag", "value")),
+          () -> client.deleteBucketTagging("volume1", "bucket1"));
+      for (Executable operation : operations) {
+        if (version == OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS) {
+          IOException error = assertThrows(IOException.class, operation);
+          assertThat(error).hasMessage("OzoneManager does not support S3 bucket tagging API");
+        } else {
+          assertDoesNotThrow(operation);
+        }
+      }
+      if (version == OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS) {
+        assertThat(requests).isEmpty();
+      } else {
+        assertThat(requests).containsExactly(Type.GetBucketTagging, Type.PutBucketTagging, Type.DeleteBucketTagging);
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  private enum KeyWriteOperation {
+    CREATE, CREATE_IF_ABSENT, REWRITE_IF_MATCH,
+    STREAM, STREAM_IF_ABSENT, STREAM_IF_MATCH,
+    MULTIPART, MULTIPART_STREAM
+  }
+
+  static Stream<Arguments> derivedKeyPiggybackCases() {
+    return Arrays.stream(KeyWriteOperation.values()).flatMap(operation -> Stream.of(
+        Arguments.of(operation, OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS.serialize(), true, false),
+        Arguments.of(operation, OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS.serialize(), false, false),
+        Arguments.of(operation, OzoneManagerVersion.S3_DERIVED_KEY.serialize(), true, true),
+        Arguments.of(operation, OzoneManagerVersion.S3_DERIVED_KEY.serialize(), false, false),
+        Arguments.of(operation, OzoneManagerVersion.ZDU.serialize(), true, true),
+        Arguments.of(operation, OzoneManagerVersion.ZDU.serialize(), false, false),
+        Arguments.of(operation, OzoneManagerVersion.SOFTWARE_VERSION.serialize() + 1, true, true),
+        Arguments.of(operation, OzoneManagerVersion.SOFTWARE_VERSION.serialize() + 1, false, false)));
+  }
+
+  @ParameterizedTest
+  @MethodSource("derivedKeyPiggybackCases")
+  void testDerivedKeyPiggybackVersionGate(KeyWriteOperation operation, int omVersion,
+      boolean requested, boolean expected) throws IOException {
+    AtomicReference<CreateKeyRequest> captured = new AtomicReference<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return super.submitRequest(request).toBuilder()
+              .setServiceListResponse(ServiceListResponse.newBuilder()
+                  .addServiceInfo(OzoneManagerProtocolProtos.ServiceInfo.newBuilder()
+                      .setNodeType(HddsProtos.NodeType.OM).setHostname("new-om")
+                      .setOMVersion(OzoneManagerVersion.SOFTWARE_VERSION.serialize()))
+                  .addServiceInfo(OzoneManagerProtocolProtos.ServiceInfo.newBuilder()
+                      .setNodeType(HddsProtos.NodeType.OM).setHostname("other-om").setOMVersion(omVersion)))
+              .build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          captured.set(request.getCreateKeyRequest());
+          throw new IOException("Captured CreateKey request");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+      IOException error = assertThrows(IOException.class, () -> {
+        switch (operation) {
+        case CREATE:
+          client.createKey("volume", "bucket", "key", 0, replication, Collections.emptyMap(), Collections.emptyMap(),
+              requested);
+          break;
+        case CREATE_IF_ABSENT:
+          client.createKeyIfNotExists("volume", "bucket", "key", 0, replication, Collections.emptyMap(),
+              Collections.emptyMap(), requested);
+          break;
+        case REWRITE_IF_MATCH:
+          client.rewriteKeyIfMatch("volume", "bucket", "key", 0, "etag", replication, Collections.emptyMap(),
+              Collections.emptyMap(), requested);
+          break;
+        case STREAM:
+          client.createStreamKey("volume", "bucket", "key", 0, replication, Collections.emptyMap(),
+              Collections.emptyMap(), requested);
+          break;
+        case STREAM_IF_ABSENT:
+          client.createStreamKeyIfNotExists("volume", "bucket", "key", 0, replication, Collections.emptyMap(),
+              Collections.emptyMap(), requested);
+          break;
+        case STREAM_IF_MATCH:
+          client.rewriteStreamKeyIfMatch("volume", "bucket", "key", 0, "etag", replication, Collections.emptyMap(),
+              Collections.emptyMap(), requested);
+          break;
+        case MULTIPART:
+          client.createMultipartKey("volume", "bucket", "key", 0, 1, "upload", requested);
+          break;
+        case MULTIPART_STREAM:
+          client.createMultipartStreamKey("volume", "bucket", "key", 0, 1, "upload", requested);
+          break;
+        default:
+          throw new IllegalArgumentException("Unexpected operation: " + operation);
+        }
+      });
+      assertThat(error).hasMessage("Captured CreateKey request");
+      assertThat(captured.get()).isNotNull();
+      assertThat(captured.get().getDerivedKeyPiggyBacking()).isEqualTo(expected);
+    } finally {
+      client.close();
+    }
+  }
+
   private static ServiceInfo om(OzoneManagerVersion version) {
     return new ServiceInfo.Builder()
         .setNodeType(HddsProtos.NodeType.OM)
@@ -355,11 +502,15 @@ public class TestRpcClient {
   }
 
   private static RpcClient createRpcClient() throws IOException {
+    return createRpcClient(new MockOmTransport());
+  }
+
+  private static RpcClient createRpcClient(OmTransport transport) throws IOException {
     OzoneConfiguration config = new OzoneConfiguration();
     return new RpcClient(config, null) {
       @Override
       protected OmTransport createOmTransport(String omServiceId) {
-        return new MockOmTransport();
+        return transport;
       }
 
       @Override
