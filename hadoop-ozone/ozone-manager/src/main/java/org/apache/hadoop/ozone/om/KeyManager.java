@@ -423,4 +423,11 @@ public interface KeyManager extends OzoneManagerFS, IOzoneAcl {
    *     the sort to SCM.
    */
   boolean isSortDatanodesForWriteEnabled();
+
+  /**
+   * @return true if OM should pass the client address to SCM on every block
+   *     allocation, so SCM can prefer a pipeline on the client's datanode
+   *     ({@code hdds.scm.block.allocation.prefer.client.local}).
+   */
+  boolean isPreferClientLocalPipeline();
 }

@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 
@@ -52,5 +53,17 @@ public interface WritableContainerProvider<T extends ReplicationConfig> {
   ContainerInfo getContainer(long size, T repConfig,
       String owner, ExcludeList excludeList)
       throws IOException;
+
+  /**
+   * Same as {@link #getContainer(long, ReplicationConfig, String, ExcludeList)}, preferring a container on a
+   * pipeline that contains {@code client} when the provider supports it.
+   *
+   * @param client The datanode the writer runs on, or null if unknown.
+   */
+  default ContainerInfo getContainer(long size, T repConfig,
+      String owner, ExcludeList excludeList, DatanodeDetails client)
+      throws IOException {
+    return getContainer(size, repConfig, owner, excludeList);
+  }
 
 }

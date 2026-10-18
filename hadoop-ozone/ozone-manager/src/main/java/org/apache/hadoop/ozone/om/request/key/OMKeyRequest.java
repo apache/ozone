@@ -210,13 +210,15 @@ public abstract class OMKeyRequest extends OMClientRequest {
     final NetworkTopology clusterMap = shouldSortDatanodes
         && keyManager.isSortDatanodesForWriteEnabled()
         ? ozoneManager.getClusterMapAllowNull() : null;
+    // SCM needs the client address to prefer a pipeline on the client's datanode; it then also sorts by it.
+    final String localityClientMachine = keyManager.isPreferClientLocalPipeline() ? remoteAddress : "";
     if (!shouldSortDatanodes) {
-      scmClientMachine = "";
+      scmClientMachine = localityClientMachine;
       omClientMachine = "";
       sortedByNodes = null;
     } else if (clusterMap != null && !remoteAddress.isEmpty()) {
-      // Sort in OM: SCM skips sorting (empty machine), OM sorts by remoteAddress.
-      scmClientMachine = "";
+      // Sort in OM: SCM skips sorting unless it gets the machine for locality, OM sorts by remoteAddress.
+      scmClientMachine = localityClientMachine;
       omClientMachine = remoteAddress;
       sortedByNodes = new HashMap<>();
     } else {

@@ -128,6 +128,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
@@ -213,6 +214,7 @@ public class KeyManagerImpl implements KeyManager {
   private final long scmBlockSize;
   private final OzoneBlockTokenSecretManager secretManager;
   private final boolean grpcBlockTokenEnabled;
+  private final boolean preferClientLocalPipeline;
 
   private KeyDeletingService keyDeletingService;
 
@@ -247,6 +249,7 @@ public class KeyManagerImpl implements KeyManager {
     this.grpcBlockTokenEnabled = conf.getBoolean(
         HDDS_BLOCK_TOKEN_ENABLED,
         HDDS_BLOCK_TOKEN_ENABLED_DEFAULT);
+    this.preferClientLocalPipeline = conf.getObject(ScmConfig.class).isPreferClientLocalPipeline();
 
     this.ozoneManager = om;
     this.scmClient = scmClient;
@@ -2333,6 +2336,11 @@ public class KeyManagerImpl implements KeyManager {
   @Override
   public boolean isSortDatanodesForWriteEnabled() {
     return ozoneManager.getConfig().isSortDatanodesForWriteEnabled();
+  }
+
+  @Override
+  public boolean isPreferClientLocalPipeline() {
+    return preferClientLocalPipeline;
   }
 
   /**
