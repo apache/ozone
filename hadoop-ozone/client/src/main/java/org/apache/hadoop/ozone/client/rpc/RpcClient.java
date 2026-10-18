@@ -141,6 +141,7 @@ import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDeleteKeys;
@@ -1427,7 +1428,7 @@ public class RpcClient implements ClientProtocol {
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
         bucketName, keyName, size, replicationConfig, metadata, tags);
     builder.setOwnerName(ownerName);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openOutputStream(builder.build(), size);
   }
 
@@ -1470,7 +1471,7 @@ public class RpcClient implements ClientProtocol {
         bucketName, keyName, size, replicationConfig, metadata, tags);
     builder.setExpectedDataGeneration(
         OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openOutputStream(builder.build(), size);
   }
 
@@ -1496,7 +1497,7 @@ public class RpcClient implements ClientProtocol {
     OmKeyArgs.Builder builder = createWriteKeyArgsBuilder(volumeName,
         bucketName, keyName, size, replicationConfig, metadata, tags);
     builder.setExpectedETag(expectedETag);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openOutputStream(builder.build(), size);
   }
 
@@ -1515,6 +1516,10 @@ public class RpcClient implements ClientProtocol {
       throws IOException {
     OpenKeySession openKey = ozoneManagerClient.openKey(keyArgs);
     return createOutputStream(openKey);
+  }
+
+  private boolean shouldPiggybackDerivedKey(boolean requested) {
+    return requested && OzoneManagerVersion.S3_DERIVED_KEY.isSupportedBy(omVersion);
   }
 
   private void validateObjectTagsSupport(Map<String, String> tags)
@@ -1577,7 +1582,7 @@ public class RpcClient implements ClientProtocol {
     OmKeyArgs.Builder builder = createStreamKeyArgsBuilder(
         volumeName, bucketName, keyName, size, replicationConfig, metadata,
         tags);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openDataStreamOutput(builder.build());
   }
 
@@ -1604,7 +1609,7 @@ public class RpcClient implements ClientProtocol {
         tags);
     builder.setExpectedDataGeneration(
         OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openDataStreamOutput(builder.build());
   }
 
@@ -1631,7 +1636,7 @@ public class RpcClient implements ClientProtocol {
         volumeName, bucketName, keyName, size, replicationConfig, metadata,
         tags);
     builder.setExpectedETag(expectedETag);
-    builder.setDerivedKeyPiggyBacking(derivedKeyPiggyBacking);
+    builder.setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking));
     return openDataStreamOutput(builder.build());
   }
 
@@ -2192,7 +2197,7 @@ public class RpcClient implements ClientProtocol {
         .setMultipartUploadPartNumber(partNumber)
         .setSortDatanodesInPipeline(sortDatanodesInPipeline)
         .setOwnerName(ownerName)
-        .setDerivedKeyPiggyBacking(derivedKeyPiggyBacking)
+        .setDerivedKeyPiggyBacking(shouldPiggybackDerivedKey(derivedKeyPiggyBacking))
         .build();
     return ozoneManagerClient.openKey(keyArgs);
   }
@@ -2587,26 +2592,36 @@ public class RpcClient implements ClientProtocol {
   @Override
   public List<OzoneFileStatus> listStatus(ListStatusLightOptions options)
       throws IOException {
+    return listStatusPage(options).getStatuses();
+  }
+
+  @Override
+  public ListStatusResult<OzoneFileStatus> listStatusPage(ListStatusLightOptions options)
+      throws IOException {
     final OmKeyArgs keyArgs = prepareListStatusKeyArgs(options);
-    return ozoneManagerClient.listStatus(keyArgs, options.isRecursive(), options.getStartKey(),
+    return ozoneManagerClient.listStatusPage(keyArgs, options.isRecursive(), options.getStartKey(),
         options.getNumEntries(), options.isAllowPartialPrefixes());
   }
 
   @Override
   public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
       throws IOException {
+    return listStatusLightPage(options).getStatuses();
+  }
+
+  @Override
+  public ListStatusResult<OzoneFileStatusLight> listStatusLightPage(ListStatusLightOptions options)
+      throws IOException {
     final OmKeyArgs keyArgs = prepareListStatusKeyArgs(options);
     if (OzoneManagerVersion.LIGHTWEIGHT_LIST_STATUS.isSupportedBy(omVersion)) {
-      return ozoneManagerClient.listStatusLight(
+      return ozoneManagerClient.listStatusLightPage(
           keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),
           options.isAllowPartialPrefixes());
     } else {
-      return ozoneManagerClient.listStatus(
+      return ozoneManagerClient.listStatusPage(
           keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),
               options.isAllowPartialPrefixes())
-          .stream()
-          .map(OzoneFileStatusLight::fromOzoneFileStatus)
-          .collect(Collectors.toList());
+          .map(OzoneFileStatusLight::fromOzoneFileStatus);
     }
   }
 
