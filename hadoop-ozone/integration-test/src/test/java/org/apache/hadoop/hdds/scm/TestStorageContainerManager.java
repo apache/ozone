@@ -628,7 +628,7 @@ public class TestStorageContainerManager {
   }
 
   @Test
-  void testStateMachineClosedByRatisTerminatesWithFailureStatus(@TempDir Path tempDir) throws Exception {
+  void testStateMachineCloseTerminatesWithFailureStatus(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.resolve("scm-meta").toString());
     StorageContainerManager.scmInit(conf, UUID.randomUUID().toString());
@@ -654,7 +654,7 @@ public class TestStorageContainerManager {
     }
   }
 
-  /** Waits until the datanode RPC server is started, so that stopping SCM releases its port. */
+  /** Waits until the state machine is ready. */
   private static void waitForStateMachineReady(StorageContainerManager scm) throws Exception {
     SCMStateMachine stateMachine = scm.getScmHAManager().getRatisServer().getSCMStateMachine();
     GenericTestUtils.waitFor(stateMachine::getIsStateMachineReady, 100, 30_000);

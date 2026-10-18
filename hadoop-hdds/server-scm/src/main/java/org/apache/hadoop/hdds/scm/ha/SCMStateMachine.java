@@ -696,6 +696,14 @@ public class SCMStateMachine extends BaseStateMachine {
           shutdown(installSnapshotExecutor, LOG, 5, TimeUnit.SECONDS);
       stopDNServerStartRetry();
     } else if (!scm.isStopped()) {
+      // A removed SCM may only have received the joint configuration, which still lists it among the old peers.
+      boolean decommissioned = scm.getScmHAManager().getRatisServer().getDivision().getRaftConf()
+          .getCurrentPeers().stream().noneMatch(peer -> peer.getId().equals(RaftPeerId.valueOf(scm.getScmId())));
+      if (decommissioned) {
+        scm.stop();
+        ExitUtils.terminate(0, "SCM is decommissioned, terminate SCM", LOG);
+        return;
+      }
       scm.shutDown("scm statemachine is closed by ratis, terminate SCM");
     }
   }
