@@ -1103,7 +1103,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         throw os3Exception;
       }
       throw newError(bucketName, key, ex);
-    } catch (IOException ex) {
+    } catch (IOException | RuntimeException ex) {
       // Ensure we handle permission failures - these can surface as IOException wrapping OMException.
       if (copyHeader != null) {
         getMetrics().updateCopyObjectFailureStats(startNanos);
