@@ -54,11 +54,12 @@ import org.apache.hadoop.ozone.util.CacheMetrics;
  * Wrapper class for Scm protocol clients.
  */
 public class ScmClient {
-
   private final ScmBlockLocationProtocol blockClient;
+  private final ScmBlockLocationProtocol blockClientForKeyDeletion;
   private final StorageContainerLocationProtocol containerClient;
   private final SCMFailoverProxyProviderBase<?> blockProxyProvider;
   private final SCMFailoverProxyProviderBase<?> containerProxyProvider;
+  private final SCMFailoverProxyProviderBase<?> keyDeletionBlockProxyProvider;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
   private final CacheMetrics datanodeDetailsCacheMetrics;
@@ -66,7 +67,15 @@ public class ScmClient {
   ScmClient(ScmBlockLocationProtocol blockClient,
             StorageContainerLocationProtocol containerClient,
             OzoneConfiguration configuration) {
-    this(blockClient, containerClient, null, null, configuration);
+    this(blockClient, containerClient, configuration, blockClient);
+  }
+
+  ScmClient(ScmBlockLocationProtocol blockClient,
+            StorageContainerLocationProtocol containerClient,
+            OzoneConfiguration configuration,
+            ScmBlockLocationProtocol blockClientForKeyDeletion) {
+    this(blockClient, containerClient, null, null, configuration,
+        blockClientForKeyDeletion, null);
   }
 
   ScmClient(ScmBlockLocationProtocol blockClient,
@@ -74,10 +83,23 @@ public class ScmClient {
             SCMFailoverProxyProviderBase<?> blockProxyProvider,
             SCMFailoverProxyProviderBase<?> containerProxyProvider,
             OzoneConfiguration configuration) {
+    this(blockClient, containerClient, blockProxyProvider,
+        containerProxyProvider, configuration, blockClient, null);
+  }
+
+  ScmClient(ScmBlockLocationProtocol blockClient,
+            StorageContainerLocationProtocol containerClient,
+            SCMFailoverProxyProviderBase<?> blockProxyProvider,
+            SCMFailoverProxyProviderBase<?> containerProxyProvider,
+            OzoneConfiguration configuration,
+            ScmBlockLocationProtocol blockClientForKeyDeletion,
+            SCMFailoverProxyProviderBase<?> keyDeletionBlockProxyProvider) {
     this.containerClient = containerClient;
     this.blockClient = blockClient;
+    this.blockClientForKeyDeletion = blockClientForKeyDeletion;
     this.blockProxyProvider = blockProxyProvider;
     this.containerProxyProvider = containerProxyProvider;
+    this.keyDeletionBlockProxyProvider = keyDeletionBlockProxyProvider;
     Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache =
         createDatanodeDetailsCache(configuration);
     this.containerLocationCache =
@@ -169,6 +191,9 @@ public class ScmClient {
     if (containerProxyProvider != null) {
       containerProxyProvider.changeConfig();
     }
+    if (keyDeletionBlockProxyProvider != null) {
+      keyDeletionBlockProxyProvider.changeConfig();
+    }
   }
 
   @VisibleForTesting
@@ -183,6 +208,10 @@ public class ScmClient {
 
   public ScmBlockLocationProtocol getBlockClient() {
     return this.blockClient;
+  }
+
+  public ScmBlockLocationProtocol getBlockClientForKeyDeletion() {
+    return this.blockClientForKeyDeletion;
   }
 
   public StorageContainerLocationProtocol getContainerClient() {
@@ -248,6 +277,9 @@ public class ScmClient {
   public void close() {
     containerCacheMetrics.unregister();
     datanodeDetailsCacheMetrics.unregister();
+    // OzoneManager.stop() is also used before restarting the same OM instance.
+    // The protocol clients are final fields reused by OzoneManager.restart(),
+    // so closing them here would leave the restarted OM with stopped clients.
   }
 
 }

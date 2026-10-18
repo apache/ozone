@@ -40,6 +40,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import javax.net.SocketFactory;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -135,6 +136,12 @@ public final class HAUtils {
         new SCMBlockLocationFailoverProxyProvider(conf));
   }
 
+  public static ScmBlockLocationProtocol getScmBlockClient(
+      OzoneConfiguration conf, SocketFactory socketFactory) {
+    return getScmBlockClient(conf,
+        new SCMBlockLocationFailoverProxyProvider(conf, socketFactory));
+  }
+
   /**
    * Creates an SCM block client using the provided proxy provider.
    * Retains the provider reference to support dynamic SCM node updates.
@@ -172,14 +179,15 @@ public final class HAUtils {
   @VisibleForTesting
   public static StorageContainerLocationProtocol getScmContainerClient(
       ConfigurationSource conf, UserGroupInformation userGroupInformation) {
-    SCMContainerLocationFailoverProxyProvider proxyProvider =
+    return getScmContainerClient(conf, userGroupInformation, null);
+  }
+
+  public static StorageContainerLocationProtocol getScmContainerClient(
+      ConfigurationSource conf, UserGroupInformation userGroupInformation,
+      SocketFactory socketFactory) {
+    return getScmContainerClient(conf,
         new SCMContainerLocationFailoverProxyProvider(conf,
-            userGroupInformation);
-    StorageContainerLocationProtocol scmContainerClient =
-        TracingUtil.createProxy(
-            new StorageContainerLocationProtocolClientSideTranslatorPB(
-                proxyProvider), StorageContainerLocationProtocol.class, conf);
-    return scmContainerClient;
+            userGroupInformation, socketFactory));
   }
 
   public static StorageContainerLocationProtocol getScmContainerClientForNode(

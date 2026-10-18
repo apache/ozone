@@ -280,7 +280,7 @@ public class KeyManagerImpl implements KeyManager {
         keyDeletingServiceCorePoolSize = 1;
       }
       keyDeletingService = new KeyDeletingService(ozoneManager,
-          scmClient.getBlockClient(), blockDeleteInterval,
+          scmClient.getBlockClientForKeyDeletion(), blockDeleteInterval,
           serviceTimeout, configuration, keyDeletingServiceCorePoolSize, isSnapshotDeepCleaningEnabled);
       keyDeletingService.start();
     }
