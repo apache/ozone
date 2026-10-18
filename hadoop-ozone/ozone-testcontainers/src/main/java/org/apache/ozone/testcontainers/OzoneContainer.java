@@ -28,10 +28,11 @@ import org.testcontainers.utility.DockerImageName;
  * integration tests can start Ozone the way they use the MinIO or LocalStack
  * modules. Wraps the all-in-one quickstart image (HDDS-14452 / ozone-docker#49),
  * which runs SCM + OM + datanode + S3 Gateway in one container and exposes S3G
- * on 9878. Non-secure S3G accepts any access key / secret.
+ * on 9878.
  *
- * <p>Credentials: in non-secure mode S3G accepts any access key / secret, so
- * {@link #getAccessKey()} / {@link #getSecretKey()} / {@link #getRegion()} just
+ * <p>Credentials: in non-secure mode S3G does not verify request signatures, so any secret / region is
+ * accepted. The access key is still passed to OM as the Ozone user name, so it decides the owner of the
+ * buckets and keys a test creates. {@link #getAccessKey()} / {@link #getSecretKey()} / {@link #getRegion()}
  * provide a consistent set for the caller to sign requests with; the fluent
  * setters change those returned values, not the container itself.
  *
@@ -47,7 +48,7 @@ public class OzoneContainer extends GenericContainer<OzoneContainer> {
   public static final int S3G_PORT = 9878;
 
   private static final DockerImageName DEFAULT_IMAGE =
-      DockerImageName.parse("apache/ozone:2.2.0-all-in-one");
+      DockerImageName.parse("apache/ozone:2.2.1-all-in-one");
 
   private String accessKey = "testuser";
   private String secretKey = "testsecret";

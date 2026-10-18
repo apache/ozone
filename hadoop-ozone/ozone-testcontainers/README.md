@@ -22,14 +22,13 @@ raised on [HDDS-14893](https://issues.apache.org/jira/browse/HDDS-14893).
 ## Status
 
 **Early / not yet released.** The module is wired into the reactor
-(`hadoop-ozone/pom.xml`) and builds clean, but the base image and packaging are
-still under discussion (see HDDS-14893). The smoke test requires a running Docker
+(`hadoop-ozone/pom.xml`) and builds clean. The smoke test requires a running Docker
 daemon and is skipped automatically when Docker is unavailable.
 
 ## What it does
 
 - `OzoneContainer` wraps the all-in-one quickstart image
-  `apache/ozone:2.2.0-all-in-one`
+  `apache/ozone:2.2.1-all-in-one`
   ([HDDS-14452](https://issues.apache.org/jira/browse/HDDS-14452) /
   `ozone-docker#49`), which runs SCM + OM + datanode + S3 Gateway in one
   container and exposes S3G on 9878.
@@ -49,10 +48,11 @@ auto-removed. Without Docker the test is skipped.
 
 ## Notes
 
-- Non-secure S3G accepts any access key / secret.
+- Non-secure S3G does not verify signatures, so any secret and region are accepted.
+  The access key is used as the Ozone user name (owner of buckets and keys).
 - The container waits for the S3 Gateway port, then retries
   `ozone admin safemode wait` until SCM leaves safe mode. The startup timeout
   defaults to four minutes and can be changed with `withStartupTimeout(Duration)`.
-- `ozone local run` (needs
-  [HDDS-15087](https://issues.apache.org/jira/browse/HDDS-15087)) would give a
-  cleaner env-driven image later, but is not required for a working module.
+- An image based on `ozone local run` (available since
+  [HDDS-15087](https://issues.apache.org/jira/browse/HDDS-15087)) could replace the
+  all-in-one image in a follow-up.

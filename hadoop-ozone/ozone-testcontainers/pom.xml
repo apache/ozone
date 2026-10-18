@@ -26,9 +26,9 @@
   <description>Testcontainers module to run a single-node Ozone with S3 Gateway in integration tests</description>
 
   <properties>
-    <aws-java-sdk2.version>2.49.3</aws-java-sdk2.version>
+    <aws-java-sdk2.version>2.55.6</aws-java-sdk2.version>
     <maven.javadoc.skip>true</maven.javadoc.skip>
-    <testcontainers.version>1.20.4</testcontainers.version>
+    <testcontainers.version>1.21.4</testcontainers.version>
   </properties>
 
   <dependencyManagement>
@@ -56,11 +56,6 @@
       <artifactId>testcontainers</artifactId>
     </dependency>
 
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-api</artifactId>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>apache-client</artifactId>
