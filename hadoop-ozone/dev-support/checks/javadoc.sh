@@ -19,11 +19,14 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
+CHECK=javadoc
+
 BASE_DIR="$(pwd -P)"
-REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/javadoc"}
+REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/${CHECK}"}
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
 MAVEN_OPTIONS="-B -fae -Djacoco.skip -DskipDocs -DskipRecon -DskipShade --no-transfer-progress ${MAVEN_OPTIONS:-}"
+MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 log=$(mktemp)
 mvn ${MAVEN_OPTIONS} clean javadoc:aggregate "$@" | tee "${log}"
