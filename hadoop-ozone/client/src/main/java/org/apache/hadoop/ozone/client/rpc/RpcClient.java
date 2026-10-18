@@ -2051,6 +2051,11 @@ public class RpcClient implements ClientProtocol {
   public OmKeyInfo getKeyInfo(
       String volumeName, String bucketName, String keyName,
       boolean forceUpdateContainerCache) throws IOException {
+    return getKeyInfo(volumeName, bucketName, keyName, forceUpdateContainerCache, false);
+  }
+
+  private OmKeyInfo getKeyInfo(String volumeName, String bucketName, String keyName,
+      boolean forceUpdateContainerCache, boolean requireFileSystemLayout) throws IOException {
     Objects.requireNonNull(volumeName, "volumeName == null");
     Objects.requireNonNull(bucketName, "bucketName == null");
     Objects.requireNonNull(keyName, "keyName == null");
@@ -2061,6 +2066,7 @@ public class RpcClient implements ClientProtocol {
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
         .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCache)
+        .setRequireFileSystemLayout(requireFileSystemLayout)
         .build();
     return getKeyInfo(keyArgs);
   }
@@ -2447,12 +2453,19 @@ public class RpcClient implements ClientProtocol {
   @Override
   public OzoneInputStream readFile(String volumeName, String bucketName,
       String keyName) throws IOException {
+    return readFile(volumeName, bucketName, keyName, false);
+  }
+
+  @Override
+  public OzoneInputStream readFile(String volumeName, String bucketName,
+      String keyName, boolean requireFileSystemLayout) throws IOException {
     OmKeyArgs keyArgs = new OmKeyArgs.Builder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
         .setSortDatanodesInPipeline(topologyAwareReadEnabled)
         .setLatestVersionLocation(getLatestVersionLocation)
+        .setRequireFileSystemLayout(requireFileSystemLayout)
         .build();
     final OmKeyInfo keyInfo;
     if (OzoneManagerVersion.OPTIMIZED_GET_KEY_INFO.isSupportedBy(omVersion)) {
@@ -2465,7 +2478,7 @@ public class RpcClient implements ClientProtocol {
     } else {
       keyInfo = ozoneManagerClient.lookupFile(keyArgs);
     }
-    return getInputStreamWithRetryFunction(keyInfo);
+    return getInputStreamWithRetryFunction(keyInfo, requireFileSystemLayout);
   }
 
   @Override
@@ -2488,10 +2501,19 @@ public class RpcClient implements ClientProtocol {
    */
   private OzoneInputStream getInputStreamWithRetryFunction(
       OmKeyInfo keyInfo) throws IOException {
+    return getInputStreamWithRetryFunction(keyInfo, false);
+  }
+
+  /**
+   * Like {@link #getInputStreamWithRetryFunction(OmKeyInfo)}; the retry lookup
+   * also asks OM to reject an OBJECT_STORE bucket if requireFileSystemLayout.
+   */
+  private OzoneInputStream getInputStreamWithRetryFunction(
+      OmKeyInfo keyInfo, boolean requireFileSystemLayout) throws IOException {
     return createInputStream(keyInfo, omKeyInfo -> {
       try {
         return getKeyInfo(omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-            omKeyInfo.getKeyName(), true);
+            omKeyInfo.getKeyName(), true, requireFileSystemLayout);
       } catch (IOException e) {
         LOG.error("Unable to lookup key {} on retry.", keyInfo.getKeyName(), e);
         return null;

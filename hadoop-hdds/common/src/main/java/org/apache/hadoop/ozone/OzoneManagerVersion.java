@@ -80,6 +80,11 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "server-side when the request sets requireFileSystemLayout, so file "
           + "system clients no longer need the client-side InfoBucket layout "
           + "check for listStatus"),
+  GET_KEY_INFO_REJECTS_OBS(102,
+      "OzoneManager version that rejects getKeyInfo on OBJECT_STORE buckets "
+          + "server-side when the request sets requireFileSystemLayout, so file "
+          + "system clients no longer need the client-side InfoBucket layout "
+          + "check for open"),
 
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");

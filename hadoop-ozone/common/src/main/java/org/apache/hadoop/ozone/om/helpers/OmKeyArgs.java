@@ -64,8 +64,8 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // Original S3/list prefix when keyName is empty (root listing). Used for STS
   // auth to check LIST on this prefix instead of "*".
   private final String listPrefix;
-  // Set by file system clients so that OM rejects a listing on an
-  // OBJECT_STORE bucket.
+  // Set by file system clients so that OM rejects a listing or a key info
+  // read on an OBJECT_STORE bucket.
   private final boolean requireFileSystemLayout;
   private final String expectedETag;
   private final boolean derivedKeyPiggyBacking;
