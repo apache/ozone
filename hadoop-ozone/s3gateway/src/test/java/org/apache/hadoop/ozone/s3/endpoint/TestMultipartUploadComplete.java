@@ -69,7 +69,7 @@ public class TestMultipartUploadComplete {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+        .thenReturn("UNSIGNED-PAYLOAD");
 
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
