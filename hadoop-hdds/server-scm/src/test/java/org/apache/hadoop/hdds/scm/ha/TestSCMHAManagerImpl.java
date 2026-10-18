@@ -60,6 +60,7 @@ import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.server.DivisionInfo;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -88,6 +89,8 @@ class TestSCMHAManagerImpl {
   @BeforeAll
   void setup(@TempDir Path tempDir) throws IOException, InterruptedException,
       TimeoutException {
+    ExitUtils.disableSystemExit();
+    ExitUtils.clear();
     storageBaseDir = tempDir;
     clusterID = UUID.randomUUID().toString();
     final StorageContainerManager scm = getMockStorageContainerManager(LEADER_SCM_ID, LEADER_PORT);
@@ -122,8 +125,12 @@ class TestSCMHAManagerImpl {
 
   @AfterAll
   void cleanup() throws IOException {
-    follower.stop();
-    primarySCMHAManager.stop();
+    try {
+      follower.stop();
+      primarySCMHAManager.stop();
+    } finally {
+      ExitUtils.clear();
+    }
   }
 
   @Test
@@ -140,13 +147,15 @@ class TestSCMHAManagerImpl {
 
   @Test
   @Order(2) // requires testAddSCM
-  void testRemoveSCM() throws IOException {
+  void testRemoveSCM() throws IOException, InterruptedException, TimeoutException {
     assumeThat(getPeerCount()).isEqualTo(2);
 
     final RemoveSCMRequest removeSCMRequest = new RemoveSCMRequest(
         clusterID, FOLLOWER_SCM_ID, getFollowerAddress());
     primarySCMHAManager.removeSCM(removeSCMRequest);
     assertEquals(1, getPeerCount());
+    GenericTestUtils.waitFor(ExitUtils::isTerminated, 100, 10_000);
+    assertEquals(0, ExitUtils.getFirstExitException().getStatus());
   }
 
   private int getPeerCount() {
