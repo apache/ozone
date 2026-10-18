@@ -94,6 +94,7 @@ public class MockXceiverClientSpi extends XceiverClientSpi {
       return result(request,
           r -> r.setPutBlock(putBlock(request.getPutBlock())));
     case GetBlock:
+      datanodeStorage.awaitGetBlockGate();
       if (datanodeStorage.consumeGetBlockFailure()) {
         return result(request, r -> r.setResult(Result.CONTAINER_NOT_FOUND));
       }

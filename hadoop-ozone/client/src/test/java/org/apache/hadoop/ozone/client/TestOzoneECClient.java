@@ -196,12 +196,18 @@ public class TestOzoneECClient {
 
       // The datanode of the third data cell answers the first GetBlock with CONTAINER_NOT_FOUND, so its stream
       // refreshes the block locations from OM. In a parallel read that cell is read by a worker thread.
-      HddsProtos.DatanodeDetailsProto thirdDataCell = recordingTransport.getKeys().get(volumeName).get(bucketName)
-          .get(keyName).getKeyLocationListList().get(0).getKeyLocations(0).getPipeline().getMembers(2);
+      HddsProtos.Pipeline pipeline = recordingTransport.getKeys().get(volumeName).get(bucketName)
+          .get(keyName).getKeyLocationListList().get(0).getKeyLocations(0).getPipeline();
       Map<DatanodeDetails, MockDatanodeStorage> storages = factoryStub.getStorages();
       MockDatanodeStorage storage =
-          storages.get(getMatchingStorage(storages, DatanodeID.fromProto(thirdDataCell.getId())));
+          storages.get(getMatchingStorage(storages, DatanodeID.fromProto(pipeline.getMembers(2).getId())));
       storage.failNextGetBlocks(1);
+      if (parallelRead) {
+        // The reading thread reads the first cell, and any cell whose task has not started yet. Holding it in the
+        // first cell until the third has failed makes a worker read the third, however late the pool starts.
+        storages.get(getMatchingStorage(storages, DatanodeID.fromProto(pipeline.getMembers(0).getId())))
+            .holdGetBlocksUntilFailureOn(storage);
+      }
       int requestsBeforeRead = omRequests.size();
 
       byte[] read = new byte[inputSize];

@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.collections4.map.HashedMap;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -56,6 +58,8 @@ public class MockDatanodeStorage {
   private IOException exception = null;
   private final AtomicInteger getBlockFailures = new AtomicInteger();
   private final List<String> failedGetBlockThreads = new CopyOnWriteArrayList<>();
+  private final CountDownLatch getBlockFailed = new CountDownLatch(1);
+  private volatile CountDownLatch getBlockGate;
 
   public void setStorageFailed(IOException reason) {
     this.exception = reason;
@@ -70,9 +74,26 @@ public class MockDatanodeStorage {
   boolean consumeGetBlockFailure() {
     if (getBlockFailures.getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0) {
       failedGetBlockThreads.add(Thread.currentThread().getName());
+      getBlockFailed.countDown();
       return true;
     }
     return false;
+  }
+
+  /** Makes GetBlock calls on this datanode wait, for at most 10 seconds, until a GetBlock call on other has failed. */
+  public void holdGetBlocksUntilFailureOn(MockDatanodeStorage other) {
+    getBlockGate = other.getBlockFailed;
+  }
+
+  void awaitGetBlockGate() {
+    CountDownLatch gate = getBlockGate;
+    if (gate != null) {
+      try {
+        gate.await(10, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   /** Names of the threads whose GetBlock call failed. */
