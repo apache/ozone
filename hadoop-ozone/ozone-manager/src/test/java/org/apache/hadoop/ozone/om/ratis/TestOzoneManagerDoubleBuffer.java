@@ -454,7 +454,6 @@ class TestOzoneManagerDoubleBuffer {
     for (int i = 0; i < 3; i++) {
       tasks.add(waitFN(fn));
     }
-    Thread.sleep(2000);
 
     // Confirm not done.
     for (Future<Boolean> task : tasks) {
@@ -464,7 +463,6 @@ class TestOzoneManagerDoubleBuffer {
 
     // Add a fourth.
     tasks.add(waitFN(fn));
-    Thread.sleep(2000);
     assertEquals(4, fn.notifyFlush());
 
     // Confirm the initial ones are done,

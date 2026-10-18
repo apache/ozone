@@ -19,9 +19,12 @@ package org.apache.hadoop.ozone.om.snapshot.diff;
 
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotDiffManager.getReportKeyForIndex;
 import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.dropColumnFamilyHandle;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.primitives.UnsignedBytes;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -30,12 +33,15 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import java.util.TreeSet;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
@@ -55,21 +61,21 @@ import org.rocksdb.RocksDBException;
  * Owns the per-job temporary RocksDB column families and batched writes shared
  * between optimized snapshot diff pipeline stages.
  *
- * <p>Diff-candidate {@code objectId}s are held in memory while their count is at
- * most {@code maxInMemoryEntries}; larger sets spill to a temporary column family.
- * Deleted and renamed directory object ids collected during merge join use the same
- * in-memory limit and spill policy.
+ * <p>Diff-candidate {@code objectId}s and DAG directory tombstone table keys are held in
+ * memory while their count is at most {@code maxInMemoryEntries}; larger sets spill to a
+ * temporary column family. Deleted and renamed directory object ids collected during merge
+ * join use the same in-memory limit and spill policy.
  *
  * <p>All RocksDB puts use raw {@code byte[]} keys and values (the JNI boundary). Callers
  * serialize {@link EntryValue} via {@link EntryValue#toBytes()} before writing to
  * {@code newList}/{@code oldList}.
  *
- * <p>Temporary column families disable RocksDB auto-compactions and are dropped once a pipeline
- * stage no longer reads them. Individual key deletes are avoided so short-lived CFs do not
- * accumulate tombstones before drop.
+ * <p>Temporary column families are created from a copy of the supplied column-family options with
+ * auto-compactions disabled, then dropped once a pipeline stage no longer reads them. Individual
+ * key deletes are avoided so short-lived CFs do not accumulate tombstones before drop.
  *
- * <p>This initial version supports the full diff sequential reader ({@link FullDiffSequentialReader}).
- * DAG diff support extends this store in HDDS-15393.
+ * <p>Shared by the full diff sequential reader ({@link FullDiffSequentialReader}) and the
+ * DAG diff sequential reader ({@link DagDiffSequentialReader}).
  */
 public final class SnapDiffJobStore implements AutoCloseable {
 
@@ -79,9 +85,13 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /** Reverse edge value header: parentId (8 BE) + nameLen (4 BE). */
   static final int EDGE_LINK_HEADER_BYTES = Long.BYTES + Integer.BYTES;
 
+  private static final Comparator<byte[]> TOMBSTONE_KEY_COMPARATOR =
+      UnsignedBytes.lexicographicalComparator();
+
   private static final String NEW_LIST_SUFFIX = "-new-list";
   private static final String OLD_LIST_SUFFIX = "-old-list";
   private static final String CAND_IDS_SUFFIX = "-cand-ids";
+  private static final String DIR_TOMBSTONE_KEYS_SUFFIX = "-dir-tombstone-keys";
   private static final String TO_EDGES_SUFFIX = "-to-edges";
   private static final String FROM_EDGES_SUFFIX = "-from-edges";
   private static final String CLASSIFIED_CREATE_SUFFIX = "-cls-create";
@@ -98,8 +108,8 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private final CodecRegistry codecRegistry;
   private final ColumnFamilyHandle reportCfh;
   private final byte[] presentMarker;
-  private final ManagedColumnFamilyOptions familyOptions;
-  private final long maxInMemoryEntries;
+  private final ManagedColumnFamilyOptions tmpCfFamilyOptions;
+  private final int maxInMemoryEntries;
   private final List<ColumnFamilyHandle> temporaryColumnFamilies = new ArrayList<>();
 
   private ColumnFamilyHandle newListCf;
@@ -113,12 +123,17 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private ColumnFamilyHandle dependencyNodesCf;
 
   private String diffCandCfName;
-  private Set<Long> diffCandidates;
+  private final Set<Long> diffCandidates;
   private ColumnFamilyHandle diffCandidatesCf;
   private boolean diffCandidatesSpilled;
 
-  private Set<Long> deletedDirectoryIds;
-  private Set<Long> renamedDirectoryIds;
+  private String dirTombstoneKeysCfName;
+  private final NavigableSet<byte[]> dirTombstoneKeys;
+  private ColumnFamilyHandle dirTombstoneKeysCf;
+  private boolean dirTombstoneKeysSpilled;
+
+  private final Set<Long> deletedDirectoryIds;
+  private final Set<Long> renamedDirectoryIds;
   private String deletedDirectoryIdsCfName;
   private String renamedDirectoryIdsCfName;
   private ColumnFamilyHandle deletedDirectoryIdsCf;
@@ -139,15 +154,9 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private final byte[] objectIdKeyBuffer = new byte[Long.BYTES];
   private final byte[] intKeyBuffer = new byte[Integer.BYTES];
 
-  /** Full diff: shared new/old lists plus FSO edge column families. */
-  public enum Mode {
-    FULL,
-    DAG
-  }
-
   @SuppressWarnings("checkstyle:ParameterNumber")
   private SnapDiffJobStore(ManagedRocksDB db, String jobId, CodecRegistry codecRegistry, boolean fso,
-      int writeBatchSize, ManagedColumnFamilyOptions familyOptions, long maxInMemoryEntries,
+      int writeBatchSize, ManagedColumnFamilyOptions tmpCfFamilyOptions, int maxInMemoryEntries,
       @Nonnull ColumnFamilyHandle reportCfh) throws IOException {
     this.db = db;
     this.jobId = jobId;
@@ -155,14 +164,15 @@ public final class SnapDiffJobStore implements AutoCloseable {
     this.codecRegistry = codecRegistry;
     this.reportCfh = reportCfh;
     this.writeBatchSize = writeBatchSize;
-    this.familyOptions = familyOptions;
-    this.familyOptions.setDisableAutoCompactions(true);
+    this.tmpCfFamilyOptions = tmpCfFamilyOptions;
+    this.tmpCfFamilyOptions.setDisableAutoCompactions(true);
     this.maxInMemoryEntries = maxInMemoryEntries;
     this.presentMarker = codecRegistry.asRawData(Boolean.TRUE);
     this.writeBatch = new ManagedWriteBatch();
     this.writeOptions = new ManagedWriteOptions();
     this.pendingOps = 0;
     this.diffCandidates = new HashSet<>();
+    this.dirTombstoneKeys = new TreeSet<>(TOMBSTONE_KEY_COMPARATOR);
     this.deletedDirectoryIds = new HashSet<>();
     this.renamedDirectoryIds = new HashSet<>();
   }
@@ -175,14 +185,15 @@ public final class SnapDiffJobStore implements AutoCloseable {
       boolean fso,
       @Nonnull ColumnFamilyHandle reportCfh,
       @Nullable Integer writeBatchSize,
-      @Nullable Long maxInMemoryEntries) throws IOException {
+      @Nullable Integer maxInMemoryEntries) throws IOException {
     int resolvedWriteBatchSize = writeBatchSize != null ? writeBatchSize : DEFAULT_BATCH_SIZE;
-    long resolvedMaxInMemoryEntries = maxInMemoryEntries != null ? maxInMemoryEntries
+    int resolvedMaxInMemoryEntries = maxInMemoryEntries != null ? maxInMemoryEntries
         : OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT;
+    ManagedColumnFamilyOptions tmpCfFamilyOptions = new ManagedColumnFamilyOptions(familyOptions);
     SnapDiffJobStore store = new SnapDiffJobStore(db, jobId, codecRegistry, fso, resolvedWriteBatchSize,
-        familyOptions, resolvedMaxInMemoryEntries, reportCfh);
+        tmpCfFamilyOptions, resolvedMaxInMemoryEntries, reportCfh);
     try {
-      store.initColumnFamilies(familyOptions);
+      store.initColumnFamilies();
       return store;
     } catch (RocksDBException e) {
       store.closeQuietly();
@@ -190,7 +201,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     }
   }
 
-  long getMaxInMemoryEntries() {
+  int getMaxInMemoryEntries() {
     return maxInMemoryEntries;
   }
 
@@ -198,14 +209,20 @@ public final class SnapDiffJobStore implements AutoCloseable {
     return writeBatchSize;
   }
 
+  @VisibleForTesting
+  ManagedColumnFamilyOptions getCopiedCfFamilyOptions() {
+    return tmpCfFamilyOptions;
+  }
+
   /** Returns report entries written during a test run. */
   List<DiffReportEntry> readReportEntriesForTest() throws IOException {
     List<DiffReportEntry> entries = new ArrayList<>();
+    String jobPrefix = jobId + DELIMITER;
     try (ManagedRocksIterator iterator = new ManagedRocksIterator(db.get().newIterator(reportCfh))) {
-      iterator.get().seek(codecRegistry.asRawData(jobId));
+      iterator.get().seek(codecRegistry.asRawData(jobPrefix));
       while (iterator.get().isValid()) {
         String key = codecRegistry.asObject(iterator.get().key(), String.class);
-        if (!key.startsWith(jobId)) {
+        if (!key.startsWith(jobPrefix)) {
           break;
         }
         entries.add(codecRegistry.asObject(iterator.get().value(), DiffReportEntry.class));
@@ -281,7 +298,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
   }
 
   private int pathResolverLruCapacity() {
-    return (int) maxInMemoryEntries / 2;
+    return maxInMemoryEntries / 2;
   }
 
   int ancestorMemoCapacity() {
@@ -297,6 +314,17 @@ public final class SnapDiffJobStore implements AutoCloseable {
       keys.add(objectIdKey(objectId));
     }
     return multiGet(db, fromEdgesCf, keys);
+  }
+
+  List<byte[]> multiGetToEdgeValues(List<Long> objectIds) throws IOException {
+    if (objectIds.isEmpty()) {
+      return Collections.emptyList();
+    }
+    List<byte[]> keys = new ArrayList<>(objectIds.size());
+    for (Long objectId : objectIds) {
+      keys.add(objectIdKey(objectId));
+    }
+    return multiGet(db, toEdgesCf, keys);
   }
 
   public List<Long> multiGetFromParentIds(List<Long> objectIds) throws IOException {
@@ -362,7 +390,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
   }
 
   /** Ascending iterator over the dependency-node column family. */
-  public DependencyNodeIterator dependencyNodeIterator() throws RocksDatabaseException {
+  public DependencyNodeIterator dependencyNodeIterator() {
     return new DependencyNodeIterator(dependencyNodesCf);
   }
 
@@ -415,7 +443,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
   }
 
   /** Clears the diff-candidate set after a from-side scan consumes it. */
-  public void clearDiffCandidates() throws IOException {
+  public void clearDiffCandidates() {
     diffCandidates.clear();
     if (diffCandidatesSpilled) {
       dropAndClose(diffCandidatesCf);
@@ -426,6 +454,39 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /** Returns the current in-memory diff-candidate count (for tests and limit wiring). */
   public int getDiffCandidateCount() {
     return diffCandidates.size();
+  }
+
+  /** Records a directory-table tombstone key from a DAG delta SST scan. */
+  public void addDirTombstoneKey(byte[] tableKey) throws IOException {
+    if (dirTombstoneKeysSpilled) {
+      batchPut(dirTombstoneKeysCf, tableKey, presentMarker);
+      return;
+    }
+    if (dirTombstoneKeys.size() >= maxInMemoryEntries) {
+      spillDirTombstoneKeys();
+    }
+    if (dirTombstoneKeysSpilled) {
+      batchPut(dirTombstoneKeysCf, tableKey, presentMarker);
+    } else {
+      dirTombstoneKeys.add(tableKey);
+    }
+  }
+
+  /** Returns whether {@code tableKey} was recorded as a directory delta tombstone. */
+  public boolean isDirTombstoneKey(byte[] tableKey) throws IOException {
+    if (dirTombstoneKeysSpilled) {
+      return get(dirTombstoneKeysCf, tableKey) != null;
+    }
+    return dirTombstoneKeys.contains(tableKey);
+  }
+
+  /** Clears directory tombstone keys after the from-side directory scan. */
+  public void clearDirTombstoneKeys() {
+    dirTombstoneKeys.clear();
+    if (dirTombstoneKeysSpilled) {
+      dropAndClose(dirTombstoneKeysCf);
+      dirTombstoneKeysSpilled = false;
+    }
   }
 
   /** Records a deleted directory {@code objectId} for ancestor filtering. */
@@ -604,11 +665,11 @@ public final class SnapDiffJobStore implements AutoCloseable {
     return cf;
   }
 
-  private void initColumnFamilies(ManagedColumnFamilyOptions options)
-      throws RocksDBException {
+  private void initColumnFamilies() throws RocksDBException {
     newListCf = createColumnFamily(this.jobId + NEW_LIST_SUFFIX);
     oldListCf = createColumnFamily(this.jobId + OLD_LIST_SUFFIX);
     diffCandCfName = this.jobId + CAND_IDS_SUFFIX;
+    dirTombstoneKeysCfName = this.jobId + DIR_TOMBSTONE_KEYS_SUFFIX;
     deletedDirectoryIdsCfName = this.jobId + DELETED_DIR_IDS_SUFFIX;
     renamedDirectoryIdsCfName = this.jobId + RENAMED_DIR_IDS_SUFFIX;
     classifiedCreateCf = createColumnFamily(this.jobId + CLASSIFIED_CREATE_SUFFIX);
@@ -634,6 +695,21 @@ public final class SnapDiffJobStore implements AutoCloseable {
     diffCandidates.clear();
     flushWrites();
     diffCandidatesSpilled = true;
+  }
+
+  private void spillDirTombstoneKeys() throws IOException {
+    try {
+      dirTombstoneKeysCf = createColumnFamily(dirTombstoneKeysCfName);
+    } catch (RocksDBException e) {
+      throw new IOException("Failed to create directory tombstone key column family "
+          + dirTombstoneKeysCfName, e);
+    }
+    for (byte[] tableKey : dirTombstoneKeys) {
+      batchPut(dirTombstoneKeysCf, tableKey, presentMarker);
+    }
+    dirTombstoneKeys.clear();
+    flushWrites();
+    dirTombstoneKeysSpilled = true;
   }
 
   private void spillDeletedDirectoryIds() throws IOException {
@@ -691,7 +767,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
 
   private ColumnFamilyHandle createColumnFamily(String name) throws RocksDBException {
     ColumnFamilyHandle handle = db.get().createColumnFamily(
-        new ColumnFamilyDescriptor(StringUtils.string2Bytes(name), familyOptions));
+        new ColumnFamilyDescriptor(StringUtils.string2Bytes(name), tmpCfFamilyOptions));
     temporaryColumnFamilies.add(handle);
     return handle;
   }
@@ -710,6 +786,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     while (!temporaryColumnFamilies.isEmpty()) {
       dropAndClose(temporaryColumnFamilies.get(0));
     }
+    tmpCfFamilyOptions.close();
   }
 
   private void closeQuietly() {
@@ -917,7 +994,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     private final ManagedRocksIterator iterator;
     private Map.Entry<Long, byte[]> next;
 
-    private ClassifiedIterator(ColumnFamilyHandle cf) throws RocksDatabaseException {
+    private ClassifiedIterator(ColumnFamilyHandle cf) {
       this.iterator = new ManagedRocksIterator(db.get().newIterator(cf));
       iterator.get().seekToFirst();
       advance();
@@ -960,7 +1037,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
     private final ManagedRocksIterator iterator;
     private SnapDiffDependencyEntry next;
 
-    private DependencyNodeIterator(ColumnFamilyHandle cf) throws RocksDatabaseException {
+    private DependencyNodeIterator(ColumnFamilyHandle cf) {
       this.iterator = new ManagedRocksIterator(db.get().newIterator(cf));
       iterator.get().seekToFirst();
       advance();
