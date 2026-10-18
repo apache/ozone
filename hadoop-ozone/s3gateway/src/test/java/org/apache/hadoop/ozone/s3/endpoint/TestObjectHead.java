@@ -31,11 +31,16 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSuccee
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.endpoint.TestObjectGet.EXPIRES1;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_RANGE;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.ACCEPT_RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CONTENT_RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_NONE_MATCH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_UNMODIFIED_SINCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER_SUPPORTED_UNIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -76,6 +81,9 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Test head object.
  */
 public class TestObjectHead {
+  private static final String RANGE_KEY = "range-key";
+  private static final String RANGE_CONTENT = "0123456789";
+
   private String bucketName = "b1";
   private ObjectEndpoint keyEndpoint;
   private OzoneBucket bucket;
@@ -127,6 +135,51 @@ public class TestObjectHead {
         .setInt(S3Consts.QueryParams.PART_NUMBER, -1);
     assertErrorResponse(INVALID_ARGUMENT,
         () -> keyEndpoint.head(bucketName, "key1"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("rangeCases")
+  public void testHeadWithRange(String range, int expectedStatus, long expectedLength, String expectedContentRange)
+      throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
+
+    Response response = keyEndpoint.head(bucketName, RANGE_KEY);
+
+    assertEquals(expectedStatus, response.getStatus());
+    assertEquals(expectedLength, Long.parseLong(response.getHeaderString(HttpHeaders.CONTENT_LENGTH)));
+    assertEquals(expectedContentRange, response.getHeaderString(CONTENT_RANGE_HEADER));
+    assertEquals(RANGE_HEADER_SUPPORTED_UNIT, response.getHeaderString(ACCEPT_RANGE_HEADER));
+    assertNotNull(response.getHeaderString(HttpHeaders.ETAG));
+  }
+
+  @Test
+  public void testHeadWithInvalidRange() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=10-20");
+
+    assertErrorResponse(INVALID_RANGE, () -> keyEndpoint.head(bucketName, RANGE_KEY));
+  }
+
+  @Test
+  public void testHeadIfNoneMatchTakesPrecedenceOverRange() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    String eTag = keyEndpoint.head(bucketName, RANGE_KEY).getHeaderString(HttpHeaders.ETAG);
+    when(headers.getHeaderString(IF_NONE_MATCH_HEADER)).thenReturn(eTag);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-4");
+
+    Response response = keyEndpoint.head(bucketName, RANGE_KEY);
+
+    assertEquals(Response.Status.NOT_MODIFIED.getStatusCode(), response.getStatus());
+  }
+
+  @Test
+  public void testHeadIfMatchFailureTakesPrecedenceOverRange() throws Exception {
+    assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
+    when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn("\"mismatched-etag\"");
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-4");
+
+    assertErrorResponse(PRECOND_FAILED, () -> keyEndpoint.head(bucketName, RANGE_KEY));
   }
 
   @Test
@@ -319,6 +372,16 @@ public class TestObjectHead {
         Arguments.of(HttpHeaders.CONTENT_ENCODING, CONTENT_ENCODING_CUSTOM, "gzip", "user-encoding"),
         Arguments.of(HttpHeaders.CONTENT_LANGUAGE, CONTENT_LANGUAGE_CUSTOM, "en-CA", "user-lang"),
         Arguments.of(HttpHeaders.CONTENT_DISPOSITION, CONTENT_DISPOSITION_CUSTOM, "inline", "user-disp"));
+  }
+
+  private static Stream<Arguments> rangeCases() {
+    return Stream.of(
+        Arguments.of(null, HttpStatus.SC_OK, 10L, null),
+        Arguments.of("bytes=0-4", HttpStatus.SC_PARTIAL_CONTENT, 5L, "bytes 0-4/10"),
+        Arguments.of("bytes=5-", HttpStatus.SC_PARTIAL_CONTENT, 5L, "bytes 5-9/10"),
+        Arguments.of("bytes=-3", HttpStatus.SC_PARTIAL_CONTENT, 3L, "bytes 7-9/10"),
+        Arguments.of("bytes=8-20", HttpStatus.SC_PARTIAL_CONTENT, 2L, "bytes 8-9/10"),
+        Arguments.of("bytes=5-2", HttpStatus.SC_OK, 10L, null));
   }
 
   private byte[] createKey(String keyPath) throws IOException {
