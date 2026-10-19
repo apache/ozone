@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.HddsDatanodeService;
@@ -129,6 +130,10 @@ public class HeartbeatEndpointTask
    */
   @Override
   public EndpointStateMachine.EndPointStates call() throws Exception {
+    return TracingUtil.executeInSpan(TracingUtil.createInternalSpan("HeartbeatEndpointTask"), this::doCall);
+  }
+
+  private EndpointStateMachine.EndPointStates doCall() throws Exception {
     rpcEndpoint.lock();
     SCMHeartbeatRequestProto.Builder requestBuilder = null;
     try {

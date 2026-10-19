@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +57,7 @@ public abstract class AbstractBackgroundContainerScanner implements Runnable {
     AbstractContainerScannerMetrics metrics = getMetrics();
     try {
       while (!stopping.get()) {
-        runIteration();
+        TracingUtil.executeInSpan(TracingUtil.createInternalSpan(getClass().getSimpleName()), this::runIteration);
         metrics.resetNumContainersScanned();
         metrics.resetNumUnhealthyContainers();
       }

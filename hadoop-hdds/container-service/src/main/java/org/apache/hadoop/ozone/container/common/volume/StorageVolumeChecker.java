@@ -47,6 +47,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.util.Timer;
@@ -154,7 +155,8 @@ public class StorageVolumeChecker {
       long periodicDiskCheckIntervalMinutes =
           dnConf.getPeriodicDiskCheckIntervalMinutes();
       periodicDiskChecker =
-          diskCheckerservice.scheduleWithFixedDelay(this::checkAllVolumeSets,
+          diskCheckerservice.scheduleWithFixedDelay(() -> TracingUtil.executeInSpan(
+              TracingUtil.createInternalSpan("StorageVolumeChecker"), this::checkAllVolumeSets),
               periodicDiskCheckIntervalMinutes,
               periodicDiskCheckIntervalMinutes, TimeUnit.MINUTES);
     }

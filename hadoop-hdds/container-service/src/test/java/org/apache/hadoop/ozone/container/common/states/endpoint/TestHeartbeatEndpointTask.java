@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.states.endpoint;
 import static java.util.Collections.emptyList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -50,6 +51,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -494,6 +496,28 @@ public class TestHeartbeatEndpointTask {
    *
    * @return HeartbeatEndpointTask
    */
+  @Test
+  public void testTracing() throws Exception {
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    when(scm.sendHeartbeat(any())).thenAnswer(invocation ->
+        SCMHeartbeatResponseProto.newBuilder()
+            .setDatanodeUUID(((SCMHeartbeatRequestProto) invocation.getArgument(0)).getDatanodeDetails().getUuid())
+            .build());
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanodeStateMachine, "");
+    when(datanodeStateMachine.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(conf, context, scm);
+
+    try (TestSpanCollector spans = TestSpanCollector.install("TestHeartbeatEndpointTask")) {
+      endpointTask.call();
+
+      assertThat(spans.named("HeartbeatEndpointTask")).hasSize(1)
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+    }
+  }
+
   private HeartbeatEndpointTask getHeartbeatEndpointTask(
       ConfigurationSource conf,
       StateContext context,

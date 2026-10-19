@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyMetadataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyDataScanResult;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -46,6 +47,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import org.apache.commons.compress.utils.Lists;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -367,6 +369,16 @@ public class TestOnDemandContainerScanner extends
       if (future.isPresent()) {
         future.get().get();
       }
+    }
+  }
+
+  @Test
+  public void testTracing() throws Exception {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestOnDemandContainerScanner")) {
+      onDemandScanner.scanContainerWithoutGap(healthy, TEST_SCAN).get().get();
+
+      assertThat(spans.named("OnDemandContainerScanner")).hasSize(1)
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
     }
   }
 }

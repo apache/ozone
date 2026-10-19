@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -466,6 +467,22 @@ public class TestEndPoint {
         registerTaskHelper(serverAddress, 1000, false)) {
       // Successful register should move us to Heartbeat state.
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndpoint.getState());
+    }
+  }
+
+  @Test
+  public void testTracing() throws Exception {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestEndPoint");
+         EndpointStateMachine versionEndPoint = createEndpoint(ozoneConf, serverAddress, 1000)) {
+      // not in GETVERSION state, so the task only logs and returns without starting the container
+      versionEndPoint.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
+      new VersionEndpointTask(versionEndPoint, ozoneConf, mock(OzoneContainer.class)).call();
+      registerTaskHelper(serverAddress, 1000, false).close();
+
+      assertThat(spans.named("VersionEndpointTask")).hasSize(1)
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+      assertThat(spans.named("RegisterEndpointTask")).hasSize(1)
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
     }
   }
 

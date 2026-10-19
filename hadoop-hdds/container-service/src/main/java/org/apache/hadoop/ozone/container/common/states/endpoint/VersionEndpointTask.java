@@ -22,6 +22,7 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -58,6 +59,10 @@ public class VersionEndpointTask implements
    */
   @Override
   public EndpointStateMachine.EndPointStates call() throws Exception {
+    return TracingUtil.executeInSpan(TracingUtil.createInternalSpan("VersionEndpointTask"), this::doCall);
+  }
+
+  private EndpointStateMachine.EndPointStates doCall() throws Exception {
     rpcEndPoint.lock();
 
     try {

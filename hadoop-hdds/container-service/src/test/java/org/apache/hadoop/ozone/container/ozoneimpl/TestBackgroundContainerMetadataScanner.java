@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.ozoneimpl;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyDataScanResult;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyMetadataScanResult;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -45,6 +46,7 @@ import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -279,5 +281,20 @@ public class TestBackgroundContainerMetadataScanner extends
     assertEquals(1, scanner.getMetrics().getNumScanIterations());
     assertEquals(0, scanner.getMetrics().getNumContainersScanned());
     assertEquals(0, scanner.getMetrics().getNumUnHealthyContainers());
+  }
+
+  @Test
+  public void testTracing() throws Exception {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestBackgroundContainerMetadataScanner")) {
+      scanner.start();
+      try {
+        GenericTestUtils.waitFor(() -> !spans.named("BackgroundContainerMetadataScanner").isEmpty(), 10, 3000);
+      } finally {
+        scanner.shutdown();
+      }
+
+      assertThat(spans.named("BackgroundContainerMetadataScanner"))
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+    }
   }
 }

@@ -23,6 +23,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.slf4j.Logger;
@@ -68,7 +69,7 @@ public abstract class ReportPublisher<T extends Message>
   public void run() {
     if (!executor.isShutdown() &&
         (context.getState() != DatanodeStates.SHUTDOWN)) {
-      publishReport();
+      TracingUtil.executeInSpan(TracingUtil.createInternalSpan(getClass().getSimpleName()), this::publishReport);
     }
   }
 

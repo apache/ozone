@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdfs.util.Canceler;
 import org.apache.hadoop.hdfs.util.DataTransferThrottler;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -87,7 +88,8 @@ public final class OnDemandContainerScanner {
     long containerId = container.getContainerData().getContainerID();
     if (addContainerToScheduledContainers(containerId)) {
       resultFuture = scanExecutor.submit(() -> {
-        performOnDemandScan(container, helper, reasonForScan);
+        TracingUtil.executeInSpan(TracingUtil.createInternalSpan("OnDemandContainerScanner"),
+            () -> performOnDemandScan(container, helper, reasonForScan));
         removeContainerFromScheduledContainers(containerId);
       });
     } else {

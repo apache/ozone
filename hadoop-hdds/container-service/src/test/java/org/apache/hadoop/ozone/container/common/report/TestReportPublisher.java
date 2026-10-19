@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.report;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
@@ -35,6 +36,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
@@ -165,5 +167,17 @@ public class TestReportPublisher {
             .getCmdStatusCount(),
         "Should publish report with 2 status objects");
     executorService.shutdown();
+  }
+
+  @Test
+  public void testTracing() {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestReportPublisher")) {
+      ReportPublisher publisher = new DummyReportPublisher(0);
+      publisher.init(mock(StateContext.class), mock(ScheduledExecutorService.class));
+      publisher.run();
+
+      assertThat(spans.named("DummyReportPublisher")).hasSize(1)
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+    }
   }
 }
