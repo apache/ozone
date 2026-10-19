@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -94,10 +95,13 @@ public class SCMDeletedBlockTransactionStatusManager {
   private final AtomicLong totalBlockCount = new AtomicLong(0);
   private final AtomicLong totalBlocksSize = new AtomicLong(0);
   private final AtomicLong totalReplicatedBlocksSize = new AtomicLong(0);
+  // Upper bound for a summary update to wait for the reload on leader ready before it is rejected.
+  private static final long SUMMARY_RELOAD_WAIT_MS = 10_000;
   private final Object summaryLock = new Object();
   // Guarded by summaryLock. Set when this SCM becomes leader and cleared once the summary is reloaded on leader
-  // ready. Summary updates are rejected in between because the in-memory counters may still be stale.
+  // ready. Summary updates wait in between because the in-memory counters may still be stale.
   private boolean summaryReloadPending;
+  private long summaryReloadWaitMs = SUMMARY_RELOAD_WAIT_MS;
   // Guarded by summaryLock. Incremented on every summary reload, so that an update which failed after a reload
   // does not roll back its change on top of the reloaded counters.
   private long summaryReloadCount;
@@ -446,6 +450,7 @@ public class SCMDeletedBlockTransactionStatusManager {
     } catch (IOException e) {
       synchronized (summaryLock) {
         summaryReloadPending = false;
+        summaryLock.notifyAll();
       }
       LOG.warn("Failed to initialize Storage space distribution data. The feature will continue with current {}." +
           " There is a high chance that the real data and current data has a gap.", summaryToString(getSummary()));
@@ -516,10 +521,25 @@ public class SCMDeletedBlockTransactionStatusManager {
     deletedBlockLogStateManager.addTransactionsToDB(txList);
   }
 
+  /**
+   * Waits until the summary is reloaded on leader ready. Ratis reports this SCM as leader before
+   * notifyLeaderReady completes, so a request can arrive in between. Must be called holding summaryLock.
+   */
   private void checkSummaryReloaded() throws SCMException {
-    if (summaryReloadPending) {
-      throw new SCMException("Deleted blocks transaction summary is not reloaded yet after becoming leader",
-          SCMException.ResultCodes.SCM_NOT_LEADER);
+    long deadline = Time.monotonicNow() + summaryReloadWaitMs;
+    while (summaryReloadPending) {
+      long remaining = deadline - Time.monotonicNow();
+      if (remaining <= 0) {
+        throw new SCMException("Deleted blocks transaction summary is not reloaded yet after becoming leader",
+            SCMException.ResultCodes.SCM_NOT_LEADER);
+      }
+      try {
+        summaryLock.wait(remaining);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new SCMException("Interrupted while waiting for summary reload", e,
+            SCMException.ResultCodes.INTERNAL_ERROR);
+      }
     }
   }
 
@@ -768,6 +788,11 @@ public class SCMDeletedBlockTransactionStatusManager {
   }
 
   @VisibleForTesting
+  void setSummaryReloadWaitMs(long waitMs) {
+    summaryReloadWaitMs = waitMs;
+  }
+
+  @VisibleForTesting
   public static void setDisableDataDistributionForTest(boolean disabled) {
     disableDataDistributionForTest = disabled;
   }
@@ -797,6 +822,7 @@ public class SCMDeletedBlockTransactionStatusManager {
       }
       summaryReloadPending = false;
       summaryReloadCount++;
+      summaryLock.notifyAll();
     }
     LOG.info("Storage space distribution is initialized with {}", summaryToString(getSummary()));
   }

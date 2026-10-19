@@ -146,8 +146,8 @@ public class DeletedBlockLogStateManagerImpl
   @Override
   public void addTransactionsToDB(ArrayList<DeletedBlocksTransaction> txs,
       DeletedBlocksTransactionSummary summary) throws IOException {
-    // Hold the buffer lock across the row-plus-summary write so that a concurrent flush() (e.g. from takeSnapshot)
-    // cannot land between the two, which would commit the transaction rows to RocksDB without the matching summary.
+    // Hold the buffer lock across the row-plus-summary write so that a concurrent flush() (e.g. from a checkpoint
+    // download) cannot land between the two, which would commit the transaction rows to RocksDB without the summary.
     transactionBuffer.lock();
     try {
       for (DeletedBlocksTransaction tx : txs) {

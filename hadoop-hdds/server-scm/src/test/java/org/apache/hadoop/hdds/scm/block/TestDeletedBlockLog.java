@@ -38,6 +38,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -49,6 +50,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -1150,9 +1154,9 @@ public class TestDeletedBlockLog {
   }
 
   /**
-   * After becoming leader, summary updates are rejected without touching the counters, txSizeMap or the DB until
-   * the summary is reloaded on leader ready. A remove that ran after txSizeMap was cleared would otherwise delete
-   * the row without decrementing the summary.
+   * After becoming leader, summary updates are rejected once the reload wait times out, without touching the
+   * counters, txSizeMap or the DB until the summary is reloaded on leader ready. A remove that ran after txSizeMap
+   * was cleared would otherwise delete the row without decrementing the summary.
    */
   @Test
   public void testSummaryUpdateRejectedUntilLeaderReady() throws IOException {
@@ -1160,6 +1164,7 @@ public class TestDeletedBlockLog {
     TxBlockInfo txBlockInfo = new TxBlockInfo(txId, 200L, 2L, 2048L, 6144L);
     DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
     SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
+    statusManager.setSummaryReloadWaitMs(10);
     statusManager.onBecomeLeader();
     statusManager.getTxSizeMap().put(txId, txBlockInfo);
 
@@ -1179,6 +1184,37 @@ public class TestDeletedBlockLog {
     statusManager.removeTransactions(new ArrayList<>(Collections.singletonList(txId)));
     assertEquals(6, statusManager.getSummary().getTotalTransactionCount());
     verify(mockStateManager).removeTransactionsFromDB(any(ArrayList.class), any());
+  }
+
+  /**
+   * A summary update that arrives after becoming leader but before leader ready waits for the reload and then
+   * applies its change on top of the reloaded summary.
+   */
+  @Test
+  public void testSummaryUpdateWaitsForLeaderReady() throws Exception {
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
+    statusManager.onBecomeLeader();
+
+    CompletableFuture<Void> add = CompletableFuture.runAsync(() -> {
+      try {
+        statusManager.addTransactions(new ArrayList<>(Collections.singletonList(buildTx(1L, 100L, 1024L, 2L))));
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
+    // The add is waiting for the reload and has not reached the DB yet.
+    assertThrows(TimeoutException.class, () -> add.get(200, TimeUnit.MILLISECONDS));
+    verify(mockStateManager, never()).addTransactionsToDB(any(ArrayList.class), any());
+
+    persistSummary(7);
+    statusManager.onLeaderReady();
+    add.get(10, TimeUnit.SECONDS);
+    ArgumentCaptor<HddsProtos.DeletedBlocksTransactionSummary> addSummary =
+        ArgumentCaptor.forClass(HddsProtos.DeletedBlocksTransactionSummary.class);
+    verify(mockStateManager).addTransactionsToDB(any(ArrayList.class), addSummary.capture());
+    assertEquals(8, addSummary.getValue().getTotalTransactionCount());
+    assertEquals(8, statusManager.getSummary().getTotalTransactionCount());
   }
 
   /**
