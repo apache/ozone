@@ -402,48 +402,51 @@ public class TestSCMStateMachine {
   }
 
   @Test
-  public void testBecomingLeaderFlushesAndReloadsDeletedBlockLogUnderOneLock() throws Exception {
+  public void testDeletedBlockSummaryReloadedOnLeaderReady() throws Exception {
     SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
     DeletedBlockLogImpl deletedBlockLog = mock(DeletedBlockLogImpl.class);
     NodeDecommissionManager decommissionManager = mock(NodeDecommissionManager.class);
-    doAnswer(invocation -> {
-      verify(deletedBlockLog, never()).onBecomeLeader();
-      invocation.<Runnable>getArgument(0).run();
-      return null;
-    }).when(buffer).flushAndRun(any());
-    SCMStateMachine leaderStateMachine = newLeaderStateMachine(buffer, deletedBlockLog, decommissionManager);
+    SCMContext scmContext = mock(SCMContext.class);
+    SCMStateMachine leaderStateMachine =
+        newLeaderStateMachine(buffer, deletedBlockLog, decommissionManager, scmContext);
 
     leaderStateMachine.notifyLeaderChanged(memberId(), followerId);
 
-    InOrder order = inOrder(buffer, deletedBlockLog, decommissionManager);
-    order.verify(buffer).flushAndRun(any());
-    order.verify(deletedBlockLog).onBecomeLeader();
-    order.verify(decommissionManager).onBecomeLeader();
+    verify(deletedBlockLog).onBecomeLeader();
+    verify(decommissionManager).onBecomeLeader();
+    verify(deletedBlockLog, never()).onLeaderReady();
     verify(buffer, never()).flush();
+
+    leaderStateMachine.notifyLeaderReady();
+
+    InOrder order = inOrder(buffer, deletedBlockLog, scmContext);
+    order.verify(buffer).flush();
+    order.verify(deletedBlockLog).onLeaderReady();
+    order.verify(scmContext).setLeaderReady();
   }
 
   @Test
-  public void testFlushAndRunFailureOnBecomingLeaderTerminates() throws Exception {
+  public void testFlushFailureOnLeaderReadyTerminates() throws Exception {
     ExitUtils.disableSystemExit();
     try {
       SCMHADBTransactionBuffer buffer = mock(SCMHADBTransactionBuffer.class);
       DeletedBlockLogImpl deletedBlockLog = mock(DeletedBlockLogImpl.class);
-      NodeDecommissionManager decommissionManager = mock(NodeDecommissionManager.class);
-      doThrow(new RocksDatabaseException("injected flush failure")).when(buffer).flushAndRun(any());
-      SCMStateMachine leaderStateMachine = newLeaderStateMachine(buffer, deletedBlockLog, decommissionManager);
+      SCMContext scmContext = mock(SCMContext.class);
+      doThrow(new RocksDatabaseException("injected flush failure")).when(buffer).flush();
+      SCMStateMachine leaderStateMachine =
+          newLeaderStateMachine(buffer, deletedBlockLog, mock(NodeDecommissionManager.class), scmContext);
 
-      assertThrows(ExitUtils.ExitException.class,
-          () -> leaderStateMachine.notifyLeaderChanged(memberId(), followerId));
+      assertThrows(ExitUtils.ExitException.class, leaderStateMachine::notifyLeaderReady);
 
-      verify(deletedBlockLog, never()).onBecomeLeader();
-      verify(decommissionManager, never()).onBecomeLeader();
+      verify(deletedBlockLog, never()).onLeaderReady();
+      verify(scmContext, never()).setLeaderReady();
     } finally {
       ExitUtils.clear();
     }
   }
 
   private SCMStateMachine newLeaderStateMachine(SCMHADBTransactionBuffer buffer, DeletedBlockLogImpl deletedBlockLog,
-      NodeDecommissionManager decommissionManager) {
+      NodeDecommissionManager decommissionManager, SCMContext scmContext) {
     StorageContainerManager scm = mock(StorageContainerManager.class);
     SCMHAManager haManager = mock(SCMHAManager.class);
     SCMRatisServer ratisServer = mock(SCMRatisServer.class);
@@ -451,7 +454,8 @@ public class TestSCMStateMachine {
     DivisionInfo divisionInfo = mock(DivisionInfo.class);
     BlockManager blockManager = mock(BlockManager.class);
     when(scm.getMetrics()).thenReturn(mock(SCMMetrics.class));
-    when(scm.getScmContext()).thenReturn(mock(SCMContext.class));
+    when(scm.getScmContext()).thenReturn(scmContext);
+    when(scm.getSCMServiceManager()).thenReturn(mock(SCMServiceManager.class));
     when(scm.getScmHAManager()).thenReturn(haManager);
     when(haManager.getRatisServer()).thenReturn(ratisServer);
     when(ratisServer.getDivision()).thenReturn(division);

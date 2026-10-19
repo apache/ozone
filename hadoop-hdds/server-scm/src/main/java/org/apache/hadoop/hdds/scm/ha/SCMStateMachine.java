@@ -368,11 +368,7 @@ public class SCMStateMachine extends BaseStateMachine {
         .getDeletedBlockLog();
     Preconditions.checkArgument(
         deletedBlockLog instanceof DeletedBlockLogImpl);
-    try {
-      transactionBuffer.flushAndRun(((DeletedBlockLogImpl) deletedBlockLog)::onBecomeLeader);
-    } catch (Exception ex) {
-      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
-    }
+    ((DeletedBlockLogImpl) deletedBlockLog).onBecomeLeader();
     scm.getScmDecommissionManager().onBecomeLeader();
 
     scm.scmHAMetricsUpdate(newLeaderId.toString());
@@ -616,6 +612,18 @@ public class SCMStateMachine extends BaseStateMachine {
     if (!isInitialized) {
       return;
     }
+    // Transactions of the previous leader terms may be applied after notifyLeaderChanged, so the deleted blocks
+    // summary is reloaded here. This runs on the apply thread, so no transaction is applied between flush and
+    // reload.
+    try {
+      transactionBuffer.flush();
+    } catch (Exception ex) {
+      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
+    }
+    DeletedBlockLog deletedBlockLog = scm.getScmBlockManager().getDeletedBlockLog();
+    Preconditions.checkArgument(deletedBlockLog instanceof DeletedBlockLogImpl);
+    ((DeletedBlockLogImpl) deletedBlockLog).onLeaderReady();
+
     // On leader SCM once after it is ready, notify SCM services and also set
     // leader ready  in SCMContext.
     scm.getScmContext().setLeaderReady();

@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -1148,81 +1150,94 @@ public class TestDeletedBlockLog {
   }
 
   /**
-   * A summary reload (leader change) must not overwrite the in-memory counters while an add is still
-   * between the counter update and the end of the DB update, and must work again afterwards.
+   * After becoming leader, summary updates are rejected without touching the counters, txSizeMap or the DB until
+   * the summary is reloaded on leader ready. A remove that ran after txSizeMap was cleared would otherwise delete
+   * the row without decrementing the summary.
    */
   @Test
-  public void testSummaryReloadSkippedWhileAddInFlight() throws IOException {
+  public void testSummaryUpdateRejectedUntilLeaderReady() throws IOException {
+    long txId = 2L;
+    TxBlockInfo txBlockInfo = new TxBlockInfo(txId, 200L, 2L, 2048L, 6144L);
     DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
     SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
-    persistSummary(0);
     statusManager.onBecomeLeader();
+    statusManager.getTxSizeMap().put(txId, txBlockInfo);
+
+    SCMException addException = assertThrows(SCMException.class, () -> statusManager.addTransactions(
+        new ArrayList<>(Collections.singletonList(buildTx(1L, 100L, 1024L, 2L)))));
+    assertEquals(SCMException.ResultCodes.SCM_NOT_LEADER, addException.getResult());
+    SCMException removeException = assertThrows(SCMException.class,
+        () -> statusManager.removeTransactions(new ArrayList<>(Collections.singletonList(txId))));
+    assertEquals(SCMException.ResultCodes.SCM_NOT_LEADER, removeException.getResult());
+    verify(mockStateManager, never()).addTransactionsToDB(any(ArrayList.class), any());
+    verify(mockStateManager, never()).removeTransactionsFromDB(any(ArrayList.class), any());
+    assertSame(txBlockInfo, statusManager.getTxSizeMap().get(txId));
 
     persistSummary(7);
-    doAnswer(invocation -> {
-      statusManager.onBecomeLeader();
-      assertEquals(1, statusManager.getSummary().getTotalTransactionCount(),
-          "reload must be skipped while the add is in flight");
-      return null;
-    }).when(mockStateManager).addTransactionsToDB(any(ArrayList.class), any());
-
-    statusManager.addTransactions(new ArrayList<>(
-        Collections.singletonList(buildTx(1L, 100L, 1024L, 2L))));
-    assertEquals(1, statusManager.getSummary().getTotalTransactionCount());
-
-    statusManager.onBecomeLeader();
-    assertEquals(7, statusManager.getSummary().getTotalTransactionCount(),
-        "reload must apply once no update is in flight");
-  }
-
-  /**
-   * Same as above for a remove: the decremented in-memory counters survive a reload during the remove.
-   */
-  @Test
-  public void testSummaryReloadSkippedWhileRemoveInFlight() throws IOException {
-    long txId = 2L;
-    long blockSize = 1024L;
-    long blockCount = 2L;
-    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
-    SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
-    statusManager.addTransactions(new ArrayList<>(
-        Collections.singletonList(buildTx(txId, 200L, blockSize, blockCount))));
-    statusManager.getTxSizeMap().put(txId,
-        new TxBlockInfo(txId, 200L, blockCount, blockSize * blockCount, blockSize * blockCount * 3L));
-
-    persistSummary(5);
-    doAnswer(invocation -> {
-      statusManager.onBecomeLeader();
-      assertEquals(0, statusManager.getSummary().getTotalTransactionCount(),
-          "reload must be skipped while the remove is in flight");
-      return null;
-    }).when(mockStateManager).removeTransactionsFromDB(any(ArrayList.class), any());
-
+    statusManager.onLeaderReady();
+    assertEquals(7, statusManager.getSummary().getTotalTransactionCount());
     statusManager.removeTransactions(new ArrayList<>(Collections.singletonList(txId)));
-    assertEquals(0, statusManager.getSummary().getTotalTransactionCount());
-
-    statusManager.onBecomeLeader();
-    assertEquals(5, statusManager.getSummary().getTotalTransactionCount());
+    assertEquals(6, statusManager.getSummary().getTotalTransactionCount());
+    verify(mockStateManager).removeTransactionsFromDB(any(ArrayList.class), any());
   }
 
   /**
-   * A failed add (Ratis timeout or hard failure) must still release the in-flight marker,
-   * otherwise every later reload would be skipped forever.
+   * An add that fails after a leader change must not leave its change on top of the summary reloaded on leader
+   * ready: a timed out change is dropped by the reload, and a failed change is not rolled back after the reload.
    */
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  public void testSummaryReloadResumesAfterFailedAdd(boolean ratisTimeout) throws IOException {
+  public void testFailedAddDuringLeaderChangeKeepsReloadedSummary(boolean ratisTimeout) throws IOException {
     DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
     SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
-    doThrow(ratisTimeout ? ratisTimeout() : hardDbFailure())
-        .when(mockStateManager).addTransactionsToDB(any(ArrayList.class), any());
+    doAnswer(invocation -> {
+      statusManager.onBecomeLeader();
+      if (!ratisTimeout) {
+        persistSummary(9);
+        statusManager.onLeaderReady();
+      }
+      throw ratisTimeout ? ratisTimeout() : hardDbFailure();
+    }).when(mockStateManager).addTransactionsToDB(any(ArrayList.class), any());
 
-    assertThrows(IOException.class, () -> statusManager.addTransactions(new ArrayList<>(
-        Collections.singletonList(buildTx(1L, 100L, 1024L, 2L)))));
-
-    persistSummary(9);
-    statusManager.onBecomeLeader();
+    assertThrows(SCMException.class, () -> statusManager.addTransactions(
+        new ArrayList<>(Collections.singletonList(buildTx(1L, 100L, 1024L, 2L)))));
+    if (ratisTimeout) {
+      persistSummary(9);
+      statusManager.onLeaderReady();
+    }
     assertEquals(9, statusManager.getSummary().getTotalTransactionCount());
+    assertEquals(9, statusManager.getSummary().getTotalBlockCount());
+  }
+
+  /**
+   * Same as above for a remove: a failed remove does not restore its txSizeMap entry or counters over the summary
+   * reloaded on leader ready.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testFailedRemoveDuringLeaderChangeKeepsReloadedSummary(boolean ratisTimeout) throws IOException {
+    long txId = 2L;
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
+    statusManager.getTxSizeMap().put(txId, new TxBlockInfo(txId, 200L, 2L, 2048L, 6144L));
+    doAnswer(invocation -> {
+      statusManager.onBecomeLeader();
+      if (!ratisTimeout) {
+        persistSummary(9);
+        statusManager.onLeaderReady();
+      }
+      throw ratisTimeout ? ratisTimeout() : hardDbFailure();
+    }).when(mockStateManager).removeTransactionsFromDB(any(ArrayList.class), any());
+
+    assertThrows(SCMException.class,
+        () -> statusManager.removeTransactions(new ArrayList<>(Collections.singletonList(txId))));
+    if (ratisTimeout) {
+      persistSummary(9);
+      statusManager.onLeaderReady();
+    }
+    assertEquals(9, statusManager.getSummary().getTotalTransactionCount());
+    assertEquals(9, statusManager.getSummary().getTotalBlockCount());
+    assertFalse(statusManager.getTxSizeMap().containsKey(txId));
   }
 
   private SCMDeletedBlockTransactionStatusManager newStatusManager(DeletedBlockLogStateManager stateManager)

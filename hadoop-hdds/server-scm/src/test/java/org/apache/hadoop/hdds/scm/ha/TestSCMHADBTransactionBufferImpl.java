@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIO
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_DBTRANSACTIONBUFFER_FLUSH_PENDING_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -41,7 +40,6 @@ import java.io.File;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -300,67 +298,6 @@ public class TestSCMHADBTransactionBufferImpl {
     assertTrue(buffer.flushIfPendingLimitReached());
     assertDurable("key");
     assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
-  }
-
-  @Test
-  public void testFlushAndRunRunsActionAfterFlush() throws Exception {
-    SCMHADBTransactionBufferImpl buffer = newBuffer(10);
-    buffer.updateLatestTrxInfo(TRX_INFO_T4);
-    buffer.flush();
-    clearInvocations(deletedBlockLog);
-    put(buffer, "key");
-    buffer.updateLatestTrxInfo(TRX_INFO_T5);
-
-    AtomicInteger runs = new AtomicInteger();
-    buffer.flushAndRun(() -> {
-      runs.incrementAndGet();
-      assertDoesNotThrow(() -> assertDurable("key"));
-      verify(deletedBlockLog, times(1)).onFlush();
-    });
-
-    assertEquals(1, runs.get());
-    assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
-  }
-
-  @Test
-  public void testFlushAndRunBlocksBufferWritesUntilActionCompletes() throws Exception {
-    SCMHADBTransactionBufferImpl buffer = newBuffer(10);
-    buffer.updateLatestTrxInfo(TRX_INFO_T4);
-    buffer.flush();
-    put(buffer, "before");
-    buffer.updateLatestTrxInfo(TRX_INFO_T5);
-
-    Thread writer = new Thread(() -> assertDoesNotThrow(() -> put(buffer, "during")));
-    buffer.flushAndRun(() -> {
-      writer.start();
-      assertDoesNotThrow(() -> waitFor(() -> writer.getState() == Thread.State.WAITING, 10, 5_000));
-      assertDoesNotThrow(() -> assertNotDurable("during"));
-    });
-    writer.join(10_000);
-
-    // The write that waited for the action landed after the flush, so it is only buffered.
-    assertDurable("before");
-    assertNotDurable("during");
-    buffer.flush();
-    assertDurable("during");
-  }
-
-  @Test
-  public void testFlushAndRunReleasesLockWhenActionFails() throws Exception {
-    SCMHADBTransactionBufferImpl buffer = newBuffer(10);
-    buffer.updateLatestTrxInfo(TRX_INFO_T4);
-    buffer.flush();
-    put(buffer, "key");
-    buffer.updateLatestTrxInfo(TRX_INFO_T5);
-
-    assertThrows(IllegalStateException.class, () -> buffer.flushAndRun(() -> {
-      throw new IllegalStateException("injected");
-    }));
-    assertDurable("key");
-
-    // A write from another thread would block forever if the write lock had leaked.
-    CompletableFuture<Void> write = CompletableFuture.runAsync(() -> assertDoesNotThrow(() -> put(buffer, "after")));
-    write.get(10, TimeUnit.SECONDS);
   }
 
   private SCMHADBTransactionBufferImpl newBuffer(OzoneConfiguration conf) throws Exception {
