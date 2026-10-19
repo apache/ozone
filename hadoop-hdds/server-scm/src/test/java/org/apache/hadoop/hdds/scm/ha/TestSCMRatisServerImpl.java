@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.Parameters;
@@ -53,6 +54,7 @@ import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.RaftServer;
+import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
 import org.junit.jupiter.api.Test;
@@ -274,6 +276,8 @@ public class TestSCMRatisServerImpl {
       server.start();
       assertTrue(client.io().send(SCMRatisRequest.of(RequestType.CONTAINER, "op", new Class<?>[0]).encode())
           .isSuccess());
+      final RaftLog oldLog = server.getDivision(oldGroup.getGroupId()).getRaftLog();
+      GenericTestUtils.waitFor(() -> oldLog.getFlushIndex() >= oldLog.getLastEntryTermIndex().getIndex(), 100, 10000);
     }
 
     // The Ratis directory is kept while the SCM is initialized again with a new cluster ID and SCM ID.
