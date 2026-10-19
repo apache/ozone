@@ -1463,7 +1463,7 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
-    if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(omVersion)) {
       throw new IOException(
           "OzoneManager does not support atomic key creation.");
     }
@@ -1600,7 +1600,7 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
-    if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(omVersion)) {
       throw new IOException(
           "OzoneManager does not support atomic key creation.");
     }
