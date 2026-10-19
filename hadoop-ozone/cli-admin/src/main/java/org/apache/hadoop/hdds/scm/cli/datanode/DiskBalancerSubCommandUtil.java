@@ -157,6 +157,7 @@ final class DiskBalancerSubCommandUtil {
    *   <li>"hostname:port" - Uses the specified port</li>
    *   <li>"hostname" - Uses the default CLIENT_RPC port (HDDS_DATANODE_CLIENT_PORT_DEFAULT)</li>
    * </ul>
+   * An IPv6 literal has to be bracketed, e.g. "[2001:db8::1]:port" or "[2001:db8::1]".
    * 
    * @param address the datanode address in "host:port" or "host" format
    * @return DiskBalancerProtocol proxy
@@ -168,6 +169,7 @@ final class DiskBalancerSubCommandUtil {
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     
     // Parse address and add default port if not specified
+    HddsUtils.validateHostPortAuthority("Datanode address", address);
     int port = HddsUtils.getHostPort(address).orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT);
     InetSocketAddress nodeAddr = NetUtils.createSocketAddr(
         HddsUtils.getHostPortString(HddsUtils.getHostName(address).get(), port));

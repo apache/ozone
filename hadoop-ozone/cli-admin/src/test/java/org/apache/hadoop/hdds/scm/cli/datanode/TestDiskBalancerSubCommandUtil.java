@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocolPB.DiskBalancerProtocolClientSideTranslatorPB;
@@ -121,7 +123,6 @@ public class TestDiskBalancerSubCommandUtil {
   @CsvSource({
       "10.0.0.1, 10.0.0.1, " + HDDS_DATANODE_CLIENT_PORT_DEFAULT,
       "10.0.0.1:1234, 10.0.0.1, 1234",
-      "2001:db8::1, 2001:db8::1, " + HDDS_DATANODE_CLIENT_PORT_DEFAULT,
       "[2001:db8::1], 2001:db8::1, " + HDDS_DATANODE_CLIENT_PORT_DEFAULT,
       "[2001:db8::1]:1234, 2001:db8::1, 1234",
   })
@@ -134,6 +135,14 @@ public class TestDiskBalancerSubCommandUtil {
     }
 
     assertEquals(Arrays.asList(new InetSocketAddress(host, port)), addresses);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"2001:db8::1, [2001:db8::1]", "2001:db8::1:1234, [2001:db8::1]:1234"})
+  public void testGetSingleNodeDiskBalancerProxyRejectsUnbracketedIpv6(String address, String suggestion) {
+    ConfigurationException e = assertThrows(ConfigurationException.class,
+        () -> DiskBalancerSubCommandUtil.getSingleNodeDiskBalancerProxy(address));
+    assertThat(e.getMessage()).contains(address).contains(suggestion);
   }
 
   @Test
