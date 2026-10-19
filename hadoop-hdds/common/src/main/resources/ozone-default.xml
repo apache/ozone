@@ -3881,6 +3881,17 @@
     </description>
   </property>
   <property>
+    <name>ozone.http.sni.keymanager.delegate.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SECURITY, MANAGEMENT</tag>
+    <description>
+      Whether the HTTPS endpoints of Ozone daemons delegate SNI certificate selection to the
+      JDK key manager. When the server keystore combines multiple certificates, enabling this
+      lets the key manager pick the certificate that matches the request's TLS SNI name instead
+      of always serving the default certificate.
+    </description>
+  </property>
+  <property>
     <name>ozone.https.client.need-auth</name>
     <tag>OZONE, SECURITY, MANAGEMENT</tag>
     <value>false</value>
