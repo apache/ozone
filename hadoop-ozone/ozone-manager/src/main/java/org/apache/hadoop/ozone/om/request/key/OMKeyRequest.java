@@ -25,13 +25,13 @@ import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_PART;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -1131,8 +1131,10 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nonnull long transactionLogIndex, long objectID,
           OmConfig configuration) throws IOException {
 
-    Preconditions.checkArgument(args.getMultipartNumber() > 0,
-            "PartNumber Should be greater than zero");
+    if (args.getMultipartNumber() <= 0) {
+      throw new OMException("Part number should be greater than zero, but was " + args.getMultipartNumber(),
+          INVALID_PART);
+    }
     // When key is multipart upload part key, we should take replication
     // type and replication factor from original key which has done
     // initiate multipart upload. If we have not found any such, we throw
