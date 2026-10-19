@@ -81,6 +81,8 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "system clients no longer need the client-side InfoBucket layout "
           + "check for listStatus"),
 
+  // Only operations included in the first release with version 102 may share it.
+  // S3 volume context support added later needs a new version.
   S3_VOLUME_CONTEXT_RESOLUTION(102,
       "OzoneManager version that supports server-side S3 volume context resolution"),
 
