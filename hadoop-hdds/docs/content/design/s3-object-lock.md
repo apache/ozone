@@ -61,6 +61,7 @@ stable rollout of baseline tamper-proof protection.
 * Authorization: Ozone has no root account.
   * With native ACLs, changing Object Lock settings and bypassing Governance retention are limited to the volume or bucket owner, and setting a Compliance retention is limited to Ozone administrators (see [Native ACL Mapping](#1-native-acl-mapping)).
   * With Ranger, AWS-style action-level authorization for S3 requests requires `enableActionMatcherInPoliciesCondition` to be enabled; it is `false` by default (see [Ranger Authorization](#2-ranger-authorization)).
+  * `GetObjectRetention` / `GetObjectLegalHold` also require `GetObject`, because Ozone serves them with the same key lookup as `HeadObject` (see [Dependent Permissions](#6-dependent-permissions)).
   * A Compliance retention cannot be removed through any API; it can only be changed offline with `ozone repair` (see [Offline Compliance Retention Repair](#offline-compliance-retention-repair)).
 
 ## Technical Description
@@ -91,10 +92,12 @@ stable rollout of baseline tamper-proof protection.
 * Retention Modes:
   * Compliance Mode: The strictest protection tier. Once applied, no user (including root/admin) can remove the lock, shorten the duration, or overwrite the object before the retention period expires.
   * Governance Mode: A flexible protection tier. Standard users are restricted by locking rules, but users with `BypassGovernanceRetention` permissions can bypass restrictions to modify or delete the object.
-* Event Hold / Event-based Retention:
+* Event Hold / Event-based Retention (AWS S3 *variable retention*):
   * Used for records management where the retention lifecycle depends on external events (e.g., contract termination, employee departure, loan closure).
   * Keeps the object immutable while awaiting event notification; once the event occurs, the definitive expiration date (`RetainUntilDate`) is calculated and applied.
-  * While the event has not occurred, `eventHold.enabled = true` keeps the key locked indefinitely. `eventHold.rule` is copied from the bucket default when the key is created, so later changes to the bucket default do not affect existing keys.
+  * Follows the AWS S3 API: an event hold has a status (`EventHold`: `ON` / `OFF`) and a duration (`EventHoldDuration`, in days or years), and always requires a retention mode.
+  * While the event has not occurred, `eventHold.enabled = true` keeps the key locked indefinitely. The duration (`eventHold.rule`) is set by the request or copied from the bucket default when the key is created, so later changes to the bucket default do not affect existing keys.
+  * While the event hold is `ON`, the effective `RetainUntilDate` is the later of now + duration and the stored `retentionDate` (if any), so it moves forward as time passes. `GetObjectRetention`, `HeadObject` and `GetObject` return this computed date.
   * The bucket default can have both `rule` and `eventHold`. In that case a new key gets `retentionDate` = creation time + `rule` and an active event hold;
     the key stays locked until the event hold is released and `retentionDate` has passed. With only `eventHold`, `retentionDate` is unset until the hold is released.
   * While an event hold is active, a `GOVERNANCE` key can be deleted or overwritten with `bypassGovernanceRetention`; a `COMPLIANCE` key cannot.
@@ -125,11 +128,17 @@ retention timer starts (RetainUntilDate is calculated)
 WORM until timer expires
 ```
 
-The "business event occurs" step is triggered with `PutObjectRetention`, so no new API or Ranger action is needed
-and S3 clients can release the hold through S3 Gateway (native clients use `OzoneBucket#setRetention`).
-When OM handles `PutObjectRetention` on a key with an active event hold, it clears `eventHold` under the key write lock
-and sets `retentionDate` to the latest of the existing `retentionDate`, the requested `RetainUntilDate`, and the leader-stamped request time plus the event hold `rule`.
-The retention mode cannot be changed by this request, so the usual rules for shortening retention still apply.
+Event holds are managed with `PutObjectRetention`, following the AWS S3 API, so no new API or Ranger action is needed
+(native clients use `OzoneBucket#setRetention`). OM handles the request under the key write lock, using the leader-stamped request time as now:
+* **Set an event hold**: `EventHold=ON` with exactly one `EventHoldDuration`. It can also be set at creation with the `x-amz-object-lock-event-hold`
+  and `x-amz-object-lock-event-hold-duration-days` / `-years` headers, or from the bucket default.
+* **Update while the hold is `ON`**: a request without `EventHold=OFF` keeps the event hold active, so updating the mode or `RetainUntilDate` never releases it.
+  The duration can be changed. Without a Governance bypass the effective `RetainUntilDate` never moves earlier: when the duration is decreased, OM first stores the current effective date (now + old duration) in `retentionDate` as the minimum (see [Retention Updates](#retention-updates)).
+* **Release the hold (the "business event occurs" step)**: only an explicit `EventHold=OFF` on a key whose hold is `ON` releases it. The request must not carry `EventHoldDuration`, and `RetainUntilDate` is optional.
+  OM clears `eventHold.enabled` and sets `retentionDate` to the latest of the existing `retentionDate`, the requested `RetainUntilDate` (if any), and now + `eventHold.rule`.
+* **Invalid requests** are rejected with `400 Bad Request`, as in AWS S3: an event hold without a retention mode, `EventHold=ON` without exactly one duration, `EventHold=OFF` with a duration,
+  or `EventHold=OFF` on a key that has no active hold and no `RetainUntilDate`. Durations must be positive and at most 36,500 days or 100 years.
+* The retention mode cannot be changed when the hold is released, so the usual rules for shortening retention still apply.
 
 > _**Note**:
 > * Background & Root Cause: A prerequisite for enabling WORM (Write Once, Read Many) in AWS S3 is that Object Versioning must be enabled. Under S3 architecture, executing a Put on a locked object generates a new version without affecting the protected prior version; thus, S3 Object Lock primarily restricts Delete Object. 
@@ -190,7 +199,7 @@ message KeyInfo {
 
 message KeyRetention {
   required RetentionMode retentionMode = 1;
-  optional uint64 retentionDate = 2; // epoch milliseconds
+  optional uint64 retentionDate = 2; // epoch milliseconds; the minimum date while the event hold is ON
   optional EventHold eventHold = 3;
 }
 ```
@@ -217,10 +226,11 @@ Ozone Object Lock enforces a dual-gate protection mechanism combining **authoriz
 | `GetBucketObjectLockConfiguration`                                | Bucket         | `READ`                             |
 | `GetObjectRetention`, `GetObjectLegalHold`                        | Key            | `READ`                             |
 | `PutBucketObjectLockConfiguration` (no default or `GOVERNANCE`)   | Bucket         | Owner                              |
-| `PutObjectRetention` (`GOVERNANCE`)                               | Key            | Owner                              |
+| `PutObjectRetention`: set a `GOVERNANCE` retention, extend a retention, or release an event hold | Key | Owner                  |
 | `PutObjectLegalHold`                                              | Key            | Owner                              |
-| Bypass Governance retention                                       | Key            | Owner                              |
-| Any change that sets or updates a `COMPLIANCE` retention          | Bucket / Key   | Ozone administrator only           |
+| Bypass Governance retention (including shortening or removing a `GOVERNANCE` retention) | Key | Owner                  |
+| Dependent permissions (for example `GOVERNANCE` or legal hold headers on key creation) | Bucket / Key | Owner (see [Dependent Permissions](#6-dependent-permissions)) |
+| Set a `COMPLIANCE` retention on a key or as the bucket default    | Bucket / Key   | Ozone administrator only           |
 
 **Reading lock information requires `READ`**: Object Lock state is not sensitive for a principal that can already read the key, and `HeadObject` / `GetObject` return the same information in the `x-amz-object-lock-*` headers.
 
@@ -228,10 +238,12 @@ Ozone Object Lock enforces a dual-gate protection mechanism combining **authoriz
 * Changing a lock is limited to owners, instead of an ACL type such as `WRITE_ACL`: any ACL type can be granted to other users, so a user who was only meant to read or write data could be given the right to remove a lock.
 * Owners can also bypass Governance retention, so with native ACLs Governance retention protects keys from accidental deletion by every user except the owners and Ozone administrators.
 
-**Compliance is limited to Ozone administrators**: a Compliance retention cannot be shortened or removed through any API, so setting one is irreversible. With native ACLs, only an Ozone administrator can:
+**Setting Compliance is limited to Ozone administrators**: a Compliance retention cannot be shortened or removed through any API, so setting one is irreversible. With native ACLs, only an Ozone administrator can:
 * set a `COMPLIANCE` retention on a key with `PutObjectRetention`, or with the `x-amz-object-lock-*` headers on Put Object / Create Multipart Upload,
-* extend a `COMPLIANCE` retention, change a `GOVERNANCE` retention to `COMPLIANCE`, or release the event hold of a `COMPLIANCE` key,
+* change a `GOVERNANCE` retention to `COMPLIANCE`,
 * set `COMPLIANCE` as the default retention mode of a bucket with `PutBucketObjectLockConfiguration`, or change the default of a bucket whose default is already `COMPLIANCE`.
+
+Extending a retention or releasing an event hold (see [Retention Updates](#retention-updates)) only needs the owner, also for a `COMPLIANCE` key, as in AWS S3 where they only need `PutObjectRetention`.
 
 New keys written to a bucket whose default mode is `COMPLIANCE` get the default retention without an administrator check, because an administrator already approved it when configuring the bucket.
 
@@ -261,7 +273,8 @@ New keys written to a bucket whose default mode is `COMPLIANCE` get the default 
 * The condition only narrows a policy item and never adds permissions: an item with `action-matches` applies only when both the access type and the action match.
   Policy items without the condition behave as before and are checked by access type only.
 * For example, a legal team can be granted `WRITE_ACL` with `action-matches: PutObjectLegalHold`, so it can change legal holds but not retention.
-* S3 Gateway maps each Object Lock request to its S3 action in `S3GActionIamMapper`, and OM passes it to Ranger in the `RequestContext`. OM does not set S3 actions itself.
+* S3 Gateway maps each Object Lock request to its S3 action in `S3GActionIamMapper`, and OM passes it to Ranger in the `RequestContext`.
+  The only actions OM adds are the dependent actions listed in [Dependent Permissions](#6-dependent-permissions).
 * Today S3 Gateway only sends the action when `ozone.s3g.sts.http.enabled=true`. This design depends on [HDDS-17054](https://issues.apache.org/jira/browse/HDDS-17054), which sends the action for every S3 request, so that Object Lock does not require STS to be enabled.
 
 For how requests without an S3 action (ofs, o3fs, Ozone CLI, Hadoop and native Java API) are authorized, see [Trusted Boundary](#trusted-boundary-and-compliance-scope).
@@ -312,12 +325,61 @@ Policy items without an `action-matches` condition are checked only against the 
        With Ranger, the principal needs `WRITE_ACL`, `WRITE` and `DELETE` on the target key; if the policy item has an `action-matches` condition, it must also match **`BypassGovernanceRetention`**.
     3. If either check fails, the request is aborted with `403 Access Denied`.
 
+##### Retention Updates
+
+`PutObjectRetention` on a key that already has a retention follows AWS S3. "Longer" and "shorter" compare the effective `RetainUntilDate` before and after the request:
+
+| Change                                                                              | `GOVERNANCE`                                              | `COMPLIANCE`                                         |
+|:------------------------------------------------------------------------------------|:----------------------------------------------------------|:-----------------------------------------------------|
+| Longer retention (later `RetainUntilDate`, longer event hold duration, `EventHold=ON`) | Allowed with `PutObjectRetention`, no bypass needed     | Allowed with `PutObjectRetention`                    |
+| Shorter retention (earlier `RetainUntilDate`, shorter event hold duration) or removal | Requires `PutObjectRetention` and the Governance bypass | Not allowed: rejected, or for a shorter event hold duration the effective date is kept |
+| Release the event hold (`EventHold=OFF`)                                            | Allowed with `PutObjectRetention`                         | Allowed with `PutObjectRetention`                    |
+| Change the mode                                                                     | `GOVERNANCE` → `COMPLIANCE`: allowed with `PutObjectRetention` | `COMPLIANCE` → `GOVERNANCE`: not allowed        |
+
+With native ACLs, `PutObjectRetention` means the owner, and setting `COMPLIANCE` (including `GOVERNANCE` → `COMPLIANCE`) means an Ozone administrator (see [Native ACL Mapping](#1-native-acl-mapping)).
+
 
 > _**Warning**: Permanent Data Immutability in Compliance Mode_
 >
 > Unlike AWS S3, where objects in Compliance mode cannot be deleted by any user (including root) and will only be destroyed if the entire AWS account itself is removed, Apache Ozone has no concept of a root or tenant account.
 > Once applied, a Compliance lock cannot be overridden or deleted through the Ozone API by any admin, native ACL or Ranger policy until the retention period expires.
 > It can only be changed offline with `ozone repair` (see below).
+
+#### 6. Dependent Permissions
+
+As in AWS S3 ([required permissions for S3 API operations](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-policy-actions.html)),
+the permission to read or write data and the permission to read or manage locks are separate. Some S3 APIs need an extra Object Lock permission, depending on the request:
+
+| S3 API                                                    | Main S3 action   | Condition                                                                                              | Dependent S3 action                        | Ranger access type            | Native ACLs                                              | If denied                                   |
+|:----------------------------------------------------------|:-----------------|:-------------------------------------------------------------------------------------------------------|:-------------------------------------------|:------------------------------|:---------------------------------------------------------|:--------------------------------------------|
+| `CreateBucket`                                            | `CreateBucket`   | `x-amz-bucket-object-lock-enabled: true`                                                               | `PutBucketObjectLockConfiguration`         | `WRITE_ACL` (bucket)          | Owner                                                    | Request fails                               |
+| `PutObject`, `CopyObject` (destination), `CreateMultipartUpload` | `PutObject` | `x-amz-object-lock-mode`, `-retain-until-date`, `-event-hold`, `-event-hold-duration-days` / `-years` | `PutObjectRetention`                       | `WRITE_ACL` (key)             | Owner (`GOVERNANCE`), Ozone administrator (`COMPLIANCE`) | Request fails                               |
+| `PutObject`, `CopyObject` (destination), `CreateMultipartUpload` | `PutObject` | `x-amz-object-lock-legal-hold`                                                                     | `PutObjectLegalHold`                       | `WRITE_ACL` (key)             | Owner                                                    | Request fails                               |
+| `GetObject`, `HeadObject`                                 | `GetObject`      | The key read by OM has a retention (`GetObjectRetention`) or a legal hold (`GetObjectLegalHold`)       | `GetObjectRetention`, `GetObjectLegalHold` | `READ_ACL` (key)              | `READ` (already required by the main action)             | OM removes that lock information from the response, so S3 Gateway omits the `x-amz-object-lock-*` headers; the request succeeds |
+| `GetObjectRetention`, `GetObjectLegalHold`                | `GetObjectRetention`, `GetObjectLegalHold` | Always (served by the same key lookup as `HeadObject`, like `GetObjectAttributes`)  | `GetObject`                                | `READ` (key)                  | `READ`                                                   | Request fails                               |
+| `DeleteObject`, `DeleteObjects`                           | `DeleteObject`   | `x-amz-bypass-governance-retention: true` on a key under Governance retention                          | `BypassGovernanceRetention`                | `WRITE_ACL`, `WRITE`, `DELETE` (key) | Owner                                             | Request fails (`DeleteObjects`: per-key `AccessDenied`) |
+| `PutObjectRetention`                                      | `PutObjectRetention` | Shortens or removes a Governance retention (see [Retention Updates](#retention-updates))           | `BypassGovernanceRetention`                | `WRITE_ACL`, `WRITE`, `DELETE` (key) | Owner                                             | Request fails                               |
+| `PutObject`, `CopyObject`, `CompleteMultipartUpload`, rename (Ozone only) | `PutObject` | Overwrites or renames a key under Governance retention with `bypassGovernanceRetention`  | `BypassGovernanceRetention`                | `WRITE_ACL`, `WRITE`, `DELETE` (key) | Owner                                             | Request fails                               |
+
+* A client that can only write data cannot choose its own retention (for example, a shorter one than the bucket default) by adding a header,
+  and a principal that can manage retention cannot upload data without the write permission.
+* Keys that only get the bucket default retention need no extra check, because the default was already authorized by `PutBucketObjectLockConfiguration`.
+* `GetObjectRetention` / `GetObjectLegalHold` also need `GetObject`, which AWS S3 does not require: in Ozone they are served by the key lookup that `HeadObject` uses, so they follow the existing `GetObjectAttributes` → `GetObject` dependency.
+* The last row has no AWS S3 equivalent: AWS S3 writes a new version instead of overwriting, while Ozone rejects overwrites of locked keys unless the Governance bypass applies.
+* Native clients pass the same settings and the `bypassGovernanceRetention` flag as request arguments, and the same rules apply.
+
+The check is done in OM, following the existing dependent S3 action check in `OmMetadataReader` (`DEPENDENT_S3_ACTIONS`),
+which today also checks `GetObject` when a request is authorized as `GetObjectAttributes`, in the same RPC. It is extended in three ways:
+1. **Conditional on the request**: a dependent action is checked only when its condition holds, for example `PutObjectRetention` only when the request carries retention settings.
+2. **Own access type**: each dependent action uses the access type in the table, not the access type of the main request.
+   Otherwise a principal with only `WRITE` and `action-matches: PutObjectRetention` could set retention at upload time with weaker permissions than the `PutObjectRetention` API requires.
+3. **Conditional on the key, without failing the request**: for `GetObject` / `HeadObject`, OM first checks `READ` and reads the key as today. Only if the key has a retention or a legal hold,
+   OM checks the dependent action in the same RPC, without throwing on denial, and removes the lock information it is not allowed to return.
+   S3 Gateway does not need another RPC, and reads of keys without a lock cost nothing extra.
+   Listing responses do not include lock information, so listing does not need a check per key; clients read it with `HeadObject` or `GetObjectRetention` / `GetObjectLegalHold`.
+
+Unlike the current dependent action check, which only runs when the request has an S3 action, these checks also run for requests without an S3 action, using the access type only,
+so the rules in [Trusted Boundary](#trusted-boundary-and-compliance-scope) apply to them.
 
 ### New Ozone APIs
 
@@ -334,20 +396,24 @@ public void setLegalHold(String keyName, boolean hold);
 ### Supported S3 APIs
 
 To ensure seamless integration with existing S3 clients (e.g., AWS CLI, Boto3) and applications, the Ozone S3 Gateway (S3G) will translate and support standard AWS S3 APIs.
-In alignment with AWS S3, HeadObject and GetObject responses will be enriched with lock-related headers (`x-amz-object-lock-mode`, `x-amz-object-lock-retain-until-date`, and `x-amz-object-lock-legal-hold`) when the caller possesses the required GetObjectRetention or GetObjectLegalHold permissions. Without the permission the headers are omitted and the request still succeeds, so the extra authorization never fails a plain read.
+In alignment with AWS S3, HeadObject and GetObject responses will be enriched with lock-related headers (`x-amz-object-lock-mode`, `x-amz-object-lock-retain-until-date`, and `x-amz-object-lock-legal-hold`) when the caller possesses the required GetObjectRetention or GetObjectLegalHold permissions. OM checks them in the same RPC only for keys that have lock information, and without the permission the headers are omitted and the request still succeeds, so the extra authorization never fails a plain read (see [Dependent Permissions](#6-dependent-permissions)).
 
 **Bucket-Level APIs:**
 * `CreateBucket`: Supports enabling Object Lock at creation time via the x-amz-bucket-object-lock-enabled: true header.
 * `GetBucketObjectLockConfiguration`: Retrieves the Object Lock status and the default retention configuration (if any) for a specified OBS bucket.
 * `PutBucketObjectLockConfiguration`: Enables Object Lock and default retention on an existing bucket. In alignment with AWS S3, passing the `x-amz-bucket-object-lock-token` header is supported when enabling lock on existing buckets.
+  The default retention can include `DefaultEventHold` (an event hold duration), so new keys start with an active event hold.
 * Bucket links: S3 buckets are often links (for example `/s3v/bucket1` → `/vol1/bucket1`). Unlike `OMBucketSetPropertyRequest`, which rejects property changes on links,
   `PutBucketObjectLockConfiguration` follows the link and stores the configuration on the source bucket, and `GetBucketObjectLockConfiguration` reads it from there.
   Authorization is checked on both the link and the source bucket, like other requests that resolve links. Key operations already resolve links, so WORM checks always use the source bucket's configuration.
 
 **Object-Level APIs:**
-* `PutObject / CreateMultipartUpload`: Supports setting retention and legal hold directly during object creation via `x-amz-object-lock-mode`, `x-amz-object-lock-retain-until-date`, and `x-amz-object-lock-legal-hold` request headers.
-* `PutObjectRetention`: Places a retention configuration on an object, specifying the retention mode (COMPLIANCE or GOVERNANCE) and the retention duration (in days or years).
-* `GetObjectRetention`: Retrieves the current retention configuration applied to an object.
+* `PutObject / CreateMultipartUpload`: Supports setting retention and legal hold directly during object creation via `x-amz-object-lock-mode`, `x-amz-object-lock-retain-until-date`,
+  `x-amz-object-lock-event-hold`, `x-amz-object-lock-event-hold-duration-days` / `-years`, and `x-amz-object-lock-legal-hold` request headers.
+  These headers need extra permissions (see [Dependent Permissions](#6-dependent-permissions)).
+* `PutObjectRetention`: Places a retention configuration on an object: the retention mode (`COMPLIANCE` or `GOVERNANCE`), `RetainUntilDate`, `EventHold` (`ON` / `OFF`) and `EventHoldDuration`.
+  See [Event Hold Trigger Workflow](#event-hold-trigger-workflow) for how event holds are set, updated and released.
+* `GetObjectRetention`: Retrieves the current retention configuration applied to an object, including the event hold status and duration. While the event hold is `ON`, `RetainUntilDate` is the computed date.
 * `PutObjectLegalHold`: Applies or removes a Legal Hold configuration to the specified object.
 * `GetObjectLegalHold`: Retrieves the current Legal Hold status of an object.
 
@@ -484,12 +550,13 @@ The implementation is divided into the phases below. Only the highlights are lis
 
 * Native ACLs: `READ` for reading lock information, owner check for changing locks and Governance bypass, and Ozone administrator check for Compliance.
 * Ranger: register the 7 Object Lock actions in S3 Gateway and Ranger, with the `READ_ACL` / `WRITE_ACL` access types for requests without an S3 action. Depends on HDDS-17054.
+* Extend `DEPENDENT_S3_ACTIONS` with conditional and optional dependent actions that have their own access type, for the dependent permissions of `CreateBucket`, key creation, `GetObject` / `HeadObject`, delete, overwrite and rename.
 * Document the Ranger action matcher prerequisite and the native ACL ownership model in the user documentation.
 
 ### Phase 3: Object Lock Management APIs
 
 * Bucket: `CreateBucket` with Object Lock, `PutBucketObjectLockConfiguration`, `GetBucketObjectLockConfiguration` (following bucket links).
-* Key: `PutObjectRetention` / `GetObjectRetention` (including releasing an event hold), `PutObjectLegalHold` / `GetObjectLegalHold`.
+* Key: `PutObjectRetention` / `GetObjectRetention` (including `EventHold` / `EventHoldDuration`, explicit event hold release and the computed `RetainUntilDate`), `PutObjectLegalHold` / `GetObjectLegalHold`.
 * `OzoneBucket` client APIs.
 
 ### Phase 4: WORM Enforcement
@@ -512,7 +579,7 @@ The implementation is divided into the phases below. Only the highlights are lis
 
 * **S3 Versioning**: when versioning is enabled, existing keys become the latest version and keep their lock state; overwrites create new versions instead of being rejected, and locks apply per version.
 * **FSO Buckets**: define lock granularity for files and directories and the rename / move semantics.
-* **Value-Level Ranger Authorization**: a payload-aware Ranger condition evaluator on `s3:object-lock-legal-hold` and `s3:object-lock-mode`, so policies can allow, for example, setting a legal hold `ON` but not `OFF`, or only `GOVERNANCE` mode.
+* **Value-Level Ranger Authorization**: a payload-aware Ranger condition evaluator on `s3:object-lock-legal-hold`, `s3:object-lock-mode`, `s3:object-lock-event-hold` and `s3:object-lock-event-hold-duration-days`, so policies can allow, for example, setting a legal hold `ON` but not `OFF`, or only `GOVERNANCE` mode.
 
 ## References
 
