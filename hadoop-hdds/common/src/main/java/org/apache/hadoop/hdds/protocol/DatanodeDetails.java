@@ -736,7 +736,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    * @return true if both nodes advertise the same currentVersion.
    */
   public boolean compareNodeVersions(DatanodeDetails datanodeDetails) {
-    return this.currentVersion == datanodeDetails.currentVersion;
+    return this.getSerializedCurrentVersion() == datanodeDetails.getSerializedCurrentVersion();
   }
 
   @Override
