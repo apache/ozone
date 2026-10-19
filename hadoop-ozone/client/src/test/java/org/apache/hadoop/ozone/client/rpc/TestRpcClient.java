@@ -373,7 +373,7 @@ public class TestRpcClient {
 
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
-      names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "S3_MULTIPART_UPLOAD_ABORT_CONTEXT"})
+      names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
   void testAbortS3MultipartUpload(OzoneManagerVersion version) throws Exception {
     RpcClient client = spy(createRpcClient());
     try {
@@ -382,7 +382,7 @@ public class TestRpcClient {
       FieldUtils.writeField(client, "ozoneManagerClient", om, true);
       doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
           .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(client).getS3VolumeContext();
-      boolean assumeContext = version == OzoneManagerVersion.S3_MULTIPART_UPLOAD_ABORT_CONTEXT;
+      boolean assumeContext = version == OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION;
 
       client.abortS3MultipartUpload("bucket", "key", "upload-id");
 
