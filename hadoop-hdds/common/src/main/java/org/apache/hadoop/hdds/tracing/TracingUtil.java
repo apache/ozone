@@ -529,6 +529,24 @@ public final class TracingUtil {
     };
   }
 
+  /**
+   * Create a new root INTERNAL span (a new trace), e.g. for one run of a background task.
+   * The caller makes it current and ends it.
+   * Returns an invalid span when tracing is not enabled.
+   */
+  public static Span createInternalSpan(String spanName) {
+    return importAndCreateSpan(spanName, null, SpanKind.INTERNAL);
+  }
+
+  /**
+   * Create an INTERNAL span that is a child of the current span.
+   * The caller makes it current and ends it.
+   * Returns an invalid span when tracing is not enabled.
+   */
+  public static Span createChildSpan(String spanName) {
+    return buildSpan(spanName, SpanKind.INTERNAL);
+  }
+
   public static Span getActiveSpan() {
     return Span.current();
   }

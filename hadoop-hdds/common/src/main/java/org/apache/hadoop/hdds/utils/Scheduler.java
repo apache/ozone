@@ -17,10 +17,14 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,24 +63,41 @@ public class Scheduler {
   }
 
   public void schedule(Runnable runnable, long delay, TimeUnit timeUnit) {
-    scheduledExecutorService.schedule(runnable, delay, timeUnit);
+    scheduledExecutorService.schedule(inSpan(runnable), delay, timeUnit);
   }
 
   public void schedule(CheckedRunnable<?> runnable, long delay,
       TimeUnit timeUnit, Logger logger, String errMsg) {
-    scheduledExecutorService.schedule(() -> {
+    scheduledExecutorService.schedule(inSpan(() -> {
       try {
         runnable.run();
       } catch (Throwable throwable) {
+        TracingUtil.getActiveSpan().recordException(throwable).setStatus(StatusCode.ERROR);
         logger.error(errMsg, throwable);
       }
-    }, delay, timeUnit);
+    }), delay, timeUnit);
   }
 
   public ScheduledFuture<?> scheduleWithFixedDelay(Runnable runnable,
       long initialDelay, long fixedDelay, TimeUnit timeUnit) {
     return scheduledExecutorService
-        .scheduleWithFixedDelay(runnable, initialDelay, fixedDelay, timeUnit);
+        .scheduleWithFixedDelay(inSpan(runnable), initialDelay, fixedDelay, timeUnit);
+  }
+
+  /** Runs each execution of {@code runnable} in its own span, named after this scheduler. */
+  private Runnable inSpan(Runnable runnable) {
+    return () -> {
+      Span span = TracingUtil.createInternalSpan(threadName);
+      try (Scope ignored = span.makeCurrent()) {
+        runnable.run();
+      } catch (Throwable e) {
+        span.recordException(e).setStatus(StatusCode.ERROR);
+        LOG.error("{} task failed", threadName, e);
+        throw e;
+      } finally {
+        span.end();
+      }
+    };
   }
 
   public boolean isClosed() {

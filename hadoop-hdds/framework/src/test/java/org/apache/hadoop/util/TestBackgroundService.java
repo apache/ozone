@@ -17,15 +17,24 @@
 
 package org.apache.hadoop.util;
 
+import static org.apache.hadoop.hdds.tracing.OzoneContextStorageProvider.MDC_TRACE_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.trace.ReadWriteSpan;
+import io.opentelemetry.sdk.trace.ReadableSpan;
+import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.SpanProcessor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,6 +42,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -42,6 +53,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.slf4j.MDC;
 
 /**
  * Test class for validating the functionality of the base class BackgroundService.
@@ -187,5 +199,75 @@ public class TestBackgroundService {
     // The first run throws, the periodic task must not be cancelled and the task runs in a later interval.
     GenericTestUtils.waitFor(() -> map.get(0) == 1, interval / 5, serviceTimeout);
     assertThat(getTasksCalls.get()).isGreaterThan(1);
+  }
+
+  @Test
+  public void testTracing() {
+    EndedSpanCollector endedSpans = new EndedSpanCollector();
+    GlobalOpenTelemetry.set(OpenTelemetrySdk.builder()
+        .setTracerProvider(SdkTracerProvider.builder().addSpanProcessor(endedSpans).build())
+        .build());
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.tracing.enabled", true);
+    TracingUtil.initTracing("TestBackgroundService", conf);
+
+    int nTasks = 3;
+    List<String> mdcTraceIds = new CopyOnWriteArrayList<>();
+    BackgroundTask task = () -> {
+      mdcTraceIds.add(MDC.get(MDC_TRACE_ID));
+      return BackgroundTaskResult.EmptyTaskResult.newResult();
+    };
+    IntStream.range(0, nTasks).forEach(i -> queue.add(task));
+    backgroundService = createBackgroundService("testTracing", 100, TimeUnit.MILLISECONDS, 1, 3000);
+    BackgroundService.PeriodicalTask periodicalTask = backgroundService.new PeriodicalTask();
+    // submits all tasks to the single worker thread
+    periodicalTask.run();
+    // joins the previous run, so all tasks and the service run span have ended
+    periodicalTask.run();
+
+    assertThat(endedSpans.spans).hasSize(nTasks + 1);
+    List<ReadableSpan> serviceRunSpans = endedSpans.named("testTracing");
+    assertThat(serviceRunSpans).hasSize(1);
+    ReadableSpan serviceRunSpan = serviceRunSpans.get(0);
+    assertThat(serviceRunSpan.getParentSpanContext().isValid()).isFalse();
+    String traceId = serviceRunSpan.getSpanContext().getTraceId();
+
+    List<ReadableSpan> taskSpans = endedSpans.named("testTracing.task");
+    assertThat(taskSpans).hasSize(nTasks);
+    // all tasks of one run are grouped under the service run span's trace
+    assertThat(taskSpans).allSatisfy(span -> {
+      assertThat(span.getSpanContext().getTraceId()).isEqualTo(traceId);
+      assertThat(span.getParentSpanContext().getSpanId()).isEqualTo(serviceRunSpan.getSpanContext().getSpanId());
+    });
+    assertThat(taskSpans).extracting(span -> span.getSpanContext().getSpanId()).doesNotHaveDuplicates();
+    assertThat(mdcTraceIds).hasSize(nTasks).containsOnly(traceId);
+  }
+
+  /** Collects every span when it ends. */
+  private static final class EndedSpanCollector implements SpanProcessor {
+    private final List<ReadableSpan> spans = new CopyOnWriteArrayList<>();
+
+    List<ReadableSpan> named(String name) {
+      return spans.stream().filter(span -> span.getName().equals(name)).collect(Collectors.toList());
+    }
+
+    @Override
+    public void onStart(Context parentContext, ReadWriteSpan span) {
+    }
+
+    @Override
+    public boolean isStartRequired() {
+      return false;
+    }
+
+    @Override
+    public void onEnd(ReadableSpan span) {
+      spans.add(span);
+    }
+
+    @Override
+    public boolean isEndRequired() {
+      return true;
+    }
   }
 }

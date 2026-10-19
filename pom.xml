@@ -2376,6 +2376,7 @@
                   - https://issues.apache.org/jira/browse/MNG-6058
                 -->
                 <ignoredNonTestScopedDependency>com.fasterxml.jackson.core:jackson-databind:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>io.opentelemetry:opentelemetry-sdk-trace:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.commons:commons-compress:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.ozone:hdds-client:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.ozone:ozone-interface-client:jar</ignoredNonTestScopedDependency>

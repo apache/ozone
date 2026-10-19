@@ -19,11 +19,16 @@ package org.apache.hadoop.hdds.utils;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -168,30 +173,37 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
+      Span serviceRunSpan = TracingUtil.createInternalSpan(serviceName);
+      Context serviceRunContext = Context.current().with(serviceRunSpan);
       synchronized (BackgroundService.this) {
         while (!tasks.isEmpty()) {
           BackgroundTask task = tasks.poll();
-          future = future.thenCombine(CompletableFuture.runAsync(() -> {
+          future = future.thenCombine(CompletableFuture.runAsync(serviceRunContext.wrap(() -> {
             long startTime = System.nanoTime();
-            try {
+            Span span = TracingUtil.createChildSpan(serviceName + ".task");
+            try (Scope ignored = span.makeCurrent()) {
               BackgroundTaskResult result = task.call();
               if (LOG.isDebugEnabled()) {
                 LOG.debug("task execution result size {}", result.getSize());
               }
             } catch (Throwable e) {
+              span.recordException(e).setStatus(StatusCode.ERROR);
+              span.setStatus(StatusCode.ERROR);
               LOG.error("Background task execution failed", e);
               if (e instanceof Error) {
                 throw (Error) e;
               }
             } finally {
+              span.end();
               long endTime = System.nanoTime();
               if (endTime - startTime > serviceTimeoutInNanos) {
                 LOG.warn("{} Background task execution took {}ns > {}ns(timeout)",
                     serviceName, endTime - startTime, serviceTimeoutInNanos);
               }
             }
-          }, exec).exceptionally(e -> null), (Void1, Void) -> null);
+          }), exec).exceptionally(e -> null), (Void1, Void) -> null);
         }
+        future = future.whenComplete((result, e) -> serviceRunSpan.end());
       }
     }
   }
