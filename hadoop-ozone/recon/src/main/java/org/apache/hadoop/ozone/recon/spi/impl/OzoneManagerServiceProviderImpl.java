@@ -734,6 +734,11 @@ public class OzoneManagerServiceProviderImpl
 
         if (currentSequenceNumber <= 0) {
           fullSnapshot = true;
+        } else if (!omMetadataManager.getStore().getDbLocation().exists()) {
+          // A failed full snapshot leaves Recon on its previous OM DB, whose directory was deleted before the fetch.
+          LOG.warn("Recon OM DB directory {} no longer exists, fetching a full snapshot.",
+              omMetadataManager.getStore().getDbLocation());
+          fullSnapshot = true;
         } else {
           // Get updates from OM and apply to local Recon OM DB and update task status in table
           deltaReconTaskStatusUpdater.recordRunStart();

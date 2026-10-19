@@ -36,8 +36,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
@@ -176,6 +178,62 @@ public class TestReconOmMetadataManagerImpl {
     assertThat(active.isClosed()).isFalse();
     assertThat(reconOMMetadataManager.getVolumeTable().get("/sampleVol")).isNotNull();
     reconOMMetadataManager.stop();
+    omMetadataManager.stop();
+  }
+
+  @Test
+  public void testSnapshotWithUnreadableTables() throws Exception {
+    OMMetadataManager omMetadataManager = getOMMetadataManager();
+    File reconOmDbDir = Files.createDirectory(temporaryFolder.resolve("reconOmDbDir")).toFile();
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir.getAbsolutePath());
+    File readable = omMetadataManager.getStore().getCheckpoint(true).getCheckpointLocation().toFile();
+
+    // A snapshot that RocksDB opens, but whose OM tables cannot be initialized: a volume cannot be decoded.
+    omMetadataManager.getStore().getTable(OMDBDefinition.VOLUME_TABLE)
+        .put("/badVol".getBytes(UTF_8), "not a volume".getBytes(UTF_8));
+    File unreadableTables = omMetadataManager.getStore().getCheckpoint(true).getCheckpointLocation().toFile();
+    FileUtils.copyDirectory(unreadableTables, new File(reconOmDbDir, "om.snapshot.db_" + System.currentTimeMillis()));
+
+    // At startup the failure is still reported, and no OM DB is left in use.
+    ReconOMMetadataManager reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils());
+    assertThatThrownBy(() -> reconOMMetadataManager.start(configuration)).isInstanceOf(Exception.class);
+    assertThat(reconOMMetadataManager.getStore()).isNull();
+
+    // A refresh to it fails, and the active DB and all its tables are kept.
+    reconOMMetadataManager.updateOmDB(readable, true);
+    DBStore active = reconOMMetadataManager.getStore();
+    assertThatThrownBy(() -> reconOMMetadataManager.updateOmDB(unreadableTables, true))
+        .isInstanceOf(Exception.class);
+    assertThat(unreadableTables).doesNotExist();
+    assertThat(reconOMMetadataManager.getStore()).isSameAs(active);
+    assertThat(active.isClosed()).isFalse();
+    assertTrue(reconOMMetadataManager.isOmTablesInitialized());
+    assertThat(reconOMMetadataManager.getVolumeTable().get("/sampleVol")).isNotNull();
+    assertThat(reconOMMetadataManager.getKeyTable(getBucketLayout()).get("/sampleVol/bucketOne/key_one")).isNotNull();
+    reconOMMetadataManager.stop();
+    omMetadataManager.stop();
+  }
+
+  @Test
+  public void testStartReportsTableInitializationFailure() throws Exception {
+    OMMetadataManager omMetadataManager = getOMMetadataManager();
+    File reconOmDbDir = Files.createDirectory(temporaryFolder.resolve("reconOmDbDir")).toFile();
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR, reconOmDbDir.getAbsolutePath());
+    FileUtils.copyDirectory(omMetadataManager.getStore().getCheckpoint(true).getCheckpointLocation().toFile(),
+        new File(reconOmDbDir, "om.snapshot.db_" + System.currentTimeMillis()));
+
+    ReconOMMetadataManager reconOMMetadataManager = new ReconOmMetadataManagerImpl(configuration, new ReconUtils()) {
+      @Override
+      protected void initializeOmTables(TableCache.CacheType cacheType, boolean addCacheMetrics) throws IOException {
+        throw new IOException("Mocked table initialization failure");
+      }
+    };
+
+    // Only a snapshot that cannot be opened is skipped at startup. A failure to initialize its tables is reported.
+    assertThatThrownBy(() -> reconOMMetadataManager.start(configuration)).isInstanceOf(IOException.class);
+    assertThat(reconOMMetadataManager.getStore()).isNull();
     omMetadataManager.stop();
   }
 

@@ -33,6 +33,7 @@ import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -110,27 +111,50 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     if (lastKnownOMSnapshot != null) {
       LOG.info("Last known snapshot for OM : {}",
           lastKnownOMSnapshot.getAbsolutePath());
+      DBStore store;
       try {
-        initializeNewRdbStore(lastKnownOMSnapshot, true);
+        store = openRdbStore(lastKnownOMSnapshot);
       } catch (IOException ioEx) {
+        // Start without an OM DB, so that a new snapshot is fetched.
         LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
+        return;
       }
+      initializeNewRdbStore(store, true);
     }
   }
 
+  private DBStore openRdbStore(File dbFile) throws IOException {
+    DBStore store = DBStoreBuilder.newBuilder(ozoneConfiguration, OMDBDefinition.get(), dbFile).build();
+    LOG.info("Created OM DB handle from snapshot at {}.", dbFile.getAbsolutePath());
+    return store;
+  }
+
   /**
-   * Replace existing DB instance with new one.
+   * Replace existing DB instance with new one. If the OM tables cannot be initialized from the new DB, it is closed
+   * and the previous DB is restored, so that the store and all OM tables always point to the same DB.
    *
-   * @param dbFile          new DB file location.
+   * @param newStore        new DB instance.
    * @param addCacheMetrics
    */
-  private void initializeNewRdbStore(File dbFile, boolean addCacheMetrics) throws IOException {
-    setStore(DBStoreBuilder.newBuilder(ozoneConfiguration, OMDBDefinition.get(), dbFile).build());
-    LOG.info("Created OM DB handle from snapshot at {}.", dbFile.getAbsolutePath());
-    if (getStore() != null) {
+  private void initializeNewRdbStore(DBStore newStore, boolean addCacheMetrics) throws IOException {
+    DBStore previous = getStore();
+    setStore(newStore);
+    try {
       initializeOmTables(TableCache.CacheType.FULL_CACHE, addCacheMetrics);
-      omTablesInitialized = true;
+    } catch (IOException | RuntimeException e) {
+      setStore(previous);
+      IOUtils.close(LOG, newStore);
+      if (previous != null) {
+        try {
+          initializeOmTables(TableCache.CacheType.FULL_CACHE, addCacheMetrics);
+        } catch (IOException | RuntimeException restoreEx) {
+          e.addSuppressed(restoreEx);
+          omTablesInitialized = false;
+        }
+      }
+      throw e;
     }
+    omTablesInitialized = true;
   }
 
   @Override
@@ -151,13 +175,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     }
     DBStore current = getStore();
     try {
-      initializeNewRdbStore(newDbLocation, addCacheMetrics);
-    } catch (IOException e) {
-      if (current == getStore()) {
-        // Do not leave a snapshot that failed to open behind as the last known OM DB.
-        LOG.warn("Deleting OM snapshot db at {} that could not be opened.", newDbLocation.getAbsolutePath());
-        FileUtils.deleteQuietly(newDbLocation);
-      }
+      initializeNewRdbStore(openRdbStore(newDbLocation), addCacheMetrics);
+    } catch (IOException | RuntimeException e) {
+      // The previous DB is kept. Do not leave a snapshot that failed to open behind as the last known OM DB.
+      LOG.warn("Deleting OM snapshot db at {} that could not be opened.", newDbLocation.getAbsolutePath());
+      FileUtils.deleteQuietly(newDbLocation);
       throw e;
     } finally {
       // Always close DBStore if it's replaced.

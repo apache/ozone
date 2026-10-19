@@ -600,6 +600,36 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
+  public void testSyncDataFromOMWithDeletedOMDbDir(
+      @TempDir File dirOmMetadata, @TempDir File dirReconMetadata) throws Exception {
+
+    OMMetadataManager omMetadataManager = initializeNewOmMetadataManager(dirOmMetadata);
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata);
+    DBStore previousStore = reconOMMetadataManager.getStore();
+    // A failed full snapshot leaves Recon on its previous OM DB, whose directory was deleted before the fetch.
+    FileUtils.deleteDirectory(previousStore.getDbLocation());
+
+    ReconUtils reconUtilsMock = getMockReconUtils();
+    when(reconUtilsMock.getReconNodeDetails(any(OzoneConfiguration.class)))
+        .thenReturn(ReconTestUtils.getReconNodeDetails());
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
+        new OzoneManagerServiceProviderImpl(configuration, reconOMMetadataManager, getMockTaskController(),
+            reconUtilsMock, ozoneManagerProtocol, reconContext, getMockTaskStatusUpdaterManager());
+    ozoneManagerServiceProvider.setReconSnapshotProvider(newStubSnapshotProvider(omSnapshotDbParentDir,
+        omMetadataManager.getStore().getCheckpoint(true).getCheckpointLocation(), false));
+    OzoneManagerSyncMetrics metrics = ozoneManagerServiceProvider.getMetrics();
+
+    // Delta updates would succeed, but the sync must fetch a full snapshot instead.
+    ozoneManagerServiceProvider.syncDataFromOM();
+
+    assertEquals(1, metrics.getNumSnapshotRequests());
+    assertTrue(previousStore.isClosed());
+    assertTrue(reconOMMetadataManager.getStore().getDbLocation().exists());
+    omMetadataManager.stop();
+    reconOMMetadataManager.stop();
+  }
+
+  @Test
   public void testSyncDataFromOMFullSnapshotForSNNFE(
       @TempDir File dirOmMetadata, @TempDir File dirReconMetadata)
       throws Exception {
