@@ -988,7 +988,17 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public Map<String, String> getObjectTagging(String volumeName, String bucketName, String keyName) throws IOException {
-    return getBucket(volumeName, bucketName).getObjectTagging(keyName);
+    return getObjectTagging(volumeName, bucketName, keyName, false);
+  }
+
+  @Override
+  public Map<String, String> getObjectTagging(String volumeName,
+      String bucketName, String keyName, boolean assumeS3Context)
+      throws IOException {
+    OzoneBucket bucket = assumeS3Context
+        ? objectStoreStub.getS3Volume().getBucket(bucketName)
+        : getBucket(volumeName, bucketName);
+    return bucket.getObjectTagging(keyName);
   }
 
   @Override

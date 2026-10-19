@@ -373,6 +373,32 @@ public class TestRpcClient {
 
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
+      names = {"ZDU", "S3_OBJECT_TAGGING_WITH_VOLUME_CONTEXT"})
+  void testGetObjectTaggingWithS3Context(OzoneManagerVersion version)
+      throws Exception {
+    RpcClient client = spy(createRpcClient());
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "omVersion", version, true);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
+          .setOwnerName("owner").setAdminName("admin").build(), "owner"))
+          .when(client).getS3VolumeContext();
+      boolean assumeContext = version == OzoneManagerVersion.S3_OBJECT_TAGGING_WITH_VOLUME_CONTEXT;
+
+      client.getObjectTagging("", "bucket", "key", true);
+
+      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+      verify(om).getObjectTagging(args.capture(), eq(assumeContext));
+      verify(client, times(assumeContext ? 0 : 1)).getS3VolumeContext();
+      assertEquals(assumeContext ? "" : "tenant-volume", args.getValue().getVolumeName());
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
       names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "S3_MULTIPART_UPLOAD_ABORT_CONTEXT"})
   void testAbortS3MultipartUpload(OzoneManagerVersion version) throws Exception {
     RpcClient client = spy(createRpcClient());

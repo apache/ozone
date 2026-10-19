@@ -1291,6 +1291,19 @@ public interface OzoneManagerProtocol
   Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException;
 
   /**
+   * Gets the tags for the specified key, optionally resolving the volume from
+   * the S3 request context.
+   * @param args Key arguments. The volume name is ignored when
+   *             {@code assumeS3Context} is true.
+   * @param assumeS3Context Whether to resolve the volume from the S3 request
+   *                        context.
+   * @return Tags associated with the key.
+   * @throws IOException If the request fails.
+   */
+  Map<String, String> getObjectTagging(OmKeyArgs args,
+      boolean assumeS3Context) throws IOException;
+
+  /**
    * Sets the tags to an existing key.
    * @param args Key args
    */

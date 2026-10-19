@@ -1715,6 +1715,21 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Gets the tags for an existing key, optionally resolving the volume from
+   * the S3 request context.
+   * @param volumeName Volume name. Ignored when {@code assumeS3Context} is true.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @param assumeS3Context Whether OM resolves the volume from the S3 request
+   *                        context.
+   * @return Tags for the specified key.
+   * @throws IOException If the request fails.
+   */
+  Map<String, String> getObjectTagging(String volumeName,
+      String bucketName, String keyName, boolean assumeS3Context)
+      throws IOException;
+
+  /**
    * Sets the tags to an existing key.
    * @param volumeName Volume name.
    * @param bucketName Bucket name.

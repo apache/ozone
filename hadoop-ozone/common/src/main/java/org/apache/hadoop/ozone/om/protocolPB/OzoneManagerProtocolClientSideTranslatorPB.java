@@ -2912,6 +2912,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public Map<String, String> getObjectTagging(OmKeyArgs args) throws IOException {
+    return getObjectTagging(args, false);
+  }
+
+  @Override
+  public Map<String, String> getObjectTagging(OmKeyArgs args,
+      boolean assumeS3Context) throws IOException {
     KeyArgs keyArgs = KeyArgs.newBuilder()
         .setVolumeName(args.getVolumeName())
         .setBucketName(args.getBucketName())
@@ -2924,6 +2930,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .build();
 
     OMRequest omRequest = createOMRequest(Type.GetObjectTagging)
+        .setAssumeS3Context(assumeS3Context)
         .setGetObjectTaggingRequest(req)
         .build();
 

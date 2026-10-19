@@ -441,7 +441,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         break;
       case GetObjectTagging:
         OzoneManagerProtocolProtos.GetObjectTaggingResponse getObjectTaggingResponse =
-            getObjectTagging(request.getGetObjectTaggingRequest());
+            getObjectTagging(request.getGetObjectTaggingRequest(),
+                request.getAssumeS3Context());
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
         break;
       case GetLifecycleConfiguration:
@@ -1772,8 +1773,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
   }
 
-  private GetObjectTaggingResponse getObjectTagging(GetObjectTaggingRequest request)
-      throws IOException {
+  private GetObjectTaggingResponse getObjectTagging(
+      GetObjectTaggingRequest request, boolean assumeS3Context) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
     OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
@@ -1784,7 +1785,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     GetObjectTaggingResponse.Builder resp =
         GetObjectTaggingResponse.newBuilder();
 
-    Map<String, String> result = impl.getObjectTagging(omKeyArgs);
+    Map<String, String> result = impl.getObjectTagging(omKeyArgs,
+        assumeS3Context);
 
     resp.addAllTags(KeyValueUtil.toProtobuf(result));
     return resp.build();
