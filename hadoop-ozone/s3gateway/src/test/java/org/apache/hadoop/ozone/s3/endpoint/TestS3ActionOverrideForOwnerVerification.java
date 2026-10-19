@@ -346,7 +346,6 @@ public class TestS3ActionOverrideForOwnerVerification {
     final OzoneClient client = mock(OzoneClient.class);
     final ObjectStore objectStore = mock(ObjectStore.class);
     final ClientProtocol clientProtocol = mock(ClientProtocol.class);
-    final OzoneVolume volume = mock(OzoneVolume.class);
     final OzoneBucket bucket = mock(OzoneBucket.class);
     final AtomicReference<S3Auth> s3AuthRef = new AtomicReference<>();
 
@@ -358,8 +357,7 @@ public class TestS3ActionOverrideForOwnerVerification {
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket("bucket")).thenAnswer(invocationOnMock -> {
+    when(clientProtocol.getS3BucketDetails("bucket")).thenAnswer(invocationOnMock -> {
       final S3Auth s3Auth = s3AuthRef.get();
       actionAtBucketLookup.set(s3Auth == null ? null : s3Auth.getS3Action());
       return bucket;
