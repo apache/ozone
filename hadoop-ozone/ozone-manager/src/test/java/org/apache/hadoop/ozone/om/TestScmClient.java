@@ -312,7 +312,7 @@ public class TestScmClient {
 
     assertEquals(HDDSVersion.UNKNOWN_VERSION, original.getCurrentVersion());
     assertEquals(HDDSVersion.UNKNOWN_VERSION, upgraded.getCurrentVersion());
-    assertNotSame(original.getSerializedCurrentVersion(), upgraded.getSerializedCurrentVersion());
+    assertNotEquals(original.getSerializedCurrentVersion(), upgraded.getSerializedCurrentVersion());
 
     ScmClient.newPipelineWithDNCache(
         createPipeline(1L, asList(original)).getPipeline(), datanodeDetailsCache);
