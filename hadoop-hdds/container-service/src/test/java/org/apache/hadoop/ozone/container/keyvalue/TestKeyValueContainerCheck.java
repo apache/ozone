@@ -17,15 +17,15 @@
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.CORRUPT_BLOCK;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.CORRUPT_CONTAINER_FILE;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_BLOCK;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CHUNKS_DIR;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CONTAINER_DIR;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_CONTAINER_FILE;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.TRUNCATED_BLOCK;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.TRUNCATED_CONTAINER_FILE;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.CORRUPT_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.CORRUPT_CONTAINER_FILE;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_CHUNKS_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_CONTAINER_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_CONTAINER_FILE;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_METADATA_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.TRUNCATED_BLOCK;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.TRUNCATED_CONTAINER_FILE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -87,7 +87,7 @@ public class TestKeyValueContainerCheck
    * metadata fault.
    */
   private static Stream<Arguments> provideMetadataCorruptions() {
-    List<TestContainerCorruptions> metadataCorruptions = Arrays.asList(
+    List<ContainerTestCorruptions> metadataCorruptions = Arrays.asList(
         MISSING_CHUNKS_DIR,
         MISSING_METADATA_DIR,
         MISSING_CONTAINER_DIR,
@@ -106,7 +106,7 @@ public class TestKeyValueContainerCheck
   @ParameterizedTest
   @MethodSource("provideMetadataCorruptions")
   public void testExitEarlyOnMetadataError(ContainerTestVersionInfo versionInfo,
-      TestContainerCorruptions metadataCorruption) throws Exception {
+      ContainerTestCorruptions metadataCorruption) throws Exception {
     initTestData(versionInfo);
     long containerID = 101;
     int deletedBlocks = 0;

@@ -322,13 +322,11 @@ public class NodeStateMap {
    */
   @Override
   public String toString() {
-    // TODO - fix this method to include the commented out values
     StringBuilder builder = new StringBuilder();
     builder.append("Total number of nodes: ").append(getTotalNodeCount());
-   // for (NodeState state : NodeState.values()) {
-   //   builder.append("Number of nodes in ").append(state).append(" state: ")
-   //       .append(getNodeCount(state));
-   // }
+    for (NodeState state : NodeState.values()) {
+      builder.append(", ").append(state).append(": ").append(getNodeCount(null, state));
+    }
     return builder.toString();
   }
 

@@ -48,8 +48,9 @@ teardown() {
   run hadoop-ozone/dev-support/checks/errorprone.sh
 
   [ "$status" -eq 1 ]
-  grep -q -- '-DskipTests clean package' "${TEST_TMPDIR}/mvn-args"
-  ! grep -q -- '-DskipShade' "${TEST_TMPDIR}/mvn-args"
+  grep -q -- '-DskipTests' "${TEST_TMPDIR}/mvn-args"
+  grep -q -- '-DskipShade' "${TEST_TMPDIR}/mvn-args"
+  grep -q -- 'clean package' "${TEST_TMPDIR}/mvn-args"
   [ "$(wc -l < "${OUTPUT_DIR}/diagnostics.txt")" -eq 5 ]
   grep -q '^\[WARNING\].*\[JdkObsolete\]' "${OUTPUT_DIR}/diagnostics.txt"
   grep -q '^\[ERROR\].*\[FormatString\]' "${OUTPUT_DIR}/diagnostics.txt"

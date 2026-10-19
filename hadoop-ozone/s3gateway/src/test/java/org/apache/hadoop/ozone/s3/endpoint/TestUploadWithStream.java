@@ -26,12 +26,15 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSuccee
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signatureInfo;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBody;
+import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signedChunkedBodyWithTrailer;
 import static org.apache.hadoop.ozone.s3.signature.SignatureTestUtils.signingKey;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_TRAILER;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -46,6 +49,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
+import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -133,6 +137,29 @@ public class TestUploadWithStream {
   }
 
   @Test
+  public void testUploadWithValidSignedTrailer() throws Exception {
+    OzoneBucket bucket = configureSignedChunksWithTrailer(S3_COPY_EXISTING_KEY_CONTENT.length());
+    String body = signedChunkedBodyWithTrailer(
+        S3_COPY_EXISTING_KEY_CONTENT, "x-amz-checksum-crc32c", "sOO8/Q==");
+
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, body));
+
+    assertKeyContent(bucket, S3KEY, S3_COPY_EXISTING_KEY_CONTENT);
+  }
+
+  @Test
+  public void testUploadRejectsTamperedTrailer() throws Exception {
+    OzoneBucket bucket = configureSignedChunksWithTrailer(S3_COPY_EXISTING_KEY_CONTENT.length());
+    String body = signedChunkedBodyWithTrailer(
+        S3_COPY_EXISTING_KEY_CONTENT, "x-amz-checksum-crc32c", "sOO8/Q==")
+        .replace("sOO8/Q==", "tampered");
+
+    assertErrorResponse(S3ErrorTable.SIGNATURE_DOES_NOT_MATCH,
+        () -> put(rest, S3BUCKET, S3KEY, body));
+    assertThatThrownBy(() -> bucket.getKey(S3KEY)).isInstanceOf(IOException.class);
+  }
+
+  @Test
   public void testUploadDoesNotCommitWhenBodyReadFails() throws Exception {
     OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
     byte[] keyContent = S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8);
@@ -190,11 +217,68 @@ public class TestUploadWithStream {
     assertEquals(dataSize, newDataSize);
   }
 
+  @Test
+  public void testUploadWithCopyReusesSourceETag() throws Exception {
+    // A deliberately fake plain (non-multipart) ETag: if the copy re-hashed the
+    // content, the destination would get the real MD5 instead of this value
+    String sourceETag = "00000000000000000000000000000000";
+    createCopySourceKey(sourceETag);
+    setCopyHeaders();
+
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, null));
+
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    assertEquals(sourceETag, bucket.getKey(S3KEY).getMetadata().get(OzoneConsts.ETAG));
+  }
+
+  @Test
+  public void testUploadWithCopyRecomputesETagForMultipartSource() throws Exception {
+    // An aggregate "-N" ETag of an MPU-created source is not a content MD5, so
+    // the copy computes a fresh digest for the destination
+    createCopySourceKey("9b2cf535f27731c974343645a3985328-2");
+    setCopyHeaders();
+
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, null));
+
+    String expectedETag = DatatypeConverter.printHexBinary(
+        MessageDigest.getInstance("MD5").digest(S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8))).toLowerCase();
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    assertEquals(expectedETag, bucket.getKey(S3KEY).getMetadata().get(OzoneConsts.ETAG));
+  }
+
+  private void createCopySourceKey(String eTag) throws IOException {
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    byte[] keyContent = S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8);
+    Map<String, String> metadata = new HashMap<>();
+    metadata.put(OzoneConsts.ETAG, eTag);
+    try (OutputStream stream = bucket
+        .createStreamKey(S3_COPY_EXISTING_KEY, keyContent.length,
+            ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
+                ReplicationFactor.THREE), metadata)) {
+      stream.write(keyContent);
+    }
+  }
+
+  private void setCopyHeaders() {
+    HttpHeaders copyHeaders = mock(HttpHeaders.class);
+    when(copyHeaders.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
+    when(copyHeaders.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(S3BUCKET + "/" + S3_COPY_EXISTING_KEY);
+    rest.setHeaders(copyHeaders);
+  }
+
   private OzoneBucket configureSignedChunks(int decodedLength) throws IOException {
     OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
     ((OzoneBucketStub) bucket).setDerivedKey(signingKey());
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(String.valueOf(decodedLength));
+    return bucket;
+  }
+
+  private OzoneBucket configureSignedChunksWithTrailer(int decodedLength) throws IOException {
+    OzoneBucket bucket = configureSignedChunks(decodedLength);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER);
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32c");
     return bucket;
   }
 }

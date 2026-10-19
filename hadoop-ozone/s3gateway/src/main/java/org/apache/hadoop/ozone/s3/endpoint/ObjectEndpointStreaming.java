@@ -26,7 +26,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
-import java.security.MessageDigest;
 import java.util.Map;
 import java.util.function.Consumer;
 import javax.ws.rs.core.HttpHeaders;
@@ -143,18 +142,7 @@ final class ObjectEndpointStreaming {
         writeGuard.addPreCommit(checkContentMD5Hook);
       }
 
-      // If sha256Digest exists, this request must validate x-amz-content-sha256
-      MessageDigest sha256Digest = body.getMessageDigest(OzoneConsts.FILE_HASH);
-      if (sha256Digest != null) {
-        final String actualSha256 = DatatypeConverter.printHexBinary(
-            sha256Digest.digest()).toLowerCase();
-        CheckedRunnable<IOException> checkSha256Hook = () -> {
-          if (!amzContentSha256Header.equals(actualSha256)) {
-            throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
-          }
-        };
-        writeGuard.addPreCommit(checkSha256Hook);
-      }
+      writeGuard.checkContentSha256(body, amzContentSha256Header);
     }
     return Pair.of(md5Hash, writeLen);
   }
@@ -178,6 +166,12 @@ final class ObjectEndpointStreaming {
     return bucket.createStreamKey(keyPath, length, replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
   }
 
+  /**
+   * Writes the copy source stream to the destination key. When {@code reusedETag} is null the MD5
+   * digest {@code body} computes during the copy becomes the destination ETag; otherwise
+   * {@code reusedETag} is stored as-is and {@code body} has digesting switched off, so the content
+   * is not re-hashed.
+   */
   @SuppressWarnings("checkstyle:ParameterNumber")
   public static CopyResult copyKeyWithStream(
       OzoneBucket bucket,
@@ -186,7 +180,7 @@ final class ObjectEndpointStreaming {
       int bufferSize,
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
-      DigestInputStream body, PerformanceStringBuilder perf, long startNanos,
+      DigestInputStream body, String reusedETag, PerformanceStringBuilder perf, long startNanos,
       Map<String, String> tags,
       S3ConditionalRequest.WriteConditions writeConditions)
       throws IOException {
@@ -200,8 +194,8 @@ final class ObjectEndpointStreaming {
       long metadataLatencyNs =
           METRICS.updateCopyKeyMetadataStats(startNanos);
       writeLen = writeGuard.copyFrom(body, bufferSize);
-      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
-          .toLowerCase();
+      eTag = reusedETag != null ? reusedETag
+          : DatatypeConverter.printHexBinary(body.getMessageDigest().digest()).toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
       writeGuard.getMetadata().put(OzoneConsts.ETAG, eTag);
     }
@@ -234,6 +228,7 @@ final class ObjectEndpointStreaming {
           };
           writeGuard.addPreCommit(checkContentMD5Hook);
         }
+        writeGuard.checkContentSha256(body, headers.getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256));
         writeGuard.getMetadata().put(OzoneConsts.ETAG, eTag);
         METRICS.incPutKeySuccessLength(putLength);
         perf.appendMetaLatencyNanos(metadataLatencyNs);

@@ -17,15 +17,30 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 CHECK=integration
 ERROR_PATTERN="\[ERROR\]"
+PHASE=test
 
 args=""
-if [[ "$@" =~ "-Ptest-flaky" ]]; then
-  args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
-  # tests may pass on re-run, so we cannot rely on output for status
-  ERROR_PATTERN=""
-fi
-if [[ "$@" =~ "-Ptest-" ]] && [[ ! "$@" =~ "-Ptest-filesystem" ]]; then
-  args="$args -DskipShade"
+
+if [[ "$@" =~ -Ptest-([a-z]+) ]]; then
+  split="${BASH_REMATCH[1]}"
+  if [[ "${split}" == "flaky" ]]; then
+    args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
+    # tests may pass on re-run, so we cannot rely on output for status
+    ERROR_PATTERN=""
+  fi
+
+  if [[ "${split}" == "filesystem" ]]; then
+    if [[ "${CI:-}" == "true" ]]; then
+      args="$args -DskipShade --activate-profiles CI"
+    else
+      # shading is performed in `package` phase, which is after `test`
+      PHASE=verify
+    fi
+  else
+    args="$args -DskipShade"
+  fi
+
+  args="$args -Dscan.value.testset=${split}"
 fi
 
 source "${DIR}/junit.sh" $args "$@"

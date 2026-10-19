@@ -103,10 +103,6 @@
       <artifactId>javax.inject</artifactId>
     </dependency>
     <dependency>
-      <groupId>javax.servlet</groupId>
-      <artifactId>javax.servlet-api</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-collections4</artifactId>
     </dependency>
@@ -214,8 +210,12 @@
       <artifactId>ratis-proto</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-servlet</artifactId>
+      <groupId>org.eclipse.jetty.ee8</groupId>
+      <artifactId>jetty-ee8-servlet</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.eclipse.jetty.toolchain</groupId>
+      <artifactId>jetty-servlet-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.glassfish.hk2</groupId>
@@ -236,10 +236,6 @@
     <dependency>
       <groupId>org.jooq</groupId>
       <artifactId>jooq</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.reflections</groupId>
-      <artifactId>reflections</artifactId>
     </dependency>
     <dependency>
       <groupId>org.rocksdb</groupId>
@@ -313,6 +309,18 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-framework</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-server-scm</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>

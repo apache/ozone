@@ -34,7 +34,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -64,6 +64,7 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconFileMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconGlobalStatsManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
@@ -108,6 +109,7 @@ public class ReconControllerModule extends AbstractModule {
     bind(ReconHttpServer.class).in(Singleton.class);
     bind(ReconStorageConfig.class).in(Singleton.class);
     bind(ReconDBProvider.class).in(Singleton.class);
+    bind(ReconReplicaHistoryDBProvider.class).in(Singleton.class);
     bind(ReconOMMetadataManager.class)
         .to(ReconOmMetadataManagerImpl.class);
     bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);
@@ -218,9 +220,9 @@ public class ReconControllerModule extends AbstractModule {
   }
 
   @Provides
-  StorageContainerLocationProtocol getSCMProtocol(
+  StorageContainerLocationInternalInterface getSCMProtocol(
       final OzoneConfiguration configuration) {
-    StorageContainerLocationProtocol storageContainerLocationProtocol = null;
+    StorageContainerLocationInternalInterface storageContainerLocationProtocol = null;
     storageContainerLocationProtocol = newContainerRpcClient(configuration);
     return storageContainerLocationProtocol;
   }

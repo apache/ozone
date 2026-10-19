@@ -18,11 +18,11 @@
 package org.apache.hadoop.ozone.om;
 
 import java.nio.charset.StandardCharsets;
-import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import org.apache.hadoop.ozone.security.HmacSha256;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
@@ -37,21 +37,6 @@ public final class AWSV4AuthValidator {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AWSV4AuthValidator.class);
-  private static final String HMAC_SHA256_ALGORITHM = "HmacSHA256";
-
-  /**
-   * ThreadLocal cache of Mac instances.
-   */
-  private static final ThreadLocal<Mac> THREAD_LOCAL_MAC =
-      ThreadLocal.withInitial(() -> {
-        try {
-          return Mac.getInstance(HMAC_SHA256_ALGORITHM);
-        } catch (NoSuchAlgorithmException nsa) {
-          throw new IllegalArgumentException(
-              "Failed to initialize Mac instance that implements the " +
-                  HMAC_SHA256_ALGORITHM + " algorithm.", nsa);
-        }
-      });
 
   private AWSV4AuthValidator() {
   }
@@ -64,14 +49,12 @@ public final class AWSV4AuthValidator {
 
   private static byte[] sign(byte[] key, String msg) {
     try {
-      SecretKeySpec signingKey = new SecretKeySpec(key, HMAC_SHA256_ALGORITHM);
-      // Returns the cached Mac instance for the current thread or creates a
-      // new one if none exists.
-      Mac mac = THREAD_LOCAL_MAC.get();
-      mac.init(signingKey);
-      return mac.doFinal(msg.getBytes(StandardCharsets.UTF_8));
-    } catch (GeneralSecurityException gse) {
-      throw new RuntimeException(gse);
+      return HmacSha256.sign(new SecretKeySpec(key, HmacSha256.ALGORITHM), msg);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalArgumentException(
+          "Failed to initialize Mac instance that implements the " + HmacSha256.ALGORITHM + " algorithm.", e);
+    } catch (InvalidKeyException e) {
+      throw new RuntimeException(e);
     }
   }
 

@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMDatanodeRequest;
@@ -144,7 +144,7 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
    * @param extendedDatanodeDetailsProto - extended Datanode Details
    * @param nodeReport - Node Report.
    * @param containerReportsRequestProto - Container Reports.
-   * @param layoutInfo - Layout Version Information.
+   * @param versionInfo - Datanode Version Information.
    * @return SCM Command.
    */
   @Override
@@ -153,7 +153,7 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
       NodeReportProto nodeReport,
       ContainerReportsProto containerReportsRequestProto,
       PipelineReportsProto pipelineReportsProto,
-      LayoutVersionProto layoutInfo)
+      DatanodeVersionProto versionInfo)
       throws IOException {
     SCMRegisterRequestProto.Builder req =
         SCMRegisterRequestProto.newBuilder();
@@ -161,8 +161,8 @@ public class StorageContainerDatanodeProtocolClientSideTranslatorPB
     req.setContainerReport(containerReportsRequestProto);
     req.setPipelineReports(pipelineReportsProto);
     req.setNodeReport(nodeReport);
-    if (layoutInfo != null) {
-      req.setDataNodeLayoutVersion(layoutInfo);
+    if (versionInfo != null) {
+      req.setDatanodeVersion(versionInfo);
     }
     return submitRequest(Type.Register,
         (builder) -> builder.setRegisterRequest(req))

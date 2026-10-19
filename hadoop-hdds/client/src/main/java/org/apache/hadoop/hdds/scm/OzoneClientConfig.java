@@ -213,7 +213,7 @@ public class OzoneClientConfig {
       description = "Ozone client to verify checksum of the checksum "
           + "blocksize data.",
       tags = ConfigTag.CLIENT)
-  private boolean checksumVerify = true;
+  private volatile boolean checksumVerify = true;
 
   @Config(key = "ozone.client.max.ec.stripe.write.retries",
       defaultValue = "10",
@@ -317,13 +317,17 @@ public class OzoneClientConfig {
           tags = ConfigTag.CLIENT)
   private boolean enablePutblockPiggybacking = false;
 
-  @Config(key = "ozone.client.datastream.putblock.on.close.enabled",
+  @Config(key = "ozone.client.datastream.putblock.without.raft.enabled",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
-      description = "When enabled, use StreamInitWithPutBlock so datanodes commit PutBlock " +
-          "when the Ratis data stream closes instead of via a separate WriteAsync PutBlock.",
+      description = "When enabled, the PutBlock of a Ratis data stream is committed through the data stream " +
+          "instead of a separate WriteAsync PutBlock, so that it does not go through the Raft log: " +
+          "StreamInitWithPutBlock is used so that datanodes commit PutBlock when the data stream closes, " +
+          "and the PutBlock triggered by a flush in the middle of the stream is sent as a data stream command. " +
+          "It takes effect only for pipelines whose datanodes all support committing PutBlock through the data " +
+          "stream; otherwise PutBlock goes through the Raft log.",
       tags = ConfigTag.CLIENT)
-  private boolean datastreamPutBlockOnCloseEnabled = false;
+  private boolean datastreamPutBlockWithoutRaftEnabled = false;
 
   @Config(key = "ozone.client.key.write.concurrency",
       defaultValue = "1",
@@ -338,7 +342,9 @@ public class OzoneClientConfig {
       defaultValue = "33554432",
       type = ConfigType.LONG,
       tags = {ConfigTag.CLIENT},
-      description = "Extra bytes to prefetch during streaming reads.")
+      description = "Size of the pre-read window for streaming reads: the number of bytes requested from the " +
+          "datanode ahead of the current read position. The window is refilled in bulk once the bytes requested " +
+          "ahead drop below half of this value. Set to 0 to disable pre-read.")
   private long streamReadPreReadSize = 32L << 20;
 
   @Config(key = "ozone.client.stream.read.response-data-size",
@@ -706,12 +712,12 @@ public class OzoneClientConfig {
     this.streamReadTimeout = streamReadTimeout;
   }
 
-  public boolean isDatastreamPutBlockOnCloseEnabled() {
-    return datastreamPutBlockOnCloseEnabled;
+  public boolean isDatastreamPutBlockWithoutRaftEnabled() {
+    return datastreamPutBlockWithoutRaftEnabled;
   }
 
-  public void setDatastreamPutBlockOnCloseEnabled(boolean datastreamPutBlockOnCloseEnabled) {
-    this.datastreamPutBlockOnCloseEnabled = datastreamPutBlockOnCloseEnabled;
+  public void setDatastreamPutBlockWithoutRaftEnabled(boolean datastreamPutBlockWithoutRaftEnabled) {
+    this.datastreamPutBlockWithoutRaftEnabled = datastreamPutBlockWithoutRaftEnabled;
   }
 
   /**
