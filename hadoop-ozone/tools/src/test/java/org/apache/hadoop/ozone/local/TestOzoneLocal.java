@@ -128,6 +128,19 @@ class TestOzoneLocal {
   }
 
   @Test
+  void runCommandBracketsIpv6HostInStartupSummary() throws Exception {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    StubRuntime runtime = new StubRuntime("::1", 9860, 9862, "http://[::1]:9878");
+    CommandLine commandLine = new CommandLine(new TestableRunCommand(runtime));
+    commandLine.setOut(new PrintWriter(new OutputStreamWriter(out, UTF_8), true));
+
+    assertEquals(0, commandLine.execute());
+    String text = out.toString(UTF_8.name());
+    assertTrue(text.contains("SCM RPC: [::1]:9860"), text);
+    assertTrue(text.contains("OM RPC: [::1]:9862"), text);
+  }
+
+  @Test
   void runCommandPrintsReconEndpointWhenEnabled() throws Exception {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     StubRuntime runtime = new StubRuntime("localhost", 9860, 9862,

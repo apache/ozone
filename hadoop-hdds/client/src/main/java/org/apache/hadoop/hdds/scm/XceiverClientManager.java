@@ -34,6 +34,7 @@ import java.net.InetSocketAddress;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
@@ -207,7 +208,7 @@ public class XceiverClientManager extends XceiverClientCreator {
       for (DatanodeDetails dn : pipeline.getNodes()) {
         // read port from the data node, on failure use default configured port.
         port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
-        InetSocketAddress addr = NetUtils.createSocketAddr(dn.getIpAddress(), port);
+        InetSocketAddress addr = NetUtils.createSocketAddr(HddsUtils.getHostPortString(dn.getIpAddress(), port));
         if (OzoneNetUtils.isAddressLocal(addr) && SHORT_CIRCUIT_READS.isSupportedBy(dn.getCurrentVersion())) {
           localAddr = addr;
           localDN = dn;

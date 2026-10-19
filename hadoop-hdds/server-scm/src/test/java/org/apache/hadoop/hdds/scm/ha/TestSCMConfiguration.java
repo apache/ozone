@@ -240,6 +240,27 @@ class TestSCMConfiguration {
     assertThat(e.getMessage()).contains(addressKey).contains(address);
   }
 
+  @ParameterizedTest
+  @CsvSource({"2001:db8::2", "[2001:db8::2]"})
+  void testSCMConfigWithIpv6PeerAddress(String address) throws Exception {
+    String scmServiceId = "scmserviceId";
+    conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
+    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY + "." + scmServiceId, "scm1,scm2");
+    conf.set(ScmConfigKeys.OZONE_SCM_NODE_ID_KEY, "scm1");
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, "scm1"), "localhost");
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, "scm2"), address);
+    conf.setInt(OZONE_SCM_RATIS_PORT_KEY, 10000);
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getState()).thenReturn(Storage.StorageState.NOT_INITIALIZED);
+
+    SCMHANodeDetails details = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
+
+    assertThat(details.getPeerNodeDetails())
+        .singleElement()
+        .extracting(SCMNodeDetails::getRpcAddress)
+        .isEqualTo(new InetSocketAddress("2001:db8::2", 10000));
+  }
+
   @Test
   public void testSamePortConfig() throws Exception {
     String scmServiceId = "scmserviceId";

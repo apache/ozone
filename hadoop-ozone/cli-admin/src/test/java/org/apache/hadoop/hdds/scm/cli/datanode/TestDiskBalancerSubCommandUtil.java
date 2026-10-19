@@ -23,18 +23,24 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocolPB.DiskBalancerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.net.NetUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.MockedConstruction;
 
 /**
  * Unit tests for {@link DiskBalancerSubCommandUtil}.
@@ -109,6 +115,25 @@ public class TestDiskBalancerSubCommandUtil {
     assertEquals("[2001:db8::5]:" + HDDS_DATANODE_CLIENT_PORT_DEFAULT, address);
     assertEquals(new InetSocketAddress("2001:db8::5", HDDS_DATANODE_CLIENT_PORT_DEFAULT),
         NetUtils.createSocketAddr(address));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "10.0.0.1, 10.0.0.1, " + HDDS_DATANODE_CLIENT_PORT_DEFAULT,
+      "10.0.0.1:1234, 10.0.0.1, 1234",
+      "2001:db8::1, 2001:db8::1, " + HDDS_DATANODE_CLIENT_PORT_DEFAULT,
+      "[2001:db8::1], 2001:db8::1, " + HDDS_DATANODE_CLIENT_PORT_DEFAULT,
+      "[2001:db8::1]:1234, 2001:db8::1, 1234",
+  })
+  public void testGetSingleNodeDiskBalancerProxyAddress(String address, String host, int port) throws IOException {
+    List<Object> addresses = new ArrayList<>();
+    try (MockedConstruction<DiskBalancerProtocolClientSideTranslatorPB> ignored = mockConstruction(
+        DiskBalancerProtocolClientSideTranslatorPB.class,
+        (proxy, context) -> addresses.add(context.arguments().get(0)))) {
+      DiskBalancerSubCommandUtil.getSingleNodeDiskBalancerProxy(address);
+    }
+
+    assertEquals(Arrays.asList(new InetSocketAddress(host, port)), addresses);
   }
 
   @Test

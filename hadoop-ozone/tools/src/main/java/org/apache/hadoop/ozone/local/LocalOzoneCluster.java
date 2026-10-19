@@ -125,6 +125,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -375,7 +376,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     if (!config.isReconEnabled()) {
       return "";
     }
-    return "http://" + getDisplayHost() + ":" + getReconPort();
+    return "http://" + address(getDisplayHost(), getReconPort());
   }
 
   @Override
@@ -1205,7 +1206,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
   }
 
   private static String address(String host, int port) {
-    return host + ":" + port;
+    return HddsUtils.getHostPortString(host, port);
   }
 
   private static String initializedClusterId(Storage storage) {

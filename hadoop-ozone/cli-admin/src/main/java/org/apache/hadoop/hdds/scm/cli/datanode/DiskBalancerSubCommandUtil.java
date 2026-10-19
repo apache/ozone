@@ -168,14 +168,9 @@ final class DiskBalancerSubCommandUtil {
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     
     // Parse address and add default port if not specified
-    InetSocketAddress nodeAddr;
-    if (address.contains(":")) {
-      // Port is specified, use NetUtils to parse
-      nodeAddr = NetUtils.createSocketAddr(address);
-    } else {
-      // Port not specified, use default
-      nodeAddr = NetUtils.createSocketAddr(address, HDDS_DATANODE_CLIENT_PORT_DEFAULT);
-    }
+    int port = HddsUtils.getHostPort(address).orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT);
+    InetSocketAddress nodeAddr = NetUtils.createSocketAddr(
+        HddsUtils.getHostPortString(HddsUtils.getHostName(address).get(), port));
     return new DiskBalancerProtocolClientSideTranslatorPB(
         nodeAddr, user, ozoneConf);
   }

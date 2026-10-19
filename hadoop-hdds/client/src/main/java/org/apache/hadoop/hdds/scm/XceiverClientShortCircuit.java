@@ -49,6 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -121,7 +122,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     this.blockStreamCache = new ConcurrentHashMap<>();
     this.sentRequests = new ConcurrentHashMap<>();
     int port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
-    this.dnAddr = NetUtils.createSocketAddr(dn.getIpAddress(), port);
+    this.dnAddr = NetUtils.createSocketAddr(HddsUtils.getHostPortString(dn.getIpAddress(), port));
     this.bufferSize = config.getObject(OzoneClientConfig.class).getShortCircuitBufferSize();
     this.readDaemon = new Daemon(new ReceiveResponseTask());
     LOG.info("{} is created for pipeline {}", XceiverClientShortCircuit.class.getSimpleName(), pipeline);

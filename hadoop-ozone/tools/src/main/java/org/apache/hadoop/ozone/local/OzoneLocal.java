@@ -25,6 +25,7 @@ import java.time.format.DateTimeParseException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -261,8 +262,8 @@ public class OzoneLocal extends GenericCli {
     private void printSummary(LocalOzoneRuntime runtime, LocalOzoneClusterConfig config) {
       PrintWriter writer = out();
       writer.println("Local Ozone is running from " + config.getDataDir());
-      writer.println("SCM RPC: " + runtime.getDisplayHost() + ":" + runtime.getScmPort());
-      writer.println("OM RPC: " + runtime.getDisplayHost() + ":" + runtime.getOmPort());
+      writer.println("SCM RPC: " + HddsUtils.getHostPortString(runtime.getDisplayHost(), runtime.getScmPort()));
+      writer.println("OM RPC: " + HddsUtils.getHostPortString(runtime.getDisplayHost(), runtime.getOmPort()));
       if (config.isS3gEnabled()) {
         writer.println("S3 endpoint: " + runtime.getS3Endpoint());
         writer.println("Suggested local AWS settings:");
