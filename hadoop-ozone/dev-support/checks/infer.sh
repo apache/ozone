@@ -76,7 +76,8 @@ MAVEN_OPTIONS='-B -DskipTests -DskipDocs -DskipRecon -DskipShade -Dsort.skip=tru
 MAVEN_OPTIONS+=' -Ddevelocity.cache.local.enabled=false -Ddevelocity.cache.remote.enabled=false'
 
 # Keep the log outside target because Maven clean removes it.
-infer run --keep-going --report-console-limit 0 \
+# Do not let Infer's Maven profile override each module's maven.compiler.release.
+infer run --java-version-reset --keep-going --report-console-limit 0 \
   --skip-analysis-in-path '.*/src/test/.*' \
   --skip-analysis-in-path '.*/target/generated-test-sources/.*' \
   --skip-analysis-in-path '.*/target/generated-sources/.*' \

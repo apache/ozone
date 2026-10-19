@@ -151,6 +151,13 @@ teardown() {
   grep -qx -- '-Ddevelocity.cache.remote.enabled=false' infer-args
 }
 
+@test "Infer preserves Maven's per-module Java release settings" {
+  run bash hadoop-ozone/dev-support/checks/infer.sh
+
+  [ "${status}" -eq 0 ]
+  grep -qx -- '--java-version-reset' infer-args
+}
+
 @test "Infer failures are not hidden by a fresh report" {
   export INFER_EXIT_CODE=5
 
