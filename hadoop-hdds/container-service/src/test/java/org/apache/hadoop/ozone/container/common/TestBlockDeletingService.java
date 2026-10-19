@@ -138,6 +138,8 @@ public class TestBlockDeletingService {
   private MutableVolumeSet volumeSet;
   private BlockDeletingServiceTestImpl blockDeletingService;
   private static final int BLOCK_CHUNK_SIZE = 100;
+  // If positive, delete transactions are created as for EC blocks with this many data replicas.
+  private int ecDataNum;
 
   @BeforeEach
   public void init() throws IOException {
@@ -283,12 +285,19 @@ public class TestBlockDeletingService {
   private void createTxn(KeyValueContainerData data, List<Long> containerBlocks,
       int txnID, long containerID) {
     try (DBHandle metadata = BlockUtils.getDB(data, conf)) {
-      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx =
+      long sizePerReplica = containerBlocks.size() * BLOCK_CHUNK_SIZE;
+      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.Builder dtxBuilder =
           StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
               .newBuilder().setTxID(txnID).setContainerID(containerID)
               .addAllLocalID(containerBlocks)
-              .setTotalBlockSize(containerBlocks.size() * BLOCK_CHUNK_SIZE)
-              .setCount(0).build();
+              .setCount(0);
+      if (ecDataNum > 0) {
+        // Like SCM does for EC: logical block size spans all data replicas, each DN holds one share of it.
+        dtxBuilder.setTotalBlockSize(sizePerReplica * ecDataNum).setTotalSizePerReplica(sizePerReplica);
+      } else {
+        dtxBuilder.setTotalBlockSize(sizePerReplica);
+      }
+      StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction dtx = dtxBuilder.build();
       try (BatchOperation batch = metadata.getStore().getBatchHandler()
           .initBatchOperation()) {
         DatanodeStore ds = metadata.getStore();
@@ -740,6 +749,44 @@ public class TestBlockDeletingService {
     } catch (Exception ex) {
       ex.printStackTrace();
       fail("Test failed with exception: " + ex.getMessage());
+    }
+  }
+
+  /**
+   * For EC blocks, the DN adds totalSizePerReplica of a delete transaction to the pending deletion bytes.
+   * Processing the transaction must release the same amount, not the logical totalBlockSize.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testPendingDeletionBytesForECTransactions(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
+    // Schema V1 does not use delete transactions on the DN.
+    Assumptions.assumeFalse(isSameSchemaVersion(schemaVersion, SCHEMA_V1));
+    ecDataNum = 3;
+    DatanodeConfiguration dnConf = conf.getObject(DatanodeConfiguration.class);
+    dnConf.setBlockDeletionLimit(1);
+    this.blockLimitPerInterval = dnConf.getBlockDeletionLimit();
+    conf.setFromObject(dnConf);
+    ContainerSet containerSet = newContainerSet();
+    // 3 transactions, one block each, each with per-replica size BLOCK_CHUNK_SIZE.
+    KeyValueContainerData data = createToDeleteBlocks(containerSet, 3, 1);
+    ContainerMetrics metrics = ContainerMetrics.create(conf);
+    KeyValueHandler keyValueHandler =
+        ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
+    createBlockDeletingService(containerSet, conf, keyValueHandler);
+    blockDeletingService.start();
+    GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
+    BlockDeletingServiceMetrics deletingServiceMetrics = blockDeletingService.getMetrics();
+
+    assertEquals(3 * BLOCK_CHUNK_SIZE, data.getBlockPendingDeletionBytes());
+
+    // Each interval processes one transaction, which should release only its per-replica size.
+    for (int processed = 1; processed <= 3; processed++) {
+      deleteAndWait(blockDeletingService, processed);
+      long remaining = 3 - processed;
+      GenericTestUtils.waitFor(() -> data.getNumPendingDeletionBlocks() == remaining, 100, 3000);
+      assertEquals(remaining * BLOCK_CHUNK_SIZE, data.getBlockPendingDeletionBytes());
+      // The metric is computed before the deletion in the same interval.
+      assertEquals((remaining + 1) * BLOCK_CHUNK_SIZE, deletingServiceMetrics.getTotalPendingBlockBytes());
     }
   }
 
