@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.storagepolicy;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -141,6 +142,7 @@ public class UsageInfoSubCommand extends ScmSubcommand {
         datanodeUsage.add(new DatanodeStorageTypeUsage(dn, st));
       }
     }
+    datanodeUsage.sort(Comparator.comparing(DatanodeStorageTypeUsage::getStorageType));
     return datanodeUsage;
   }
 

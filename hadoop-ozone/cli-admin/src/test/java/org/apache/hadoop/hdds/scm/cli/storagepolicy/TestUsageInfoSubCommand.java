@@ -152,6 +152,23 @@ public class TestUsageInfoSubCommand {
     assertThatThrownBy(() -> cmd.execute(scmClient)).isInstanceOf(ArithmeticException.class);
   }
 
+  @Test
+  public void testWithDatanodeTextOutputGroupsDatanodesByStorageType() throws IOException {
+    // Each datanode reports DISK and SSD.
+    // Each StorageType header must still be printed once, not once per change of type.
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.listStorageTypeUsageInfo(any())).thenReturn(
+        Arrays.asList(datanodeWithDiskAndSsd(), datanodeWithDiskAndSsd()));
+
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--with-datanode");
+    cmd.execute(scmClient);
+
+    String output = outContent.toString(StandardCharsets.UTF_8.name());
+    assertThat(output).containsOnlyOnce("StorageType DISK:");
+    assertThat(output).containsOnlyOnce("StorageType SSD:");
+  }
+
   private JsonNode findByStorageType(JsonNode summary, String storageType) {
     for (JsonNode node : summary) {
       if (storageType.equals(node.get("storageType").asText())) {
@@ -165,6 +182,13 @@ public class TestUsageInfoSubCommand {
     return Arrays.asList(
         datanodeUsage(2000, 500, 1500, 0, 0, HddsProtos.StorageTypeProto.DISK),
         datanodeUsage(1000, 200, 800, 0, 0, HddsProtos.StorageTypeProto.SSD));
+  }
+
+  private DatanodeStorageTypeUsageInfoProto datanodeWithDiskAndSsd() {
+    return datanodeUsage(2000, 500, 1500, 0, 0, HddsProtos.StorageTypeProto.DISK).toBuilder()
+        .addStorageTypeUsageInfo(
+            datanodeUsage(1000, 200, 800, 0, 0, HddsProtos.StorageTypeProto.SSD).getStorageTypeUsageInfo(0))
+        .build();
   }
 
   private DatanodeStorageTypeUsageInfoProto datanodeUsage(long capacity, long used, long remaining,
