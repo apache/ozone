@@ -32,19 +32,14 @@
       <fileFingerprints>true</fileFingerprints>
       <buildLogging>true</buildLogging>
       <testLogging>true</testLogging>
+      <resourceUsage>true</resourceUsage>
     </capture>
     <backgroundBuildScanUpload>#{isFalse(env['GITHUB_ACTIONS'])}</backgroundBuildScanUpload>
     <publishing>
       <onlyIf><![CDATA[authenticated]]></onlyIf>
     </publishing>
-    <obfuscation>
-      <ipAddresses>#{{'0.0.0.0'}}</ipAddresses>
-    </obfuscation>
   </buildScan>
   <buildCache>
-    <local>
-      <enabled>#{isFalse(env['GITHUB_ACTIONS'])}</enabled>
-    </local>
     <remote>
       <enabled>true</enabled>
       <storeEnabled>#{isTrue(env['GITHUB_ACTIONS']) and env['DEVELOCITY_ACCESS_KEY'] != null and env['DEVELOCITY_ACCESS_KEY'] != ''}</storeEnabled>
