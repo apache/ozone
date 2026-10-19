@@ -134,7 +134,7 @@ public class TestMiniOzoneCluster {
 
     try {
       // Repeated transfers must not remove any OM or change its index.
-      for (int i = 0; i < originalOMs.size(); i++) {
+      for (int i = 0; i < 3; i++) {
         OzoneManager oldLeader = haCluster.getOMLeader();
         OzoneManager newLeader = haCluster.transferOMLeadershipToAnotherNode(oldLeader);
         assertNotEquals(oldLeader, newLeader);
