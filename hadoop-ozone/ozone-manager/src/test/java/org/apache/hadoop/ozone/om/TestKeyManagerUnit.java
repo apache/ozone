@@ -60,7 +60,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -103,7 +103,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
   private static final AtomicLong CONTAINER_ID = new AtomicLong();
 
   private OMMetadataManager metadataManager;
-  private StorageContainerLocationProtocol containerClient;
+  private StorageContainerLocationInternalInterface containerClient;
   private KeyManagerImpl keyManager;
 
   private Instant startDate;
@@ -117,7 +117,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
     ExitUtils.disableSystemExit();
     OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.toString());
-    containerClient = mock(StorageContainerLocationProtocol.class);
+    containerClient = mock(StorageContainerLocationInternalInterface.class);
     blockClient = mock(ScmBlockLocationProtocol.class);
     InnerNode.Factory factory = InnerNodeImpl.FACTORY;
     when(blockClient.getNetworkTopology()).thenReturn(
