@@ -238,11 +238,6 @@ public final class SCMHAManagerStub implements SCMHAManager {
     }
 
     @Override
-    public long getFollowerReplicationLag() {
-      return 0;
-    }
-
-    @Override
     public List<String> getRatisRoles() {
       return Arrays
           .asList("180.3.14.5:9894", "180.3.14.21:9894", "180.3.14.145:9894");
