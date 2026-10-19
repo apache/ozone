@@ -80,6 +80,11 @@ public enum OzoneManagerVersion implements ComponentVersion {
           + "server-side when the request sets requireFileSystemLayout, so file "
           + "system clients no longer need the client-side InfoBucket layout "
           + "check for listStatus"),
+  GET_KEY_INFO_REJECTS_OBS(102,
+      "OzoneManager version that rejects getKeyInfo on OBJECT_STORE buckets "
+          + "server-side when the request sets requireFileSystemLayout, so file "
+          + "system clients no longer need the client-side InfoBucket layout "
+          + "check for open"),
 
   // Only operations included in the first release with version 102 may share it.
   // S3 volume context support added later needs a new version.

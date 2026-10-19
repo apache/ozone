@@ -944,6 +944,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     GetKeyInfoRequest.Builder req = GetKeyInfoRequest.newBuilder();
     req.setKeyArgs(args.toProtobuf());
     req.setAssumeS3Context(assumeS3Context);
+    if (args.isRequireFileSystemLayout()) {
+      req.setRequireFileSystemLayout(true);
+    }
 
     OMRequest omRequest = createOMRequest(Type.GetKeyInfo)
         .setGetKeyInfoRequest(req)
