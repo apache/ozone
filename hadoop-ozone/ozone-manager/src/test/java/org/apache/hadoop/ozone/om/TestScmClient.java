@@ -72,7 +72,6 @@ public class TestScmClient {
    */
   private static final int UNKNOWN_WIRE_VERSION_A = 500;
   private static final int UNKNOWN_WIRE_VERSION_B = 501;
-  private StorageContainerLocationProtocol containerLocationProtocol;
   private StorageContainerLocationInternalInterface containerLocationProtocol;
   private ScmClient scmClient;
 
