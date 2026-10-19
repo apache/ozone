@@ -19,12 +19,15 @@ package org.apache.hadoop.ozone.shell;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Function;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -33,11 +36,16 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.admin.OzoneAdmin;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.RaftPeer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import picocli.CommandLine.ExitCode;
 
 /**
  * Test transferLeadership with SCM HA setup.
@@ -100,27 +108,53 @@ public class TestTransferLeadershipShell {
     assertOMResetPriorities();
   }
 
-  @Test
-  public void testScmTransfer() throws Exception {
-    StorageContainerManager oldLeader = getScmLeader(cluster);
-    List<StorageContainerManager> scmList = new ArrayList<>(cluster.
-        getStorageContainerManagersList());
-    assertThat(scmList).contains(oldLeader);
-    scmList.remove(oldLeader);
-    StorageContainerManager newLeader = scmList.get(0);
+  static Stream<Named<Function<StorageContainerManager, String>>> scmTargetIdExtractors() {
+    return Stream.of(
+        Named.of("scmId", StorageContainerManager::getScmId),
+        Named.of("nodeId", StorageContainerManager::getSCMNodeId));
+  }
 
-    String[] args1 = {"scm", "transfer", "-n", newLeader.getScmId()};
-    ozoneAdmin.execute(args1);
+  @ParameterizedTest
+  @MethodSource("scmTargetIdExtractors")
+  public void testScmTransfer(Function<StorageContainerManager, String> targetId) throws Exception {
+    StorageContainerManager newLeader = pickScmFollower();
+
+    String[] args = {"scm", "transfer", "-n", targetId.apply(newLeader)};
+    ozoneAdmin.execute(args);
     cluster.waitForClusterToBeReady();
     assertEquals(newLeader, getScmLeader(cluster));
     assertSCMResetPriorities();
+  }
 
-    oldLeader = getScmLeader(cluster);
-    String[] args3 = {"scm", "transfer", "-r"};
-    ozoneAdmin.execute(args3);
+  @Test
+  public void testScmTransferToRandomFollower() throws Exception {
+    StorageContainerManager oldLeader = getScmLeader(cluster);
+
+    String[] args = {"scm", "transfer", "-r"};
+    ozoneAdmin.execute(args);
     cluster.waitForClusterToBeReady();
     assertNotSame(oldLeader, getScmLeader(cluster));
     assertSCMResetPriorities();
+  }
+
+  @Test
+  public void testScmTransferToUnknownIdFails() throws Exception {
+    StorageContainerManager leader = getScmLeader(cluster);
+
+    String[] args = {"scm", "transfer", "-n", "no-such-scm"};
+    try (GenericTestUtils.SystemErrCapturer capture = new GenericTestUtils.SystemErrCapturer()) {
+      assertNotEquals(ExitCode.OK, ozoneAdmin.execute(args));
+      assertThat(capture.getOutput()).contains("Target no-such-scm not found in group");
+    }
+    assertEquals(leader, getScmLeader(cluster));
+  }
+
+  private StorageContainerManager pickScmFollower() {
+    StorageContainerManager leader = getScmLeader(cluster);
+    List<StorageContainerManager> scmList = new ArrayList<>(cluster.getStorageContainerManagersList());
+    assertThat(scmList).contains(leader);
+    scmList.remove(leader);
+    return scmList.get(0);
   }
 
   private void assertOMResetPriorities() {

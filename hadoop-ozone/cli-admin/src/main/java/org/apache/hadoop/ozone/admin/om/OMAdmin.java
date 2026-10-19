@@ -50,6 +50,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class,
     subcommands = {
+        BucketDeletedBytesSubCommand.class,
         FinalizeUpgradeSubCommand.class,
         ListOpenFilesSubCommand.class,
         GetServiceRolesSubcommand.class,

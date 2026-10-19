@@ -63,7 +63,7 @@ public class OMGetDelegationTokenRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     // We need to populate user info in our request object.
-    OMRequest request = super.preExecute(ozoneManager);
+    final OMRequest request = super.preExecute(ozoneManager);
 
     GetDelegationTokenRequestProto getDelegationTokenRequest =
         request.getGetDelegationTokenRequest();

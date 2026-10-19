@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -37,6 +36,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -196,7 +196,7 @@ public class ContainerOperationClient implements ScmClient {
       HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
-        queryScope, poolName, ClientVersion.CURRENT_VERSION);
+        queryScope, poolName, ClientVersion.CURRENT);
   }
 
   @Override
@@ -352,7 +352,7 @@ public class ContainerOperationClient implements ScmClient {
   public List<ContainerReplicaInfo> getContainerReplicas(long containerId) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> protos =
         storageContainerLocationClient.getContainerReplicas(containerId,
-            ClientVersion.CURRENT_VERSION);
+            ClientVersion.CURRENT);
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
     for (HddsProtos.SCMContainerReplicaProto p : protos) {
       replicas.add(ContainerReplicaInfo.fromProto(p));
@@ -375,8 +375,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatuses()
-      throws IOException {
+  public List<SafeModeRuleStatusProto> getSafeModeRuleStatuses() throws IOException {
     return storageContainerLocationClient.getSafeModeRuleStatuses();
   }
 
@@ -468,14 +467,14 @@ public class ContainerOperationClient implements ScmClient {
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String address, String uuid) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(address,
-        uuid, ClientVersion.CURRENT_VERSION);
+        uuid, ClientVersion.CURRENT);
   }
 
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count,
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
   }
 
   @Override

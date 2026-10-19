@@ -27,14 +27,18 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -108,5 +112,24 @@ public class TestQueryNode {
     nodeCount = scmClient.queryNode(null, DEAD,
         HddsProtos.QueryScope.CLUSTER, "").size();
     assertEquals(2, nodeCount, "Mismatch of expected nodes count");
+  }
+
+  /**
+   * A datanode that dies is removed from SCM's network topology, and added back once it is restarted.
+   */
+  @Test
+  public void testDeadNodeIsRemovedFromTopologyUntilRestarted() throws Exception {
+    StorageContainerManager scm = cluster.getStorageContainerManager();
+    NetworkTopology topology = scm.getClusterMap();
+    DatanodeDetails dn = cluster.getHddsDatanodes().get(0).getDatanodeDetails();
+    String path = scm.getScmNodeManager().getNode(dn.getID()).getNetworkFullPath();
+    assertNotNull(topology.getNode(path));
+
+    cluster.shutdownHddsDatanode(dn);
+    GenericTestUtils.waitFor(() -> topology.getNode(path) == null, 100, 30_000);
+    assertEquals(DEAD, scm.getScmNodeManager().getNodeStatus(dn).getHealth());
+
+    cluster.restartHddsDatanode(dn, true);
+    assertNotNull(topology.getNode(path));
   }
 }

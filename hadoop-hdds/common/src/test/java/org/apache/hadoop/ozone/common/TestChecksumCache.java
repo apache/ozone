@@ -25,6 +25,7 @@ import org.apache.hadoop.ozone.common.Checksum.Algorithm;
 import org.apache.hadoop.ozone.common.Checksum.StreamingChecksum;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -109,6 +110,38 @@ class TestChecksumCache {
     final ChecksumData actual = cached.computeChecksum(partiallyPositioned(data), true);
 
     Assertions.assertEquals(expected.getChecksums(), actual.getChecksums());
+  }
+
+  @Test
+  void testRejectsInvalidBufferWhenLengthMatchesCache() throws Exception {
+    final Checksum checksum = new Checksum(ChecksumType.SHA256, 10, true);
+    checksum.computeChecksum(ByteBuffer.wrap(new byte[10]), true);
+
+    try (ChunkBuffer data = ChunkBuffer.allocate(20, 10)) {
+      data.put(new byte[10]);
+      final IllegalStateException exception = Assertions.assertThrows(
+          IllegalStateException.class,
+          () -> checksum.computeChecksum(data, true));
+      Assertions.assertEquals(
+          "ChunkBuffer remaining byte count is 10, but its underlying buffers expose 0 bytes",
+          exception.getMessage());
+    }
+  }
+
+  @Test
+  void testRejectedBufferDoesNotModifyCache() throws Exception {
+    final Checksum cached = new Checksum(ChecksumType.SHA256, 10, true);
+    try (ChunkBuffer data = ChunkBuffer.allocate(80, 32)) {
+      data.put(new byte[33]);
+      Assertions.assertThrows(IllegalStateException.class,
+          () -> cached.computeChecksum(data, true));
+    }
+
+    final ByteBuffer valid = ByteBuffer.wrap(new byte[10]);
+    final ChecksumData expected = new Checksum(ChecksumType.SHA256, 10)
+        .computeChecksum(valid.duplicate());
+    final ChecksumData actual = cached.computeChecksum(valid, true);
+    Assertions.assertEquals(expected, actual);
   }
 
   private static ChunkBuffer split(byte[] data, int length, int bufferSize) {

@@ -103,7 +103,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
             true);
 
     List<OmKeyLocationInfo> omKeyLocationInfo =
-        omKeyInfo.getLatestVersionLocations().getLocationList();
+        omKeyInfo.getLatestVersionLocations().createLocationList();
 
     assertEquals(0, omKeyLocationInfo.size());
 
@@ -133,7 +133,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         modifiedOmRequest.getAllocateBlockRequest().getKeyLocation();
 
     omKeyLocationInfo =
-        omKeyInfo.getLatestVersionLocations().getLocationList();
+        omKeyInfo.getLatestVersionLocations().createLocationList();
 
     assertEquals(1, omKeyLocationInfo.size());
 

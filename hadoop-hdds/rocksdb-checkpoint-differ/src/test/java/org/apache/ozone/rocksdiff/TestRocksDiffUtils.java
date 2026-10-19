@@ -17,7 +17,6 @@
 
 package org.apache.ozone.rocksdiff;
 
-import static org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -74,10 +73,10 @@ public class TestRocksDiffUtils {
 
   public static Stream<Arguments> values() {
     return Stream.of(
-        arguments("validColumnFamily", "validColumnFamily", "a", "d", "e", "g"),
-        arguments("validColumnFamily", "validColumnFamily", "e", "g", "a", "d"),
-        arguments("validColumnFamily", "validColumnFamily", "b", "b", "e", "g"),
-        arguments("validColumnFamily", "validColumnFamily", "a", "d", "e", "e")
+        arguments("validColumnFamily", "invalidColumnFamily", "a", "d", "e", "g"),
+        arguments("validColumnFamily", "invalidColumnFamily", "e", "g", "a", "d"),
+        arguments("validColumnFamily", "invalidColumnFamily", "b", "b", "e", "g"),
+        arguments("validColumnFamily", "invalidColumnFamily", "a", "d", "e", "e")
     );
   }
 
@@ -97,6 +96,9 @@ public class TestRocksDiffUtils {
             invalidSSTFileEndRange, invalidColumnFamilyName), untrackedSstFile,
         new SstFileInfo(untrackedSstFile, null, null, null));
     Map<String, SstFileInfo> inputSstFiles = new HashMap<>();
+    Map<String, String> prefixes = new HashMap<>();
+    prefixes.put(invalidColumnFamilyName, invalidSSTFileEndRange + "z");
+    prefixes.put(validSSTColumnFamilyName, expectedPrefix);
     List<Set<String>> tablesToLookupSet = Arrays.asList(ImmutableSet.of(validSSTColumnFamilyName),
         ImmutableSet.of(invalidColumnFamilyName), ImmutableSet.of(validSSTColumnFamilyName, invalidColumnFamilyName),
         Collections.emptySet());
@@ -105,11 +107,7 @@ public class TestRocksDiffUtils {
       inputSstFiles.putAll(sstFile);
       RocksDiffUtils.filterRelevantSstFiles(inputSstFiles,
           tablesToLookup,
-          new TablePrefixInfo(
-              new HashMap<String, String>() {{
-                put(invalidColumnFamilyName, getLexicographicallyHigherString(invalidSSTFileEndRange));
-                put(validSSTColumnFamilyName, expectedPrefix);
-              }}));
+          new TablePrefixInfo(prefixes));
       if (tablesToLookup.contains(validSSTColumnFamilyName)) {
         Assertions.assertEquals(Sets.newTreeSet(validSstFile, untrackedSstFile), inputSstFiles.keySet(),
             "Failed for " + tablesToLookup);

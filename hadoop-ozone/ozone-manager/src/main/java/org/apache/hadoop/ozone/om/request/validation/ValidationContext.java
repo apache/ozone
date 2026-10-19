@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManagerUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 
 /**
  * A context that contains useful information for request validator instances.
@@ -31,13 +31,11 @@ import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 public interface ValidationContext {
 
   /**
-   * Gets the {@link LayoutVersionManager} of the service, so that a pre
-   * finalization validation can check if the layout version it belongs to
-   * is finalized already or not.
+   * Gets the OM component version manager for pre-finalization checks and feature gating.
    *
-   * @return the {@link LayoutVersionManager} of the service
+   * @return the {@link OMVersionManager} of the service
    */
-  LayoutVersionManager versionManager();
+  OMVersionManager versionManager();
 
   /**
    * Gets the {@link BucketLayout} of the given bucket. In case of a link bucket
@@ -51,16 +49,16 @@ public interface ValidationContext {
   /**
    * Creates a context object based on the given parameters.
    *
-   * @param versionManager the {@link LayoutVersionManager} of the service
+   * @param omVersionManager the {@link OMVersionManager} of the service
    * @return the {@link ValidationContext} specified by the parameters.
    */
-  static ValidationContext of(LayoutVersionManager versionManager,
+  static ValidationContext of(OMVersionManager omVersionManager,
                               OMMetadataManager omMetadataManager) {
 
     return new ValidationContext() {
       @Override
-      public LayoutVersionManager versionManager() {
-        return versionManager;
+      public OMVersionManager versionManager() {
+        return omVersionManager;
       }
 
       @Override

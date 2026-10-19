@@ -41,6 +41,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PREFIX_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
@@ -55,6 +56,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -82,6 +84,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -109,6 +112,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -146,6 +150,7 @@ public class TestOmMetadataManager {
       SNAPSHOT_INFO_TABLE,
       SNAPSHOT_RENAMED_TABLE,
       COMPACTION_LOG_TABLE,
+      S3_REVOKED_STS_TOKEN_TABLE,
       LIFECYCLE_CONFIGURATION_TABLE,
       LIFECYCLE_SCAN_STATE_TABLE
   };
@@ -1522,6 +1527,44 @@ public class TestOmMetadataManager {
         volumeName, bucketName, prefix, null, null, 10, true);
 
     assertEquals(25, noPagination.size());
+  }
+
+  @Test
+  public void testS3RevokedStsTokenTablePutAndGet() throws Exception {
+    // Ensure the table is initialized
+    assertNotNull(omMetadataManager.getS3RevokedStsTokenTable(), "s3RevokedStsTokenTable should be initialized");
+
+    final MockClock clock = MockClock.newInstance();
+    final String originalAccessKeyId1 = "orig-1";
+    final long insertionTime1 = clock.millis();
+    final String originalAccessKeyId2 = "orig-2";
+    final long insertionTime2 = insertionTime1 + 1234L;
+
+    // This table is configured as FULL_CACHE in OmMetadataManagerImpl.
+    // A put() writes to RocksDB but does not update the table cache, so get() and getIfExist() will return null unless
+    // the cache is updated with addCacheEntry().  getSkipCache() will read the DB instead of the cache.
+    final TypedTable<String, Long> revokedTable =
+        (TypedTable<String, Long>) omMetadataManager.getS3RevokedStsTokenTable();
+
+    revokedTable.put(originalAccessKeyId1, insertionTime1);
+    revokedTable.put(originalAccessKeyId2, insertionTime2);
+
+    // Verify the values are persisted in RocksDB.
+    assertEquals(insertionTime1, revokedTable.getSkipCache(originalAccessKeyId1));
+    assertEquals(insertionTime2, revokedTable.getSkipCache(originalAccessKeyId2));
+
+    // Update cache to make get/getIfExist reflect the write for FULL_CACHE tables.
+    revokedTable.addCacheEntry(originalAccessKeyId1, insertionTime1, 1L);
+    revokedTable.addCacheEntry(originalAccessKeyId2, insertionTime2, 1L);
+
+    // Verify get and getIfExist return the stored value
+    assertEquals(insertionTime1, revokedTable.get(originalAccessKeyId1));
+    assertEquals(insertionTime1, revokedTable.getIfExist(originalAccessKeyId1));
+    assertEquals(insertionTime2, revokedTable.get(originalAccessKeyId2));
+    assertEquals(insertionTime2, revokedTable.getIfExist(originalAccessKeyId2));
+
+    // Invalid originalAccessKeyId should return null for getIfExist.
+    assertNull(revokedTable.getIfExist("INVALID_ORIGINAL_ACCESS_KEY_ID"));
   }
 
   @Test
