@@ -382,8 +382,22 @@ the permission to read or write data and the permission to read or manage locks 
 * The last row has no AWS S3 equivalent: AWS S3 writes a new version instead of overwriting, while Ozone rejects overwrites of locked keys unless the Governance bypass applies.
 * Native clients pass the same settings and the `bypassGovernanceRetention` flag as request arguments, and the same rules apply.
 
-The check is done in OM, following the existing dependent S3 action check in `OmMetadataReader` (`DEPENDENT_S3_ACTIONS`),
-which today also checks `GetObject` when a request is authorized as `GetObjectAttributes`, in the same RPC. It is extended in three ways:
+**How the check works**: S3 Gateway sends one RPC with one S3 action (the main action). In that RPC, OM calls the authorizer once per required action,
+and each `checkAccess` call carries exactly one access type and one S3 action. The request is allowed only if every call is allowed, as in AWS S3, where each required action is evaluated separately.
+For example, `PutObject` with retention headers is checked as (`CREATE` / `WRITE`, `PutObject`) and then (`WRITE_ACL`, `PutObjectRetention`) on the key.
+Each call is a separate Ranger audit record, so a denial shows which action was missing.
+
+Two alternatives were rejected:
+* **Pass several actions to one `checkAccess` call** and extend Ranger's `action-matches` to match a list: one call has only one access type, while the actions need different ones (`WRITE` vs `WRITE_ACL`).
+  Matching any action in the list would let an item that only allows `PutObject` grant `PutObjectRetention`, and matching all of them would force both actions into one policy item,
+  although they are usually granted to different roles. It would also need a change in the Ranger plugin.
+* **Let S3 Gateway send an extra RPC per dependent action** (as `CopyObject` does, because its source and destination are different keys): S3 Gateway does not know the key state
+  (whether a key read by `GetObject` has a lock, or whether a key is under Governance retention), native clients do not go through S3 Gateway,
+  and a separate check before the request adds an RPC and a gap between the check and the write.
+
+This follows the existing dependent S3 action check in `OmMetadataReader` (`DEPENDENT_S3_ACTIONS`),
+which today also checks `GetObject` when a request is authorized as `GetObjectAttributes`, in the same RPC. Write requests use the same check through `OMClientRequest#checkAcls`.
+Today the dependent actions come from a fixed map keyed by the main S3 action; instead, the OM request passes the list of (access type, S3 action) pairs to check. It is extended in three ways:
 1. **Conditional on the request**: a dependent action is checked only when its condition holds, for example `PutObjectRetention` only when the request carries retention settings.
 2. **Own access type**: each dependent action uses the access type in the table, not the access type of the main request.
    Otherwise a principal with only `WRITE` and `action-matches: PutObjectRetention` could set retention at upload time with weaker permissions than the `PutObjectRetention` API requires.
