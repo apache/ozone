@@ -9,7 +9,7 @@
 - **Author:** ASF Security team, via the threat-model-producer rubric (Scovetta
   rubric) at the Ozone PMC's request (path 3, confirmed siyao@ 2026-06-02).
 - **Status:** v1 — ratified by the Ozone PMC. Maintainer review complete (Siyao Meng / smengcl and Wei-Chiu Chuang / jojochuang, 2026-06/07); wave-1–3 answers folded.
-- **Revisions:** 2026-10, availability added (§4, §7, §8 item 7, §9, §10, §11a, §13); GDPR buckets (§9); key name visibility in listings (§11a).
+- **Revisions:** 2026-10, availability added (§4, §7, §8 item 7, §9, §10, §11a, §13); GDPR buckets (§9); key name visibility in listings (§11a); Datanode reports about its own replicas (§7, §9, §11a, §13).
 - **Version binding:** versioned with the project; a report against version *N*
   is triaged against the model as it stood at *N*.
 - **Reporting cross-reference:** §8-violating findings go to
@@ -238,6 +238,7 @@ Per-boundary input trust (grouped by family):
   checks**, so ordinary single-replica corruption is detected — but there is **no
   full guarantee against a Byzantine datanode that forges both data and metadata
   on the path it serves**. *(maintainer — smengcl, 2026-06-23; checksum behaviour documented in [ozone-site#397](https://github.com/apache/ozone-site/pull/397).)*
+  Outside Ratis, SCM trusts what a Datanode reports about its own replicas (§9). *(maintainer, smengcl, 2026-10.)*
 - **Out of scope:** compromised KDC / Ranger / SCM-CA-key / operator host;
   side-channel/co-tenant adversaries against the host; a client that an operator
   has authorized to do the thing it did. That exclusion covers the intended
@@ -304,6 +305,7 @@ Per-boundary input trust (grouped by family):
   on the path it serves** — Ratis is not BFT, and while checksum + replica/container
   checks catch ordinary corruption, a peer that can forge consistently on its
   served path is out of model (§7). *(maintainer — smengcl, 2026-06-23.)*
+- **SCM trusts what a Datanode reports about its own replicas.** The replica state, BCSID, origin Datanode, size and key count in a Datanode's container reports decide which replicas SCM keeps, replicates or deletes. A compromised Datanode that misreports its own replicas can steer those decisions; like forging the data it serves, this is out of model (§7). *(maintainer, smengcl, 2026-10.)*
 - **GDPR buckets are an erasure aid, not encryption at rest.** The Ozone shell (`ozone sh key put`, `ozone sh key cp`) marks keys written into a bucket created with `--enforcegdpr` with the GDPR flag. For such a key the client generates a random per-key secret, which the OM stores in the key's metadata, and encrypts the data with it; in a TDE bucket the key is encrypted with TDE instead. When the key is deleted, the OM removes the secret (and, in a TDE bucket, the encrypted data key), so the remaining blocks cannot be read without it. It does not provide confidentiality or integrity at rest: the secret is returned to anyone who can read the key; copies remain in the Ratis log and RocksDB files until they are purged or compacted, in copies of the OM DB such as checkpoints and Recon's, and in OM snapshots taken while the key existed (§10); and stored blocks are not authenticated (see the Byzantine datanode bullet above). Use TDE for confidentiality at rest (§8 item 6). Keys written through the S3 Gateway or ofs/o3fs are not marked, so they are not GDPR encrypted even in a GDPR bucket. *(maintainer, smengcl, 2026-10.)*
 - **No promise to withstand load by volume.** Request floods, connection exhaustion, and many concurrent requests whose cost the server already limits are outside §8 item 7. Limiting them is the operator's (§10). Concurrent requests whose cost the caller chooses are not load by volume and stay under §8 item 7. *(maintainer, smengcl, 2026-10.)*
 - **Resource use within granted limits is not an availability finding.** A user who fills their own quota, creates as many keys or buckets as they are allowed to, or runs listings within the server's page limits is using the service as authorized, provided the service keeps serving others (§8 item 7). Quotas are off by default and are the operator's control (§10). *(maintainer, smengcl, 2026-10.)*
@@ -379,6 +381,7 @@ list. *(requested by jojochuang, 2026-06-25.)*
 - **A user exhausts resources the operator granted them** (fills their quota, creates all the keys or buckets they are allowed, runs listings within the server's page limits): `BY-DESIGN: property-disclaimed` (§9/§10).
 - **An admin (a principal in a configured administrator list) can stop or degrade a service**: `OUT-OF-MODEL: adversary-not-in-scope` (§7/§9). A caller admitted to an internal protocol only by its service ACL is covered by the service ACL entry above.
 - **Key names visible to a principal who can list the bucket or an ancestor directory, despite a per-key ACL that denies READ** (for example through `listKeys`, a recursive `listStatus`, or a snapshot diff of the bucket): `KNOWN-NON-FINDING`. Per-key and prefix ACLs control reading and changing a key; they do not hide the key from those listings, which return its name and key info such as size and modification time. S3 requests with STS credentials are the exception: their listings check READ on the listed prefix. Which right (READ or LIST) a bucket-level listing requires is a consistency question, not a §8 break. *(maintainer, smengcl, 2026-10.)*
+- **A Datanode misreports its own replicas** (state, BCSID, origin, size, key count) **so that SCM keeps, replicates or deletes replicas**: `OUT-OF-MODEL: adversary-not-in-scope` (§7/§9). This covers what a Datanode reports about itself under its own identity. *(maintainer, smengcl, 2026-10.)*
 - **Findings in `ozone-thirdparty`, `integration-test-*`, `*TestImpl`** —
   `OUT-OF-MODEL: unsupported-component` (§3).
 - **KDC/KMS/Ranger/SCM-CA-key compromise scenarios** — out of layer (§3/§7).
@@ -401,7 +404,7 @@ list. *(requested by jojochuang, 2026-06-25.)*
 | `VALID` | A §8 property breaks in secure mode, via an in-scope actor. | §8, §6, §7 |
 | `VALID-HARDENING` | No §8 break, but a §11 misuse is too easy to fall into. | §11 |
 | `OUT-OF-MODEL: trusted-input` | Requires control of operator config (Ranger/object ACL, service-protocol ACLs, keys). | §6/§10 |
-| `OUT-OF-MODEL: adversary-not-in-scope` | Needs KDC/CA-key/Byzantine-majority, or an admin or service peer acting against availability. | §7 |
+| `OUT-OF-MODEL: adversary-not-in-scope` | Needs KDC/CA-key/Byzantine-majority, a Datanode misreporting its own replicas, or an admin or service peer acting against availability. | §7 |
 | `OUT-OF-MODEL: non-default-build` | Only in non-secure mode (or a discouraged knob). | §5a |
 | `OUT-OF-MODEL: unsupported-component` | thirdparty / test / infra Ozone doesn't own. | §3 |
 | `BY-DESIGN: property-disclaimed` | Non-secure mode, policy correctness, dependency security, load by volume, use within granted limits. | §9 |
