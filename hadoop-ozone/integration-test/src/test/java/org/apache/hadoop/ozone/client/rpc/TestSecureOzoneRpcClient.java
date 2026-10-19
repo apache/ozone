@@ -111,6 +111,16 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
 
+  // An AWS Signature V4 string to sign, its signature and the secret that produces it, for the S3 auth tests.
+  private static final String S3_STRING_TO_SIGN = "AWS4-HMAC-SHA256\n" +
+      "20150830T123600Z\n" +
+      "20150830/us-east-1/iam/aws4_request\n" +
+      "f536975d06c0309214f805bb90ccff089219ecd68b2" +
+      "577efef23edd43b7e1a59";
+  private static final String S3_SIGNATURE = "5d672d79c15b13162d9279b0855cfba" +
+      "6789a8edb4c82c400e06b5924a6f2b5d7";
+  private static final String S3_SECRET = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
+
   @TempDir
   private static File testDir;
   private static String keyProviderUri = "kms://http@localhost:9600/kms";
@@ -360,18 +370,6 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
 
     String volumeName = UUID.randomUUID().toString();
 
-    String strToSign = "AWS4-HMAC-SHA256\n" +
-        "20150830T123600Z\n" +
-        "20150830/us-east-1/iam/aws4_request\n" +
-        "f536975d06c0309214f805bb90ccff089219ecd68b2" +
-        "577efef23edd43b7e1a59";
-
-    String signature =  "5d672d79c15b13162d9279b0855cfba" +
-        "6789a8edb4c82c400e06b5924a6f2b5d7";
-
-    String secret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
-
-
     String accessKey = UserGroupInformation.getCurrentUser().getUserName();
 
     S3SecretManager s3SecretManager = getCluster().getOzoneManager()
@@ -379,7 +377,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
 
     // Add secret to S3Secret table.
     s3SecretManager.storeSecret(accessKey,
-        S3SecretValue.of(accessKey, secret));
+        S3SecretValue.of(accessKey, S3_SECRET));
 
     OMRequest writeRequest = OMRequest.newBuilder()
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
@@ -391,7 +389,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
             .build())
         .setS3Authentication(S3Authentication.newBuilder()
             .setAccessId(accessKey)
-            .setSignature(signature).setStringToSign(strToSign))
+            .setSignature(S3_SIGNATURE).setStringToSign(S3_STRING_TO_SIGN))
         .build();
 
     GenericTestUtils.waitFor(() -> getCluster().getOzoneManager().isLeaderReady(),
@@ -411,7 +409,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
             .setVolumeName(volumeName).build())
         .setS3Authentication(S3Authentication.newBuilder()
             .setAccessId(accessKey)
-            .setSignature(signature).setStringToSign(strToSign))
+            .setSignature(S3_SIGNATURE).setStringToSign(S3_STRING_TO_SIGN))
         .build();
 
     omResponse = getCluster().getOzoneManager().getOmServerProtocol()
@@ -463,16 +461,8 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
       out.write(data);
     }
 
-    String strToSign = "AWS4-HMAC-SHA256\n" +
-        "20150830T123600Z\n" +
-        "20150830/us-east-1/iam/aws4_request\n" +
-        "f536975d06c0309214f805bb90ccff089219ecd68b2" +
-        "577efef23edd43b7e1a59";
-    String signature = "5d672d79c15b13162d9279b0855cfba" +
-        "6789a8edb4c82c400e06b5924a6f2b5d7";
-    String secret = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
     String accessKey = UserGroupInformation.getCurrentUser().getUserName();
-    getCluster().getOzoneManager().getS3SecretManager().storeSecret(accessKey, S3SecretValue.of(accessKey, secret));
+    getCluster().getOzoneManager().getS3SecretManager().storeSecret(accessKey, S3SecretValue.of(accessKey, S3_SECRET));
 
     OzoneConfiguration readConf = new OzoneConfiguration(getCluster().getConf());
     OzoneClientConfig clientConfig = readConf.getObject(OzoneClientConfig.class);
@@ -480,7 +470,7 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     readConf.setFromObject(clientConfig);
     try (OzoneClient readClient = OzoneClientFactory.getRpcClient(readConf)) {
       ClientProtocol proxy = readClient.getProxy();
-      proxy.setThreadLocalS3Auth(new S3Auth(strToSign, signature, accessKey, accessKey));
+      proxy.setThreadLocalS3Auth(new S3Auth(S3_STRING_TO_SIGN, S3_SIGNATURE, accessKey, accessKey));
       proxy.setThreadLocalReadConsistency(ReadConsistency.LINEARIZABLE_LEADER_ONLY);
       try (OzoneInputStream in = readClient.getObjectStore().getVolume(volumeName).getBucket(bucketName)
           .readKey(keyName)) {
