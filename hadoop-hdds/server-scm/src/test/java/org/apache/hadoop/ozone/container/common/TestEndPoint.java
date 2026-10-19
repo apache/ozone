@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.RETURNS_MOCKS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -528,7 +529,9 @@ public class TestEndPoint {
     try (EndpointStateMachine rpcEndpoint = new EndpointStateMachine(
         new HostAndPort(serverAddress.getHostName(), serverAddress.getPort()),
         scm, conf, "")) {
-      DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
+      DatanodeStateMachine datanode = mock(DatanodeStateMachine.class, RETURNS_MOCKS);
+      when(datanode.getDatanodeDetails()).thenReturn(datanodeDetails);
+      when(datanode.getVersionManager()).thenReturn(versionManager);
       StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
       HostAndPort otherScm = new HostAndPort("other-scm", 9861);
       context.addEndpoint(rpcEndpoint.getAddress());
