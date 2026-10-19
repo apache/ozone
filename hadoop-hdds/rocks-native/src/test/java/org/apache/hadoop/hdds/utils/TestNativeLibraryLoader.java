@@ -88,8 +88,10 @@ public class TestNativeLibraryLoader {
           .thenReturn(new ByteArrayInputStream(new byte[]{0, 1, 2, 3}));
       String dummyLibraryName = "dummy_lib";
       List<String> dependencies = Arrays.asList("dep1", "dep2");
-      File absDir = new File(nativeLibraryDirectoryLocation == null ? "" : nativeLibraryDirectoryLocation)
-          .getAbsoluteFile();
+      // Without NATIVE_LIB_TMP_DIR the library goes to java.io.tmpdir, not the working directory.
+      File absDir = nativeLibraryDirectoryLocation == null || nativeLibraryDirectoryLocation.isEmpty()
+          ? new File(System.getProperty("java.io.tmpdir")).getAbsoluteFile()
+          : new File(nativeLibraryDirectoryLocation).getAbsoluteFile();
 
       NativeLibraryLoader.getInstance().loadLibrary(dummyLibraryName, dependencies);
 

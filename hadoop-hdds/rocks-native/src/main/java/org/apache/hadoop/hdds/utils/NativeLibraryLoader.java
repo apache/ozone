@@ -29,7 +29,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.io.FileUtils;
@@ -165,13 +164,13 @@ public class NativeLibraryLoader {
         return Pair.of(Optional.empty(), null);
       }
 
-      final String nativeLibDir =
-          Objects.nonNull(getSystemProperty(NATIVE_LIB_TMP_DIR)) ?
-              getSystemProperty(NATIVE_LIB_TMP_DIR) : "";
-      final File dir = new File(nativeLibDir).getAbsoluteFile();
+      final String nativeLibDir = getSystemProperty(NATIVE_LIB_TMP_DIR);
 
-      // create a temporary dir to copy the library to
-      final Path tempPath = Files.createTempDirectory(dir.toPath(), libraryName);
+      // create a temporary dir to copy the library to, under java.io.tmpdir unless NATIVE_LIB_TMP_DIR is set,
+      // since the working directory may not be writable.
+      final Path tempPath = nativeLibDir == null || nativeLibDir.isEmpty()
+          ? Files.createTempDirectory(libraryName)
+          : Files.createTempDirectory(new File(nativeLibDir).getAbsoluteFile().toPath(), libraryName);
       final File tempDir = tempPath.toFile();
       if (!tempDir.exists()) {
         return Pair.of(Optional.empty(), null);
