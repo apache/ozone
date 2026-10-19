@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
@@ -89,6 +90,16 @@ public class TestNodeStateManager {
     eventPublisher = new MockEventPublisher();
     clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
     nsm = new NodeStateManager(conf, eventPublisher, clusterMap, scmContext);
+  }
+
+  @Test
+  public void testTracing() {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestNodeStateManager")) {
+      nsm.run();
+
+      assertThat(spans.named("NodeStateManager.healthCheck")).hasSize(1)
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+    }
   }
 
   @Test

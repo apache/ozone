@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,7 +161,8 @@ public abstract class UnhealthyReplicationProcessor<HealthResult extends
     try {
       while (!Thread.currentThread().isInterrupted()) {
         if (replicationManager.shouldRun()) {
-          processAll(replicationManager.getQueue());
+          TracingUtil.executeInSpan(TracingUtil.createInternalSpan(getClass().getSimpleName()),
+              () -> processAll(replicationManager.getQueue()));
         }
 
         final Duration duration = interval.get();

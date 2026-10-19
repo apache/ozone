@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeUsageInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -192,7 +193,7 @@ public class ContainerBalancerTask implements Runnable {
             " balancing.", delayDuration);
         Thread.sleep(Duration.ofSeconds(delayDuration).toMillis());
       }
-      balance();
+      TracingUtil.executeInSpan(TracingUtil.createInternalSpan("ContainerBalancerTask"), this::balance);
     } catch (Exception e) {
       LOG.error("Container Balancer is stopped abnormally, ", e);
       recordStopReason(ContainerBalancerStopReason.ERROR,

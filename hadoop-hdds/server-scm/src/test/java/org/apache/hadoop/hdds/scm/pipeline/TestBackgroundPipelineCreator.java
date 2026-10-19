@@ -17,11 +17,16 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Clock;
 import java.util.List;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -30,7 +35,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -113,4 +120,26 @@ public class TestBackgroundPipelineCreator {
     assertTrue(configs.isEmpty());
   }
 
+  @Test
+  public void testTracing() throws Exception {
+    SCMContext scmContext = mock(SCMContext.class);
+    when(scmContext.isLeader()).thenReturn(true);
+    when(scmContext.threadNamePrefix()).thenReturn("");
+    PipelineManager pipelineManager = mock(PipelineManager.class);
+    when(pipelineManager.createPipeline(any())).thenThrow(new IOException("no datanodes"));
+    BackgroundPipelineCreator creator =
+        new BackgroundPipelineCreator(pipelineManager, new OzoneConfiguration(), scmContext, Clock.systemUTC());
+    try (TestSpanCollector spans = TestSpanCollector.install("TestBackgroundPipelineCreator")) {
+      creator.start();
+      try {
+        creator.notifyEventTriggered(NEW_NODE_HANDLER_TRIGGERED);
+        GenericTestUtils.waitFor(() -> !spans.named("RatisPipelineUtilsThread").isEmpty(), 10, 3000);
+      } finally {
+        creator.stop();
+      }
+
+      assertThat(spans.named("RatisPipelineUtilsThread"))
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+    }
+  }
 }

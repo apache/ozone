@@ -470,13 +470,13 @@ public final class TracingUtil {
    *
    * @return the value returned by {@code supplier}
    */
-  private static <R, E extends Exception> R executeInSpan(Span span,
+  public static <R, E extends Exception> R executeInSpan(Span span,
       CheckedSupplier<R, E> supplier) throws E {
     try (Scope ignored = span.makeCurrent()) {
       return supplier.get();
     } catch (Exception ex) {
       span.addEvent("Failed with exception: " + ex.getMessage());
-      span.setStatus(StatusCode.ERROR);
+      span.setStatus(StatusCode.ERROR).recordException(ex);
       throw ex;
     } finally {
       span.end();
@@ -486,13 +486,13 @@ public final class TracingUtil {
   /**
    * Execute {@code runnable} in the given {@code span}.
    */
-  private static <E extends Exception> void executeInSpan(Span span,
+  public static <E extends Exception> void executeInSpan(Span span,
       CheckedRunnable<E> runnable) throws E {
     try (Scope ignored = span.makeCurrent()) {
       runnable.run();
     } catch (Exception ex) {
       span.addEvent("Failed with exception: " + ex.getMessage());
-      span.setStatus(StatusCode.ERROR);
+      span.setStatus(StatusCode.ERROR).recordException(ex);
       throw ex;
     } finally {
       span.end();

@@ -53,6 +53,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -102,6 +103,16 @@ public class TestDatanodeAdminMonitor {
     monitor.startMonitoring(dn);
     assertEquals(1, monitor.getPendingCount());
     assertEquals(0, monitor.getCancelledCount());
+  }
+
+  @Test
+  public void testTracing() {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestDatanodeAdminMonitor")) {
+      monitor.run();
+
+      assertThat(spans.named("DatanodeAdminMonitor")).hasSize(1)
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+    }
   }
 
   /**

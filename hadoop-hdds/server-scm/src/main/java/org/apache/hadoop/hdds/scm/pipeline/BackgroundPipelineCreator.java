@@ -47,6 +47,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMService;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -176,7 +177,7 @@ public class BackgroundPipelineCreator implements SCMService {
   private void run() {
     while (running.get()) {
       if (shouldRun()) {
-        createPipelines();
+        TracingUtil.executeInSpan(TracingUtil.createInternalSpan(threadName), this::createPipelines);
       }
 
       try {

@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,7 +146,8 @@ public class SCMSafeModeManager implements SafeModeManager {
       try {
         while (getInSafeMode()) {
           Thread.sleep(refreshIntervalMs);
-          runRefreshAndValidate();
+          TracingUtil.executeInSpan(TracingUtil.createInternalSpan("SafeModeRuleRefresh"),
+              this::runRefreshAndValidate);
         }
       } catch (InterruptedException e) {
         LOG.info("Interrupted {}", name, e);

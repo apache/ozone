@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.any;
@@ -35,6 +36,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult.UnderReplicatedHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -131,4 +134,21 @@ public class TestUnderReplicatedProcessor {
     assertEquals(1, rmMetrics.getPendingReplicationLimitReachedTotal());
   }
 
+  @Test
+  public void testTracing() throws Exception {
+    when(replicationManager.getQueue()).thenReturn(queue);
+    try (TestSpanCollector spans = TestSpanCollector.install("TestUnderReplicatedProcessor")) {
+      Thread processorThread = new Thread(underReplicatedProcessor);
+      processorThread.start();
+      try {
+        GenericTestUtils.waitFor(() -> !spans.named("UnderReplicatedProcessor").isEmpty(), 10, 3000);
+      } finally {
+        processorThread.interrupt();
+        processorThread.join();
+      }
+
+      assertThat(spans.named("UnderReplicatedProcessor"))
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+    }
+  }
 }

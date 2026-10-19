@@ -68,6 +68,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -287,6 +288,10 @@ public class RootCARotationManager extends StatefulService<CertInfoProto> {
 
     @Override
     public void run() {
+      TracingUtil.executeInSpan(TracingUtil.createInternalSpan("MonitorTask"), this::doRun);
+    }
+
+    private void doRun() {
       Thread.currentThread().setName(threadName +
           (isRunning() ? "-Active" : "-Inactive"));
       if (!isRunning.get()) {
@@ -357,6 +362,10 @@ public class RootCARotationManager extends StatefulService<CertInfoProto> {
 
     @Override
     public void run() {
+      TracingUtil.executeInSpan(TracingUtil.createInternalSpan("RotationTask"), this::doRun);
+    }
+
+    private void doRun() {
       if (!isRunning.get()) {
         isProcessing.set(false);
         processStartTime.set(null);
@@ -511,6 +520,10 @@ public class RootCARotationManager extends StatefulService<CertInfoProto> {
 
     @Override
     public void run() {
+      TracingUtil.executeInSpan(TracingUtil.createInternalSpan("SubCARotationPrepareTask"), this::doRun);
+    }
+
+    private void doRun() {
       // Lock to protect the sub CA certificate rotation preparation process,
       // to make sure there is only one task is ongoing at one time.
       // Sub CA rotation preparation steps:
@@ -651,6 +664,10 @@ public class RootCARotationManager extends StatefulService<CertInfoProto> {
 
     @Override
     public void run() {
+      TracingUtil.executeInSpan(TracingUtil.createInternalSpan("WaitSubCARotationPrepareAckTask"), this::doRun);
+    }
+
+    private void doRun() {
       checkInterruptState();
       if (!isRunning()) {
         LOG.info("SCM is not leader anymore. Delete the in-progress " +

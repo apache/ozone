@@ -18,6 +18,9 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,6 +50,7 @@ import org.apache.hadoop.hdds.scm.node.NodeDecommissionMetrics.ContainerStateInW
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -225,7 +229,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
    */
   @Override
   public void run() {
-    try {
+    Span span = TracingUtil.createInternalSpan("DatanodeAdminMonitor");
+    try (Scope ignored = span.makeCurrent()) {
       containerStateByHost.clear();
       synchronized (this) {
         trackedRecommission = getCancelledCount();
@@ -241,9 +246,12 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       }
       setMetricsToGauge();
     } catch (Exception e) {
+      span.recordException(e).setStatus(StatusCode.ERROR);
       LOG.error("Caught an error in the DatanodeAdminMonitor", e);
       // Intentionally do not re-throw, as if we do the monitor thread
       // will not get rescheduled.
+    } finally {
+      span.end();
     }
   }
 

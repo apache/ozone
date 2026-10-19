@@ -89,6 +89,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
@@ -1043,7 +1044,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private synchronized void run() {
     try {
       while (running) {
-        processAll();
+        TracingUtil.executeInSpan(TracingUtil.createInternalSpan("ReplicationManager"), this::processAll);
         wait(rmConf.getInterval().toMillis());
       }
     } catch (Throwable t) {

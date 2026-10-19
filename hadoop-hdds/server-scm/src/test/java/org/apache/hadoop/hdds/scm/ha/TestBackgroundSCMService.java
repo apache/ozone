@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doNothing;
@@ -30,6 +31,8 @@ import java.time.ZoneOffset;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,5 +111,20 @@ public class TestBackgroundSCMService {
       backgroundSCMService.runImmediately();
     }
     verify(pipelineManager, timeout(3000).atLeastOnce()).scrubPipelines();
+  }
+
+  @Test
+  public void testTracing() throws Exception {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestBackgroundSCMService")) {
+      synchronized (backgroundSCMService) {
+        backgroundSCMService.notifyStatusChanged();
+        testClock.fastForward(60000);
+        backgroundSCMService.runImmediately();
+      }
+      GenericTestUtils.waitFor(() -> !spans.named("testBackgroundService").isEmpty(), 10, 3000);
+
+      assertThat(spans.named("testBackgroundService"))
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+    }
   }
 }

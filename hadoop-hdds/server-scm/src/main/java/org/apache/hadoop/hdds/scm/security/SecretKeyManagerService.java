@@ -20,6 +20,9 @@ package org.apache.hadoop.hdds.scm.security;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +38,7 @@ import org.apache.hadoop.hdds.security.symmetric.SecretKeyConfig;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyState;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyStore;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,11 +96,15 @@ public class SecretKeyManagerService implements SCMService, Runnable {
         // Asynchronously initialize SecretKeys for first time leader.
         if (!secretKeyManager.isInitialized()) {
           scheduler.schedule(() -> {
-            try {
+            Span span = TracingUtil.createInternalSpan(SERVICE_NAME);
+            try (Scope ignored = span.makeCurrent()) {
               secretKeyManager.checkAndInitialize();
             } catch (Exception e) {
+              span.recordException(e).setStatus(StatusCode.ERROR);
               throw new RuntimeException(
                   "Error replicating initialized state.", e);
+            } finally {
+              span.end();
             }
           }, 0, TimeUnit.SECONDS);
         }
@@ -126,10 +134,14 @@ public class SecretKeyManagerService implements SCMService, Runnable {
       return;
     }
 
-    try {
+    Span span = TracingUtil.createInternalSpan(SERVICE_NAME);
+    try (Scope ignored = span.makeCurrent()) {
       secretKeyManager.checkAndRotate(false);
     } catch (Exception e) {
+      span.recordException(e).setStatus(StatusCode.ERROR);
       LOG.error("Error occurred when updating SecretKeys.", e);
+    } finally {
+      span.end();
     }
   }
 

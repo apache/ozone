@@ -58,6 +58,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
@@ -672,7 +673,8 @@ public class NodeStateManager implements Runnable, Closeable {
       LOG.info("Detected long delay in scheduling HB processing thread. "
           + "Skipping heartbeat checks for one iteration.");
     } else {
-      checkNodesHealth();
+      TracingUtil.executeInSpan(TracingUtil.createInternalSpan("NodeStateManager.healthCheck"),
+          this::checkNodesHealth);
     }
 
     // we purposefully make this non-deterministic. Instead of using a

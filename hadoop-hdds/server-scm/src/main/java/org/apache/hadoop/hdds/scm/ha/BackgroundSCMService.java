@@ -18,10 +18,14 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.annotations.VisibleForTesting;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.time.Clock;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,11 +98,15 @@ public final class BackgroundSCMService implements SCMService {
     while (running.get()) {
       try {
         if (shouldRun()) {
-          try {
+          Span span = TracingUtil.createInternalSpan(serviceName);
+          try (Scope ignored = span.makeCurrent()) {
             periodicalTask.run();
           } catch (Throwable e) {
+            span.recordException(e).setStatus(StatusCode.ERROR);
             log.error("Caught Unhandled exception in {}. The task will be " +
                 "re-tried in {}ms", getServiceName(), intervalInMillis, e);
+          } finally {
+            span.end();
           }
         }
         synchronized (this) {
