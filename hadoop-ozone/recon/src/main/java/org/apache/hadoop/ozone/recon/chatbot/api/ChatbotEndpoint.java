@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.chatbot.api;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +44,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
+import org.apache.hadoop.ozone.recon.chatbot.agent.ChatHistoryBuilder;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotAgent;
 import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
 import org.slf4j.Logger;
@@ -191,13 +193,18 @@ public class ChatbotEndpoint {
     // Submit chatbot work to the dedicated pool and block the Jetty thread with
     // a hard timeout. At most poolSize Jetty threads are ever blocked on chatbot
     // work; requests beyond pool+queue capacity are rejected immediately.
+    // Map the client-supplied (untrusted) history into the agent's turn type once,
+    // so the value captured by the executor task is effectively final.
+    List<ChatHistoryBuilder.HistoryTurn> history = toHistoryTurns(request.getHistory());
+
     Future<String> future;
     try {
       future = chatbotExecutor.submit(() ->
           chatbotAgent.processQuery(
               request.getQuery(),
               request.getModel(),
-              request.getProvider()));
+              request.getProvider(),
+              history));
     } catch (RejectedExecutionException e) {
       LOG.warn("Chatbot request rejected — thread pool and queue are full");
       return Response.status(Response.Status.SERVICE_UNAVAILABLE)
@@ -291,6 +298,24 @@ public class ChatbotEndpoint {
         userId.substring(userId.length() - 2);
   }
 
+  /**
+   * Converts the client-supplied conversation history into the agent's turn type.
+   * Returns {@code null} when there is no history. Trimming, filtering, and budget
+   * enforcement happen later in {@code ChatHistoryBuilder}; this is a pure mapping.
+   */
+  private List<ChatHistoryBuilder.HistoryTurn> toHistoryTurns(List<ChatTurn> turns) {
+    if (turns == null || turns.isEmpty()) {
+      return null;
+    }
+    List<ChatHistoryBuilder.HistoryTurn> mapped = new ArrayList<>(turns.size());
+    for (ChatTurn turn : turns) {
+      if (turn != null) {
+        mapped.add(new ChatHistoryBuilder.HistoryTurn(turn.getRole(), turn.getContent()));
+      }
+    }
+    return mapped;
+  }
+
   // =========================================================================
   // Data Transfer Objects (DTOs)
   // These are simple classes that translate JSON into Java objects and vice versa.
@@ -307,6 +332,7 @@ public class ChatbotEndpoint {
     private String model;
     private String provider;
     private String userId;
+    private List<ChatTurn> history;
 
     public String getQuery() {
       return query;
@@ -338,6 +364,41 @@ public class ChatbotEndpoint {
 
     public void setUserId(String userId) {
       this.userId = userId;
+    }
+
+    public List<ChatTurn> getHistory() {
+      return history;
+    }
+
+    public void setHistory(List<ChatTurn> history) {
+      this.history = history;
+    }
+  }
+
+  /**
+   * A single prior conversation turn resent by the client for context (V1 memory).
+   * {@code role} is expected to be {@code user} or {@code assistant}; the server
+   * treats these as untrusted hints and trims/validates them before use.
+   */
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class ChatTurn {
+    private String role;
+    private String content;
+
+    public String getRole() {
+      return role;
+    }
+
+    public void setRole(String role) {
+      this.role = role;
+    }
+
+    public String getContent() {
+      return content;
+    }
+
+    public void setContent(String content) {
+      this.content = content;
     }
   }
 

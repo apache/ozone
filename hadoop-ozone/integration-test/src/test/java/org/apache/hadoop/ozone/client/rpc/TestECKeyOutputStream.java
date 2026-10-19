@@ -225,9 +225,11 @@ public class TestECKeyOutputStream {
       OmKeyLocationInfo omKeyLocationInfo = locationInfoList.get(0);
       long containerId = omKeyLocationInfo.getContainerID();
       Pipeline pipeline = omKeyLocationInfo.getPipeline();
-      DatanodeDetails dnWithReplicaIndex1 =
-          pipeline.getReplicaIndexes().entrySet().stream().filter(e -> e.getValue() == 1).map(Map.Entry::getKey)
-              .findFirst().get();
+      DatanodeDetails dnWithReplicaIndex1 = pipeline.getReplicaIndexes().entrySet().stream()
+          .filter(e -> e.getValue() == 1)
+          .map(Map.Entry::getKey)
+          .findFirst()
+          .get();
       Mockito.when(handlers.get(dnWithReplicaIndex1.getUuidString()).getDatanodeId())
           .thenAnswer(i -> {
             if (!failed.get()) {
@@ -403,7 +405,7 @@ public class TestECKeyOutputStream {
     final OzoneBucket bucket = getOzoneBucket();
     String keyName =
         String.format("testMultipleChunksInSingleWriteOpOffset" +
-                "%dBufferChunks%dNumChunks", offset, bufferChunks,
+                "%dBufferChunks%dNumChunks%d", offset, bufferChunks,
             numChunks);
     try (OzoneOutputStream out = bucket.createKey(keyName, 4096,
         new ECReplicationConfig(3, 2, ECReplicationConfig.EcCodec.RS,

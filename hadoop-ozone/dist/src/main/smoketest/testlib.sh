@@ -30,8 +30,9 @@ run_rebot() {
   #Should be writeable from the docker containers where user is different.
   chmod a+wx "${tempdir}"
   if docker run --rm -v "${input_dir}":/rebot-input -v "${tempdir}":/rebot-output -w /rebot-input \
+      --entrypoint bash \
       $(get_runner_image_spec) \
-      bash -c "rebot --nostatusrc -d /rebot-output $@"; then
+      -c "rebot --nostatusrc -d /rebot-output $@"; then
     mv -v "${tempdir}"/* "${output_dir}"/
   fi
   rmdir "${tempdir}"

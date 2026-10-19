@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
@@ -158,6 +157,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
@@ -494,12 +494,16 @@ public class TestSnapshotDiffManager {
       Set<Long> oldParentIds = Sets.newHashSet();
       Set<Long> newParentIds = Sets.newHashSet();
 
+      SnapshotDiffJob dummyJob = new SnapshotDiffJob(System.currentTimeMillis(),
+          "", IN_PROGRESS, VOLUME_NAME, BUCKET_NAME, "from", "to", false, false, 0, null, 0.0, "");
+      db.get().put(snapDiffJobTable, codecRegistry.asRawData(""), codecRegistry.asRawData(dummyJob));
+
       snapshotDiffManager.addToObjectIdMap(toSnapshotTable,
           fromSnapshotTable, Sets.newHashSet(Paths.get("dummy.sst")),
           nativeLibraryLoaded, oldObjectIdKeyMap, newObjectIdKeyMap,
           objectIdsToCheck, Optional.of(oldParentIds),
           Optional.of(newParentIds),
-          new TablePrefixInfo(ImmutableMap.of(DIRECTORY_TABLE, "0", KEY_TABLE, "0", FILE_TABLE, "0")), "");
+          new TablePrefixInfo(ImmutableMap.of(DIRECTORY_TABLE, "0", KEY_TABLE, "0", FILE_TABLE, "0")), "", "");
 
       try (ClosableIterator<Map.Entry<byte[], byte[]>> oldObjectIdIter =
                oldObjectIdKeyMap.iterator()) {
@@ -555,7 +559,6 @@ public class TestSnapshotDiffManager {
         new SnapshotTestUtils.StubbedPersistentMap<>();
     Map<Long, SnapshotDiffReport.DiffType> diffMap = new HashMap<>();
     AtomicInteger count = new AtomicInteger(0);
-    AtomicInteger maxIndex = new AtomicInteger(0);
     LongStream.range(0, 100).forEach(objectId -> {
       try {
         String key = "key" + objectId;
@@ -593,7 +596,6 @@ public class TestSnapshotDiffManager {
         }
         if (objectId >= 0 && objectId <= 25 && objectId % 4 == 2) {
           diffMap.put(objectId, SnapshotDiffReport.DiffType.MODIFY);
-          maxIndex.set(count.get());
           count.getAndIncrement();
         }
       } catch (IOException e) {
@@ -655,16 +657,16 @@ public class TestSnapshotDiffManager {
       assertEquals(100, totalDiffEntries.getKey());
       SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, "jobId",
           JobStatus.DONE, "vol", "buck", "fs", "ts", false,
-          true, diffMap.size(), null, 0.0, "jobId-4" + leftPad(String.valueOf(maxIndex.get()), 20, '0'));
+          true, diffMap.size(), null, 0.0, totalDiffEntries.getRight());
       SnapshotDiffReportOzone snapshotDiffReportOzone =
           snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
               "buck", "fs", "ts",
               "", Integer.MAX_VALUE);
       Set<SnapshotDiffReport.DiffType> expectedOrder = new LinkedHashSet<>();
       expectedOrder.add(SnapshotDiffReport.DiffType.DELETE);
+      expectedOrder.add(SnapshotDiffReport.DiffType.MODIFY);
       expectedOrder.add(SnapshotDiffReport.DiffType.RENAME);
       expectedOrder.add(SnapshotDiffReport.DiffType.CREATE);
-      expectedOrder.add(SnapshotDiffReport.DiffType.MODIFY);
 
       Set<SnapshotDiffReport.DiffType> actualOrder = new LinkedHashSet<>();
       for (DiffReportEntry entry :
@@ -719,7 +721,7 @@ public class TestSnapshotDiffManager {
       }
     }
     List<SnapshotDiffReport.DiffType> orderedList = Arrays.asList(SnapshotDiffReport.DiffType.DELETE,
-        SnapshotDiffReport.DiffType.RENAME, SnapshotDiffReport.DiffType.CREATE, SnapshotDiffReport.DiffType.MODIFY);
+        SnapshotDiffReport.DiffType.MODIFY, SnapshotDiffReport.DiffType.RENAME, SnapshotDiffReport.DiffType.CREATE);
 
     indexList.sort((idx1, idx2) -> {
       if (typeMap.get(idx1) != typeMap.get(idx2)) {
@@ -770,6 +772,39 @@ public class TestSnapshotDiffManager {
               Integer.parseInt(snapshotDiffReportOzone.getToken().substring(1)),
           idx == indexList.size() ? null : indexList.get(idx));
     }
+  }
+
+  @Test
+  public void testCreatePageResponseDependencyOrderedReportKeys() throws Exception {
+    String testJobId = "dependencyJob";
+    int totalNumberOfRecords = 3;
+    List<String> orderedIndexTokens = new ArrayList<>();
+    for (int idx = 0; idx < totalNumberOfRecords; idx++) {
+      String indexToken = org.apache.commons.lang3.StringUtils.leftPad(String.valueOf(idx), 21, '0');
+      orderedIndexTokens.add(indexToken);
+      String reportEntryKey = SnapshotDiffManager.getReportKeyForIndex(testJobId, indexToken);
+      db.get().put(snapDiffReportTable,
+          codecRegistry.asRawData(reportEntryKey),
+          codecRegistry.asRawData(getTestDiffEntry(testJobId, idx)));
+    }
+    String largestIndexToken = orderedIndexTokens.get(totalNumberOfRecords - 1);
+    SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, testJobId,
+        JobStatus.DONE, "vol", "buck", "fs", "ts", false,
+        true, totalNumberOfRecords, null, 0.0,
+        testJobId + DELIMITER + largestIndexToken);
+
+    SnapshotDiffReportOzone firstPage = snapshotDiffManager.createPageResponse(snapshotDiffJob,
+        "vol", "buck", "fs", "ts", "", 2);
+    assertEquals(2, firstPage.getDiffList().size());
+    assertEquals(getTestDiffEntry(testJobId, 0), firstPage.getDiffList().get(0));
+    assertEquals(getTestDiffEntry(testJobId, 1), firstPage.getDiffList().get(1));
+    assertEquals(orderedIndexTokens.get(2), firstPage.getToken());
+
+    SnapshotDiffReportOzone secondPage = snapshotDiffManager.createPageResponse(snapshotDiffJob,
+        "vol", "buck", "fs", "ts", firstPage.getToken(), 2);
+    assertEquals(1, secondPage.getDiffList().size());
+    assertEquals(getTestDiffEntry(testJobId, 2), secondPage.getDiffList().get(0));
+    assertNull(secondPage.getToken());
   }
 
   /**
@@ -1130,20 +1165,72 @@ public class TestSnapshotDiffManager {
 
     spy.loadJobsOnStartUp();
 
-    // Wait for sometime to make sure that job finishes.
-    attempt(() ->
-        verify(spy, atLeast(1))
-            .generateSnapshotDiffReport(anyString(), anyString(),
-                eq(VOLUME_NAME), eq(BUCKET_NAME), eq(snapshotInfo.getName()),
-                eq(snapshotInfoList.get(1).getName()), eq(false),
-                eq(false)),
-        10, TimeDuration.ONE_SECOND, null, null);
+    // Wait until the job's status is persisted as DONE. Mockito records the
+    // invocation before running the stubbed answer, so waiting on verify(...)
+    // alone can return while the answer is still executing and has not yet
+    // written DONE to the DB, leaving the read below to observe IN_PROGRESS.
+    attempt(() -> {
+      if (getSnapshotDiffJobFromDb(snapshotInfo, snapshotInfoList.get(1))
+          .getStatus() != DONE) {
+        throw new IllegalStateException("Snapshot diff job is not DONE yet.");
+      }
+      return null;
+    }, 10, TimeDuration.ONE_SECOND, null, null);
 
     SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(snapshotInfo,
         snapshotInfoList.get(1));
 
     assertEquals(DONE, snapDiffJob.getStatus());
     assertEquals(1L, snapDiffJob.getTotalDiffEntries());
+  }
+
+  @Test
+  public void testLoadJobsOnStartUpClearsPartialReportRows() throws Exception {
+    SnapshotDiffJob inProgressJob = snapDiffJobs.get(1);
+    assertEquals(IN_PROGRESS, inProgressJob.getStatus());
+    uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(1), inProgressJob);
+
+    SnapshotDiffJob doneJob = snapDiffJobs.get(2);
+    assertEquals(DONE, doneJob.getStatus());
+    uploadSnapshotDiffJobToDb(snapshotInfo, snapshotInfoList.get(2), doneJob);
+
+    String jobId = inProgressJob.getJobId();
+    String doneJobId = doneJob.getJobId();
+    DiffReportEntry legacyEntry = getTestDiffEntry(jobId, 0);
+    byte[] legacyEntryBytes = codecRegistry.asRawData(legacyEntry);
+    byte[] inProgressLegacyKey = codecRegistry.asRawData(
+        jobId + DELIMITER + "3" + org.apache.commons.lang3.StringUtils.leftPad("0", 20, '0'));
+    byte[] doneJobLegacyKey = codecRegistry.asRawData(
+        doneJobId + DELIMITER + "3" + org.apache.commons.lang3.StringUtils.leftPad("0", 20, '0'));
+    byte[] currentLayoutKey = codecRegistry.asRawData(
+        SnapshotDiffManager.getReportKeyForIndex(jobId, SnapshotDiffReport.DiffType.CREATE, 0));
+
+    db.get().put(snapDiffReportTable, inProgressLegacyKey, legacyEntryBytes);
+    db.get().put(snapDiffReportTable, doneJobLegacyKey, legacyEntryBytes);
+
+    DiffReportEntry createEntry = new DiffReportEntry(SnapshotDiffReport.DiffType.CREATE,
+        codecRegistry.asRawData("created-after-resume"));
+
+    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    doAnswer(invocation -> {
+      db.get().put(snapDiffReportTable, currentLayoutKey, codecRegistry.asRawData(createEntry));
+      return null;
+    }).when(spy).generateSnapshotDiffReport(anyString(), eq(jobId),
+        eq(VOLUME_NAME), eq(BUCKET_NAME), eq(snapshotInfo.getName()),
+        eq(snapshotInfoList.get(1).getName()), eq(false), eq(false));
+
+    spy.loadJobsOnStartUp();
+
+    attempt(() -> {
+      if (db.get().get(snapDiffReportTable, currentLayoutKey) == null) {
+        throw new IllegalStateException("Resumed job has not written the CREATE report row yet.");
+      }
+      return null;
+    }, 10, TimeDuration.ONE_SECOND, null, null);
+
+    assertNull(db.get().get(snapDiffReportTable, inProgressLegacyKey));
+    assertNotNull(db.get().get(snapDiffReportTable, currentLayoutKey));
+    assertNotNull(db.get().get(snapDiffReportTable, doneJobLegacyKey));
   }
 
   private SnapshotDiffJob getSnapshotDiffJobFromDb(SnapshotInfo fromSnapshot,
@@ -1557,6 +1644,24 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
+  public void testUpdateJobStatusToDoneSkipsSupersededJob() throws IOException {
+    SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
+    String liveJobId = UUID.randomUUID().toString();
+    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey,
+        new SnapshotDiffJob(0L, liveJobId, IN_PROGRESS, ctx.volumeName, ctx.bucketName,
+            ctx.fromSnapshotName, ctx.toSnapshotName, false, false, 0L, null, 0.0, null));
+
+    // A superseded task's publish is ignored, the live job's own publish goes through.
+    snapshotDiffManager.updateJobStatusToDone(ctx.diffJobKey, UUID.randomUUID().toString(), 5L, "staleKey");
+    assertEquals(IN_PROGRESS, snapshotDiffManager.getSnapDiffJobTable().get(ctx.diffJobKey).getStatus());
+
+    snapshotDiffManager.updateJobStatusToDone(ctx.diffJobKey, liveJobId, 5L, "liveKey");
+    SnapshotDiffJob done = snapshotDiffManager.getSnapDiffJobTable().get(ctx.diffJobKey);
+    assertEquals(DONE, done.getStatus());
+    assertEquals("liveKey", done.getLargestEntryKey());
+  }
+
+  @Test
   public void testSubmitSnapshotDiffResubmitsWhenPreviouslyRejected()
       throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
@@ -1674,17 +1779,190 @@ public class TestSnapshotDiffManager {
         .containsExactlyElementsOf(expectedEntries);
   }
 
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("filterTopLevelDeletedEntryScenarios")
+  public void testHasDeletedAncestorsBatch(
+      String scenarioDescription,
+      List<WithParentObjectId> deletedEntries,
+      Set<Long> renamedDirectoryIds,
+      Map<Long, Long> objectIdToParentId,
+      Set<Long> expectedObjectIds) throws IOException {
+    long bucketObjectId = 0L;
+    Map<Long, Long> parentMap = objectIdToParentId != null
+        ? objectIdToParentId
+        : buildDirATreeParentMap(bucketObjectId);
+
+    List<WithParentObjectId> filteredDeletes = filterTopLevelDeletedEntriesBatch(
+        deletedEntries, renamedDirectoryIds, parentMap, bucketObjectId);
+
+    assertThat(filteredDeletes)
+        .extracting(WithParentObjectId::getObjectID)
+        .containsExactlyInAnyOrderElementsOf(expectedObjectIds);
+  }
+
+  private static Stream<Arguments> filterTopLevelDeletedEntryScenarios() {
+    long bucketObjectId = 0L;
+    OmDirectoryInfo dirA = newDeletedDir(100L, bucketObjectId);
+    OmDirectoryInfo dirB = newDeletedDir(101L, 100L);
+    OmDirectoryInfo dirC = newDeletedDir(102L, 101L);
+    OmDirectoryInfo dirD = newDeletedDir(103L, 101L);
+    OmKeyInfo fileA = newDeletedFile(104L, 102L);
+    OmKeyInfo fileUnderDirB = newDeletedFile(105L, 101L);
+    return Stream.of(
+        Arguments.of(
+            "full candidate set keeps only top-level deleted dirA",
+            Arrays.asList(dirA, dirB, dirC, fileA, dirD),
+            Collections.emptySet(),
+            null,
+            Sets.newHashSet(dirA.getObjectID())),
+        Arguments.of(
+            "partial DAG candidates with dirA dirD and fileA keep only dirA",
+            Arrays.asList(dirA, dirD, fileA),
+            Collections.emptySet(),
+            null,
+            Sets.newHashSet(dirA.getObjectID())),
+        Arguments.of(
+            "deleted dirB with partial candidates keeps only dirB",
+            Arrays.asList(dirB, dirD, fileA),
+            Collections.emptySet(),
+            null,
+            Sets.newHashSet(dirB.getObjectID())),
+        Arguments.of(
+            "sibling deleted dirs dirD and dirC suppress fileA under deleted dirC",
+            Arrays.asList(dirD, dirC, fileA),
+            Collections.emptySet(),
+            null,
+            Sets.newHashSet(dirD.getObjectID(), dirC.getObjectID())),
+        Arguments.of(
+            "unrelated deleted dirD and fileA are both kept",
+            Arrays.asList(dirD, fileA),
+            Collections.emptySet(),
+            null,
+            Sets.newHashSet(dirD.getObjectID(), fileA.getObjectID())),
+        Arguments.of(
+            "renamed dirB retains file delete when dirA is also deleted",
+            Arrays.asList(dirA, fileUnderDirB),
+            Sets.newHashSet(dirB.getObjectID()),
+            null,
+            Sets.newHashSet(dirA.getObjectID(), fileUnderDirB.getObjectID())),
+        Arguments.of(
+            "broken parent chain in live directory graph skips delete from report",
+            Collections.singletonList(fileA),
+            Collections.emptySet(),
+            ImmutableMap.of(102L, 101L),
+            Collections.emptySet()),
+        Arguments.of(
+            "delete with parent absent from live directory graph is skipped",
+            Collections.singletonList(newDeletedFile(104L, 999L)),
+            Collections.emptySet(),
+            null,
+            Collections.emptySet()));
+  }
+
   @Test
-  public void testGetSnapshotDiffReportReportOnlyInProgressIncludesProgressDetails()
-      throws IOException {
+  public void testHasDeletedAncestorsBatchRejectsNullArguments() {
+    long bucketObjectId = 0L;
+    OmDirectoryInfo dirA = newDeletedDir(100L, bucketObjectId);
+    List<Long> parentObjectIds = Collections.singletonList(dirA.getParentObjectID());
+
+    assertThrows(NullPointerException.class, () -> snapshotDiffManager
+        .hasDeletedAncestors(parentObjectIds, null, id -> false,
+            ids -> ids.stream().map(id -> dirA.getParentObjectID()).collect(Collectors.toList()),
+            bucketObjectId, new HashMap<>()));
+    assertThrows(NullPointerException.class, () -> snapshotDiffManager
+        .hasDeletedAncestors(parentObjectIds, id -> false, null,
+            ids -> ids.stream().map(id -> dirA.getParentObjectID()).collect(Collectors.toList()),
+            bucketObjectId, new HashMap<>()));
+  }
+
+  private static Map<Long, Long> buildDirATreeParentMap(long bucketObjectId) {
+    return ImmutableMap.<Long, Long>builder()
+        .put(100L, bucketObjectId)
+        .put(101L, 100L)
+        .put(102L, 101L)
+        .put(103L, 101L)
+        .put(104L, 102L)
+        .put(105L, 101L)
+        .build();
+  }
+
+  private List<WithParentObjectId> filterTopLevelDeletedEntriesBatch(
+      List<WithParentObjectId> deletedEntries, Set<Long> renamedDirectoryIds,
+      Map<Long, Long> objectIdToParentId, long bucketObjectId) throws IOException {
+    List<Long> parentObjectIds = deletedEntries.stream()
+        .map(WithParentObjectId::getParentObjectID)
+        .collect(Collectors.toList());
+    Set<Long> deletedDirectoryIds = deletedEntries.stream()
+        .filter(OmDirectoryInfo.class::isInstance)
+        .map(WithParentObjectId::getObjectID)
+        .collect(Collectors.toSet());
+    boolean[] hasDeletedAncestor = snapshotDiffManager.hasDeletedAncestors(parentObjectIds,
+        deletedDirectoryIds::contains, renamedDirectoryIds::contains,
+        objectIds -> objectIds.stream().map(objectIdToParentId::get).collect(Collectors.toList()),
+        bucketObjectId, new HashMap<>());
+    List<WithParentObjectId> filteredDeletes = new ArrayList<>();
+    for (int i = 0; i < deletedEntries.size(); i++) {
+      if (!hasDeletedAncestor[i]) {
+        filteredDeletes.add(deletedEntries.get(i));
+      }
+    }
+    return filteredDeletes;
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = SnapshotDiffResponse.SubStatus.class,
+      names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO", "OBJECT_ID_MAP_GEN_FSO_DIR",
+          "OBJECT_ID_MAP_GEN_FSO_FILE"})
+  public void testGetSnapshotDiffReportReportOnlyInProgressIncludesProgressDetails(
+      SnapshotDiffResponse.SubStatus subStatus) throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
         IN_PROGRESS, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
-        false, false, 0L, SnapshotDiffResponse.SubStatus.OBJECT_ID_MAP_GEN_OBS, 55.5, null);
+        false, false, 0L, subStatus, 55.5, null);
     snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
 
     SnapshotDiffResponse response = snapshotDiffManager.getSnapshotDiffReport(
         ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, "", 1000);
     assertEquals(IN_PROGRESS, response.getJobStatus());
+    assertEquals(subStatus, response.getSubStatus());
+    assertThat(response.getProgressPercent()).isEqualTo(55.5);
   }
+
+  @Test
+  public void testGetSnapshotDiffReportInProgressWithPathResolutionSubStatus()
+      throws IOException {
+    SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
+    SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
+        IN_PROGRESS, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
+        false, false, 0L, SnapshotDiffResponse.SubStatus.PATH_RESOLUTION_FSO, 0.0, null);
+    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
+
+    SnapshotDiffResponse response = snapshotDiffManager.getSnapshotDiffReport(
+        ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName, "", 1000);
+    assertEquals(IN_PROGRESS, response.getJobStatus());
+    assertEquals(SnapshotDiffResponse.SubStatus.PATH_RESOLUTION_FSO, response.getSubStatus());
+  }
+
+  private static OmDirectoryInfo newDeletedDir(long objectId, long parentId) {
+    return OmDirectoryInfo.newBuilder()
+        .setObjectID(objectId)
+        .setParentObjectID(parentId)
+        .setName("dir-" + objectId)
+        .setOwner("test")
+        .setCreationTime(0L)
+        .setModificationTime(0L)
+        .build();
+  }
+
+  private static OmKeyInfo newDeletedFile(long objectId, long parentId) {
+    return new OmKeyInfo.Builder()
+        .setObjectID(objectId)
+        .setParentObjectID(parentId)
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName("file-" + objectId)
+        .setReplicationConfig(new ECReplicationConfig(3, 2))
+        .build();
+  }
+
 }

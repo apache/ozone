@@ -222,7 +222,8 @@ public class TestAddRemoveOzoneManager {
    */
   @Test
   public void testBootstrap() throws Exception {
-    setupCluster(1);
+    // With admin authorization on, the new OMs are admitted as the user that runs the OMs.
+    setupCluster(1, true);
     OzoneManager oldOM = cluster.getOzoneManager();
 
     // 1. Add 2 new OMs to an existing 1 node OM cluster.
@@ -489,7 +490,7 @@ public class TestAddRemoveOzoneManager {
     // Verify decomm node is removed from the HA ring
     GenericTestUtils.waitFor(() -> {
       for (OzoneManager om : activeOMs) {
-        if (om.getPeerNodes().contains(decommNodeId)) {
+        if (om.getPeerNodes().stream().anyMatch(node -> node.getNodeId().equals(decommNodeId))) {
           return false;
         }
       }

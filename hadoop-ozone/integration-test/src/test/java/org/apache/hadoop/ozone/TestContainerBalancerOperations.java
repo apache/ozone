@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
@@ -156,8 +157,7 @@ public class TestContainerBalancerOperations {
     List<ContainerWithPipeline> createdContainers = new ArrayList<>(5);
     for (int i = 0; i < 5; i++) {
       createdContainers.add(containerBalancerClient.createContainer(
-          HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.ONE,
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
           OzoneConsts.OZONE));
     }
     String excludedContainersList = createdContainers.get(0).getContainerInfo().getContainerID() + ","
@@ -193,7 +193,7 @@ public class TestContainerBalancerOperations {
 
     //If config value is not added in ozone-site.xml and CLI option is not passed
     //then it takes the default configuration
-    assertEquals(70, config.getBalancingInterval().toMinutes());
+    assertEquals(3, config.getBalancingInterval().toMinutes());
 
     //If config value is added in ozone-site.xml and CLI option is not passed
     //then it takes the value from ozone-site.xml

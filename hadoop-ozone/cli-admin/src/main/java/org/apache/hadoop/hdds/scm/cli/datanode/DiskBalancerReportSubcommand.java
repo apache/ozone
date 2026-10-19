@@ -193,7 +193,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         .append("  - move delta: source volume space to be reclaimed after move completion;" +
             " this value is reflected only when diskBalancer is running else it is 0.%n");
 
-    return String.format(formatBuilder.toString(), contentList.toArray(new String[0]));
+    return String.format(formatBuilder.toString(), contentList.toArray(new Object[0]));
   }
 
   @Override

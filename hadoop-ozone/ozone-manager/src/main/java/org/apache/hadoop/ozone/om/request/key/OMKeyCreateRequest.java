@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
@@ -87,7 +88,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    CreateKeyRequest createKeyRequest = super.preExecute(ozoneManager)
+    final CreateKeyRequest createKeyRequest = super.preExecute(ozoneManager)
         .getCreateKeyRequest();
     Objects.requireNonNull(createKeyRequest, "createKeyRequest == null");
 
@@ -163,7 +164,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
       newKeyArgs.addAllKeyLocations(omKeyLocationInfoList.stream()
           .map(info -> info.getProtobuf(false,
-              getOmRequest().getVersion()))
+              ClientVersion.deserialize(getOmRequest().getVersion())))
           .collect(Collectors.toList()));
     } else {
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now());
@@ -195,7 +196,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
-    CreateKeyRequest createKeyRequest = getOmRequest().getCreateKeyRequest();
+    OMRequest omRequest = getOmRequest();
+    CreateKeyRequest createKeyRequest = omRequest.getCreateKeyRequest();
 
     KeyArgs keyArgs = createKeyRequest.getKeyArgs();
     Map<String, String> auditMap = buildKeyArgsAuditMap(keyArgs);
@@ -242,7 +244,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       keyArgs = validateAndRewriteIfMatchAsExpectedGeneration(keyArgs, dbKeyInfo);
 
       OmBucketInfo bucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
+          getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       // If FILE_EXISTS we just override like how we used to do for Key Create.
       if (LOG.isDebugEnabled()) {
@@ -317,6 +319,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       checkBucketQuotaInBytes(omMetadataManager, bucketInfo,
           preAllocatedSpace);
       checkBucketQuotaInNamespace(bucketInfo, numMissingParents + 1L);
+      CreateKeyResponse.Builder builder = CreateKeyResponse.newBuilder();
       perfMetrics.addCreateKeyQuotaCheckLatencyNs(Time.monotonicNowNanos() - quotaCheckStartTime);
       bucketInfo.incrUsedNamespace(numMissingParents);
 
@@ -326,6 +329,11 @@ public class OMKeyCreateRequest extends OMKeyRequest {
         OMFileRequest.addKeyTableCacheEntries(omMetadataManager, volumeName,
             bucketName, bucketInfo.getBucketLayout(),
             null, missingParentInfos, trxnLogIndex);
+
+        // Parent directory creation holds the bucket write lock; key path locking leaves
+        // numMissingParents at 0.
+        omMetadataManager.getBucketTable().addCacheEntry(
+            omMetadataManager.getBucketKey(volumeName, bucketName), bucketInfo, trxnLogIndex);
       }
 
       // Add to cache entry can be done outside of lock for this openKey.
@@ -334,12 +342,13 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       omMetadataManager.getOpenKeyTable(getBucketLayout()).addCacheEntry(
           dbOpenKeyName, omKeyInfo, trxnLogIndex);
 
-      // Prepare response
-      omResponse.setCreateKeyResponse(CreateKeyResponse.newBuilder()
-          .setKeyInfo(omKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(),
+      builder.setKeyInfo(omKeyInfo.getNetworkProtobuf(
+              ClientVersion.deserialize(getOmRequest().getVersion()),
               keyArgs.getLatestVersionLocation()))
           .setID(clientID)
-          .setOpenVersion(openVersion).build())
+          .setOpenVersion(openVersion);
+      // Prepare response
+      omResponse.setCreateKeyResponse(builder.build())
           .setCmdType(Type.CreateKey);
       omClientResponse = new OMKeyCreateResponse(omResponse.build(),
           omKeyInfo, missingParentInfos, clientID, bucketInfo.copyObject());

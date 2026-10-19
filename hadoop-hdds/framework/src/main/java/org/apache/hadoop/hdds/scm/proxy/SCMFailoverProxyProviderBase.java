@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.proxy;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.net.InetAddresses;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -29,8 +30,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
@@ -65,7 +68,7 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
   // scmNodeId -> ProxyInfo<rpcProxy>
   private final Map<String, ProxyInfo<T>> scmProxies;
   // scmNodeId -> SCMProxyInfo
-  private final Map<String, SCMProxyInfo> scmProxyInfoMap;
+  private Map<String, SCMProxyInfo> scmProxyInfoMap;
   private List<String> scmNodeIds;
 
   // As SCM Client is shared across threads, performFailOver()
@@ -119,7 +122,6 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     this.scmVersion = RPC.getProtocolVersion(protocol);
 
     this.scmProxies = new HashMap<>();
-    this.scmProxyInfoMap = new HashMap<>();
     loadConfigs();
 
     this.currentProxyIndex = 0;
@@ -171,9 +173,19 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
 
   @VisibleForTesting
   protected synchronized void loadConfigs() {
-    List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
-    scmNodeIds = new ArrayList<>();
+    ScmProxyConfig newConfig = buildConfigs();
+    scmNodeIds = newConfig.nodeIds;
+    scmProxyInfoMap = newConfig.proxyInfoMap;
+  }
 
+  /**
+   * Thread-safely resolves node addresses into an isolated holder.
+   * Fails atomically if any address is missing.
+   */
+  private ScmProxyConfig buildConfigs() {
+    List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
+    List<String> newScmNodeIds = new ArrayList<>();
+    Map<String, SCMProxyInfo> newScmProxyInfoMap = new HashMap<>();
 
     for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
       String protocolAddress = getProtocolAddress(scmNodeInfo);
@@ -185,15 +197,85 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
 
         String scmServiceId = scmNodeInfo.getServiceId();
         String scmNodeId = scmNodeInfo.getNodeId();
-        scmNodeIds.add(scmNodeId);
+        newScmNodeIds.add(scmNodeId);
         // Preserve the original config string so DNS can be re-resolved
         // on connection failure when the SCM peer is rescheduled to a
         // new IP (Kubernetes pod-IP-change recovery). See
         // refreshProxyAddressIfChanged(String).
         SCMProxyInfo scmProxyInfo = new SCMProxyInfo(scmServiceId, scmNodeId,
             protocolAddr, protocolAddress);
-        scmProxyInfoMap.put(scmNodeId, scmProxyInfo);
+        newScmProxyInfoMap.put(scmNodeId, scmProxyInfo);
       }
+    }
+
+    return new ScmProxyConfig(newScmNodeIds, newScmProxyInfoMap);
+  }
+
+  /**
+   * Reloads SCM nodes and proxies from updated config without a restart.
+   * Stops proxies for removed/changed nodes; fails atomically if config is invalid.
+   * In-flight calls on removed nodes persist until the next failover.
+   */
+  public void changeConfig() {
+    // Resolve DNS before locking to prevent slow lookup from blocking callers.
+    ScmProxyConfig newConfig = buildConfigs();
+
+    Map<String, ProxyInfo<T>> staleProxies = new HashMap<>();
+    synchronized (this) {
+      Map<String, SCMProxyInfo> oldProxyInfoMap = scmProxyInfoMap;
+      scmNodeIds = newConfig.nodeIds;
+      scmProxyInfoMap = newConfig.proxyInfoMap;
+
+      // Re-sync proxy index to the new list, or fall back to first node if removed.
+      int newProxyIndex = scmNodeIds.indexOf(currentProxySCMNodeId);
+      if (newProxyIndex < 0) {
+        newProxyIndex = 0;
+        currentProxySCMNodeId = scmNodeIds.get(newProxyIndex);
+      }
+      currentProxyIndex = newProxyIndex;
+
+      // Drop removed failover target to prevent NPE on next failover.
+      if (updatedLeaderNodeID != null
+          && !scmProxyInfoMap.containsKey(updatedLeaderNodeID)) {
+        updatedLeaderNodeID = null;
+      }
+
+      // Evict stale proxies under lock, but defer stopProxy until unlocked to avoid blocking.
+      for (Map.Entry<String, SCMProxyInfo> entry : oldProxyInfoMap.entrySet()) {
+        String nodeId = entry.getKey();
+        SCMProxyInfo newInfo = scmProxyInfoMap.get(nodeId);
+        if (newInfo == null
+            || !newInfo.getAddress().equals(entry.getValue().getAddress())) {
+          ProxyInfo<T> staleProxy = scmProxies.remove(nodeId);
+          if (staleProxy != null && staleProxy.proxy != null) {
+            staleProxies.put(nodeId, staleProxy);
+          }
+        }
+      }
+
+      getLogger().info("Reloaded SCM proxy configuration for protocol {} with {} nodes: {}",
+          protocolClass.getSimpleName(), scmNodeIds.size(), scmProxyInfoMap.values());
+    }
+
+    for (Map.Entry<String, ProxyInfo<T>> entry : staleProxies.entrySet()) {
+      try {
+        RPC.stopProxy(entry.getValue().proxy);
+      } catch (RuntimeException stopEx) {
+        getLogger().warn("Failed to stop stale proxy for SCM node {}",
+            entry.getKey(), stopEx);
+      }
+    }
+  }
+
+  /** Parsed node list and resolved addresses, built without touching shared state. */
+  private static final class ScmProxyConfig {
+    private final List<String> nodeIds;
+    private final Map<String, SCMProxyInfo> proxyInfoMap;
+
+    ScmProxyConfig(List<String> nodeIds,
+        Map<String, SCMProxyInfo> proxyInfoMap) {
+      this.nodeIds = nodeIds;
+      this.proxyInfoMap = proxyInfoMap;
     }
   }
 
@@ -249,22 +331,96 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
                                                            Exception e) {
     ServerNotLeaderException snle =
         (ServerNotLeaderException) SCMHAUtils.getServerNotLeaderException(e);
-    if (snle != null && snle.getSuggestedLeader() != null) {
-      Optional<SCMProxyInfo> matchedProxyInfo =
-          scmProxyInfoMap.values().stream().filter(
-              proxyInfo -> NetUtils.getHostPortString(proxyInfo.getAddress())
-                  .equals(snle.getSuggestedLeader())).findFirst();
-      if (matchedProxyInfo.isPresent()) {
-        newLeader = matchedProxyInfo.get().getNodeId();
+    String suggestedLeader = snle != null ? snle.getSuggestedLeader() : null;
+    if (suggestedLeader != null) {
+      Optional<String> matchedNodeId = findSuggestedLeaderNodeId(suggestedLeader);
+      if (matchedNodeId.isPresent()) {
+        newLeader = matchedNodeId.get();
         getLogger().debug("Performing failover to suggested leader {}, nodeId {}",
-            snle.getSuggestedLeader(), newLeader);
+            suggestedLeader, newLeader);
       } else {
         getLogger().debug("Suggested leader {} does not match with any of the " +
-                "proxyInfo address {}", snle.getSuggestedLeader(),
+                "proxyInfo address {}", suggestedLeader,
             Arrays.toString(scmProxyInfoMap.values().toArray()));
       }
     }
     assignLeaderToNode(newLeader);
+  }
+
+  /**
+   * Find the SCM nodeId whose address matches the suggested-leader authority. Callers hold
+   * the provider monitor, so this must never resolve a name.
+   */
+  private Optional<String> findSuggestedLeaderNodeId(String suggestedLeader) {
+    final Optional<String> host;
+    final OptionalInt port;
+    try {
+      host = HddsUtils.getHostName(suggestedLeader);
+      port = HddsUtils.getHostPort(suggestedLeader);
+    } catch (IllegalArgumentException ex) {
+      getLogger().warn("Ignoring unparseable suggested leader {}", suggestedLeader, ex);
+      return Optional.empty();
+    }
+    if (!host.isPresent() || !port.isPresent()) {
+      return Optional.empty();
+    }
+    return scmProxyInfoMap.values().stream()
+        .filter(proxyInfo -> matchesAuthority(proxyInfo.getAddress(), host.get(), port.getAsInt()))
+        .findFirst()
+        .map(SCMProxyInfo::getNodeId);
+  }
+
+  private static boolean matchesAuthority(InetSocketAddress address, String host, int port) {
+    if (address.getPort() != port) {
+      return false;
+    }
+    // Both getHostString() and getAddress() read what was resolved when the proxy info was
+    // built, so neither triggers a lookup here.
+    String addressHost = address.getHostString();
+    if (sameHost(addressHost, host)) {
+      return true;
+    }
+    InetAddress resolved = address.getAddress();
+    return resolved != null && sameIpLiteral(resolved.getHostAddress(), host);
+  }
+
+  /**
+   * Whether two authority hosts denote the same SCM. Names are matched case-insensitively as DNS
+   * requires, while IP literals go through {@link #sameIpLiteral} so that an IPv6 zone keeps its
+   * case: eth0 and ETH0 are different interfaces.
+   */
+  private static boolean sameHost(String addressHost, String host) {
+    if (isIpLiteral(addressHost) || isIpLiteral(host)) {
+      return sameIpLiteral(addressHost, host);
+    }
+    return addressHost.equalsIgnoreCase(host);
+  }
+
+  /**
+   * Whether two IP literals denote the same address, allowing for different spellings of one
+   * IPv6 address. Scope is compared as text, unlike {@link InetAddress#equals} which drops it,
+   * so fe80::1%1 and fe80::1%2 differ, and so do %2 and %eth0 for the same interface.
+   */
+  private static boolean sameIpLiteral(String host, String otherHost) {
+    String ip = stripScope(host);
+    String otherIp = stripScope(otherHost);
+    return scopeOf(host).equals(scopeOf(otherHost))
+        && InetAddresses.isInetAddress(ip) && InetAddresses.isInetAddress(otherIp)
+        && InetAddresses.forString(ip).equals(InetAddresses.forString(otherIp));
+  }
+
+  private static boolean isIpLiteral(String host) {
+    return InetAddresses.isInetAddress(stripScope(host));
+  }
+
+  private static String stripScope(String host) {
+    int mark = host.indexOf('%');
+    return mark < 0 ? host : host.substring(0, mark);
+  }
+
+  private static String scopeOf(String host) {
+    int mark = host.indexOf('%');
+    return mark < 0 ? "" : host.substring(mark + 1);
   }
 
   @Override

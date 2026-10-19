@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.s3;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_DOMAIN_NAME;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.net.HostAndPort;
+import com.google.common.net.InetAddresses;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
@@ -61,6 +63,9 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
   public void filter(ContainerRequestContext requestContext) throws
       IOException {
     domains = conf.getTrimmedStrings(OZONE_S3G_DOMAIN_NAME);
+    for (int i = 0; i < domains.length; i++) {
+      domains[i] = normalizeDomain(domains[i]);
+    }
 
     if (domains.length == 0) {
       // domains is not configured, might be it is path style.
@@ -123,12 +128,29 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
   }
 
   /**
-   * This method finds the longest match with the domain name.
+   * This method finds the longest match with the domain name, except for a host
+   * that still holds a colon once its port is stripped, which has to be one of
+   * the configured domains itself, compared as an address rather than as text.
    * @param host
    * @return domain name matched with the host. if none of them are matching,
    * return null.
    */
   private String getDomainName(String host) {
+    // A colon at this point means an IPv6 literal (or a Host header malformed
+    // enough that checkHostWithoutPort returned it as it came), and neither can
+    // carry a bucket prefix. Matched by suffix, 2001:db8::1 would match the
+    // domain ::1 and be read as a request for a bucket named "2001:db8".
+    if (host.indexOf(':') >= 0) {
+      for (String domainVal : domains) {
+        if (isSameAddress(host, domainVal)) {
+          // The host itself, so that the caller sees nothing left in front of
+          // the domain to read as a bucket, however the two spell the address.
+          return host;
+        }
+      }
+      return null;
+    }
+
     String match = null;
     int length = 0;
     for (String domainVal : domains) {
@@ -143,12 +165,61 @@ public class VirtualHostStyleFilter implements ContainerRequestFilter {
     return match;
   }
 
-  private String checkHostWithoutPort(String host) {
-    int portIndex = host.lastIndexOf(':');
-    if (portIndex >= 0) {
-      return host.substring(0, portIndex);
-    } else {
+  /**
+   * Strips a trailing port from the Host header, if present. Uses bracket-aware
+   * parsing so IPv6 literals are handled correctly: {@code [::1]:9878} and
+   * {@code [::1]} both yield {@code ::1}, and a bare {@code 2001:db8::1} (whose
+   * colons are part of the address, not a port) is returned unchanged. A plain
+   * {@code lastIndexOf(':')} would mistake an address segment for the port.
+   */
+  @VisibleForTesting
+  String checkHostWithoutPort(String host) {
+    try {
+      return HostAndPort.fromString(host).getHost();
+    } catch (IllegalArgumentException e) {
+      // Malformed Host header (e.g. unbalanced brackets): fall back to the raw
+      // value so it is rejected with a clear "no matching domain" error rather
+      // than failing with an internal error.
       return host;
     }
+  }
+
+  /**
+   * Compares a host with a configured domain by address rather than by
+   * spelling, so that a client writing the gateway's address in a form other
+   * than the configured one still reaches it: ::1 and 0:0:0:0:0:0:0:1 are the
+   * same address, and hexadecimal digits may be in either case. A zone names an
+   * interface of the node holding the address and must not be sent on the wire
+   * (RFC 9844), so one the operator wrote in the domain is dropped before
+   * comparing, while a Host header carrying one names no gateway. Neither is
+   * ever resolved: Guava accepts a scoped literal as a valid address but throws
+   * on parsing one whose interface this node does not have.
+   */
+  private static boolean isSameAddress(String host, String domain) {
+    if (host.indexOf('%') >= 0) {
+      return false;
+    }
+    String domainAddress = stripZone(domain);
+    return host.equals(domainAddress)
+        || (InetAddresses.isInetAddress(host) && InetAddresses.isInetAddress(domainAddress)
+            && InetAddresses.forString(host).equals(InetAddresses.forString(domainAddress)));
+  }
+
+  private static String stripZone(String host) {
+    int mark = host.indexOf('%');
+    return mark < 0 ? host : host.substring(0, mark);
+  }
+
+  /**
+   * Strips surrounding brackets from a configured IPv6 domain so it matches the
+   * unbracketed host produced by {@link #checkHostWithoutPort(String)}, letting
+   * {@code ozone.s3g.domain.name} be configured in either form. For example
+   * {@code [::1]} becomes {@code ::1}; other values are returned unchanged.
+   */
+  private static String normalizeDomain(String domain) {
+    if (domain.length() > 1 && domain.startsWith("[") && domain.endsWith("]")) {
+      return domain.substring(1, domain.length() - 1);
+    }
+    return domain;
   }
 }

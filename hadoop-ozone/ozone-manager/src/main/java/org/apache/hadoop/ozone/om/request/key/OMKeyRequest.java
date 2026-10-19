@@ -933,9 +933,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   public static long sumBlockLengths(OmKeyInfo omKeyInfo) {
     long bytesUsed = 0;
     for (OmKeyLocationInfoGroup group: omKeyInfo.getKeyLocationVersions()) {
-      for (OmKeyLocationInfo locationInfo : group.getLocationList()) {
-        bytesUsed += QuotaUtil.getReplicatedSize(
-            locationInfo.getLength(), omKeyInfo.getReplicationConfig());
+      for (List<OmKeyLocationInfo> locationInfoList : group.getLocationLists()) {
+        for (OmKeyLocationInfo locationInfo : locationInfoList) {
+          bytesUsed += QuotaUtil.getReplicatedSize(
+              locationInfo.getLength(), omKeyInfo.getReplicationConfig());
+        }
       }
     }
 
@@ -943,7 +945,11 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   /**
-   * Return bucket info for the specified bucket.
+   * Return bucket info for the specified bucket, for read-only use.
+   * <p>
+   * The returned {@link OmBucketInfo} is the cached instance, returned by
+   * reference. Callers that mutate it must use
+   * {@link #getBucketInfoForUpdate(OMMetadataManager, String, String)} instead.
    */
   @Nullable
   public static OmBucketInfo getBucketInfo(OMMetadataManager omMetadataManager,
@@ -954,6 +960,24 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .getCacheValue(new CacheKey<>(bucketKey));
 
     return value != null ? value.getCacheValue() : null;
+  }
+
+  /**
+   * Return a copy of the cached bucket info for callers that mutate it.
+   * <p>
+   * Mutations stay invisible until the caller publishes the copy with
+   * {@code getBucketTable().addCacheEntry(...)}, after all fallible work and
+   * only on the path that persists the response. A caller that publishes must
+   * hold the bucket write lock for the whole read-modify-publish, not just the
+   * publish, or a concurrent writer can be lost. A caller under key path
+   * locking holds only the bucket read lock, so it must not publish.
+   */
+  @Nullable
+  public static OmBucketInfo getBucketInfoForUpdate(OMMetadataManager omMetadataManager,
+      String volume, String bucket) {
+    OmBucketInfo omBucketInfo = getBucketInfo(omMetadataManager, volume, bucket);
+
+    return omBucketInfo != null ? omBucketInfo.copyObject() : null;
   }
 
   /**
@@ -1247,7 +1271,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
     // the referenceKey.
     Map<ContainerBlockID, OmKeyLocationInfo> cbIdSet = referenceKey.getKeyLocationVersions()
         .stream()
-        .flatMap(e -> e.getLocationList().stream())
+        .flatMap(group -> group.getLocationLists().stream())
+        .flatMap(List::stream)
         .collect(Collectors.toMap(omKeyLocationInfo -> omKeyLocationInfo.getBlockID().getContainerBlockID(),
             Function.identity()));
     Map<OmKeyInfo, List<OmKeyLocationInfo>> filteredOutBlocks = new HashMap<>();

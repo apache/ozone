@@ -17,12 +17,16 @@
 
 package org.apache.hadoop.ozone.snapshot;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Collections;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.EnumSource.Mode;
 
 class TestSnapshotDiffResponse {
 
@@ -57,18 +61,46 @@ class TestSnapshotDiffResponse {
     assertTrue(message.contains("resubmit the job without using the --get-report option"));
   }
 
-  @Test
-  void testReportOnlyInProgressIncludesSubStatusAndProgress() {
+  @ParameterizedTest
+  @EnumSource(value = SubStatus.class, names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO",
+      "OBJECT_ID_MAP_GEN_FSO_FILE", "OBJECT_ID_MAP_GEN_FSO_DIR"})
+  void testInProgressWithMapGenSubStatusIncludesProgress(SubStatus subStatus) {
     SnapshotDiffResponse response = new SnapshotDiffResponse(createReport(),
         JobStatus.IN_PROGRESS, 1000L, true);
-    response.setSubStatus(SubStatus.OBJECT_ID_MAP_GEN_OBS);
+    response.setSubStatus(subStatus);
     response.setProgressPercent(55.5);
 
     String message = response.toString();
     assertTrue(message.contains("IN_PROGRESS"));
-    assertTrue(message.contains("OBJECT_ID_MAP_GEN_OBS"));
+    assertTrue(message.contains(subStatus.name()));
     assertTrue(message.contains("Keys Processed Estimated Percentage"));
     assertTrue(message.contains("55.5"));
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = SubStatus.class,
+      names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO", "OBJECT_ID_MAP_GEN_FSO_FILE",
+          "OBJECT_ID_MAP_GEN_FSO_DIR"},
+      mode = Mode.EXCLUDE)
+  void testInProgressWithNonMapGenSubStatusRendersSubStatusButNotProgress(SubStatus subStatus) {
+    SnapshotDiffResponse response = new SnapshotDiffResponse(createReport(), JobStatus.IN_PROGRESS, 1000L, true);
+    response.setSubStatus(subStatus);
+    response.setProgressPercent(55.5);
+
+    String message = response.toString();
+    assertTrue(message.contains("IN_PROGRESS"));
+    assertTrue(message.contains(subStatus.name()));
+    assertFalse(message.contains("Keys Processed Estimated Percentage"));
+    assertFalse(message.contains("55.5"));
+  }
+
+  @Test
+  void testInProgressWithNullSubStatusOmitsSubStatusAndProgressLines() {
+    SnapshotDiffResponse response = new SnapshotDiffResponse(createReport(), JobStatus.IN_PROGRESS, 1000L, true);
+    String message = response.toString();
+    assertTrue(message.contains("IN_PROGRESS"));
+    assertFalse(message.contains("SubStatus"));
+    assertFalse(message.contains("Keys Processed Estimated Percentage"));
   }
 
   private SnapshotDiffReportOzone createReport() {

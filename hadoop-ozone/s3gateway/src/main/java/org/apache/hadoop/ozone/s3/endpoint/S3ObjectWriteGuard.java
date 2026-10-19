@@ -20,10 +20,18 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import javax.xml.bind.DatatypeConverter;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
+import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.ratis.util.function.CheckedRunnable;
 
 /**
@@ -84,6 +92,28 @@ class S3ObjectWriteGuard implements AutoCloseable {
     preCommits.add(preCommit);
   }
 
+  void checkContentSha256(MultiDigestInputStream body, String expectedSha256) {
+    // A digest is present only when x-amz-content-sha256 contains a payload hash.
+    MessageDigest sha256Digest = body.getMessageDigest(OzoneConsts.FILE_HASH);
+    if (sha256Digest != null) {
+      final String actualSha256 = DatatypeConverter.printHexBinary(sha256Digest.digest()).toLowerCase();
+      addPreCommit(() -> {
+        if (!expectedSha256.equals(actualSha256)) {
+          throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
+        }
+      });
+    }
+  }
+
+  void onKeyOpened(Consumer<ByteBuffer> action) {
+    try {
+      action.accept(getDerivedKey());
+    } catch (RuntimeException ex) {
+      recordTransferFailure(ex);
+      throw ex;
+    }
+  }
+
   long copyFrom(InputStream body, int bufferSize) throws IOException {
     byte[] buffer = new byte[bufferSize];
     while (writtenLength < expectedLength) {
@@ -107,7 +137,20 @@ class S3ObjectWriteGuard implements AutoCloseable {
       }
       writtenLength += readLength;
     }
+    try {
+      verifySignedChunksComplete(body);
+    } catch (IOException | RuntimeException ex) {
+      recordTransferFailure(ex);
+      throw ex;
+    }
     return writtenLength;
+  }
+
+  private static void verifySignedChunksComplete(InputStream body) throws IOException {
+    SignedChunksInputStream signed = SignedChunksInputStream.unwrap(body);
+    if (signed != null) {
+      signed.verifyComplete();
+    }
   }
 
   protected void write(byte[] buffer, int offset, int length)
@@ -117,6 +160,11 @@ class S3ObjectWriteGuard implements AutoCloseable {
 
   public Map<String, String> getMetadata() {
     return ((OzoneOutputStream) outputStream).getMetadata();
+  }
+
+  /** @return the signing key OM derived for chunk verification, or null. */
+  public ByteBuffer getDerivedKey() {
+    return ((OzoneOutputStream) outputStream).getDerivedKey();
   }
 
   @Override

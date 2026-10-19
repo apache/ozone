@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.tracing;
 
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import org.apache.ratis.thirdparty.io.grpc.ForwardingServerCallListener.SimpleForwardingServerCallListener;
 import org.apache.ratis.thirdparty.io.grpc.Metadata;
@@ -44,7 +45,8 @@ public class GrpcServerInterceptor implements ServerInterceptor {
         Span span = TracingUtil
             .importAndCreateSpan(
                 call.getMethodDescriptor().getFullMethodName(),
-                headers.get(GrpcClientInterceptor.TRACING_HEADER));
+                headers.get(GrpcClientInterceptor.TRACING_HEADER),
+                SpanKind.SERVER);
         try (Scope ignored = span.makeCurrent()) {
           super.onMessage(message);
         } finally {

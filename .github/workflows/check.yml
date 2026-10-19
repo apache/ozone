@@ -137,7 +137,7 @@ on:
 env:
   HADOOP_IMAGE: ghcr.io/apache/hadoop
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   OZONE_IMAGE: ghcr.io/apache/ozone
   OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
   OZONE_VOLUME_OWNER: 1000
@@ -153,15 +153,20 @@ jobs:
     steps:
       - name: Checkout project
         if: ${{ !inputs.needs-ozone-source-tarball }}
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
           ref: ${{ inputs.sha }}
           fetch-depth: ${{ inputs.checkout-fetch-depth }}
 
+      - name: Delete .git to omit commit SHA in build artifacts
+        if: ${{ !inputs.needs-ozone-source-tarball && inputs.checkout-fetch-depth == '1' }}
+        run: |
+          rm -fr .git
+
       - name: Download Ozone source tarball
         if: ${{ inputs.needs-ozone-source-tarball }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@v8
         with:
           name: ozone-src
 
@@ -172,7 +177,7 @@ jobs:
 
       - name: Cache for NPM dependencies
         if: ${{ inputs.needs-npm-cache }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@v6
         with:
           path: |
             ~/.pnpm-store
@@ -182,7 +187,7 @@ jobs:
 
       - name: Cache for Maven dependencies
         if: ${{ inputs.needs-maven-cache }}
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -194,7 +199,7 @@ jobs:
       - name: Download Ozone repo
         id: download-ozone-repo
         if: ${{ inputs.needs-ozone-repo }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@v8
         with:
           name: ozone-repo
           path: |
@@ -202,7 +207,7 @@ jobs:
 
       - name: Download Ratis repo
         if: ${{ inputs.ratis-args != '' }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@v8
         with:
           name: ratis-jars
           path: |
@@ -210,7 +215,7 @@ jobs:
 
       - name: Download Ozone binary tarball
         if: ${{ inputs.needs-ozone-binary-tarball }}
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@v8
         with:
           name: ozone-bin
 
@@ -223,7 +228,7 @@ jobs:
 
       - name: Setup java ${{ inputs.java-version }}
         if: ${{ inputs.java-version }}
-        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5.6.0
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: ${{ inputs.java-version }}
@@ -266,19 +271,27 @@ jobs:
           hadoop-ozone/dev-support/checks/_summary.sh target/$SCRIPT/summary.txt
 
       - name: Archive build results
+        id: archive
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ (inputs.split && format('{0}-{1}', inputs.script, inputs.split)) || inputs.script }}
           # please keep path as a single item; move to that directory all files needed in the artifact
           path: target/${{ inputs.script }}
         continue-on-error: true
 
+      - name: Test summary
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: python3 dev-support/ci/junit_summary.py >> "$GITHUB_STEP_SUMMARY"
+        env:
+          JUNIT_REPORT_URL: ${{ steps.archive.outputs.artifact-url }}
+
       # The following steps are hard-coded to be run only for 'build' check,
       # to avoid the need for 3 more inputs.
       - name: Store binaries for tests
         if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: ozone-bin
           path: |
@@ -288,7 +301,7 @@ jobs:
 
       - name: Store source tarball for compilation
         if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: ozone-src
           path: |
@@ -297,7 +310,7 @@ jobs:
 
       - name: Store Maven repo for tests
         if: ${{ inputs.script == 'build' && !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: ozone-repo
           path: |

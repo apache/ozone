@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
+import static org.apache.hadoop.hdds.HDDSVersion.COMBINED_PUTBLOCK_WRITECHUNK_RPC;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.writeChunkAsync;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
@@ -187,16 +187,9 @@ public class BlockOutputStream extends OutputStream {
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
 
-    ContainerProtos.DatanodeBlockID.Builder blkIDBuilder =
-        ContainerProtos.DatanodeBlockID.newBuilder()
-            .setContainerID(blockID.getContainerID())
-            .setLocalID(blockID.getLocalID())
-            .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId());
-    if (replicationIndex > 0) {
-      blkIDBuilder.setReplicaIndex(replicationIndex);
-    }
-    this.containerBlockData = BlockData.newBuilder().setBlockID(
-        blkIDBuilder.build()).addMetadata(keyValue);
+    this.containerBlockData = BlockData.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobufBuilder(replicationIndex))
+        .addMetadata(keyValue);
     this.pipeline = pipeline;
     // tell DataNode I will send incremental chunk list
     this.supportIncrementalChunkList = canEnableIncrementalChunkList();
@@ -285,8 +278,8 @@ public class BlockOutputStream extends OutputStream {
     // that supports PutBlock piggybacking.
     for (DatanodeDetails dn : pipeline.getNodes()) {
       LOG.debug("dn = {}, version = {}", dn, dn.getCurrentVersion());
-      if (dn.getCurrentVersion() <
-              COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue()) {
+      if (!COMBINED_PUTBLOCK_WRITECHUNK_RPC.isSupportedBy(
+          dn.getCurrentVersion())) {
         return false;
       }
     }

@@ -21,17 +21,32 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getChunk;
+import static org.apache.hadoop.ozone.container.ContainerTestHelper.getWriteChunkRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.setDataChecksum;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockConstruction;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
@@ -45,6 +60,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
@@ -68,6 +84,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.MockedConstruction;
 
 /**
  * Test for FilePerBlockStrategy.
@@ -76,6 +93,59 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
   @TempDir
   private File tempDir;
+
+  @Test
+  public void testWriteChunkReadsFileSizeOnce() throws IOException {
+    File chunkFile = FILE_PER_BLOCK.getChunkFile(getKeyValueContainerData(), getBlockID(), null);
+    byte[] expectedData = new byte[getData().remaining()];
+    getData().duplicate().get(expectedData);
+    KeyValueHandler handler = createKeyValueHandler(newContainerSet());
+    try (RandomAccessFile actualFile = new RandomAccessFile(chunkFile, "rw")) {
+      FileChannel channel = mock(FileChannel.class, delegatesTo(actualFile.getChannel()));
+      try (MockedConstruction<RandomAccessFile> files = mockConstruction(RandomAccessFile.class,
+          (file, context) -> when(file.getChannel()).thenReturn(channel))) {
+        handler.getChunkManager().writeChunk(
+            getKeyValueContainer(), getBlockID(), getChunkInfo(), getData(), WRITE_STAGE);
+
+        verify(channel).size();
+        assertThat(files.constructed()).hasSize(1);
+        assertThat(Files.readAllBytes(chunkFile.toPath())).isEqualTo(expectedData);
+        checkWriteIOStats(expectedData.length, 1);
+        assertThat(getKeyValueContainerData().getBytesUsed()).isEqualTo(expectedData.length);
+      }
+    } finally {
+      handler.stop();
+    }
+  }
+
+  @Test
+  public void testFileSizeFailure() throws IOException {
+    KeyValueHandler handler = createKeyValueHandler(newContainerSet());
+    ContainerProtos.ContainerCommandRequestProto request =
+        getWriteChunkRequest(MockPipeline.createSingleNodePipeline(), getBlockID(), 20);
+    FileChannel channel = mock(FileChannel.class);
+    IOException failure = new IOException("Failed to read file size");
+    when(channel.size()).thenThrow(failure);
+
+    try (MockedConstruction<RandomAccessFile> files =
+             mockConstruction(RandomAccessFile.class, (file, context) -> when(file.getChannel()).thenReturn(channel))) {
+      assertThatThrownBy(() -> handler.getChunkManager().writeChunk(
+          getKeyValueContainer(), getBlockID(), getChunkInfo(), getData(), WRITE_STAGE))
+          .isInstanceOf(UncheckedIOException.class)
+          .hasCause(failure);
+
+      ContainerProtos.ContainerCommandResponseProto response =
+          handler.handle(request, getKeyValueContainer(), WRITE_STAGE);
+      assertThat(response.getResult()).isEqualTo(ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+      assertThat(files.constructed()).hasSize(1);
+      verify(channel, times(2)).size();
+      verifyNoMoreInteractions(channel);
+      checkWriteIOStats(0, 0);
+      assertThat(getKeyValueContainerData().getBytesUsed()).isZero();
+    } finally {
+      handler.stop();
+    }
+  }
 
   @Test
   public void testDeletePartialChunkWithOffsetUnsupportedRequest() {
@@ -177,7 +247,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     Assertions.assertThrows(IOException.class, () -> keyValueHandler.writeChunkForClosedContainer(
         getChunkInfo(), getBlockID(), ChunkBuffer.wrap(getData()), keyValueContainer));
     Assertions.assertThrows(IOException.class, () -> keyValueHandler.putBlockForClosedContainer(keyValueContainer,
-            new BlockData(getBlockID()), 0L, true));
+            new BlockData(getBlockID()), 0L, true, true));
   }
 
   @Test
@@ -301,7 +371,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
     ChunkBuffer chunkData = ContainerTestHelper.getData(20);
     keyValueHandler.writeChunkForClosedContainer(info, getBlockID(), chunkData, kvContainer);
-    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 1L, true, true);
     keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
     assertEquals(1L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
@@ -323,7 +393,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
     chunkData = ContainerTestHelper.getData(20);
     keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
-    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true, true);
     long previousDataChecksum = containerData.getDataChecksum();
     keyValueHandler.updateAndGetContainerChecksumFromMetadata(kvContainer);
     assertEquals(2L, containerData.getBlockCommitSequenceId());
@@ -349,7 +419,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
 
     chunkData = ContainerTestHelper.getData(30);
     keyValueHandler.writeChunkForClosedContainer(newChunkInfo, getBlockID(), chunkData, kvContainer);
-    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true, true);
     assertEquals(2L, containerData.getBlockCommitSequenceId());
     assertEquals(1L, containerData.getBlockCount());
     // Old chunk size 20, new chunk size 30, difference 10. So bytesUsed should be 40 + 10 = 50
@@ -363,7 +433,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
       assertEquals(50L, dbHandle.getStore().getMetadataTable().get(containerData.getBytesUsedKey()));
     }
 
-    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true);
+    keyValueHandler.putBlockForClosedContainer(kvContainer, putBlockData, 2L, true, true);
     assertEquals(2L, containerData.getBlockCommitSequenceId());
   }
 

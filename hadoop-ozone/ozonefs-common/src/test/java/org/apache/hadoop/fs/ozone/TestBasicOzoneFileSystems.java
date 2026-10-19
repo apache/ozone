@@ -22,15 +22,25 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAU
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.nullable;
+import static org.mockito.Mockito.same;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collection;
 import org.apache.hadoop.conf.Configuration;
@@ -38,8 +48,11 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Unit test for Basic*OzoneFileSystem.
@@ -135,6 +148,147 @@ public class TestBasicOzoneFileSystems {
       fail("Test case not implemented for FileSystem: " +
           subject.getClass().getSimpleName());
     }
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {
+      // hostname / IPv4 authority (behaviour unchanged)
+      "ofs://host:9862/, host, 9862",
+      "ofs://omservice1/, omservice1, -1",
+      // service id with an underscore: HostAndPort tolerates it (URI.getHost does not)
+      "ofs://om_service/, om_service, -1",
+      // IPv6 literal authority, with and without a port; the bare literal is
+      // passed to the adapter (which re-brackets it), while the filesystem URI
+      // keeps the bracketed authority.
+      "ofs://[::1]:9862/, ::1, 9862",
+      "ofs://[2001:db8::1]/, 2001:db8::1, -1",
+  })
+  public void testRootedAuthorityParsing(String uri, String expectedHost,
+      int expectedPort) throws Exception {
+    BasicRootedOzoneFileSystem ofs = spy(new BasicRootedOzoneFileSystem());
+    BasicRootedOzoneClientAdapterImpl adapter =
+        mock(BasicRootedOzoneClientAdapterImpl.class);
+    doReturn(adapter).when(ofs).createAdapter(any(), anyString(), anyInt());
+
+    ofs.initialize(new URI(uri), new OzoneConfiguration());
+
+    ArgumentCaptor<String> hostCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Integer> portCaptor = ArgumentCaptor.forClass(Integer.class);
+    verify(ofs).createAdapter(any(), hostCaptor.capture(),
+        portCaptor.capture());
+    assertEquals(expectedHost, hostCaptor.getValue());
+    assertEquals(expectedPort, portCaptor.getValue().intValue());
+
+    // The rebuilt filesystem URI keeps the (bracketed) IPv6 authority intact.
+    assertEquals(new URI(uri).getAuthority(), ofs.getUri().getAuthority());
+  }
+
+  @Test
+  public void testRootedIpv6UriConstructionAndRoundTrip() throws Exception {
+    URI uri = new URI("ofs", null, "2001:db8::10", 9862, "/", null, null);
+    assertEquals("ofs://[2001:db8::10]:9862/", uri.toString());
+
+    BasicRootedOzoneFileSystem ofs = spy(new BasicRootedOzoneFileSystem());
+    BasicRootedOzoneClientAdapterImpl adapter = mock(BasicRootedOzoneClientAdapterImpl.class);
+    doReturn(adapter).when(ofs).createAdapter(any(), anyString(), anyInt());
+    ofs.initialize(uri, new OzoneConfiguration());
+
+    Path qualified = ofs.makeQualified(new Path("/volume/bucket/key"));
+    assertEquals("ofs://[2001:db8::10]:9862/volume/bucket/key", qualified.toString());
+    assertEquals(qualified, new Path(qualified.toUri()));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "ofs://2001:db8::10/",
+      "ofs://2001:db8::10:9862/"
+  })
+  public void testRootedAuthorityRejectsUnbracketedIpv6(String uri) throws Exception {
+    BasicRootedOzoneFileSystem ofs = new BasicRootedOzoneFileSystem();
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> ofs.initialize(new URI(uri), new OzoneConfiguration()));
+    assertTrue(exception.getMessage().contains("must be enclosed in brackets"));
+  }
+
+  @Test
+  public void testRootedMalformedAuthorityUsesGeneralError() throws Exception {
+    BasicRootedOzoneFileSystem ofs = new BasicRootedOzoneFileSystem();
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> ofs.initialize(new URI("ofs://host:123:456/"), new OzoneConfiguration()));
+    assertTrue(exception.getMessage().contains("URL should be one of the following formats"));
+  }
+
+  @ParameterizedTest
+  @CsvSource(value = {
+      "o3fs://bucket.volume/, NULL, -1",
+      "o3fs://bucket.volume.omservice1/, omservice1, -1",
+      "o3fs://bucket.volume.om.example.com:9862/, om.example.com, 9862",
+      "o3fs://bucket.volume.192.0.2.1:9862/, 192.0.2.1, 9862"
+  }, nullValues = "NULL")
+  public void testO3fsAuthorityParsing(String uri, String expectedHost, int expectedPort) throws Exception {
+    BasicOzoneFileSystem o3fs = spy(new BasicOzoneFileSystem());
+    BasicOzoneClientAdapterImpl adapter = mock(BasicOzoneClientAdapterImpl.class);
+    doReturn(adapter).when(o3fs).createAdapter(any(), anyString(), anyString(), nullable(String.class), anyInt());
+
+    o3fs.initialize(new URI(uri), new OzoneConfiguration());
+
+    ArgumentCaptor<String> hostCaptor = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<Integer> portCaptor = ArgumentCaptor.forClass(Integer.class);
+    verify(o3fs).createAdapter(any(), anyString(), anyString(), hostCaptor.capture(), portCaptor.capture());
+    assertEquals(expectedHost, hostCaptor.getValue());
+    assertEquals(expectedPort, portCaptor.getValue().intValue());
+    assertEquals(new URI(uri).getAuthority(), o3fs.getUri().getAuthority());
+  }
+
+  @Test
+  public void testO3fsNullEndpoint() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    BasicOzoneFileSystem o3fs = spy(new BasicOzoneFileSystem());
+    BasicOzoneClientAdapterImpl adapter = mock(BasicOzoneClientAdapterImpl.class);
+    doReturn(adapter).when(o3fs).createAdapter(any(), anyString(), anyString(), nullable(String.class), anyInt());
+
+    o3fs.initialize(new URI("o3fs://bucket.volume/"), conf);
+
+    verify(o3fs).createAdapter(same(conf), eq("bucket"), eq("volume"), isNull(), eq(-1));
+  }
+
+  @Test
+  public void testO3fsDottedIpv6UriCannotBeConstructed() {
+    assertThrows(URISyntaxException.class,
+        () -> new URI("o3fs://bucket.volume.[2001:db8::10]:9862/"));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "o3fs://bucket.volume.2001:db8::10/",
+      "o3fs://bucket.volume.2001:db8::10:9862/"
+  })
+  public void testO3fsInitializationRejectsIpv6LiteralForms(String uri) throws Exception {
+    BasicOzoneFileSystem o3fs = new BasicOzoneFileSystem();
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> o3fs.initialize(new URI(uri), new OzoneConfiguration()));
+    assertTrue(exception.getMessage().contains("use an OM service ID or DNS name instead"));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "o3fs://[2001:db8::10]/",
+      "o3fs://[2001:db8::10]:9862/",
+      "o3fs://bucket.volume.host:123:456/"
+  })
+  public void testO3fsMalformedAuthoritiesUseGeneralError(String uri) throws Exception {
+    BasicOzoneFileSystem o3fs = new BasicOzoneFileSystem();
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> o3fs.initialize(new URI(uri), new OzoneConfiguration()));
+    assertTrue(exception.getMessage().contains("Ozone file system URL should be one of the following formats"));
+  }
+
+  @Test
+  public void testRootedAuthorityRejectsOutOfRangePort() {
+    BasicRootedOzoneFileSystem ofs = spy(new BasicRootedOzoneFileSystem());
+    // HostAndPort rejects ports outside 0-65535, unlike a bare Integer.parseInt.
+    assertThrows(IllegalArgumentException.class,
+        () -> ofs.initialize(new URI("ofs://host:99999/"), new OzoneConfiguration()));
   }
 
   private void assertDefaultBlockSize(long expected, FileSystem subject) {

@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.apache.hadoop.hdds.DatanodeVersion.SHORT_CIRCUIT_READS;
+import static org.apache.hadoop.hdds.HDDSVersion.SHORT_CIRCUIT_READS;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.NO_REPLICA_FOUND;
@@ -208,8 +208,7 @@ public class XceiverClientManager extends XceiverClientCreator {
         // read port from the data node, on failure use default configured port.
         port = dn.getPort(DatanodeDetails.Port.Name.STANDALONE).getValue();
         InetSocketAddress addr = NetUtils.createSocketAddr(dn.getIpAddress(), port);
-        if (OzoneNetUtils.isAddressLocal(addr) &&
-            dn.getCurrentVersion() >= SHORT_CIRCUIT_READS.toProtoValue()) {
+        if (OzoneNetUtils.isAddressLocal(addr) && SHORT_CIRCUIT_READS.isSupportedBy(dn.getCurrentVersion())) {
           localAddr = addr;
           localDN = dn;
           break;

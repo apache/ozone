@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.signature;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -27,6 +28,7 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
+import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +46,18 @@ public class TestAWSSignatureProcessor {
     assertEquals("AWS4-HMAC-SHA256 value",
         headers.remove("AUTHORIZATION"));
     assertFalse(headers.containsKey("authorization"));
+  }
+
+  @Test
+  public void testRestoreEmptyContentType() {
+    MultivaluedMap<String, String> rawHeaders = new MultivaluedHashMap<>();
+    rawHeaders.putSingle(HeaderPreprocessor.ORIGINAL_CONTENT_TYPE, "");
+
+    AWSSignatureProcessor.LowerCaseKeyStringMap headers =
+        AWSSignatureProcessor.LowerCaseKeyStringMap.fromHeaderMap(rawHeaders);
+
+    assertTrue(headers.containsKey(HeaderPreprocessor.CONTENT_TYPE));
+    assertEquals("", headers.get(HeaderPreprocessor.CONTENT_TYPE));
   }
 
   @Test

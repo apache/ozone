@@ -37,11 +37,15 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import org.apache.commons.compress.archivers.ArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -162,6 +166,36 @@ public class ReconRDBSnapshotProvider extends RDBSnapshotProvider {
       }
       return null;
     });
+  }
+
+  /**
+   * Extract each file to a temporary name and move it to its own name only once all its bytes are written.
+   * The candidate dir is kept after a failed fetch and the next request lists its files as already received,
+   * so an untar that fails part way (a truncated stream or a full disk) must not leave a partly written file there.
+   */
+  @Override
+  protected Path untarContentsOfTarball(File snapshot, File untarDir, boolean deleteSnapshot) throws IOException {
+    Path dir = untarDir.toPath();
+    try (ArchiveInputStream<TarArchiveEntry> in = Archiver.untar(Files.newInputStream(snapshot.toPath()))) {
+      for (TarArchiveEntry entry = in.getNextEntry(); entry != null; entry = in.getNextEntry()) {
+        Path path = dir.resolve(entry.getName());
+        if (entry.isDirectory()) {
+          Archiver.extractEntry(entry, in, entry.getSize(), dir, path);
+        } else {
+          Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
+          try {
+            Archiver.extractEntry(entry, in, entry.getSize(), dir, tmp);
+            Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING);
+          } finally {
+            Files.deleteIfExists(tmp);
+          }
+        }
+      }
+    }
+    if (deleteSnapshot) {
+      FileUtils.deleteQuietly(snapshot);
+    }
+    return dir;
   }
 
   /**

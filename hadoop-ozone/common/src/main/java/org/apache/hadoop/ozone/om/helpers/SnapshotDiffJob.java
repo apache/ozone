@@ -229,8 +229,7 @@ public class SnapshotDiffJob {
     }
     if (status.equals(JobStatus.IN_PROGRESS) && subStatus != null) {
       sb.append(", subStatus: ").append(subStatus);
-      if (subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_FSO) ||
-          subStatus.equals(SubStatus.OBJECT_ID_MAP_GEN_OBS)) {
+      if (subStatus.hasProgress()) {
         sb.append(String.format(", keysProcessedPct: %.2f", keysProcessedPct));
       }
     }

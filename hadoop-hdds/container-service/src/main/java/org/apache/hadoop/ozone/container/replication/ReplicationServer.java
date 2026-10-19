@@ -238,7 +238,7 @@ public class ReplicationServer {
     )
     private double outOfServiceFactor = OUTOFSERVICE_FACTOR_DEFAULT;
 
-    @Config(key = PER_VOLUME_ENABLED_KEY,
+    @Config(key = "hdds.datanode.replication.per.volume.enabled",
         type = ConfigType.BOOLEAN,
         defaultValue = "false",
         tags = {DATANODE},
@@ -250,7 +250,7 @@ public class ReplicationServer {
     )
     private boolean perVolumeEnabled = false;
 
-    @Config(key = PER_VOLUME_STREAMS_LIMIT_KEY,
+    @Config(key = "hdds.datanode.replication.per.volume.streams.limit",
         type = ConfigType.INT,
         defaultValue = "2",
         reconfigurable = true,

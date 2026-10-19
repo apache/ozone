@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.common.transport.server;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.net.BindException;
@@ -75,6 +76,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private DatanodeID id;
   private Server server;
   private final ContainerDispatcher storageContainer;
+  private final GrpcXceiverService xceiverService;
   private boolean isStarted;
   private DatanodeDetails datanodeDetails;
   private EventLoopGroup eventLoopGroup;
@@ -135,7 +137,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     }
 
     LOG.info("GrpcServer channel type {}", channelType.getSimpleName());
-    GrpcXceiverService xceiverService = new GrpcXceiverService(dispatcher);
+    xceiverService = new GrpcXceiverService(dispatcher, dnConf.getStreamReadFileIdleTimeout(),
+        datanodeDetails.threadNamePrefix());
     NettyServerBuilder nettyServerBuilder = NettyServerBuilder.forPort(port)
         .maxInboundMessageSize(OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE)
         .bossEventLoopGroup(eventLoopGroup)
@@ -233,6 +236,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
       try {
         server.shutdown();
         server.awaitTermination(5, TimeUnit.SECONDS);
+        xceiverService.shutdown();
         eventLoopGroup.shutdownGracefully().sync();
       } catch (InterruptedException e) {
         LOG.error("failed to shutdown XceiverServerGrpc", e);
@@ -253,7 +257,8 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
     Span span = TracingUtil
         .importAndCreateSpan(
             "XceiverServerGrpc." + request.getCmdType().name(),
-            request.getTraceID());
+            request.getTraceID(),
+            SpanKind.SERVER);
     try (Scope ignore = span.makeCurrent()) {
       ContainerProtos.ContainerCommandResponseProto response =
           storageContainer.dispatch(request, null);

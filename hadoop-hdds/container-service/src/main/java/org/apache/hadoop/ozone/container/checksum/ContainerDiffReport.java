@@ -33,6 +33,11 @@ public class ContainerDiffReport {
   private final Map<Long, List<ContainerProtos.ChunkMerkleTree>> corruptChunks;
   private final List<DeletedBlock> divergedDeletedBlocks;
   private final long containerID;
+  // Peer chunks that would have been reported missing or corrupt but were dropped because the peer marked
+  // them unhealthy. A non-zero count means this diff is not a complete account of the peer's tree: a block
+  // whose only differences were dropped never enters the repair lists at all, so reconciliation uses this
+  // counter to keep the container-wide BCSID from advancing past such a block's missing data.
+  private long numUnhealthyChunksFiltered;
 
   public ContainerDiffReport(long containerID) {
     this.missingBlocks = new ArrayList<>();
@@ -67,6 +72,10 @@ public class ContainerDiffReport {
    */
   public void addCorruptChunk(long blockId, ContainerProtos.ChunkMerkleTree corruptChunk) {
     this.corruptChunks.computeIfAbsent(blockId, any -> new ArrayList<>()).add(corruptChunk);
+  }
+
+  public void incrementUnhealthyChunksFiltered() {
+    numUnhealthyChunksFiltered++;
   }
 
   public void addDivergedDeletedBlock(ContainerProtos.BlockMerkleTree blockMerkleTree) {
@@ -114,6 +123,10 @@ public class ContainerDiffReport {
 
   public long getNumMissingChunks() {
     return missingChunks.values().stream().mapToInt(List::size).sum();
+  }
+
+  public long getNumUnhealthyChunksFiltered() {
+    return numUnhealthyChunksFiltered;
   }
 
   public long getNumMissingBlocks() {

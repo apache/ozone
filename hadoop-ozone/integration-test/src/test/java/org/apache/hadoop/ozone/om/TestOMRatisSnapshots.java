@@ -30,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,8 +37,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -54,14 +56,12 @@ import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.FaultInjector;
-import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -78,7 +78,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -90,23 +89,19 @@ import org.junit.jupiter.api.Test;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 /**
  * Tests the Ratis snapshots feature in OM. These tests do not depend on the
  * checkpoint transfer format and run once with the default (inode-based)
  * transfer; tests exercising the transfer path under both formats live in
- * {@link TestOMRatisSnapshotTransfer}.
+ * {@link TestOMRatisSnapshotTransfer}. Bootstrap install snapshot coverage lives in
+ * {@link TestOMInstallSnapshotDuringBootstrapping}.
  */
 public class TestOMRatisSnapshots {
   private static final String OM_SERVICE_ID = "om-service-test1";
-  private static final String BOOTSTRAP_OM_SERVICE_ID = "om-service-bootstrap";
   private static final int NUM_OF_OMS = 3;
-
-  private static final int BOOTSTRAP_LOG_PURGE_GAP = 5;
-  private static final long BOOTSTRAP_TARGET_LOG_INDEX = 200;
-  private static final int BOOTSTRAP_INSTALL_START_DEADLINE_MS = 30_000;
-  private static final int BOOTSTRAP_COMPLETION_DEADLINE_MS = 60_000;
 
   private MiniOzoneHAClusterImpl cluster = null;
   private ObjectStore objectStore;
@@ -310,14 +305,16 @@ public class TestOMRatisSnapshots {
     assertLogCapture(logCapture, msg);
     assertLogCapture(logCapture, "Install Checkpoint is finished");
 
-    // Wait for the follower to apply everything the leader has applied; all
+    // Wait for the follower to apply everything the leader has committed; all
     // writes have completed on the leader, so after this no further snapshot
     // install (and DB reload) can occur and the follower DB reads below are
     // safe from "Rocks Database is closed" races.
-    long leaderApplied = leaderOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
+    // The applied index only advances on double buffer flush, so it can lag
+    // acked writes; the commit index covers them all.
+    long leaderCommitted = leaderRatisServer.getServerDivision().getRaftLog()
+        .getLastCommittedIndex();
     GenericTestUtils.waitFor(() -> followerOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex() >= leaderApplied, 100, 30_000);
+        .getLastAppliedTermIndex().getIndex() >= leaderCommitted, 100, 30_000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -382,6 +379,12 @@ public class TestOMRatisSnapshots {
     long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
+    // The snapshot index above only advances on double buffer flush, so it can
+    // lag the keys written above; the commit index covers them all. Read after
+    // the snapshot index, so it is never behind it.
+    long leaderCommitted = leaderRatisServer.getServerDivision().getRaftLog()
+        .getLastCommittedIndex();
+
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     OzoneManager.setTestInstallSnapshot(true);
     cluster.startInactiveOM(followerNodeId);
@@ -404,12 +407,11 @@ public class TestOMRatisSnapshots {
     });
     readFuture.get();
 
-    // The recently started OM should be lagging behind the leader OM.
-    // Wait & for follower to update transactions to leader snapshot index.
-    // Timeout error if follower does not load update within 3s
+    // The recently started OM should be lagging behind the leader OM. Wait for
+    // it to catch up, which covers the snapshot index and all the keys.
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
+          >= leaderCommitted;
     }, 100, 30_000);
 
     long followerOMLastAppliedIndex =
@@ -478,10 +480,12 @@ public class TestOMRatisSnapshots {
 
     // Wait for the follower to finish applying in-flight transactions, so
     // that the TermIndex read below matches what installCheckpoint observes.
-    long leaderAppliedIndex = leaderOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
+    // The applied index only advances on double buffer flush, so it can lag
+    // acked writes; the commit index covers them all.
+    long leaderCommitted = leaderOM.getOmRatisServer().getServerDivision()
+        .getRaftLog().getLastCommittedIndex();
     GenericTestUtils.waitFor(() -> followerRatisServer
-        .getLastAppliedTermIndex().getIndex() >= leaderAppliedIndex, 100, 10_000);
+        .getLastAppliedTermIndex().getIndex() >= leaderCommitted, 100, 10_000);
 
     // Install the old checkpoint on the follower OM. This should fail as the
     // followerOM is already ahead of that transactionLogIndex and the OM
@@ -644,6 +648,82 @@ public class TestOMRatisSnapshots {
     }
   }
 
+  /**
+   * An apply offered while installCheckpoint has the state machine paused is rejected, and Ratis moves
+   * past it. If the install then fails, the old DB is kept and Ratis does not reload the state machine,
+   * so the entry would never be applied: the OM must exit instead of resuming applies, so that a restart
+   * replays it from the Raft log. A failed install with no such entry must not exit.
+   *
+   * The install is called directly on a follower that keeps receiving entries, which is wider than a
+   * Ratis driven install: there the follower refuses appendEntries, so only entries already committed in
+   * its log but not yet applied can be rejected.
+   */
+  @Test
+  public void testFailedInstallExitsAfterApplyRejectedDuringPause() throws Exception {
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    // The active follower, so it keeps receiving entries while it installs.
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (!cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+
+    writeKeys(1);
+    DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore().getCheckpoint(true);
+    Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    assertNotNull(leaderCheckpointLocation);
+    Path omDbDir = leaderCheckpointLocation.resolve(OM_DB_NAME);
+    Files.createDirectory(omDbDir);
+    moveCheckpointContentsToOmDbDir(leaderCheckpointLocation, omDbDir);
+    TransactionInfo trxnInfo = OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf, omDbDir);
+    // The follower is caught up, so claim a newer checkpoint to let the replacement start. It fails
+    // at the first backup move, before anything from the checkpoint is installed.
+    TransactionInfo aheadTrxnInfo = TransactionInfo.valueOf(trxnInfo.getTerm(), trxnInfo.getTransactionIndex() + 1000);
+
+    DummyExitManager exitManager = new DummyExitManager();
+    followerOM.setExitManagerForTesting(exitManager);
+    LogCapturer updaterLog =
+        LogCapturer.captureLogs(LoggerFactory.getLogger("org.apache.ratis.server.impl.StateMachineUpdater"));
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    BlockThenThrowFaultInjector injector = new BlockThenThrowFaultInjector();
+    try {
+      // Nothing left to apply on the follower, so this install fails with no entry rejected.
+      long leaderIndex = leaderOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
+      GenericTestUtils.waitFor(
+          () -> followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex() >= leaderIndex, 100, 30_000);
+      followerOM.setCheckpointBackupInjector(new ThrowOnNthPauseFaultInjector(1, "Simulated backup move failure"));
+      assertNull(followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation, aheadTrxnInfo));
+      assertThat(exitManager.messages).isEmpty();
+
+      followerOM.setCheckpointBackupInjector(injector);
+      Future<TermIndex> install = executor.submit(
+          () -> followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation, aheadTrxnInfo));
+      assertTrue(injector.paused.await(60, TimeUnit.SECONDS));
+      String key = createKey(ozoneBucket);
+      OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).setBucketName(bucketName)
+          .setKeyName(key).build();
+      long keyIndex = leaderOM.lookupKey(keyArgs).getUpdateID();
+      // Ratis logs the rejected apply of the key's commit on the follower.
+      String follower = followerNodeId + "@";
+      String index = "applying txn index=" + keyIndex + ",";
+      GenericTestUtils.waitFor(() -> Arrays.stream(updaterLog.getOutput().split("\n"))
+          .anyMatch(line -> line.contains(follower) && line.contains(index)), 100, 30_000);
+      injector.resume();
+      assertNull(install.get(60, TimeUnit.SECONDS));
+
+      assertThat(exitManager.messages)
+          .as("follower resumed applies on its old DB after the entry at index %d was skipped", keyIndex)
+          .singleElement().asString().contains("rejected while the state machine was paused");
+    } finally {
+      injector.resume();
+      executor.shutdownNow();
+      updaterLog.stopCapturing();
+      followerOM.setCheckpointBackupInjector(null);
+      cluster.setupExitManagerForTesting();
+    }
+  }
+
   /** Top-level entries of the OM metadata dir, ignoring backup dirs the install creates. */
   private static Set<String> topLevelNames(File metaDir) throws IOException {
     try (Stream<Path> list = Files.list(metaDir.toPath())) {
@@ -651,6 +731,55 @@ public class TestOMRatisSnapshots {
           .filter(n -> !n.startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX))
           .collect(Collectors.toSet());
     }
+  }
+
+  /**
+   * After a successful install the in-memory transaction info must describe the
+   * position the state machine was unpaused at, not the follower's pre-install
+   * index. Asserted immediately after the call: a later takeSnapshot recomputes
+   * the value from the applied index and would mask a regression here.
+   *
+   * This pins an Ozone-internal invariant, not the Ratis contract. Calling
+   * installCheckpoint directly queues no Ratis reload, so the pre-fix value seen
+   * here is starker than a real install leaves behind.
+   */
+  @Test
+  public void testInstallCheckpointPublishesNewTransactionInfo() throws Exception {
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
+
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+
+    writeKeysToIncreaseLogIndex(leaderRatisServer, 100);
+
+    DBCheckpoint leaderDbCheckpoint =
+        leaderOM.getMetadataManager().getStore().getCheckpoint(false);
+    Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    assertNotNull(leaderCheckpointLocation);
+    Path omDbDir = leaderCheckpointLocation.resolve(OM_DB_NAME);
+    assertTrue(omDbDir.toFile().mkdir());
+    moveCheckpointContentsToOmDbDir(leaderCheckpointLocation, omDbDir);
+    TransactionInfo leaderCheckpointTrxnInfo =
+        OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf, omDbDir);
+
+    // The follower was never started, so restarting its RPC server at the end of
+    // installCheckpoint fails. That happens after the transaction info is published
+    // and is not what this test is about, so swallow the exit.
+    followerOM.setExitManagerForTesting(new DummyExitManager());
+
+    TermIndex installed = followerOM.installCheckpoint(
+        leaderOMNodeId, leaderCheckpointLocation, leaderCheckpointTrxnInfo);
+    assertNotNull(installed, "Install should have succeeded");
+    assertEquals(leaderCheckpointTrxnInfo.getTransactionIndex(), installed.getIndex());
+
+    assertEquals(followerOM.getOmRatisServer().getLastAppliedTermIndex(),
+        followerOM.getTransactionInfo().getTermIndex(),
+        "In-memory transaction info must match the position the state machine was unpaused at");
   }
 
   @Test
@@ -691,134 +820,6 @@ public class TestOMRatisSnapshots {
         "Candidate dir should be cleaned after failed download");
     // Clear injector
     followerOM.getOmSnapshotProvider().setInjector(null);
-  }
-
-  /**
-   * Regression test for bootstrap when leader logs are purged: checkpoint install
-   * must proceed during {@code BOOTSTRAPPING} with the default v2 checkpoint API
-   * and complete successfully.
-   */
-  @Test
-  public void testBootstrapInstallSnapshotDuringBootstrapping() throws Exception {
-    IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-
-    OzoneConfiguration bootstrapConf = new OzoneConfiguration();
-    bootstrapConf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 5);
-    bootstrapConf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, BOOTSTRAP_LOG_PURGE_GAP);
-    bootstrapConf.setLong(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
-        SNAPSHOT_THRESHOLD);
-    bootstrapConf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16,
-        StorageUnit.KB);
-    bootstrapConf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY,
-        16, StorageUnit.KB);
-
-    OzoneManagerRatisServerConfig omRatisConf =
-        bootstrapConf.getObject(OzoneManagerRatisServerConfig.class);
-    omRatisConf.setLogAppenderWaitTimeMin(10);
-    bootstrapConf.setFromObject(omRatisConf);
-
-    cluster = (MiniOzoneHAClusterImpl) MiniOzoneCluster.newHABuilder(bootstrapConf)
-        .setOMServiceId(BOOTSTRAP_OM_SERVICE_ID)
-        .setNumOfOzoneManagers(2)
-        .setNumDatanodes(1)
-        .build();
-    cluster.waitForClusterToBeReady();
-
-    client = OzoneClientFactory.getRpcClient(BOOTSTRAP_OM_SERVICE_ID, bootstrapConf);
-    objectStore = client.getObjectStore();
-    String bootstrapVolume = uniqueObjectName("volume");
-    String bootstrapBucket = uniqueObjectName("bucket");
-    objectStore.createVolume(bootstrapVolume);
-    OzoneVolume volume = objectStore.getVolume(bootstrapVolume);
-    volume.createBucket(bootstrapBucket,
-        BucketArgs.newBuilder().setBucketLayout(TEST_BUCKET_LAYOUT).build());
-    ozoneBucket = volume.getBucket(bootstrapBucket);
-
-    OzoneManager leader = cluster.getOMLeader();
-    writeKeysToIncreaseLogIndex(leader.getOmRatisServer(), BOOTSTRAP_TARGET_LOG_INDEX);
-    assertThat(leader.getRatisSnapshotIndex())
-        .as("leader should have purged early logs")
-        .isGreaterThan((long) BOOTSTRAP_LOG_PURGE_GAP);
-
-    LogCapturer omLog = LogCapturer.captureLogs(OzoneManager.class);
-    LogCapturer stateMachineLog =
-        LogCapturer.captureLogs(OzoneManagerStateMachine.class);
-    LogCapturer snapshotProviderLog =
-        LogCapturer.captureLogs(RDBSnapshotProvider.class);
-    String newNodeId = "omNode-bootstrap-ratis-snapshots";
-    ExecutorService executor = Executors.newSingleThreadExecutor();
-    Future<?> bootstrapFuture = executor.submit(() -> {
-      try {
-        cluster.bootstrapOzoneManager(newNodeId);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
-    });
-
-    try {
-      waitForBootstrapCheckpointInstallToStart(omLog, snapshotProviderLog);
-      bootstrapFuture.get(BOOTSTRAP_COMPLETION_DEADLINE_MS, TimeUnit.MILLISECONDS);
-      assertBootstrapOmJoinedRatisGroup(newNodeId);
-    } finally {
-      bootstrapFuture.cancel(true);
-      omLog.stopCapturing();
-      stateMachineLog.stopCapturing();
-      snapshotProviderLog.stopCapturing();
-      executor.shutdownNow();
-      if (cluster != null) {
-        cluster.shutdown();
-      }
-    }
-
-    assertThat(stateMachineLog.getOutput())
-        .as("Ratis should notify the bootstrapping OM to install a checkpoint")
-        .contains("Received install snapshot notification from OM leader");
-    assertThat(omLog.getOutput())
-        .as("checkpoint install must not be aborted during BOOTSTRAPPING")
-        .doesNotContain("Abort install snapshot from Leader");
-    assertThat(omLog.getOutput())
-        .as("checkpoint installation should finish")
-        .contains("Install Checkpoint is finished");
-    assertThat(snapshotProviderLog.getOutput())
-        .as("checkpoint download should start after install is accepted")
-        .contains("Prepare to download the snapshot from leader OM");
-    assertThat(snapshotProviderLog.getOutput())
-        .as("checkpoint tarball should be assembled on the bootstrapping OM")
-        .contains("DB snapshot transfer is complete.");
-  }
-
-  private void assertBootstrapOmJoinedRatisGroup(String newNodeId) {
-    OzoneManager newOm = cluster.getOzoneManager(newNodeId);
-    assertNotNull(newOm, "Bootstrapped OM should be registered on the cluster");
-    for (OzoneManager om : cluster.getOzoneManagersList()) {
-      assertTrue(om.doesPeerExist(newNodeId),
-          "New OM node " + newNodeId + " not present in peer list of OM " + om.getOMNodeId());
-      assertTrue(om.getOmRatisServer().doesPeerExist(newNodeId),
-          "New OM node " + newNodeId + " not present in Ratis peer list of OM "
-              + om.getOMNodeId());
-    }
-  }
-
-  private void waitForBootstrapCheckpointInstallToStart(
-      LogCapturer omLog,
-      LogCapturer snapshotProviderLog)
-      throws InterruptedException, TimeoutException {
-    try {
-      GenericTestUtils.waitFor(() -> {
-        if (omLog.getOutput().contains("Abort install snapshot from Leader")) {
-          fail("Checkpoint install was aborted during BOOTSTRAPPING.");
-        }
-        return snapshotProviderLog.getOutput()
-            .contains("Prepare to download the snapshot from leader OM");
-      }, 200, BOOTSTRAP_INSTALL_START_DEADLINE_MS);
-    } catch (TimeoutException e) {
-      fail("Checkpoint download did not start within " + BOOTSTRAP_INSTALL_START_DEADLINE_MS
-          + "ms. OzoneManager log: " + omLog.getOutput()
-          + ", RDBSnapshotProvider log: " + snapshotProviderLog.getOutput());
-    }
   }
 
   /**
@@ -949,10 +950,37 @@ public class TestOMRatisSnapshots {
   }
 
   private static class DummyExitManager extends ExitManager {
+    private final List<String> messages = new CopyOnWriteArrayList<>();
+
     @Override
     public void exitSystem(int status, String message, Throwable throwable,
         Logger log) {
+      messages.add(throwable == null ? message : message + " " + throwable.getMessage());
       log.error("System Exit: " + message, throwable);
+    }
+  }
+
+  /**
+   * FaultInjector that blocks pause() until resume(), then throws IOException.
+   */
+  private static class BlockThenThrowFaultInjector extends FaultInjector {
+    private final CountDownLatch paused = new CountDownLatch(1);
+    private final CountDownLatch released = new CountDownLatch(1);
+
+    @Override
+    public void pause() throws IOException {
+      paused.countDown();
+      try {
+        released.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      throw new IOException("Simulated backup move failure");
+    }
+
+    @Override
+    public void resume() {
+      released.countDown();
     }
   }
 

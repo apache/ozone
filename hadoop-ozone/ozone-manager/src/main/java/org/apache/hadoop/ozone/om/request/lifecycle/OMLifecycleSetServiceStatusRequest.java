@@ -57,9 +57,9 @@ public class OMLifecycleSetServiceStatusRequest extends OMClientRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest request = super.preExecute(ozoneManager);
+    final OMRequest request = super.preExecute(ozoneManager);
 
-    if (ozoneManager.getAclsEnabled()) {
+    if (ozoneManager.isAdminAuthorizationEnabled()) {
       boolean suspend = request.getSetLifecycleServiceStatusRequest().getSuspend();
       UserGroupInformation ugi = createUGIForApi();
       if (!ozoneManager.isAdmin(ugi)) {

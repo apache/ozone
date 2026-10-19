@@ -19,12 +19,14 @@ package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -36,6 +38,10 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
@@ -45,7 +51,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -173,6 +182,37 @@ public class TestReconUtils {
     for (int i = 0; i < 10; i++) {
       assertNextClosestPowerIndexOfTwo(RandomUtils.secure().randomLong());
     }
+  }
+
+  @Test
+  @Timeout(30)
+  public void testGatherSubPathsToleratesCyclicTree() throws IOException {
+    // Corrupted NSSummary tree: 1 -> {2, 3}, 2 -> 1 (back edge), 3 -> 3 (self
+    // loop). gatherSubPaths must terminate instead of overflowing the stack,
+    // and must list each reachable child directory once.
+    ReconNamespaceSummaryManager nsSummaryManager =
+        mock(ReconNamespaceSummaryManager.class);
+    when(nsSummaryManager.getNSSummary(1L))
+        .thenReturn(nsSummaryWithChildren(2L, 3L));
+    when(nsSummaryManager.getNSSummary(2L))
+        .thenReturn(nsSummaryWithChildren(1L));
+    when(nsSummaryManager.getNSSummary(3L))
+        .thenReturn(nsSummaryWithChildren(3L));
+
+    List<String> subPaths = new ArrayList<>();
+    ReconUtils.gatherSubPaths(1L, subPaths, 100L, 200L, nsSummaryManager);
+
+    // Child directories reachable from parent 1 are exactly {2, 3}, each emitted
+    // once. The traversal root (1) must be excluded and no child dropped, so
+    // assert the exact "/volumeId/bucketId/objectId" subpaths (in any order).
+    assertThat(subPaths).containsExactlyInAnyOrder("/100/200/2", "/100/200/3");
+    verify(nsSummaryManager).recordNSSummaryInvalidTreeDetection();
+  }
+
+  private static NSSummary nsSummaryWithChildren(Long... childIds) {
+    NSSummary nsSummary = new NSSummary();
+    nsSummary.setChildDir(new HashSet<>(Arrays.asList(childIds)));
+    return nsSummary;
   }
 
   static void assertNextClosestPowerIndexOfTwo(long n) {
