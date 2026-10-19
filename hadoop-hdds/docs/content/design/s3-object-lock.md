@@ -56,11 +56,11 @@ stable rollout of baseline tamper-proof protection.
 ## Differences from AWS
 
 * Single-Version Model: Locks apply to the current key rather than individual object versions. 
-* Direct Overwrite Blocking: Unlike AWS S3 (which writes a new version), Ozone strictly rejects Put, Copy, and MPU requests on locked keys with 403 Access Denied (WORMProtectionException). 
+* Direct Overwrite Blocking: In AWS S3, a Put, Copy, or MPU request on a locked object writes a new version and leaves the locked version unchanged.
+  Because Ozone uses the single-version model above, the same request would replace the locked key itself, so Ozone rejects Put, Copy, and MPU requests on locked keys with 403 Access Denied (WORMProtectionException). 
 * Authorization: Ozone has no root account.
-  * With native ACLs, changing Object Lock settings requires `WRITE_ACL` and bypassing Governance retention is limited to Ozone administrators (see [Native ACL Mapping](#1-native-acl-mapping)).
-  * With Ranger, AWS-style action-level authorization for S3 requests requires both `ozone.s3g.sts.http.enabled` and `enableActionMatcherInPoliciesCondition` to be enabled; both are `false` by default (see [Prerequisite for S3 Fine-Grained Authorization](#3-prerequisite-for-s3-fine-grained-authorization)).
-  * Otherwise, and for native clients, Ranger falls back to `READ_ACL` / `WRITE_ACL`, and bypassing Governance retention requires `WRITE_ACL`, `WRITE` and `DELETE` (see [Fallback: Base Permission Mode](#4-fallback-base-permission-mode)).
+  * With native ACLs, changing Object Lock settings and bypassing Governance retention are limited to the volume or bucket owner, and setting a Compliance retention is limited to Ozone administrators (see [Native ACL Mapping](#1-native-acl-mapping)).
+  * With Ranger, AWS-style action-level authorization for S3 requests requires `enableActionMatcherInPoliciesCondition` to be enabled; it is `false` by default (see [Ranger Authorization](#2-ranger-authorization)).
   * A Compliance retention cannot be removed through any API; it can only be changed offline with `ozone repair` (see [Offline Compliance Retention Repair](#offline-compliance-retention-repair)).
 
 ## Technical Description
@@ -69,7 +69,7 @@ stable rollout of baseline tamper-proof protection.
 
 **Legal Hold**
 
-* **Definition**: Applies an indefinite lock status to an object. The object remains protected until a principal allowed to change the legal hold (`WRITE_ACL` on the key, plus the `PutObjectLegalHold` action in Ranger Fine-Grained Mode) explicitly removes the lock (Remove Legal Hold).
+* **Definition**: Applies an indefinite lock status to an object. The object remains protected until a principal allowed to change the legal hold (the volume or bucket owner with native ACLs, or the `PutObjectLegalHold` action with Ranger) explicitly removes the lock (Remove Legal Hold).
 * **Restricted Operations**:
   * Put Object 
   * Delete Object 
@@ -202,148 +202,73 @@ message KeyRetention {
 Ozone Object Lock enforces a dual-gate protection mechanism combining **authorization (native ACLs or Ranger)** and **underlying OM WORM state validation**:
 
 * **Standard Data Operations (Put / Delete)**: Even if a principal has valid `CREATE`, `WRITE` or `DELETE` access, any attempt to mutate, overwrite, or delete an object under an active Legal Hold or an unexpired Retention period is immediately rejected with `403 Access Denied` (`WORMProtectionException`).
-* **Base Permissions**: Object Lock operations are checked against the existing `READ_ACL` / `WRITE_ACL` types for both native ACLs and Ranger, so no new ACL type is needed (see below).
-* **Fine-Grained S3 Action Matching (Ranger)**: For requests through S3 Gateway, Object Lock management integrates with the action-matching authorization framework introduced via STS. S3 Object Lock actions map 1:1 to AWS S3 action names. See [AWS STS Design for Ozone S3](ozone-sts.md) for details.
+* **Two authorization models**: Object Lock requests are authorized by the authorizer the cluster is configured with, either native ACLs or Ranger:
+  * [Native ACLs](#1-native-acl-mapping) have no per-action permissions, so they use a simple and strict model based on ownership and the Ozone administrator role.
+  * [Ranger](#2-ranger-authorization) checks the access type of each operation, and can also restrict policy items by S3 action, as in AWS S3.
+* **Fine-grained permissions**: deployments that need separate permissions for each Object Lock operation (for example, granting `PutObjectLegalHold` without `PutObjectRetention`)
+  should use Ranger and enable `ranger.servicedef.ozone.enableActionMatcherInPoliciesCondition=true`.
 
 ---
 
 #### 1. Native ACL Mapping
 
-Changing Object Lock state is treated as a permission change, so it requires `WRITE_ACL` rather than `WRITE`.
-A user who can only write or delete data cannot remove or shorten a lock.
+| Operation                                                         | Resource Level | Required with Native ACLs          |
+|:------------------------------------------------------------------|:---------------|:-----------------------------------|
+| `GetBucketObjectLockConfiguration`                                | Bucket         | `READ`                             |
+| `GetObjectRetention`, `GetObjectLegalHold`                        | Key            | `READ`                             |
+| `PutBucketObjectLockConfiguration` (no default or `GOVERNANCE`)   | Bucket         | Owner                              |
+| `PutObjectRetention` (`GOVERNANCE`)                               | Key            | Owner                              |
+| `PutObjectLegalHold`                                              | Key            | Owner                              |
+| Bypass Governance retention                                       | Key            | Owner                              |
+| Any change that sets or updates a `COMPLIANCE` retention          | Bucket / Key   | Ozone administrator only           |
 
-| Operation                              | Resource Level | Required Native ACL                |
-|:---------------------------------------|:---------------|:-----------------------------------|
-| `GetBucketObjectLockConfiguration`     | Bucket         | `READ_ACL`                         |
-| `PutBucketObjectLockConfiguration`     | Bucket         | `WRITE_ACL`                        |
-| `GetObjectRetention`                   | Key            | `READ_ACL`                         |
-| `PutObjectRetention`                   | Key            | `WRITE_ACL`                        |
-| `GetObjectLegalHold`                   | Key            | `READ_ACL`                         |
-| `PutObjectLegalHold`                   | Key            | `WRITE_ACL`                        |
-| Bypass Governance retention            | Key            | Ozone administrator only           |
+**Reading lock information requires `READ`**: Object Lock state is not sensitive for a principal that can already read the key, and `HeadObject` / `GetObject` return the same information in the `x-amz-object-lock-*` headers.
+
+**Owner** means the owner of the volume or the bucket that contains the resource, the same owner that the native authorizer already lets skip ACL checks (`OzoneNativeAuthorizer`). Ozone administrators can also perform every owner operation.
+* Changing a lock is limited to owners, instead of an ACL type such as `WRITE_ACL`: any ACL type can be granted to other users, so a user who was only meant to read or write data could be given the right to remove a lock.
+* Owners can also bypass Governance retention, so with native ACLs Governance retention protects keys from accidental deletion by every user except the owners and Ozone administrators.
+
+**Compliance is limited to Ozone administrators**: a Compliance retention cannot be shortened or removed through any API, so setting one is irreversible. With native ACLs, only an Ozone administrator can:
+* set a `COMPLIANCE` retention on a key with `PutObjectRetention`, or with the `x-amz-object-lock-*` headers on Put Object / Create Multipart Upload,
+* extend a `COMPLIANCE` retention, change a `GOVERNANCE` retention to `COMPLIANCE`, or release the event hold of a `COMPLIANCE` key,
+* set `COMPLIANCE` as the default retention mode of a bucket with `PutBucketObjectLockConfiguration`, or change the default of a bucket whose default is already `COMPLIANCE`.
+
+New keys written to a bucket whose default mode is `COMPLIANCE` get the default retention without an administrator check, because an administrator already approved it when configuring the bucket.
 
 **Ozone administrator** means a user listed in `ozone.administrators` or a member of a group listed in `ozone.administrators.groups`
 (if neither is set, only the user that starts the OM is an administrator). This is the same check used for other admin-only OM operations.
-* The native authorizer already grants every ACL to Ozone administrators, so they also pass the `READ_ACL` / `WRITE_ACL` checks above.
-* Bypass is limited to administrators because the native ACL model has no permission dedicated to it: any ACL type would also be grantable by bucket or key owners,
-  who could then remove the Governance protection from their own data.
-* Read-only administrators (`ozone.readonly.administrators`) and S3 administrators (`ozone.s3.administrators`) cannot bypass Governance retention.
-* The administrator role is cluster wide, so it cannot be scoped to a single volume or bucket. Deployments that need per-bucket bypass entitlement should use Ranger.
-* The bypass does not apply to Compliance retention or a legal hold; a legal hold must be removed explicitly with `PutObjectLegalHold`, which an administrator can do because it only requires `WRITE_ACL`.
+* Read-only administrators (`ozone.readonly.administrators`) and S3 administrators (`ozone.s3.administrators`) cannot perform the Compliance operations above.
+* The administrator role is cluster wide, so it cannot be scoped to a single volume or bucket. Deployments that need finer control should use Ranger.
 
 ---
 
-#### 2. Ranger Authorization Modes
-
-With Ranger, every Object Lock request is authorized in one of two modes.
-S3 actions are an S3 protocol concept, so only S3 Gateway sets them; OM does not add S3 actions to requests itself.
-In both modes OM always checks the base access type (`READ_ACL` / `WRITE_ACL`), and the OM WORM state validation is the same.
-
-| Request source                  | `ozone.s3g.sts.http.enabled` | `enableActionMatcherInPoliciesCondition` | Mode                                                                    |
-|:--------------------------------|:-----------------------------|:-----------------------------------------|:------------------------------------------------------------------------|
-| S3 Gateway                      | `true`                       | `true`                                   | [Fine-Grained Mode](#3-prerequisite-for-s3-fine-grained-authorization)  |
-| S3 Gateway                      | `false`                      | `true`                                   | [Base Permission Mode](#4-fallback-base-permission-mode); denied by policy items with an action condition (see below) |
-| S3 Gateway                      | `false`                      | `false`                                  | [Base Permission Mode](#4-fallback-base-permission-mode)                |
-| S3 Gateway                      | `true`                       | `false`                                  | [Base Permission Mode](#4-fallback-base-permission-mode) (not recommended, see below) |
-| Native Java API / CLI           | any                          | any                                      | [Base Permission Mode](#4-fallback-base-permission-mode); with the Ranger flag enabled, denied by policy items with an action condition |
-
-* **Fine-Grained Mode**: Ranger checks the S3 action (for example `PutObjectLegalHold`) and its base access type in the [mapping below](#6-action-to-ranger-access-type-mapping).
-* **Base Permission Mode**: Ranger checks only the base access type.
-
-**Requests without an action when the Ranger flag is enabled**:
-
-When `enableActionMatcherInPoliciesCondition=true`, the result for a request without an S3 action (S3 Gateway with the STS flag disabled, or a native client) depends on the matching Ranger policy item:
-
-| Matching policy item                          | Request with an S3 action                          | Request without an S3 action                         |
-|:----------------------------------------------|:---------------------------------------------------|:-----------------------------------------------------|
-| Has an action condition (e.g. `PutObjectLegalHold`) | Granted only if the action is listed and the access type matches | **Denied**: the action condition cannot be satisfied |
-| Has no action condition                       | Granted if the access type matches                 | Granted if the access type matches (Base Permission Mode) |
-
-* If the principal is granted Object Lock access only through policy items with an action condition, every Object Lock request without an action is denied,
-  including the requests that the same principal could send through S3 Gateway with both flags enabled.
-* If the principal is granted the access type through a policy item without an action condition, the request falls back to Base Permission Mode.
-* When `enableActionMatcherInPoliciesCondition=false`, action conditions are not evaluated at all, so every request is in Base Permission Mode.
-
----
-
-#### 3. Prerequisite for S3 Fine-Grained Authorization
+#### 2. Ranger Authorization
 
 > _**Important for S3 users**_: AWS-style action-level authorization for Object Lock (separate permissions for `PutObjectRetention`,
-> `PutObjectLegalHold`, `PutBucketObjectLockConfiguration` and `BypassGovernanceRetention`) is only available when **both** flags below are enabled.
-> Both are `false` by default, so a cluster with default settings authorizes S3 Object Lock requests in [Base Permission Mode](#4-fallback-base-permission-mode).
+> `PutObjectLegalHold`, `PutBucketObjectLockConfiguration` and `BypassGovernanceRetention`) requires the Ranger action matcher to be enabled.
+> It is `false` by default:
+> ```properties
+> ranger.servicedef.ozone.enableActionMatcherInPoliciesCondition=true
+> ```
 
-```properties
-# S3 Gateway and OM: extract the S3 action and forward it to the authorizer
-ozone.s3g.sts.http.enabled=true
-# Ranger Ozone service definition: evaluate the S3 action in policy conditions
-ranger.servicedef.ozone.enableActionMatcherInPoliciesCondition=true
-```
+**Access types**:
+* OM maps each Object Lock operation to the access type in the [mapping below](#4-action-to-ranger-access-type-mapping) (for example `WRITE_ACL` for `PutObjectLegalHold`).
+  A principal with that access type on the target resource is allowed, regardless of whether the request comes from S3 Gateway, ofs / o3fs or the Ozone CLI.
 
-**Why both flags are required**:
-* `ozone.s3g.sts.http.enabled` decides whether the S3 action reaches Ranger at all. Today S3 Gateway sets `S3Authentication.s3Action` and OM copies it into the `RequestContext` only when this flag is `true`
-  (`EndpointBase.applyS3Action`, `OmMetadataReader.maybeAddToContextFromThreadLocal`). The action was originally only needed for STS, which is why it is tied to this flag.
-* `enableActionMatcherInPoliciesCondition` decides whether Ranger uses the action. When it is `false`, Ranger's `RangerActionMatcher` ignores the action and only checks the access type.
-* If only the Ranger flag is enabled, S3 Gateway sends no action. Requests are denied by policy items with an action condition, and fall back to Base Permission Mode only through policy items without one
-  (see [Requests without an action when the Ranger flag is enabled](#2-ranger-authorization-modes)). S3 users granted Object Lock permissions by action would therefore be denied, so this combination is not recommended either.
-* If only the STS flag is enabled, Ranger ignores the action, so requests also fall back to Base Permission Mode.
-  This combination is not recommended: STS session policies restrict temporary credentials by S3 action (see [AWS STS Design for Ozone S3](ozone-sts.md)),
-  so without the Ranger flag those restrictions would not be enforced. This is also why the STS flag is not enabled by default.
+**Action-based policy condition (`action-matches`)**:
+* When `enableActionMatcherInPoliciesCondition` is enabled, the Ozone service definition gets an `action-matches` policy condition that can be added to individual policy items.
+  Its value is a list of S3 actions (wildcards `*` and `Prefix*` are supported), which `RangerActionMatcher` compares with the S3 action of the request.
+* The condition only narrows a policy item and never adds permissions: an item with `action-matches` applies only when both the access type and the action match.
+  Policy items without the condition behave as before and are checked by access type only.
+* For example, a legal team can be granted `WRITE_ACL` with `action-matches: PutObjectLegalHold`, so it can change legal holds but not retention.
+* S3 Gateway maps each Object Lock request to its S3 action in `S3GActionIamMapper`, and OM passes it to Ranger in the `RequestContext`. OM does not set S3 actions itself.
+* Today S3 Gateway only sends the action when `ozone.s3g.sts.http.enabled=true`. This design depends on [HDDS-17054](https://issues.apache.org/jira/browse/HDDS-17054), which sends the action for every S3 request, so that Object Lock does not require STS to be enabled.
 
-**What S3 users get in Fine-Grained Mode**:
-* Object Lock permissions can be granted separately, as in AWS IAM. For example, a legal team can be granted `PutObjectLegalHold` without `PutObjectRetention`,
-  and `BypassGovernanceRetention` can be granted to a smaller group than the one that sets retention.
-* STS session policies (AssumeRole) can include or exclude Object Lock actions, and `IamSessionPolicyResolver` restricts the temporary credential accordingly.
-* Each action still requires its base access type, so a wrong action mapping in S3 Gateway cannot reduce the check below `READ_ACL` / `WRITE_ACL`.
-
-**Operator guidance**:
-* Clusters that expose Object Lock to S3 users with different roles (for example, data writers, compliance officers and administrators) should enable both flags before enabling Object Lock on any bucket.
-* The STS flag only affects S3 Gateway requests. Native clients never carry an action, so they are denied by policy items with an action condition and are granted only through policy items without one (see [below](#4-fallback-base-permission-mode)).
-* The user documentation of this feature will describe both flags and the difference between the two modes.
+For how requests without an S3 action (ofs, o3fs, Ozone CLI, Hadoop and native Java API) are authorized, see [Trusted Boundary](#trusted-boundary-and-compliance-scope).
 
 ---
 
-#### 4. Fallback: Base Permission Mode
-
-Base Permission Mode is used for every request without an S3 action:
-requests from the native Java API or CLI, and S3 Gateway requests when either flag in the [previous section](#3-prerequisite-for-s3-fine-grained-authorization) is disabled.
-OM does not set an S3 action for these requests, so that the S3 action mapping stays in `S3GActionIamMapper` only.
-When the Ranger flag is enabled, these requests are granted only through policy items without an action condition
-(see [Requests without an action when the Ranger flag is enabled](#2-ranger-authorization-modes)).
-
-**Checks**:
-
-| Operation                              | Resource Level | Required Ranger Access Type |
-|:---------------------------------------|:---------------|:----------------------------|
-| `GetBucketObjectLockConfiguration`     | Bucket         | `READ_ACL`                  |
-| `PutBucketObjectLockConfiguration`     | Bucket         | `WRITE_ACL`                 |
-| `GetObjectRetention`                   | Key            | `READ_ACL`                  |
-| `PutObjectRetention`                   | Key            | `WRITE_ACL`                 |
-| `GetObjectLegalHold`                   | Key            | `READ_ACL`                  |
-| `PutObjectLegalHold`                   | Key            | `WRITE_ACL`                 |
-| Bypass Governance retention            | Key            | `WRITE_ACL`, `WRITE` and `DELETE` |
-
-**Why `READ_ACL` / `WRITE_ACL` instead of `READ` / `WRITE`**:
-* Without an S3 action, a `WRITE` check could not tell `PutObject` from `PutObjectLegalHold`, so any user who can write a key could also remove its legal hold or shorten its retention.
-* Changing a lock is treated as a permission change, so it uses the same access type as changing an ACL. Users with only `READ`, `WRITE`, `CREATE` or `DELETE` on a key cannot read or change its Object Lock settings.
-* This matches the [Native ACL Mapping](#1-native-acl-mapping), so the same operation needs the same access type with native ACLs and with Ranger.
-
-**Limitations compared with Fine-Grained Mode**:
-* All Object Lock changes on a resource need the same `WRITE_ACL`, so they cannot be granted separately. A principal that can set a legal hold can also set retention on the same key, and can bypass Governance retention if it also has `WRITE` and `DELETE`.
-* Governance retention therefore only protects keys from principals without `WRITE_ACL`, `WRITE` and `DELETE`. Deployments that need a separate bypass entitlement should use Fine-Grained Mode.
-* `WRITE_ACL` is also the access type for changing ACLs, so granting Object Lock management also grants that.
-* Unlike native ACLs, where bypass is limited to Ozone administrators, Ranger has no Ozone administrator role, so bypass is granted through a policy with `WRITE_ACL`, `WRITE` and `DELETE`.
-* Compliance retention is not affected: it cannot be removed in either mode.
-
-**Native clients when both flags are enabled**:
-* Native clients carry no S3 action. A policy item with an action condition cannot be satisfied by a request without an action, so it does not grant the request.
-* A principal whose `WRITE_ACL` is limited to `PutObjectLegalHold` through S3 Gateway is therefore denied all Object Lock operations through a native client;
-  it cannot use a native client to get around the action-level restrictions.
-* To let a principal manage Object Lock through a native client, grant the access type through a policy item without an action condition.
-  That item applies to S3 Gateway requests as well, so the principal gets every Object Lock operation allowed by the access type, without action-level separation.
-
----
-
-#### 5. Ranger & S3 Gateway Component Updates
+#### 3. Ranger & S3 Gateway Component Updates
 
 1. **UI & Metadata Registration**:
   * Update `security-admin/src/main/webapp/react-webapp/src/utils/actionRequirements/ozone.json` in Apache Ranger:
@@ -351,13 +276,14 @@ When the Ranger flag is enabled, these requests are granted only through policy 
 
 2. **S3 Gateway & STS Mapping**:
   * Update **`S3GActionIamMapper`**: Map incoming HTTP request context and sub-resources (e.g., `?legal-hold`, `?retention`, `?object-lock`) to the corresponding action string.
-  * Update **`IamSessionPolicyResolver`**: Ensure session-scoped policies (STS AssumeRole / federation tokens) recognize and evaluate the new Object Lock action strings, mapped to the same `READ_ACL` / `WRITE_ACL` base access types.
+  * Update **`IamSessionPolicyResolver`**: Ensure session-scoped policies (STS AssumeRole / federation tokens) recognize and evaluate the new Object Lock action strings, mapped to the same base access types.
 
 ---
 
-#### 6. Action to Ranger Access Type Mapping
+#### 4. Action to Ranger Access Type Mapping
 
-In Fine-Grained Mode, following the declarative contract in `ozone.json`, each S3 action requires a baseline primitive Ranger permission at the designated resource hierarchy:
+Following the declarative contract in `ozone.json`, each S3 action requires a baseline primitive Ranger permission at the designated resource hierarchy.
+Policy items without an `action-matches` condition are checked only against the access type:
 
 | S3 Action                              | Resource Level | Required Ranger Access Type | Description                                                         |
 |:---------------------------------------|:---------------|:----------------------------|:--------------------------------------------------------------------|
@@ -371,7 +297,7 @@ In Fine-Grained Mode, following the declarative contract in `ozone.json`, each S
 
 ---
 
-#### 7. Retention Modes & Governance Bypass Enforcement
+#### 5. Retention Modes & Governance Bypass Enforcement
 
 * **Compliance Mode**:
   * The strictest WORM protection tier.
@@ -382,8 +308,8 @@ In Fine-Grained Mode, following the declarative contract in `ozone.json`, each S
     1. **Client Declaration**: The client must explicitly set the `bypassGovernanceRetention` flag on the request. S3 Gateway sets it from the `x-amz-bypass-governance-retention: true` header; native Ozone clients pass it as a boolean argument.
        It is carried in `KeyArgs` and `DeleteKeyArgs`, so it is available to every operation that checks Object Lock (delete, batch delete, overwrite, multipart upload, `PutObjectRetention`).
        Because Ozone does not support versioning yet, this flag is an Ozone-specific design: when Object Lock is enabled without versioning, a Governance-locked key can only be deleted or overwritten with the flag.
-    2. **Bypass Entitlement**: With native ACLs, the principal must be an Ozone administrator (`ozone.administrators`).
-       With Ranger, the principal needs `WRITE_ACL`, `WRITE` and `DELETE` on the target key, and in Fine-Grained Mode also the **`BypassGovernanceRetention`** action.
+    2. **Bypass Entitlement**: With native ACLs, the principal must be the owner of the volume or bucket, or an Ozone administrator.
+       With Ranger, the principal needs `WRITE_ACL`, `WRITE` and `DELETE` on the target key; if the policy item has an `action-matches` condition, it must also match **`BypassGovernanceRetention`**.
     3. If either check fails, the request is aborted with `403 Access Denied`.
 
 
@@ -493,9 +419,9 @@ The additional metadata lookups are expected to have a small impact on throughpu
 
 ## Security
 
-Access control via native ACLs or Ranger ensures all Object Lock operations (such as Retention Policy configuration and Legal Hold management) are enforced under strict access permissions. With native ACLs, changing a lock requires `WRITE_ACL` and Governance bypass is limited to Ozone administrators.
+Access control via native ACLs or Ranger ensures all Object Lock operations (such as Retention Policy configuration and Legal Hold management) are enforced under strict access permissions. With native ACLs, changing a lock or bypassing Governance retention is limited to the volume or bucket owner, and setting a Compliance retention is limited to Ozone administrators.
 
-With Ranger, changing a lock requires `WRITE_ACL`, and bypassing Governance retention requires `WRITE_ACL`, `WRITE` and `DELETE`. For S3 Gateway requests, by leveraging the **STS action-matching framework**, Ozone maps standard S3 API actions (e.g., `BypassGovernanceRetention`, `PutObjectLegalHold`) directly to standard Ranger primitive access types (`READ_ACL`, `WRITE_ACL`, plus `WRITE` and `DELETE` for `BypassGovernanceRetention`). This fine-grained, action-level authorization enforces the Principle of Least Privilege **without requiring custom dedicated access types**. It effectively prevents unauthorized tampering or removal of locks, ensuring robust compliance and data immutability.
+With Ranger, Ozone maps standard S3 API actions (e.g., `BypassGovernanceRetention`, `PutObjectLegalHold`) to standard Ranger access types (`READ_ACL`, `WRITE_ACL`, plus `WRITE` and `DELETE` for `BypassGovernanceRetention`), and the **`action-matches` policy condition** (enabled by `enableActionMatcherInPoliciesCondition`) restricts policy items to specific S3 actions. This action-level authorization enforces the Principle of Least Privilege **without requiring custom dedicated access types**. It effectively prevents unauthorized tampering or removal of locks, ensuring robust compliance and data immutability.
 
 ### Trusted Boundary and Compliance Scope
 
@@ -505,6 +431,16 @@ While AWS S3 can guarantee absolute immutability across all levels because its i
 The trusted boundary for this Object Lock design is defined at the **Application API Level**.
 * All data and metadata operations routed through the Ozone Java API, S3 Gateway, RPC interfaces, and standard Ozone clients are strictly governed by the Object Lock validation (`validateAndUpdateCache`) and native ACLs or Ranger access policies.
 * Within this boundary, immutability is strictly enforced. Unless explicitly authorized with specific privileged permissions (e.g., s3:BypassGovernanceRetention), even cluster administrators using standard client tools cannot overwrite or delete locked objects until the retention period expires or the legal hold is removed.
+* **With Ranger, `action-matches` is what separates Object Lock permissions.**
+  The access type alone does not: `PutObjectRetention`, `PutObjectLegalHold` and `PutBucketObjectLockConfiguration` all map to `WRITE_ACL`.
+  * A policy item that grants `WRITE_ACL` without `action-matches` (or with `*`) allows every Object Lock change on its resources, from any client.
+  * To give a principal only some of these permissions (for example only `PutObjectLegalHold`), add `action-matches` to its policy items, and make sure no other item grants it `WRITE_ACL` on the same resources without the condition.
+    Ranger allows a request when any policy item matches, so one item without `action-matches` cancels the restriction.
+* **Requests without an S3 action** (ofs, o3fs, Ozone CLI, Hadoop and native Java API) are inside the same boundary: they go through the same Object Lock validation and the same access type checks as S3 Gateway requests.
+  * They carry no S3 action, so policy items with a specific `action-matches` value do not match them; only items without the condition, or with `*`, can grant them.
+    The same rule applies to the grants of inline (session) policies.
+  * So an `action-matches` restriction cannot be avoided by switching from S3 Gateway to a non-S3 client: the request is denied, not allowed.
+  * In a deployment with both S3 and non-S3 access, keep policy items without `action-matches` for the principals that use non-S3 clients, so that their access is not denied unexpectedly. Those items grant every Object Lock change allowed by their access type, so give them only to principals that should have it.
 
 **Out of Scope (Infrastructure Level bypass):**
 Since Ozone runs on customer-managed infrastructure, operations executed with OS-level `root` privileges or physical access to the server nodes bypass the application-level API boundary. The following scenarios are not protected by Ozone Object Lock:
@@ -546,10 +482,9 @@ The implementation is divided into the phases below. Only the highlights are lis
 
 ### Phase 2: Authorization
 
-* Native ACLs: `READ_ACL` / `WRITE_ACL` checks for the Object Lock operations, and Ozone administrator check for Governance bypass.
-* Ranger: `READ_ACL` / `WRITE_ACL` checks for the Object Lock operations, and `WRITE_ACL`, `WRITE` and `DELETE` for Governance bypass (Base Permission Mode).
-* Fine-Grained Mode: register the 7 Object Lock actions in S3 Gateway and Ranger.
-* Document both flags and the two modes in the user documentation.
+* Native ACLs: `READ` for reading lock information, owner check for changing locks and Governance bypass, and Ozone administrator check for Compliance.
+* Ranger: register the 7 Object Lock actions in S3 Gateway and Ranger, with the `READ_ACL` / `WRITE_ACL` access types for requests without an S3 action. Depends on HDDS-17054.
+* Document the Ranger action matcher prerequisite and the native ACL ownership model in the user documentation.
 
 ### Phase 3: Object Lock Management APIs
 
