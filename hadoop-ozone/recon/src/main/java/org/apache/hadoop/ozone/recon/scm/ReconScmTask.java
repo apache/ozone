@@ -94,8 +94,18 @@ public abstract class ReconScmTask {
 
   protected void initializeAndRunTask() throws Exception {
     taskStatusUpdater.recordRunStart();
-    runTask();
-    taskStatusUpdater.recordRunCompletion();
+    try {
+      taskStatusUpdater.setLastTaskRunStatus(0);
+      runTask();
+    } catch (InterruptedException e) {
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+      throw e;
+    } catch (Exception e) {
+      LOG.error("Failed to run task {}.", getTaskName(), e);
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+    } finally {
+      taskStatusUpdater.recordRunCompletion();
+    }
   }
 
   /**
