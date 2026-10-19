@@ -110,6 +110,7 @@ We use GitHub pull requests for contributing changes to the repository. The main
   5. Make your changes locally.
      * For complex changes, committing each logical part is recommended.
      * Start commit messages with the Jira ID, e.g. `HDDS-1234. Fix snapshot purge regression`.
+     * If you include non-trivial content created using generative AI tooling, disclose it in each commit's message as `Co-authored-by: TOOL (MODEL)` (see [ASF Generative Tooling Guidance](https://www.apache.org/legal/generative-tooling.html) for details).  Validate changes proposed by the tools before relying on it.
   6. Push your changes to your fork of Ozone
   7. Wait for the `build-branch` workflow to complete successfully for your commit.
   8. Create a pull request for your changes
@@ -132,7 +133,8 @@ We use GitHub pull requests for contributing changes to the repository. The main
 * For test fixes, inspect the failure evidence and address the cause instead of only increasing a timeout.
 * Keep the PR in draft while the implementation is unstable, fork CI is failing, or you are still addressing review comments.
 * CI resources are shared. Do not run CI for obsolete revisions, trigger it only when necessary, and do not rerun unrelated flaky tests that are already fixed on `master`.
-* If you use generative AI tooling, validate its analysis and proposed fixes before relying on them, and keep PR descriptions concise. When it produced non-trivial content, disclose it in the PR description as `Generated-by: TOOL (MODEL)`, see the [ASF Generative Tooling Guidance](https://www.apache.org/legal/generative-tooling.html).
+* Keep PR descriptions concise.
+* If you use generative AI tooling for drafting pull request text, please include `Generated-by: TOOL (MODEL)` in the description.
 
 ## Committer guidelines
 
