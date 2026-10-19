@@ -18,9 +18,12 @@
 package org.apache.hadoop.ozone.recon.scm;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
@@ -32,6 +35,9 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
@@ -54,6 +60,73 @@ class TestReconScmTask {
     when(manager.getTaskStatusUpdater(anyString())).thenReturn(updater);
     task = mock(ReconScmTask.class, org.mockito.Mockito.withSettings().useConstructor(manager)
         .defaultAnswer(org.mockito.Mockito.CALLS_REAL_METHODS));
+  }
+
+  @Test
+  void testTaskCanRestartAfterThreadExits() throws Exception {
+    AtomicReference<Thread> thread = new AtomicReference<>();
+    CountDownLatch started = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      thread.set(Thread.currentThread());
+      started.countDown();
+      return null;
+    }).when(task).run();
+
+    task.start();
+    assertTrue(started.await(5, TimeUnit.SECONDS));
+    thread.get().join(5000);
+    assertFalse(thread.get().isAlive());
+    assertFalse(task.isRunning());
+    assertFalse(task.canRun());
+
+    CountDownLatch restarted = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      thread.set(Thread.currentThread());
+      restarted.countDown();
+      return null;
+    }).when(task).run();
+    task.start();
+    assertTrue(restarted.await(5, TimeUnit.SECONDS));
+    thread.get().join(5000);
+    assertFalse(task.isRunning());
+  }
+
+  @Test
+  void testPipelineInterruptionCompletesRunOnce() throws Exception {
+    ReconTaskConfig config = new ReconTaskConfig();
+    PipelineSyncTask pipelineTask = spy(new PipelineSyncTask(null, null, null, config, manager));
+    doReturn(true).when(pipelineTask).canRun();
+    doAnswer(invocation -> {
+      throw new InterruptedException("Stopping task");
+    }).when(pipelineTask).runTask();
+
+    try {
+      pipelineTask.run();
+      assertTrue(Thread.currentThread().isInterrupted());
+      verify(updater).recordRunCompletion();
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  @Test
+  void testPipelineSleepInterruptionDoesNotFailCompletedRun() throws Exception {
+    ReconTaskConfig config = new ReconTaskConfig();
+    PipelineSyncTask pipelineTask = spy(new PipelineSyncTask(null, null, null, config, manager));
+    doReturn(true).when(pipelineTask).canRun();
+    doAnswer(invocation -> {
+      Thread.currentThread().interrupt();
+      return null;
+    }).when(pipelineTask).runTask();
+
+    try {
+      pipelineTask.run();
+      assertTrue(Thread.currentThread().isInterrupted());
+      verify(updater).recordRunCompletion();
+      verify(updater, times(0)).setLastTaskRunStatus(-1);
+    } finally {
+      Thread.interrupted();
+    }
   }
 
   @Test

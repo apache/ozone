@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
 public abstract class ReconScmTask {
 
   private static final Logger LOG = LoggerFactory.getLogger(ReconScmTask.class);
-  private Thread taskThread;
+  private volatile Thread taskThread;
   private volatile boolean running;
   private final ReconTaskStatusUpdater taskStatusUpdater;
 
@@ -46,7 +46,13 @@ public abstract class ReconScmTask {
     if (!isRunning()) {
       LOG.info("Starting {} Thread.", getTaskName());
       running = true;
-      taskThread = new Thread(this::run, "Recon-" + getTaskName());
+      taskThread = new Thread(() -> {
+        try {
+          run();
+        } finally {
+          running = false;
+        }
+      }, "Recon-" + getTaskName());
       taskThread.setName(getTaskName());
       taskThread.setDaemon(true);
       taskThread.start();
@@ -69,13 +75,8 @@ public abstract class ReconScmTask {
   }
 
   public boolean isRunning() {
-    if (!running) {
-      synchronized (this) {
-        return taskThread != null
-            && taskThread.isAlive();
-      }
-    }
-    return true;
+    Thread thread = taskThread;
+    return thread != null && thread.isAlive();
   }
 
   protected boolean canRun() {
@@ -92,7 +93,7 @@ public abstract class ReconScmTask {
 
   protected abstract void run();
 
-  protected void initializeAndRunTask() throws Exception {
+  protected void initializeAndRunTask() throws InterruptedException {
     taskStatusUpdater.recordRunStart();
     try {
       taskStatusUpdater.setLastTaskRunStatus(0);
