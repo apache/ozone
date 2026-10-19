@@ -273,12 +273,47 @@ public class TestS3InitiateMultipartUploadRequest
   }
 
   /**
+   * Before STORAGE_POLICY_SUPPORT is finalized, an old OM ignores the policy field.
+   */
+  @Test
+  public void testStoragePolicyNotStampedBeforeFinalization() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    when(ozoneManager.getBucketInfo(volumeName, bucketName)).thenReturn(OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setStoragePolicy(OzoneStoragePolicy.COLD)
+        .build());
+
+    OMRequest clientRequest = OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName, keyName,
+        Collections.emptyMap(), Collections.emptyMap(), OzoneStoragePolicy.HOT);
+
+    OMRequest preExecuted = getS3InitiateMultipartUploadReq(clientRequest).preExecute(ozoneManager);
+    OzoneManagerProtocolProtos.KeyArgs keyArgs = preExecuted.getInitiateMultiPartUploadRequest().getKeyArgs();
+    assertThat(keyArgs.hasStoragePolicy()).isFalse();
+
+    OMClientResponse response = getS3InitiateMultipartUploadReq(preExecuted)
+        .validateAndUpdateCache(ozoneManager, 100L);
+    assertThat(response.getOMResponse().getStatus()).isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+
+    String multipartKey = getMultipartKey(volumeName, bucketName, keyName, keyArgs.getMultipartUploadID());
+    assertThat(omMetadataManager.getMultipartInfoTable().get(multipartKey).getStoragePolicy()).isNull();
+    assertThat(omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getMultipartOpenKey(volumeName, bucketName, keyName, keyArgs.getMultipartUploadID()))
+        .getStoragePolicy()).isNull();
+  }
+
+  /**
    * Initiates an upload on a bucket with {@code bucketPolicy} (none if null), asking for
    * {@code requestedPolicy} (none if null), and checks that {@code expectedPolicy} is stamped on the
    * request and stored on both the multipart info and the open key.
    */
   private void assertMpuInitiatedWithStoragePolicy(StoragePolicy bucketPolicy, StoragePolicy requestedPolicy,
       StoragePolicy expectedPolicy) throws Exception {
+    finalizeStoragePolicySupport();
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();

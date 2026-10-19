@@ -441,7 +441,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
   public static OMRequest disallowCreateBucketWithStoragePolicy(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)) {
+        .isAllowed(OMLayoutFeature.STORAGE_POLICY_SUPPORT)) {
       BucketInfo bucketInfo = req.getCreateBucketRequest().getBucketInfo();
       if (bucketInfo.hasStoragePolicy()
           || bucketInfo.hasAllowFallbackStoragePolicy()) {

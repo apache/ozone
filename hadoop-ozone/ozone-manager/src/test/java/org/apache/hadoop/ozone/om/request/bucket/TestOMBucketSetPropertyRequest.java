@@ -613,7 +613,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
 
     LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
     when(versionManager.isAllowed(
-        OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)).thenReturn(true);
+        OMLayoutFeature.STORAGE_POLICY_SUPPORT)).thenReturn(true);
 
     assertThat(OMBucketSetPropertyRequest
         .disallowSetBucketPropertyWithStoragePolicy(
@@ -654,7 +654,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
   private ValidationContext preFinalizedContext() {
     LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
     when(versionManager.isAllowed(
-        OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)).thenReturn(false);
+        OMLayoutFeature.STORAGE_POLICY_SUPPORT)).thenReturn(false);
     return of(versionManager, omMetadataManager);
   }
 }

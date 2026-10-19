@@ -163,7 +163,8 @@ public class S3InitiateMultipartUploadRequestWithFSO
                   bucketInfo.getDefaultReplicationConfig() :
                   null, ozoneManager);
 
-      // Absent when replaying a request logged by an OM that did not set it; stays null then.
+      // Absent when the request was logged before STORAGE_POLICY_SUPPORT was finalized, or by an OM that did not
+      // set it; stays null then.
       final StoragePolicy storagePolicy = keyArgs.hasStoragePolicy()
           ? OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()) : null;
 

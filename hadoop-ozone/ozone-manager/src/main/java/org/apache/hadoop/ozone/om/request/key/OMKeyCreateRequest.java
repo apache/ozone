@@ -163,6 +163,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
                 storagePolicy, allowFallbackStoragePolicy));
       }
 
+      // TODO: stamp the policy only if STORAGE_POLICY_SUPPORT is finalized (see
+      //  S3InitiateMultipartUploadRequest#preExecute). Otherwise an old OM ignores the field and applies this request
+      //  differently from an upgraded OM.
       newKeyArgs = keyArgs.toBuilder().setModificationTime(Time.now())
               .setType(type).setFactor(factor)
               .setDataSize(effectiveDataSize)

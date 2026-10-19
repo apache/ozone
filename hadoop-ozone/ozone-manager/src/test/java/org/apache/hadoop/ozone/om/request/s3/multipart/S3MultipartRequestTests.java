@@ -137,6 +137,15 @@ public class S3MultipartRequestTests {
         .isAllowed(OMLayoutFeature.MPU_PARTS_TABLE_SPLIT)).thenReturn(true);
   }
 
+  /**
+   * Simulate a cluster that has finalized STORAGE_POLICY_SUPPORT, so initiate stamps the storage policy
+   * on the request. Without this the version manager mock reports the feature as not finalized.
+   */
+  protected void finalizeStoragePolicySupport() {
+    when(ozoneManager.getVersionManager()
+        .isAllowed(OMLayoutFeature.STORAGE_POLICY_SUPPORT)).thenReturn(true);
+  }
+
   @AfterEach
   public void stop() {
     omMetrics.unRegister();

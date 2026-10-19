@@ -99,8 +99,15 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
             .setMultipartUploadID(
                 OMMultipartUploadUtils.getMultipartUploadId())
             .setModificationTime(Time.now())
-            .setKeyName(keyPath)
-            .setStoragePolicy(OzoneStoragePolicy.toProto(getStoragePolicy(bucketInfo, keyArgs)));
+            .setKeyName(keyPath);
+
+    // Stamp the policy only once finalized: an OM without storage policy support ignores the field, so stamping it
+    // earlier would make old and new OMs apply this request differently. Clearing also drops a client-sent value.
+    if (ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.STORAGE_POLICY_SUPPORT)) {
+      newKeyArgs.setStoragePolicy(OzoneStoragePolicy.toProto(getStoragePolicy(bucketInfo, keyArgs)));
+    } else {
+      newKeyArgs.clearStoragePolicy();
+    }
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
@@ -198,7 +205,8 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
                   bucketInfo.getDefaultReplicationConfig() :
                   null, ozoneManager);
 
-      // Absent when replaying a request logged by an OM that did not set it; stays null then.
+      // Absent when the request was logged before STORAGE_POLICY_SUPPORT was finalized, or by an OM that did not
+      // set it; stays null then.
       final StoragePolicy storagePolicy = keyArgs.hasStoragePolicy()
           ? OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()) : null;
 
