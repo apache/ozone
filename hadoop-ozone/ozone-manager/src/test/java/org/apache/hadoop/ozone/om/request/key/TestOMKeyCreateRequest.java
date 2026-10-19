@@ -131,6 +131,19 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     preExecuteTest(true, 1, ratis3Config);
   }
 
+  @Test
+  public void testPreExecuteWithInvalidUploadId() {
+    OMRequest omRequest = createKeyRequest(true, 1);
+    KeyArgs keyArgs = omRequest.getCreateKeyRequest().getKeyArgs().toBuilder()
+        .setMultipartUploadID("invalid/" + UUID.randomUUID()).build();
+    OMRequest invalidRequest = omRequest.toBuilder()
+        .setCreateKeyRequest(omRequest.getCreateKeyRequest().toBuilder().setKeyArgs(keyArgs)).build();
+
+    OMException e = assertThrows(OMException.class,
+        () -> getOMKeyCreateRequest(invalidRequest).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+  }
+
   private void preExecuteTest(boolean isMultipartKey, int partNumber,
                               ReplicationConfig repConfig) throws Exception {
     long scmBlockSize = ozoneManager.getScmBlockSize();

@@ -145,6 +145,20 @@ public class TestOMFileCreateRequest extends OMKeyRequestTests {
   }
 
   @Test
+  public void testPreExecuteWithInvalidUploadId() {
+    OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
+        HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS, false, false);
+    KeyArgs keyArgs = omRequest.getCreateFileRequest().getKeyArgs().toBuilder()
+        .setIsMultipartKey(true).setMultipartNumber(1).setMultipartUploadID("invalid/" + UUID.randomUUID()).build();
+    OMRequest invalidRequest = omRequest.toBuilder()
+        .setCreateFileRequest(omRequest.getCreateFileRequest().toBuilder().setKeyArgs(keyArgs)).build();
+
+    OMException e = assertThrows(OMException.class,
+        () -> getOMFileCreateRequest(invalidRequest).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+  }
+
+  @Test
   public void testValidateAndUpdateCache() throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
