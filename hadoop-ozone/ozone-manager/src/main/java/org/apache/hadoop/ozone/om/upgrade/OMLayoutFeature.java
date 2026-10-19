@@ -48,8 +48,7 @@ public enum OMLayoutFeature implements LayoutFeature {
   S3_LIFECYCLE_SUPPORT(10, "S3 bucket lifecycle configuration support"),
   MPU_PARTS_TABLE_SPLIT(11, "Split multipart table into separate table for parts and key"),
 
-  OBJECT_VERSIONING(12, "S3-compatible object versioning: bucket versioning"
-      + " state machine and the versionedKeyTable for noncurrent versions");
+  OBJECT_VERSIONING(12, "S3-compatible object versioning");
 
   ///////////////////////////////  /////////////////////////////
 

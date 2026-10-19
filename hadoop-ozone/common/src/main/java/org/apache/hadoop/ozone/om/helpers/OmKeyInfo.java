@@ -112,12 +112,8 @@ public final class OmKeyInfo extends WithParentObjectId
   // been modified.
   private final Long expectedDataGeneration;
 
-  // S3-compatible object versioning. versionId is allocated once when a
-  // version is written and then frozen, and increases within a key so its
-  // versions can be ordered newest first; absent on records that predate
-  // versioning support (treated as the null version). A delete marker has
-  // isDeleteMarker set and no data blocks. isNullVersion marks the single
-  // overwritable "null version" slot per key.
+  // S3 object versioning. versionId increases within a key; it is null on
+  // records written before versioning, which count as the null version.
   private final Long versionId;
   private final boolean isDeleteMarker;
   private final boolean isNullVersion;
@@ -483,8 +479,7 @@ public final class OmKeyInfo extends WithParentObjectId
   }
 
   /**
-   * @return the object version identity, or null for records that predate
-   * versioning support (treated as the null version).
+   * @return the versionId, or null for records written before versioning.
    */
   public Long getVersionId() {
     return versionId;

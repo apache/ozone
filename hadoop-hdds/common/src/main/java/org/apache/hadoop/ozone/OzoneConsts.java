@@ -181,12 +181,8 @@ public final class OzoneConsts {
   public static final String OM_KEY_PREFIX = "/";
   public static final String DOUBLE_SLASH_OM_KEY_PREFIX  = "//";
   /**
-   * Separates a key name from the versionId suffix in versionedKeyTable DB keys.
-   * OM_KEY_PREFIX cannot be used: OBJECT_STORE key names contain '/' verbatim, so
-   * a key's versions would interleave with the versions of keys nested under it.
-   * 0x00 is the minimum byte value, so {keyName} + this separator can never be a
-   * prefix of {keyName} + "/". Written as an octal escape because a literal
-   * unicode escape for NUL is expanded by the Java lexer before parsing.
+   * Separates the key name from the versionId in versionedKeyTable DB keys.
+   * Not '/', since key names may contain it.
    */
   public static final String OM_VERSIONED_KEY_SEPARATOR = "\0";
   public static final String OM_USER_PREFIX = "$";

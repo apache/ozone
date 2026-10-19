@@ -395,8 +395,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)) {
       SetBucketPropertyRequest propReq =
           req.getSetBucketPropertyRequest();
-      // The deprecated isVersionEnabled flag from an older client is read as
-      // a versioning status too, so it is gated the same way.
+      // The deprecated isVersionEnabled flag also maps to a versioning status.
       if (propReq.hasBucketArgs()
           && (propReq.getBucketArgs().hasVersioningStatus()
           || propReq.getBucketArgs().hasIsVersionEnabled())) {

@@ -695,8 +695,7 @@ public class RpcClient implements ClientProtocol {
         bucketArgs.getQuotaInNamespace(), bucketArgs.getQuotaInBytes());
 
     ozoneManagerClient.createBucket(builder.build());
-    // A bucket cannot be created already versioned, so versioning is
-    // enabled as a separate step.
+    // Versioning can only be set after the bucket is created.
     if (isVersionEnabled) {
       setBucketVersioning(volumeName, bucketName, true);
     }

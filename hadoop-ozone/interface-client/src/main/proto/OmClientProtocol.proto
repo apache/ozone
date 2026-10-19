@@ -798,8 +798,7 @@ message BucketInfo {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated OzoneAclInfo acls = 3;
-    // Deprecated, use versioningStatus. Still written (true iff
-    // VERSIONING_ENABLED) for older readers; ignored when read.
+    // Deprecated, use versioningStatus. Written for older readers only.
     required bool isVersionEnabled = 4 [default = false, deprecated = true];
     required hadoop.hdds.StorageTypeProto storageType = 5 [default = DISK];
     optional uint64 creationTime = 6;
@@ -898,8 +897,7 @@ message DataEncryptionKeyProto {
 message BucketArgs {
     required string volumeName = 1;
     required string bucketName = 2;
-    // Deprecated, use versioningStatus. Read only when versioningStatus is
-    // absent: true maps to VERSIONING_ENABLED, false to VERSIONING_SUSPENDED.
+    // Deprecated, use versioningStatus. true means ENABLED, false SUSPENDED.
     optional bool isVersionEnabled = 5 [deprecated = true];
     optional hadoop.hdds.StorageTypeProto storageType = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
@@ -1245,13 +1243,8 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
-  // S3-compatible object versioning fields. versionId identifies an object
-  // version: allocated once when the version is written and then frozen,
-  // and increasing within a key so its versions can be ordered newest
-  // first. A delete marker is a record with isDeleteMarker set and no data
-  // blocks. isNullVersion marks the single overwritable "null version" slot
-  // per key (writes while versioning is suspended, or objects that predate
-  // enabling versioning).
+  // S3 object versioning. versionId increases within a key. isNullVersion
+  // marks the single overwritable "null version" of a key.
     optional uint64 versionId = 23;
     optional bool isDeleteMarker = 24;
     optional bool isNullVersion = 25;

@@ -434,9 +434,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   public OmBucketInfo withOperationalPropertiesFrom(OmBucketInfo source) {
     return toBuilder()
         .setStorageType(source.getStorageType())
-        // Only when the real bucket actually carries a status: copying the
-        // value getVersioningStatus() derives would give the link an explicit
-        // status the real bucket does not have.
+        // Copy only a status the source bucket actually has set.
         .setVersioningStatus(source.hasVersioningStatus()
             ? source.getVersioningStatus() : null)
         .setBucketEncryptionKey(source.getEncryptionKeyInfo())
@@ -689,8 +687,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setQuotaInNamespace(quotaInNamespace)
         .setSnapshotUsedBytes(snapshotUsedBytes)
         .setSnapshotUsedNamespace(snapshotUsedNamespace);
-    // Written only when actually set, so that hasVersioningStatus() survives
-    // a round trip through RocksDB.
+    // Written only when set, to keep hasVersioningStatus() across round trips.
     if (versioningStatus != null) {
       bib.setVersioningStatus(versioningStatus.toProto());
     }
@@ -737,8 +734,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setBucketName(bucketInfo.getBucketName())
         .setAcls(bucketInfo.getAclsList().stream().map(
             OzoneAcl::fromProtobuf).collect(Collectors.toList()))
-        // The deprecated isVersionEnabled flag is ignored: a record without a
-        // status is UNVERSIONED.
+        // The deprecated isVersionEnabled flag is ignored.
         .setVersioningStatus(bucketInfo.hasVersioningStatus()
             ? BucketVersioningStatus.fromProto(bucketInfo.getVersioningStatus())
             : null)
