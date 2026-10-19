@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.protocolPB;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
 
 /**
  * OzoneManagerClientProtocol defines interfaces needed on the client side
@@ -48,4 +49,10 @@ public interface OzoneManagerClientProtocol extends OzoneManagerProtocol {
   void clearThreadLocalReadConsistency();
 
   ThreadLocal<S3Auth> getS3CredentialsProvider();
+
+  /**
+   * The thread-local read consistency hint sent with OM read requests, so it can be carried to threads that make
+   * OM calls on behalf of the request.
+   */
+  ThreadLocal<ReadConsistencyHint> getReadConsistencyHintProvider();
 }

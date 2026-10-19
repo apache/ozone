@@ -2373,6 +2373,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   @SkipTracing
+  public ThreadLocal<ReadConsistencyHint> getReadConsistencyHintProvider() {
+    return this.threadLocalReadConsistencyHint;
+  }
+
+  @Override
+  @SkipTracing
   public S3Auth getThreadLocalS3Auth() {
     return this.threadLocalS3Auth.get();
   }
