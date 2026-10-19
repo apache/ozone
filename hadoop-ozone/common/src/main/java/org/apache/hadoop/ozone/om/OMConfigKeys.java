@@ -719,9 +719,9 @@ public final class OMConfigKeys {
   public static final String
       OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB
       = "ozone.om.snapshot.diff.max.in.memory.entries.per.job";
-  public static final long
+  public static final int
       OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT
-      = 1_000_000L;
+      = 1_000_000;
 
   public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
       = "ozone.om.upgrade.quota.recalculate.enabled";
@@ -806,6 +806,10 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
       "ozone.om.ratis.events.max.limit";
   public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
+
+  public static final String OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL =
+      "ozone.om.upgrade.finalization.check.interval";
+  public static final String OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL_DEFAULT = "1m";
 
   /**
    * Never constructed.

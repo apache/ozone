@@ -53,7 +53,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.ContentSummary;
@@ -88,6 +87,7 @@ import org.apache.hadoop.ozone.client.OzoneClientUtils;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.SelectorOutputStream;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
@@ -951,13 +951,14 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     LOG.trace("listStatus() path:{}", f);
     int numEntries = listingPageSize;
     LinkedList<FileStatusAdapter> statuses = new LinkedList<>();
+    ListStatusResult<FileStatusAdapter> page;
     List<FileStatusAdapter> tmpStatusList;
     String startPath = "";
     int entriesAdded;
     do {
-      tmpStatusList =
-          adapter.listStatus(pathToKey(f), false, startPath,
-              numEntries, uri, workingDir, getUsername(), lite);
+      page = adapter.listStatusPage(pathToKey(f), false, startPath,
+          numEntries, uri, workingDir, getUsername(), lite);
+      tmpStatusList = page.getStatuses();
       entriesAdded = 0;
       if (!tmpStatusList.isEmpty()) {
         if (startPath.isEmpty() || !statuses.getLast().getPath().toString()
@@ -970,12 +971,16 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         }
         startPath = pathToKey(statuses.getLast().getPath());
       }
-      // listStatus returns entries numEntries in size if available.
-      // Any lesser number of entries indicate that the required entries have
-      // exhausted.
-    } while (entriesAdded > 0);
+      // OM may return fewer than numEntries even when more entries follow, as it caps the page size, so
+      // stop only when OM reports the listing complete or a page adds nothing.
+    } while (entriesAdded > 0 && !page.isComplete());
 
     return statuses;
+  }
+
+  @Override
+  public void setVerifyChecksum(boolean verifyChecksum) {
+    adapter.setVerifyChecksum(verifyChecksum);
   }
 
   @Override
@@ -1256,6 +1261,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     private T curStat = null;
     private String startPath = "";
     private boolean lite;
+    /** True once OM reported that no entries follow the current listing. */
+    private boolean listingComplete;
 
     /**
      * Constructor to initialize OzoneFileStatusIterator.
@@ -1271,7 +1278,7 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       this.lite = lite;
       this.transformFunc = transformFunc;
       // fetch the first batch of entries in the directory
-      thisListing = listFileStatus(p, startPath, lite);
+      thisListing = nextListing();
       if (thisListing != null && !thisListing.isEmpty()) {
         startPath = pathToKey(
             thisListing.get(thisListing.size() - 1).getPath());
@@ -1308,9 +1315,9 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         return false;
       }
       if (i >= thisListing.size()) {
-        if (startPath != null && (!thisListing.isEmpty())) {
+        if (startPath != null && !thisListing.isEmpty() && !listingComplete) {
           // current listing is exhausted & fetch a new listing
-          thisListing = listFileStatus(p, startPath, lite);
+          thisListing = nextListing();
           if (thisListing != null && !thisListing.isEmpty()) {
             startPath = pathToKey(
                 thisListing.get(thisListing.size() - 1).getPath());
@@ -1323,6 +1330,12 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
         }
       }
       return (i < thisListing.size());
+    }
+
+    private List<FileStatus> nextListing() throws IOException {
+      ListStatusResult<FileStatus> page = listFileStatus(p, startPath, lite);
+      listingComplete = page.isComplete();
+      return page.getStatuses();
     }
 
     /**
@@ -1346,27 +1359,25 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
    * @param f
    * @param startPath
    * @param lite if true return lightweight keys
-   * @return list of file status.
+   * @return list of file status, and whether OM reported that no entries follow.
    * @throws IOException
    */
-  private List<FileStatus> listFileStatus(Path f, String startPath, boolean lite)
+  private ListStatusResult<FileStatus> listFileStatus(Path f, String startPath, boolean lite)
       throws IOException {
     incrementCounter(Statistic.INVOCATION_LIST_STATUS, 1);
     statistics.incrementReadOps(1);
     LOG.trace("listFileStatus() path:{}", f);
-    List<FileStatus> statusList;
-    statusList =
-        adapter.listStatus(pathToKey(f), false, startPath,
+    ListStatusResult<FileStatus> page =
+        adapter.listStatusPage(pathToKey(f), false, startPath,
                 listingPageSize, uri, workingDir, getUsername(), lite)
-            .stream()
-            .map(this::convertFileStatus)
-            .collect(Collectors.toList());
+            .map(this::convertFileStatus);
+    List<FileStatus> statusList = page.getStatuses();
 
     if (!statusList.isEmpty() && !startPath.isEmpty()) {
       // Excluding the 1st file status element from list.
       statusList.remove(0);
     }
-    return statusList;
+    return page;
   }
 
   /**

@@ -20,6 +20,8 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
@@ -30,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
@@ -40,6 +43,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.SecurityUtil;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -89,6 +93,33 @@ class TestTrashOzoneFileSystem {
         Collection<FileStatus> trashRoots = fs.getTrashRoots(true);
         assertEquals(TRASH_ROOT_COUNT, trashRoots.size());
       }
+    } finally {
+      omTestManagers.stop();
+    }
+  }
+
+  @Test
+  void testGetFileStatusDoesNotIncrementOmRpcMetric(@TempDir File testDir) throws Exception {
+    OmTestManagers omTestManagers = newOmTestManagers(testDir);
+    try {
+      OzoneManager om = omTestManagers.getOzoneManager();
+      OzoneManagerProtocol writeClient = omTestManagers.getWriteClient();
+      String volumeName = "vol-" + objectId.incrementAndGet();
+      String bucketName = "bucket-" + objectId.incrementAndGet();
+      createVolumeAndBucket(omTestManagers, volumeName, bucketName,
+          BucketLayout.FILE_SYSTEM_OPTIMIZED, writeClient);
+
+      long getFileStatusBefore = om.getMetrics().getNumGetFileStatus();
+      long trashGetFileStatusBefore = getLongCounter("NumTrashGetFileStatus",
+          getMetrics(OMMetrics.class.getSimpleName()));
+      try (FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>) () -> new TrashOzoneFileSystem(om))) {
+        fs.getFileStatus(new Path("/" + volumeName + "/" + bucketName + "/" + TRASH_PREFIX));
+      }
+
+      assertEquals(getFileStatusBefore, om.getMetrics().getNumGetFileStatus());
+      assertEquals(trashGetFileStatusBefore + 1,
+          getLongCounter("NumTrashGetFileStatus", getMetrics(OMMetrics.class.getSimpleName())));
     } finally {
       omTestManagers.stop();
     }

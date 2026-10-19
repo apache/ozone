@@ -143,6 +143,9 @@ import software.amazon.awssdk.services.s3.model.DeleteBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectTaggingRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectsRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectsResponse;
+import software.amazon.awssdk.services.s3.model.DeletedObject;
+import software.amazon.awssdk.services.s3.model.EncodingType;
 import software.amazon.awssdk.services.s3.model.ExpirationStatus;
 import software.amazon.awssdk.services.s3.model.GetBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.GetBucketLifecycleConfigurationResponse;
@@ -167,6 +170,7 @@ import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsRequest;
 import software.amazon.awssdk.services.s3.model.ListDirectoryBucketsResponse;
 import software.amazon.awssdk.services.s3.model.ListMultipartUploadsRequest;
 import software.amazon.awssdk.services.s3.model.ListMultipartUploadsResponse;
+import software.amazon.awssdk.services.s3.model.ListObjectVersionsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsRequest;
 import software.amazon.awssdk.services.s3.model.ListObjectsResponse;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
@@ -177,6 +181,7 @@ import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.ObjectAttributes;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.s3.model.ObjectLockLegalHoldStatus;
+import software.amazon.awssdk.services.s3.model.ObjectVersion;
 import software.amazon.awssdk.services.s3.model.PutBucketAclRequest;
 import software.amazon.awssdk.services.s3.model.PutBucketTaggingRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -965,6 +970,39 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
 
     // the current object must not be deleted
     assertDoesNotThrow(() -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testDeleteObjectsListedByListObjectVersions() {
+    final String bucketName = getBucketName();
+    final List<String> keyNames = Arrays.asList("dir/key 3", "key+1", "key2");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    keyNames.forEach(k -> s3Client.putObject(b -> b.bucket(bucketName).key(k), RequestBody.fromString("bar")));
+
+    final List<ObjectVersion> versions = s3Client.listObjectVersionsPaginator(
+            b -> b.bucket(bucketName).maxKeys(2).encodingType(EncodingType.URL))
+        .versions().stream().collect(Collectors.toList());
+
+    // versioning is not implemented, each object only has the null version
+    assertThat(versions).extracting(ObjectVersion::key).containsExactlyElementsOf(keyNames);
+    assertThat(versions).allSatisfy(v -> {
+      assertThat(v.versionId()).isEqualTo("null");
+      assertThat(v.isLatest()).isTrue();
+      assertThat(v.size()).isEqualTo(3L);
+    });
+
+    final DeleteObjectsResponse deleted = s3Client.deleteObjects(b -> b.bucket(bucketName).delete(d -> d.objects(
+        versions.stream()
+            .map(v -> ObjectIdentifier.builder().key(v.key()).versionId(v.versionId()).build())
+            .collect(Collectors.toList()))));
+
+    assertThat(deleted.errors()).isEmpty();
+    assertThat(deleted.deleted()).extracting(DeletedObject::key).containsExactlyInAnyOrderElementsOf(keyNames);
+    assertThat(deleted.deleted()).extracting(DeletedObject::versionId).containsOnly("null");
+    final ListObjectVersionsResponse remaining = s3Client.listObjectVersions(b -> b.bucket(bucketName));
+    assertThat(remaining.versions()).isEmpty();
+    assertThat(remaining.deleteMarkers()).isEmpty();
+    assertThat(remaining.isTruncated()).isFalse();
   }
 
   @Test
@@ -2243,6 +2281,72 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertTrue(secondPage.objectParts().parts().isEmpty());
   }
 
+  /**
+   * Directory (FSO layout) buckets return per-part {@code Part} elements even when no additional
+   * checksum was stored at upload time, matching AWS S3 directory-bucket behavior.
+   */
+  @Test
+  public void testGetObjectAttrFsoMpuNoChecksum(@TempDir Path tempDir)
+      throws Exception {
+    final String bucketName = uniqueObjectName();
+    final String keyName = getKeyName();
+    final int partSize = (int) (5 * MB);
+
+    createFsoBucket(bucketName);
+    try {
+      File multipartUploadFile =
+          Files.createFile(tempDir.resolve("fso-get-object-attributes-mpu.txt")).toFile();
+      createFile(multipartUploadFile, (int) (15 * MB));
+      multipartUpload(bucketName, keyName, multipartUploadFile, partSize, new HashMap<>(),
+          Collections.emptyList());
+
+      GetObjectAttributesResponse attributesResponse = s3Client.getObjectAttributes(
+          GetObjectAttributesRequest.builder()
+              .bucket(bucketName)
+              .key(keyName)
+              .objectAttributes(ObjectAttributes.OBJECT_PARTS, ObjectAttributes.OBJECT_SIZE)
+              .build());
+
+      assertNotNull(attributesResponse.objectParts());
+      assertEquals(3, attributesResponse.objectParts().totalPartsCount());
+      assertFalse(attributesResponse.objectParts().isTruncated());
+      assertEquals(multipartUploadFile.length(), attributesResponse.objectSize());
+      assertEquals(3, attributesResponse.objectParts().parts().size());
+      for (int i = 0; i < 3; i++) {
+        assertEquals(i + 1, attributesResponse.objectParts().parts().get(i).partNumber());
+        assertEquals((long) partSize, attributesResponse.objectParts().parts().get(i).size());
+      }
+
+      GetObjectAttributesResponse firstPage = s3Client.getObjectAttributes(
+          GetObjectAttributesRequest.builder()
+              .bucket(bucketName)
+              .key(keyName)
+              .objectAttributes(ObjectAttributes.OBJECT_PARTS)
+              .maxParts(2)
+              .partNumberMarker(0)
+              .build());
+      assertTrue(firstPage.objectParts().isTruncated());
+      assertEquals(2, firstPage.objectParts().parts().size());
+      assertEquals(1, firstPage.objectParts().parts().get(0).partNumber());
+      assertEquals(2, firstPage.objectParts().parts().get(1).partNumber());
+
+      GetObjectAttributesResponse secondPage = s3Client.getObjectAttributes(
+          GetObjectAttributesRequest.builder()
+              .bucket(bucketName)
+              .key(keyName)
+              .objectAttributes(ObjectAttributes.OBJECT_PARTS)
+              .maxParts(2)
+              .partNumberMarker(2)
+              .build());
+      assertFalse(secondPage.objectParts().isTruncated());
+      assertEquals(1, secondPage.objectParts().parts().size());
+      assertEquals(3, secondPage.objectParts().parts().get(0).partNumber());
+    } finally {
+      s3Client.deleteObject(b -> b.bucket(bucketName).key(keyName));
+      deleteFsoBucket(bucketName);
+    }
+  }
+
   @Test
   public void testGetObjectAttributesNonContiguousMultipartObjectParts() throws Exception {
     final String bucketName = getBucketName();
@@ -3443,6 +3547,22 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(S3ErrorTable.NOT_IMPLEMENTED.getErrorMessage(), exception.awsErrorDetails().errorMessage());
   }
 
+  private void createFsoBucket(String bucketName) throws Exception {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
+      volume.createBucket(bucketName, BucketArgs.newBuilder()
+          .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+          .build());
+    }
+  }
+
+  private void deleteFsoBucket(String bucketName) throws Exception {
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
+      volume.deleteBucket(bucketName);
+    }
+  }
+
   private String multipartUpload(String bucketName, String key, File file, int partSize,
                                  Map<String, String> userMetadata, List<Tag> tags) throws Exception {
     String uploadId = initiateMultipartUpload(bucketName, key, userMetadata, tags);
@@ -4589,22 +4709,6 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         assertThat(allBuckets).contains(fsoBucketName);
       } finally {
         deleteFsoBucket(fsoBucketName);
-      }
-    }
-
-    private void createFsoBucket(String bucketName) throws Exception {
-      try (OzoneClient ozoneClient = cluster.newClient()) {
-        OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
-        volume.createBucket(bucketName, BucketArgs.newBuilder()
-            .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
-            .build());
-      }
-    }
-
-    private void deleteFsoBucket(String bucketName) throws Exception {
-      try (OzoneClient ozoneClient = cluster.newClient()) {
-        OzoneVolume volume = ozoneClient.getObjectStore().getS3Volume();
-        volume.deleteBucket(bucketName);
       }
     }
   }

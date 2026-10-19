@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.scm.XceiverClientCreator;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.kohsuke.MetaInfServices;
@@ -96,7 +96,7 @@ public class DatanodeBlockPutter extends BaseFreonGenerator implements
           "datanode-block-putter is not supported in secure environment");
     }
 
-    try (StorageContainerLocationProtocol scmLocationClient =
+    try (StorageContainerLocationInternalInterface scmLocationClient =
         createStorageContainerLocationClient(ozoneConf)) {
       Pipeline pipeline =
           findPipelineForTest(pipelineId, scmLocationClient, LOG);
