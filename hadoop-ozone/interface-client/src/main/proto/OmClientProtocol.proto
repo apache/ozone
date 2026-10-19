@@ -798,7 +798,9 @@ message BucketInfo {
     required string volumeName = 1;
     required string bucketName = 2;
     repeated OzoneAclInfo acls = 3;
-    required bool isVersionEnabled = 4 [default = false];
+    // Deprecated, use versioningStatus. Still written (true iff
+    // VERSIONING_ENABLED) for older readers; ignored when read.
+    required bool isVersionEnabled = 4 [default = false, deprecated = true];
     required hadoop.hdds.StorageTypeProto storageType = 5 [default = DISK];
     optional uint64 creationTime = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
@@ -818,11 +820,7 @@ message BucketInfo {
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
     repeated hadoop.hdds.KeyValue tags = 23;
-    // S3-compatible object versioning status. When absent the bucket carries
-    // no S3 versioning status at all: it reads as UNVERSIONED whatever
-    // isVersionEnabled says, and that flag alone drives the legacy in-record
-    // block version list. When set it is authoritative, and isVersionEnabled
-    // is kept in sync with it (VERSIONING_ENABLED -> true).
+    // S3-compatible object versioning status; UNVERSIONED when absent.
     optional BucketVersioningStatusProto versioningStatus = 24;
 }
 
@@ -900,7 +898,9 @@ message DataEncryptionKeyProto {
 message BucketArgs {
     required string volumeName = 1;
     required string bucketName = 2;
-    optional bool isVersionEnabled = 5;
+    // Deprecated, use versioningStatus. Read only when versioningStatus is
+    // absent: true maps to VERSIONING_ENABLED, false to VERSIONING_SUSPENDED.
+    optional bool isVersionEnabled = 5 [deprecated = true];
     optional hadoop.hdds.StorageTypeProto storageType = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional uint64 quotaInBytes = 8;
@@ -909,8 +909,7 @@ message BucketArgs {
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
     optional BucketEncryptionInfoProto bekInfo = 12;
     repeated hadoop.hdds.KeyValue tags = 13;
-    // S3-compatible object versioning status. Takes precedence over
-    // isVersionEnabled when both are set.
+    // S3-compatible object versioning status.
     optional BucketVersioningStatusProto versioningStatus = 14;
 }
 

@@ -255,7 +255,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
-      } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+      } else if (keyToDelete != null && !omBucketInfo.isVersionEnabled()) {
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
             keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
         String delKeyName = omMetadataManager

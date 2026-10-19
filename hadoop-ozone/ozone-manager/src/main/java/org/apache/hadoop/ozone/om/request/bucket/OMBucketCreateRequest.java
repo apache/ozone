@@ -105,8 +105,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // state; the state is set afterwards, through the transition checks in
     // OMBucketSetPropertyRequest. versioningStatus is on BucketInfo because
     // that message is also the bucket's on-disk record and the shape
-    // InfoBucket and ListBuckets return, not because a create needs it.
-    if (bucketInfo.hasVersioningStatus()) {
+    // InfoBucket and ListBuckets return, not because a create needs it. The
+    // deprecated isVersionEnabled flag from an older client is rejected too.
+    if (bucketInfo.hasVersioningStatus() || bucketInfo.getIsVersionEnabled()) {
       throw new OMException("Bucket versioning cannot be set while the bucket"
           + " is being created; create the bucket first and then set its"
           + " versioning status.", ResultCodes.INVALID_REQUEST);

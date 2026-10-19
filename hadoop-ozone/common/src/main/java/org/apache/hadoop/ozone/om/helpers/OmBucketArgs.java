@@ -41,12 +41,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   private final String bucketName;
   /**
-   * Bucket Version flag.
-   */
-  private final Boolean isVersionEnabled;
-  /**
    * S3-compatible versioning status; null when not being changed.
-   * Takes precedence over isVersionEnabled when both are set.
    */
   private final BucketVersioningStatus versioningStatus;
   /**
@@ -77,7 +72,6 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
-    this.isVersionEnabled = b.isVersionEnabled;
     this.versioningStatus = b.versioningStatus;
     this.storageType = b.storageType;
     this.ownerName = b.ownerName;
@@ -107,11 +101,14 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   }
 
   /**
-   * Returns true if bucket version is enabled, else false.
-   * @return isVersionEnabled
+   * Returns whether versioning is being enabled, or null if it is not being
+   * changed.
+   * @deprecated use {@link #getVersioningStatus()}.
    */
+  @Deprecated
   public Boolean getIsVersionEnabled() {
-    return isVersionEnabled;
+    return versioningStatus == null ? null
+        : versioningStatus == BucketVersioningStatus.ENABLED;
   }
 
   /**
@@ -202,8 +199,6 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     auditMap.put(OzoneConsts.BUCKET, this.bucketName);
     auditMap.put(OzoneConsts.GDPR_FLAG,
         getMetadata().get(OzoneConsts.GDPR_FLAG));
-    auditMap.put(OzoneConsts.IS_VERSION_ENABLED,
-                String.valueOf(this.isVersionEnabled));
     if (this.versioningStatus != null) {
       auditMap.put(OzoneConsts.VERSIONING_STATUS, this.versioningStatus.name());
     }
@@ -243,7 +238,6 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
   public static class Builder extends WithMetadata.Builder {
     private String volumeName;
     private String bucketName;
-    private Boolean isVersionEnabled;
     private BucketVersioningStatus versioningStatus;
     private StorageType storageType;
     private boolean quotaInBytesSet = false;
@@ -274,8 +268,15 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    /**
+     * Maps the legacy flag onto the versioning status: true enables
+     * versioning, false suspends it.
+     * @deprecated use {@link #setVersioningStatus(BucketVersioningStatus)}.
+     */
+    @Deprecated
     public Builder setIsVersionEnabled(Boolean versionFlag) {
-      this.isVersionEnabled = versionFlag;
+      this.versioningStatus = versionFlag == null ? null : versionFlag
+          ? BucketVersioningStatus.ENABLED : BucketVersioningStatus.SUSPENDED;
       return this;
     }
 
@@ -359,9 +360,6 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     BucketArgs.Builder builder = BucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName);
-    if (isVersionEnabled != null) {
-      builder.setIsVersionEnabled(isVersionEnabled);
-    }
     if (versioningStatus != null) {
       builder.setVersioningStatus(versioningStatus.toProto());
     }
@@ -404,12 +402,12 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
         .setBucketName(bucketArgs.getBucketName())
         .addAllMetadata(KeyValueUtil.getFromProtobuf(bucketArgs.getMetadataList()));
 
-    if (bucketArgs.hasIsVersionEnabled()) {
-      builder.setIsVersionEnabled(bucketArgs.getIsVersionEnabled());
-    }
     if (bucketArgs.hasVersioningStatus()) {
       builder.setVersioningStatus(
           BucketVersioningStatus.fromProto(bucketArgs.getVersioningStatus()));
+    } else if (bucketArgs.hasIsVersionEnabled()) {
+      // Deprecated flag, still sent by older clients.
+      builder.setIsVersionEnabled(bucketArgs.getIsVersionEnabled());
     }
     if (bucketArgs.hasStorageType()) {
       builder.setStorageType(StorageType.valueOf(bucketArgs.getStorageType()));

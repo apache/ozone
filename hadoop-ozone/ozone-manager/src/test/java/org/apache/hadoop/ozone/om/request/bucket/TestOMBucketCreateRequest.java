@@ -429,6 +429,15 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     assertEquals(OMException.ResultCodes.INVALID_REQUEST,
         omException.getResult());
 
+    // so is the deprecated isVersionEnabled flag from an older client
+    OMRequest legacyRequest = newCreateBucketRequest(
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setIsVersionEnabled(true)).build();
+    omException = assertThrows(OMException.class,
+        () -> new OMBucketCreateRequest(legacyRequest).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST,
+        omException.getResult());
+
     // the same request without a status is accepted
     OMRequest withoutStatus = newCreateBucketRequest(
         newBucketInfoBuilder(bucketName, volumeName)).build();

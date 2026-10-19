@@ -174,26 +174,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       }
 
       //Check Versioning to update
-      Boolean versioning = omBucketArgs.getIsVersionEnabled();
       BucketVersioningStatus newVersioningStatus = omBucketArgs.getVersioningStatus();
-      if (versioning != null) {
-        // Apply the legacy flag on its own; setVersioningStatus below overrides
-        // it when a status is also being set.
-        bucketInfoBuilder.setIsVersionEnabled(versioning);
-      }
-      if (newVersioningStatus == null && versioning != null
-          && dbBucketInfo.hasVersioningStatus()) {
-        // Legacy flag from an older client against a bucket that already has an
-        // S3 versioning status: keep the two consistent. Disabling maps to
-        // SUSPENDED, since the S3 state machine forbids returning to
-        // UNVERSIONED once versioning has been enabled.
-        //
-        // On a bucket without a status the flag is left alone: it selects the
-        // legacy in-record block version list, and an old client must not be
-        // able to opt a bucket into S3 versioning semantics.
-        newVersioningStatus = versioning
-            ? BucketVersioningStatus.ENABLED : BucketVersioningStatus.SUSPENDED;
-      }
       if (newVersioningStatus != null) {
         if (!dbBucketInfo.getVersioningStatus().canTransitionTo(newVersioningStatus)) {
           throw new OMException("Bucket versioning cannot be changed from "
@@ -414,8 +395,11 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)) {
       SetBucketPropertyRequest propReq =
           req.getSetBucketPropertyRequest();
+      // The deprecated isVersionEnabled flag from an older client is read as
+      // a versioning status too, so it is gated the same way.
       if (propReq.hasBucketArgs()
-          && propReq.getBucketArgs().hasVersioningStatus()) {
+          && (propReq.getBucketArgs().hasVersioningStatus()
+          || propReq.getBucketArgs().hasIsVersionEnabled())) {
         throw new OMException("Cluster does not have the object versioning"
             + " feature finalized yet, but the request contains a bucket"
             + " versioning status. Rejecting the request, please finalize the"

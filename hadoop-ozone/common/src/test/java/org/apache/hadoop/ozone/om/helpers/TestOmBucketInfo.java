@@ -56,87 +56,73 @@ public class TestOmBucketInfo {
   }
 
   @Test
-  public void legacyFlagDoesNotImplyAnS3VersioningStatus() {
-    // Records written before the versioningStatus field existed deserialize
-    // unchanged and keep carrying the legacy flag alone. The legacy flag
-    // selects the in-record block version list, which is a different feature
-    // from S3 versioning, so it must not be promoted to a status.
+  public void deprecatedVersionFlagIsIgnoredWhenRead() {
+    // A record carrying only the deprecated flag has no versioning status and
+    // reads as UNVERSIONED, whatever the flag says.
     OzoneManagerProtocolProtos.BucketInfo oldRecord =
         OzoneManagerProtocolProtos.BucketInfo.newBuilder()
             .setVolumeName("vol1")
             .setBucketName("bucket")
-            .setIsVersionEnabled(false)
+            .setIsVersionEnabled(true)
             .setStorageType(HddsProtos.StorageTypeProto.DISK)
             .build();
     OmBucketInfo bucket = OmBucketInfo.getFromProtobuf(oldRecord);
     assertFalse(bucket.hasVersioningStatus());
     assertEquals(BucketVersioningStatus.UNVERSIONED,
         bucket.getVersioningStatus());
-    assertFalse(bucket.getIsVersionEnabled());
-    assertEquals(bucket, OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
-
-    oldRecord = oldRecord.toBuilder().setIsVersionEnabled(true).build();
-    bucket = OmBucketInfo.getFromProtobuf(oldRecord);
-    assertFalse(bucket.hasVersioningStatus());
-    assertEquals(BucketVersioningStatus.UNVERSIONED,
-        bucket.getVersioningStatus());
-    assertTrue(bucket.getIsVersionEnabled());
-    // the absent status survives the round trip, so a re-serialized legacy
-    // record is still distinguishable from an S3-versioned one
+    assertFalse(bucket.isVersionEnabled());
     assertFalse(bucket.getProtobuf().hasVersioningStatus());
+    assertFalse(bucket.getProtobuf().getIsVersionEnabled());
     assertEquals(bucket, OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
   }
 
   @Test
   public void versioningStatusProtobufConversion() {
-    // SUSPENDED is not representable by the legacy flag alone, so it must
-    // survive a proto round trip via the new field.
-    OmBucketInfo bucket = OmBucketInfo.newBuilder()
-        .setBucketName("bucket")
-        .setVolumeName("vol1")
-        .setVersioningStatus(BucketVersioningStatus.SUSPENDED)
-        .build();
-    assertFalse(bucket.getIsVersionEnabled());
+    for (BucketVersioningStatus status : BucketVersioningStatus.values()) {
+      OmBucketInfo bucket = OmBucketInfo.newBuilder()
+          .setBucketName("bucket")
+          .setVolumeName("vol1")
+          .setVersioningStatus(status)
+          .build();
+      boolean enabled = status == BucketVersioningStatus.ENABLED;
+      assertEquals(enabled, bucket.isVersionEnabled());
+      // the deprecated flag is still written for older readers
+      assertEquals(enabled, bucket.getProtobuf().getIsVersionEnabled());
 
-    OmBucketInfo recovered = OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
-    assertEquals(BucketVersioningStatus.SUSPENDED,
-        recovered.getVersioningStatus());
-    assertFalse(recovered.getIsVersionEnabled());
-    assertEquals(bucket, recovered);
+      OmBucketInfo recovered =
+          OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+      assertEquals(status, recovered.getVersioningStatus());
+      assertEquals(bucket, recovered);
+    }
   }
 
   @Test
-  public void builderKeepsVersioningStatusAndLegacyFlagInSync() {
+  @SuppressWarnings("deprecation")
+  public void deprecatedBuilderFlagMapsOntoVersioningStatus() {
     OmBucketInfo.Builder builder = OmBucketInfo.newBuilder()
         .setBucketName("bucket")
         .setVolumeName("vol1");
 
-    // no status set at all
+    // false on a bucket that never had versioning enabled sets nothing
+    builder.setIsVersionEnabled(false);
     assertFalse(builder.build().hasVersioningStatus());
     assertEquals(BucketVersioningStatus.UNVERSIONED,
         builder.build().getVersioningStatus());
 
-    // the legacy flag sets only itself: no status is derived from it
     builder.setIsVersionEnabled(true);
-    assertFalse(builder.build().hasVersioningStatus());
-    assertEquals(BucketVersioningStatus.UNVERSIONED,
+    assertEquals(BucketVersioningStatus.ENABLED,
         builder.build().getVersioningStatus());
-    assertTrue(builder.build().getIsVersionEnabled());
+    assertTrue(builder.build().isVersionEnabled());
 
-    // an explicit status is authoritative and drives the legacy flag
-    builder.setVersioningStatus(BucketVersioningStatus.SUSPENDED);
-    assertTrue(builder.build().hasVersioningStatus());
+    // once enabled, false suspends
+    builder.setIsVersionEnabled(false);
     assertEquals(BucketVersioningStatus.SUSPENDED,
         builder.build().getVersioningStatus());
-    assertFalse(builder.build().getIsVersionEnabled());
-
-    // ENABLED shows up as true to clients that only know the legacy flag
-    builder.setVersioningStatus(BucketVersioningStatus.ENABLED);
-    assertTrue(builder.build().getIsVersionEnabled());
+    assertFalse(builder.build().isVersionEnabled());
 
     // a null status is a no-op (records without the new field)
     builder.setVersioningStatus(null);
-    assertEquals(BucketVersioningStatus.ENABLED,
+    assertEquals(BucketVersioningStatus.SUSPENDED,
         builder.build().getVersioningStatus());
   }
 
@@ -191,7 +177,7 @@ public class TestOmBucketInfo {
         .setBucketName("source")
         .setBucketLayout(BucketLayout.OBJECT_STORE)
         .setStorageType(StorageType.SSD)
-        .setIsVersionEnabled(true)
+        .setVersioningStatus(BucketVersioningStatus.ENABLED)
         .setQuotaInBytes(1000)
         .setQuotaInNamespace(10)
         .setUsedBytes(500)
@@ -222,7 +208,7 @@ public class TestOmBucketInfo {
 
     assertEquals(BucketLayout.OBJECT_STORE, resolvedLink.getBucketLayout());
     assertEquals(StorageType.SSD, resolvedLink.getStorageType());
-    assertTrue(resolvedLink.getIsVersionEnabled());
+    assertTrue(resolvedLink.isVersionEnabled());
     assertEquals(1000, resolvedLink.getQuotaInBytes());
     assertEquals(10, resolvedLink.getQuotaInNamespace());
     assertEquals(500, resolvedLink.getUsedBytes());

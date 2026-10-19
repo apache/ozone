@@ -131,6 +131,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.BucketVersioningStatus;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -649,7 +650,6 @@ public class RpcClient implements ClientProtocol {
     OmBucketInfo.Builder builder = OmBucketInfo.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setIsVersionEnabled(isVersionEnabled)
         .addAllMetadata(bucketArgs.getMetadata())
         .setStorageType(storageType)
         .setSourceVolume(bucketArgs.getSourceVolume())
@@ -695,6 +695,11 @@ public class RpcClient implements ClientProtocol {
         bucketArgs.getQuotaInNamespace(), bucketArgs.getQuotaInBytes());
 
     ozoneManagerClient.createBucket(builder.build());
+    // A bucket cannot be created already versioned, so versioning is
+    // enabled as a separate step.
+    if (isVersionEnabled) {
+      setBucketVersioning(volumeName, bucketName, true);
+    }
   }
 
   private static void verifyVolumeName(String volumeName) throws OMException {
@@ -1215,7 +1220,8 @@ public class RpcClient implements ClientProtocol {
     OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setIsVersionEnabled(versioning);
+        .setVersioningStatus(versioning
+            ? BucketVersioningStatus.ENABLED : BucketVersioningStatus.SUSPENDED);
     ozoneManagerClient.setBucketProperty(builder.build());
   }
 
@@ -1324,7 +1330,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(bucketInfo.getVolumeName())
         .setName(bucketInfo.getBucketName())
         .setStorageType(bucketInfo.getStorageType())
-        .setVersioning(bucketInfo.getIsVersionEnabled())
+        .setVersioning(bucketInfo.isVersionEnabled())
         .setCreationTime(bucketInfo.getCreationTime())
         .setModificationTime(bucketInfo.getModificationTime())
         .setMetadata(bucketInfo.getMetadata())
@@ -1357,7 +1363,7 @@ public class RpcClient implements ClientProtocol {
                 .setVolumeName(bucket.getVolumeName())
                 .setName(bucket.getBucketName())
                 .setStorageType(bucket.getStorageType())
-                .setVersioning(bucket.getIsVersionEnabled())
+                .setVersioning(bucket.isVersionEnabled())
                 .setCreationTime(bucket.getCreationTime())
                 .setModificationTime(bucket.getModificationTime())
                 .setMetadata(bucket.getMetadata())

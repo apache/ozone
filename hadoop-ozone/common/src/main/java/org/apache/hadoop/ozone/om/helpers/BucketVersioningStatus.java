@@ -52,11 +52,6 @@ public enum BucketVersioningStatus {
     }
   }
 
-  /** The legacy isVersionEnabled flag value kept in sync with this status. */
-  public boolean toVersionEnabledFlag() {
-    return this == ENABLED;
-  }
-
   /**
    * Whether a bucket may transition from this status to {@code target}.
    * The only forbidden transition is back to UNVERSIONED after versioning

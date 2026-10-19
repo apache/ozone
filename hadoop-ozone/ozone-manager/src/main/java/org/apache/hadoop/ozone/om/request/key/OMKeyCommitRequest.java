@@ -325,7 +325,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         correctedSpace -= keyToDelete.getReplicatedSize();
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
-      } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+      } else if (keyToDelete != null && !omBucketInfo.isVersionEnabled()) {
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
             keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
         // using pseudoObjId as objectId can be same in case of overwrite key
