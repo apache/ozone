@@ -159,6 +159,11 @@ jobs:
           ref: ${{ inputs.sha }}
           fetch-depth: ${{ inputs.checkout-fetch-depth }}
 
+      - name: Delete .git to omit commit SHA in build artifacts
+        if: ${{ !inputs.needs-ozone-source-tarball && inputs.checkout-fetch-depth == '1' }}
+        run: |
+          rm -fr .git
+
       - name: Download Ozone source tarball
         if: ${{ inputs.needs-ozone-source-tarball }}
         uses: actions/download-artifact@v8

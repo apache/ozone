@@ -46,7 +46,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.apache.hadoop.ozone.util.CacheMetrics;
 
@@ -56,7 +56,7 @@ import org.apache.hadoop.ozone.util.CacheMetrics;
 public class ScmClient {
 
   private final ScmBlockLocationProtocol blockClient;
-  private final StorageContainerLocationProtocol containerClient;
+  private final StorageContainerLocationInternalInterface containerClient;
   private final SCMFailoverProxyProviderBase<?> blockProxyProvider;
   private final SCMFailoverProxyProviderBase<?> containerProxyProvider;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
@@ -64,13 +64,13 @@ public class ScmClient {
   private final CacheMetrics datanodeDetailsCacheMetrics;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
-            StorageContainerLocationProtocol containerClient,
+            StorageContainerLocationInternalInterface containerClient,
             OzoneConfiguration configuration) {
     this(blockClient, containerClient, null, null, configuration);
   }
 
   ScmClient(ScmBlockLocationProtocol blockClient,
-            StorageContainerLocationProtocol containerClient,
+            StorageContainerLocationInternalInterface containerClient,
             SCMFailoverProxyProviderBase<?> blockProxyProvider,
             SCMFailoverProxyProviderBase<?> containerProxyProvider,
             OzoneConfiguration configuration) {
@@ -91,7 +91,7 @@ public class ScmClient {
 
   static LoadingCache<Long, Pipeline> createContainerLocationCache(
       OzoneConfiguration configuration,
-      StorageContainerLocationProtocol containerClient,
+      StorageContainerLocationInternalInterface containerClient,
       Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache) {
     int maxSize = configuration.getInt(OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE,
         OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT);
@@ -185,7 +185,7 @@ public class ScmClient {
     return this.blockClient;
   }
 
-  public StorageContainerLocationProtocol getContainerClient() {
+  public StorageContainerLocationInternalInterface getContainerClient() {
     return this.containerClient;
   }
 

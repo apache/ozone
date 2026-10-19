@@ -1463,7 +1463,7 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
-    if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(omVersion)) {
       throw new IOException(
           "OzoneManager does not support atomic key creation.");
     }
@@ -1600,7 +1600,7 @@ public class RpcClient implements ClientProtocol {
       String bucketName, String keyName, long size,
       ReplicationConfig replicationConfig, Map<String, String> metadata,
       Map<String, String> tags, boolean derivedKeyPiggyBacking) throws IOException {
-    if (!OzoneManagerVersion.ATOMIC_REWRITE_KEY.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.isSupportedBy(omVersion)) {
       throw new IOException(
           "OzoneManager does not support atomic key creation.");
     }
@@ -2338,6 +2338,23 @@ public class RpcClient implements ClientProtocol {
 
     return ozoneManagerClient.completeMultipartUpload(keyArgs,
         omMultipartUploadCompleteList);
+  }
+
+  @Override
+  public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
+    if (!OzoneManagerVersion.S3_MULTIPART_UPLOAD_ABORT_CONTEXT.isSupportedBy(omVersion)) {
+      abortMultipartUpload(getS3VolumeContext().getOmVolumeArgs().getVolume(), bucketName, keyName, uploadID);
+      return;
+    }
+    verifyBucketName(bucketName);
+    HddsClientUtils.checkNotNull(keyName, uploadID);
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setMultipartUploadID(uploadID)
+        .build();
+    ozoneManagerClient.abortMultipartUpload(keyArgs, true);
   }
 
   @Override

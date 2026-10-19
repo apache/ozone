@@ -212,6 +212,24 @@ class TestOzoneManagerProtocolClientSideTranslatorPB {
   }
 
   @Test
+  void abortMultipartUploadSetsS3Context() throws IOException {
+    CapturingTransport transport = new CapturingTransport();
+    OzoneManagerProtocolClientSideTranslatorPB client =
+        new OzoneManagerProtocolClientSideTranslatorPB(transport, "client-id");
+    OmKeyArgs keyArgs = new OmKeyArgs.Builder()
+        .setVolumeName("s3v")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setMultipartUploadID("upload-id")
+        .build();
+
+    client.abortMultipartUpload(keyArgs, true);
+
+    assertThat(transport.getLastRequest().getCmdType()).isEqualTo(Type.AbortMultiPartUpload);
+    assertThat(transport.getLastRequest().getAssumeS3Context()).isTrue();
+  }
+
+  @Test
   void testQuietDeleteKeysThrowsWhenWholeBatchFails() throws IOException {
     // Whole-batch failure at OM: non-OK status, DeleteKeysResponse has status=false and no per-key errors.
     when(omTransport.submitRequest(any(OMRequest.class))).thenReturn(

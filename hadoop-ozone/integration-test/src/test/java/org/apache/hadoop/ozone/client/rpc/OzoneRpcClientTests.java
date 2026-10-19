@@ -1493,7 +1493,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void testCreateKeyIfNotExistsSuccess(BucketLayout layout) throws IOException {
-    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
     OzoneBucket bucket = createBucket(layout);
     String keyName = "create-if-not-exists-" + layout.name();
     byte[] content = "test-content".getBytes(UTF_8);
@@ -1511,7 +1511,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @ParameterizedTest
   @EnumSource
   void testCreateKeyIfNotExistsFailsWhenKeyExists(BucketLayout layout) throws IOException {
-    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS);
     OzoneBucket bucket = createBucket(layout);
     OzoneKeyDetails keyDetails = createTestKey(bucket);
     byte[] newContent = "new-content".getBytes(UTF_8);

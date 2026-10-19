@@ -199,6 +199,7 @@ message OMRequest {
   optional LayoutVersion layoutVersion = 6;
 
   optional ReadConsistencyHint readConsistencyHint = 7;
+  optional bool assumeS3Context = 8;
 
   // Resolve the S3 volume from the request authentication context.
   optional bool assumeS3Context = 8;

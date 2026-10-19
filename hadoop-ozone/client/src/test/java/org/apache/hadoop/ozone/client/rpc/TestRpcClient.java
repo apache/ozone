@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
@@ -36,6 +37,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -44,6 +46,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
@@ -389,6 +392,94 @@ public class TestRpcClient {
       verify(om).getObjectTagging(args.capture(), eq(assumeContext));
       verify(client, times(assumeContext ? 0 : 1)).getS3VolumeContext();
       assertEquals(assumeContext ? "" : "tenant-volume", args.getValue().getVolumeName());
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "S3_MULTIPART_UPLOAD_ABORT_CONTEXT"})
+  void testAbortS3MultipartUpload(OzoneManagerVersion version) throws Exception {
+    RpcClient client = spy(createRpcClient());
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "omVersion", version, true);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
+          .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(client).getS3VolumeContext();
+      boolean assumeContext = version == OzoneManagerVersion.S3_MULTIPART_UPLOAD_ABORT_CONTEXT;
+
+      client.abortS3MultipartUpload("bucket", "key", "upload-id");
+
+      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+      if (assumeContext) {
+        verify(om).abortMultipartUpload(args.capture(), eq(true));
+      } else {
+        verify(om).abortMultipartUpload(args.capture());
+      }
+      verify(client, times(assumeContext ? 0 : 1)).getS3VolumeContext();
+      assertEquals(assumeContext ? "s3v" : "tenant-volume", args.getValue().getVolumeName());
+      assertEquals("upload-id", args.getValue().getMultipartUploadID());
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testCreateKeyIfNotExistsRequiresSupportedOmVersion(OzoneManagerVersion version) throws IOException {
+    checkCreateKeyIfNotExistsOmVersion(version, false);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testCreateStreamKeyIfNotExistsRequiresSupportedOmVersion(OzoneManagerVersion version) throws IOException {
+    checkCreateKeyIfNotExistsOmVersion(version, true);
+  }
+
+  private static void checkCreateKeyIfNotExistsOmVersion(OzoneManagerVersion version, boolean streaming)
+      throws IOException {
+    AtomicInteger createKeyRequests = new AtomicInteger();
+    IOException requestSent = new IOException("CreateKey request sent");
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          OMResponse response = super.submitRequest(request);
+          return response.toBuilder().setServiceListResponse(response.getServiceListResponse().toBuilder()
+              .clearServiceInfo().addServiceInfo(om(version).getProtobuf())).build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          createKeyRequests.incrementAndGet();
+          assertThat(request.getCreateKeyRequest().getKeyArgs().hasExpectedDataGeneration()).isTrue();
+          assertEquals(OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT,
+              request.getCreateKeyRequest().getKeyArgs().getExpectedDataGeneration());
+          throw requestSent;
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      IOException error = assertThrows(IOException.class, () -> {
+        if (streaming) {
+          client.createStreamKeyIfNotExists("volume1", "bucket1", "key1", 0,
+              RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+              Collections.emptyMap(), Collections.emptyMap());
+        } else {
+          client.createKeyIfNotExists("volume1", "bucket1", "key1", 0,
+              RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+              Collections.emptyMap(), Collections.emptyMap());
+        }
+      });
+      if (version.serialize() < OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.serialize()) {
+        assertEquals("OzoneManager does not support atomic key creation.", error.getMessage());
+        assertEquals(0, createKeyRequests.get());
+      } else {
+        assertSame(requestSent, error);
+        assertEquals(1, createKeyRequests.get());
+      }
     } finally {
       client.close();
     }
