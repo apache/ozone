@@ -38,7 +38,21 @@ Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，
 
 ![OM HA](HA-OM.png)
 
-客户端连接到 Ozone Manager 上，而 Ozone Manager 负责处理请求并且安排复制。当请求复制到所有的 follower 上后，leader 就可以给客户端回包了。
+客户端连接到 Ozone Manager 上，而 Ozone Manager 负责处理请求并且安排复制。当请求持久化到多数投票 OM 的 Raft 日志后，leader 就可以给客户端回包了。
+
+## 容错能力
+
+OM 和 SCM HA 组可以包含三个以上的投票成员。Raft 需要多数投票成员才能选举 leader 并提交请求：
+
+| 投票成员数 | 所需多数 | 可容忍的故障数 |
+| --- | --- | --- |
+| 2 | 2 | 0 |
+| 3 | 2 | 1 |
+| 4 | 3 | 1 |
+| 5 | 3 | 2 |
+| 6 | 4 | 2 |
+
+偶数个投票成员可以工作，但与前一个奇数相比不会增加容错能力。三个投票成员可容忍一个故障；五个可容忍两个，允许在一个节点停机维护时再发生一个节点故障。应将投票成员部署在独立主机上。Listener OM 不计入投票多数，也不会增加容错能力。
 
 ## 配置
 
@@ -61,6 +75,8 @@ Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，
    <value>om1,om2,om3</value>
 </property>
 ```
+
+对于五个投票成员的组，在 `ozone.om.nodes.cluster1` 中列出 `om1,om2,om3,om4,om5`，并为每个 OM 配置地址。这些 ID 必须对应投票 OM；添加 Listener OM 不会增加容错能力。
 
 已定义的前缀可用于定义每个 OM 服务的地址：
 
@@ -92,6 +108,18 @@ hdfs dfs -ls o3fs://bucket.volume.cluster1/prefix/
 ```shell
 hdfs dfs -ls ofs://cluster1/volume/bucket/prefix/
 ```
+
+## 添加 OM
+
+使用 `ozone om --bootstrap` 添加新的 OM 前，必须在所有现有 OM 的 `ozone-site.xml` 中加入新 OM 的节点 ID、地址和端口。现有 OM 会在收到 bootstrap 请求时重新读取磁盘上的配置，无需重启。
+
+在新 OM 可能成为 leader 之前，还必须更新所有 OM 客户端的 `ozone.om.nodes.<serviceId>` 和对应的 `ozone.om.address.<serviceId>.<nodeId>` 配置，包括 Ozone 客户端、管理工具、S3 Gateway、Recon 和 HttpFS。确保运行中的客户端已加载新配置，必要时重启。仅更新现有 OM 的配置文件并不足够：客户端无法跟随未列入其配置的 leader，参见 [HDDS-17126](https://issues.apache.org/jira/browse/HDDS-17126)。
+
+## Leader 转移
+
+使用 `ozone admin om transfer -id <OM_SERVICE_ID> -n <NEW_LEADER_ID>` 可以手动转移 leader。
+
+在 [HDDS-17124](https://issues.apache.org/jira/browse/HDDS-17124) 修复之前，五节点测试中观察到 OM 和 SCM 的手动 leader 转移命令耗时约 4–13 秒，原因是 Ratis 客户端发现 leader 和重置优先级时的重试等待。这是测试观察值，并非延迟上限，也不是自动故障转移的耗时保证。执行命令时应考虑客户端 RPC 超时；若命令超时，应先检查当前角色再决定是否重试。
 
 ## 实现细节
 

@@ -31,6 +31,20 @@ Both Ozone Manager and Storage Container Manager supports HA. In this mode the i
 
 This document explains the HA setup of Storage Container Manager (SCM), please check [this page]({{< ref "OM-HA" >}}) for HA setup of Ozone Manager (OM). While they can be setup for HA independently, a reliable, full HA setup requires enabling HA for both services. 
 
+## Fault tolerance
+
+OM and SCM HA groups can have more than three voting members. Raft requires a majority of voting members to elect a leader and commit requests:
+
+| Voting members | Majority required | Failures tolerated |
+| --- | --- | --- |
+| 2 | 2 | 0 |
+| 3 | 2 | 1 |
+| 4 | 3 | 1 |
+| 5 | 3 | 2 |
+| 6 | 4 | 2 |
+
+An even number of voting members works, but adds no failure tolerance compared with the preceding odd number. Three voting members tolerate one failure; five tolerate two, allowing one node to fail while another is down for maintenance. Deploy voting members on independent hosts. Listener OMs do not count toward the voting majority or increase failure tolerance.
+
 ## Configuration
 
 One Ozone configuration (`ozone-site.xml`) can support multiple SCM HA node set, multiple Ozone clusters. To select between the available SCM nodes a logical name is required for each of the clusters which can be resolved to the IP addresses (and domain names) of the Storage Container Managers.
@@ -72,7 +86,7 @@ The defined prefixes can be used to define the address of each of the SCM servic
 </property>
 ```
 
-For reliable HA support choose 3 independent nodes to form a quorum. 
+For a five-member group, list `scm1,scm2,scm3,scm4,scm5` in `ozone.scm.nodes.cluster1` and configure an address for each SCM.
 
 ## Bootstrap
 
@@ -82,7 +96,7 @@ The initialization of the **first** SCM-HA node is the same as a non-HA SCM:
 ozone scm --init
 ```
 
-Second and third nodes should be *bootstrapped* instead of init. These clusters will join to the configured RAFT quorum. The id of the current server is identified by DNS name or can be set explicitly by `ozone.scm.node.id`. Most of the time you don't need to set it as DNS based id detection can work well.
+All additional nodes should be *bootstrapped* instead of init. These clusters will join to the configured RAFT quorum. The id of the current server is identified by DNS name or can be set explicitly by `ozone.scm.node.id`. Most of the time you don't need to set it as DNS based id detection can work well.
 
 ```
 ozone scm --bootstrap
@@ -91,6 +105,8 @@ ozone scm --bootstrap
 Note: both commands perform one-time initialization.  SCM still needs to be started by running `ozone --daemon start scm`.
 
 ## SCM Leader Transfer
+
+Until [HDDS-17124](https://issues.apache.org/jira/browse/HDDS-17124) is fixed, manual OM and SCM leadership transfer commands have taken approximately 4–13 seconds in five-node tests because of Ratis client retry waits during leader discovery and priority reset. This is an observation, not an upper bound or a guarantee about automatic failover latency. Account for client RPC timeouts; if a command times out, check the current roles before deciding whether to retry.
 
 The `ozone admin scm transfer` command allows you to manually transfer the leadership of the Storage Container Manager (SCM) Raft group to a specific SCM node or to a randomly chosen follower.
 
@@ -175,7 +191,7 @@ host3     | 9876       | FOLLOWER | 9c8d2b3a-e4f5-6789-0123-456789abcdef     | 1
 In some environments (e.g. Kubernetes) we need to have a common, unified way to initialize SCM HA quorum. As a reminder, the standard initialization flow is the following:
 
  1. On the first, "primordial" node: `ozone scm --init`
- 2. On second/third nodes: `ozone scm --bootstrap`
+ 2. On all additional nodes: `ozone scm --bootstrap`
 
 This can be improved: primordial SCM can be configured by setting `ozone.scm.primordial.node.id` in the config to one of the nodes.
 
@@ -210,7 +226,9 @@ So, primordial SCM has a special role in the SCM HA cluster, as it is the only o
 The primordial SCM takes a root-CA role, which signs all SCM instances with a sub-CA certificate. 
 The sub-CA certificates are used by SCM to sign certificates for OM/Datanodes.
 
-When bootstrapping a SCM, it gets a signed certificate from the primary SCM and starts sub-CA.
+When bootstrapping a SCM, it gets a signed certificate from the primordial SCM and starts sub-CA.
+
+Adding more SCMs increases Raft failure tolerance but does not remove this dependency: bootstrapping a new SCM in a secure cluster requires the primordial SCM to issue its sub-CA certificate. A surviving Raft majority alone is not sufficient for this operation. Plan for primordial SCM availability when expanding the group; see [HDDS-17128](https://issues.apache.org/jira/browse/HDDS-17128) for replacement testing and documentation.
 
 Sub-CA on the SCM’s are used to issue signed certificates for OM/DN in the cluster. Only the leader SCM issues a certificate to OM/DN.
 
@@ -268,9 +286,11 @@ This replication process is a simpler version of OM HA replication process as it
 
 Datanodes are sending all the reports (Container reports, Pipeline reports...) to *all* SCM nodes in parallel. Only the leader node can assign/create new containers, and only the leader node sends commands back to the Datanodes.
 
+Each additional SCM receives reports from every datanode, increasing datanode report traffic and the aggregate SCM report processing load. Moving from three to five SCMs adds two report destinations per datanode. Size and monitor datanode network usage and SCM resources accordingly; total performance impact depends on the workload.
+
 ## Verify SCM HA setup
 
-After starting an SCM-HA it can be validated if the SCM nodes are forming one single quorum instead of 3 individual SCM nodes.
+After starting an SCM-HA it can be validated if the SCM nodes are forming one single quorum instead of independent SCM nodes.
 
 First, check if all the SCM nodes store the same ClusterId metadata:
 

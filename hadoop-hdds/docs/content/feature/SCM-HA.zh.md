@@ -31,6 +31,20 @@ Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，
 
 本文档解释了 Storage Container Manager (SCM)的 HA 设置，请在[本页]({{< ref "OM-HA" >}})中查看 Ozone Manager (OM)的 HA 设置。虽然它们可以独立地为 HA 进行设置，但可靠的、完全的 HA 设置需要为两个服务启用 HA。
 
+## 容错能力
+
+OM 和 SCM HA 组可以包含三个以上的投票成员。Raft 需要多数投票成员才能选举 leader 并提交请求：
+
+| 投票成员数 | 所需多数 | 可容忍的故障数 |
+| --- | --- | --- |
+| 2 | 2 | 0 |
+| 3 | 2 | 1 |
+| 4 | 3 | 1 |
+| 5 | 3 | 2 |
+| 6 | 4 | 2 |
+
+偶数个投票成员可以工作，但与前一个奇数相比不会增加容错能力。三个投票成员可容忍一个故障；五个可容忍两个，允许在一个节点停机维护时再发生一个节点故障。应将投票成员部署在独立主机上。Listener OM 不计入投票多数，也不会增加容错能力。
+
 ## 配置
 
 一个 Ozone 配置(`ozone-site.xml`)可以支持多个SCM HA节点集，多个 Ozone 集群。要在可用的 SCM 节点之间进行选择，每个集群都需要一个逻辑名称，可以将其解析为 Storage Container Manage 的 IP 地址(和域名)。
@@ -72,7 +86,7 @@ Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，
 </property>
 ```
 
-为了获得可靠的 HA 支持，请选择3个独立的节点以形成仲裁。
+对于五成员组，在 `ozone.scm.nodes.cluster1` 中列出 `scm1,scm2,scm3,scm4,scm5`，并为每个 SCM 配置地址。
 
 ## 引导
 
@@ -82,7 +96,7 @@ Ozone Manager 和 Storage Container Manager 都支持 HA。在这种模式下，
 bin/ozone scm --init
 ```
 
-第二个和第三个节点应该被 *bootstrap*，而不是 init。这些集群将加入到配置的 RAFT 仲裁。当前服务器的 id 通过 DNS 名称标识，也可以通过 `ozone.scm.node.id` 明确设置。大多数时候你不需要设置它，因为基于 DNS 的 id 检测可以很好地工作。
+所有后续节点应该被 *bootstrap*，而不是 init。这些集群将加入到配置的 RAFT 仲裁。当前服务器的 id 通过 DNS 名称标识，也可以通过 `ozone.scm.node.id` 明确设置。大多数时候你不需要设置它，因为基于 DNS 的 id 检测可以很好地工作。
 
 ```
 bin/ozone scm --bootstrap
@@ -93,11 +107,11 @@ bin/ozone scm --bootstrap
 在某些环境（例如容器化/ K8s 环境）中，我们需要一种通用的统一方法来初始化 SCM HA 仲裁。 剩下的标准初始化流程如下：
 
  1. 在第一个“原始”节点上，调用 `scm --init`
- 2. 在第二个/第三个节点上，调用`scm --bootstrap`
+ 2. 在所有后续节点上，调用`scm --bootstrap`
 
 这可以通过使用 `ozone.scm.primordial.node.id` 更改。您可以定义原始节点。设置这个节点后，你应该在**所有**的节点上**同时**执行 `scm --init` 和 `scm --bootstrap`。
 
-根据 `ozone.scm.primordial.node.id`，初始化进程将在第二个/第三个节点上被忽略，引导进程将在除原始节点外的所有节点上被忽略。
+根据 `ozone.scm.primordial.node.id`，初始化进程将在除原始节点外的所有节点上被忽略，引导进程将在原始节点上被忽略。
 
 ## SCM HA 安全
 
@@ -112,6 +126,8 @@ bin/ozone scm --bootstrap
 SCM 使用子 CA 证书来签署 OM/Datanodes 的证书。
 
 引导 SCM 时会从原始 SCM 获取签名证书并启动子 CA。
+
+增加 SCM 数量可提高 Raft 容错能力，但不会消除此依赖：安全集群中引导新的 SCM 需要原始 SCM 为其颁发子 CA 证书。仅有存活的 Raft 多数成员不足以完成该操作。扩容时应确保原始 SCM 可用；更换原始 SCM 的测试和文档参见 [HDDS-17128](https://issues.apache.org/jira/browse/HDDS-17128)。
 
 SCM 上的子 CA 用于为集群中的 OM/DN 颁发签名证书。 只有 leader SCM 向 OM/DN 颁发证书。
 
@@ -167,9 +183,17 @@ SCM HA 使用 Apache Ratis 在 SCM HA 仲裁的成员之间复制状态。每个
 
 数据节点将所有报告(容器报告、管道报告……)并发发送给 *所有* SCM 节点。只有 leader 节点可以分配/创建新的容器，并且只有 leader 节点可以将命令返回给数据节点。
 
+每增加一个 SCM，所有数据节点都会向其发送报告，增加数据节点的报告流量和 SCM 的总报告处理负载。从三个增加到五个 SCM，会为每个数据节点增加两个报告目的地。应据此规划并监控数据节点网络和 SCM 资源；整体性能影响取决于实际工作负载。
+
+## Leader 转移
+
+使用 `ozone admin scm transfer -id <SCM_SERVICE_ID> -n <NEW_LEADER_ID>` 可以手动转移 leader。
+
+在 [HDDS-17124](https://issues.apache.org/jira/browse/HDDS-17124) 修复之前，五节点测试中观察到 OM 和 SCM 的手动 leader 转移命令耗时约 4–13 秒，原因是 Ratis 客户端发现 leader 和重置优先级时的重试等待。这是测试观察值，并非延迟上限，也不是自动故障转移的耗时保证。执行命令时应考虑客户端 RPC 超时；若命令超时，应先检查当前角色再决定是否重试。
+
 ## 验证SCM HA设置
 
-启动 SCM-HA 后，可以验证 SCM 节点是否形成了一个仲裁，而不是3个单独的 SCM 节点。
+启动 SCM-HA 后，可以验证 SCM 节点是否形成了一个仲裁，而不是多个独立的 SCM 节点。
 
 首先，检查所有的 SCM 节点是否存储相同的 ClusterId 元数据：
 

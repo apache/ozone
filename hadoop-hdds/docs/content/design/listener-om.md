@@ -41,7 +41,7 @@ Clients can be configured to send read requests to Listener OMs. This allows rea
 
 ## Best Practices
 
-*   **Recommended Cluster Topology:** For a production environment, you can have 1 or 3 voting OMs. A setup with 2 voting OMs will not work as Ratis requires an odd number of voting members for quorum. You can add any number of Listener OMs to this cluster. For high availability, 3 voting OMs are recommended.
+*   **Recommended Cluster Topology:** Use an odd number of voting OMs, such as 3 or 5, for high availability. Two voting OMs work, but both are required for quorum, so they tolerate no failure. Three voting OMs tolerate one failure and five tolerate two; an even count adds no failure tolerance compared with the preceding odd count. You can add Listener OMs, but they do not vote or increase failure tolerance. See [OM High Availability]({{< ref "../feature/OM-HA.md" >}}) for the fault-tolerance table.
 *   **Deploy multiple Listener OMs for high availability:** To ensure that your read requests can still be served in the event of a Listener OM failure, it is recommended to deploy multiple Listener OMs.
 *   **Monitor the load on your Listener OMs:** It is important to monitor the load on your Listener OMs to ensure that they are not becoming a bottleneck.
 *   **Decommissioning a Listener OM:** A Listener OM can be decommissioned. The process is the same as decommissioning a regular OM. Once the Listener OM is decommissioned, it is removed from the OM HA Ring and does not receive Ratis transactions.

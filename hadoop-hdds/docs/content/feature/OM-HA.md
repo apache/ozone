@@ -37,7 +37,21 @@ A single Ozone Manager uses [RocksDB](https://github.com/facebook/rocksdb/) to p
 
 ![HA OM](HA-OM.png)
 
-Client connects to the Leader Ozone Manager which process the request and schedule the replication with RAFT. When the request is replicated to all the followers the leader can return with the response.
+Client connects to the Leader Ozone Manager which process the request and schedule the replication with RAFT. When the request is persisted to the Raft logs of a majority of voting OMs, the leader can return with the response.
+
+## Fault tolerance
+
+OM and SCM HA groups can have more than three voting members. Raft requires a majority of voting members to elect a leader and commit requests:
+
+| Voting members | Majority required | Failures tolerated |
+| --- | --- | --- |
+| 2 | 2 | 0 |
+| 3 | 2 | 1 |
+| 4 | 3 | 1 |
+| 5 | 3 | 2 |
+| 6 | 4 | 2 |
+
+An even number of voting members works, but adds no failure tolerance compared with the preceding odd number. Three voting members tolerate one failure; five tolerate two, allowing one node to fail while another is down for maintenance. Deploy voting members on independent hosts. Listener OMs do not count toward the voting majority or increase failure tolerance.
 
 ## Configuration
 
@@ -60,6 +74,8 @@ For each of the defined `serviceId` a logical configuration name should be defin
    <value>om1,om2,om3</value>
 </property>
 ```
+
+For a five-voter group, list `om1,om2,om3,om4,om5` in `ozone.om.nodes.cluster1` and configure an address for each OM. These IDs must identify voting OMs; adding Listener OMs does not increase failure tolerance.
 
 The defined prefixes can be used to define the address of each of the OM services:
 
@@ -110,6 +126,8 @@ Before bootstrapping a new OM node, all the existing OM's on-disk configuration 
 of the new OM such as nodeId, address, port etc. Note that the existing OMs need not be restarted. They will reload the configuration from disk when
 they receive a bootstrap request from the bootstrapping node.
 
+Before a new OM can become leader, update every OM client configuration with the new node IDs in `ozone.om.nodes.<serviceId>` and the corresponding `ozone.om.address.<serviceId>.<nodeId>` entries. This includes Ozone clients, admin tools, S3 Gateway, Recon, and HttpFS. Ensure running clients load the updated configuration, restarting them where necessary. Updating the existing OMs' configuration files alone is insufficient: a client cannot follow a leader that is absent from its configured OM list (see [HDDS-17126](https://issues.apache.org/jira/browse/HDDS-17126)).
+
 To bootstrap an OM, the following command needs to be run:
 
 ```shell
@@ -126,6 +144,8 @@ ozone om [global options (optional)] --bootstrap --force
 Note that using the _force_ option during bootstrap could crash the OM process if it does not have updated configurations.
 
 ## OM Leader Transfer
+
+Until [HDDS-17124](https://issues.apache.org/jira/browse/HDDS-17124) is fixed, manual OM and SCM leadership transfer commands have taken approximately 4–13 seconds in five-node tests because of Ratis client retry waits during leader discovery and priority reset. This is an observation, not an upper bound or a guarantee about automatic failover latency. Account for client RPC timeouts; if a command times out, check the current roles before deciding whether to retry.
 
 The `ozone admin om transfer` command allows you to manually transfer the leadership of the Ozone Manager (OM) Raft group to a specific OM node or to a randomly chosen follower.
 
