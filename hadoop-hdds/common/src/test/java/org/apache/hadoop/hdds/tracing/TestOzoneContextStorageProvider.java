@@ -73,6 +73,7 @@ public class TestOzoneContextStorageProvider {
         assertThat(MDC.get(MDC_SPAN_ID)).isNull();
       }
       assertThat(MDC.get(MDC_TRACE_ID)).isEqualTo(TRACE_ID);
+      assertThat(MDC.get(MDC_SPAN_ID)).isEqualTo(PARENT_SPAN_ID);
     }
     assertThat(MDC.get(MDC_TRACE_ID)).isNull();
     assertThat(MDC.get(MDC_SPAN_ID)).isNull();
@@ -93,16 +94,26 @@ public class TestOzoneContextStorageProvider {
   @Test
   public void testWrappedTaskOnOtherThread() throws Exception {
     ExecutorService executor = Executors.newSingleThreadExecutor();
+    ExecutorService clearedExecutor = Executors.newSingleThreadExecutor();
     try {
+      // a thread that explicitly cleared its MDC still gets the IDs from the next wrapped task
+      clearedExecutor.submit(MDC::clear).get();
       Future<String> inSpan;
+      Future<String[]> inSpanCleared;
       try (Scope ignored = span(PARENT_SPAN_ID).makeCurrent()) {
         inSpan = executor.submit(Context.current().wrap(() -> MDC.get(MDC_SPAN_ID)));
+        inSpanCleared = clearedExecutor.submit(Context.current().wrap(
+            () -> new String[] {MDC.get(MDC_TRACE_ID), MDC.get(MDC_SPAN_ID)}));
       }
       assertThat(inSpan.get()).isEqualTo(PARENT_SPAN_ID);
-      // after the wrapped task, the worker thread must not keep the span IDs
+      assertThat(inSpanCleared.get()).containsExactly(TRACE_ID, PARENT_SPAN_ID);
+      // after the wrapped task, the worker threads must not keep the span IDs
       assertThat(executor.submit(() -> MDC.get(MDC_SPAN_ID)).get()).isNull();
+      assertThat(clearedExecutor.submit(() -> MDC.get(MDC_TRACE_ID)).get()).isNull();
+      assertThat(clearedExecutor.submit(() -> MDC.get(MDC_SPAN_ID)).get()).isNull();
     } finally {
       executor.shutdownNow();
+      clearedExecutor.shutdownNow();
     }
   }
 
