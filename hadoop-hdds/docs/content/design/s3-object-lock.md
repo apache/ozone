@@ -130,14 +130,28 @@ WORM until timer expires
 
 Event holds are managed with `PutObjectRetention`, following the AWS S3 API, so no new API or Ranger action is needed
 (native clients use `OzoneBucket#setRetention`). OM handles the request under the key write lock, using the leader-stamped request time as now:
-* **Set an event hold**: `EventHold=ON` with exactly one `EventHoldDuration`. It can also be set at creation with the `x-amz-object-lock-event-hold`
-  and `x-amz-object-lock-event-hold-duration-days` / `-years` headers, or from the bucket default.
-* **Update while the hold is `ON`**: a request without `EventHold=OFF` keeps the event hold active, so updating the mode or `RetainUntilDate` never releases it.
-  The duration can be changed. Without a Governance bypass the effective `RetainUntilDate` never moves earlier: when the duration is decreased, OM first stores the current effective date (now + old duration) in `retentionDate` as the minimum (see [Retention Updates](#retention-updates)).
-* **Release the hold (the "business event occurs" step)**: only an explicit `EventHold=OFF` on a key whose hold is `ON` releases it. The request must not carry `EventHoldDuration`, and `RetainUntilDate` is optional.
-  OM clears `eventHold.enabled` and sets `retentionDate` to the latest of the existing `retentionDate`, the requested `RetainUntilDate` (if any), and now + `eventHold.rule`.
-* **Invalid requests** are rejected with `400 Bad Request`, as in AWS S3: an event hold without a retention mode, `EventHold=ON` without exactly one duration, `EventHold=OFF` with a duration,
-  or `EventHold=OFF` on a key that has no active hold and no `RetainUntilDate`. Durations must be positive and at most 36,500 days or 100 years.
+
+1. **A retention has a `RetainUntilDate`, an event hold, or both**, always with a retention mode. A request with neither is rejected.
+   An event hold is set with `EventHold=ON` and exactly one `EventHoldDuration`, or at creation with the `x-amz-object-lock-event-hold`
+   and `x-amz-object-lock-event-hold-duration-days` / `-years` headers, or from the bucket default.
+2. **`retentionDate` comes from one of two places**: a `RetainUntilDate` that is put (by a request, or computed from the bucket default `rule`),
+   or now + duration (`eventHold.rule`) computed when the event hold is released. While the hold is `ON`, nothing is computed yet:
+   the effective `RetainUntilDate` returned to clients is the later of `retentionDate` and now + duration.
+3. **Releasing the event hold computes the date**: only an explicit `EventHold=OFF` on a key whose hold is `ON` releases it; any other request keeps the hold active.
+   OM computes now + duration, and it replaces `retentionDate` only if it is later. The request must not carry `EventHoldDuration`.
+   If the request also carries a `RetainUntilDate`, that date is used instead; an earlier date is a shortening (see 4).
+4. **Only the Governance bypass can shorten**: without the bypass, no request makes the effective date earlier.
+   A `RetainUntilDate` earlier than the effective date is rejected with `403 Access Denied`, and decreasing the duration while the hold is `ON` keeps the current effective date
+   (OM saves it in `retentionDate` first). With the bypass, an earlier `RetainUntilDate` is accepted for a `GOVERNANCE` key; a `COMPLIANCE` key can never be shortened.
+   The bypass only applies to an explicit `RetainUntilDate`: a shorter duration still never moves the date earlier.
+   While the hold is `ON`, the request must also carry `EventHold` (`OFF` releases the hold with the new date), and with `EventHold=ON` the date cannot be earlier than now + duration.
+
+Other rules:
+* **Invalid requests** are rejected with `400 Bad Request`, as in AWS S3: a request without a retention mode, a request with neither `RetainUntilDate` nor `EventHold`,
+  `EventHoldDuration` without `EventHold=ON`, `EventHold=ON` without exactly one duration, `EventHold=OFF` with a duration,
+  `EventHold=ON` with a `RetainUntilDate` earlier than now + duration, a shortening `RetainUntilDate` without `EventHold` while the hold is `ON`,
+  or `EventHold=OFF` when neither the request nor the key has a `RetainUntilDate` in the future (an active hold counts as one).
+  `EventHold=OFF` on a key without an active hold but with a future `retentionDate` changes nothing. Durations must be positive and at most 36,500 days or 100 years.
 * The retention mode cannot be changed when the hold is released, so the usual rules for shortening retention still apply.
 
 > _**Note**:
@@ -327,13 +341,14 @@ Policy items without an `action-matches` condition are checked only against the 
 
 ##### Retention Updates
 
-`PutObjectRetention` on a key that already has a retention follows AWS S3. "Longer" and "shorter" compare the effective `RetainUntilDate` before and after the request:
+`PutObjectRetention` on a key that already has a retention follows AWS S3. "Longer" and "shorter" compare the effective `RetainUntilDate` (the computed date while the event hold is `ON`) before and after the request:
 
 | Change                                                                              | `GOVERNANCE`                                              | `COMPLIANCE`                                         |
 |:------------------------------------------------------------------------------------|:----------------------------------------------------------|:-----------------------------------------------------|
 | Longer retention (later `RetainUntilDate`, longer event hold duration, `EventHold=ON`) | Allowed with `PutObjectRetention`, no bypass needed     | Allowed with `PutObjectRetention`                    |
-| Shorter retention (earlier `RetainUntilDate`, shorter event hold duration) or removal | Requires `PutObjectRetention` and the Governance bypass | Not allowed: rejected, or for a shorter event hold duration the effective date is kept |
-| Release the event hold (`EventHold=OFF`)                                            | Allowed with `PutObjectRetention`                         | Allowed with `PutObjectRetention`                    |
+| Shorter event hold duration while the hold is `ON`                                  | Allowed with `PutObjectRetention`; not a shortening, the effective date is kept | Allowed with `PutObjectRetention`; the effective date is kept |
+| Shorter retention (`RetainUntilDate` earlier than the effective date, also on release) or removal | Requires `PutObjectRetention` and the Governance bypass; while the hold is `ON`, the request must carry `EventHold` | Not allowed: rejected with `403 Access Denied` |
+| Release the event hold (`EventHold=OFF` without `RetainUntilDate`)                  | Allowed with `PutObjectRetention`                         | Allowed with `PutObjectRetention`                    |
 | Change the mode                                                                     | `GOVERNANCE` → `COMPLIANCE`: allowed with `PutObjectRetention` | `COMPLIANCE` → `GOVERNANCE`: not allowed        |
 
 With native ACLs, `PutObjectRetention` means the owner, and setting `COMPLIANCE` (including `GOVERNANCE` → `COMPLIANCE`) means an Ozone administrator (see [Native ACL Mapping](#1-native-acl-mapping)).
