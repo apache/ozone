@@ -31,8 +31,8 @@ import org.apache.commons.io.FileUtils;
  * Utility class to read audit logs.
  */
 public final class AuditLogTestUtils {
-  private static final String AUDITLOG_FILENAME = "target/audit.log";
-  private static final String SYSTEM_AUDITLOG_FILENAME = "target/system_audit.log";
+  private static final String AUDITLOG_FILENAME = "audit.log";
+  private static final String SYSTEM_AUDITLOG_FILENAME = "system_audit.log";
 
   private AuditLogTestUtils() {
   }
