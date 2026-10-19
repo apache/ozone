@@ -41,6 +41,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -257,4 +258,22 @@ public class TestScmClient {
         .build();
   }
 
+  @Test
+  public void testDatanodeDetailsCacheUpdatesCurrentVersionChange() {
+    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache = CacheBuilder.newBuilder().build();
+    DatanodeDetails original = randomDatanode();
+    original.setCurrentVersion(DatanodeVersion.STREAM_BLOCK_SUPPORT.version());
+    DatanodeDetails upgraded = DatanodeDetails.newBuilder()
+        .setDatanodeDetails(original)
+        .setCurrentVersion(DatanodeVersion.SHORT_CIRCUIT_READS.version())
+        .build();
+
+    ScmClient.newPipelineWithDNCache(createPipeline(1L, asList(original)).getPipeline(), datanodeDetailsCache);
+    Pipeline refreshed = ScmClient.newPipelineWithDNCache(
+        createPipeline(2L, asList(upgraded)).getPipeline(), datanodeDetailsCache);
+
+    assertSame(upgraded, refreshed.getNodes().get(0));
+    assertEquals(DatanodeVersion.SHORT_CIRCUIT_READS.version(), refreshed.getNodes().get(0).getCurrentVersion());
+    assertSame(upgraded, datanodeDetailsCache.getIfPresent(original.getID()));
+  }
 }
