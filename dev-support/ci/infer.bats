@@ -32,7 +32,19 @@ setup() {
   git -c user.name=Test -c user.email=test@example.com -c core.hooksPath=/dev/null commit -qm initial
   printf '%s\n' \
     '#!/usr/bin/env bash' \
+    'if [[ "$1" == debug ]]; then' \
+    '  if [[ "${INFER_EMPTY_CAPTURE:-false}" != true ]]; then echo src/main/java/Example.java; fi' \
+    '  exit 0' \
+    'fi' \
     'touch "${TEST_TMPDIR}/infer-called"' \
+    'printf "%s\n" "$@" > "${TEST_TMPDIR}/infer-args"' \
+    'for arg in "$@"; do if [[ "$arg" == clean ]]; then rm -rf target; fi; done' \
+    'if [[ "${INFER_NO_REPORT:-false}" != true ]]; then' \
+    '  mkdir -p infer-out' \
+    '  printf "%s\n" "${INFER_REPORT:-No issues found}" > infer-out/report.txt' \
+    '  printf "%s\n" "${INFER_JSON-[]}" > infer-out/report.json' \
+    'fi' \
+    'echo "Infer output"' \
     'printf "%s\n" modified > hadoop-ozone/ozonefs-hadoop2/pom.xml' \
     'printf "%s\n" modified > hadoop-ozone/ozonefs-shaded/pom.xml' \
     'if [[ -n "${INFER_SIGNAL:-}" ]]; then kill -"${INFER_SIGNAL}" "$PPID"; fi' \
@@ -123,5 +135,104 @@ teardown() {
 
   [ "${status}" -eq 130 ]
   [ -e infer-called ]
+  git diff --exit-code -- "${POMS[@]}"
+}
+
+@test "Infer cleans the build without losing the output log" {
+  mkdir -p target
+  touch target/previous-build
+
+  run bash hadoop-ozone/dev-support/checks/infer.sh
+
+  [ "${status}" -eq 0 ]
+  [ ! -e target/previous-build ]
+  grep -q 'Infer output' target/infer/output.log
+  grep -qx -- '-Ddevelocity.cache.local.enabled=false' infer-args
+  grep -qx -- '-Ddevelocity.cache.remote.enabled=false' infer-args
+}
+
+@test "Infer failures are not hidden by a fresh report" {
+  export INFER_EXIT_CODE=5
+
+  run bash hadoop-ozone/dev-support/checks/infer.sh
+
+  [ "${status}" -eq 1 ]
+  grep -q 'code 5' target/infer/summary.txt
+  [ -f target/infer/report.txt ]
+}
+
+@test "Infer failures do not reuse previous reports" {
+  mkdir -p target/infer infer-out
+  printf '%s\n' stale > target/infer/report.txt
+  printf '%s\n' stale > infer-out/report.txt
+  export INFER_EXIT_CODE=5 INFER_NO_REPORT=true
+
+  run bash hadoop-ozone/dev-support/checks/infer.sh
+
+  [ "${status}" -eq 1 ]
+  [ ! -e target/infer/report.txt ]
+  grep -q 'code 5' target/infer/summary.txt
+}
+
+@test "Infer requires a report even when the command succeeds" {
+  export INFER_NO_REPORT=true
+
+  run bash hadoop-ozone/dev-support/checks/infer.sh
+
+  [ "${status}" -eq 1 ]
+  grep -q 'no report' target/infer/summary.txt
+}
+
+@test "Infer rejects empty capture instead of reporting a clean analysis" {
+  export INFER_EMPTY_CAPTURE=true
+
+  run bash hadoop-ozone/dev-support/checks/infer.sh
+
+  [ "${status}" -eq 1 ]
+  grep -q 'no source files' target/infer/summary.txt
+}
+
+@test "Infer clean reports contain a single zero count" {
+  run bash hadoop-ozone/dev-support/checks/infer.sh
+
+  [ "${status}" -eq 0 ]
+  [ "$(cat target/infer/failures)" = 0 ]
+  grep -qx 'Infer analysis complete. Found 0 issues.' target/infer/summary.txt
+}
+
+@test "Infer counts findings from JSON and keeps them informational" {
+  export INFER_REPORT='Example.java:1: error: Null Dereference'
+  export INFER_JSON='[{"severity":"ERROR"},{"severity":"WARNING"},{"suppressed":true},{"censored_reason":"filtered"}]'
+
+  run bash hadoop-ozone/dev-support/checks/infer.sh
+
+  [ "${status}" -eq 0 ]
+  [ "$(cat target/infer/failures)" = 2 ]
+  cmp infer-out/report.json target/infer/report.json
+}
+
+@test "Infer rejects an invalid JSON report" {
+  local report
+  for report in 'invalid JSON' '' '[] []' '{}' 'null'; do
+    export INFER_JSON="${report}"
+    run bash hadoop-ozone/dev-support/checks/infer.sh
+
+    [ "${status}" -eq 1 ]
+    grep -q 'invalid JSON report' target/infer/summary.txt
+  done
+}
+
+@test "Infer installation failures preserve diagnostics in the artifact" {
+  export OZONE_PREFER_LOCAL_TOOL=false
+  printf '%s\n' '#!/usr/bin/env bash' 'echo "download failed" >&2' 'exit 22' > bin/curl
+  chmod +x bin/curl
+
+  run bash hadoop-ozone/dev-support/checks/infer.sh
+
+  [ "${status}" -eq 1 ]
+  [ ! -e infer-called ]
+  grep -q 'Failed to install infer' target/infer/summary.txt
+  grep -q 'download failed' target/infer/output.log
+  ! grep -q 'unbound variable' target/infer/output.log
   git diff --exit-code -- "${POMS[@]}"
 }

@@ -172,6 +172,7 @@ function filter_changed_files() {
 
 SOURCES_TRIGGERING_TESTS=(
     "^.github"
+    "^\.inferconfig$"
     "^dev-support"
     "^hadoop-hdds"
     "^hadoop-ozone"
@@ -519,11 +520,14 @@ function check_needs_pmd() {
 function check_needs_infer() {
     start_end::group_start "Check if infer is needed"
     local pattern_array=(
-        "^.inferconfig$"
+        "^\.inferconfig$"
         "^hadoop-ozone/dev-support/checks/infer.sh$"
         "^hadoop-ozone/dev-support/checks/install/infer.sh$"
         "pom.xml"
-        "src/..../java"
+        "src/main/java"
+    )
+    local ignore_array=(
+        ".*/test-utils/src/main/java"
     )
     filter_changed_files
 
@@ -552,7 +556,7 @@ function get_count_misc_files() {
         "\.bats$"
         "\.txt$"
         "\.md$"
-        ".inferconfig$"
+        "^\.inferconfig$"
         "findbugsExcludeFile.xml"
         "pmd-ruleset.xml"
         "/NOTICE$"

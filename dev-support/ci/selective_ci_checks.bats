@@ -33,6 +33,77 @@
 load bats-support/load.bash
 load bats-assert/load.bash
 
+function run_with_changed_file() {
+  local file="$1"
+  local repo
+  repo=$(mktemp -d)
+  git -C "${repo}" init -q
+  git -C "${repo}" config user.name "Selective CI test"
+  git -C "${repo}" config user.email "test@example.com"
+  git -C "${repo}" -c core.hooksPath=/dev/null -c commit.gpgsign=false commit -q --allow-empty -m "Base"
+  mkdir -p "${repo}/$(dirname "${file}")"
+  touch "${repo}/${file}"
+  git -C "${repo}" add "${file}"
+  git -C "${repo}" -c core.hooksPath=/dev/null -c commit.gpgsign=false commit -q -m "Change ${file}"
+
+  run env GIT_DIR="${repo}/.git" GIT_WORK_TREE="${repo}" dev-support/ci/selective_ci_checks.sh HEAD
+  rm -rf "${repo}"
+}
+
+@test "Infer configuration only" {
+  run_with_changed_file .inferconfig
+
+  assert_success
+  assert_output -p 'basic-checks=["rat"]'
+  assert_output -p needs-build=false
+  assert_output -p needs-compile=false
+  assert_output -p needs-compose-tests=false
+  assert_output -p needs-infer=true
+  assert_output -p needs-integration-tests=false
+  assert_output -p needs-kubernetes-tests=false
+}
+
+@test "Infer scripts" {
+  local file
+  for file in hadoop-ozone/dev-support/checks/infer.sh hadoop-ozone/dev-support/checks/install/infer.sh; do
+    run_with_changed_file "${file}"
+
+    assert_success
+    assert_output -p needs-infer=true
+    assert_output -p needs-compose-tests=false
+    assert_output -p needs-integration-tests=false
+    assert_output -p needs-kubernetes-tests=false
+  done
+}
+
+@test "Infer runs for test-utils POM changes" {
+  run_with_changed_file hadoop-hdds/test-utils/pom.xml
+
+  assert_success
+  assert_output -p needs-infer=true
+}
+
+@test "Infer skips test-utils Java in other modules" {
+  run_with_changed_file hadoop-ozone/test-utils/src/main/java/org/apache/ozone/test/TestHelper.java
+
+  assert_success
+  assert_output -p needs-infer=false
+}
+
+@test "push runs Infer" {
+  run dev-support/ci/selective_ci_checks.sh
+
+  assert_success
+  assert_output -p needs-infer=true
+}
+
+@test "full tests needed label runs Infer for test-only changes" {
+  PR_LABELS="full tests needed" run dev-support/ci/selective_ci_checks.sh bf59f31a7e5fcad1acc85e1228d77c22ee7f036c
+
+  assert_success
+  assert_output -p needs-infer=true
+}
+
 @test "checkstyle and bats" {
   run dev-support/ci/selective_ci_checks.sh 11b098430
 
@@ -144,6 +215,7 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
+  assert_output -p needs-infer=false
   assert_output -p needs-integration-tests=false
   assert_output -p needs-kubernetes-tests=false
   assert_output -p test-classes=org/apache/ozone/test/Test*,org/apache/hadoop/ozone/container/TestContainerReportHandling.java,org/apache/hadoop/ozone/container/TestContainerReportHandlingWithHA.java,org/apache/hadoop/ozone/container/TestHelper.java
@@ -203,6 +275,7 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
+  assert_output -p needs-infer=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
   assert_output -p test-classes=
@@ -239,6 +312,7 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
+  assert_output -p needs-infer=false
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
   assert_output -p test-classes=
@@ -341,6 +415,7 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
+  assert_output -p needs-infer=true
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=true
 }
@@ -352,6 +427,7 @@ load bats-assert/load.bash
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
+  assert_output -p needs-infer=true
   assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=true
 }

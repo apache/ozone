@@ -27,11 +27,17 @@ if ! git diff --quiet -- "${POM_FILES[@]}" || ! git diff --cached --quiet -- "${
 fi
 
 POM_BACKUP_DIR=$(mktemp -d) || exit 1
+REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/infer"}
+REPORT_FILE="$REPORT_DIR/summary.txt"
+OUTPUT_LOG="${POM_BACKUP_DIR}/output.log"
 
 restore_poms() {
   local rc=$?
   local restore_failed=false
   local i
+  if ! mkdir -p "$REPORT_DIR" || ! cp "$OUTPUT_LOG" "${REPORT_DIR}/output.log"; then
+    rc=1
+  fi
   for i in "${!POM_FILES[@]}"; do
     if [[ -f "${POM_BACKUP_DIR}/${i}" ]] && ! cp "${POM_BACKUP_DIR}/${i}" "${POM_FILES[$i]}"; then
       restore_failed=true
@@ -43,62 +49,77 @@ restore_poms() {
   else
     rm -rf "${POM_BACKUP_DIR}"
   fi
+  if [[ ${rc} -ne 0 ]]; then
+    echo "Infer check failed with exit code ${rc}." >> "$REPORT_FILE"
+    echo "1" > "${REPORT_DIR}/failures"
+  fi
   exit "${rc}"
 }
 
 trap restore_poms EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+mkdir -p "$REPORT_DIR" || exit 1
+rm -f "${REPORT_DIR}/report.txt" "${REPORT_DIR}/report.json" "${REPORT_DIR}/captured-sources.txt" \
+  "${REPORT_DIR}/logs" infer-out/report.txt infer-out/report.json || exit 1
+: > "$REPORT_FILE"
+: > "$OUTPUT_LOG"
+echo "0" > "${REPORT_DIR}/failures"
 for i in "${!POM_FILES[@]}"; do
   cp "${POM_FILES[$i]}" "${POM_BACKUP_DIR}/${i}" || exit 1
 done
 
 source "${DIR}/_lib.sh"
-source "${DIR}/install/infer.sh"
-
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/infer"}
-REPORT_FILE="$REPORT_DIR/summary.txt"
+source "${DIR}/install/infer.sh" >> "$OUTPUT_LOG" 2>&1
 
 MAVEN_OPTIONS='-B -DskipTests -DskipDocs -DskipRecon -DskipShade -Dsort.skip=true --no-transfer-progress'
+MAVEN_OPTIONS+=' -Ddevelocity.cache.local.enabled=false -Ddevelocity.cache.remote.enabled=false'
 
-mkdir -p "$REPORT_DIR"
-infer run --keep-going \
+# Keep the log outside target because Maven clean removes it.
+infer run --keep-going --report-console-limit 0 \
   --skip-analysis-in-path '.*/src/test/.*' \
   --skip-analysis-in-path '.*/target/generated-test-sources/.*' \
   --skip-analysis-in-path '.*/target/generated-sources/.*' \
   --skip-analysis-in-path '.*/test-utils/.*' \
-  -- mvn ${MAVEN_OPTIONS} install "$@" 2>&1 | tee "${REPORT_DIR}/output.log"
+  -- mvn ${MAVEN_OPTIONS} clean install "$@" 2>&1 | tee -a "$OUTPUT_LOG"
 infer_rc=$?
 
 mkdir -p "$REPORT_DIR"
 
-# Only copy text reports, not the multi-GB capture/results databases
-if [[ -f infer-out/report.txt ]]; then
-  cp infer-out/report.txt "${REPORT_DIR}/"
-  cp infer-out/logs "${REPORT_DIR}/" 2>/dev/null || true
-  cp infer-out/stats "${REPORT_DIR}/" -r 2>/dev/null || true
-elif [[ -d infer-out ]]; then
-  find infer-out -name "report.txt" -exec cp {} "${REPORT_DIR}/" \; 2>/dev/null || true
-fi
+# Copy reports and diagnostics, not the multi-GB capture/results databases.
+for report in report.txt report.json; do
+  if [[ -f "infer-out/${report}" ]]; then
+    cp "infer-out/${report}" "${REPORT_DIR}/" || exit 1
+  fi
+done
+cp infer-out/logs "${REPORT_DIR}/" 2>/dev/null || true
+cp -R infer-out/stats "${REPORT_DIR}/" 2>/dev/null || true
 
-touch "$REPORT_FILE"
-
-if [[ -f "${REPORT_DIR}/report.txt" ]]; then
-  issue_count=$(grep -c '\.java:' "${REPORT_DIR}/report.txt" 2>/dev/null || echo "0")
-  echo "Infer analysis complete. Found ${issue_count} issues." >> "$REPORT_FILE"
-  echo "${issue_count}" > "${REPORT_DIR}/failures"
-else
-  echo "Infer analysis produced no report." >> "$REPORT_FILE"
-  echo "0" > "${REPORT_DIR}/failures"
-fi
-
-# Infer findings are informational, never a failure.
-# Only exit non-zero if infer itself failed without producing any report.
-if [[ -f "${REPORT_DIR}/report.txt" ]]; then
-  exit 0
-elif [[ ${infer_rc} -ne 0 ]]; then
-  echo "Infer exited with code ${infer_rc} and no report was produced." >> "$REPORT_FILE"
+if [[ ${infer_rc} -ne 0 ]]; then
+  echo "Infer exited with code ${infer_rc}." >> "$REPORT_FILE"
   exit 1
-else
-  exit 0
 fi
+if [[ ! -f "${REPORT_DIR}/report.txt" || ! -f "${REPORT_DIR}/report.json" ]]; then
+  echo "Infer analysis produced no report." >> "$REPORT_FILE"
+  exit 1
+fi
+
+if ! infer debug --source-files > "${REPORT_DIR}/captured-sources.txt" 2>> "$OUTPUT_LOG" \
+    || ! grep -q '[^[:space:]]' "${REPORT_DIR}/captured-sources.txt"; then
+  echo "Infer captured no source files or could not read the capture." >> "$REPORT_FILE"
+  exit 1
+fi
+
+issue_count=$(jq -es '
+  if length == 1 and (.[0] | type) == "array" then
+    [.[0][] | select(.suppressed != true and .censored_reason == null)] | length
+  else error("Expected a single JSON report array") end
+' "${REPORT_DIR}/report.json" 2>> "$OUTPUT_LOG") || {
+  echo "Infer produced an invalid JSON report." >> "$REPORT_FILE"
+  exit 1
+}
+echo "Infer analysis complete. Found ${issue_count} issues." >> "$REPORT_FILE"
+echo "${issue_count}" > "${REPORT_DIR}/failures"
+
+# Findings are informational; execution and reporting failures are not.
+exit 0
