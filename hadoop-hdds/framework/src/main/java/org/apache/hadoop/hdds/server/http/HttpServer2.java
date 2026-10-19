@@ -221,7 +221,7 @@ public final class HttpServer2 implements FilterContainer {
   // gets stored.
   public static final String CONF_CONTEXT_ATTRIBUTE = "hadoop.conf";
   private static final String ADMINS_ACL = "admins.acl";
-  private static final String SPNEGO_FILTER = "SpnegoFilter";
+  static final String SPNEGO_FILTER = "SpnegoFilter";
   private static final String NO_CACHE_FILTER = "NoCacheFilter";
 
   private static final String BIND_ADDRESS = "bind.address";

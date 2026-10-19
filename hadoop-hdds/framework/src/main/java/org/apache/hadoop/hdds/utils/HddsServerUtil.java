@@ -68,6 +68,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.NetworkInterface;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -82,6 +83,8 @@ import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -141,6 +144,8 @@ public final class HddsServerUtil {
 
   private static final int SHUTDOWN_HOOK_PRIORITY = 0;
 
+  private static final Pattern KERBEROS_PRINCIPAL = Pattern.compile("([^/@]+)(/[^/@]+)?(@[^/@]+)?");
+
   public static final String OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME =
       "OZONE_RATIS_SNAPSHOT_COMPLETE";
 
@@ -184,7 +189,7 @@ public final class HddsServerUtil {
       if (ifc.isUp()) {
         Enumeration<InetAddress> enumAdds = ifc.getInetAddresses();
         while (enumAdds.hasMoreElements()) {
-          InetAddress addr = enumAdds.nextElement();
+          InetAddress addr = dropScopeUnlessLinkLocal(enumAdds.nextElement());
 
           if (isValidInetForCsr(addr)) {
             LOG.info("Adding ip:{},host:{}", addr.getHostAddress(), addr.getHostName());
@@ -197,6 +202,21 @@ public final class HddsServerUtil {
     }
 
     return hostIps;
+  }
+
+  /**
+   * A network interface returns every IPv6 address with the interface as scope, which
+   * {@link #isScopedOrMaskingIPv6Address(InetAddress)} rejects. Only a link-local address needs the scope, so it is
+   * dropped from any other address.
+   *
+   * @param addr the InetAddress as returned by a network interface
+   * @return the address without scope, or the same address if it is link-local or not an IPv6 address
+   */
+  public static InetAddress dropScopeUnlessLinkLocal(InetAddress addr) throws UnknownHostException {
+    if (addr instanceof Inet6Address && !addr.isLinkLocalAddress()) {
+      return InetAddress.getByAddress(addr.getAddress());
+    }
+    return addr;
   }
 
   /**
@@ -773,6 +793,20 @@ public final class HddsServerUtil {
   public static UserGroupInformation getRemoteUser() throws IOException {
     UserGroupInformation ugi = Server.getRemoteUser();
     return (ugi != null) ? ugi : UserGroupInformation.getCurrentUser();
+  }
+
+  /**
+   * @return true if {@code user} is a service user of the Kerberos {@code principal}: not a proxy user, with the same
+   * service name, with the same realm if the principal has one, and with a host if the principal has one. The host is
+   * not compared, as _HOST in the principal stands for the host of any instance of the service.
+   */
+  public static boolean isServiceUser(UserGroupInformation user, String principal) {
+    final Matcher expected = KERBEROS_PRINCIPAL.matcher(principal);
+    final Matcher actual = KERBEROS_PRINCIPAL.matcher(user.getUserName());
+    return user.getRealUser() == null && expected.matches() && actual.matches()
+        && expected.group(1).equals(actual.group(1))
+        && (expected.group(2) == null) == (actual.group(2) == null)
+        && (expected.group(3) == null || expected.group(3).equals(actual.group(3)));
   }
 
   /**

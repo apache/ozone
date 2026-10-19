@@ -76,7 +76,7 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
       UnmarshallerHandler unmarshallerHandler =
           context.createUnmarshaller().getUnmarshallerHandler();
       XmlNamespaceFilter filter =
-          new XmlNamespaceFilter(S3_XML_NAMESPACE);
+          createNamespaceFilter();
       filter.setContentHandler(unmarshallerHandler);
       filter.setParent(xmlReader);
       filter.parse(new InputSource(inputStream));
@@ -84,6 +84,10 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
     } catch (Exception e) {
       throw wrapOS3Exception(newError(INVALID_REQUEST, e).withMessage(e.getMessage()));
     }
+  }
+
+  protected XmlNamespaceFilter createNamespaceFilter() {
+    return new XmlNamespaceFilter(S3_XML_NAMESPACE);
   }
 
   /** Convenience method for programmatic invocation. */
