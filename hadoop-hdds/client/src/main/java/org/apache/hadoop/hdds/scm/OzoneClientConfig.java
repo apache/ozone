@@ -343,7 +343,8 @@ public class OzoneClientConfig {
           "instead of a separate WriteAsync PutBlock, so that it does not go through the Raft log: " +
           "StreamInitWithPutBlock is used so that datanodes commit PutBlock when the data stream closes, " +
           "and the PutBlock triggered by a flush in the middle of the stream is sent as a data stream command. " +
-          "All the datanodes must support committing PutBlock through the data stream.",
+          "It takes effect only for pipelines whose datanodes all support committing PutBlock through the data " +
+          "stream; otherwise PutBlock goes through the Raft log.",
       tags = ConfigTag.CLIENT)
   private boolean datastreamPutBlockWithoutRaftEnabled = false;
 

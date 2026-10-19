@@ -60,12 +60,15 @@ public class TestBucketNotImplemented {
         QueryParams.METADATA_TABLE, QueryParams.METRICS, QueryParams.NOTIFICATION, QueryParams.OBJECT_LOCK,
         QueryParams.OWNERSHIP_CONTROLS, QueryParams.POLICY, QueryParams.POLICY_STATUS, QueryParams.PUBLIC_ACCESS_BLOCK,
         QueryParams.REPLICATION, QueryParams.REQUEST_PAYMENT, QueryParams.SESSION, QueryParams.VERSIONING,
-        QueryParams.VERSIONS, QueryParams.WEBSITE);
+        QueryParams.WEBSITE);
   }
 
-  /** Same as {@link #subresources()}, plus uploads, for which only GET (ListMultipartUploads) is implemented. */
+  /**
+   * Same as {@link #subresources()}, plus uploads and versions, for which only GET (ListMultipartUploads and
+   * ListObjectVersions) is implemented.
+   */
   private static Stream<String> putSubresources() {
-    return Stream.concat(subresources(), Stream.of(QueryParams.UPLOADS));
+    return Stream.concat(subresources(), Stream.of(QueryParams.UPLOADS, QueryParams.VERSIONS));
   }
 
   /** Same as {@link #putSubresources()}, plus acl, for which only GET and PUT are implemented. */

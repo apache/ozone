@@ -21,6 +21,8 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NO
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -39,6 +41,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -87,7 +90,10 @@ import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -183,6 +189,7 @@ public class TestSCMBlockProtocolServer {
   @BeforeEach
   void setUp(@TempDir File dir) throws Exception {
     config = SCMTestUtils.getConf(dir);
+    config.set(SCMBlockProtocolServer.OM_KERBEROS_PRINCIPAL_KEY, "om/_HOST@EXAMPLE.COM");
     config.set(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class.getName());
     List<DatanodeDetails> datanodes = new ArrayList<>(NODE_COUNT);
@@ -319,6 +326,41 @@ public class TestSCMBlockProtocolServer {
     assertEquals(0, resp.getNodeList().size());
     resp.getNodeList().stream().forEach(
         node -> System.out.println(node.getNetworkName()));
+  }
+
+  @Test
+  void allocateAndDeleteBlocksAreDeniedForOtherUsers() {
+    for (String user : new String[] {"alice", "alice/om@EXAMPLE.COM", "dn/host1@EXAMPLE.COM", "om@EXAMPLE.COM",
+        "om/host1@OTHER.COM"}) {
+      UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+      assertThatThrownBy(() -> ugi.doAs((PrivilegedExceptionAction<?>) this::allocateBlock))
+          .isInstanceOf(AccessControlException.class)
+          .hasMessageContaining(SCMBlockProtocolServer.OM_KERBEROS_PRINCIPAL_KEY);
+      assertThatThrownBy(() -> ugi.doAs((PrivilegedExceptionAction<?>) () ->
+          server.deleteKeyBlocks(Collections.emptyList())))
+          .isInstanceOf(AccessControlException.class);
+    }
+  }
+
+  @Test
+  void allocateAndDeleteBlocksAreAllowedForOm() throws Exception {
+    UserGroupInformation om = UserGroupInformation.createRemoteUser("om/host1@EXAMPLE.COM");
+    assertThat(om.doAs((PrivilegedExceptionAction<List<AllocatedBlock>>) this::allocateBlock)).hasSize(1);
+    assertThat(om.doAs((PrivilegedExceptionAction<List<DeleteBlockGroupResult>>) () ->
+        server.deleteKeyBlocks(Collections.emptyList()))).isEmpty();
+  }
+
+  @Test
+  void allocateBlockIsDeniedForProxyUserOfOm() {
+    UserGroupInformation proxy = UserGroupInformation.createProxyUser("om/host1@EXAMPLE.COM",
+        UserGroupInformation.createRemoteUser("alice"));
+    assertThatThrownBy(() -> proxy.doAs((PrivilegedExceptionAction<?>) this::allocateBlock))
+        .isInstanceOf(AccessControlException.class);
+  }
+
+  private List<AllocatedBlock> allocateBlock() throws IOException {
+    return server.allocateBlock(128 * MB, 1, RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "o",
+        new ExcludeList(), null);
   }
 
   @Test

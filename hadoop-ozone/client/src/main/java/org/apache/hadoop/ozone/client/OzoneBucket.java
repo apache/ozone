@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -1215,6 +1216,26 @@ public class OzoneBucket extends WithMetadata {
   public List<OzoneFileStatusLight> listStatusLight(String keyName, boolean recursive,
       String startKey, long numEntries) throws IOException {
     return proxy.listStatusLight(volumeName, name, keyName, recursive, startKey, numEntries, false);
+  }
+
+  /**
+   * Like {@link #listStatus(String, boolean, String, long)}, but also returns whether OM reported that no
+   * entries follow this page.
+   */
+  public ListStatusResult<OzoneFileStatus> listStatusPage(String keyName, boolean recursive,
+      String startKey, long numEntries) throws IOException {
+    return proxy.listStatusPage(
+        ListStatusLightOptions.of(volumeName, name, keyName, recursive, startKey, numEntries, false));
+  }
+
+  /**
+   * Like {@link #listStatusLight(String, boolean, String, long)}, but also returns whether OM reported that
+   * no entries follow this page.
+   */
+  public ListStatusResult<OzoneFileStatusLight> listStatusLightPage(String keyName, boolean recursive,
+      String startKey, long numEntries) throws IOException {
+    return proxy.listStatusLightPage(
+        ListStatusLightOptions.of(volumeName, name, keyName, recursive, startKey, numEntries, false));
   }
 
   /**
