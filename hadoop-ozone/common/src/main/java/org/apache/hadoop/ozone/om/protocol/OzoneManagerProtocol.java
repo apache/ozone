@@ -213,6 +213,8 @@ public interface OzoneManagerProtocol
 
   /**
    * Gets bucket information.
+   * The default implementation ignores {@code assumeS3Context}. Only the OM server resolves the S3 volume;
+   * the client-side translator forwards the flag to OM.
    * @param volumeName - Volume name.
    * @param bucketName - Bucket name.
    * @param assumeS3Context if true OM will automatically lookup the S3

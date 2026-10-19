@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +57,23 @@ class TestS3RequestContext {
     assertThat(context.getBucket("bucket1")).isSameAs(bucket);
     verify(proxy).getS3BucketDetails("bucket1");
     verify(endpoint, never()).getVolume();
+  }
+
+  @Test
+  void volumeNameReusesCachedBucket() throws IOException {
+    when(bucket.getVolumeName()).thenReturn("volume1");
+    context.getBucket("bucket1");
+    assertThat(context.getVolumeName()).isEqualTo("volume1");
+    verify(endpoint, never()).getVolume();
+  }
+
+  @Test
+  void volumeNameLooksUpVolumeWithoutCachedBucket() throws IOException {
+    OzoneVolume volume = mock(OzoneVolume.class);
+    when(volume.getName()).thenReturn("volume1");
+    when(endpoint.getVolume()).thenReturn(volume);
+    assertThat(context.getVolumeName()).isEqualTo("volume1");
+    verify(proxy, never()).getS3BucketDetails("bucket1");
   }
 
   @Test
