@@ -2342,7 +2342,7 @@ public class RpcClient implements ClientProtocol {
 
   @Override
   public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
-    if (!OzoneManagerVersion.S3_MULTIPART_UPLOAD_ABORT_CONTEXT.isSupportedBy(omVersion)) {
+    if (!OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(omVersion)) {
       abortMultipartUpload(getS3VolumeContext().getOmVolumeArgs().getVolume(), bucketName, keyName, uploadID);
       return;
     }
