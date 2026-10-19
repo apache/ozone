@@ -21,6 +21,8 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.mockMetricsRecordBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -30,12 +32,14 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -108,19 +112,25 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
           TermIndex.valueOf(term, trxId.incrementAndGet()));
     }
     int totalBucketCount = bucketCount + 1;
-    waitFor(() -> metrics.getTotalNumOfFlushedTransactions() == totalBucketCount,
-        100, 60000);
+    doubleBuffer.awaitFlushAsync().get(60, TimeUnit.SECONDS);
 
-    assertThat(metrics.getTotalNumOfFlushOperations()).isGreaterThan(0);
+    assertEquals(totalBucketCount, metrics.getTotalNumOfFlushedTransactions());
+
+    long flushIterations = doubleBuffer.getFlushIterationsForTesting();
+    assertThat(flushIterations).isGreaterThan(0);
+    assertEquals(flushIterations, metrics.getTotalNumOfFlushOperations());
     assertEquals(totalBucketCount, doubleBuffer.getFlushedTransactionCountForTesting());
     assertThat(metrics.getMaxNumberOfTransactionsFlushedInOneIteration()).isGreaterThan(0);
     assertEquals(totalBucketCount, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
-    assertThat(doubleBuffer.getFlushIterationsForTesting()).isGreaterThan(0);
-    assertThat(metrics.getFlushTime().lastStat().numSamples()).isGreaterThan(0);
     assertThat(metrics.getAvgFlushTransactionsInOneIteration()).isGreaterThan(0);
-    assertEquals(totalBucketCount, (long) metrics.getQueueSize().lastStat().total());
-    assertThat(metrics.getQueueSize().lastStat().numSamples()).isGreaterThan(0);
+
+    // Use cumulative sample counts because metrics collection can reset the interval statistics.
+    MetricsRecordBuilder recordBuilder = mockMetricsRecordBuilder();
+    metrics.getQueueSize().snapshot(recordBuilder, true);
+    metrics.getFlushTime().snapshot(recordBuilder, true);
+    assertCounter("QueueSizeNumOps", flushIterations, recordBuilder);
+    assertCounter("FlushTimeNumOps", flushIterations, recordBuilder);
 
     // Assert there is only instance of OM Double Metrics.
     OzoneManagerDoubleBufferMetrics metricsCopy =

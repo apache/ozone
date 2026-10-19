@@ -495,6 +495,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
+    objectStoreStub.getS3Volume().getBucket(bucketName).abortMultipartUpload(keyName, uploadID);
+  }
+
+  @Override
   public void abortMultipartUpload(String volumeName, String bucketName,
                                    String keyName, String uploadID)
       throws IOException {
@@ -706,6 +711,11 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options) throws IOException {
+    return null;
+  }
+
+  @Override
+  public List<OzoneFileStatus> listStatus(ListStatusLightOptions options) throws IOException {
     return null;
   }
 

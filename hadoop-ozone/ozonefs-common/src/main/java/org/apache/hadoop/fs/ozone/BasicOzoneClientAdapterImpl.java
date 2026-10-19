@@ -79,6 +79,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -445,23 +446,22 @@ public class BasicOzoneClientAdapterImpl implements OzoneClientAdapter {
   public List<FileStatusAdapter> listStatus(String keyName, boolean recursive,
       String startKey, long numEntries, URI uri,
       Path workingDir, String username, boolean lite) throws IOException {
+    return listStatusPage(keyName, recursive, startKey, numEntries, uri, workingDir, username, lite)
+        .getStatuses();
+  }
+
+  @Override
+  public ListStatusResult<FileStatusAdapter> listStatusPage(String keyName, boolean recursive,
+      String startKey, long numEntries, URI uri,
+      Path workingDir, String username, boolean lite) throws IOException {
     try {
       incrementCounter(Statistic.OBJECTS_LIST, 1);
-      List<FileStatusAdapter> result = new ArrayList<>();
       if (lite) {
-        List<OzoneFileStatusLight> statuses = bucket
-            .listStatusLight(keyName, recursive, startKey, numEntries);
-        for (OzoneFileStatusLight status : statuses) {
-          result.add(toFileStatusAdapter(status, username, uri, workingDir));
-        }
-      } else {
-        List<OzoneFileStatus> statuses = bucket
-            .listStatus(keyName, recursive, startKey, numEntries);
-        for (OzoneFileStatus status : statuses) {
-          result.add(toFileStatusAdapter(status, username, uri, workingDir));
-        }
+        return bucket.listStatusLightPage(keyName, recursive, startKey, numEntries)
+            .map(status -> toFileStatusAdapter(status, username, uri, workingDir));
       }
-      return result;
+      return bucket.listStatusPage(keyName, recursive, startKey, numEntries)
+          .map(status -> toFileStatusAdapter(status, username, uri, workingDir));
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
         throw new FileNotFoundException(e.getMessage());
