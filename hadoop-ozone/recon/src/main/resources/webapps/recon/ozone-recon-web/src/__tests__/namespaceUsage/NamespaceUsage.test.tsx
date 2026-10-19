@@ -212,7 +212,7 @@ describe('Namespace Usage page (Disk Usage)', () => {
     });
   });
 
-  test('notifies when namespace summary is still initializing', async () => {
+  test('notifies when namespace usage, summary, and quota is still initializing', async () => {
     namespaceUsageServer.use(
       http.get('/api/v1/namespace/usage', () =>
         HttpResponse.json(mockResponses.InitializingUsage)),
@@ -229,6 +229,18 @@ describe('Namespace Usage page (Disk Usage)', () => {
       expect(commonUtils.showInfoNotification).toHaveBeenCalledWith(
         'Information being initialized',
         expect.stringContaining('Namespace Summary is being initialized')
+      )
+    );
+
+    await waitFor(() =>
+      expect(commonUtils.showDataFetchError).toHaveBeenCalledWith(
+        'The metadata is currently initializing. Please wait a moment and try again later'
+      )
+    );
+
+    await waitFor(() =>
+      expect(commonUtils.showDataFetchError).toHaveBeenCalledWith(
+        'The quota is currently initializing. Please wait a moment and try again later'
       )
     );
   });
