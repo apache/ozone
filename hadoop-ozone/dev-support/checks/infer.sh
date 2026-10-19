@@ -19,6 +19,40 @@ set -u -o pipefail
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
+POM_FILES=(hadoop-ozone/ozonefs-hadoop2/pom.xml hadoop-ozone/ozonefs-shaded/pom.xml)
+if ! git diff --quiet -- "${POM_FILES[@]}" || ! git diff --cached --quiet -- "${POM_FILES[@]}"; then
+  echo "Infer requires clean ozonefs POMs. Commit or stash changes to these files first:" >&2
+  printf '  %s\n' "${POM_FILES[@]}" >&2
+  exit 1
+fi
+
+POM_BACKUP_DIR=$(mktemp -d) || exit 1
+
+restore_poms() {
+  local rc=$?
+  local restore_failed=false
+  local i
+  for i in "${!POM_FILES[@]}"; do
+    if [[ -f "${POM_BACKUP_DIR}/${i}" ]] && ! cp "${POM_BACKUP_DIR}/${i}" "${POM_FILES[$i]}"; then
+      restore_failed=true
+    fi
+  done
+  if [[ "${restore_failed}" == "true" ]]; then
+    echo "Failed to restore ozonefs POMs. Original files are saved in ${POM_BACKUP_DIR}" >&2
+    rc=1
+  else
+    rm -rf "${POM_BACKUP_DIR}"
+  fi
+  exit "${rc}"
+}
+
+trap restore_poms EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+for i in "${!POM_FILES[@]}"; do
+  cp "${POM_FILES[$i]}" "${POM_BACKUP_DIR}/${i}" || exit 1
+done
+
 source "${DIR}/_lib.sh"
 source "${DIR}/install/infer.sh"
 
@@ -26,10 +60,6 @@ REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/infer"}
 REPORT_FILE="$REPORT_DIR/summary.txt"
 
 MAVEN_OPTIONS='-B -DskipTests -DskipDocs -DskipRecon -DskipShade -Dsort.skip=true --no-transfer-progress'
-
-# Restore pom.xml files that may have been corrupted by a previous infer run
-# (infer injects profiles into pom.xml and sometimes fails to restore them).
-git checkout -- hadoop-ozone/ozonefs-hadoop2/pom.xml hadoop-ozone/ozonefs-shaded/pom.xml 2>/dev/null || true
 
 mkdir -p "$REPORT_DIR"
 infer run --keep-going \
@@ -50,9 +80,6 @@ if [[ -f infer-out/report.txt ]]; then
 elif [[ -d infer-out ]]; then
   find infer-out -name "report.txt" -exec cp {} "${REPORT_DIR}/" \; 2>/dev/null || true
 fi
-
-# Restore pom.xml files again after infer (belt and suspenders)
-git checkout -- hadoop-ozone/ozonefs-hadoop2/pom.xml hadoop-ozone/ozonefs-shaded/pom.xml 2>/dev/null || true
 
 touch "$REPORT_FILE"
 
