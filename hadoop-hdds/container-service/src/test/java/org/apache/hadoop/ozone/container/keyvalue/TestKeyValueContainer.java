@@ -38,8 +38,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
@@ -78,8 +81,10 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerExcep
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -104,13 +109,17 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.hadoop.util.DiskChecker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.LiveFileMetaData;
 
@@ -1159,6 +1168,49 @@ public class TestKeyValueContainer {
             new File(c.getContainerData().getContainerPath());
         FileUtils.deleteDirectory(directory);
       }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testAutoCompactionClosesCompactRangeOptions(boolean compactionFails) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
+    dc.setAutoCompactionSmallSstFileNum(1);
+    conf.setFromObject(dc);
+    DatanodeStoreSchemaThreeImpl store =
+        spy(new DatanodeStoreSchemaThreeImpl(conf, new File(folder, "compaction.db").getAbsolutePath(), false));
+    List<ManagedCompactRangeOptions> options = new ArrayList<>();
+    try {
+      for (long containerId = 1; containerId <= 2; containerId++) {
+        store.getBlockDataTable().put(DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(containerId) + 1,
+            new BlockData(new BlockID(containerId, 1)));
+        store.flushDB();
+      }
+      RDBStore rdbStore = spy((RDBStore) store.getStore());
+      RocksDatabase db = spy(rdbStore.getDb());
+      doReturn(rdbStore).when(store).getStore();
+      doReturn(db).when(rdbStore).getDb();
+      IOException failure = new IOException("Compaction failed");
+      doAnswer(invocation -> {
+        options.add(invocation.getArgument(3));
+        if (compactionFails) {
+          throw failure;
+        }
+        return invocation.callRealMethod();
+      }).when(db).compactRange(any(ColumnFamily.class), any(byte[].class), any(byte[].class),
+          any(ManagedCompactRangeOptions.class));
+
+      if (compactionFails) {
+        assertThat(assertThrows(IOException.class, store::compactionIfNeeded)).isSameAs(failure);
+      } else {
+        store.compactionIfNeeded();
+      }
+      assertThat(options).isNotEmpty().noneMatch(ManagedCompactRangeOptions::isOwningHandle);
+    } finally {
+      options.forEach(ManagedCompactRangeOptions::close);
+      // Preserve the column family options shared by datanode DBs.
+      store.stop();
     }
   }
 
