@@ -420,9 +420,10 @@ public class TestDeletedBlockLog {
   }
 
   // The tests below exercise SCM's purge decision in SCMDeletedBlockTransactionStatusManager#commitTransactions.
-  // A replica added by a real container copy may already carry the pending-delete record and self-heal on the
-  // datanode; these tests only verify that SCM keeps the transaction for resend whenever it cannot rule out a
-  // replica that missed the deletion.
+  // TestKeyValueContainer#testExportCarriesOnlyDeletionsRecordedBeforeExport covers the datanode side: a copy
+  // exported before the source recorded the deletion keeps the blocks with no pending-delete record, while a copy
+  // exported later carries it. These tests verify that SCM keeps the transaction for resend whenever it cannot rule
+  // out a replica of the first kind.
   @Test
   public void testCommitTransactionsDefersPurgeForReplicaAddedDuringCommit()
       throws Exception {
@@ -460,8 +461,8 @@ public class TestDeletedBlockLog {
     commitTransactions(singleTxn, dnList.get(1));
     commitTransactions(singleTxn, dnList.get(2));
 
-    // The transaction must remain outstanding: the new replica never received or
-    // acknowledged the delete, so purging now would leak its blocks forever.
+    // The transaction must remain outstanding: the new replica has not acknowledged the
+    // delete, so it may be a copy exported before the source recorded the deletion.
     assertEquals(1, deletedBlockLog.getNumOfValidTransactions(),
         "transaction was purged although a never-acked replica exists");
     assertEquals(1, deletedBlockLog.getTransactionToDNsCommitMapSize(),
@@ -520,8 +521,8 @@ public class TestDeletedBlockLog {
     // shared by both txIDs of this container: three calls total, not four.
     verify(containerManager, times(3)).getContainerReplicas(cid);
 
-    // Both transactions must stay outstanding and get the SAME verdict: a never-acked
-    // replica now exists, so purging either would leak its blocks with no way to resend.
+    // Both transactions must stay outstanding and get the SAME verdict: a replica that has
+    // not acknowledged either deletion now exists, so both must stay available for resend.
     assertEquals(2, deletedBlockLog.getNumOfValidTransactions(),
         "both transactions for the container must stay outstanding once a never-acked "
             + "replica exists");
@@ -562,7 +563,7 @@ public class TestDeletedBlockLog {
     List<DeletedBlocksTransaction> singleTxn = Collections.singletonList(blocks.get(0));
     final ContainerID cid = ContainerID.valueOf(blocks.get(0).getContainerID());
 
-    // A copy is scheduled (its export may predate the source recording the deletion) and all original replicas
+    // A copy is scheduled, so its export may predate the source recording the deletion, and all original replicas
     // acknowledge before the copy is imported: the transaction must be kept.
     DatanodeDetails copyTarget = DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build();
     pendingOps.scheduleAddReplica(cid, copyTarget, 0, mock(SCMCommand.class), Long.MAX_VALUE, 0L, 0L);

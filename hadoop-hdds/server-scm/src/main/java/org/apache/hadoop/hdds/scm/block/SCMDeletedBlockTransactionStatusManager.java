@@ -624,11 +624,13 @@ public class SCMDeletedBlockTransactionStatusManager {
             transactionResult.getTxID(), e);
       }
     }
-    // A container copy (ReplicationManager) can add a replica after the ack-set check above but before the
-    // durable removal below; purging then would leave that replica's blocks undeleted with no way to resend.
-    // Each candidate container is therefore checked once: first for an in-flight replica ADD, then against a
-    // fresh replica set. The order matters: ContainerStateManager registers a replica and clears its pending
-    // ADD under the same container lock, so an ADD that is no longer pending is already in the replica set.
+    // A container copy made by ReplicationManager misses this deletion only if it was exported before the source
+    // recorded the deletion: the datanode serializes export and recording under the container lock, and ACKs only
+    // after recording. Such a copy was therefore scheduled before the ACKs above, so its replica ADD is either still
+    // pending here or already completed. ContainerStateManager registers a replica and clears its pending ADD under
+    // the same container lock, so the pending ADD is checked before the replica set is read: an ADD that is no
+    // longer pending is already in that replica set. A copy scheduled after this check is exported after the
+    // deletion was recorded and deletes the blocks without a resend.
     final Map<ContainerID, List<DatanodeID>> replicaSnapshots = new HashMap<>();
     for (ContainerID containerId : new HashSet<>(purgeCandidateContainers.values())) {
       if (hasPendingAddReplica(containerId)) {
@@ -693,9 +695,8 @@ public class SCMDeletedBlockTransactionStatusManager {
    * Checks that every replica in the pre-purge snapshot has committed the deletion. A missing snapshot means the
    * container has an in-flight replica ADD or could not be looked up, so the transaction is kept for resend.
    *
-   * <p>Not covered: a copy scheduled after the snapshot but before {@link #removeTransactions} commits, or one
-   * whose pending ADD already expired but still completes. SCM does not track per-replica delete progress, so
-   * such a copy relies on the pending-delete record carried in the exported container DB.
+   * <p>Not covered: a copy exported before the deletion was recorded whose pending ADD expired before its replica
+   * registered. SCM does not track per-replica delete progress, so it cannot reconcile such a late replica.
    */
   private boolean isSafeToPurge(long txID, ContainerID containerId,
       Map<ContainerID, List<DatanodeID>> replicaSnapshots) {
