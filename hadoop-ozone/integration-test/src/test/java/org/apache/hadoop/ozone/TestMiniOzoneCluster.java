@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -111,6 +112,43 @@ public class TestMiniOzoneCluster {
         client.connect();
         assertTrue(client.isConnected(pipeline.getFirstNode()));
       }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testTransferOMLeadershipPreservesCluster(boolean stopFollower) throws Exception {
+    MiniOzoneHAClusterImpl haCluster = MiniOzoneCluster.newHABuilder(conf)
+        .setOMServiceId("om-service")
+        .setNumOfOzoneManagers(stopFollower ? 5 : 3)
+        .build();
+    cluster = haCluster;
+    cluster.waitForClusterToBeReady();
+    haCluster.waitForLeaderOM();
+    List<OzoneManager> originalOMs = new ArrayList<>(haCluster.getOzoneManagersList());
+    OzoneManager leader = haCluster.getOMLeader();
+    if (stopFollower) {
+      OzoneManager follower = originalOMs.stream().filter(om -> om != leader).findFirst().get();
+      haCluster.stopOzoneManager(follower.getOMNodeId());
+    }
+
+    try {
+      // Repeated transfers must not remove any OM or change its index.
+      for (int i = 0; i < originalOMs.size(); i++) {
+        OzoneManager oldLeader = haCluster.getOMLeader();
+        OzoneManager newLeader = haCluster.transferOMLeadershipToAnotherNode(oldLeader);
+        assertNotEquals(oldLeader, newLeader);
+        assertTrue(newLeader.isRunning());
+        assertEquals(originalOMs, haCluster.getOzoneManagersList());
+        for (int j = 0; j < originalOMs.size(); j++) {
+          assertEquals(originalOMs.get(j), haCluster.getOzoneManager(j));
+        }
+      }
+
+      haCluster.stop();
+      originalOMs.forEach(om -> assertFalse(om.isRunning()));
+    } finally {
+      originalOMs.forEach(MiniOzoneClusterImpl::stopOM);
     }
   }
 
