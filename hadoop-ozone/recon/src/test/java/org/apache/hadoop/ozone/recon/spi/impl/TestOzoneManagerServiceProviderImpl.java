@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeEmptyOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -339,7 +338,7 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @Test
-  public void testPartiallyUntarredFileNotReportedOnRetry(@TempDir File dirReconMetadata) throws Exception {
+  public void testCandidateDirClearedAfterFailedDownload(@TempDir File dirReconMetadata) throws Exception {
     File completeSst = new File(dirReconMetadata, "000009.sst");
     File truncatedSst = new File(dirReconMetadata, "000010.sst");
     FileUtils.writeByteArrayToFile(completeSst, new byte[10_000]);
@@ -372,11 +371,9 @@ public class TestOzoneManagerServiceProviderImpl {
     assertNull(ozoneManagerServiceProvider.getOzoneManagerDBSnapshot());
     assertNull(ozoneManagerServiceProvider.getOzoneManagerDBSnapshot());
 
-    // The fully extracted file is kept and listed as received, so the leader does not send it again.
-    // The truncated file must not be listed, or the leader would skip it too.
-    assertThat(requestedExclusions).containsExactly(emptyList(), singletonList(completeSst.getName()));
-    assertThat(snapshotProvider.getCandidateDir().list()).containsExactly(completeSst.getName());
-    assertEquals(completeSst.length(), new File(snapshotProvider.getCandidateDir(), completeSst.getName()).length());
+    // The failed attempt leaves nothing behind, so the retry does not ask the leader to skip the truncated file.
+    assertThat(requestedExclusions).containsExactly(emptyList(), emptyList());
+    assertThat(snapshotProvider.getCandidateDir().list()).isEmpty();
   }
 
   static RocksDatabase getRocksDatabase(OMMetadataManager om) {
