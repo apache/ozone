@@ -140,10 +140,9 @@ Event holds are managed with `PutObjectRetention`, following the AWS S3 API, so 
 3. **Releasing the event hold computes the date**: only an explicit `EventHold=OFF` on a key whose hold is `ON` releases it; any other request keeps the hold active.
    OM computes now + duration, and it replaces `retentionDate` only if it is later. The request must not carry `EventHoldDuration`.
    If the request also carries a `RetainUntilDate`, that date is used instead; an earlier date is a shortening (see 4).
-4. **Only the Governance bypass can shorten**: without the bypass, no request makes the effective date earlier.
-   A `RetainUntilDate` earlier than the effective date is rejected with `403 Access Denied`, and decreasing the duration while the hold is `ON` keeps the current effective date
-   (OM saves it in `retentionDate` first). With the bypass, an earlier `RetainUntilDate` is accepted for a `GOVERNANCE` key; a `COMPLIANCE` key can never be shortened.
-   The bypass only applies to an explicit `RetainUntilDate`: a shorter duration still never moves the date earlier.
+4. **Only an explicit `RetainUntilDate` can shorten a retention, and only for `GOVERNANCE` with the bypass.** Changing the event hold duration can only extend the effective date or keep it; it never moves it earlier.
+   Without the bypass, a `RetainUntilDate` earlier than the effective date is rejected with `403 Access Denied`; a `COMPLIANCE` key can never be shortened.
+   Decreasing the duration while the hold is `ON` is accepted, but OM first saves the current effective date in `retentionDate`, with or without the bypass.
    While the hold is `ON`, the request must also carry `EventHold` (`OFF` releases the hold with the new date), and with `EventHold=ON` the date cannot be earlier than now + duration.
 
 Other rules:
