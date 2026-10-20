@@ -117,11 +117,14 @@ public class TestReconWithDifferentSqlDBs {
           String.valueOf(dsl.fetchValue("PRAGMA busy_timeout")));
     }
 
-    // A journal mode set in the URL is kept.
+    // A journal mode and busy timeout set in the URL are kept.
     DataSourceConfiguration urlConfiguration = mock(DataSourceConfiguration.class);
-    when(urlConfiguration.getJdbcUrl()).thenReturn(configuration.getJdbcUrl() + "?journal_mode=TRUNCATE");
+    when(urlConfiguration.getJdbcUrl())
+        .thenReturn(configuration.getJdbcUrl() + "?journal_mode=TRUNCATE&busy_timeout=5000");
     try (Connection connection = new SqliteDataSourceProvider(urlConfiguration).get().getConnection()) {
-      assertEquals("truncate", String.valueOf(DSL.using(connection).fetchValue("PRAGMA journal_mode")));
+      DSLContext dsl = DSL.using(connection);
+      assertEquals("truncate", String.valueOf(dsl.fetchValue("PRAGMA journal_mode")));
+      assertEquals("5000", String.valueOf(dsl.fetchValue("PRAGMA busy_timeout")));
     }
   }
 

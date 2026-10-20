@@ -17,11 +17,12 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.sqlite.SQLiteConfig.Pragma.BUSY_TIMEOUT;
 import static org.sqlite.SQLiteConfig.Pragma.JOURNAL_MODE;
 
 import com.google.inject.Inject;
 import com.google.inject.Provider;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.sqlite.SQLiteConfig;
@@ -34,6 +35,7 @@ public class SqliteDataSourceProvider implements Provider<DataSource> {
 
   /** Same as Derby's default lock wait timeout (derby.locks.waitTimeout). */
   static final int BUSY_TIMEOUT_MS = 60_000;
+  private static final Pattern URL_BUSY_TIMEOUT = Pattern.compile("[?&]busy_timeout=(\\d+)", Pattern.CASE_INSENSITIVE);
 
   private DataSourceConfiguration configuration;
 
@@ -62,9 +64,9 @@ public class SqliteDataSourceProvider implements Provider<DataSource> {
     if (!StringUtils.containsIgnoreCase(jdbcUrl, JOURNAL_MODE.pragmaName)) {
       ds.setJournalMode(SQLiteConfig.JournalMode.WAL.name());
     }
-    if (!StringUtils.containsIgnoreCase(jdbcUrl, BUSY_TIMEOUT.pragmaName)) {
-      ds.setBusyTimeout(BUSY_TIMEOUT_MS);
-    }
+    // SQLiteDataSource ignores busy_timeout in the URL (its config always sets one), so apply the URL value here.
+    Matcher urlBusyTimeout = URL_BUSY_TIMEOUT.matcher(jdbcUrl);
+    ds.setBusyTimeout(urlBusyTimeout.find() ? Integer.parseInt(urlBusyTimeout.group(1)) : BUSY_TIMEOUT_MS);
     return ds;
   }
 }
