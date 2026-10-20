@@ -1122,6 +1122,39 @@ public class TestKeyValueContainer {
     }
   }
 
+  @Test
+  void testLoadKVContainerDataChecksKeyPrefix() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStoreSchemaThreeImpl source =
+        new DatanodeStoreSchemaThreeImpl(conf, new File(folder, "source.db").getAbsolutePath(), false);
+    DatanodeStoreSchemaThreeImpl target =
+        new DatanodeStoreSchemaThreeImpl(conf, new File(folder, "target.db").getAbsolutePath(), false);
+    try {
+      for (long containerId = 1; containerId <= 2; containerId++) {
+        String prefix = DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(containerId);
+        source.getMetadataTable().put(prefix + "#blockCount", 1L);
+        source.getBlockDataTable().put(prefix + 1, new BlockData(new BlockID(containerId, 1)));
+      }
+      File dumpDir = new File(folder, "dump");
+      assertTrue(dumpDir.mkdir());
+      source.dumpKVContainerData(1, dumpDir);
+      // Replace the block data of container 1 with that of container 2.
+      File blockDataDump = DatanodeStoreSchemaThreeImpl.getTableDumpFile(source.getBlockDataTable(), dumpDir);
+      Files.delete(blockDataDump.toPath());
+      source.getBlockDataTable().dumpToFileWithPrefix(blockDataDump,
+          DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(2));
+
+      IOException e = assertThrows(IOException.class, () -> target.loadKVContainerData(dumpDir, 1));
+      assertThat(e).hasMessageContaining("outside container 1");
+      // Nothing is loaded, not even the metadata of container 1 read before the failure.
+      assertTrue(target.getMetadataTable().isEmpty());
+      assertTrue(target.getBlockDataTable().isEmpty());
+    } finally {
+      source.stop();
+      target.stop();
+    }
+  }
+
   @ContainerTestVersionInfo.ContainerTest
   public void testIsEmptyContainerStateWhileImport(
       ContainerTestVersionInfo versionInfo) throws Exception {
