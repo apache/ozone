@@ -114,6 +114,11 @@ public class ContainerImporter {
             packer.unpackContainerDescriptor(input);
         containerData = getKeyValueContainerData(containerDescriptorYaml);
       }
+      if (containerData.getContainerID() != containerID) {
+        throw new StorageContainerException("Container ID " + containerData.getContainerID()
+            + " in the archive does not match the requested container " + containerID,
+            ContainerProtos.Result.INVALID_ARGUMENT);
+      }
       ContainerUtils.verifyContainerFileChecksum(containerData, conf);
       containerData.setVolume(targetVolume);
       // lastDataScanTime should be cleared for an imported container
