@@ -56,69 +56,39 @@ final class ChunkReader {
     final long adjustedOffset;
     final long adjustedLen;
     if (verifyChecksum) {
-      ChecksumBoundaries boundaries = computeChecksumBoundaries(chunkRelativePosition, toRead);
-      adjustedOffset = boundaries.offset;
-      adjustedLen = boundaries.length;
+      int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
+      adjustedOffset = (chunkRelativePosition / bytesPerChecksum) * bytesPerChecksum;
+      long endIndex = ((chunkRelativePosition + toRead - 1) / bytesPerChecksum + 1) * bytesPerChecksum;
+      adjustedLen = Math.min(endIndex, length) - adjustedOffset;
     } else {
       adjustedOffset = chunkRelativePosition;
       adjustedLen = toRead;
     }
 
+    if (adjustedOffset == 0 && adjustedLen == length) {
+      return chunkInfo;
+    }
     return ChunkInfo.newBuilder(chunkInfo)
         .setOffset(chunkInfo.getOffset() + adjustedOffset)
         .setLen(adjustedLen)
         .build();
   }
 
-  private ChecksumBoundaries computeChecksumBoundaries(long startByteIndex, int dataLen) {
-
-    int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
-    // index of the last byte to be read from chunk, inclusively.
-    final long endByteIndex = startByteIndex + dataLen - 1;
-
-    long adjustedChunkOffset =  (startByteIndex / bytesPerChecksum)
-        * bytesPerChecksum; // inclusive
-    final long endIndex = ((endByteIndex / bytesPerChecksum) + 1)
-        * bytesPerChecksum; // exclusive
-    long adjustedChunkLen = Math.min(endIndex, length) - adjustedChunkOffset;
-    return new ChecksumBoundaries(adjustedChunkOffset, adjustedChunkLen);
-  }
-
-  /**
-   * Represents a byte range (offset and length) expanded to align with
-   * checksum chunk boundaries required for verification.
-   */
-  private static final class ChecksumBoundaries {
-    private final long offset;
-    private final long length;
-
-    private ChecksumBoundaries(long offset, long length) {
-      this.offset = offset;
-      this.length = length;
-    }
-  }
-
   private static int copyRange(ByteBuffer[] src, long skip, int toCopy, ByteBuffer dst) {
     long remainingSkip = skip;
     int copied = 0;
     for (ByteBuffer source : src) {
-      ByteBuffer buffer = source.duplicate();
       if (copied >= toCopy) {
         break;
       }
-      if (remainingSkip > 0) {
-        if (remainingSkip >= buffer.remaining()) {
-          remainingSkip -= buffer.remaining();
-          continue;
-        } else {
-          buffer.position(Math.toIntExact(buffer.position() + remainingSkip));
-          remainingSkip = 0;
-        }
-      }
-      int n = Math.min(buffer.remaining(), toCopy - copied);
-      if (n <= 0) {
+      if (remainingSkip >= source.remaining()) {
+        remainingSkip -= source.remaining();
         continue;
       }
+      ByteBuffer buffer = source.duplicate();
+      buffer.position(buffer.position() + (int) remainingSkip);
+      remainingSkip = 0;
+      int n = Math.min(buffer.remaining(), toCopy - copied);
       buffer.limit(buffer.position() + n);
       dst.put(buffer);
       copied += n;

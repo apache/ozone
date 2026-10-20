@@ -24,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -63,6 +64,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -376,6 +379,60 @@ public class TestChunkInputStream {
     } finally {
       executor.shutdownNow();
       assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+      "true, 0, 100, 0, 100",
+      "true, 1, 98, 0, 100",
+      "true, 19, 2, 0, 40",
+      "true, 91, 9, 80, 20",
+      "false, 0, 100, 0, 100",
+      "false, 7, 17, 7, 17"
+  })
+  void rangeReadsReuseFullChunkInfo(boolean verifyChecksum, int offset, int length,
+      int expectedOffset, int expectedLength) throws Exception {
+    ChunkInfo info = chunkInfo.toBuilder().setOffset(1024).build();
+    ChunkReader reader = new ChunkReader(info, verifyChecksum, range -> {
+      assertEquals(1024 + expectedOffset, range.getOffset());
+      assertEquals(expectedLength, range.getLen());
+      assertEquals(info.getChecksumData(), range.getChecksumData());
+      if (expectedLength == CHUNK_SIZE) {
+        assertSame(info, range);
+      }
+      return new ByteBuffer[] {ByteBuffer.wrap(chunkData, expectedOffset, expectedLength)};
+    });
+    ByteBuffer destination = ByteBuffer.allocate(length);
+    assertEquals(length, reader.read(offset, destination));
+    assertArrayEquals(Arrays.copyOfRange(chunkData, offset, offset + length), destination.array());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+  void rangeReadsSkipBuffersWithoutChangingTheirPositions(boolean directSource, boolean directDestination)
+      throws Exception {
+    ByteBuffer[] sources = new ByteBuffer[5];
+    for (int i = 0; i < sources.length; i++) {
+      ByteBuffer buffer = directSource ? ByteBuffer.allocateDirect(8) : ByteBuffer.allocate(8);
+      buffer.position(2);
+      buffer.put(chunkData, i * 4, 4);
+      buffer.limit(6).position(2);
+      sources[i] = buffer.asReadOnlyBuffer();
+    }
+    ChunkReader reader = new ChunkReader(chunkInfo, true, range -> sources);
+    ByteBuffer destination = directDestination ? ByteBuffer.allocateDirect(10) : ByteBuffer.allocate(10);
+    destination.position(2).limit(9);
+    assertEquals(7, reader.read(9, destination));
+    assertEquals(9, destination.position());
+    assertEquals(9, destination.limit());
+    destination.position(2);
+    byte[] actual = new byte[7];
+    destination.get(actual);
+    assertArrayEquals(Arrays.copyOfRange(chunkData, 9, 16), actual);
+    for (ByteBuffer source : sources) {
+      assertEquals(2, source.position());
+      assertEquals(6, source.limit());
     }
   }
 
