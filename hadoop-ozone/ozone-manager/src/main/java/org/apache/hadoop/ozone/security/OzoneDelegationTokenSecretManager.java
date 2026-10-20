@@ -359,7 +359,7 @@ public class OzoneDelegationTokenSecretManager
   }
 
   /**
-   * Remove the canceled token from in-memory map.
+   * Remove the canceled token from in-memory map and record it as canceled, so that a renew applied later is rejected.
    */
   public void removeToken(OzoneTokenIdentifier ozoneTokenIdentifier) {
     currentTokens.remove(ozoneTokenIdentifier);
