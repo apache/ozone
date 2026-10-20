@@ -73,6 +73,7 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -910,6 +911,21 @@ public class TestBlockDeletingService {
       updatedConf.setFromObject(updatedDnConf);
       svc.updateAndRestart(updatedConf);
       assertEquals(newInterval.toMillis(), svc.getIntervalMillis());
+    } finally {
+      svc.shutdown();
+    }
+  }
+
+  @Test
+  public void testUpdateAndRestartKeepsMetricsRegistered() throws Exception {
+    OzoneContainer ozoneContainer = mockDependencies(newContainerSet(), null);
+    BlockDeletingService svc = new BlockDeletingService(ozoneContainer, 1000, 1000, TimeUnit.MILLISECONDS, 10, conf,
+        new ContainerChecksumTreeManager(conf));
+    try {
+      OzoneConfiguration updatedConf = new OzoneConfiguration(conf);
+      updatedConf.setInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS, 20);
+      svc.updateAndRestart(updatedConf);
+      assertNotNull(DefaultMetricsSystem.instance().getSource(BlockDeletingServiceMetrics.SOURCE_NAME));
     } finally {
       svc.shutdown();
     }

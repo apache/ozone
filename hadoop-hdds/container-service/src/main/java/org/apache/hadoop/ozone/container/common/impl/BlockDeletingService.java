@@ -324,16 +324,6 @@ public class BlockDeletingService extends BackgroundService {
     return dnConf.getBlockDeletionLimit();
   }
 
-  @Override
-  public synchronized void shutdown() {
-    super.shutdown();
-    if (metrics != null) {
-      // DeleteBlocksCommandHandler shares this metrics instance, but unregistration is owned
-      // here: both are stopped together during datanode shutdown.
-      metrics.unregister();
-    }
-  }
-
   private static class BlockDeletingTaskBuilder {
     private BlockDeletingService blockDeletingService;
     private BlockDeletingService.ContainerBlockInfo containerBlockInfo;

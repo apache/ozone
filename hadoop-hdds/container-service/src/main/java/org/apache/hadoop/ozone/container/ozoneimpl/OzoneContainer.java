@@ -727,6 +727,8 @@ public class OzoneContainer {
       dbCompactionExecutorService.shutdown();
     }
     blockDeletingService.shutdown();
+    // Not in BlockDeletingService#shutdown: updateAndRestart() restarts the service with the same metrics.
+    blockDeletingService.getMetrics().unregister();
     if (diskBalancerService != null) {
       diskBalancerService.shutdown();
     }
