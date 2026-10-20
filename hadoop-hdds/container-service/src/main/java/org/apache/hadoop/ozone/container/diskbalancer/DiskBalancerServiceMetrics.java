@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -36,8 +34,6 @@ public final class DiskBalancerServiceMetrics {
 
   public static final String SOURCE_NAME =
       DiskBalancerServiceMetrics.class.getSimpleName();
-  private static final Map<String, DiskBalancerServiceMetrics> INSTANCES =
-      new ConcurrentHashMap<>();
   private final String sourceName;
 
   @Metric(about = "The number of successful balance job")
@@ -74,23 +70,12 @@ public final class DiskBalancerServiceMetrics {
 
   public static DiskBalancerServiceMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return INSTANCES.computeIfAbsent(MetricUtil.qualifySourceName(SOURCE_NAME, component),
-        key -> ms.register(key, "DiskBalancerService",
-            new DiskBalancerServiceMetrics(key)));
-  }
-
-  /**
-   * Unregister the metrics instance.
-   */
-  public static void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    INSTANCES.remove(SOURCE_NAME);
-    ms.unregisterSource(SOURCE_NAME);
+    String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME, component);
+    return ms.register(sourceName, "DiskBalancerService", new DiskBalancerServiceMetrics(sourceName));
   }
 
   public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    INSTANCES.remove(sourceName);
     ms.unregisterSource(sourceName);
   }
 

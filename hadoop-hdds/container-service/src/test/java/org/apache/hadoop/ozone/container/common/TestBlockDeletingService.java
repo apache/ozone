@@ -706,10 +706,10 @@ public class TestBlockDeletingService {
     createToDeleteBlocks(containerSet, 1, 3, 1);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
-    BlockDeletingServiceMetrics blockDeletingServiceMetrics = BlockDeletingServiceMetrics.create();
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     createBlockDeletingService(containerSet, conf, keyValueHandler);
+    BlockDeletingServiceMetrics blockDeletingServiceMetrics = blockDeletingService.getMetrics();
     blockDeletingService.start();
     GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
 

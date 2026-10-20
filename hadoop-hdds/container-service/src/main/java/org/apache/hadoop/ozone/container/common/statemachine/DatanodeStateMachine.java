@@ -253,7 +253,7 @@ public class DatanodeStateMachine implements Closeable {
             dnConf.getContainerCloseThreads(),
             dnConf.getCommandQueueLimit(), threadNamePrefix))
         .addHandler(new DeleteBlocksCommandHandler(getContainer(),
-            conf, dnConf, threadNamePrefix, metricsSourceComponent))
+            conf, dnConf, threadNamePrefix))
         .addHandler(new ReplicateContainerCommandHandler(supervisor, pushReplicatorWithMetrics))
         .addHandler(reconstructECContainersCommandHandler)
         .addHandler(new DeleteContainerCommandHandler(

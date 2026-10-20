@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.helpers;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
@@ -37,8 +35,6 @@ public final class BlockDeletingServiceMetrics {
 
   public static final String SOURCE_NAME =
       BlockDeletingService.class.getSimpleName();
-  private static final Map<String, BlockDeletingServiceMetrics> INSTANCES =
-      new ConcurrentHashMap<>();
   private final String sourceName;
 
   @Metric(about = "The number of successful delete blocks")
@@ -99,9 +95,8 @@ public final class BlockDeletingServiceMetrics {
 
   public static BlockDeletingServiceMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return INSTANCES.computeIfAbsent(getSourceName(component),
-        key -> ms.register(key, "BlockDeletingService",
-            new BlockDeletingServiceMetrics(key)));
+    String sourceName = getSourceName(component);
+    return ms.register(sourceName, "BlockDeletingService", new BlockDeletingServiceMetrics(sourceName));
   }
 
   /**
@@ -112,18 +107,8 @@ public final class BlockDeletingServiceMetrics {
     return MetricUtil.qualifySourceName(SOURCE_NAME, component);
   }
 
-  /**
-   * Unregister the metrics instance.
-   */
-  public static void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    INSTANCES.remove(SOURCE_NAME);
-    ms.unregisterSource(SOURCE_NAME);
-  }
-
   public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    INSTANCES.remove(sourceName);
     ms.unregisterSource(sourceName);
   }
 
