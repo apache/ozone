@@ -17,21 +17,27 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.LIST;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.BUCKET;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.KEY;
 import static org.apache.hadoop.ozone.security.acl.OzoneObj.ResourceType.VOLUME;
+import static org.apache.hadoop.ozone.security.acl.OzoneObj.StoreType.OZONE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -47,14 +53,19 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -85,6 +96,7 @@ public class TestOMMetadataReader {
 
   private static final String ACCESS_KEY_ID = "ASIA7O1AJD8VV4KCEAX5";
   private static final String VOLUME_NAME = "s3v";
+  private static final String TENANT_VOLUME_NAME = "tenantvol";
   private static final String BUCKET_NAME = "bucket123";
   private static final String KEY_PREFIX = "prefix";
   private static final long MAX_KEYS = 100L;
@@ -1044,5 +1056,80 @@ public class TestOMMetadataReader {
     assertNotNull(reader.getKeyInfo(getKeyInfoArgs("obs-bucket", false), assumeS3Context).getKeyInfo());
 
     verify(keyManager).getKeyInfo(any(OmKeyArgs.class), any(ResolvedBucket.class), any());
+  }
+
+  @Test
+  public void getBucketInfoResolvesS3VolumeWhenAssumeS3Context() throws Exception {
+    BucketManager bucketManager = mock(BucketManager.class);
+    OmMetadataReader reader = mock(OmMetadataReader.class);
+    OMMetrics metrics = mock(OMMetrics.class);
+    OzoneManager ozoneManager = newBucketInfoOzoneManager(bucketManager, reader, metrics);
+    OmBucketInfo bucket = bucketInfo(TENANT_VOLUME_NAME);
+    when(bucketManager.getBucketInfo(TENANT_VOLUME_NAME, BUCKET_NAME)).thenReturn(bucket);
+
+    BucketInfoWithVolumeContext result = ozoneManager.getBucketInfo(VOLUME_NAME, BUCKET_NAME, true);
+
+    assertSame(bucket, result.getBucketInfo());
+    assertEquals(Optional.of("user"), result.getUserPrincipal());
+    verify(ozoneManager).getS3VolumeContext(true);
+    verify(reader).checkAcls(BUCKET, OZONE, READ, TENANT_VOLUME_NAME, BUCKET_NAME, null);
+    verify(reader, never()).checkAcls(eq(VOLUME), any(), any(), any(), any(), any());
+    verify(metrics).incNumBucketInfos();
+  }
+
+  @Test
+  public void getBucketInfoUsesRequestedVolumeWithoutAssumeS3Context() throws Exception {
+    BucketManager bucketManager = mock(BucketManager.class);
+    OmMetadataReader reader = mock(OmMetadataReader.class);
+    OzoneManager ozoneManager = newBucketInfoOzoneManager(bucketManager, reader, mock(OMMetrics.class));
+    OmBucketInfo bucket = bucketInfo(VOLUME_NAME);
+    when(bucketManager.getBucketInfo(VOLUME_NAME, BUCKET_NAME)).thenReturn(bucket);
+
+    BucketInfoWithVolumeContext result = ozoneManager.getBucketInfo(VOLUME_NAME, BUCKET_NAME, false);
+
+    assertSame(bucket, result.getBucketInfo());
+    assertFalse(result.getUserPrincipal().isPresent());
+    verify(ozoneManager, never()).getS3VolumeContext(anyBoolean());
+    verify(reader).checkAcls(BUCKET, OZONE, READ, VOLUME_NAME, BUCKET_NAME, null);
+  }
+
+  @Test
+  public void getBucketInfoReturnsBucketNotFoundWithoutVolumeCheck() throws Exception {
+    BucketManager bucketManager = mock(BucketManager.class);
+    OmMetadataReader reader = mock(OmMetadataReader.class);
+    OMMetrics metrics = mock(OMMetrics.class);
+    OzoneManager ozoneManager = newBucketInfoOzoneManager(bucketManager, reader, metrics);
+    // OmMetadataReader.checkAcls looks up the bucket owner first, so a missing bucket fails there.
+    doThrow(new OMException("missing", BUCKET_NOT_FOUND)).when(reader)
+        .checkAcls(BUCKET, OZONE, READ, TENANT_VOLUME_NAME, BUCKET_NAME, null);
+
+    OMException ex = assertThrows(OMException.class, () -> ozoneManager.getBucketInfo(VOLUME_NAME, BUCKET_NAME, true));
+
+    assertEquals(BUCKET_NOT_FOUND, ex.getResult());
+    verify(ozoneManager).getS3VolumeContext(true);
+    verify(reader, never()).checkAcls(eq(VOLUME), any(), any(), any(), any(), any());
+    verify(bucketManager, never()).getBucketInfo(any(), any());
+    verify(metrics).incNumBucketInfoFails();
+  }
+
+  private static OzoneManager newBucketInfoOzoneManager(BucketManager bucketManager, OmMetadataReader reader,
+      OMMetrics metrics) throws IOException {
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    when(ozoneManager.getBucketInfo(anyString(), anyString(), anyBoolean())).thenCallRealMethod();
+    HddsWhiteboxTestUtils.setInternalState(ozoneManager, "bucketManager", bucketManager);
+    HddsWhiteboxTestUtils.setInternalState(ozoneManager, "omMetadataReader", reader);
+    HddsWhiteboxTestUtils.setInternalState(ozoneManager, "metrics", metrics);
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+    when(ozoneManager.getS3VolumeContext(true)).thenReturn(new S3VolumeContext(OmVolumeArgs.newBuilder()
+        .setVolume(TENANT_VOLUME_NAME).setAdminName("admin").setOwnerName("owner").build(), "user"));
+    AuditMessage auditMessage = mock(AuditMessage.class);
+    when(auditMessage.getOp()).thenReturn("READ_BUCKET");
+    when(ozoneManager.buildAuditMessageForSuccess(any(), anyMap())).thenReturn(auditMessage);
+    when(ozoneManager.buildAuditMessageForFailure(any(), anyMap(), any(Throwable.class))).thenReturn(auditMessage);
+    return ozoneManager;
+  }
+
+  private static OmBucketInfo bucketInfo(String volumeName) {
+    return OmBucketInfo.newBuilder().setVolumeName(volumeName).setBucketName(BUCKET_NAME).setOwner("owner").build();
   }
 }
