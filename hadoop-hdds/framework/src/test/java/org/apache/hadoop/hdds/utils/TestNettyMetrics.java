@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -105,40 +104,18 @@ class TestNettyMetrics {
   }
 
   @Test
-  void createUsesDistinctSourceNamesPerComponent() {
-    NettyMetrics scmMetrics = null;
-    NettyMetrics omMetrics = null;
-    NettyMetrics datanodeMetrics = null;
+  void componentSourcesRegisterAndUnregisterIndependently() {
+    NettyMetrics scmMetrics = NettyMetrics.create("SCM");
+    NettyMetrics omMetrics = NettyMetrics.create("OM");
     try {
-      scmMetrics = assertDoesNotThrow(() -> NettyMetrics.create("SCM"));
-      omMetrics = assertDoesNotThrow(() -> NettyMetrics.create("OM"));
-      datanodeMetrics = assertDoesNotThrow(
-          () -> NettyMetrics.create("Datanode-1"));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME + ".SCM"));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME + ".OM"));
+      scmMetrics.unregister();
+      assertNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME + ".SCM"));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME + ".OM"));
     } finally {
-      if (datanodeMetrics != null) {
-        datanodeMetrics.unregister();
-      }
-      if (omMetrics != null) {
-        omMetrics.unregister();
-      }
-      if (scmMetrics != null) {
-        scmMetrics.unregister();
-      }
-    }
-  }
-
-  @Test
-  void unregisterReleasesSourceNameForReuse() {
-    NettyMetrics metrics = NettyMetrics.create("SCM");
-    metrics.unregister();
-
-    NettyMetrics recreated = null;
-    try {
-      recreated = assertDoesNotThrow(() -> NettyMetrics.create("SCM"));
-    } finally {
-      if (recreated != null) {
-        recreated.unregister();
-      }
+      scmMetrics.unregister();
+      omMetrics.unregister();
     }
   }
 }

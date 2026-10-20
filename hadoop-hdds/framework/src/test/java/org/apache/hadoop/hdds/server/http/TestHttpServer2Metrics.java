@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2M
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadQueueWaitingTaskCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.SERVER_NAME;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.any;
@@ -98,9 +97,8 @@ public class TestHttpServer2Metrics {
   }
 
   /**
-   * All datanodes of a same-JVM cluster name their HTTP server the same. A second create() with
-   * that component used to fail the registration as a duplicate source; it now takes a counter
-   * suffix, deterministic in start order.
+   * All datanodes of a same-JVM cluster name their HTTP server the same, so a second create() with that component
+   * takes a counter suffix, deterministic in start order.
    */
   @Test
   public void testDuplicateComponentsGetDistinctSourceNames() {
@@ -111,8 +109,7 @@ public class TestHttpServer2Metrics {
     HttpServer2Metrics firstMetrics =
         HttpServer2Metrics.create(firstPool, "hddsDatanode", "hddsDatanode");
     try {
-      HttpServer2Metrics secondMetrics = assertDoesNotThrow(
-          () -> HttpServer2Metrics.create(secondPool, "hddsDatanode", "hddsDatanode"));
+      HttpServer2Metrics secondMetrics = HttpServer2Metrics.create(secondPool, "hddsDatanode", "hddsDatanode");
       try {
         assertNotNull(ms.getSource(HttpServer2Metrics.SOURCE_NAME + ".hddsDatanode"));
         assertNotNull(ms.getSource(HttpServer2Metrics.SOURCE_NAME + ".hddsDatanode1"));

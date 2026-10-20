@@ -53,7 +53,7 @@ class TestDataNodeMetricsCollectionTask {
 
   private DatanodePendingDeletionMetrics collect(List<Map<String, Object>> beans) throws Exception {
     MetricsServiceProvider provider = mock(MetricsServiceProvider.class);
-    when(provider.getMetrics(anyString())).thenReturn(beans);
+    when(provider.getMetrics(LEGACY_BEAN + "*")).thenReturn(beans);
     MetricsServiceProviderFactory factory = mock(MetricsServiceProviderFactory.class);
     when(factory.getJmxMetricsServiceProvider(anyString())).thenReturn(provider);
     return new DataNodeMetricsCollectionTask(nodeDetails, false, factory).call();
@@ -73,7 +73,7 @@ class TestDataNodeMetricsCollectionTask {
     String otherBean = BEAN_PREFIX
         + BlockDeletingServiceMetrics.getSourceName("other-datanode");
     List<Map<String, Object>> beans =
-        Arrays.asList(bean(otherBean, 11L), bean(ownBean, 42L));
+        Arrays.asList(bean(LEGACY_BEAN, 7L), bean(otherBean, 11L), bean(ownBean, 42L));
 
     assertEquals(42L, collect(beans).getPendingBlockSize());
   }

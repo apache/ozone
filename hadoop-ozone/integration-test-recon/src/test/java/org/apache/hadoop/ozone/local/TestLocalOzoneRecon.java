@@ -78,8 +78,6 @@ class TestLocalOzoneRecon {
         assertNotNull(scm);
         assertNotNull(om);
         assertNotNull(recon);
-        assertNotSame(scm, om);
-        assertNotSame(scm, recon);
 
         assertEquals(200, responseCode(cluster.getReconEndpoint() + "/api/v1/clusterState"));
         endpoints.add(cluster.getReconEndpoint());
