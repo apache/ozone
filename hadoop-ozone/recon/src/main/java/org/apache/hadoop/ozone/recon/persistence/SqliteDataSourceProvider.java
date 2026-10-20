@@ -17,15 +17,23 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
+import static org.sqlite.SQLiteConfig.Pragma.BUSY_TIMEOUT;
+import static org.sqlite.SQLiteConfig.Pragma.JOURNAL_MODE;
+
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import javax.sql.DataSource;
+import org.apache.commons.lang3.StringUtils;
+import org.sqlite.SQLiteConfig;
 import org.sqlite.SQLiteDataSource;
 
 /**
  * Provide a {@link javax.sql.DataSource} for the application.
  */
 public class SqliteDataSourceProvider implements Provider<DataSource> {
+
+  /** Same as Derby's default lock wait timeout (derby.locks.waitTimeout). */
+  static final int BUSY_TIMEOUT_MS = 60_000;
 
   private DataSourceConfiguration configuration;
 
@@ -40,11 +48,23 @@ public class SqliteDataSourceProvider implements Provider<DataSource> {
    * Default sqlite database does not work with a connection pool, actually
    * most embedded databases do not, hence returning native implementation for
    * default db.
+   * <p>
+   * SQLite allows a single writer. WAL lets readers (such as a long unhealthy
+   * container export) run without blocking that writer, and the busy timeout
+   * makes writers wait for the lock instead of failing with SQLITE_BUSY.
    */
   @Override
   public DataSource get() {
     SQLiteDataSource ds = new SQLiteDataSource();
-    ds.setUrl(configuration.getJdbcUrl());
+    String jdbcUrl = configuration.getJdbcUrl();
+    ds.setUrl(jdbcUrl);
+    // Settings on the data source override the same pragma in the URL, so only set them when the URL does not.
+    if (!StringUtils.containsIgnoreCase(jdbcUrl, JOURNAL_MODE.pragmaName)) {
+      ds.setJournalMode(SQLiteConfig.JournalMode.WAL.name());
+    }
+    if (!StringUtils.containsIgnoreCase(jdbcUrl, BUSY_TIMEOUT.pragmaName)) {
+      ds.setBusyTimeout(BUSY_TIMEOUT_MS);
+    }
     return ds;
   }
 }
