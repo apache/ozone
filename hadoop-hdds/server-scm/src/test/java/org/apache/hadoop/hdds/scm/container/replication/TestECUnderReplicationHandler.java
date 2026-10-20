@@ -720,7 +720,7 @@ public class TestECUnderReplicationHandler {
         .filter(c -> c.getValue() instanceof ReplicateContainerCommand)
         .count());
     assertEquals(0, metrics.getEcDecommissionReconstructionFallbackNoOpTotal());
-    assertEquals(0, metrics.getEcReconstructionDecommissionTriggeredTotal());
+    assertEquals(1, metrics.getEcReconstructionDecommissionTriggeredTotal());
   }
 
   @Test
