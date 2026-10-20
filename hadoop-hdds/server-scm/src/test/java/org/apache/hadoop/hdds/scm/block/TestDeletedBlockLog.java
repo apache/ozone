@@ -1479,7 +1479,8 @@ public class TestDeletedBlockLog {
   private SCMDeletedBlockTransactionStatusManager newStatusManager(DeletedBlockLogStateManager stateManager)
       throws IOException {
     return new SCMDeletedBlockTransactionStatusManager(stateManager,
-        scm.getScmMetadataStore().getStatefulServiceConfigTable(), containerManager, metrics, Long.MAX_VALUE);
+        scm.getScmMetadataStore().getStatefulServiceConfigTable(), containerManager, () -> pendingOps, metrics,
+        Long.MAX_VALUE);
   }
 
   private void persistSummary(long txCount) throws IOException {
