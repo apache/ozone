@@ -41,6 +41,16 @@ class TestOzoneClientConfig {
   }
 
   @Test
+  void nonPositiveEcParallelReadPoolLimit() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt("ozone.client.ec.parallel.read.pool.limit", 0);
+
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+
+    assertEquals(1, subject.getEcParallelReadPoolLimit());
+  }
+
+  @Test
   void testClientHBaseEnhancementsAllowedTrue() {
     // When ozone.client.hbase.enhancements.allowed = true,
     // related client configs should be effective as-is.

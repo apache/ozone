@@ -207,7 +207,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -686,7 +686,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Retain SCM proxy providers so OM can dynamically reload nodes/addresses without restarting.
     final SCMContainerLocationFailoverProxyProvider scmContainerProxyProvider =
         new SCMContainerLocationFailoverProxyProvider(configuration, null);
-    final StorageContainerLocationProtocol scmContainerClient =
+    final StorageContainerLocationInternalInterface scmContainerClient =
         HAUtils.getScmContainerClient(configuration, scmContainerProxyProvider);
     // verifies that the SCM info in the OM Version file is correct.
     final SCMBlockLocationFailoverProxyProvider scmBlockProxyProvider =
@@ -1419,7 +1419,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @Override
   public UUID refetchSecretKey() throws IOException {
     checkAdminUserPrivilege("refetch secret key.");
-    secretKeyClient.refetchSecretKey();
+    try {
+      secretKeyClient.refetchSecretKey();
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
+    }
     return secretKeyClient.getCurrentSecretKey().getId();
   }
 
@@ -2718,13 +2722,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Returns the caller of a delegation token operation. With security enabled the call must carry an RPC user.
+   */
+  private UserGroupInformation getDelegationTokenCaller() throws IOException {
+    if (ProtobufRpcEngine.Server.getRemoteUser() == null && isSecurityEnabled()) {
+      throw new OMException("Delegation token operations require an RPC user."
+          + " Send the request over the OM RPC transport.", PERMISSION_DENIED);
+    }
+    return getRemoteUser();
+  }
+
+  /**
    * Returns authentication method used to establish the connection.
    *
    * @return AuthenticationMethod used to establish connection
    */
   private AuthenticationMethod getConnectionAuthenticationMethod()
       throws IOException {
-    UserGroupInformation ugi = getRemoteUser();
+    UserGroupInformation ugi = getDelegationTokenCaller();
     AuthenticationMethod authMethod = ugi.getAuthenticationMethod();
     if (authMethod == AuthenticationMethod.PROXY) {
       authMethod = ugi.getRealUser().getAuthenticationMethod();
@@ -2752,7 +2767,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         return null;
       }
 
-      UserGroupInformation ugi = getRemoteUser();
+      UserGroupInformation ugi = getDelegationTokenCaller();
       String user = ugi.getUserName();
       Text owner = new Text(user);
       Text realUser = null;
@@ -2788,7 +2803,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             + "kerberos or web authentication",
             INVALID_AUTH_METHOD);
       }
-      String renewer = getRemoteUser().getShortUserName();
+      String renewer = getDelegationTokenCaller().getShortUserName();
       expiryTime = delegationTokenMgr.renewToken(token, renewer);
 
     } catch (OMException oex) {
@@ -2816,7 +2831,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public void cancelDelegationToken(Token<OzoneTokenIdentifier> token)
       throws OMException {
     try {
-      String canceller = getRemoteUser().getUserName();
+      String canceller = getDelegationTokenCaller().getUserName();
       final OzoneTokenIdentifier id = delegationTokenMgr.cancelToken(token, canceller);
       LOG.trace("Delegation token cancelled for dt: {}", id);
     } catch (OMException oex) {
@@ -3909,10 +3924,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       services.add(scmServiceInfoBuilder.build());
     }
     metrics.incNumGetServiceLists();
-    // For now there is no exception that can can happen in this call,
-    // so failure metrics is not handled. In future if there is any need to
-    // handle exception in this method, we need to incorporate
-    // metrics.incNumGetServiceListFails()
     AUDIT.logReadSuccess(
         buildAuditMessageForSuccess(OMAction.GET_SERVICE_LIST,
             new LinkedHashMap<>()));
@@ -4068,7 +4079,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("OM is not leader or not ready", INVALID_REQUEST);
     }
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     // Check Ozone admin privilege
     if (isAdminAuthorizationEnabled() && !isAdmin(ugi)) {
       throw new OMException("Only Ozone admins are allowed to trigger "
@@ -4108,7 +4119,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     // Note: Any OM (leader or follower) can run snapshot defrag
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     // Check Ozone admin privilege
     if (isAdminAuthorizationEnabled() && !isAdmin(ugi)) {
       throw new OMException("Only Ozone admins are allowed to trigger "
@@ -4222,7 +4233,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metrics.incNumTenantLists();
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (isAdminAuthorizationEnabled() && !isAdmin(ugi)) {
       final OMException omEx = new OMException(
           "Only Ozone admins are allowed to list tenants.", PERMISSION_DENIED);
@@ -5362,7 +5373,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return;
     }
     
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!isAdmin(ugi)) {
       throw new OMException("Only Ozone admins are allowed to " + operation,
           PERMISSION_DENIED);
@@ -5382,7 +5393,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       return;
     }
 
-    final UserGroupInformation ugi = getRemoteUser();
+    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
     if (!isAdmin(ugi) && !isReadOnlyAdmin(ugi) && !isReconUser(ugi)) {
       throw new OMException("Only Ozone admins, read-only admins and Recon are allowed to "
           + "access the OM metadata database via getDBUpdates.", PERMISSION_DENIED);
@@ -5740,6 +5751,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       throw new OMException("Enter safe mode is unsupported",
           INTERNAL_ERROR);
     case FORCE_EXIT:
+      // SCM sees this call as coming from the OM user, so the caller has to be checked here.
+      checkAdminUserPrivilege("force exit safe mode.");
       return getScmClient().getContainerClient().forceExitSafeMode();
     case GET:
       return getScmClient().getContainerClient().inSafeMode();

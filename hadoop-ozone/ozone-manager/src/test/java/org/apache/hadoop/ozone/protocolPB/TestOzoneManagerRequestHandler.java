@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
@@ -41,12 +42,14 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -67,10 +70,15 @@ import org.mockito.Mockito;
 public class TestOzoneManagerRequestHandler {
 
   private OzoneManagerRequestHandler getRequestHandler(int limitListKeySize) {
+    return getRequestHandler(limitListKeySize, new OzoneConfiguration());
+  }
+
+  private OzoneManagerRequestHandler getRequestHandler(int limitListKeySize, OzoneConfiguration conf) {
     OmConfig config = OzoneConfiguration.newInstanceOf(OmConfig.class);
     config.setMaxListSize(limitListKeySize);
     OzoneManager ozoneManager = Mockito.mock(OzoneManager.class);
     Mockito.when(ozoneManager.getConfig()).thenReturn(config);
+    Mockito.when(ozoneManager.getConfiguration()).thenReturn(conf);
     return new OzoneManagerRequestHandler(ozoneManager);
   }
 
@@ -305,6 +313,126 @@ public class TestOzoneManagerRequestHandler {
       int expectedSize = Math.max(Math.min(Math.min(10, requestSize), resultSize), 0);
       Assertions.assertEquals(expectedSize, omResponse.getListStatusResponse().getStatusesList().size());
     }
+  }
+
+  /**
+   * isTruncated is set when a ListStatus / ListStatusLight page is full: OM returned as many entries as the
+   * request allows after ozone.om.server.list.max.size, ozone.fs.listing.page.size.max and the minimum page
+   * size of 2. A shorter page is the last one.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"ListStatus", "ListStatusLight"})
+  public void testListStatusIsTruncated(String typeName) throws IOException {
+    OzoneManagerProtocolProtos.Type type = OzoneManagerProtocolProtos.Type.valueOf(typeName);
+    // {server list max size, listing page size max, requested entries, effective page size}
+    long[][] cases = {
+        {1000, 1024, 1024, 1000},  // ozone.om.server.list.max.size is the limit
+        {1000, 5, 1024, 5},        // ozone.fs.listing.page.size.max is the limit
+        {1000, 1024, 7, 7},        // the request is the limit
+        {1000, 1024, 1, 2},        // OM raises a page size of 1 to 2
+    };
+    for (long[] c : cases) {
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.setInt(OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE_MAX, (int) c[1]);
+      OzoneManagerRequestHandler requestHandler = getRequestHandler((int) c[0], conf);
+      long effective = c[3];
+      for (long returned : new long[] {0, effective - 1, effective}) {
+        mockListStatusResult(requestHandler.getOzoneManager(), (int) returned);
+        OzoneManagerProtocolProtos.OMRequest request = Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+        Mockito.when(request.getTraceID()).thenReturn("traceId");
+        Mockito.when(request.getCmdType()).thenReturn(type);
+        Mockito.when(request.getListStatusRequest()).thenReturn(
+            OzoneManagerProtocolProtos.ListStatusRequest.newBuilder()
+                .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                    .setVolumeName("volume").setBucketName("bucket").setKeyName("dir"))
+                .setRecursive(false).setStartKey("").setNumEntries(c[2])
+                .build());
+        OzoneManagerProtocolProtos.OMResponse response = requestHandler.handleReadRequest(request);
+        boolean truncated = type == OzoneManagerProtocolProtos.Type.ListStatus
+            ? response.getListStatusResponse().getIsTruncated()
+            : response.getListStatusLightResponse().getIsTruncated();
+        Assertions.assertEquals(returned >= effective, truncated,
+            "case " + Arrays.toString(c) + ", returned " + returned);
+      }
+    }
+  }
+
+  private void mockListStatusResult(OzoneManager ozoneManager, int count) throws IOException {
+    List<OzoneFileStatus> statuses = IntStream.range(0, count)
+        .mapToObj(i -> getMockedOzoneFileStatus()).collect(Collectors.toList());
+    List<OzoneFileStatusLight> lightStatuses = IntStream.range(0, count)
+        .mapToObj(i -> new OzoneFileStatusLight())
+        .collect(Collectors.toList());
+    Mockito.when(ozoneManager.listStatus(any(OmKeyArgs.class), Mockito.anyBoolean(), Mockito.anyString(),
+        Mockito.anyLong(), Mockito.anyBoolean())).thenReturn(statuses);
+    Mockito.when(ozoneManager.listStatusLight(any(OmKeyArgs.class), Mockito.anyBoolean(), Mockito.anyString(),
+        Mockito.anyLong(), Mockito.anyBoolean())).thenReturn(lightStatuses);
+  }
+
+  /**
+   * ListStatus and ListStatusLight must forward requireFileSystemLayout from
+   * the request into the OmKeyArgs handed to the OM.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testListStatusForwardsRequireFileSystemLayout(boolean require) throws IOException {
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+    OzoneManager ozoneManager = requestHandler.getOzoneManager();
+    OzoneManagerProtocolProtos.ListStatusRequest listStatusRequest =
+        OzoneManagerProtocolProtos.ListStatusRequest.newBuilder()
+            .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                .setVolumeName("volume").setBucketName("bucket").setKeyName("dir"))
+            .setRecursive(false).setStartKey("").setNumEntries(10)
+            .setRequireFileSystemLayout(require)
+            .build();
+
+    for (OzoneManagerProtocolProtos.Type type : Arrays.asList(
+        OzoneManagerProtocolProtos.Type.ListStatus, OzoneManagerProtocolProtos.Type.ListStatusLight)) {
+      OzoneManagerProtocolProtos.OMRequest request = Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+      Mockito.when(request.getTraceID()).thenReturn("traceId");
+      Mockito.when(request.getCmdType()).thenReturn(type);
+      Mockito.when(request.getListStatusRequest()).thenReturn(listStatusRequest);
+      requestHandler.handleReadRequest(request);
+    }
+
+    ArgumentCaptor<OmKeyArgs> listStatusArgs = ArgumentCaptor.forClass(OmKeyArgs.class);
+    Mockito.verify(ozoneManager).listStatus(listStatusArgs.capture(), Mockito.anyBoolean(), Mockito.anyString(),
+        Mockito.anyLong(), Mockito.anyBoolean());
+    Assertions.assertEquals(require, listStatusArgs.getValue().isRequireFileSystemLayout());
+    ArgumentCaptor<OmKeyArgs> listStatusLightArgs = ArgumentCaptor.forClass(OmKeyArgs.class);
+    Mockito.verify(ozoneManager).listStatusLight(listStatusLightArgs.capture(), Mockito.anyBoolean(),
+        Mockito.anyString(), Mockito.anyLong(), Mockito.anyBoolean());
+    Assertions.assertEquals(require, listStatusLightArgs.getValue().isRequireFileSystemLayout());
+  }
+
+  /**
+   * GetKeyInfo must forward requireFileSystemLayout from the request into the
+   * OmKeyArgs handed to the OM.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testGetKeyInfoForwardsRequireFileSystemLayout(boolean require) throws IOException {
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+    OzoneManager ozoneManager = requestHandler.getOzoneManager();
+    KeyInfoWithVolumeContext keyInfo = KeyInfoWithVolumeContext.newBuilder().setKeyInfo(getMockedOmKeyInfo()).build();
+    Mockito.when(ozoneManager.getKeyInfo(any(OmKeyArgs.class), Mockito.anyBoolean())).thenReturn(keyInfo);
+    OzoneManagerProtocolProtos.GetKeyInfoRequest getKeyInfoRequest =
+        OzoneManagerProtocolProtos.GetKeyInfoRequest.newBuilder()
+            .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                .setVolumeName("volume").setBucketName("bucket").setKeyName("key"))
+            .setRequireFileSystemLayout(require)
+            .build();
+    OzoneManagerProtocolProtos.OMRequest request = Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+    Mockito.when(request.getTraceID()).thenReturn("traceId");
+    Mockito.when(request.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.GetKeyInfo);
+    Mockito.when(request.getGetKeyInfoRequest()).thenReturn(getKeyInfoRequest);
+
+    OzoneManagerProtocolProtos.OMResponse response = requestHandler.handleReadRequest(request);
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getStatus());
+
+    ArgumentCaptor<OmKeyArgs> keyArgs = ArgumentCaptor.forClass(OmKeyArgs.class);
+    Mockito.verify(ozoneManager).getKeyInfo(keyArgs.capture(), Mockito.eq(false));
+    Assertions.assertEquals(require, keyArgs.getValue().isRequireFileSystemLayout());
   }
 
   /**

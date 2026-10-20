@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.storage;
 
+import static org.apache.hadoop.hdds.HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT;
 import static org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls.putBlockAsync;
 
 import com.google.common.base.Preconditions;
@@ -143,6 +144,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   // buffers for which putBlock is yet to be executed
   private List<StreamBuffer> buffersForPutBlock;
   private boolean isDatastreamPipelineMode;
+  // Whether PutBlock is committed through the data stream instead of the Raft log; fixed for the stream lifetime.
+  private final boolean putBlockWithoutRaft;
 
   /**
    * Creates a new BlockDataStreamOutput.
@@ -162,6 +165,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.isDatastreamPipelineMode = config.isDatastreamPipelineMode();
+    this.putBlockWithoutRaft = config.isDatastreamPutBlockWithoutRaftEnabled()
+        && allDatanodesSupportStreamPutBlock(pipeline);
     this.syncSize = config.getDataStreamSyncSize();
     this.blockID = new AtomicReference<>(blockID);
     KeyValue keyValue =
@@ -198,6 +203,17 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     metrics = XceiverClientManager.getXceiverClientMetrics();
   }
 
+  private static boolean allDatanodesSupportStreamPutBlock(Pipeline pipeline) {
+    for (DatanodeDetails dn : pipeline.getNodes()) {
+      if (!STREAM_PUTBLOCK_WITHOUT_RAFT.isSupportedBy(dn.getCurrentVersion())) {
+        LOG.debug("Datanode {} at version {} does not support {}; PutBlock goes through Raft for pipeline {}",
+            dn, dn.getCurrentVersion(), STREAM_PUTBLOCK_WITHOUT_RAFT, pipeline.getId());
+        return false;
+      }
+    }
+    return true;
+  }
+
   private DataStreamOutput setupStream(Pipeline pipeline) throws IOException {
     for (DatanodeDetails dn : pipeline.getNodes()) {
       if (!dn.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)) {
@@ -216,7 +232,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     // TODO: The datanode UUID is not used meaningfully, consider deprecating
     //  it or remove it completely if possible
     String id = pipeline.getFirstNode().getUuidString();
-    ContainerProtos.Type streamInitType = config.isDatastreamPutBlockWithoutRaftEnabled()
+    ContainerProtos.Type streamInitType = putBlockWithoutRaft
         ? ContainerProtos.Type.StreamInitWithPutBlock
         : ContainerProtos.Type.StreamInit;
     ContainerProtos.ContainerCommandRequestProto.Builder builder =
@@ -428,7 +444,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
       byteBufferList = null;
     }
     waitFuturesComplete();
-    if (close && config.isDatastreamPutBlockWithoutRaftEnabled()) {
+    if (close && putBlockWithoutRaft) {
       // Wait for boundary PutBlock(s) before appending the stream-close PutBlock.
       waitPutBlockCommandFuturesComplete();
     }
@@ -453,12 +469,12 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
           }
         }
       });
-      if (config.isDatastreamPutBlockWithoutRaftEnabled()) {
+      if (putBlockWithoutRaft) {
         // PutBlock is supposed to be committed after the data stream close so there
         // is no need to continue.
         return;
       }
-    } else if (config.isDatastreamPutBlockWithoutRaftEnabled()) {
+    } else if (putBlockWithoutRaft) {
       executePutBlockCommand(blockData, byteBufferList);
       return;
     }

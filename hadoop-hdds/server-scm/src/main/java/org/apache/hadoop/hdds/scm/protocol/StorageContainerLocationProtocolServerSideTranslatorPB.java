@@ -28,8 +28,9 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetPipeline;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListContainer;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListPipelines;
-import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.ADMIN_COMMAND_TYPE;
-import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.FOLLOWER_READABLE_COMMAND_TYPES;
+import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface.ADMIN_COMMAND_TYPE;
+import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface
+    .FOLLOWER_READABLE_COMMAND_TYPES;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -164,7 +165,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This class is the server-side translator that forwards requests received on
  * {@link StorageContainerLocationProtocolPB} to the
- * {@link StorageContainerLocationProtocol} server implementation.
+ * {@link StorageContainerLocationInternalInterface} server implementation.
  */
 @InterfaceAudience.Private
 @SuppressWarnings({"method"})
@@ -185,7 +186,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
           + " Please upgrade the client to a version that supports Erasure"
           + " Coded data, and retry!";
 
-  private final StorageContainerLocationProtocol impl;
+  private final StorageContainerLocationInternalInterface impl;
   private final StorageContainerManager scm;
   private static final String ROLE_TYPE = "SCM";
 
@@ -196,12 +197,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   /**
    * Creates a new StorageContainerLocationProtocolServerSideTranslatorPB.
    *
-   * @param impl            {@link StorageContainerLocationProtocol} server
+   * @param impl            {@link StorageContainerLocationInternalInterface} server
    *                        implementation
    * @param protocolMetrics
    */
   public StorageContainerLocationProtocolServerSideTranslatorPB(
-      StorageContainerLocationProtocol impl,
+      StorageContainerLocationInternalInterface impl,
       StorageContainerManager scm,
       ProtocolMessageMetrics<StorageContainerLocationProtocolProtos.Type> protocolMetrics)
       throws IOException {

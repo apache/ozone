@@ -21,14 +21,15 @@ PHASE=test
 
 args=""
 
-if [[ "$@" =~ "-Ptest-" ]]; then
-  if [[ "$@" =~ "-Ptest-flaky" ]]; then
+if [[ "$@" =~ -Ptest-([a-z]+) ]]; then
+  split="${BASH_REMATCH[1]}"
+  if [[ "${split}" == "flaky" ]]; then
     args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
     # tests may pass on re-run, so we cannot rely on output for status
     ERROR_PATTERN=""
   fi
 
-  if [[ "$@" =~ "-Ptest-filesystem" ]]; then
+  if [[ "${split}" == "filesystem" ]]; then
     if [[ "${CI:-}" == "true" ]]; then
       args="$args -DskipShade --activate-profiles CI"
     else
@@ -38,6 +39,8 @@ if [[ "$@" =~ "-Ptest-" ]]; then
   else
     args="$args -DskipShade"
   fi
+
+  args="$args -Dscan.value.testset=${split}"
 fi
 
 source "${DIR}/junit.sh" $args "$@"

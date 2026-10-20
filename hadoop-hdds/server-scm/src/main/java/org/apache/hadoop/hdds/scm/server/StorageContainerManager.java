@@ -1799,7 +1799,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   @Override
   public void shutDown(String message) {
     stop();
-    ExitUtils.terminate(0, message, LOG);
+    ExitUtils.terminate(1, message, LOG);
   }
 
   public boolean isStopped() {
@@ -2246,6 +2246,10 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public Collection<String> getScmAdminUsernames() {
     return scmAdmins.getAdminUsernames();
+  }
+
+  public Collection<String> getScmAdminGroups() {
+    return scmAdmins.getAdminGroups();
   }
 
   public Collection<String> getScmReadOnlyAdminUsernames() {
