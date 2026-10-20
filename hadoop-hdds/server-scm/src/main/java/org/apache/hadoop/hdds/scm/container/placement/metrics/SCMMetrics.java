@@ -34,7 +34,7 @@ import org.apache.hadoop.util.Time;
  * This class is for maintaining StorageContainerManager statistics.
  */
 @Metrics(about = "Storage Container Manager Metrics", context = "dfs")
-public class SCMMetrics {
+public final class SCMMetrics {
   public static final String SOURCE_NAME =
       SCMMetrics.class.getSimpleName();
 

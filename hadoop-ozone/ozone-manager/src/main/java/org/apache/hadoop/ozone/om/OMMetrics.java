@@ -39,7 +39,7 @@ import org.apache.hadoop.util.Time;
  */
 @InterfaceAudience.Private
 @Metrics(about = "Ozone Manager Metrics", context = "dfs")
-public class OMMetrics implements OmMetadataReaderMetrics {
+public final class OMMetrics implements OmMetadataReaderMetrics {
   private static final String SOURCE_NAME =
       OMMetrics.class.getSimpleName();
 
