@@ -32,13 +32,19 @@ fi
 #
 # export WAITFOR=localhost:9878
 #
+# An IPv6 literal must be enclosed in square brackets:
+#
+# export WAITFOR=[2001:db8::1]:9878
+#
 # With an optional parameter, you can also set the maximum
 # time of waiting with (in seconds) with WAITFOR_TIMEOUT.
 # (The default is 300 seconds / 5 minutes.)
 if [ -n "$WAITFOR" ]; then
   echo "Waiting for the service $WAITFOR"
-  WAITFOR_HOST=$(printf "%s\n" "$WAITFOR"| cut -d : -f 1)
-  WAITFOR_PORT=$(printf "%s\n" "$WAITFOR"| cut -d : -f 2)
+  WAITFOR_HOST=${WAITFOR%:*}
+  WAITFOR_HOST=${WAITFOR_HOST#\[}
+  WAITFOR_HOST=${WAITFOR_HOST%\]}
+  WAITFOR_PORT=${WAITFOR##*:}
   for i in $(seq "${WAITFOR_TIMEOUT:-300}" -1 0) ; do
     set +e
     nc -z "$WAITFOR_HOST" "$WAITFOR_PORT" > /dev/null 2>&1
