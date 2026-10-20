@@ -242,7 +242,7 @@ public class TestDecommissionAndMaintenance {
     scmClient.recommissionNodes(Arrays.asList(
         getDNHostAndPort(toDecommission)));
     waitForDnToReachOpState(nm, toDecommission, IN_SERVICE);
-    waitForDnToReachPersistedOpState(toDecommission, IN_SERVICE);
+    waitForDnToReachPersistedOpState(nm.getNode(dnID), IN_SERVICE);
   }
 
   @Test
@@ -484,7 +484,7 @@ public class TestDecommissionAndMaintenance {
     // has, then the SCM state should be used and the DN state updated.
     waitForDnToReachHealthState(nm, newDn, HEALTHY);
     waitForDnToReachOpState(nm, newDn, IN_SERVICE);
-    waitForDnToReachPersistedOpState(dn, IN_SERVICE);
+    waitForDnToReachPersistedOpState(newDn, IN_SERVICE);
   }
 
   @Test
