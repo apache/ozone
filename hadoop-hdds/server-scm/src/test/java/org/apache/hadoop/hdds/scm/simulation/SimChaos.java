@@ -42,6 +42,8 @@ final class SimChaos {
   private final ScmSimulation sim;
   private final List<SimScheduler.Timer> recoveries = new ArrayList<>();
   private final Set<SimDatanode> inMaintenance = new LinkedHashSet<>();
+  /** The datanodes each DECOMMISSION_RACK fault took out, until they are recommissioned. */
+  private final List<List<SimDatanode>> decommissionedRacks = new ArrayList<>();
   private SimScheduler.Timer timer;
   private long lastScmRestart = Long.MIN_VALUE / 2;
 
@@ -53,7 +55,11 @@ final class SimChaos {
     scheduleNext();
   }
 
-  /** Stops injecting faults and brings every datanode back. */
+  /**
+   * Stops injecting faults and brings every datanode back. A rack that has finished decommissioning comes back half of
+   * the time, so SCM must also fix the mis-replication it could not fix while the rack was out. A rack that is still
+   * decommissioning stays out, so the end check still catches a decommission that is stuck.
+   */
   void stopAndHeal() {
     sim.scheduler().cancel(timer);
     recoveries.forEach(sim.scheduler()::cancel);
@@ -67,15 +73,22 @@ final class SimChaos {
       }
     }
     for (SimDatanode dn : inMaintenance) {
-      endMaintenanceEventually(dn);
+      recommissionEventually(dn);
     }
     inMaintenance.clear();
+    for (List<SimDatanode> rack : decommissionedRacks) {
+      if (rack.stream().allMatch(this::isDecommissioned) && random().nextBoolean()) {
+        sim.record("chaos.recommissionRack", rack.get(0).getRack());
+        rack.forEach(this::recommissionEventually);
+      }
+    }
+    decommissionedRacks.clear();
   }
 
   /** Recommissions the node, retrying until SCM accepts it (it may not know the node yet after a restart). */
-  private void endMaintenanceEventually(SimDatanode dn) {
+  private void recommissionEventually(SimDatanode dn) {
     if (!sim.recommission(dn)) {
-      sim.scheduler().schedule("chaos.recommissionRetry " + dn.getName(), 30_000, () -> endMaintenanceEventually(dn));
+      sim.scheduler().schedule("chaos.recommissionRetry " + dn.getName(), 30_000, () -> recommissionEventually(dn));
     }
   }
 
@@ -230,11 +243,17 @@ final class SimChaos {
         decommissioned.add(dn);
       }
     }
-    if (!decommissioned.isEmpty() && random().nextBoolean()) {
-      recoveries.add(sim.scheduler().schedule("chaos.recommissionRack " + rack.get(0).getRack(), longMs(),
-          () -> decommissioned.forEach(sim::recommission)));
+    if (decommissioned.isEmpty()) {
+      return false;
     }
-    return !decommissioned.isEmpty();
+    decommissionedRacks.add(decommissioned);
+    if (random().nextBoolean()) {
+      recoveries.add(sim.scheduler().schedule("chaos.recommissionRack " + rack.get(0).getRack(), longMs(), () -> {
+        decommissionedRacks.remove(decommissioned);
+        decommissioned.forEach(sim::recommission);
+      }));
+    }
+    return true;
   }
 
   private boolean maintenance() {
@@ -373,6 +392,11 @@ final class SimChaos {
       }
     }
     return result;
+  }
+
+  private boolean isDecommissioned(SimDatanode dn) {
+    NodeStatus status = sim.nodeStatus(dn);
+    return status != null && status.isDecommissioned();
   }
 
   /** Keeps enough in-service datanodes that SCM can re-replicate around outages. */
