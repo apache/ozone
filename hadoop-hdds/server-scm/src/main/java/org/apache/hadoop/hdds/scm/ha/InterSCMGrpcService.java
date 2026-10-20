@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,17 +44,11 @@ public class InterSCMGrpcService extends
 
   private static final int BUFFER_SIZE = 1024 * 1024;
 
-  private final SCMDBCheckpointProvider provider;
-
   private final StorageContainerManager scm;
-  private final Table<String, TransactionInfo> transactionInfoTable;
 
-  InterSCMGrpcService(final StorageContainerManager scm) throws IOException {
+  InterSCMGrpcService(final StorageContainerManager scm) {
     Objects.requireNonNull(scm, "scm");
     this.scm = scm;
-    this.transactionInfoTable = HAUtils.getTransactionInfoTable(
-        scm.getScmMetadataStore().getStore(), SCMDBDefinition.get());
-    this.provider = new SCMDBCheckpointProvider(scm.getScmMetadataStore().getStore());
   }
 
   @Override
@@ -62,13 +56,15 @@ public class InterSCMGrpcService extends
       StreamObserver<CopyDBCheckpointResponseProto> responseObserver) {
     try {
       scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
+      // Look up the store per request because installing a checkpoint replaces it.
+      final DBStore store = scm.getScmMetadataStore().getStore();
       TransactionInfo transactionInfo =
-          transactionInfoTable.get(TRANSACTION_INFO_KEY);
+          HAUtils.getTransactionInfoTable(store, SCMDBDefinition.get()).get(TRANSACTION_INFO_KEY);
       Objects.requireNonNull(transactionInfo, "transactionInfo");
       SCMGrpcOutputStream outputStream =
           new SCMGrpcOutputStream(responseObserver, scm.getClusterId(),
               BUFFER_SIZE);
-      provider.writeDBCheckPointToSream(outputStream, request.getFlush());
+      new SCMDBCheckpointProvider(store).writeDBCheckPointToSream(outputStream, request.getFlush());
 
     } catch (IOException e) {
       LOG.error("Error streaming SCM DB checkpoint", e);

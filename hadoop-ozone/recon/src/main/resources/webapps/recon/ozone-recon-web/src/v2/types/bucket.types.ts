@@ -17,6 +17,7 @@
  */
 
 import { Acl } from "@/v2/types/acl.types";
+import { ReplicationInfo } from '@/v2/types/insights.types';
 import { Option as MultiOption } from "@/v2/components/select/multiSelect";
 
 // Corresponds to OzoneManagerProtocolProtos.StorageTypeProto
@@ -37,6 +38,14 @@ export const BucketLayoutTypeList = [
 export type BucketLayout = typeof BucketLayoutTypeList[number];
 
 
+// Corresponds to the serialized org.apache.hadoop.hdds.client.DefaultReplicationConfig
+// returned by the Recon bucket endpoint (BucketObjectDBInfo#replicationConfigInfo).
+// The nested config is the same shape the OM DB insights endpoints return.
+export type BucketReplicationConfig = {
+  type: string;
+  replicationConfig?: ReplicationInfo | null;
+}
+
 export type Bucket = {
   volumeName: string;
   name: string;
@@ -53,6 +62,7 @@ export type Bucket = {
   owner: string;
   acls?: Acl[];
   bucketLayout: BucketLayout;
+  replicationConfigInfo?: BucketReplicationConfig | null;
 }
 
 export type BucketResponse = {

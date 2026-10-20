@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -402,6 +403,36 @@ public class TestOzoneManagerRequestHandler {
     Mockito.verify(ozoneManager).listStatusLight(listStatusLightArgs.capture(), Mockito.anyBoolean(),
         Mockito.anyString(), Mockito.anyLong(), Mockito.anyBoolean());
     Assertions.assertEquals(require, listStatusLightArgs.getValue().isRequireFileSystemLayout());
+  }
+
+  /**
+   * GetKeyInfo must forward requireFileSystemLayout from the request into the
+   * OmKeyArgs handed to the OM.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testGetKeyInfoForwardsRequireFileSystemLayout(boolean require) throws IOException {
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+    OzoneManager ozoneManager = requestHandler.getOzoneManager();
+    KeyInfoWithVolumeContext keyInfo = KeyInfoWithVolumeContext.newBuilder().setKeyInfo(getMockedOmKeyInfo()).build();
+    Mockito.when(ozoneManager.getKeyInfo(any(OmKeyArgs.class), Mockito.anyBoolean())).thenReturn(keyInfo);
+    OzoneManagerProtocolProtos.GetKeyInfoRequest getKeyInfoRequest =
+        OzoneManagerProtocolProtos.GetKeyInfoRequest.newBuilder()
+            .setKeyArgs(OzoneManagerProtocolProtos.KeyArgs.newBuilder()
+                .setVolumeName("volume").setBucketName("bucket").setKeyName("key"))
+            .setRequireFileSystemLayout(require)
+            .build();
+    OzoneManagerProtocolProtos.OMRequest request = Mockito.mock(OzoneManagerProtocolProtos.OMRequest.class);
+    Mockito.when(request.getTraceID()).thenReturn("traceId");
+    Mockito.when(request.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.GetKeyInfo);
+    Mockito.when(request.getGetKeyInfoRequest()).thenReturn(getKeyInfoRequest);
+
+    OzoneManagerProtocolProtos.OMResponse response = requestHandler.handleReadRequest(request);
+    Assertions.assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getStatus());
+
+    ArgumentCaptor<OmKeyArgs> keyArgs = ArgumentCaptor.forClass(OmKeyArgs.class);
+    Mockito.verify(ozoneManager).getKeyInfo(keyArgs.capture(), Mockito.eq(false));
+    Assertions.assertEquals(require, keyArgs.getValue().isRequireFileSystemLayout());
   }
 
   /**
