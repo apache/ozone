@@ -38,6 +38,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -96,7 +97,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   @Override
   @DisallowedUntilLayoutVersion(HBASE_SUPPORT)
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    OMRequest request = super.preExecute(ozoneManager);
+    final OMRequest request = super.preExecute(ozoneManager);
     RecoverLeaseRequest recoverLeaseRequest = request.getRecoverLeaseRequest();
 
     String keyPath = recoverLeaseRequest.getKeyName();
@@ -242,9 +243,9 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     openKeyInfo.setKeyName(keyName);
 
     OmKeyLocationInfoGroup keyLatestVersionLocations = keyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.getLocationList();
+    List<OmKeyLocationInfo> keyLocationInfoList = keyLatestVersionLocations.createLocationList();
     OmKeyLocationInfoGroup openKeyLatestVersionLocations = openKeyInfo.getLatestVersionLocations();
-    List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.getLocationList();
+    List<OmKeyLocationInfo> openKeyLocationInfoList = openKeyLatestVersionLocations.createLocationList();
 
     if (!keyLocationInfoList.isEmpty()) {
       updateBlockInfo(ozoneManager, keyLocationInfoList.get(keyLocationInfoList.size() - 1));
@@ -257,8 +258,9 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     }
 
     RecoverLeaseResponse.Builder rb = RecoverLeaseResponse.newBuilder();
-    rb.setKeyInfo(keyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true));
-    rb.setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(getOmRequest().getVersion(), true));
+    ClientVersion clientVersion = ClientVersion.deserialize(getOmRequest().getVersion());
+    rb.setKeyInfo(keyInfo.getNetworkProtobuf(clientVersion, true));
+    rb.setOpenKeyInfo(openKeyInfo.getNetworkProtobuf(clientVersion, true));
     return rb.build();
   }
 

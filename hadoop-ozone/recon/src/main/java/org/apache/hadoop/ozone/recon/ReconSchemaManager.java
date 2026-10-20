@@ -22,7 +22,7 @@ import com.google.inject.Inject;
 import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.Set;
-import org.apache.hadoop.ozone.recon.upgrade.ReconLayoutFeature;
+import org.apache.hadoop.ozone.recon.upgrade.ReconVersion;
 import org.apache.ozone.recon.schema.ReconSchemaDefinition;
 import org.apache.ozone.recon.schema.SchemaVersionTableDefinition;
 import org.slf4j.Logger;
@@ -44,9 +44,6 @@ public class ReconSchemaManager {
 
   @VisibleForTesting
   public void createReconSchema() {
-    // Calculate the latest SLV from ReconLayoutFeature
-    int latestSLV = calculateLatestSLV();
-
     try {
       // Initialize the schema version table first
       reconSchemaDefinitions.stream()
@@ -54,7 +51,7 @@ public class ReconSchemaManager {
           .findFirst()
           .ifPresent(schemaDefinition -> {
             SchemaVersionTableDefinition schemaVersionTable = (SchemaVersionTableDefinition) schemaDefinition;
-            schemaVersionTable.setLatestSLV(latestSLV);
+            schemaVersionTable.setSoftwareVersion(ReconVersion.SOFTWARE_VERSION.serialize());
             try {
               schemaVersionTable.initializeSchema();
             } catch (SQLException e) {
@@ -76,14 +73,5 @@ public class ReconSchemaManager {
     } catch (Exception e) {
       LOG.error("Error creating Recon schema.", e);
     }
-  }
-
-  /**
-   * Calculate the latest SLV by iterating over ReconLayoutFeature.
-   *
-   * @return The latest SLV.
-   */
-  private int calculateLatestSLV() {
-    return ReconLayoutFeature.determineSLV();
   }
 }

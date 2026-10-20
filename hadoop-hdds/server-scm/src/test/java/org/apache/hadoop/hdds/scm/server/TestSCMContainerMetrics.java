@@ -25,7 +25,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.HashMap;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -42,16 +42,15 @@ public class TestSCMContainerMetrics {
   public void testSCMContainerMetrics() {
     SCMMXBean scmmxBean = mock(SCMMXBean.class);
 
-    Map<String, Integer> stateInfo = new HashMap<String, Integer>() {{
-        put(HddsProtos.LifeCycleState.OPEN.toString(), 2);
-        put(HddsProtos.LifeCycleState.CLOSING.toString(), 3);
-        put(HddsProtos.LifeCycleState.QUASI_CLOSED.toString(), 4);
-        put(HddsProtos.LifeCycleState.CLOSED.toString(), 5);
-        put(HddsProtos.LifeCycleState.DELETING.toString(), 6);
-        put(HddsProtos.LifeCycleState.DELETED.toString(), 7);
-        put(HddsProtos.LifeCycleState.RECOVERING.toString(), 8);
-      }};
-
+    Map<String, Integer> stateInfo = ImmutableMap.<String, Integer>builder()
+        .put(HddsProtos.LifeCycleState.OPEN.toString(), 2)
+        .put(HddsProtos.LifeCycleState.CLOSING.toString(), 3)
+        .put(HddsProtos.LifeCycleState.QUASI_CLOSED.toString(), 4)
+        .put(HddsProtos.LifeCycleState.CLOSED.toString(), 5)
+        .put(HddsProtos.LifeCycleState.DELETING.toString(), 6)
+        .put(HddsProtos.LifeCycleState.DELETED.toString(), 7)
+        .put(HddsProtos.LifeCycleState.RECOVERING.toString(), 8)
+        .build();
 
     when(scmmxBean.getContainerStateCount()).thenReturn(stateInfo);
 

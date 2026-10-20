@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -208,6 +209,51 @@ public class TestSnapshotChain {
   }
 
   @Test
+  public void testFailedAddPreservesChains() throws Exception {
+    UUID id = UUID.randomUUID();
+    SnapshotInfo info = createSnapshotInfo(id, UUID.randomUUID(), null, 1L);
+
+    assertThrows(IOException.class, () -> chainManager.addSnapshot(info));
+
+    assertTrue(chainManager.getGlobalSnapshotChain().isEmpty());
+    assertTrue(chainManager.getSnapshotChainByPath().isEmpty());
+  }
+
+  @Test
+  public void testFailedAddPreservesExistingSnapshot() throws Exception {
+    UUID firstId = UUID.randomUUID();
+    chainManager.addSnapshot(createSnapshotInfo(firstId, null, null, 1L));
+
+    UUID rejectedId = UUID.randomUUID();
+    SnapshotInfo rejected = createSnapshotInfo(rejectedId, UUID.randomUUID(), firstId, 2L);
+
+    assertThrows(IOException.class, () -> chainManager.addSnapshot(rejected));
+
+    assertEquals(1, chainManager.getGlobalSnapshotChain().size());
+    assertEquals(1, chainManager.getSnapshotChainPath("vol1/bucket1").size());
+    assertEquals(firstId, chainManager.getOldestGlobalSnapshotId());
+    assertEquals(firstId, chainManager.getLatestGlobalSnapshotId());
+    assertEquals(firstId, chainManager.getLatestPathSnapshotId("vol1/bucket1"));
+    assertFalse(chainManager.hasNextGlobalSnapshot(firstId));
+    assertFalse(chainManager.hasNextPathSnapshot("vol1/bucket1", firstId));
+    assertFalse(chainManager.getGlobalSnapshotChain().containsKey(rejectedId));
+  }
+
+  @Test
+  public void testWrongPathDeletePreservesGlobalChain() throws Exception {
+    UUID id = UUID.randomUUID();
+    chainManager.addSnapshot(createSnapshotInfo(id, null, null, 1L));
+
+    SnapshotInfo wrongPath = createSnapshotInfo(id, null, null, 1L);
+    wrongPath.setSnapshotPath("vol1/bucket2");
+
+    assertThrows(IOException.class, () -> chainManager.deleteSnapshot(wrongPath));
+
+    assertTrue(chainManager.getGlobalSnapshotChain().containsKey(id));
+    assertTrue(chainManager.getSnapshotChainPath("vol1/bucket1").containsKey(id));
+  }
+
+  @Test
   public void testDeleteSnapshot() throws Exception {
     // add three snapshots
     UUID snapshotID1 = UUID.randomUUID();
@@ -333,6 +379,34 @@ public class TestSnapshotChain {
     assertEquals(expectedChain, forwardChain);
     assertEquals(forwardChain, reverseChain);
 
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testSnapshotChainIteratorWhenNextSnapshotIsPurged(boolean reverse) throws IOException {
+    Table<String, SnapshotInfo> snapshotInfo = omMetadataManager.getSnapshotInfoTable();
+    List<SnapshotInfo> snapshotInfoList = new ArrayList<>();
+    UUID prevSnapshotID = null;
+    long time = System.currentTimeMillis();
+    for (int i = 0; i < 3; i++) {
+      UUID snapshotID = UUID.randomUUID();
+      SnapshotInfo snapInfo = createSnapshotInfo(snapshotID, prevSnapshotID, prevSnapshotID, time++);
+      snapshotInfo.put(snapshotID.toString(), snapInfo);
+      prevSnapshotID = snapshotID;
+      snapshotInfoList.add(snapInfo);
+    }
+    chainManager = new SnapshotChainManager(omMetadataManager);
+    Iterator<UUID> iterator = chainManager.iterator(reverse);
+    assertEquals(snapshotInfoList.get(reverse ? 2 : 0).getSnapshotId(), iterator.next());
+
+    // Purge the snapshot the iterator moved to, as a concurrent snapshot purge would.
+    SnapshotInfo purged = snapshotInfoList.get(1);
+    assertTrue(chainManager.deleteSnapshot(purged));
+
+    assertTrue(iterator.hasNext());
+    assertEquals(purged.getSnapshotId(), iterator.next());
+    assertFalse(iterator.hasNext());
+    assertThrows(NoSuchElementException.class, iterator::next);
   }
 
   private static Stream<? extends Arguments> invalidSnapshotChain() {

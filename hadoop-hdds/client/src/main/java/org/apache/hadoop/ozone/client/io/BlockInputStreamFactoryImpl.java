@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.client.io;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.STREAM_BLOCK_SUPPORT;
+import static org.apache.hadoop.hdds.HDDSVersion.STREAM_BLOCK_SUPPORT;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;
@@ -55,15 +55,33 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
         ecReconstructExecutorSupplier);
   }
 
+  /**
+   * @param ecParallelReadExecutorSupplier executor for reading the cells of a healthy EC block in parallel, or
+   *     null to always read them one at a time
+   */
+  public static BlockInputStreamFactory getInstance(
+      ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier,
+      Supplier<ExecutorService> ecParallelReadExecutorSupplier) {
+    return new BlockInputStreamFactoryImpl(byteBufferPool,
+        ecReconstructExecutorSupplier, ecParallelReadExecutorSupplier);
+  }
+
   public BlockInputStreamFactoryImpl() {
     this(new ElasticByteBufferPool(), Executors::newSingleThreadExecutor);
   }
 
   public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool,
       Supplier<ExecutorService> ecReconstructExecutorSupplier) {
+    this(byteBufferPool, ecReconstructExecutorSupplier, null);
+  }
+
+  public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier,
+      Supplier<ExecutorService> ecParallelReadExecutorSupplier) {
     this.ecBlockStreamFactory =
         ECBlockInputStreamFactoryImpl.getInstance(this, byteBufferPool,
-            ecReconstructExecutorSupplier);
+            ecReconstructExecutorSupplier, ecParallelReadExecutorSupplier);
   }
 
   /**
@@ -103,7 +121,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
     // return true only if all DataNodes in the pipeline are on a version
     // that supports for reading a block by streaming chunks..
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (dn.getCurrentVersion() < STREAM_BLOCK_SUPPORT.toProtoValue()) {
+      if (!STREAM_BLOCK_SUPPORT.isSupportedBy(dn.getCurrentVersion())) {
         return false;
       }
     }

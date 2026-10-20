@@ -48,7 +48,7 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -577,8 +577,8 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
         UUID.randomUUID().toString(), UUID.randomUUID().toString(),
         BucketVersioningStatus.ENABLED);
 
-    OMLayoutVersionManager preFinalizedVersionManager =
-        mock(OMLayoutVersionManager.class);
+    OMVersionManager preFinalizedVersionManager =
+        mock(OMVersionManager.class);
     when(preFinalizedVersionManager
         .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)).thenReturn(false);
     ValidationContext preFinalizedContext = ValidationContext.of(
@@ -604,8 +604,8 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
         omException.getResult());
 
     // after finalization the request passes through untouched
-    OMLayoutVersionManager finalizedVersionManager =
-        mock(OMLayoutVersionManager.class);
+    OMVersionManager finalizedVersionManager =
+        mock(OMVersionManager.class);
     when(finalizedVersionManager
         .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)).thenReturn(true);
     ValidationContext finalizedContext = ValidationContext.of(

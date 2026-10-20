@@ -39,6 +39,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -104,17 +105,23 @@ public final class S3Utils {
    *                                   config.
    * @param clientConfiguredReplConfig - Client side configured replication
    *                                   config.
+   * @param standardUsesClientDefault  - whether STANDARD resolves to a non-null
+   *                                   clientConfiguredReplConfig.
    * @return client resolved replication config.
    */
   public static ReplicationConfig resolveS3ClientSideReplicationConfig(
       String s3StorageTypeHeader, String s3StorageConfigHeader,
       ReplicationConfig clientConfiguredReplConfig,
-      ReplicationConfig bucketReplConfig)
+      ReplicationConfig bucketReplConfig, boolean standardUsesClientDefault)
       throws OS3Exception {
 
     // If user provided s3 storage type header is not null then map it
     // to ozone replication config
     if (!StringUtils.isEmpty(s3StorageTypeHeader)) {
+      if (standardUsesClientDefault && clientConfiguredReplConfig != null
+          && S3StorageType.STANDARD.name().equals(s3StorageTypeHeader)) {
+        return clientConfiguredReplConfig;
+      }
       return toReplicationConfig(s3StorageTypeHeader, s3StorageConfigHeader);
     }
 
@@ -141,6 +148,7 @@ public final class S3Utils {
   public static WebApplicationException wrapOS3Exception(OS3Exception ex) {
     return new WebApplicationException(ex.getErrorMessage(), ex,
         Response.status(ex.getHttpCode())
+            .type(MediaType.APPLICATION_XML_TYPE)
             .entity(ex.toXml())
             .build());
   }

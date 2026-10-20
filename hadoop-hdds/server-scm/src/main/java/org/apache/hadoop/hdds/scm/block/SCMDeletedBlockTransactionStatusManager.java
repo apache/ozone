@@ -52,10 +52,12 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,6 +95,16 @@ public class SCMDeletedBlockTransactionStatusManager {
   private final AtomicLong totalBlockCount = new AtomicLong(0);
   private final AtomicLong totalBlocksSize = new AtomicLong(0);
   private final AtomicLong totalReplicatedBlocksSize = new AtomicLong(0);
+  // Upper bound for a summary update to wait for the reload on leader ready before it is rejected.
+  private static final long SUMMARY_RELOAD_WAIT_MS = 10_000;
+  private final Object summaryLock = new Object();
+  // Guarded by summaryLock. Set when this SCM becomes leader and cleared once the summary is reloaded on leader
+  // ready. Summary updates wait in between because the in-memory counters may still be stale.
+  private boolean summaryReloadPending;
+  private long summaryReloadWaitMs = SUMMARY_RELOAD_WAIT_MS;
+  // Guarded by summaryLock. Incremented on every summary reload, so that an update which failed after a reload
+  // does not roll back its change on top of the reloaded counters.
+  private long summaryReloadCount;
   private static boolean disableDataDistributionForTest;
 
   /**
@@ -423,10 +435,23 @@ public class SCMDeletedBlockTransactionStatusManager {
     transactionToRetryCountMap.clear();
     scmDeleteBlocksCommandStatusManager.clear();
     transactionToDNsCommitMap.clear();
-    txSizeMap.clear();
+    synchronized (summaryLock) {
+      txSizeMap.clear();
+      summaryReloadPending = true;
+    }
+  }
+
+  /**
+   * Reloads the summary once all transactions of the previous leader terms are applied and flushed to DB.
+   */
+  public void onLeaderReady() {
     try {
       initDataDistributionData();
     } catch (IOException e) {
+      synchronized (summaryLock) {
+        summaryReloadPending = false;
+        summaryLock.notifyAll();
+      }
       LOG.warn("Failed to initialize Storage space distribution data. The feature will continue with current {}." +
           " There is a high chance that the real data and current data has a gap.", summaryToString(getSummary()));
     }
@@ -460,19 +485,33 @@ public class SCMDeletedBlockTransactionStatusManager {
     }
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
-      for (DeletedBlocksTransaction tx: txList) {
-        if (tx.hasTotalBlockSize()) {
-          incrDeletedBlocksSummary(tx);
-        }
-      }
-      try {
-        deletedBlockLogStateManager.addTransactionsToDB(txList, getSummary());
-      } catch (IOException e) {
-        // Revert the in-memory changes if the DB update fails
+      DeletedBlocksTransactionSummary summary;
+      long reloadCount;
+      synchronized (summaryLock) {
+        checkSummaryReloaded();
+        reloadCount = summaryReloadCount;
         for (DeletedBlocksTransaction tx: txList) {
           if (tx.hasTotalBlockSize()) {
-            rollbackDeletedBlocksSummary(tx);
-            LOG.warn("{} is decreased from summary due to DB update failure", transactionToString(tx));
+            incrDeletedBlocksSummary(tx);
+          }
+        }
+        summary = getSummary();
+      }
+      try {
+        deletedBlockLogStateManager.addTransactionsToDB(txList, summary);
+      } catch (IOException e) {
+        if (isRatisTimeout(e)) {
+          throw e;
+        }
+        synchronized (summaryLock) {
+          // Revert the in-memory changes if the DB update fails, unless a reload has already replaced them
+          if (reloadCount == summaryReloadCount) {
+            for (DeletedBlocksTransaction tx: txList) {
+              if (tx.hasTotalBlockSize()) {
+                rollbackDeletedBlocksSummary(tx);
+                LOG.warn("{} is decreased from summary due to DB update failure", transactionToString(tx));
+              }
+            }
           }
         }
         throw e;
@@ -480,6 +519,43 @@ public class SCMDeletedBlockTransactionStatusManager {
       return;
     }
     deletedBlockLogStateManager.addTransactionsToDB(txList);
+  }
+
+  /**
+   * Waits until the summary is reloaded on leader ready. Ratis reports this SCM as leader before
+   * notifyLeaderReady completes, so a request can arrive in between. Must be called holding summaryLock.
+   */
+  private void checkSummaryReloaded() throws SCMException {
+    long deadline = Time.monotonicNow() + summaryReloadWaitMs;
+    while (summaryReloadPending) {
+      long remaining = deadline - Time.monotonicNow();
+      if (remaining <= 0) {
+        throw new SCMException("Deleted blocks transaction summary is not reloaded yet after becoming leader",
+            SCMException.ResultCodes.SCM_NOT_LEADER);
+      }
+      try {
+        summaryLock.wait(remaining);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new SCMException("Interrupted while waiting for summary reload", e,
+            SCMException.ResultCodes.INTERNAL_ERROR);
+      }
+    }
+  }
+
+  private static boolean isRatisTimeout(IOException e) {
+    if (!(e instanceof SCMException)) {
+      return false;
+    }
+    SCMException.ResultCodes code = ((SCMException) e).getResult();
+    if (code == SCMException.ResultCodes.TIMEOUT) {
+      return true;
+    }
+    if (code == SCMException.ResultCodes.INTERNAL_ERROR) {
+      Throwable cause = e.getCause();
+      return cause instanceof InterruptedException;
+    }
+    return false;
   }
 
   private void rollbackDeletedBlocksSummary(TxBlockInfo txBlockInfo) {
@@ -506,21 +582,35 @@ public class SCMDeletedBlockTransactionStatusManager {
     if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) &&
         !disableDataDistributionForTest) {
       List<TxBlockInfo> removedTxBlockInfos = new ArrayList<>();
-      for (Long txID: txIDs) {
-        TxBlockInfo txBlockInfo = txSizeMap.remove(txID);
-        if (txBlockInfo != null) {
-          descDeletedBlocksSummary(txBlockInfo);
-          removedTxBlockInfos.add(txBlockInfo);
+      DeletedBlocksTransactionSummary summary;
+      long reloadCount;
+      synchronized (summaryLock) {
+        checkSummaryReloaded();
+        reloadCount = summaryReloadCount;
+        for (Long txID: txIDs) {
+          TxBlockInfo txBlockInfo = txSizeMap.remove(txID);
+          if (txBlockInfo != null) {
+            descDeletedBlocksSummary(txBlockInfo);
+            removedTxBlockInfos.add(txBlockInfo);
+          }
         }
+        summary = getSummary();
       }
       try {
-        deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, getSummary());
+        deletedBlockLogStateManager.removeTransactionsFromDB(txIDs, summary);
       } catch (IOException e) {
-        // Revert the in-memory changes if the DB update fails
-        for (TxBlockInfo txBlockInfo : removedTxBlockInfos) {
-          txSizeMap.put(txBlockInfo.getTxId(), txBlockInfo);
-          rollbackDeletedBlocksSummary(txBlockInfo);
-          LOG.warn("{} is added back to txSizeMap and increased to summary due to DB update failure", txBlockInfo);
+        if (isRatisTimeout(e)) {
+          throw e;
+        }
+        synchronized (summaryLock) {
+          // Revert the in-memory changes if the DB update fails, unless a reload has already replaced them
+          if (reloadCount == summaryReloadCount) {
+            for (TxBlockInfo txBlockInfo : removedTxBlockInfos) {
+              txSizeMap.put(txBlockInfo.getTxId(), txBlockInfo);
+              rollbackDeletedBlocksSummary(txBlockInfo);
+              LOG.warn("{} is added back to txSizeMap and increased to summary due to DB update failure", txBlockInfo);
+            }
+          }
         }
         throw e;
       }
@@ -698,6 +788,11 @@ public class SCMDeletedBlockTransactionStatusManager {
   }
 
   @VisibleForTesting
+  void setSummaryReloadWaitMs(long waitMs) {
+    summaryReloadWaitMs = waitMs;
+  }
+
+  @VisibleForTesting
   public static void setDisableDataDistributionForTest(boolean disabled) {
     disableDataDistributionForTest = disabled;
   }
@@ -714,15 +809,20 @@ public class SCMDeletedBlockTransactionStatusManager {
 
   private void initDataDistributionData() throws IOException {
     DeletedBlocksTransactionSummary newSummary = loadDeletedBlocksSummary();
-    if (newSummary != null) {
-      DeletedBlocksTransactionSummary currentSummary = getSummary();
-      totalTxCount.set(newSummary.getTotalTransactionCount());
-      totalBlockCount.set(newSummary.getTotalBlockCount());
-      totalBlocksSize.set(newSummary.getTotalBlockSize());
-      totalReplicatedBlocksSize.set(newSummary.getTotalBlockReplicatedSize());
-      if (!isSummaryEqual(currentSummary, newSummary)) {
-        LOG.info("Old summary {} is replaced.", summaryToString(currentSummary));
+    synchronized (summaryLock) {
+      if (newSummary != null) {
+        DeletedBlocksTransactionSummary currentSummary = getSummary();
+        totalTxCount.set(newSummary.getTotalTransactionCount());
+        totalBlockCount.set(newSummary.getTotalBlockCount());
+        totalBlocksSize.set(newSummary.getTotalBlockSize());
+        totalReplicatedBlocksSize.set(newSummary.getTotalBlockReplicatedSize());
+        if (!isSummaryEqual(currentSummary, newSummary)) {
+          LOG.info("Old summary {} is replaced.", summaryToString(currentSummary));
+        }
       }
+      summaryReloadPending = false;
+      summaryReloadCount++;
+      summaryLock.notifyAll();
     }
     LOG.info("Storage space distribution is initialized with {}", summaryToString(getSummary()));
   }

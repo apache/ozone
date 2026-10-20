@@ -104,7 +104,7 @@ public class TestRepeatedOmKeyInfoCodec
     byte[] rawData = codec.toPersistedFormat(repeatedOmKeyInfo);
     RepeatedOmKeyInfo key = codec.fromPersistedFormat(rawData);
     assertNull(key.getOmKeyInfoList().get(0).getLatestVersionLocations()
-        .getLocationList().get(0).getPipeline());
+        .createLocationList().get(0).getPipeline());
     assertEquals(bucketId, key.getBucketId());
   }
 
@@ -119,7 +119,7 @@ public class TestRepeatedOmKeyInfoCodec
     byte[] rawData = codecWithPipeline.toPersistedFormat(repeatedOmKeyInfo);
     RepeatedOmKeyInfo key = codecWithoutPipeline.fromPersistedFormat(rawData);
     assertNotNull(key.getOmKeyInfoList().get(0).getLatestVersionLocations()
-        .getLocationList().get(0).getPipeline());
+        .createLocationList().get(0).getPipeline());
     assertEquals(bucketId, key.getBucketId());
   }
 

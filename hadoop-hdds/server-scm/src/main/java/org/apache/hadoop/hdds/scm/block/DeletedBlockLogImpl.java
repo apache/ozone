@@ -218,6 +218,14 @@ public class DeletedBlockLogImpl
   }
 
   /**
+   * Called in SCMStateMachine#notifyLeaderReady after the transaction buffer is flushed, when all transactions
+   * of the previous leader terms are applied.
+   */
+  public void onLeaderReady() {
+    transactionStatusManager.onLeaderReady();
+  }
+
+  /**
    * Called in SCMDBTransactionBuffer#flush when the cached deleting operations
    * are flushed.
    */
@@ -530,7 +538,7 @@ public class DeletedBlockLogImpl
           metrics.incrDNCommandsFailure(dnId, 1);
         } else {
           LOG.debug("Delete Block Command {} is not executed on the Datanode" +
-              " {}.", commandStatus.getCmdId(), dnId);
+              " {}.", commandStatus.getCmdId(), details);
         }
 
         getSCMDeletedBlockTransactionStatusManager()

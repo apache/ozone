@@ -131,7 +131,7 @@ public class ChunkKeyHandler extends KeyHandler {
                         keyLocation.getBlockID(),
                         keyLocation.getToken(),
                         datanodeDetails,
-                        pipeline.getReplicaIndexes());
+                        pipeline);
 
                 if (blockResponse == null || !blockResponse.hasBlockData()) {
                   System.err.printf("GetBlock call failed on %s datanode and %s block.%n",
@@ -221,6 +221,8 @@ public class ChunkKeyHandler extends KeyHandler {
                 jsonGen.writeEndObject(); // End this datanode's response object
 
                 jsonGen.flush();
+                // End the line so that stderr messages never share a line with JSON when streams are merged
+                System.out.println();
               } catch (Exception e) {
                 System.err.printf("Error getting block from datanode %s: %s%n",
                     datanodeDetails.getHostName(), e.getMessage());

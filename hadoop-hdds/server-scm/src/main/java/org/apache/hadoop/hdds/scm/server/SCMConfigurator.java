@@ -28,10 +28,8 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.WritableContainerFactory;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateServer;
 import org.apache.hadoop.ozone.lease.LeaseManager;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 
 /**
  * This class acts as an SCM builder Class. This class is important for us
@@ -74,8 +72,6 @@ public final class SCMConfigurator {
   private SCMHAManager scmHAManager;
   private SCMContext scmContext;
   private WritableContainerFactory writableContainerFactory;
-  private UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-      finalizationExecutor;
   private LeaseManager<Object> leaseManager;
 
   /**
@@ -186,15 +182,6 @@ public final class SCMConfigurator {
   }
 
   /**
-   * Allows user to set the executor for upgrade finalization.
-   * @param executor - Finalization executor to use.
-   */
-  public void setUpgradeFinalizationExecutor(
-      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
-    this.finalizationExecutor = executor;
-  }
-
-  /**
    * Allows user to specify a custom version lease manager.
    * @param leaseManager - lease Manager.
    */
@@ -296,15 +283,6 @@ public final class SCMConfigurator {
    */
   public WritableContainerFactory getWritableContainerFactory() {
     return writableContainerFactory;
-  }
-
-  /**
-   * Get the upgrade finalization executor.
-   * @return UpgradeFinalizationExecutor.
-   */
-  public UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-      getUpgradeFinalizationExecutor() {
-    return finalizationExecutor;
   }
 
   /**

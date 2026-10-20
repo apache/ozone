@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -35,6 +37,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -256,6 +259,10 @@ public class TestOMOpenKeysDeleteRequest extends OMKeyRequestTests {
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, transactionId);
 
     assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
+    String expectedCleanupTable =
+        getBucketLayout().isFileSystemOptimized() ? OPEN_FILE_TABLE : OPEN_KEY_TABLE;
+    assertEquals(Collections.singleton(expectedCleanupTable),
+        omClientResponse.removeCleanupTables());
 
     assertInOpenKeyTable(keysWithHigherUpdateID);
     assertNotInOpenKeyTable(keysWithSameUpdateID);
