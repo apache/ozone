@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,16 +81,9 @@ public class SCMConnectionManager
     this.rpcTimeout = timeOut.intValue();
     this.scmMachines = new HashMap<>();
     this.conf = conf;
-    if (component == null || component.isEmpty()) {
-      jmxBean = MBeans.register("HddsDatanode",
-          "SCMConnectionManager",
-          this);
-    } else {
-      Map<String, String> jmxProperties = new HashMap<>();
-      jmxProperties.put("datanode", component);
-      jmxBean = HddsUtils.registerWithJmxProperties("HddsDatanode",
-          "SCMConnectionManager", jmxProperties, this);
-    }
+    Map<String, String> jmxProperties =
+        component == null ? Collections.emptyMap() : Collections.singletonMap("datanode", component);
+    jmxBean = HddsUtils.registerWithJmxProperties("HddsDatanode", "SCMConnectionManager", jmxProperties, this);
   }
 
   /**
