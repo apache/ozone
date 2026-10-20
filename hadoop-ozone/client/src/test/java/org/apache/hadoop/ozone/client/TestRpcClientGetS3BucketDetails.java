@@ -43,7 +43,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * Verifies that {@link RpcClient#getS3BucketDetails} resolves the S3 volume on OM in the InfoBucket call
@@ -127,9 +128,10 @@ public class TestRpcClientGetS3BucketDetails {
     return client;
   }
 
-  @Test
-  public void resolvesS3VolumeInInfoBucket() throws IOException {
-    try (OzoneClient client = newClient(OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION)) {
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, names = {"S3_VOLUME_CONTEXT_RESOLUTION", "GET_KEY_INFO_REJECTS_OBS"})
+  public void resolvesS3VolumeInInfoBucket(OzoneManagerVersion omVersion) throws IOException {
+    try (OzoneClient client = newClient(omVersion)) {
       OzoneBucket bucket = client.getProxy().getS3BucketDetails(BUCKET);
 
       assertEquals(TENANT_VOLUME, bucket.getVolumeName());
@@ -140,9 +142,11 @@ public class TestRpcClientGetS3BucketDetails {
     }
   }
 
-  @Test
-  public void fallsBackToS3VolumeContextForOlderOm() throws IOException {
-    try (OzoneClient client = newClient(OzoneManagerVersion.GET_FILE_STATUS_REJECTS_OBS)) {
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "LIST_STATUS_REJECTS_OBS"})
+  public void fallsBackToS3VolumeContextForOlderOm(OzoneManagerVersion omVersion) throws IOException {
+    try (OzoneClient client = newClient(omVersion)) {
       OzoneBucket bucket = client.getProxy().getS3BucketDetails(BUCKET);
 
       assertEquals(TENANT_VOLUME, bucket.getVolumeName());
