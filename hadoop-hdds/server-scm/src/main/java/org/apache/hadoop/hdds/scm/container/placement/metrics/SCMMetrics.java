@@ -67,10 +67,6 @@ public class SCMMetrics {
     return dbCheckpointMetrics;
   }
 
-  public SCMMetrics(int maxRatisEvents) {
-    this(maxRatisEvents, null);
-  }
-
   private SCMMetrics(int maxRatisEvents, String metricsSourceComponent) {
     dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics", metricsSourceComponent);
     this.maxRatisEvents = maxRatisEvents;

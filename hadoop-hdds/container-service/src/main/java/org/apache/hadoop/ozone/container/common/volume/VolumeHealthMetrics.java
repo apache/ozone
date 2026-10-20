@@ -70,10 +70,6 @@ public final class VolumeHealthMetrics implements MetricsSource {
    * @param volumeType Type of volumes (DATA_VOLUME, META_VOLUME, DB_VOLUME)
    * @return The registered VolumeHealthMetrics instance
    */
-  public static VolumeHealthMetrics create(StorageVolume.VolumeType volumeType) {
-    return create(null, volumeType);
-  }
-
   public static VolumeHealthMetrics create(String component, StorageVolume.VolumeType volumeType) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     VolumeHealthMetrics metrics = new VolumeHealthMetrics(component, volumeType);

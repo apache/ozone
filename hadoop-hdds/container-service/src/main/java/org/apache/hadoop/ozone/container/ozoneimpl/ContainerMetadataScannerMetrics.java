@@ -36,10 +36,6 @@ public final class ContainerMetadataScannerMetrics
     super(name, ms);
   }
 
-  public static ContainerMetadataScannerMetrics create() {
-    return create(null);
-  }
-
   public static ContainerMetadataScannerMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String name = MetricUtil.qualifySourceName("ContainerMetadataScannerMetrics", component);

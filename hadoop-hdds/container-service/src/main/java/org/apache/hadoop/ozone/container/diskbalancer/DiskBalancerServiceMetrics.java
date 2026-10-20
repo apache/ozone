@@ -64,10 +64,6 @@ public final class DiskBalancerServiceMetrics {
     this.sourceName = sourceName;
   }
 
-  public static DiskBalancerServiceMetrics create() {
-    return create(null);
-  }
-
   public static DiskBalancerServiceMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME, component);

@@ -74,10 +74,6 @@ public final class ContainerMerkleTreeMetrics {
     this.sourceName = sourceName;
   }
 
-  public static ContainerMerkleTreeMetrics create() {
-    return create(null);
-  }
-
   public static ContainerMerkleTreeMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String sourceName = MetricUtil.qualifySourceName(METRICS_SOURCE_NAME, component);

@@ -81,12 +81,7 @@ public final class DatanodeQueueMetrics implements MetricsSource {
     initializeQueues();
   }
 
-  public static synchronized DatanodeQueueMetrics create(DatanodeStateMachine
-      datanodeStateMachine) {
-    return create(datanodeStateMachine, null);
-  }
-
-  public static synchronized DatanodeQueueMetrics create(DatanodeStateMachine datanodeStateMachine, String component) {
+  public static DatanodeQueueMetrics create(DatanodeStateMachine datanodeStateMachine, String component) {
     String sourceName = MetricUtil.qualifySourceName(METRICS_SOURCE_NAME, component);
     return DefaultMetricsSystem.instance().register(sourceName,
         "Queue metrics in Datanode",
@@ -155,7 +150,7 @@ public final class DatanodeQueueMetrics implements MetricsSource {
     }
   }
 
-  public synchronized void unRegister() {
+  public void unRegister() {
     DefaultMetricsSystem.instance().unregisterSource(sourceName);
   }
 

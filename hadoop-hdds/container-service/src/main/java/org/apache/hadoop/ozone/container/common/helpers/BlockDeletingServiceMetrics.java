@@ -89,10 +89,6 @@ public final class BlockDeletingServiceMetrics {
     this.sourceName = sourceName;
   }
 
-  public static BlockDeletingServiceMetrics create() {
-    return create(null);
-  }
-
   public static BlockDeletingServiceMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String sourceName = getSourceName(component);

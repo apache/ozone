@@ -266,10 +266,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numPutBucketTaggingFails;
   private @Metric MutableCounterLong numDeleteBucketTaggingFails;
 
-  public OMMetrics(int maxRatisEvents) {
-    this(maxRatisEvents, null);
-  }
-
   private OMMetrics(int maxRatisEvents, String metricsSourceComponent) {
     dbCheckpointMetrics = DBCheckpointMetrics.create("OM Metrics", metricsSourceComponent);
     this.maxRatisEvents = maxRatisEvents;
