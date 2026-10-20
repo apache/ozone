@@ -22,21 +22,25 @@ import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -49,6 +53,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
@@ -100,6 +107,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for DeletedBlockLog.
@@ -1312,6 +1320,177 @@ public class TestDeletedBlockLog {
         "Hard remove failure: summary must be rolled back to 1");
     assertTrue(statusManager.getTxSizeMap().containsKey(txId),
         "Hard remove failure: txSizeMap entry must be restored for retry");
+  }
+
+  /**
+   * The summary handed to the state manager is the snapshot taken right after the counters were updated.
+   */
+  @Test
+  public void testStateManagerReceivesPostUpdateSummary() throws IOException {
+    long txId = 5L;
+    long containerId = 500L;
+    long blockSize = 4L * 1024 * 1024;
+    long blockCount = 3L;
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
+
+    statusManager.addTransactions(new ArrayList<>(
+        Collections.singletonList(buildTx(txId, containerId, blockSize, blockCount))));
+    ArgumentCaptor<HddsProtos.DeletedBlocksTransactionSummary> addSummary =
+        ArgumentCaptor.forClass(HddsProtos.DeletedBlocksTransactionSummary.class);
+    verify(mockStateManager).addTransactionsToDB(any(ArrayList.class), addSummary.capture());
+    assertEquals(1, addSummary.getValue().getTotalTransactionCount());
+    assertEquals(blockSize * blockCount, addSummary.getValue().getTotalBlockSize());
+    assertEquals(blockSize * blockCount * 3L, addSummary.getValue().getTotalBlockReplicatedSize());
+
+    statusManager.getTxSizeMap().put(txId,
+        new TxBlockInfo(txId, containerId, blockCount, blockSize * blockCount, blockSize * blockCount * 3L));
+    statusManager.removeTransactions(new ArrayList<>(Collections.singletonList(txId)));
+    ArgumentCaptor<HddsProtos.DeletedBlocksTransactionSummary> removeSummary =
+        ArgumentCaptor.forClass(HddsProtos.DeletedBlocksTransactionSummary.class);
+    verify(mockStateManager).removeTransactionsFromDB(any(ArrayList.class), removeSummary.capture());
+    assertEquals(0, removeSummary.getValue().getTotalTransactionCount());
+    assertEquals(0, removeSummary.getValue().getTotalBlockSize());
+  }
+
+  /**
+   * After becoming leader, summary updates are rejected once the reload wait times out, without touching the
+   * counters, txSizeMap or the DB until the summary is reloaded on leader ready. A remove that ran after txSizeMap
+   * was cleared would otherwise delete the row without decrementing the summary.
+   */
+  @Test
+  public void testSummaryUpdateRejectedUntilLeaderReady() throws IOException {
+    long txId = 2L;
+    TxBlockInfo txBlockInfo = new TxBlockInfo(txId, 200L, 2L, 2048L, 6144L);
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
+    statusManager.setSummaryReloadWaitMs(10);
+    statusManager.onBecomeLeader();
+    statusManager.getTxSizeMap().put(txId, txBlockInfo);
+
+    SCMException addException = assertThrows(SCMException.class, () -> statusManager.addTransactions(
+        new ArrayList<>(Collections.singletonList(buildTx(1L, 100L, 1024L, 2L)))));
+    assertEquals(SCMException.ResultCodes.SCM_NOT_LEADER, addException.getResult());
+    SCMException removeException = assertThrows(SCMException.class,
+        () -> statusManager.removeTransactions(new ArrayList<>(Collections.singletonList(txId))));
+    assertEquals(SCMException.ResultCodes.SCM_NOT_LEADER, removeException.getResult());
+    verify(mockStateManager, never()).addTransactionsToDB(any(ArrayList.class), any());
+    verify(mockStateManager, never()).removeTransactionsFromDB(any(ArrayList.class), any());
+    assertSame(txBlockInfo, statusManager.getTxSizeMap().get(txId));
+
+    persistSummary(7);
+    statusManager.onLeaderReady();
+    assertEquals(7, statusManager.getSummary().getTotalTransactionCount());
+    statusManager.removeTransactions(new ArrayList<>(Collections.singletonList(txId)));
+    assertEquals(6, statusManager.getSummary().getTotalTransactionCount());
+    verify(mockStateManager).removeTransactionsFromDB(any(ArrayList.class), any());
+  }
+
+  /**
+   * A summary update that arrives after becoming leader but before leader ready waits for the reload and then
+   * applies its change on top of the reloaded summary.
+   */
+  @Test
+  public void testSummaryUpdateWaitsForLeaderReady() throws Exception {
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
+    statusManager.onBecomeLeader();
+
+    CompletableFuture<Void> add = CompletableFuture.runAsync(() -> {
+      try {
+        statusManager.addTransactions(new ArrayList<>(Collections.singletonList(buildTx(1L, 100L, 1024L, 2L))));
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
+    // The add is waiting for the reload and has not reached the DB yet.
+    assertThrows(TimeoutException.class, () -> add.get(200, TimeUnit.MILLISECONDS));
+    verify(mockStateManager, never()).addTransactionsToDB(any(ArrayList.class), any());
+
+    persistSummary(7);
+    statusManager.onLeaderReady();
+    add.get(10, TimeUnit.SECONDS);
+    ArgumentCaptor<HddsProtos.DeletedBlocksTransactionSummary> addSummary =
+        ArgumentCaptor.forClass(HddsProtos.DeletedBlocksTransactionSummary.class);
+    verify(mockStateManager).addTransactionsToDB(any(ArrayList.class), addSummary.capture());
+    assertEquals(8, addSummary.getValue().getTotalTransactionCount());
+    assertEquals(8, statusManager.getSummary().getTotalTransactionCount());
+  }
+
+  /**
+   * An add that fails after a leader change must not leave its change on top of the summary reloaded on leader
+   * ready: a timed out change is dropped by the reload, and a failed change is not rolled back after the reload.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testFailedAddDuringLeaderChangeKeepsReloadedSummary(boolean ratisTimeout) throws IOException {
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
+    doAnswer(invocation -> {
+      statusManager.onBecomeLeader();
+      if (!ratisTimeout) {
+        persistSummary(9);
+        statusManager.onLeaderReady();
+      }
+      throw ratisTimeout ? ratisTimeout() : hardDbFailure();
+    }).when(mockStateManager).addTransactionsToDB(any(ArrayList.class), any());
+
+    assertThrows(SCMException.class, () -> statusManager.addTransactions(
+        new ArrayList<>(Collections.singletonList(buildTx(1L, 100L, 1024L, 2L)))));
+    if (ratisTimeout) {
+      persistSummary(9);
+      statusManager.onLeaderReady();
+    }
+    assertEquals(9, statusManager.getSummary().getTotalTransactionCount());
+    assertEquals(9, statusManager.getSummary().getTotalBlockCount());
+  }
+
+  /**
+   * Same as above for a remove: a failed remove does not restore its txSizeMap entry or counters over the summary
+   * reloaded on leader ready.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testFailedRemoveDuringLeaderChangeKeepsReloadedSummary(boolean ratisTimeout) throws IOException {
+    long txId = 2L;
+    DeletedBlockLogStateManager mockStateManager = mock(DeletedBlockLogStateManager.class);
+    SCMDeletedBlockTransactionStatusManager statusManager = newStatusManager(mockStateManager);
+    statusManager.getTxSizeMap().put(txId, new TxBlockInfo(txId, 200L, 2L, 2048L, 6144L));
+    doAnswer(invocation -> {
+      statusManager.onBecomeLeader();
+      if (!ratisTimeout) {
+        persistSummary(9);
+        statusManager.onLeaderReady();
+      }
+      throw ratisTimeout ? ratisTimeout() : hardDbFailure();
+    }).when(mockStateManager).removeTransactionsFromDB(any(ArrayList.class), any());
+
+    assertThrows(SCMException.class,
+        () -> statusManager.removeTransactions(new ArrayList<>(Collections.singletonList(txId))));
+    if (ratisTimeout) {
+      persistSummary(9);
+      statusManager.onLeaderReady();
+    }
+    assertEquals(9, statusManager.getSummary().getTotalTransactionCount());
+    assertEquals(9, statusManager.getSummary().getTotalBlockCount());
+    assertFalse(statusManager.getTxSizeMap().containsKey(txId));
+  }
+
+  private SCMDeletedBlockTransactionStatusManager newStatusManager(DeletedBlockLogStateManager stateManager)
+      throws IOException {
+    return new SCMDeletedBlockTransactionStatusManager(stateManager,
+        scm.getScmMetadataStore().getStatefulServiceConfigTable(), containerManager, metrics, Long.MAX_VALUE);
+  }
+
+  private void persistSummary(long txCount) throws IOException {
+    HddsProtos.DeletedBlocksTransactionSummary summary = HddsProtos.DeletedBlocksTransactionSummary.newBuilder()
+        .setTotalTransactionCount(txCount)
+        .setTotalBlockCount(txCount)
+        .setTotalBlockSize(txCount)
+        .setTotalBlockReplicatedSize(txCount * 3)
+        .build();
+    scm.getScmMetadataStore().getStatefulServiceConfigTable()
+        .put(DeletedBlockLogStateManagerImpl.SERVICE_DEFINITION.getServiceName(), summary.toByteString());
   }
 
   private void mockInadequateReplicaUnhealthyContainerInfo(long containerID,

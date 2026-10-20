@@ -219,6 +219,14 @@ public class DeletedBlockLogImpl
   }
 
   /**
+   * Called in SCMStateMachine#notifyLeaderReady after the transaction buffer is flushed, when all transactions
+   * of the previous leader terms are applied.
+   */
+  public void onLeaderReady() {
+    transactionStatusManager.onLeaderReady();
+  }
+
+  /**
    * Called in SCMDBTransactionBuffer#flush when the cached deleting operations
    * are flushed.
    */
