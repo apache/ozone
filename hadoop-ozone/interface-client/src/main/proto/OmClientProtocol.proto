@@ -1430,6 +1430,9 @@ message LookupKeyResponse {
 message GetKeyInfoRequest {
   required KeyArgs keyArgs = 1;
   optional bool assumeS3Context = 2;
+  // Set by file system clients: OM rejects the request with
+  // NOT_SUPPORTED_OPERATION if the resolved bucket layout is OBJECT_STORE.
+  optional bool requireFileSystemLayout = 3;
 }
 
 message GetKeyInfoResponse {

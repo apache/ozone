@@ -327,7 +327,7 @@ public final class BlockUtils {
       File metaDir = new File(containerData.getMetadataPath());
       File dumpDir = DatanodeStoreSchemaThreeImpl.getDumpDir(metaDir);
       try {
-        store.loadKVContainerData(dumpDir);
+        store.loadKVContainerData(dumpDir, containerID);
       } catch (IOException e) {
         // Don't delete unloaded or partially loaded files on failure,
         // but delete all partially loaded metadata.
