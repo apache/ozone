@@ -95,6 +95,17 @@ class TestSnapshotDiffResponse {
   }
 
   @Test
+  void testDoneIncludesDependencyOrderingLineFromReason() {
+    SnapshotDiffResponse ordered = new SnapshotDiffResponse(createReport(), JobStatus.DONE, 0L,
+        "Report is dependency ordered.");
+    assertTrue(ordered.toString().contains("Report is dependency ordered."));
+
+    SnapshotDiffResponse unordered = new SnapshotDiffResponse(createReport(), JobStatus.DONE, 0L,
+        "Report is dependency unordered.");
+    assertTrue(unordered.toString().contains("Report is dependency unordered."));
+  }
+
+  @Test
   void testInProgressWithNullSubStatusOmitsSubStatusAndProgressLines() {
     SnapshotDiffResponse response = new SnapshotDiffResponse(createReport(), JobStatus.IN_PROGRESS, 1000L, true);
     String message = response.toString();

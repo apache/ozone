@@ -163,7 +163,7 @@ class TestMergeJoinSnapDiffWriter {
 
       SnapshotDiffManager manager = mockManagerPassthroughDeletes();
       assertThrows(IOException.class,
-          () -> writeReport(manager, store, BUCKET_OBJECT_ID, false, false));
+          () -> writeReport(manager, store, BUCKET_OBJECT_ID, false, false, null));
     }
   }
 
@@ -207,7 +207,7 @@ class TestMergeJoinSnapDiffWriter {
       }).when(store).multiGetFromEdgeValues(any());
 
       long reportIndex = writeReport(mockManagerWithRealDeleteRetention(), store,
-          BUCKET_OBJECT_ID, true, false).getKey();
+          BUCKET_OBJECT_ID, true, false, null).getKey();
 
       assertEquals(2, multiGetCalls.get());
       assertEquals(1001, reportIndex);
@@ -286,7 +286,7 @@ class TestMergeJoinSnapDiffWriter {
       }).when(store).multiGetDependencyReportEntries(any());
 
       writeReport(mockManagerPassthroughDeletes(), store,
-          BUCKET_OBJECT_ID, true, true);
+          BUCKET_OBJECT_ID, true, true, null);
 
       assertEquals(2, batchLookups.get());
     }
@@ -303,7 +303,7 @@ class TestMergeJoinSnapDiffWriter {
       store.flushWrites();
 
       writeReport(mockManagerPassthroughDeletes(), store,
-          BUCKET_OBJECT_ID, true, true);
+          BUCKET_OBJECT_ID, true, true, null);
 
       List<DiffReportEntry> entries = store.readReportEntriesForTest();
       assertEquals(2, entries.size());
@@ -319,7 +319,7 @@ class TestMergeJoinSnapDiffWriter {
 
   private static List<DiffReportEntry> runWriteReportWithManager(SnapDiffJobStore store,
       long bucketObjectId, boolean fso, SnapshotDiffManager manager, boolean ordering) throws IOException {
-    writeReport(manager, store, bucketObjectId, fso, ordering);
+    writeReport(manager, store, bucketObjectId, fso, ordering, null);
     return store.readReportEntriesForTest();
   }
 
