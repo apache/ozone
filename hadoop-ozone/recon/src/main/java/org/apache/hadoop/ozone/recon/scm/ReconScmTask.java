@@ -104,6 +104,10 @@ public abstract class ReconScmTask {
     } catch (Exception e) {
       LOG.error("Failed to run task {}.", getTaskName(), e);
       taskStatusUpdater.setLastTaskRunStatus(-1);
+    } catch (Error e) {
+      LOG.error("Task {} failed with an unrecoverable error.", getTaskName(), e);
+      taskStatusUpdater.setLastTaskRunStatus(-1);
+      throw e;
     } finally {
       taskStatusUpdater.recordRunCompletion();
     }

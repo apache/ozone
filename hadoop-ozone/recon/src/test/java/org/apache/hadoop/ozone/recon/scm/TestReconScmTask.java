@@ -163,6 +163,23 @@ class TestReconScmTask {
   }
 
   @Test
+  void testErrorPropagatesAndCompletesFailedRunOnce() throws Exception {
+    AssertionError error = new AssertionError("Task failed with an error");
+    doThrow(error).when(task).runTask();
+
+    assertSame(error, assertThrows(AssertionError.class, task::initializeAndRunTask));
+
+    InOrder order = inOrder(updater, task);
+    order.verify(updater).recordRunStart();
+    order.verify(updater).setLastTaskRunStatus(0);
+    order.verify(task).runTask();
+    order.verify(updater).setLastTaskRunStatus(-1);
+    order.verify(updater).recordRunCompletion();
+    verify(updater).recordRunCompletion();
+    verify(task).runTask();
+  }
+
+  @Test
   void testInterruptionPropagatesAndCompletesRun() throws Exception {
     InterruptedException interruption = new InterruptedException("Stopping task");
     doThrow(interruption).when(task).runTask();
