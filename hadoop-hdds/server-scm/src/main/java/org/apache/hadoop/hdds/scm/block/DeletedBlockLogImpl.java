@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.time.Duration;
@@ -94,6 +96,10 @@ public class DeletedBlockLogImpl
   private long lastProcessedTransactionId = -1;
   private final int logAppenderQueueByteLimit;
   private int deletionFactorPerDatanode;
+  // Bounded cache of recently persisted deleted blocks, keyed by the globally
+  // unique block localID. Used to skip re-persisting duplicate delete block
+  // transactions when OM retries the same blocks. Null when disabled.
+  private final Cache<Long, Boolean> recentlyDeletedBlocks;
 
   public DeletedBlockLogImpl(ConfigurationSource conf,
       StorageContainerManager scm,
@@ -127,6 +133,12 @@ public class DeletedBlockLogImpl
         OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR_DEFAULT);
     this.deletionFactorPerDatanode = deletionFactor <= 0 ? 1 : deletionFactor;
 
+    int duplicateCacheSize = conf.getInt(
+        ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_DUPLICATE_CACHE_SIZE,
+        ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_DUPLICATE_CACHE_SIZE_DEFAULT);
+    this.recentlyDeletedBlocks = duplicateCacheSize > 0
+        ? CacheBuilder.newBuilder().maximumSize(duplicateCacheSize).build()
+        : null;
   }
 
   @VisibleForTesting
@@ -245,29 +257,74 @@ public class DeletedBlockLogImpl
     lock.lock();
     try {
       ArrayList<DeletedBlocksTransaction> txsToBeAdded = new ArrayList<>();
+      List<Long> blocksToBeCached = new ArrayList<>();
       long currentBatchSizeBytes = 0;
       for (Map.Entry<Long, List<DeletedBlock>> entry :
           containerBlocksMap.entrySet()) {
+        List<DeletedBlock> newBlocks = filterDuplicateBlocks(entry.getValue());
+        if (newBlocks.isEmpty()) {
+          continue;
+        }
         long nextTXID = sequenceIdGen.getNextId(SequenceIdType.delTxnId);
         DeletedBlocksTransaction tx = constructNewTransaction(nextTXID,
-            entry.getKey(), entry.getValue());
+            entry.getKey(), newBlocks);
         txsToBeAdded.add(tx);
+        newBlocks.forEach(b -> blocksToBeCached.add(b.getBlockID().getLocalID()));
         long txSize = tx.getSerializedSize();
         currentBatchSizeBytes += txSize;
 
         if (currentBatchSizeBytes >= logAppenderQueueByteLimit) {
           transactionStatusManager.addTransactions(txsToBeAdded);
           metrics.incrBlockDeletionTransactionCreated(txsToBeAdded.size());
+          cacheDeletedBlocks(blocksToBeCached);
           txsToBeAdded.clear();
+          blocksToBeCached.clear();
           currentBatchSizeBytes = 0;
         }
       }
       if (!txsToBeAdded.isEmpty()) {
         transactionStatusManager.addTransactions(txsToBeAdded);
         metrics.incrBlockDeletionTransactionCreated(txsToBeAdded.size());
+        cacheDeletedBlocks(blocksToBeCached);
       }
     } finally {
       lock.unlock();
+    }
+  }
+
+  /**
+   * Drops blocks that already have a recently persisted delete transaction so
+   * that retries from OM do not create duplicate transactions in SCM DB.
+   */
+  private List<DeletedBlock> filterDuplicateBlocks(List<DeletedBlock> blocks) {
+    if (recentlyDeletedBlocks == null) {
+      return blocks;
+    }
+    List<DeletedBlock> newBlocks = new ArrayList<>(blocks.size());
+    long duplicates = 0;
+    for (DeletedBlock block : blocks) {
+      if (recentlyDeletedBlocks.getIfPresent(block.getBlockID().getLocalID()) != null) {
+        duplicates++;
+      } else {
+        newBlocks.add(block);
+      }
+    }
+    if (duplicates > 0) {
+      metrics.incrDuplicateDeleteBlocksSkipped(duplicates);
+    }
+    return newBlocks;
+  }
+
+  /**
+   * Records blocks in the cache only after their transaction has been persisted,
+   * so a failed write cannot cause a real block to be skipped later.
+   */
+  private void cacheDeletedBlocks(List<Long> localIDs) {
+    if (recentlyDeletedBlocks == null) {
+      return;
+    }
+    for (Long localID : localIDs) {
+      recentlyDeletedBlocks.put(localID, Boolean.TRUE);
     }
   }
 

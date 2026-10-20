@@ -88,6 +88,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
   @Metric(about = "The number of created txs which are added into DB.")
   private MutableCounterLong numBlockDeletionTransactionCreated;
 
+  @Metric(about = "The number of duplicate delete blocks skipped before "
+      + "persisting a transaction.")
+  private MutableCounterLong numDuplicateDeleteBlocksSkipped;
+
   @Metric(about = "The number of skipped transactions")
   private MutableCounterLong numSkippedTransactions;
 
@@ -174,6 +178,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     this.numBlockDeletionTransactionCreated.incr(count);
   }
 
+  public void incrDuplicateDeleteBlocksSkipped(long count) {
+    this.numDuplicateDeleteBlocksSkipped.incr(count);
+  }
+
   public void incrSkippedTransaction() {
     this.numSkippedTransactions.incr();
   }
@@ -247,6 +255,10 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     return numBlockDeletionTransactionCreated.value();
   }
 
+  public long getNumDuplicateDeleteBlocksSkipped() {
+    return numDuplicateDeleteBlocksSkipped.value();
+  }
+
   public long getNumSkippedTransactions() {
     return numSkippedTransactions.value();
   }
@@ -270,6 +282,7 @@ public final class ScmBlockDeletingServiceMetrics implements MetricsSource {
     numBlockDeletionTransactionFailureOnDatanodes.snapshot(builder, all);
     numBlockDeletionTransactionCompleted.snapshot(builder, all);
     numBlockDeletionTransactionCreated.snapshot(builder, all);
+    numDuplicateDeleteBlocksSkipped.snapshot(builder, all);
     numSkippedTransactions.snapshot(builder, all);
     numProcessedTransactions.snapshot(builder, all);
     numBlockDeletionTransactionDataNodes.snapshot(builder, all);
