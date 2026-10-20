@@ -172,7 +172,8 @@
     <value>10</value>
     <tag>OZONE, SCM, CONTAINER</tag>
     <description>The max number of outstanding full container report leases
-      SCM can grant to datanodes.</description>
+      SCM can grant to datanodes. Full container report rate limiting requires
+      HDDS finalization on SCM and datanodes.</description>
   </property>
   <property>
     <name>ozone.scm.full.container.report.lease.duration</name>

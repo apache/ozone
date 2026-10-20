@@ -28,6 +28,8 @@ import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZ
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.apache.ozone.test.HddsWhiteboxTestUtils.setInternalState;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -71,6 +73,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -112,6 +115,7 @@ import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.IncrementalContainerReportFromDatanode;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseMetrics;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventExecutor;
@@ -125,6 +129,7 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
+import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -142,6 +147,7 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
@@ -681,6 +687,37 @@ public class TestStorageContainerManager {
       assertThat(datanodeInfo.getLastHeartbeatTime()).isPositive();
       assertEquals(datanodeInfo.getID().toString(), datanodeInfo.getNetworkName());
       assertEquals("/rack1", datanodeInfo.getNetworkLocation());
+    }
+  }
+
+  @Test
+  void testFullContainerReportLeaseActivationAfterFinalization() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(SCMStorageConfig.TESTING_INIT_APPARENT_VERSION_KEY,
+        HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT.serialize());
+    conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 200, TimeUnit.MILLISECONDS);
+    conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1)
+        .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
+            .setApparentVersion(HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT).build()).build()) {
+      cluster.waitForClusterToBeReady();
+      StorageContainerManager scm = cluster.getStorageContainerManager();
+      DatanodeStateMachine datanode = cluster.getHddsDatanodes().get(0).getDatanodeStateMachine();
+      EndpointStateMachine endpoint = datanode.getConnectionManager().getValues().stream()
+          .filter(peer -> !peer.isPassive()).findFirst().orElseThrow(AssertionError::new);
+      VersionResponse capability = endpoint.getVersion();
+      String metricsSource = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+      assertTrue(endpoint.supportsFullContainerReportLease());
+      assertFalse(datanode.getContext().isFullContainerReportLeaseEnabled(endpoint));
+      assertEquals(0, getLongCounter("NumFCRLeaseRequests", getMetrics(metricsSource)));
+
+      scm.getFinalizationManager().finalizeUpgrade();
+
+      GenericTestUtils.waitFor(() -> datanode.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)
+          && getLongCounter("NumFCRReportsProcessedWithLease", getMetrics(metricsSource)) > 0, 100, 30_000);
+      assertTrue(datanode.getContext().isFullContainerReportLeaseEnabled(endpoint));
+      assertThat(endpoint.getVersion()).isSameAs(capability);
+      assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, endpoint.getState());
     }
   }
 

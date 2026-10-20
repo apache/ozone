@@ -2133,6 +2133,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @return The {@link ScmVersionManager} which can be used to check this SCM's local apparent and software versions.
    *  To finalize all SCM's via Ratis, use {@link FinalizationManager} instead.
    */
+  @Override
   public ScmVersionManager getVersionManager() {
     return versionManager;
   }

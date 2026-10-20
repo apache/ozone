@@ -105,8 +105,7 @@ public final class RegisterEndpointTask implements
             .setSoftwareVersion(
                 versionManager.getSoftwareVersion().serialize())
             .build();
-        boolean supportsFCRLease =
-            rpcEndPoint.supportsFullContainerReportLease();
+        boolean supportsFCRLease = stateContext.isFullContainerReportLeaseEnabled(rpcEndPoint);
         ContainerReportsProto containerReport = supportsFCRLease
             ? ContainerReportsProto.newBuilder()
                 .setFullContainerReportDeferred(true)

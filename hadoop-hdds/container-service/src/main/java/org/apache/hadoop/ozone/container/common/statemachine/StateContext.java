@@ -58,6 +58,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus.Status;
@@ -407,7 +408,15 @@ public class StateContext {
   }
 
   /**
-   * Gets a periodic snapshot, preserving ICRs for endpoints that must wait for an FCR lease.
+   * Checks the current apparent version so finalization activates leases without refreshing endpoint capabilities.
+   */
+  public boolean isFullContainerReportLeaseEnabled(EndpointStateMachine endpoint) {
+    return endpoint.supportsFullContainerReportLease()
+        && parentDatanodeStateMachine.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE);
+  }
+
+  /**
+   * Gets a periodic snapshot, preserving ICRs for endpoints that generate their FCR when sending.
    */
   public ContainerReportsProto getFullContainerReport() throws IOException {
     Set<HostAndPort> leasedEndpoints = parentDatanodeStateMachine.getConnectionManager().getValues().stream()

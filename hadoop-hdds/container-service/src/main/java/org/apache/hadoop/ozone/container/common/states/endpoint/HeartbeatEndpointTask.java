@@ -181,8 +181,7 @@ public class HeartbeatEndpointTask
       Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
       putBackIncrementalReports(requestBuilder);
-      if (requestBuilder.hasContainerReport()
-          && requestBuilder.getContainerReport().hasFullContainerReportLease()) {
+      if (requestBuilder.hasContainerReport() && rpcEndpoint.supportsFullContainerReportLease()) {
         context.putBackFullContainerReport(rpcEndpoint.getAddress());
       }
       rpcEndpoint.logIfNeeded(ex);
@@ -235,18 +234,20 @@ public class HeartbeatEndpointTask
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
     boolean fcrReady = context.isFullContainerReportReady(
         rpcEndpoint.getAddress());
+    // Keep FCR snapshots and ICR collection independent of finalization.
     boolean supportsFCRLease = rpcEndpoint.supportsFullContainerReportLease();
+    boolean useFCRLease = context.isFullContainerReportLeaseEnabled(rpcEndpoint);
     boolean hasFCRLease = rpcEndpoint.hasFullContainerReportLease();
     if (supportsFCRLease && fcrReady) {
-      if (hasFCRLease) {
+      if (!useFCRLease || hasFCRLease) {
         try {
           ContainerReportsProto report = context.getFullContainerReportDiscardPendingICR(rpcEndpoint.getAddress());
           if (report != null) {
-            FullContainerReportLeaseProto lease =
-                rpcEndpoint.takeFullContainerReportLease();
-            requestBuilder.setContainerReport(report.toBuilder()
-                .setFullContainerReportLease(lease)
-                .build());
+            if (useFCRLease) {
+              FullContainerReportLeaseProto lease = rpcEndpoint.takeFullContainerReportLease();
+              report = report.toBuilder().setFullContainerReportLease(lease).build();
+            }
+            requestBuilder.setContainerReport(report);
           }
         } catch (IOException | RuntimeException ex) {
           LOG.warn("Failed to generate full container report for {}. Continuing heartbeat.",

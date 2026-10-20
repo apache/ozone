@@ -98,6 +98,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -493,9 +495,9 @@ public class TestEndPoint {
     }
   }
 
-  @Test
-  public void testRegisterTaskDefersFCRWhenSCMSupportsFCRLease()
-      throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testRegisterTaskDefersFCRWhenSCMSupportsFCRLease(boolean finalized) throws Exception {
     OzoneConfiguration conf = SCMTestUtils.getConf(tempDir);
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
@@ -515,16 +517,20 @@ public class TestEndPoint {
         .createNodeReport(Arrays.asList(getStorageReports(datanodeID)),
             Arrays.asList(getMetadataStorageReports(datanodeID))));
     ContainerController controller = mock(ContainerController.class);
-    when(controller.getContainerReport()).thenThrow(new IOException("snapshot unavailable"));
+    if (finalized) {
+      when(controller.getContainerReport()).thenThrow(new IOException("snapshot unavailable"));
+    } else {
+      when(controller.getContainerReport()).thenReturn(HddsTestUtils.getRandomContainerReports(1));
+    }
     when(ozoneContainer.getController()).thenReturn(controller);
     when(ozoneContainer.getPipelineReport()).thenReturn(
         HddsTestUtils.getRandomPipelineReports());
-    HDDSLayoutVersionManager versionManager =
-        mock(HDDSLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    when(versionManager.getSoftwareLayoutVersion())
-        .thenReturn(maxLayoutVersion());
+    DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
+    HDDSVersion apparentVersion = finalized ? HDDSVersion.SOFTWARE_VERSION : HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT;
+    when(versionManager.getApparentVersion()).thenReturn(apparentVersion);
+    when(versionManager.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getVersionForClient()).thenReturn(apparentVersion);
+    when(versionManager.isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)).thenReturn(finalized);
 
     try (EndpointStateMachine rpcEndpoint = new EndpointStateMachine(
         new HostAndPort(serverAddress.getHostName(), serverAddress.getPort()),
@@ -554,13 +560,18 @@ public class TestEndPoint {
 
       endpointTask.call();
       assertEquals(EndpointStateMachine.EndPointStates.HEARTBEAT, rpcEndpoint.getState());
-      assertTrue(context.isFullContainerReportReady(rpcEndpoint.getAddress()));
+      assertEquals(finalized, context.isFullContainerReportReady(rpcEndpoint.getAddress()));
       assertFalse(context.isFullContainerReportReady(otherScm));
-      verify(controller, never()).getContainerReport();
+      if (finalized) {
+        verify(controller, never()).getContainerReport();
+      } else {
+        verify(controller).getContainerReport();
+      }
+      verify(scm, never()).sendHeartbeat(any());
     }
 
-    assertTrue(containerReport.getValue().getFullContainerReportDeferred());
-    assertEquals(0, containerReport.getValue().getReportsCount());
+    assertEquals(finalized, containerReport.getValue().getFullContainerReportDeferred());
+    assertEquals(finalized ? 0 : 1, containerReport.getValue().getReportsCount());
   }
 
   @Test

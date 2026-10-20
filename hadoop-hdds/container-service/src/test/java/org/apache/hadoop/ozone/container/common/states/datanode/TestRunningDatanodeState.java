@@ -132,7 +132,12 @@ public class TestRunningDatanodeState {
     ContainerSet containers = mock(ContainerSet.class);
     when(datanode.getContainer()).thenReturn(container);
     when(datanode.getDatanodeDetails()).thenReturn(MockDatanodeDetails.randomDatanodeDetails());
-    when(datanode.getLayoutVersionManager()).thenReturn(mock(HDDSLayoutVersionManager.class));
+    DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
+    when(versionManager.getApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getVersionForClient()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)).thenReturn(true);
+    when(datanode.getVersionManager()).thenReturn(versionManager);
     when(datanode.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
     when(container.getContainerSet()).thenReturn(containers);
     when(container.getPipelineReport()).thenReturn(PipelineReportsProto.getDefaultInstance());

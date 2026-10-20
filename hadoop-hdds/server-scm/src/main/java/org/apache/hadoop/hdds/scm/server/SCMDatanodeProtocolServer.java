@@ -59,6 +59,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -253,6 +254,11 @@ public class SCMDatanodeProtocolServer implements
 
     // Read before the decision, so that a rejection made before this SCM became the ready leader is not final.
     final boolean leaderReady = scmContext == null || scmContext.isLeaderReady();
+    if (containerReportsProto.getFullContainerReportDeferred()
+        && !scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)) {
+      throw new IOException("Full container report leases must be finalized before deferring registration reports.");
+    }
+
     // TODO : Return the list of Nodes that forms the SCM HA.
     RegisteredCommand registeredCommand = scm.getScmNodeManager()
         .register(datanodeDetails, nodeReport, pipelineReportsProto,
@@ -451,7 +457,7 @@ public class SCMDatanodeProtocolServer implements
   }
 
   private OptionalLong getFCRLeaseTerm() {
-    if (scmContext == null) {
+    if (scmContext == null || !scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)) {
       return OptionalLong.empty();
     }
 
