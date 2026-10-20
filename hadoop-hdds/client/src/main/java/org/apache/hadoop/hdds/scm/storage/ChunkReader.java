@@ -56,6 +56,18 @@ final class ChunkReader {
     final long adjustedOffset;
     final long adjustedLen;
     if (verifyChecksum) {
+      /*
+       * bytesPerChecksum = 20, chunkRelativePosition = 53, toRead = 15, length = 75
+       *
+       * 40           53     60      68     75   80
+       * +-------------------+--------------+----+
+       * |            [ toRead = 15  )      |////|
+       * +-------------------+--------------+----+
+       * |<--------adjustedLen = 35-------->|
+       * ^                                  ^    ^
+       * adjustedOffset                     |    endIndex
+       *                                    min(endIndex, length)
+       */
       int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
       adjustedOffset = (chunkRelativePosition / bytesPerChecksum) * bytesPerChecksum;
       long endIndex = ((chunkRelativePosition + toRead - 1) / bytesPerChecksum + 1) * bytesPerChecksum;
