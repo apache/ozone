@@ -122,7 +122,7 @@ class TestFullDiffSequentialReader {
     putKey(fromTable, "k5", keyInfo("unchanged", 5L, 0L, 10L, 100L));
 
     try (SnapDiffJobStore store = newStore(false)) {
-      new FullDiffSequentialReader(store, gate).scanFileTables(fromTable, toTable, null);
+      scanFileTables(new FullDiffSequentialReader(store, gate), fromTable, toTable, null);
 
       assertTrue(isNewListCandidate(store, 1L));
       assertTrue(isNewListCandidate(store, 2L));
@@ -163,7 +163,7 @@ class TestFullDiffSequentialReader {
     putKey(fromTable, "k1", keyInfo("a", 1L, 0L, 5L, 100L));
 
     try (SnapDiffJobStore store = newStore(false)) {
-      new FullDiffSequentialReader(store).scanFileTables(fromTable, toTable, null);
+      scanFileTables(new FullDiffSequentialReader(store), fromTable, toTable, null);
       assertTrue(isNewListCandidate(store, 1L));
       assertTrue(isNewListCandidate(store, 2L));
       assertNotNull(store.getOldList(1L));
@@ -181,7 +181,7 @@ class TestFullDiffSequentialReader {
     putKey(fromTable, "k4", keyInfo("deleted", 4L, 0L, 10L, 100L));
 
     try (SnapDiffJobStore store = newStore(false)) {
-      new FullDiffSequentialReader(store, gate).scanFileTables(fromTable, toTable, null);
+      scanFileTables(new FullDiffSequentialReader(store, gate), fromTable, toTable, null);
 
       EntryValue deleted = EntryValue.fromBytes(store.getOldList(4L));
       assertEquals(0, deleted.getSignature().length);
@@ -201,7 +201,7 @@ class TestFullDiffSequentialReader {
     putKey(fromTable, "k11", keyInfo("default-id", 11L, 0L, DEFAULT_OM_UPDATE_ID, 100L));
 
     try (SnapDiffJobStore store = newStore(false)) {
-      new FullDiffSequentialReader(store, gate).scanFileTables(fromTable, toTable, null);
+      scanFileTables(new FullDiffSequentialReader(store, gate), fromTable, toTable, null);
 
       assertTrue(isNewListCandidate(store, 10L));
       assertTrue(isNewListCandidate(store, 11L));
@@ -235,7 +235,7 @@ class TestFullDiffSequentialReader {
         return invocation.callRealMethod();
       }).when(store).clearDiffCandidates();
 
-      new FullDiffSequentialReader(store, 50L).scanFileTables(fromTable, toTable, null);
+      scanFileTables(new FullDiffSequentialReader(store, 50L), fromTable, toTable, null);
       verify(store, times(1)).spillDiffCandidates();
     }
   }
@@ -252,7 +252,7 @@ class TestFullDiffSequentialReader {
     putKey(fromTable, "/other/out", keyInfo("out-bucket", 2L, 0L, 10L, 100L));
 
     try (SnapDiffJobStore store = newStore(false)) {
-      new FullDiffSequentialReader(store).scanFileTables(fromTable, toTable, bucketPrefix);
+      scanFileTables(new FullDiffSequentialReader(store), fromTable, toTable, bucketPrefix);
 
       assertTrue(isNewListCandidate(store, 1L));
       assertFalse(hasNewListEntry(store, 2L));
@@ -275,7 +275,7 @@ class TestFullDiffSequentialReader {
 
     SnapDiffJobStore store = spy(newStore(true));
     try (SnapDiffJobStore ignored = store) {
-      new FullDiffSequentialReader(store, 50L).scanDirectoryTables(fromTable, toTable, null);
+      scanDirectoryTables(new FullDiffSequentialReader(store, 50L), fromTable, toTable, null);
       store.flushWrites();
 
       verify(store).putToEdge(BUCKET_OBJECT_ID, 100L, nameBytes("parent"));
@@ -285,6 +285,24 @@ class TestFullDiffSequentialReader {
       verify(store).putFromEdge(100L, 101L, nameBytes("left"));
       verify(store).putFromEdge(100L, 102L, nameBytes("right"));
     }
+  }
+
+  private static void scanFileTables(FullDiffSequentialReader reader,
+      Table<byte[], byte[]> fromTable, Table<byte[], byte[]> toTable, byte[] keyPrefix)
+      throws IOException, RocksDatabaseException {
+    reader.scanFileTables(fromTable, toTable, keyPrefix, null,
+        estimatedKeys(toTable), estimatedKeys(fromTable));
+  }
+
+  private static void scanDirectoryTables(FullDiffSequentialReader reader,
+      Table<byte[], byte[]> fromTable, Table<byte[], byte[]> toTable, byte[] keyPrefix)
+      throws IOException, RocksDatabaseException {
+    reader.scanDirectoryTables(fromTable, toTable, keyPrefix, null,
+        estimatedKeys(toTable), estimatedKeys(fromTable));
+  }
+
+  private static long estimatedKeys(Table<byte[], byte[]> table) throws RocksDatabaseException {
+    return Math.max(1L, table.getEstimatedKeyCount());
   }
 
   private static byte[] nameBytes(String name) {
