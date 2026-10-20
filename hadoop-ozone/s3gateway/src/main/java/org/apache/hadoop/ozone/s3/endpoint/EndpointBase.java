@@ -32,6 +32,8 @@ import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BU
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_CLIENT_BUFFER_SIZE_KEY;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_OWNED_BY_YOU;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
@@ -41,6 +43,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.NULL_VERSION_ID;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RESERVED_USER_METADATA_KEY_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
@@ -94,6 +97,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -110,6 +114,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
@@ -123,6 +128,7 @@ import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.s3.signature.ChunksValidator;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
+import org.apache.hadoop.ozone.s3.util.ReadConsistencyContext;
 import org.apache.hadoop.ozone.s3.util.S3GActionIamMapper;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -260,6 +266,7 @@ public abstract class EndpointBase {
     ClientProtocol clientProtocol =
         getClient().getObjectStore().getClientProxy();
     clientProtocol.setThreadLocalS3Auth(s3Auth);
+    setReadConsistencyFromHeader(clientProtocol);
 
     bufferSize = (int) getOzoneConfiguration().getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
@@ -284,6 +291,27 @@ public abstract class EndpointBase {
 
   protected void init() {
     // hook method
+  }
+
+  private void setReadConsistencyFromHeader(ClientProtocol clientProtocol) {
+    ReadConsistencyContext readConsistencyContext =
+        ReadConsistencyContext.fromHeaders(getHeaders());
+    ReadConsistency readConsistency = readConsistencyContext.getReadConsistency();
+    if (OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())) {
+      // S3 credential validation currently requires the OM leader so that
+      // revoked credentials are never accepted by a stale follower.
+      clientProtocol.setThreadLocalReadConsistency(
+          ReadConsistency.LINEARIZABLE_LEADER_ONLY);
+      return;
+    }
+    if (readConsistency == null) {
+      clientProtocol.clearThreadLocalReadConsistency();
+    } else if (readConsistency == ReadConsistency.LOCAL_LEASE) {
+      clientProtocol.setThreadLocalReadConsistency(readConsistency,
+          readConsistencyContext.getLocalLeaseLogLimit(), null);
+    } else {
+      clientProtocol.setThreadLocalReadConsistency(readConsistency);
+    }
   }
 
   /**
@@ -692,6 +720,7 @@ public abstract class EndpointBase {
     }
     target.queryParams = queryParams;
     target.s3Auth = s3Auth;
+    target.s3StsEnabled = s3StsEnabled;
     target.setClient(this.client);
     target.setOzoneConfiguration(this.ozoneConfiguration);
     target.setContext(this.context);
@@ -766,6 +795,21 @@ public abstract class EndpointBase {
   }
 
   /**
+   * Versioning is not implemented, so each object only has the null version, i.e. the current object.
+   *
+   * @return true if {@code versionId} refers to any other version
+   * @throws OS3Exception InvalidArgument if {@code versionId} is empty, same as AWS S3
+   */
+  static boolean isUnsupportedVersionId(@Nullable String versionId) {
+    if (versionId != null && versionId.isEmpty()) {
+      OS3Exception ex = newError(INVALID_ARGUMENT, versionId);
+      ex.setErrorMessage("Version id cannot be the empty string");
+      throw ex;
+    }
+    return versionId != null && !NULL_VERSION_ID.equals(versionId);
+  }
+
+  /**
    * Rejects the request with {@code NotImplemented} if it has any of the {@code subresources}.
    *
    * @return null if the request has none of the {@code subresources}
@@ -795,9 +839,12 @@ public abstract class EndpointBase {
 
     ReplicationConfig clientConfiguredReplicationConfig =
         OzoneClientUtils.getClientConfiguredReplicationConfig(getOzoneConfiguration());
+    boolean standardUsesClientDefault = getOzoneConfiguration().getBoolean(
+        OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_KEY,
+        OZONE_S3G_STANDARD_STORAGE_CLASS_USE_CLIENT_DEFAULT_DEFAULT);
 
     return S3Utils.resolveS3ClientSideReplicationConfig(storageType, storageConfig,
-        clientConfiguredReplicationConfig, ozoneBucket.getReplicationConfig());
+        clientConfiguredReplicationConfig, ozoneBucket.getReplicationConfig(), standardUsesClientDefault);
   }
 
   /**
@@ -878,6 +925,12 @@ public abstract class EndpointBase {
     boolean verifyChunkSignature = signatureInfo.isSignPayload()
         && (STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header)
         || STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header));
+    if (verifyChunkSignature && OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())
+        && !OzoneManagerVersion.S3_DERIVED_KEY.isSupportedBy(getClientProtocol().getOmVersion())) {
+      OS3Exception ex = newError(S3ErrorTable.NOT_IMPLEMENTED, keyPath);
+      ex.setErrorMessage("The connected Ozone Manager does not support signed chunk verification.");
+      throw ex;
+    }
     return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength, verifyChunkSignature);
   }
 
@@ -886,7 +939,7 @@ public abstract class EndpointBase {
    * the signing key OM derived (HDDS-15140). Called after the key is opened
    * (when the derived key is available) and before the payload is read.
    *
-   * <p>In secure mode OM always returns the derived key for a signed upload, so
+   * <p>In secure mode a supporting OM returns the derived key for a signed upload, so
    * a missing key is treated as a server-side anomaly and the request is
    * rejected rather than stored unverified. In non-secure mode there is no
    * secret to verify against, so verification is skipped.

@@ -17,6 +17,29 @@ on:
   pull_request:
     types: [opened, ready_for_review, synchronize]
   push:
+    paths-ignore:
+      # ignore files/dirs irrelevant for CI
+      - '.asf.yaml'
+      - '.devcontainer/**'
+      - '.editorconfig'
+      - '.gitattributes'
+      - '.gitignore'
+      - '.idea/**'
+      - '.run/**'
+      - '**.md'
+      - '**.txt'
+      - '!**/CMakeLists.txt'
+      - '!**/src/main/resources/**'
+      - '!**/src/test/resources/**'
+      - '!dev-support/rat/rat-exclusions.txt'
+      - '!hadoop-ozone/dist/src/main/license/jar-report.txt'
+      # ignore .github except this workflow and the ones used transitively
+      - '.github/**'
+      - '!.github/workflows/check.yml'
+      - '!.github/workflows/ci.yml'
+      - '!.github/workflows/post-commit.yml'
+      - '!.github/workflows/generate-config-doc.yml'
+      - '!.github/workflows/update-ozone-site-config-doc.yml'
 concurrency:
   group: ci-${{ github.event.pull_request.number || case(github.repository == 'apache/ozone', github.sha, github.ref_name) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' || github.repository != 'apache/ozone' }}
@@ -29,6 +52,6 @@ jobs:
       || (github.repository != 'apache/ozone' && github.ref_name != 'master')
     uses: $/.github/workflows/ci.yml
     secrets:
-      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
       OZONE_WEBSITE_BUILD: ${{ secrets.OZONE_WEBSITE_BUILD }}
       SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}

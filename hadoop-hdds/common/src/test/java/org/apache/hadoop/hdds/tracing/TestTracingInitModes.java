@@ -28,6 +28,8 @@ import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
+import io.opentelemetry.sdk.trace.export.SpanExporter;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.junit.jupiter.api.AfterEach;
@@ -54,10 +56,24 @@ public class TestTracingInitModes {
   }
 
   /**
+   * Builds a recording tracer provider that exports nothing, so tests stay offline.
+   * A span processor is required: without one, the SDK hands out noop tracers.
+   * Fails fast if the provider cannot create valid spans, so the negative assertions below cannot pass vacuously.
+   */
+  private static SdkTracerProvider noExportTracerProvider() {
+    SdkTracerProvider provider =
+        SdkTracerProvider.builder().addSpanProcessor(SimpleSpanProcessor.create(SpanExporter.noop())).build();
+    Span probe = provider.get("probe").spanBuilder("probe").startSpan();
+    probe.end();
+    assertTrue(probe.getSpanContext().isValid(), "Test tracer provider must create valid spans");
+    return provider;
+  }
+
+  /**
    * Puts a real GlobalOpenTelemetry in place with no exporter, so tests stay offline.
    */
   private static void installNoExportGlobalOpenTelemetry() {
-    SdkTracerProvider provider = SdkTracerProvider.builder().build();
+    SdkTracerProvider provider = noExportTracerProvider();
     OpenTelemetrySdk sdk = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(sdk);
   }
@@ -103,7 +119,7 @@ public class TestTracingInitModes {
   /** app-aware + W3C parent on the wire: child span is created. */
   @Test
   public void testApplicationAwareExtendsExtractedContext() {
-    SdkTracerProvider provider = SdkTracerProvider.builder().build();
+    SdkTracerProvider provider = noExportTracerProvider();
     OpenTelemetrySdk external = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
 
     Span external1 = external.getTracer("external").spanBuilder("external-root").startSpan();
@@ -135,7 +151,7 @@ public class TestTracingInitModes {
   /** app-aware + GlobalOpenTelemetry set: still no root span without a parent. */
   @Test
   public void testApplicationAwareAdoptsGlobalTracer() {
-    SdkTracerProvider provider = SdkTracerProvider.builder().build();
+    SdkTracerProvider provider = noExportTracerProvider();
     OpenTelemetrySdk appGlobal = OpenTelemetrySdk.builder().setTracerProvider(provider).build();
     GlobalOpenTelemetry.set(appGlobal);
 

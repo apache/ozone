@@ -83,6 +83,15 @@ public final class S3Consts {
   public static final String RESERVED_USER_METADATA_KEY_PREFIX = "ozone-s3-internal-";
   public static final String CUSTOM_METADATA_COPY_DIRECTIVE_HEADER = "x-amz-metadata-directive";
   public static final String STORAGE_CONFIG_HEADER = "storage-config";
+  public static final String READ_CONSISTENCY_HEADER =
+      "x-ozone-read-consistency";
+  public static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
+      "x-ozone-local-lease-log-limit";
+  public static final String READ_CONSISTENCY_FOLLOWER_STALE =
+      "follower-stale";
+  public static final String READ_CONSISTENCY_FOLLOWER_LINEARIZABLE =
+      "follower-linearizable";
+  public static final String READ_CONSISTENCY_LEADER_ONLY = "leader-only";
 
   public static final String DECODED_CONTENT_LENGTH_HEADER =
       "x-amz-decoded-content-length";
@@ -104,6 +113,9 @@ public final class S3Consts {
 
   /** AWS S3 maximum number of keys per DeleteObjects request. */
   public static final int S3_DELETE_OBJECTS_MAX_KEYS = 1000;
+
+  /** Version ID of an object in a bucket that never had versioning enabled. */
+  public static final String NULL_VERSION_ID = "null";
 
   // Bucket owner condition headers
   // See https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-owner-condition.html
@@ -183,6 +195,8 @@ public final class S3Consts {
     public static final String LIFECYCLE = "lifecycle";
     public static final String ATTRIBUTES = "attributes";
     public static final String VERSION_ID = "versionId";
+    public static final String VERSION_ID_MARKER = "version-id-marker";
+    public static final String VERSIONS = "versions";
 
     // Subresources of S3 APIs that are not implemented. They are only recognized so that the
     // request can be rejected with NotImplemented instead of falling through to another operation.
@@ -215,7 +229,6 @@ public final class S3Consts {
     public static final String RETENTION = "retention";
     public static final String SESSION = "session";
     public static final String VERSIONING = "versioning";
-    public static final String VERSIONS = "versions";
     public static final String WEBSITE = "website";
 
     private QueryParams() {

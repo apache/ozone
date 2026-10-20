@@ -36,10 +36,15 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTOR
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.net.InetAddresses;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
@@ -118,6 +123,11 @@ public abstract class BaseHttpServer implements AutoCloseable {
         // Ozone config prefix must be set to avoid AuthenticationFilter
         // fall back to default one form hadoop.http.authentication.
         builder.authFilterConfigurationPrefix(getHttpAuthConfigPrefix());
+        // Without an explicit host, HttpServer2 expands _HOST in the SPNEGO
+        // principal to the host of its first endpoint, which is the bind
+        // address: a wildcard or interface-specific bind host does not name
+        // this node and matches no keytab entry.
+        builder.hostName(getSpnegoHost());
         if (httpAuthType.equals("kerberos")) {
           builder.setSecurityEnabled(true);
           builder.setUsernameConfKey(getSpnegoPrincipal());
@@ -330,6 +340,31 @@ public abstract class BaseHttpServer implements AutoCloseable {
   }
 
   /**
+   * Returns the host that replaces {@code _HOST} in this server's SPNEGO
+   * principal: the host of the advertised address of an enabled scheme, HTTP
+   * before HTTPS, when it is a name, otherwise the canonical name of the local
+   * host.
+   */
+  protected String getSpnegoHost() throws UnknownHostException {
+    List<String> addressKeys = new ArrayList<>(2);
+    if (policy.isHttpEnabled()) {
+      addressKeys.add(getHttpAddressKey());
+    }
+    if (policy.isHttpsEnabled()) {
+      addressKeys.add(getHttpsAddressKey());
+    }
+    for (String addressKey : addressKeys) {
+      Optional<String> host = getHostNameFromConfigKeys(conf, addressKey);
+      // An IP literal, wildcard or not, names no host, so it falls back to the
+      // local name exactly as the default wildcard bind address did before.
+      if (host.isPresent() && !InetAddresses.isInetAddress(host.get())) {
+        return host.get();
+      }
+    }
+    return InetAddress.getLocalHost().getCanonicalHostName();
+  }
+
+  /**
    * Retrieve the socket address that should be used by clients to connect
    * to the  HTTPS web interface.
    *
@@ -360,6 +395,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
             .register("prometheus", "Hadoop metrics prometheus exporter",
                 prometheusMetricsSink);
       }
+      BuildInfoMetrics.create(name);
       updateConnectorAddress();
     }
 
@@ -372,6 +408,7 @@ public abstract class BaseHttpServer implements AutoCloseable {
   public void stop() throws Exception {
     if (httpServer != null) {
       httpServer.stop();
+      BuildInfoMetrics.unregister();
     }
   }
 

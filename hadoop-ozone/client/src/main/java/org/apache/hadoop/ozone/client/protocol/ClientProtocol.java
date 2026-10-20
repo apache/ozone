@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -63,6 +64,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
@@ -883,6 +885,9 @@ public interface ClientProtocol {
   void abortMultipartUpload(String volumeName,
       String bucketName, String keyName, String uploadID) throws IOException;
 
+  /** Abort a multipart upload in S3 volume context. */
+  void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException;
+
   /**
    * Returns list of parts of a multipart upload key.
    * @param volumeName
@@ -1159,6 +1164,17 @@ public interface ClientProtocol {
       String keyName) throws IOException;
 
   /**
+   * Creates an input stream for reading file contents, like
+   * {@link #readFile(String, String, String)}.
+   *
+   * @param requireFileSystemLayout if true, OM rejects the read with
+   *     NOT_SUPPORTED_OPERATION if the resolved bucket layout is OBJECT_STORE.
+   *     An OM older than OzoneManagerVersion.GET_KEY_INFO_REJECTS_OBS ignores it.
+   */
+  OzoneInputStream readFile(String volumeName, String bucketName,
+      String keyName, boolean requireFileSystemLayout) throws IOException;
+
+  /**
    * Creates an output stream for writing to a file.
    *
    * @param volumeName Volume name
@@ -1252,6 +1268,18 @@ public interface ClientProtocol {
       long numEntries, boolean allowPartialPrefixes) throws IOException;
 
   /**
+   * List the status for a file or a directory and its contents, returning the
+   * full file status. Takes the same options as {@link #listStatusLight}.
+   *
+   * @param options Encapsulates volume, bucket, key, recursive, startKey,
+   *                numEntries, allowPartialPrefixes, and whether OM must reject
+   *                an OBJECT_STORE bucket.
+   * @return list of file status
+   */
+  List<OzoneFileStatus> listStatus(ListStatusLightOptions options)
+      throws IOException;
+
+  /**
    * Lightweight listStatus API.
    *
    * @param options Encapsulates volume, bucket, key, recursive, startKey,
@@ -1260,6 +1288,24 @@ public interface ClientProtocol {
    */
   List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
       throws IOException;
+
+  /**
+   * Like {@link #listStatus(ListStatusLightOptions)}, but also returns whether OM reported that no entries
+   * follow this page.
+   */
+  default ListStatusResult<OzoneFileStatus> listStatusPage(ListStatusLightOptions options)
+      throws IOException {
+    return ListStatusResult.unknown(listStatus(options));
+  }
+
+  /**
+   * Like {@link #listStatusLight(ListStatusLightOptions)}, but also returns whether OM reported that no
+   * entries follow this page.
+   */
+  default ListStatusResult<OzoneFileStatusLight> listStatusLightPage(ListStatusLightOptions options)
+      throws IOException {
+    return ListStatusResult.unknown(listStatusLight(options));
+  }
 
   /**
    * Lightweight listStatus API (convenience overload without listPrefix).
@@ -1390,15 +1436,42 @@ public interface ClientProtocol {
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
   /**
+   * Sets the read consistency hint for the current request thread.
+   * @param readConsistency read consistency selected by the client.
+   */
+  void setThreadLocalReadConsistency(ReadConsistency readConsistency);
+
+  /**
+   * Sets the read consistency hint and optional local lease context for the
+   * current request thread.
+   * @param readConsistency read consistency selected by the client.
+   * @param localLeaseLogLimit optional local lease log limit.
+   * @param localLeaseTimeMs optional local lease duration in milliseconds.
+   */
+  void setThreadLocalReadConsistency(ReadConsistency readConsistency,
+      Long localLeaseLogLimit, Long localLeaseTimeMs);
+
+  /**
    * Gets the S3 Authentication information that is attached to the thread.
    * @return S3 Authentication information.
    */
   S3Auth getThreadLocalS3Auth();
 
   /**
+   * Gets the read consistency hint that is attached to the thread.
+   * @return request-local read consistency.
+   */
+  ReadConsistency getThreadLocalReadConsistency();
+
+  /**
    * Clears the S3 Authentication information attached to the thread.
    */
   void clearThreadLocalS3Auth();
+
+  /**
+   * Clears the read consistency hint attached to the thread.
+   */
+  void clearThreadLocalReadConsistency();
 
   default ThreadLocal<S3Auth> getS3CredentialsProvider() {
     return null;
@@ -1610,6 +1683,14 @@ public interface ClientProtocol {
    * */
   void setTimes(OzoneObj obj, String keyName, long mtime, long atime)
       throws IOException;
+
+  /**
+   * Set whether this client verifies checksums when reading. Overrides ozone.client.verify.checksum for this client
+   * only. Takes effect for input streams opened afterwards, streams that are already open may or may not pick it up.
+   * @param verifyChecksum false to skip checksum verification, e.g. when the application verifies its own checksums.
+   */
+  default void setVerifyChecksum(boolean verifyChecksum) {
+  }
 
   /**
    * Start the lease recovery of a file.
