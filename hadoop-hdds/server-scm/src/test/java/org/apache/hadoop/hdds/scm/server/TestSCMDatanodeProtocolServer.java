@@ -39,6 +39,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -52,7 +54,9 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
@@ -61,6 +65,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -71,6 +77,7 @@ class TestSCMDatanodeProtocolServer {
   private Path tempDir;
 
   private SCMDatanodeProtocolServer server;
+  private StorageContainerManager scm;
   private ScmVersionManager versionManager;
   private NodeManager nodeManager;
   private EventPublisher publisher;
@@ -80,7 +87,7 @@ class TestSCMDatanodeProtocolServer {
   void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_DB_DIRS, tempDir.toString());
-    StorageContainerManager scm = mock(StorageContainerManager.class);
+    scm = mock(StorageContainerManager.class);
     SCMStorageConfig storage = new SCMStorageConfig(conf);
     storage.setScmId("scm");
     storage.setApparentVersion(HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT.serialize());
@@ -132,6 +139,75 @@ class TestSCMDatanodeProtocolServer {
     assertTrue(exception.getMessage().contains("finaliz"));
     verify(nodeManager, never()).register(any(), any(), any(), any());
     verifyNoInteractions(publisher);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testIncompatibleDeferredRegistrationIsFenced(boolean newerSoftware) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    SCMStorageConfig storage = mock(SCMStorageConfig.class);
+    when(storage.getClusterID()).thenReturn("cluster");
+    DatanodeVersionProto version = DatanodeVersionProto.newBuilder()
+        .setApparentVersion(newerSoftware ? HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT.serialize()
+            : HDDSVersion.SOFTWARE_VERSION.serialize())
+        .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize() + (newerSoftware ? 1 : 0)).build();
+    ContainerReportsProto deferred = ContainerReportsProto.newBuilder().setFullContainerReportDeferred(true).build();
+    try (SCMNodeManager realNodeManager = new SCMNodeManager(conf, storage, publisher, new NetworkTopologyImpl(conf),
+        SCMContext.emptyContext(), versionManager)) {
+      when(scm.getScmNodeManager()).thenReturn(realNodeManager);
+      try {
+        SCMRegisteredResponseProto response = server.register(datanode.getExtendedProtoBufMessage(),
+            NodeReportProto.getDefaultInstance(), deferred, PipelineReportsProto.getDefaultInstance(), version);
+
+        assertEquals(SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted, response.getErrorCode());
+        assertTrue(realNodeManager.getAllNodes().isEmpty());
+        verifyNoInteractions(publisher);
+      } finally {
+        when(scm.getScmNodeManager()).thenReturn(nodeManager);
+      }
+    }
+  }
+
+  @Test
+  void testDeferredRegistrationKeepsVersionRejectionDuringFinalization() throws Exception {
+    AtomicReference<HDDSVersion> apparentVersion = new AtomicReference<>(HDDSVersion.ZDU);
+    ScmVersionManager upgrading = mock(ScmVersionManager.class);
+    when(upgrading.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(upgrading.getApparentVersion()).thenAnswer(invocation -> apparentVersion.get());
+    when(upgrading.needsFinalization()).thenReturn(true);
+    when(upgrading.isAllowed(any(ComponentVersion.class))).thenAnswer(invocation -> {
+      ComponentVersion required = invocation.getArgument(0);
+      boolean allowed = required.isSupportedBy(apparentVersion.get());
+      if (required == HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT) {
+        apparentVersion.compareAndSet(HDDSVersion.ZDU, HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT);
+      }
+      return allowed;
+    });
+    OzoneConfiguration conf = new OzoneConfiguration();
+    SCMStorageConfig storage = mock(SCMStorageConfig.class);
+    when(storage.getClusterID()).thenReturn("cluster");
+    DatanodeVersionProto version = DatanodeVersionProto.newBuilder()
+        .setApparentVersion(HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT.serialize())
+        .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize()).build();
+    ContainerReportsProto deferred = ContainerReportsProto.newBuilder().setFullContainerReportDeferred(true).build();
+    try (SCMNodeManager realNodeManager = new SCMNodeManager(conf, storage, publisher, new NetworkTopologyImpl(conf),
+        SCMContext.emptyContext(), upgrading)) {
+      when(scm.getScmNodeManager()).thenReturn(realNodeManager);
+      when(scm.getVersionManager()).thenReturn(upgrading);
+      try {
+        SCMRegisteredResponseProto response = server.register(datanode.getExtendedProtoBufMessage(),
+            NodeReportProto.getDefaultInstance(), deferred, PipelineReportsProto.getDefaultInstance(), version);
+
+        assertEquals(SCMRegisteredResponseProto.ErrorCode.errorNodeNotPermitted, response.getErrorCode());
+        assertEquals(HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT, apparentVersion.get());
+        assertFalse(upgrading.isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE));
+        assertTrue(realNodeManager.getAllNodes().isEmpty());
+        verifyNoInteractions(publisher);
+      } finally {
+        when(scm.getScmNodeManager()).thenReturn(nodeManager);
+        when(scm.getVersionManager()).thenReturn(versionManager);
+      }
+    }
   }
 
   @Test
@@ -199,7 +275,7 @@ class TestSCMDatanodeProtocolServer {
   private SCMRegisteredResponseProto register(ContainerReportsProto report) throws IOException {
     return server.register(datanode.getExtendedProtoBufMessage(), NodeReportProto.getDefaultInstance(), report,
         PipelineReportsProto.getDefaultInstance(), DatanodeVersionProto.newBuilder()
-            .setApparentVersion(HDDSVersion.SOFTWARE_VERSION.serialize())
+            .setApparentVersion(versionManager.getApparentVersion().serialize())
             .setSoftwareVersion(HDDSVersion.SOFTWARE_VERSION.serialize()).build());
   }
 }

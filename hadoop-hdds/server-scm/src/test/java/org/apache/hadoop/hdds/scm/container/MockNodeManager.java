@@ -32,6 +32,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
@@ -779,6 +780,12 @@ public class MockNodeManager implements NodeManager {
   @Override
   public VersionResponse getVersion(SCMVersionRequestProto versionRequest) {
     return null;
+  }
+
+  @Override
+  public Optional<RegisteredCommand> getRegistrationError(DatanodeDetails datanodeDetails,
+      DatanodeVersionProto versionReport) {
+    return Optional.empty();
   }
 
   /**

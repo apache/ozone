@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -406,6 +407,19 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
             .build());
   }
 
+  @Override
+  public Optional<RegisteredCommand> getRegistrationError(DatanodeDetails datanodeDetails,
+      DatanodeVersionProto versionReport) {
+    if (!shouldFenceDatanode(datanodeDetails, versionReport)) {
+      return Optional.empty();
+    }
+    return Optional.of(RegisteredCommand.newBuilder()
+        .setErrorCode(ErrorCode.errorNodeNotPermitted)
+        .setDatanode(datanodeDetails)
+        .setClusterID(this.scmStorageConfig.getClusterID())
+        .build());
+  }
+
   /**
    * Register the node if the node finds that it is not registered with any
    * SCM.
@@ -423,12 +437,9 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
       DatanodeDetails datanodeDetails, NodeReportProto nodeReport,
       PipelineReportsProto pipelineReportsProto,
       DatanodeVersionProto dnVersionInfo) {
-    if (shouldFenceDatanode(datanodeDetails, dnVersionInfo)) {
-      return RegisteredCommand.newBuilder()
-          .setErrorCode(ErrorCode.errorNodeNotPermitted)
-          .setDatanode(datanodeDetails)
-          .setClusterID(this.scmStorageConfig.getClusterID())
-          .build();
+    Optional<RegisteredCommand> error = getRegistrationError(datanodeDetails, dnVersionInfo);
+    if (error.isPresent()) {
+      return error.get();
     }
 
     InetAddress dnAddress = Server.getRemoteIp();

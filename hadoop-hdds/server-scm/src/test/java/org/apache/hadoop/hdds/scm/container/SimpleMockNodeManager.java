@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -430,6 +431,12 @@ public class SimpleMockNodeManager implements NodeManager {
       StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto
           versionRequest) {
     return null;
+  }
+
+  @Override
+  public Optional<RegisteredCommand> getRegistrationError(DatanodeDetails datanodeDetails,
+      DatanodeVersionProto versionReport) {
+    return Optional.empty();
   }
 
   @Override

@@ -254,15 +254,18 @@ public class SCMDatanodeProtocolServer implements
 
     // Read before the decision, so that a rejection made before this SCM became the ready leader is not final.
     final boolean leaderReady = scmContext == null || scmContext.isLeaderReady();
+    // TODO : Return the list of Nodes that forms the SCM HA.
+    RegisteredCommand registeredCommand;
     if (containerReportsProto.getFullContainerReportDeferred()
         && !scm.getVersionManager().isAllowed(HDDSVersion.FULL_CONTAINER_REPORT_LEASE)) {
-      throw new IOException("Full container report leases must be finalized before deferring registration reports.");
+      // Preserve the rejection if finalization advances before the response is sent.
+      registeredCommand = scm.getScmNodeManager().getRegistrationError(datanodeDetails, versionInfo)
+          .orElseThrow(() -> new IOException(
+              "Full container report leases must be finalized before deferring registration reports."));
+    } else {
+      registeredCommand = scm.getScmNodeManager()
+          .register(datanodeDetails, nodeReport, pipelineReportsProto, versionInfo);
     }
-
-    // TODO : Return the list of Nodes that forms the SCM HA.
-    RegisteredCommand registeredCommand = scm.getScmNodeManager()
-        .register(datanodeDetails, nodeReport, pipelineReportsProto,
-            versionInfo);
     if (registeredCommand.getError()
         == SCMRegisteredResponseProto.ErrorCode.success) {
       if (containerReportsProto.getFullContainerReportDeferred()) {
