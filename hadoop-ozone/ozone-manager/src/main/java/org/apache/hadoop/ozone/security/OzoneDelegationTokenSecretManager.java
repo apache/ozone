@@ -30,6 +30,7 @@ import java.security.cert.CertificateNotYetValidException;
 import java.security.cert.X509Certificate;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.StringUtils;
@@ -73,6 +74,13 @@ public class OzoneDelegationTokenSecretManager
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneDelegationTokenSecretManager.class);
   private final Map<OzoneTokenIdentifier, TokenInfo> currentTokens;
+  /**
+   * Tokens removed by a cancel applied since this secret manager was created, kept in memory until the remover scan
+   * after their max date. Unlike {@link #currentTokens}, the expired token remover does not drop an entry before the
+   * token's max date. The set is not persisted: after a restart or a checkpoint install it is empty, so a renew
+   * applied after a cancel from before the restart or install is not rejected.
+   */
+  private final Set<OzoneTokenIdentifier> canceledTokens = ConcurrentHashMap.newKeySet();
   private final OzoneSecretStore store;
   private final S3SecretManager s3SecretManager;
   private Thread tokenRemoverThread;
@@ -351,10 +359,19 @@ public class OzoneDelegationTokenSecretManager
   }
 
   /**
-   * Remove the expired token from in-memory map.
+   * Remove the canceled token from in-memory map.
    */
   public void removeToken(OzoneTokenIdentifier ozoneTokenIdentifier) {
     currentTokens.remove(ozoneTokenIdentifier);
+    canceledTokens.add(ozoneTokenIdentifier);
+  }
+
+  /**
+   * @return true if a cancel of the token was applied since this secret manager was created and the remover scan
+   * after the token's max date has not dropped it yet.
+   */
+  public boolean isCanceled(OzoneTokenIdentifier ozoneTokenIdentifier) {
+    return canceledTokens.contains(ozoneTokenIdentifier);
   }
 
   @Override
@@ -620,6 +637,8 @@ public class OzoneDelegationTokenSecretManager
    */
   private void removeExpiredToken() {
     long now = Time.now();
+    // A renew can not extend a token past its max date, so a canceled token is no longer needed after it.
+    canceledTokens.removeIf(id -> id.getMaxDate() < now);
     synchronized (noInterruptsLock) {
       Iterator<Map.Entry<OzoneTokenIdentifier,
           TokenInfo>> i = currentTokens.entrySet().iterator();
