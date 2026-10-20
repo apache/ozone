@@ -138,6 +138,10 @@ public class TestDeletedBlockLog {
     replicationManager = mock(ReplicationManager.class);
     pendingOps = new ContainerReplicaPendingOps(Clock.systemUTC(), null);
     when(replicationManager.getContainerReplicaPendingOps()).thenReturn(pendingOps);
+    // This test runs a real SCM, whose startup builds a NodeDecommissionManager that reads
+    // rm.getConfig(), so the injected mock RM must return a real config, not null.
+    when(replicationManager.getConfig()).thenReturn(
+        conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class));
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setReplicationManager(replicationManager);
