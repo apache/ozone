@@ -28,6 +28,7 @@ cd "$DIR/../../.." || exit 1
 : ${ITERATIONS:="1"}
 : ${OZONE_WITH_COVERAGE:="false"}
 : ${OZONE_REPO_CACHED:="false"}
+: ${PHASE:="verify"}
 
 declare -i ITERATIONS
 if [[ ${ITERATIONS} -le 0 ]]; then
@@ -36,6 +37,7 @@ fi
 
 export MAVEN_OPTS="-Xmx4096m ${MAVEN_OPTS:-}"
 MAVEN_OPTIONS="-B -V -DskipDocs -DskipRecon -Dnative.lib.tmp.dir=/tmp --no-transfer-progress"
+MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
   MAVEN_OPTIONS="${MAVEN_OPTIONS} -Djacoco.skip"
@@ -54,13 +56,31 @@ if [[ -f hadoop-ozone/dist/src/shell/ozone/ozone-functions.sh ]]; then
   ozone_java_setup
 fi
 
-mvn ${MAVEN_OPTIONS} clean
-
-if [[ ${ITERATIONS} -gt 1 ]] && [[ ${OZONE_REPO_CACHED} == "false" ]]; then
-  mvn ${MAVEN_OPTIONS} -DskipTests install
+if [[ ${CI:-} != "true" ]]; then
+  # Local run, remove leftover artifacts from all modules
+  mvn ${MAVEN_OPTIONS} -Dscan=false clean
 fi
 
-REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/${CHECK}"}
+CLEAN="clean"
+
+if [[ ${ITERATIONS} -gt 1 ]] || [[ ${CHECK} == "flaky" ]]; then
+  if [[ ${OZONE_REPO_CACHED} == "false" ]]; then
+    # Need to build for local run.  In flaky-test-check the jars come from separate workflow job.
+    # Test may be limited to specific modules, also build dependencies.
+    # `clean` is included for cacheability.
+    mvn ${MAVEN_OPTIONS} -DskipTests --also-make "$@" clean install
+  fi
+
+  # Keep outputs from previous iterations
+  CLEAN=""
+
+  # Repeated runs must execute the test, not load it from the build cache
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Ddevelocity.cache.local.enabled=false"
+  MAVEN_OPTIONS="${MAVEN_OPTIONS} -Ddevelocity.cache.remote.enabled=false"
+fi
+
+BASE_DIR="$(pwd -P)"
+REPORT_DIR=${OUTPUT_DIR:-"${BASE_DIR}/target/${CHECK}"}
 REPORT_FILE="${REPORT_DIR}/summary.txt"
 mkdir -p "$REPORT_DIR"
 
@@ -74,12 +94,15 @@ for i in $(seq 1 ${ITERATIONS}); do
   if [[ ${ITERATIONS} -gt 1 ]]; then
     original_report_dir="${REPORT_DIR}"
     REPORT_DIR="${original_report_dir}/iteration${i}"
-    mkdir -p "${REPORT_DIR}"
   fi
 
-  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" verify \
-      | tee "${REPORT_DIR}/output.log"
+  log=$(mktemp)
+  mvn ${MAVEN_OPTIONS} -Dmaven-surefire-plugin.argLineAccessArgs="${OZONE_MODULE_ACCESS_ARGS}" "$@" ${CLEAN} "${PHASE}" \
+      | tee "${log}"
   irc=$?
+
+  mkdir -p "${REPORT_DIR}"
+  mv -f "${log}" "${REPORT_DIR}"/output.log
 
   # shellcheck source=hadoop-ozone/dev-support/checks/_mvn_unit_report.sh
   source "${DIR}/_mvn_unit_report.sh"

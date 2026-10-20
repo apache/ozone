@@ -105,14 +105,17 @@ public class BucketEndpoint extends BucketOperationHandler {
 
   @Override
   Response handleGetRequest(S3RequestContext context, String bucketName) throws IOException, OS3Exception {
-    final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
+    if (isListObjectVersions()) {
+      context.setAction(S3GAction.LIST_OBJECT_VERSIONS);
+    }
+    final String continueToken = isListObjectVersions() ? null : queryParams().get(QueryParams.CONTINUATION_TOKEN);
     final String delimiter = queryParams().containsKey(QueryParams.DELIMITER) ?
         queryParams().get(QueryParams.DELIMITER) : null;
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
-    final String marker = queryParams().get(QueryParams.MARKER);
+    final String marker = getListMarker();
     int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
     String prefix = queryParams().get(QueryParams.PREFIX, "");
-    String startAfter = queryParams().get(QueryParams.START_AFTER);
+    String startAfter = isListObjectVersions() ? null : queryParams().get(QueryParams.START_AFTER);
     boolean includeOwner = shouldIncludeOwnerInListResponse();
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
     // AWS S3 treats an empty continuation-token as no token: list from the
@@ -190,25 +193,20 @@ public class BucketEndpoint extends BucketOperationHandler {
           }
           String relativeKeyName = next.getName().substring(prefix.length());
 
-          int depth = StringUtils.countMatches(relativeKeyName, delimiter);
           if (!StringUtils.isEmpty(delimiter)) {
-            if (depth > 0) {
+            int delimiterIndex = relativeKeyName.indexOf(delimiter);
+            if (delimiterIndex >= 0) {
               // means key has multiple delimiters in its value.
               // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
-              String dirName = relativeKeyName.substring(0, relativeKeyName
-                  .indexOf(delimiter));
+              // Keys that equal prefix + delimiter (ex: dir/ with prefix dir and
+              // delimiter /) also hit this branch and become a common prefix.
+              String dirName = relativeKeyName.substring(0, delimiterIndex);
               if (!dirName.equals(prevDir)) {
                 response.addPrefix(EncodingTypeObject.createNullable(
                     prefix + dirName + delimiter, encodingType));
                 prevDir = dirName;
                 count++;
               }
-            } else if (relativeKeyName.endsWith(delimiter)) {
-              // means or key is same as prefix with delimiter at end and ends with
-              // delimiter. ex: dir/, where prefix is dir and delimiter is /
-              response.addPrefix(
-                  EncodingTypeObject.createNullable(relativeKeyName, encodingType));
-              count++;
             } else {
               // means our key is matched with prefix if prefix is given and it
               // does not have any common prefix.
@@ -252,7 +250,34 @@ public class BucketEndpoint extends BucketOperationHandler {
     context.getPerf().appendCount(keyCount);
     context.getPerf().appendOpLatencyNanos(opLatencyNs);
     response.setKeyCount(keyCount);
-    return Response.ok(response).build();
+    return Response.ok(toListResult(response)).build();
+  }
+
+  private boolean isListObjectVersions() {
+    return queryParams().get(QueryParams.VERSIONS) != null;
+  }
+
+  /** ListObjectVersions lists the same keys as ListObjects (V1), but paginates with key-marker instead of marker. */
+  private String getListMarker() throws OS3Exception {
+    if (!isListObjectVersions()) {
+      return queryParams().get(QueryParams.MARKER);
+    }
+    final String keyMarker = queryParams().get(QueryParams.KEY_MARKER);
+    final String versionIdMarker = queryParams().get(QueryParams.VERSION_ID_MARKER);
+    if (StringUtils.isNotEmpty(versionIdMarker)) {
+      if (StringUtils.isEmpty(keyMarker)) {
+        throw newError(S3ErrorTable.INVALID_ARGUMENT, "A version-id marker cannot be specified without a key marker");
+      }
+      if (isUnsupportedVersionId(versionIdMarker)) {
+        throw newError(S3ErrorTable.NOT_IMPLEMENTED, versionIdMarker);
+      }
+    }
+    return keyMarker;
+  }
+
+  private Object toListResult(ListObjectResponse response) {
+    return isListObjectVersions()
+        ? ListVersionsResult.of(response, queryParams().get(QueryParams.VERSION_ID_MARKER)) : response;
   }
 
   private int validateMaxKeys(int maxKeys) throws OS3Exception {
@@ -352,6 +377,12 @@ public class BucketEndpoint extends BucketOperationHandler {
       throw newError(S3ErrorTable.MALFORMED_XML, bucketName);
     }
 
+    // Only the null version can be deleted; ignoring any other VersionId would delete the current object instead.
+    if (request.getObjects() != null
+        && request.getObjects().stream().anyMatch(o -> isUnsupportedVersionId(o.getVersionId()))) {
+      throw newError(S3ErrorTable.NOT_IMPLEMENTED, bucketName);
+    }
+
     final OzoneBucket bucket;
     try {
       bucket = getVolume().getBucket(bucketName);
@@ -380,11 +411,15 @@ public class BucketEndpoint extends BucketOperationHandler {
               ResultCodes.KEY_NOT_FOUND.name().equals(error.getCode());
           if (deleted) {
             if (!request.isQuiet()) {
-              result.addDeleted(new DeletedObject(d.getKey()));
+              DeletedObject deletedObject = new DeletedObject(d.getKey());
+              deletedObject.setVersionId(d.getVersionId());
+              result.addDeleted(deletedObject);
             }
           } else {
             failedDeletes.add(d.getKey());
-            result.addError(new Error(d.getKey(), error.getCode(), error.getMessage()));
+            Error deleteError = new Error(d.getKey(), error.getCode(), error.getMessage());
+            deleteError.setVersionId(d.getVersionId());
+            result.addError(deleteError);
           }
         }
         getMetrics().updateDeleteKeySuccessStats(startNanos);
@@ -456,6 +491,7 @@ public class BucketEndpoint extends BucketOperationHandler {
         .add(new ListMultipartUploadsHandler())
         .add(new BucketTaggingHandler())
         .add(new BucketLifecycleHandler())
+        .add(new BucketOperationNotImplementedHandler())
         .add(new BucketCrudHandler())
         .add(this)
         .build();
@@ -492,6 +528,6 @@ public class BucketEndpoint extends BucketOperationHandler {
   private boolean shouldIncludeOwnerInListResponse() {
     int listType = queryParams().getInt(QueryParams.LIST_TYPE, 1);
     boolean fetchOwner = queryParams().getBoolean(QueryParams.FETCH_OWNER, false);
-    return listType != 2 || fetchOwner;
+    return isListObjectVersions() || listType != 2 || fetchOwner;
   }
 }

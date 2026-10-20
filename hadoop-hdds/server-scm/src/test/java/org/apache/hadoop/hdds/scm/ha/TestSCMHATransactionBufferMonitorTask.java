@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl.SERVICE_DEFINITION;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,11 +45,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogStateManagerImpl;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -94,9 +97,11 @@ public class TestSCMHATransactionBufferMonitorTask {
     deletedBlockLog = mock(DeletedBlockLogImpl.class);
     Clock clock = mock(Clock.class);
     when(clock.millis()).thenAnswer(invocation -> clockMillis.get());
+    when(scm.getConfiguration()).thenReturn(conf);
     when(scm.getScmMetadataStore()).thenReturn(metadataStore);
     when(scm.getSystemClock()).thenReturn(clock);
     when(scm.getScmBlockManager()).thenReturn(blockManager);
+    when(scm.getPerfMetrics()).thenReturn(mock(SCMPerformanceMetrics.class));
     when(blockManager.getDeletedBlockLog()).thenReturn(deletedBlockLog);
 
     transactionBuffer = new SCMHADBTransactionBufferImpl(scm);
@@ -319,6 +324,76 @@ public class TestSCMHATransactionBufferMonitorTask {
     }
     flusher.join(10_000);
     assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+  }
+
+  /**
+   * Verifies that {@link DeletedBlockLogStateManagerImpl#addTransactionsToDB} holds the buffer lock across the
+   * row-plus-summary write, so a concurrent flush() cannot commit the transaction row without the matching summary.
+   */
+  @Test
+  public void testAddTransactionsToDBBlocksConcurrentFlushUntilDurable() throws Exception {
+    long txId = 42L;
+    DeletedBlocksTransaction tx = DeletedBlocksTransaction.newBuilder()
+        .setTxID(txId)
+        .setContainerID(1L)
+        .setCount(0)
+        .addLocalID(1L)
+        .build();
+    DeletedBlocksTransactionSummary summary = DeletedBlocksTransactionSummary.newBuilder()
+        .setTotalTransactionCount(1)
+        .setTotalBlockCount(1)
+        .setTotalBlockSize(1)
+        .setTotalBlockReplicatedSize(3)
+        .build();
+
+    // Pause the writer right after the row is added to the buffer, before the summary is.
+    Table<Long, DeletedBlocksTransaction> deletedTable = spy(metadataStore.getDeletedBlocksTXTable());
+    CountDownLatch rowBuffered = new CountDownLatch(1);
+    CountDownLatch releaseWriter = new CountDownLatch(1);
+    doAnswer(invocation -> {
+      invocation.callRealMethod();
+      rowBuffered.countDown();
+      releaseWriter.await(10, TimeUnit.SECONDS);
+      return null;
+    }).when(deletedTable).putWithBatch(any(), any(), any());
+    DeletedBlockLogStateManagerImpl stateManager = new DeletedBlockLogStateManagerImpl(
+        deletedTable, statefulServiceConfigTable, mock(ContainerManager.class), transactionBuffer);
+    transactionBuffer.updateLatestTrxInfo(TRX_INFO_T4);
+    transactionBuffer.flush();
+
+    Thread writer = new Thread(() -> {
+      try {
+        stateManager.addTransactionsToDB(new ArrayList<>(Collections.singletonList(tx)), summary);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    });
+    writer.start();
+    assertTrue(rowBuffered.await(10, TimeUnit.SECONDS), "Timed out waiting for writer to buffer the row");
+
+    Thread flusher = new Thread(() -> {
+      transactionBuffer.updateLatestTrxInfo(TRX_INFO_T5);
+      try {
+        transactionBuffer.flush();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    });
+    flusher.start();
+    waitFor(() -> flusher.getState() == Thread.State.WAITING, 10, 5_000);
+
+    // flush() is blocked by the buffer lock, so neither the row nor the summary is durable yet.
+    assertEquals(TRX_INFO_T4, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+    assertNull(deletedTable.get(txId));
+    assertNull(statefulServiceConfigTable.get(SERVICE_DEFINITION.getServiceName()));
+
+    releaseWriter.countDown();
+    writer.join(10_000);
+    flusher.join(10_000);
+
+    assertEquals(TRX_INFO_T5, transactionInfoTable.get(TRANSACTION_INFO_KEY));
+    assertEquals(tx, deletedTable.get(txId));
+    assertEquals(summary.toByteString(), statefulServiceConfigTable.get(SERVICE_DEFINITION.getServiceName()));
   }
 
   /**

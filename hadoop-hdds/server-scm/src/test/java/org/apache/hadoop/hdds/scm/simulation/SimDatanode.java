@@ -308,7 +308,7 @@ final class SimDatanode {
     }
     SCMHeartbeatRequestProto.Builder hb = SCMHeartbeatRequestProto.newBuilder()
         .setDatanodeDetails(currentDetails().getProtoBufMessage())
-        .setDataNodeLayoutVersion(UpgradeUtils.defaultLayoutVersionProto())
+        .setDatanodeVersion(UpgradeUtils.defaultVersionProto())
         .setCommandQueueReport(commandQueueReport());
     if (nodeReportDue) {
       hb.setNodeReport(nodeReport());
@@ -361,7 +361,7 @@ final class SimDatanode {
       return;
     }
     registered = sim.register(this, currentDetails().getExtendedProtoBufMessage(), nodeReport(), containerReport(),
-        pipelineReports(), UpgradeUtils.defaultLayoutVersionProto());
+        pipelineReports(), UpgradeUtils.defaultVersionProto());
     if (registered) {
       nodeReportDue = false;
       containerReportDue = false;

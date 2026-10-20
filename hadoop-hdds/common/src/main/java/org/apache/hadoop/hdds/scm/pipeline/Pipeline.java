@@ -33,7 +33,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicatedReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -63,7 +66,7 @@ public final class Pipeline {
   private static final Codec<Pipeline> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(HddsProtos.Pipeline.getDefaultInstance()),
       Pipeline::getFromProtobufSetCreationTimestamp,
-      p -> p.getProtobufMessage(ClientVersion.CURRENT_VERSION),
+      p -> p.getProtobufMessage(ClientVersion.CURRENT),
       Pipeline.class,
       DelegatedCodec.CopyType.UNSUPPORTED);
 
@@ -301,6 +304,20 @@ public final class Pipeline {
         "All nodes are excluded: Pipeline=%s, excluded=%s", id, excluded));
   }
 
+  /**
+   * Returns the serialized component version this pipeline should execute writes at. All nodes in
+   * a pipeline are expected to share the same version, so we use the first node's. The raw
+   * serialized value is returned (see {@link DatanodeDetails#getSerializedCurrentVersion()}) so a
+   * client that cannot deserialize a newer datanode version still forwards the original value
+   * rather than {@link HDDSVersion#UNKNOWN_VERSION}.
+   */
+  public int getWriteVersion() throws IOException {
+    if (nodeStatus.isEmpty()) {
+      throw new IOException(String.format("Pipeline=%s is empty", id));
+    }
+    return nodeStatus.keySet().iterator().next().getSerializedCurrentVersion();
+  }
+
   public DatanodeDetails getClosestNode() throws IOException {
     return getClosestNode(null);
   }
@@ -376,16 +393,41 @@ public final class Pipeline {
     return replicationConfig;
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion) {
-    return getProtobufMessage(clientVersion, Collections.emptySet());
+  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion) {
+    return getProtobufMessageInternal(clientVersion, Collections.emptySet(), null);
   }
 
-  public HddsProtos.Pipeline getProtobufMessage(int clientVersion, Set<DatanodeDetails.Port.Name> filterPorts) {
+  /**
+   * Write-path override: when {@code datanodeVersion} is non-null it is set as the currentVersion on <b>every</b>
+   * member proto, so clients target a single pipeline-wide version (typically the pipeline minimum).
+   */
+  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion, Set<DatanodeDetails.Port.Name> filterPorts,
+      ComponentVersion datanodeVersion) {
+    return getProtobufMessageInternal(clientVersion, filterPorts,
+        datanodeVersion == null ? null : nodeId -> datanodeVersion);
+  }
+
+  /**
+   * Read-path override: set each member proto's currentVersion from {@code memberVersions} (keyed by datanode id),
+   * so clients see each datanode's own up-to-date version. Members absent from the map keep their own version.
+   */
+  public HddsProtos.Pipeline getProtobufMessage(ClientVersion clientVersion, Set<DatanodeDetails.Port.Name> filterPorts,
+      Map<DatanodeID, ComponentVersion> memberVersions) {
+    return getProtobufMessageInternal(clientVersion, filterPorts,
+        memberVersions == null ? null : memberVersions::get);
+  }
+
+  private HddsProtos.Pipeline getProtobufMessageInternal(ClientVersion clientVersion,
+      Set<DatanodeDetails.Port.Name> filterPorts, Function<DatanodeID, ComponentVersion> versionOverride) {
     List<HddsProtos.DatanodeDetailsProto> members = new ArrayList<>();
     List<Integer> memberReplicaIndexes = new ArrayList<>();
 
     for (DatanodeDetails dn : nodeStatus.keySet()) {
-      members.add(dn.toProto(clientVersion, filterPorts));
+      HddsProtos.DatanodeDetailsProto.Builder memberBuilder = dn.toProtoBuilder(clientVersion, filterPorts);
+      if (versionOverride != null) {
+        memberBuilder.setCurrentVersion(versionOverride.apply(dn.getID()).serialize());
+      }
+      members.add(memberBuilder.build());
       memberReplicaIndexes.add(replicaIndexes.getOrDefault(dn, 0));
     }
 

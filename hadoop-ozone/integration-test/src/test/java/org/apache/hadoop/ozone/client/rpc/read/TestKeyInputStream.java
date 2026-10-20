@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.rpc.read;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.container.OzoneTestHelper.countReplicas;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -34,14 +35,17 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.hadoop.ozone.container.OzoneTestHelper;
@@ -135,6 +139,17 @@ class TestKeyInputStream extends InputStreamTests {
       testReadChunkWithByteBuffer(bucket);
       testSkip(bucket);
       testECSeek(bucket);
+    }
+
+    // The same EC reads through a client that reads the cells of different data indexes in parallel.
+    OzoneConfiguration parallelReadConf = new OzoneConfiguration(getCluster().getConf());
+    OzoneClientConfig clientConfig = parallelReadConf.getObject(OzoneClientConfig.class);
+    clientConfig.setEcParallelReadEnabled(true);
+    parallelReadConf.setFromObject(clientConfig);
+    try (OzoneClient client = OzoneClientFactory.getRpcClient(parallelReadConf)) {
+      testECSeek(BucketForTesting.newBuilder(client).build());
+      assertThat(Thread.getAllStackTraces().keySet())
+          .anyMatch(t -> t.getName().startsWith("ec-parallel-reader-"));
     }
   }
 
@@ -272,8 +287,10 @@ class TestKeyInputStream extends InputStreamTests {
 
     // Since we read data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
-    assertEquals(readChunkCount + 2,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+    // A ReadChunk to a follower that has not yet applied the block fails with UNKNOWN_BCSID and is retried on
+    // another datanode, which is counted again.
+    assertThat(metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk))
+        .isGreaterThanOrEqualTo(readChunkCount + 2);
 
     keyInputStream.close();
 
@@ -365,8 +382,10 @@ class TestKeyInputStream extends InputStreamTests {
 
     // Since we reading data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
-    assertEquals(readChunkCount + 2,
-        metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
+    // A ReadChunk to a follower that has not yet applied the block fails with UNKNOWN_BCSID and is retried on
+    // another datanode, which is counted again.
+    assertThat(metrics.getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk))
+        .isGreaterThanOrEqualTo(readChunkCount + 2);
 
     keyInputStream.close();
 

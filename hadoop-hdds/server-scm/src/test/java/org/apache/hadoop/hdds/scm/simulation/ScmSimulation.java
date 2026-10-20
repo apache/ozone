@@ -51,7 +51,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -93,9 +93,9 @@ import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
@@ -357,7 +357,7 @@ final class ScmSimulation implements AutoCloseable {
     NetworkTopology topology = new NetworkTopologyImpl(conf, random(SimRandom.SCM));
     // Built here to track heartbeats on the simulated clock, and to take rack locations from the datanodes.
     nodeManager = new SCMNodeManager(conf, storage, eventQueue, topology, scmContext,
-        new HDDSLayoutVersionManager(storage.getLayoutVersion()), host -> null, clock);
+        new ScmVersionManager(storage, scmProxy()), host -> null, clock);
     NodeSimSupport.stopHealthCheckThread(nodeManager);
 
     SCMConfigurator configurator = new SCMConfigurator();
@@ -450,11 +450,11 @@ final class ScmSimulation implements AutoCloseable {
   // ---- datanode boundary, through SCM's datanode protocol server ----
 
   boolean register(SimDatanode dn, ExtendedDatanodeDetailsProto details, NodeReportProto nodeReport,
-      ContainerReportsProto containerReport, PipelineReportsProto pipelineReports, LayoutVersionProto layout) {
+      ContainerReportsProto containerReport, PipelineReportsProto pipelineReports, DatanodeVersionProto version) {
     SCMRegisteredResponseProto response;
     try {
       response = scm.getDatanodeProtocolServer().register(details, nodeReport, containerReport, pipelineReports,
-          layout);
+          version);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

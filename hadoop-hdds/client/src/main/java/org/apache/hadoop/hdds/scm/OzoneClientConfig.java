@@ -213,7 +213,7 @@ public class OzoneClientConfig {
       description = "Ozone client to verify checksum of the checksum "
           + "blocksize data.",
       tags = ConfigTag.CLIENT)
-  private boolean checksumVerify = true;
+  private volatile boolean checksumVerify = true;
 
   @Config(key = "ozone.client.max.ec.stripe.write.retries",
       defaultValue = "10",
@@ -257,6 +257,25 @@ public class OzoneClientConfig {
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   private int ecReconstructStripeWritePoolLimit = 10 * 3;
+
+  @Config(key = "ozone.client.ec.parallel.read.enabled",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "When enabled, a read of an EC block that spans more than one cell reads the cells of different" +
+          " data indexes from their datanodes in parallel, instead of one cell at a time. Reads within a single" +
+          " cell, and reads that need reconstruction, are not affected.",
+      tags = ConfigTag.CLIENT)
+  private boolean ecParallelReadEnabled = false;
+
+  @Config(key = "ozone.client.ec.parallel.read.pool.limit",
+      defaultValue = "30",
+      description = "Thread pool max size for reading the cells of an EC block in parallel, when" +
+          " ozone.client.ec.parallel.read.enabled is true. When the pool is saturated, the reading thread reads" +
+          " the remaining cells itself.",
+      tags = ConfigTag.CLIENT)
+  // For the largest recommended EC policy rs-10-4-1024k, a read can span
+  // 10 data indexes, so this allows 3 such reads in parallel.
+  private int ecParallelReadPoolLimit = 10 * 3;
 
   @Config(key = "ozone.client.checksum.combine.mode",
       defaultValue = "COMPOSITE_CRC",
@@ -317,13 +336,17 @@ public class OzoneClientConfig {
           tags = ConfigTag.CLIENT)
   private boolean enablePutblockPiggybacking = false;
 
-  @Config(key = "ozone.client.datastream.putblock.on.close.enabled",
+  @Config(key = "ozone.client.datastream.putblock.without.raft.enabled",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
-      description = "When enabled, use StreamInitWithPutBlock so datanodes commit PutBlock " +
-          "when the Ratis data stream closes instead of via a separate WriteAsync PutBlock.",
+      description = "When enabled, the PutBlock of a Ratis data stream is committed through the data stream " +
+          "instead of a separate WriteAsync PutBlock, so that it does not go through the Raft log: " +
+          "StreamInitWithPutBlock is used so that datanodes commit PutBlock when the data stream closes, " +
+          "and the PutBlock triggered by a flush in the middle of the stream is sent as a data stream command. " +
+          "It takes effect only for pipelines whose datanodes all support committing PutBlock through the data " +
+          "stream; otherwise PutBlock goes through the Raft log.",
       tags = ConfigTag.CLIENT)
-  private boolean datastreamPutBlockOnCloseEnabled = false;
+  private boolean datastreamPutBlockWithoutRaftEnabled = false;
 
   @Config(key = "ozone.client.key.write.concurrency",
       defaultValue = "1",
@@ -338,7 +361,9 @@ public class OzoneClientConfig {
       defaultValue = "33554432",
       type = ConfigType.LONG,
       tags = {ConfigTag.CLIENT},
-      description = "Extra bytes to prefetch during streaming reads.")
+      description = "Size of the pre-read window for streaming reads: the number of bytes requested from the " +
+          "datanode ahead of the current read position. The window is refilled in bulk once the bytes requested " +
+          "ahead drop below half of this value. Set to 0 to disable pre-read.")
   private long streamReadPreReadSize = 32L << 20;
 
   @Config(key = "ozone.client.stream.read.response-data-size",
@@ -379,6 +404,12 @@ public class OzoneClientConfig {
           OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE);
       bytesPerChecksum =
           OzoneConfigKeys.OZONE_CLIENT_BYTES_PER_CHECKSUM_MIN_SIZE;
+    }
+
+    if (ecParallelReadPoolLimit < 1) {
+      LOG.warn("ozone.client.ec.parallel.read.pool.limit ({}) must be at least 1, resetting to 1.",
+          ecParallelReadPoolLimit);
+      ecParallelReadPoolLimit = 1;
     }
 
     // Verify client configs related to HBase enhancements
@@ -620,6 +651,22 @@ public class OzoneClientConfig {
     return ecReconstructStripeWritePoolLimit;
   }
 
+  public boolean isEcParallelReadEnabled() {
+    return ecParallelReadEnabled;
+  }
+
+  public void setEcParallelReadEnabled(boolean ecParallelReadEnabled) {
+    this.ecParallelReadEnabled = ecParallelReadEnabled;
+  }
+
+  public int getEcParallelReadPoolLimit() {
+    return ecParallelReadPoolLimit;
+  }
+
+  public void setEcParallelReadPoolLimit(int poolLimit) {
+    this.ecParallelReadPoolLimit = poolLimit;
+  }
+
   public void setFsDefaultBucketLayout(String bucketLayout) {
     if (!bucketLayout.isEmpty()) {
       this.fsDefaultBucketLayout = bucketLayout;
@@ -706,12 +753,12 @@ public class OzoneClientConfig {
     this.streamReadTimeout = streamReadTimeout;
   }
 
-  public boolean isDatastreamPutBlockOnCloseEnabled() {
-    return datastreamPutBlockOnCloseEnabled;
+  public boolean isDatastreamPutBlockWithoutRaftEnabled() {
+    return datastreamPutBlockWithoutRaftEnabled;
   }
 
-  public void setDatastreamPutBlockOnCloseEnabled(boolean datastreamPutBlockOnCloseEnabled) {
-    this.datastreamPutBlockOnCloseEnabled = datastreamPutBlockOnCloseEnabled;
+  public void setDatastreamPutBlockWithoutRaftEnabled(boolean datastreamPutBlockWithoutRaftEnabled) {
+    this.datastreamPutBlockWithoutRaftEnabled = datastreamPutBlockWithoutRaftEnabled;
   }
 
   /**

@@ -46,7 +46,8 @@
       <enabled>#{isFalse(env['GITHUB_ACTIONS'])}</enabled>
     </local>
     <remote>
-      <enabled>false</enabled>
+      <enabled>true</enabled>
+      <storeEnabled>#{isTrue(env['GITHUB_ACTIONS']) and env['DEVELOCITY_ACCESS_KEY'] != null and env['DEVELOCITY_ACCESS_KEY'] != ''}</storeEnabled>
     </remote>
   </buildCache>
 </develocity>
