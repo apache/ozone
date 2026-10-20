@@ -330,6 +330,7 @@
                     </exec>
                     <exec dir="${project.build.directory}/native/rocksdb" executable="make" failonerror="true" />
                     <delete dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.source.version}" includeemptydirs="true" />
+                    <delete file="${project.build.directory}/native/rocksdb/CMakeFiles/CMakeConfigureLog.yaml" />
                   </target>
                 </configuration>
               </execution>
