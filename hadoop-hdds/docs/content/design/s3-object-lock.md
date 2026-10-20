@@ -55,10 +55,10 @@ To ship the core feature sooner, the first release excludes versioning, Legacy b
 * Governance bypass on overwrite and rename: a Governance-locked key can only be overwritten or renamed with the `bypassGovernanceRetention` flag and the bypass permission.
   AWS S3 does not need this because it writes a new version (see [Retention Modes and Governance Bypass](#3-retention-modes-and-governance-bypass)).
 * Authorization: Ozone has no root account.
-  * Native ACLs: changing locks and bypassing Governance need the volume or bucket owner; setting Compliance needs an Ozone administrator (see [Native ACLs](#1-native-acls)).
+  * Native ACLs: changing locks and bypassing Governance need the volume or bucket owner; setting or changing a Compliance retention needs an Ozone administrator (see [Native ACLs](#1-native-acls)).
   * Ranger: action-level permissions need `enableActionMatcherInPoliciesCondition`, which is `false` by default (see [Ranger](#2-ranger)).
     Object Lock uses the same access types as data (`READ` / `WRITE`), so without `action-matches`, anyone who can write a key can also change its locks.
-  * No API can remove a Compliance retention. With Ranger, only the offline `ozone repair` command can (see [Offline Compliance Retention Repair](#offline-compliance-retention-repair)).
+  * No API can remove a Compliance retention, in either model. Only the offline `ozone repair` command can (see [Offline Compliance Retention Repair](#offline-compliance-retention-repair)).
 
 ## Technical Description
 
@@ -78,7 +78,7 @@ To ship the core feature sooner, the first release excludes versioning, Legacy b
 
 * Protects a key until a `RetainUntilDate`. The date is either fixed (set directly, or from days / years) or comes from an event hold.
 * Modes:
-  * Compliance: no one, including administrators, can remove it, shorten it or overwrite the key through the Ozone API before it expires. With Ranger, only the offline `ozone repair` command can change it.
+  * Compliance: no one, including administrators, can remove it, shorten it or overwrite the key through the Ozone API before it expires. Only the offline `ozone repair` command can change it.
   * Governance: blocks normal users, but users with the bypass permission can bypass it.
 * Event hold (AWS S3 *variable retention*):
   * Used when the retention depends on an external event, such as a contract ending, an employee leaving or a loan closing.
@@ -210,7 +210,7 @@ Even with `CREATE`, `WRITE` or `DELETE`, overwriting or deleting a locked key is
 unless the Governance bypass applies (see [Retention Modes and Governance Bypass](#3-retention-modes-and-governance-bypass)).
 
 The cluster uses one of two authorization models:
-* [Native ACLs](#1-native-acls) have no per-action permissions, so changing locks needs the owner, and setting Compliance needs an Ozone administrator.
+* [Native ACLs](#1-native-acls) have no per-action permissions, so changing locks needs the owner, and setting or changing a Compliance retention needs an Ozone administrator.
 * [Ranger](#2-ranger) checks access types, and `action-matches` can limit a policy item to specific S3 actions. Use Ranger when each Object Lock operation needs its own permission.
 
 In both models, keys that only get the bucket default retention need no extra check, because the default was authorized when it was set.
@@ -225,17 +225,22 @@ Native clients pass the same settings and the `bypassGovernanceRetention` flag a
 | `GetBucketObjectLockConfiguration`                                                | Bucket       | `READ`              |
 | `GetObjectRetention`, `GetObjectLegalHold`                                        | Key          | `READ`              |
 | `PutBucketObjectLockConfiguration` (no default, or `GOVERNANCE`)                  | Bucket       | Owner               |
-| `PutObjectRetention` (`GOVERNANCE`, extending, or releasing an event hold), `PutObjectLegalHold` | Key | Owner         |
+| `PutObjectRetention` on a `GOVERNANCE` key or a key without retention (setting `GOVERNANCE`), `PutObjectLegalHold` | Key | Owner |
 | Governance bypass (including shortening or removing a `GOVERNANCE` retention)     | Key          | Owner               |
-| Set `COMPLIANCE`: on a key, `GOVERNANCE` → `COMPLIANCE`, or as the bucket default (also changing a `COMPLIANCE` default) | Bucket / Key | Ozone administrator |
+| Release the event hold of a `COMPLIANCE` key (`EventHold=OFF` without `RetainUntilDate`) | Key  | Owner               |
+| Set or change `COMPLIANCE`: on a key (including extending it), `GOVERNANCE` → `COMPLIANCE`, or as the bucket default (also changing a `COMPLIANCE` default) | Bucket / Key | Ozone administrator |
 
 * **Owner**: the owner of the volume or bucket, the same owner that `OzoneNativeAuthorizer` already lets skip ACL checks. Ozone administrators can do everything an owner can.
   Locks use the owner instead of an ACL type like `WRITE_ACL`, because any ACL type can be granted to other users.
 * **Ozone administrator**: a user in `ozone.administrators` or a group in `ozone.administrators.groups` (if neither is set, the user that starts OM).
   Read-only and S3 administrators are not included. The role is cluster wide; use Ranger for finer control.
 * Reading lock information only needs `READ`, because `HeadObject` / `GetObject` already return it in the `x-amz-object-lock-*` headers.
-* Setting Compliance needs an administrator because it cannot be undone through any API. Extending a Compliance retention or releasing its event hold only needs the owner, as in AWS S3.
-  Keys that get a Compliance bucket default need no administrator check.
+* Every change to a Compliance retention needs an administrator, because no API can undo it: setting it, and also extending it (a later date or a longer event hold duration),
+  which could otherwise lock a key for up to 100 years. This is stricter than AWS S3, where `PutObjectRetention` is enough.
+* The one exception is releasing the event hold of a Compliance key without a `RetainUntilDate`: it only turns the stored duration, which an administrator already approved, into a date,
+  so the owner can do it when the business event happens. Releasing with a `RetainUntilDate` needs an administrator.
+* Keys that get a Compliance bucket default need no administrator check. To store Compliance data, an administrator sets `COMPLIANCE` as the bucket default once,
+  and applications upload as normal users.
 
 ##### Extra Checks for Object Lock Headers
 
@@ -263,8 +268,8 @@ So a user who can only write data cannot set a lock by adding a header.
 
 * Object Lock uses the same access types as data: `READ` to read lock information, `WRITE` to change it, and `WRITE` and `DELETE` for the Governance bypass.
   They apply to every client: S3 Gateway, ofs / o3fs and the Ozone CLI.
-* Ranger has no administrator role for Object Lock. `action-matches` is what separates lock management from data access, including setting Compliance.
-  No Ranger permission can remove a Compliance retention; only the offline `ozone repair` command can (see [Offline Compliance Retention Repair](#offline-compliance-retention-repair)).
+* Ranger has no administrator role, so setting Compliance needs no special permission: `PutObjectRetention` (`WRITE`) is enough, unlike native ACLs, where it needs an Ozone administrator.
+  Only `action-matches` can limit who sets it. No Ranger permission can remove a Compliance retention; only the offline `ozone repair` command can (see [Offline Compliance Retention Repair](#offline-compliance-retention-repair)).
 
 ##### Access Type Mapping
 
@@ -331,7 +336,7 @@ These checks also run for requests without an S3 action, by access type only.
 #### 3. Retention Modes and Governance Bypass
 
 * **Compliance**: no one can overwrite, shorten or delete the key through the Ozone API until the retention expires, including administrators and `BypassGovernanceRetention`.
-  With Ranger, only the offline `ozone repair` command can change it.
+  Only the offline `ozone repair` command can change it.
 * **Governance**: protects keys from accidental deletion, and authorized users can bypass it. A bypass needs both:
   1. The `bypassGovernanceRetention` flag: S3 Gateway sets it from `x-amz-bypass-governance-retention: true`, and native clients pass it as an argument.
      It is carried in `KeyArgs` and `DeleteKeyArgs` for delete, batch delete, overwrite, multipart upload, rename and `PutObjectRetention`.
@@ -359,7 +364,7 @@ Who may send `PutObjectRetention` depends on the model: see [Native ACLs](#1-nat
 >
 > In AWS S3, Compliance objects are only destroyed when the whole AWS account is closed. Ozone has no root or tenant account,
 > so no administrator, native ACL or Ranger policy can remove a Compliance lock through the Ozone API before it expires.
-> With Ranger, it can only be changed offline with `ozone repair` (see below).
+> It can only be changed offline with `ozone repair` (see below).
 
 ### New Ozone APIs
 
@@ -452,8 +457,9 @@ Following the `ozone repair` convention, an offline command updates the retentio
 ozone repair om object-lock --bucket /<volume>/<bucket> [--key <key> | --prefix <prefix>] [--dry-run]
 ```
 
-* **Only for Ranger**: Ranger has no administrator role for Object Lock, so anyone with `PutObjectRetention` (`WRITE`) can set Compliance, and no Ranger permission can remove it.
-  A Compliance retention set by mistake can only be removed with this command. With native ACLs only Ozone administrators can set Compliance (see [Native ACLs](#1-native-acls)), so the command is not needed.
+* **Both models**: no API can relax a Compliance retention, so a Compliance retention set by mistake can only be removed with this command.
+  * Native ACLs: an Ozone administrator can set Compliance (make the retention stricter), but cannot relax it.
+  * Ranger: setting Compliance needs no special permission (anyone with `PutObjectRetention` can set it), and no Ranger permission can relax it.
 * **Offline**: runs against the OM DB while OM is stopped, like other `ozone repair om` tools, so it cannot be reached through S3 Gateway or OM RPC.
 * **Who**: Ozone administrators with access to the OM host and DB, which is already outside the API trusted boundary (see [Trusted Boundary](#trusted-boundary-and-compliance-scope)).
 * **What**: removes the retention of the selected keys or changes it from `COMPLIANCE` to `GOVERNANCE`. `--dry-run` lists the keys without changing them.
@@ -466,7 +472,7 @@ and the final check in `validateAndUpdateCache` keeps it linearizable. The impac
 
 ## Security
 
-With native ACLs, changing locks and bypassing Governance need the volume or bucket owner, and setting Compliance needs an Ozone administrator.
+With native ACLs, changing locks and bypassing Governance need the volume or bucket owner, and setting or changing a Compliance retention needs an Ozone administrator (except releasing its event hold without a date).
 
 With Ranger, the S3 Object Lock actions map to the existing access types (`READ`, `WRITE`, and `DELETE` for the bypass), and `action-matches` limits policy items to specific actions.
 This gives least privilege without new access types.
@@ -539,7 +545,7 @@ The work is split into the phases below. Details are left to the individual Jira
 
 ### Phase 2: Authorization
 
-* Native ACLs: `READ` to read locks, the owner to change locks and bypass Governance, an Ozone administrator for Compliance,
+* Native ACLs: `READ` to read locks, the owner to change locks and bypass Governance, an Ozone administrator to set or change Compliance (the owner can release its event hold without a date),
   and the [extra checks for Object Lock headers](#extra-checks-for-object-lock-headers).
 * Ranger: register the 7 actions in `S3GActionIamMapper`, `IamSessionPolicyResolver` and Ranger's `ozone.json` with the [access types](#access-type-mapping). Depends on HDDS-17054.
 * Ranger [dependent permissions](#dependent-permissions): replace the fixed `DEPENDENT_S3_ACTIONS` map with (access type, action) pairs from the OM request, also checked for requests without an S3 action.
@@ -563,7 +569,7 @@ The work is split into the phases below. Details are left to the individual Jira
 
 ### Phase 5: Offline Compliance Retention Repair
 
-* `ozone repair om object-lock` for Ranger deployments: remove or downgrade Compliance retention per key or prefix while OM is offline, with `--dry-run` and a log of every change.
+* `ozone repair om object-lock`: remove or downgrade Compliance retention per key or prefix while OM is offline, with `--dry-run` and a log of every change.
 
 ### Phase 6: Testing
 
