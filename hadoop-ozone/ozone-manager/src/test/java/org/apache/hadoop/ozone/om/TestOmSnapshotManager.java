@@ -24,8 +24,10 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_DIFF_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_CANDIDATE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.processFile;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
@@ -61,15 +63,19 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedBlockBasedTableConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -174,6 +180,25 @@ class TestOmSnapshotManager {
 
     when(snapshotInfoTable.isEmpty()).thenReturn(true);
     assertTrue(om.getOmSnapshotManager().canDisableFsSnapshot(om.getMetadataManager()));
+  }
+
+  @Test
+  public void testSnapshotDiffDbFormatVersion() throws IOException {
+    // db.snapdiff must use the pinned format_version, so that it stays readable after a downgrade.
+    Path snapDiffDb = Paths.get(ServerUtils.getDBPath(om.getConfiguration(), OZONE_OM_SNAPSHOT_DIFF_DB_DIR).toString(),
+        OM_SNAPSHOT_DIFF_DB_NAME);
+    Path optionsFile;
+    try (Stream<Path> files = Files.list(snapDiffDb)) {
+      optionsFile = files.filter(p -> p.getFileName().toString().matches("OPTIONS-[0-9]+"))
+          .max(Path::compareTo)
+          .orElseThrow(() -> new IOException("No OPTIONS file in " + snapDiffDb));
+    }
+    List<String> formatVersions = Files.readAllLines(optionsFile, StandardCharsets.UTF_8).stream()
+        .map(String::trim)
+        .filter(line -> line.startsWith("format_version="))
+        .collect(Collectors.toList());
+    assertThat(formatVersions).isNotEmpty()
+        .allMatch(line -> line.equals("format_version=" + ManagedBlockBasedTableConfig.FORMAT_VERSION));
   }
 
   @Test
