@@ -95,15 +95,17 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 
 /**
  * Test class for @{@link SCMBlockProtocolServer}.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestSCMBlockProtocolServer {
   private OzoneConfiguration config;
   private SCMBlockProtocolServer server;
@@ -186,7 +188,7 @@ public class TestSCMBlockProtocolServer {
     }
   }
 
-  @BeforeEach
+  @BeforeAll
   void setUp(@TempDir File dir) throws Exception {
     config = SCMTestUtils.getConf(dir);
     config.set(SCMBlockProtocolServer.OM_KERBEROS_PRINCIPAL_KEY, "om/_HOST@EXAMPLE.COM");
@@ -219,7 +221,7 @@ public class TestSCMBlockProtocolServer {
     service = new ScmBlockLocationProtocolServerSideTranslatorPB(server, scm, mock(ProtocolMessageMetrics.class));
   }
 
-  @AfterEach
+  @AfterAll
   public void tearDown() throws Exception {
     if (scm != null) {
       scm.stop();
@@ -589,11 +591,15 @@ public class TestSCMBlockProtocolServer {
   public void testQueryUpgradeStatusInSafemode() {
     // Put SCM into safe mode via the context the server consults.
     scm.getScmContext().updateSafeModeStatus(SafeModeStatus.INITIAL);
-    assertTrue(scm.getScmContext().isInSafeMode());
+    try {
+      assertTrue(scm.getScmContext().isInSafeMode());
 
-    // Querying upgrade status is blocked while SCM is in safe mode.
-    SCMException ex = assertThrows(SCMException.class, () -> server.queryUpgradeStatus());
-    assertEquals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION, ex.getResult());
+      // Querying upgrade status is blocked while SCM is in safe mode.
+      SCMException ex = assertThrows(SCMException.class, () -> server.queryUpgradeStatus());
+      assertEquals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION, ex.getResult());
+    } finally {
+      scm.getScmContext().updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
+    }
   }
 
   private SCMBlockProtocolServer buildTestServer(
