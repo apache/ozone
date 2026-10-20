@@ -28,13 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
-import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -432,112 +430,6 @@ public class TestDeletedBlockLog {
   // exported before the source recorded the deletion keeps the blocks with no pending-delete record, while a copy
   // exported later carries it. These tests verify that SCM keeps the transaction for resend whenever it cannot rule
   // out a replica of the first kind.
-  @Test
-  public void testCommitTransactionsDefersPurgeForReplicaAddedDuringCommit()
-      throws Exception {
-    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
-    addTransactions(generateData(1), true);
-    mockContainerHealthResult(true);
-    List<DeletedBlocksTransaction> blocks =
-        getTransactions(BLOCKS_PER_TXN * THREE);
-    assertEquals(THREE, blocks.size());
-    // All THREE entries above are the same logical transaction, one per replica DN;
-    // commit it one DN at a time to control exactly how many times
-    // containerManager.getContainerReplicas() is invoked per commit call.
-    List<DeletedBlocksTransaction> singleTxn =
-        Collections.singletonList(blocks.get(0));
-
-    final ContainerID cid = ContainerID.valueOf(blocks.get(0).getContainerID());
-    final Set<ContainerReplica> originalReplicas = new HashSet<>(replicas.get(cid));
-
-    // Simulate ReplicationManager landing a new, never-acked replica of the container
-    // in the window between the ack-set check and the durable purge: the first three
-    // getContainerReplicas() calls (the in-loop decision for each of the three commits
-    // below) see the original replica set, while every call after that (the pre-purge
-    // recheck) sees a fourth replica that never received or acknowledged the deletion.
-    ContainerReplica newReplica = ContainerReplica.newBuilder()
-        .setContainerID(cid)
-        .setContainerState(ContainerReplicaProto.State.CLOSED)
-        .setDatanodeDetails(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build())
-        .build();
-    Set<ContainerReplica> grownReplicas = new HashSet<>(originalReplicas);
-    grownReplicas.add(newReplica);
-    when(containerManager.getContainerReplicas(cid)).thenReturn(
-        originalReplicas, originalReplicas, originalReplicas, grownReplicas);
-
-    commitTransactions(singleTxn, dnList.get(0));
-    commitTransactions(singleTxn, dnList.get(1));
-    commitTransactions(singleTxn, dnList.get(2));
-
-    // The transaction must remain outstanding: the new replica has not acknowledged the
-    // delete, so it may be a copy exported before the source recorded the deletion.
-    assertEquals(1, deletedBlockLog.getNumOfValidTransactions(),
-        "transaction was purged although a never-acked replica exists");
-    assertEquals(1, deletedBlockLog.getTransactionToDNsCommitMapSize(),
-        "commit tracking was dropped although the transaction was not purged");
-  }
-
-  @Test
-  public void testCommitTransactionsReadsEachContainerOnceAndDefersConsistently()
-      throws Exception {
-    deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
-    mockContainerHealthResult(true);
-
-    // Two independent delete-block transactions against the SAME container (a container
-    // commonly accumulates several separate pending deletions over time), each already
-    // acknowledged by two of its three replicas before the decisive final ack below.
-    Map<Long, List<DeletedBlock>> firstTxBlocks = generateData(1);
-    long containerID = firstTxBlocks.keySet().iterator().next();
-    List<DeletedBlock> secondTxBlocks = firstTxBlocks.get(containerID).stream()
-        .map(b -> new DeletedBlock(new BlockID(containerID, b.getBlockID().getLocalID() + BLOCKS_PER_TXN),
-            b.getSize(), b.getReplicatedSize(), b.getSizePerReplica()))
-        .collect(Collectors.toList());
-    addTransactions(firstTxBlocks, true);
-    addTransactions(Collections.singletonMap(containerID, secondTxBlocks), true);
-
-    List<DeletedBlocksTransaction> blocks = getTransactions(2 * BLOCKS_PER_TXN * THREE);
-    assertEquals(2 * THREE, blocks.size());
-    Collection<DeletedBlocksTransaction> bothTxns = blocks.stream()
-        .collect(Collectors.toMap(DeletedBlocksTransaction::getTxID, t -> t, (a, b) -> a))
-        .values();
-    assertEquals(2, bothTxns.size());
-
-    final ContainerID cid = ContainerID.valueOf(containerID);
-    final Set<ContainerReplica> originalReplicas = new HashSet<>(replicas.get(cid));
-
-    commitTransactions(bothTxns, dnList.get(0));
-    commitTransactions(bothTxns, dnList.get(1));
-
-    // Simulate ReplicationManager landing a new, never-acked replica exactly as the
-    // decisive final ack arrives: the ack-set check for each of the two txIDs below sees
-    // the original replica set, while the pre-purge snapshot sees a fourth replica that
-    // never received or acknowledged either deletion.
-    ContainerReplica newReplica = ContainerReplica.newBuilder()
-        .setContainerID(cid)
-        .setContainerState(ContainerReplicaProto.State.CLOSED)
-        .setDatanodeDetails(DatanodeDetails.newBuilder().setUuid(UUID.randomUUID()).build())
-        .build();
-    Set<ContainerReplica> grownReplicas = new HashSet<>(originalReplicas);
-    grownReplicas.add(newReplica);
-    when(containerManager.getContainerReplicas(cid)).thenReturn(
-        originalReplicas, originalReplicas, grownReplicas);
-    clearInvocations(containerManager);
-
-    commitTransactions(bothTxns, dnList.get(2));
-
-    // Two ack-set checks (one per txID) plus exactly one deduplicated pre-purge snapshot
-    // shared by both txIDs of this container: three calls total, not four.
-    verify(containerManager, times(3)).getContainerReplicas(cid);
-
-    // Both transactions must stay outstanding and get the SAME verdict: a replica that has
-    // not acknowledged either deletion now exists, so both must stay available for resend.
-    assertEquals(2, deletedBlockLog.getNumOfValidTransactions(),
-        "both transactions for the container must stay outstanding once a never-acked "
-            + "replica exists");
-    assertEquals(2, deletedBlockLog.getTransactionToDNsCommitMapSize(),
-        "commit tracking was dropped although neither transaction was purged");
-  }
-
   @Test
   public void testCommitTransactionsDefersPurgeOnlyForContainerWithPendingAdd() throws Exception {
     deletedBlockLog.setScmCommandTimeoutMs(Long.MAX_VALUE);
