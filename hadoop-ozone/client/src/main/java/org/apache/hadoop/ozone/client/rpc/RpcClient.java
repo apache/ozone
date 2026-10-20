@@ -1841,6 +1841,12 @@ public class RpcClient implements ClientProtocol {
   @Override
   public void renameKey(String volumeName, String bucketName,
       String fromKeyName, String toKeyName) throws IOException {
+    renameKey(volumeName, bucketName, fromKeyName, toKeyName, false);
+  }
+
+  @Override
+  public void renameKey(String volumeName, String bucketName,
+      String fromKeyName, String toKeyName, boolean requireFileSystemOptimized) throws IOException {
     verifyVolumeName(volumeName);
     verifyBucketName(bucketName);
     if (checkKeyNameEnabled) {
@@ -1851,6 +1857,7 @@ public class RpcClient implements ClientProtocol {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(fromKeyName)
+        .setRequireFileSystemOptimized(requireFileSystemOptimized)
         .build();
     ozoneManagerClient.renameKey(keyArgs, toKeyName);
   }

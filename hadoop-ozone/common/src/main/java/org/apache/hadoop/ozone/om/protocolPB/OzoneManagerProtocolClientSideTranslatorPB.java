@@ -995,6 +995,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .setDataSize(args.getDataSize()).build();
     req.setKeyArgs(keyArgs);
     req.setToKeyName(toKeyName);
+    if (args.isRequireFileSystemOptimized()) {
+      req.setRequireFileSystemOptimized(true);
+    }
 
     OMRequest omRequest = createOMRequest(Type.RenameKey)
         .setRenameKeyRequest(req)

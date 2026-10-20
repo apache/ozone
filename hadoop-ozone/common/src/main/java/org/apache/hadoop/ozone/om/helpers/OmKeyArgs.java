@@ -67,6 +67,9 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // Set by file system clients so that OM rejects a listing or a key info
   // read on an OBJECT_STORE bucket.
   private final boolean requireFileSystemLayout;
+  // Set by file system clients so that OM rejects a rename unless the bucket
+  // is FILE_SYSTEM_OPTIMIZED.
+  private final boolean requireFileSystemOptimized;
   private final String expectedETag;
   private final boolean derivedKeyPiggyBacking;
 
@@ -92,6 +95,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.expectedDataGeneration = b.expectedDataGeneration;
     this.listPrefix = b.listPrefix;
     this.requireFileSystemLayout = b.requireFileSystemLayout;
+    this.requireFileSystemOptimized = b.requireFileSystemOptimized;
     this.expectedETag = b.expectedETag;
     this.derivedKeyPiggyBacking = b.derivedKeyPiggyBacking;
   }
@@ -192,6 +196,14 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return requireFileSystemLayout;
   }
 
+  /**
+   * Whether OM must reject a rename unless the resolved bucket layout is
+   * FILE_SYSTEM_OPTIMIZED, because the caller relies on atomic directory rename.
+   */
+  public boolean isRequireFileSystemOptimized() {
+    return requireFileSystemOptimized;
+  }
+
   public String getExpectedETag() {
     return expectedETag;
   }
@@ -275,6 +287,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private Long expectedDataGeneration = null;
     private String listPrefix = null;
     private boolean requireFileSystemLayout;
+    private boolean requireFileSystemOptimized;
     private String expectedETag;
     private boolean derivedKeyPiggyBacking;
 
@@ -328,6 +341,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.acls = AclListBuilder.of(obj.acls);
       this.listPrefix = obj.listPrefix;
       this.requireFileSystemLayout = obj.requireFileSystemLayout;
+      this.requireFileSystemOptimized = obj.requireFileSystemOptimized;
     }
 
     public Builder setVolumeName(String volume) {
@@ -468,6 +482,11 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setRequireFileSystemLayout(boolean require) {
       this.requireFileSystemLayout = require;
+      return this;
+    }
+
+    public Builder setRequireFileSystemOptimized(boolean require) {
+      this.requireFileSystemOptimized = require;
       return this;
     }
 

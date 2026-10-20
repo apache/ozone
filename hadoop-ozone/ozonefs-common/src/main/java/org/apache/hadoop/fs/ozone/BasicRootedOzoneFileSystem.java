@@ -53,6 +53,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.ContentSummary;
@@ -433,6 +434,13 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
       throw new IOException("Cannot rename across different volumes or buckets." +
           " Only supported within the same bucket.");
     }
+    // An empty bucket name takes the getBucket path, which reports it as FileNotFoundException.
+    if (!ofsSrc.getBucketName().isEmpty() && adapterImpl.isRenameRequiringFileSystemOptimizedSupported()) {
+      Optional<Boolean> renamed = renameIfFileSystemOptimized(ofsSrc, ofsDst);
+      if (renamed.isPresent()) {
+        return renamed.get();
+      }
+    }
     OzoneBucket bucket = adapterImpl.getBucket(ofsSrc, false);
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
       return renameFSO(bucket, ofsSrc, ofsDst);
@@ -517,24 +525,55 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
   private boolean renameFSO(OzoneBucket bucket,
       OFSPath srcPath, OFSPath dstPath) throws IOException {
     // construct src and dst key paths
-    String srcKeyPath = srcPath.getNonKeyPathNoPrefixDelim() +
-        OZONE_URI_DELIMITER + srcPath.getKeyName();
-    String dstKeyPath = dstPath.getNonKeyPathNoPrefixDelim() +
-        OZONE_URI_DELIMITER + dstPath.getKeyName();
+    String srcKeyPath = fsoRenamePath(srcPath);
+    String dstKeyPath = fsoRenamePath(dstPath);
     try {
       adapterImpl.rename(bucket, srcKeyPath, dstKeyPath);
     } catch (OMException ome) {
-      LOG.error("rename key failed: {}. source:{}, destin:{}",
-          ome.getMessage(), srcKeyPath, dstKeyPath);
-      if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
-          OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
-          OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
-        return false;
-      } else {
-        throw ome;
-      }
+      return fsoRenameFailed(ome, srcKeyPath, dstKeyPath);
     }
     return true;
+  }
+
+  /**
+   * Like {@link #renameFSO} without fetching the bucket first: one RenameKey that OM accepts only on a
+   * FILE_SYSTEM_OPTIMIZED bucket (HDDS-16951), so an FSO rename needs no InfoBucket. Returns empty when the rename
+   * must take the path that fetches the bucket instead: OM rejected the bucket as not FILE_SYSTEM_OPTIMIZED, or the
+   * volume or bucket does not exist, which that path reports as before.
+   */
+  private Optional<Boolean> renameIfFileSystemOptimized(OFSPath srcPath, OFSPath dstPath) throws IOException {
+    String srcKeyPath = fsoRenamePath(srcPath);
+    String dstKeyPath = fsoRenamePath(dstPath);
+    try {
+      adapterImpl.renameRequiringFileSystemOptimized(srcKeyPath, dstKeyPath);
+    } catch (OMException ome) {
+      switch (ome.getResult()) {
+      case NOT_SUPPORTED_OPERATION:
+      case BUCKET_NOT_FOUND:
+      case VOLUME_NOT_FOUND:
+        return Optional.empty();
+      default:
+        return Optional.of(fsoRenameFailed(ome, srcKeyPath, dstKeyPath));
+      }
+    }
+    return Optional.of(true);
+  }
+
+  private static String fsoRenamePath(OFSPath path) {
+    return path.getNonKeyPathNoPrefixDelim() + OZONE_URI_DELIMITER + path.getKeyName();
+  }
+
+  /** Returns false for the failures that make an FSO rename return false, otherwise rethrows. */
+  private static boolean fsoRenameFailed(OMException ome, String srcKeyPath, String dstKeyPath) throws OMException {
+    LOG.error("rename key failed: {}. source:{}, destin:{}",
+        ome.getMessage(), srcKeyPath, dstKeyPath);
+    if (OMException.ResultCodes.KEY_ALREADY_EXISTS == ome.getResult() ||
+        OMException.ResultCodes.KEY_RENAME_ERROR  == ome.getResult() ||
+        OMException.ResultCodes.KEY_NOT_FOUND == ome.getResult()) {
+      return false;
+    } else {
+      throw ome;
+    }
   }
 
   /**

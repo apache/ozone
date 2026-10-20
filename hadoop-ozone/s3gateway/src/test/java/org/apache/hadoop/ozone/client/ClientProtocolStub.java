@@ -401,6 +401,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void renameKey(String volumeName, String bucketName, String fromKeyName, String toKeyName,
+      boolean requireFileSystemOptimized) throws IOException {
+  }
+
+  @Override
   public void renameKeys(String volumeName, String bucketName,
                          Map<String, String> keyMap) throws IOException {
 

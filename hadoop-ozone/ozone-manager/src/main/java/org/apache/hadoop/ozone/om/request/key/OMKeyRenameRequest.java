@@ -76,6 +76,14 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         .getRenameKeyRequest();
     Objects.requireNonNull(renameKeyRequest, "renameKeyRequest == null");
 
+    // Checked before Ratis only: preExecute does not run when the request is applied. The request was created for the
+    // link-resolved layout, and the OBJECT_STORE request class also serves LEGACY, so test the layout itself.
+    if (renameKeyRequest.getRequireFileSystemOptimized() && !getBucketLayout().isFileSystemOptimized()) {
+      throw new OMException("Bucket: " + renameKeyRequest.getKeyArgs().getBucketName()
+          + " has layout: " + getBucketLayout() + ", but the rename requires "
+          + BucketLayout.FILE_SYSTEM_OPTIMIZED + ".", OMException.ResultCodes.NOT_SUPPORTED_OPERATION);
+    }
+
     KeyArgs renameKeyArgs = renameKeyRequest.getKeyArgs();
 
     if (ozoneManager.getConfig().isKeyNameCharacterCheckEnabled()) {

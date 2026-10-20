@@ -2030,6 +2030,45 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   }
 
   @Test
+  void testRenameDoesNotTriggerInfoBucketOnFso() throws Exception {
+    assumeTrue(bucketLayout.isFileSystemOptimized(), "Only a rename in an FSO bucket skips the bucket lookup");
+    Path dir = new Path(bucketPath, "rename-rpc-" + RandomStringUtils.secure().nextAlphanumeric(5));
+    Path src = new Path(dir, "file");
+    Path dst = new Path(dir, "renamed");
+    ContractTestUtils.touch(fs, src);
+
+    OMMetrics metrics = getOMMetrics();
+    long bucketInfosBefore = metrics.getNumBucketInfos();
+
+    assertTrue(fs.rename(src, dst));
+
+    assertEquals(bucketInfosBefore, metrics.getNumBucketInfos(), "an FSO rename must not trigger InfoBucket");
+    assertTrue(fs.exists(dst));
+    assertFalse(fs.exists(src));
+  }
+
+  @Test
+  void testRenameRejectsObsBucket() throws Exception {
+    // OM rejects the rename, and the client then rejects the bucket itself, as before.
+    OzoneBucket obsBucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.OBJECT_STORE);
+    DataTestUtil.createKey(obsBucket, "obs-key", "data".getBytes(StandardCharsets.UTF_8));
+    Path obsBucketPath = new Path(new Path(OZONE_URI_DELIMITER, obsBucket.getVolumeName()), obsBucket.getName());
+
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> fs.rename(new Path(obsBucketPath, "obs-key"), new Path(obsBucketPath, "obs-key-2")));
+    assertThat(exception.getMessage()).contains(obsBucket.getName());
+    assertThat(exception.getMessage()).contains("OBJECT_STORE");
+  }
+
+  @Test
+  void testRenameInMissingBucketFails() throws Exception {
+    Path missingBucket = new Path(new Path(OZONE_URI_DELIMITER, volumeName), "missing-bucket");
+    OMException exception = assertThrows(OMException.class,
+        () -> fs.rename(new Path(missingBucket, "file"), new Path(missingBucket, "file-2")));
+    assertEquals(BUCKET_NOT_FOUND, exception.getResult());
+  }
+
+  @Test
   void testGetFileStatus() throws Exception {
     String volumeNameLocal = getRandomNonExistVolumeName();
     String bucketNameLocal = RandomStringUtils.secure().nextNumeric(5);

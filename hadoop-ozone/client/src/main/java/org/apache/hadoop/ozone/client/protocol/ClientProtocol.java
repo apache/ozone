@@ -702,6 +702,18 @@ public interface ClientProtocol {
                  String toKeyName) throws IOException;
 
   /**
+   * Renames an existing key within a bucket, like
+   * {@link #renameKey(String, String, String, String)}.
+   *
+   * @param requireFileSystemOptimized if true, OM rejects the rename with
+   *     NOT_SUPPORTED_OPERATION unless the resolved bucket layout is
+   *     FILE_SYSTEM_OPTIMIZED. An OM older than
+   *     OzoneManagerVersion.RENAME_KEY_REJECTS_NON_FSO ignores it.
+   */
+  void renameKey(String volumeName, String bucketName, String fromKeyName,
+      String toKeyName, boolean requireFileSystemOptimized) throws IOException;
+
+  /**
    * Renames existing keys within a bucket.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

@@ -1466,6 +1466,10 @@ message RenameKeyRequest{
     required KeyArgs keyArgs = 1;
     required string toKeyName = 2;
     optional uint64 updateID = 3;
+    // Set by file system clients that rely on atomic directory rename: OM
+    // rejects the request with NOT_SUPPORTED_OPERATION unless the resolved
+    // bucket layout is FILE_SYSTEM_OPTIMIZED.
+    optional bool requireFileSystemOptimized = 4;
 }
 
 message RenameKeyResponse{
