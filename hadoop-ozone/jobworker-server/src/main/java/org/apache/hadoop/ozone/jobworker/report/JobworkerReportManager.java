@@ -191,12 +191,6 @@ public final class JobworkerReportManager {
       // Queue the report for specific OM group endpoint
       synchronized (reportQueue) {
         for (List<Message> queue : reportQueue.get(omServiceId).values()) {
-          if (omServiceIdToReports.get(omServiceId).getCmdStatusList().stream()
-              .anyMatch(CommandStatus::hasAttemptId)) {
-            queue.removeIf(message -> message instanceof CommandStatusReportsProto
-                && ((CommandStatusReportsProto) message).getCmdStatusList().stream()
-                    .anyMatch(CommandStatus::hasAttemptId));
-          }
           queue.add(omServiceIdToReports.get(omServiceId).build());
         }
         LOG.debug("Added report {} for omServiceId {}",

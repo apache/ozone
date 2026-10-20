@@ -19,11 +19,11 @@ package org.apache.hadoop.ozone.om.jobworker.command;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -53,18 +53,8 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
   private final Map<OMJobworkerCommandProto.Type, Map<Long, JobworkerCommandInfo>> commandInfoMaps;
   private final CommandTimeoutChecker timeoutChecker;
   private final String omServiceId;
-  private volatile OMJobworkerJobManager durableManager;
-
-  public void setDurableManager(OMJobworkerJobManager manager) {
-    this.durableManager = manager;
-    timeoutChecker.durableReconciliation = () -> {
-      try {
-        manager.reconcileUnavailableWorkers();
-      } catch (IOException e) {
-        LOG.error("Cannot reconcile durable Jobworker assignments; retaining them for retry", e);
-      }
-    };
-  }
+  // Term of this OM if it is the ready leader, otherwise empty.
+  private final Supplier<OptionalLong> leaderTerm;
 
   private static final long DEFAULT_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
 
@@ -72,12 +62,17 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
    * Create a new JobworkerCommandProcessor.
    *
    * @param jobworkerNodeManager the jobworkerNodeManager instance
+   * @param omServiceId the service ID of this OM
+   * @param leaderTerm supplies the Raft term of this OM if it is the ready leader, otherwise empty
    */
-  public OMJobworkerCommandManager(JobworkerNodeManager jobworkerNodeManager, String omServiceId) {
+  public OMJobworkerCommandManager(JobworkerNodeManager jobworkerNodeManager, String omServiceId,
+      Supplier<OptionalLong> leaderTerm) {
     Objects.requireNonNull(jobworkerNodeManager, "jobworkerNodeManager cannot be null");
     Objects.requireNonNull(omServiceId, "omServiceId cannot be null");
+    Objects.requireNonNull(leaderTerm, "leaderTerm cannot be null");
     this.jobworkerNodeManager = jobworkerNodeManager;
     this.omServiceId = omServiceId;
+    this.leaderTerm = leaderTerm;
     this.listeners = new ConcurrentHashMap<>();
     this.commandInfoMaps = new ConcurrentHashMap<>();
     this.timeoutChecker = new CommandTimeoutChecker(listeners, commandInfoMaps);
@@ -97,13 +92,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
   }
 
   public int getInFlightCommandCount(OMJobworkerCommandProto.Type commandType) {
-    if (durableManager != null) {
-      try {
-        return durableManager.count(commandType);
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
-      }
-    }
     if (commandInfoMaps.get(commandType) == null) {
       return 0;
     }
@@ -111,13 +99,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
   }
 
   public boolean isCommandInFlight(OMJobworkerCommandProto.Type commandType, long commandId) {
-    if (durableManager != null) {
-      try {
-        return durableManager.isInFlight(commandType, commandId);
-      } catch (IOException e) {
-        throw new UncheckedIOException(e);
-      }
-    }
     if (commandInfoMaps.get(commandType) == null) {
       return false;
     }
@@ -190,16 +171,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
    */
   protected void processStatusUpdate(JobworkerDetails jobworkerDetails,
                                      CommandStatus cmdStatus) {
-    if (durableManager != null && cmdStatus.getType() != OMJobworkerCommandProto.Type.reregisterCommand) {
-      try {
-        durableManager.reconcile(jobworkerDetails, java.util.Collections.singletonList(
-            org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandStatusReportsProto
-                .newBuilder().addCmdStatus(cmdStatus).build()));
-      } catch (IOException e) {
-        throw new java.io.UncheckedIOException(e);
-      }
-      return;
-    }
     long cmdId = cmdStatus.getCmdId();
     OMJobworkerCommandProto.Type type = cmdStatus.getType();
     JobworkerCommandListener listener = listeners.get(type);
@@ -224,6 +195,11 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
     if (!statusInfo.getJobworkerUuid().equals(jobworkerDetails.getUuid())
         || !omServiceId.equals(cmdStatus.getOmServiceId())) {
       LOG.warn("Ignoring status for command {} from a different worker or OM service", cmdId);
+      return;
+    }
+    if (cmdStatus.hasTerm() && cmdStatus.getTerm() != statusInfo.getTerm()) {
+      LOG.warn("Ignoring status for command {} from term {}, the command was sent in term {}",
+          cmdId, cmdStatus.getTerm(), statusInfo.getTerm());
       return;
     }
     synchronized (statusInfo) {
@@ -314,12 +290,11 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
    * @return the command ID
    */
   public long sendCommand(UUID jobworkerUuid, OMJobworkerCommand command) throws IOException {
-    if (durableManager != null && command.getType() != OMJobworkerCommandProto.Type.reregisterCommand) {
-      if (!listeners.containsKey(command.getType())) {
-        throw new IOException("No Jobworker result listener registered for " + command.getType());
-      }
-      return durableManager.submit(jobworkerUuid, command);
+    OptionalLong term = leaderTerm.get();
+    if (!term.isPresent()) {
+      throw new IOException("Cannot send Jobworker command " + command.getId() + ", OM is not the ready leader");
     }
+    command.setTerm(term.getAsLong());
     OMJobworkerCommandProto.Type type = command.getType();
     JobworkerCommandListener listener = listeners.get(type);
     if (listener == null) {
@@ -341,7 +316,13 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
       commandInfoMap.remove(command.getId(), commandInfo);
       throw e;
     }
-    LOG.debug("Queued command {} of type {} to JobWorker {}", command.getId(), command.getType(), jobworkerUuid);
+    if (!term.equals(leaderTerm.get())) {
+      // Leadership changed while queueing; onLeadershipChange may already have run, so do not leave it behind.
+      commandInfoMap.remove(command.getId(), commandInfo);
+      throw new IOException("Cannot send Jobworker command " + command.getId() + ", OM leadership changed");
+    }
+    LOG.debug("Queued command {} of type {} in term {} to JobWorker {}",
+        command.getId(), command.getType(), command.getTerm(), jobworkerUuid);
     return command.getId();
   }
 
@@ -354,23 +335,33 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
     listener.onSendCommand(command, jobworkerUuid);
   }
 
-  /** Durable terminal notifications are at-least-once; listeners must commit idempotently before returning. */
-  public void notifyCommitted(OMJobworkerCommandProto command, CommandStatus status, JobworkerDetails worker)
-      throws IOException {
-    JobworkerCommandListener listener = listeners.get(command.getCommandType());
-    if (listener == null) {
-      throw new IOException("No result listener registered for " + command.getCommandType());
-    }
-    JobworkerCommandInfo info = new JobworkerCommandInfo(listener.decodeCommand(command),
-        worker.getUuid(), status.getStatus());
-    info.setResultCode(status.getResultCode());
-    info.setMessage(status.getMsg());
-    if (status.getStatus() == CommandStatus.Status.SUCCEEDED) {
-      listener.onCommandSucceeded(info, status.getExecutionResults(), worker);
-    } else if (status.getStatus() == CommandStatus.Status.FAILED) {
-      listener.onCommandFailed(info, status.getExecutionResults(), worker);
-    } else if (status.getStatus() == CommandStatus.Status.EXECUTING) {
-      listener.onCommandExecuting(info, worker);
+  /**
+   * Forget all in-flight commands after this OM gained or lost leadership, or the term changed.
+   * The outcome of each forgotten command is unknown, so its listener is notified through
+   * {@link JobworkerCommandListener#onStatusUpdateTimeout}. Owning workflows re-issue the work from their own state.
+   */
+  public void onLeadershipChange() {
+    for (Map.Entry<OMJobworkerCommandProto.Type, Map<Long, JobworkerCommandInfo>> entry
+        : commandInfoMaps.entrySet()) {
+      JobworkerCommandListener listener = listeners.get(entry.getKey());
+      Map<Long, JobworkerCommandInfo> commandInfoMap = entry.getValue();
+      for (JobworkerCommandInfo statusInfo : new ArrayList<>(commandInfoMap.values())) {
+        synchronized (statusInfo) {
+          if (!commandInfoMap.remove(statusInfo.getCommandId(), statusInfo) || statusInfo.isTerminalState()) {
+            continue;
+          }
+          LOG.info("Dropping in-flight command {} of type {} sent in term {} to JobWorker {} on leadership change",
+              statusInfo.getCommandId(), statusInfo.getCommandType(), statusInfo.getTerm(),
+              statusInfo.getJobworkerUuid());
+          if (listener != null) {
+            try {
+              listener.onStatusUpdateTimeout(statusInfo, statusInfo.getJobworkerUuid());
+            } catch (RuntimeException e) {
+              LOG.error("Listener failed for dropped command {}", statusInfo.getCommandId(), e);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -431,7 +422,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
     private final Map<OMJobworkerCommandProto.Type, JobworkerCommandListener> listeners;
     private final Map<OMJobworkerCommandProto.Type, Map<Long, JobworkerCommandInfo>> commandInfoMaps;
     private Supplier<Long> clock = System::currentTimeMillis;
-    private volatile Runnable durableReconciliation = () -> { };
     private static long checkIntervalSeconds = 60;
     private static int checkTimes = 0;
 
@@ -448,11 +438,6 @@ public class OMJobworkerCommandManager implements java.io.Closeable {
 
     private void startChecking() {
       executor.scheduleAtFixedRate(() -> {
-        try {
-          durableReconciliation.run();
-        } catch (RuntimeException e) {
-          LOG.error("Error reconciling durable Jobworker assignments", e);
-        }
         for (OMJobworkerCommandProto.Type type : listeners.keySet()) {
           try {
             checkTimeoutsForProcessor(type);

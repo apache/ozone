@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.jobworker.states.endpoint;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -30,10 +31,14 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.JobworkerDetails;
 import org.apache.hadoop.hdds.protocol.MockJobworkerDetails;
+import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandResultCode;
+import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandStatus;
+import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.JobworkerMockCommandProto;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.JobworkerReregisterCommandProto;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.OMJobworkerCommandProto;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.SendHeartbeatRequest;
@@ -44,7 +49,9 @@ import org.apache.hadoop.ozone.jobworker.JobworkerEndpointStateMachine.EndpointS
 import org.apache.hadoop.ozone.jobworker.JobworkerStateContext;
 import org.apache.hadoop.ozone.jobworker.JobworkerStateMachine;
 import org.apache.hadoop.ozone.jobworker.JobworkerStates;
+import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommand;
 import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandManager;
+import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandStatus;
 import org.apache.hadoop.ozone.jobworker.protocol.JobworkerProtocol;
 import org.apache.hadoop.ozone.jobworker.report.JobworkerReportManager;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
@@ -255,6 +262,59 @@ public class TestHeartbeatEndpointTask {
     Mockito.verify(context).updateTermOfLeaderOM(OM_SERVICE_ID, termInOM);
     assertEquals(termInOM,
         context.getCommandManager().getTermOfLeaderOMByServiceId(OM_SERVICE_ID).orElse(-1));
+  }
+
+  @Test
+  public void testCommandFromOlderTermIsDropped() throws Exception {
+    // A late command from term 5 arrives in the response of the term 7 leader.
+    JobworkerCommandManager commandManager = context.getCommandManager();
+    sendHeartbeat(7L, mockCommand(1L, 5L), mockCommand(2L, 7L));
+
+    JobworkerCommand<?> command = commandManager.getNextCommand();
+    assertNotNull(command);
+    assertEquals(2L, command.getId());
+    assertEquals(7L, command.getTerm());
+    assertNull(commandManager.getNextCommand());
+
+    JobworkerCommandStatus stale = commandManager.getCmdStatus(OM_SERVICE_ID, 1L);
+    assertEquals(CommandStatus.Status.FAILED, stale.getStatus());
+    assertEquals(CommandResultCode.STALE_TERM, stale.getProtobufMessage().getResultCode());
+    // The status echoes the term of its command, so the term 7 leader can ignore it.
+    assertEquals(5L, stale.getProtobufMessage().getTerm());
+    assertEquals(7L, commandManager.getCmdStatus(OM_SERVICE_ID, 2L).getProtobufMessage().getTerm());
+  }
+
+  @Test
+  public void testCommandWithoutTermIsIgnored() throws Exception {
+    sendHeartbeat(7L, mockCommand(1L, 7L).toBuilder().clearTerm().build());
+
+    assertNull(context.getCommandManager().getNextCommand());
+    assertNull(context.getCommandManager().getCmdStatus(OM_SERVICE_ID, 1L));
+  }
+
+  private void sendHeartbeat(long term, OMJobworkerCommandProto... commands) throws Exception {
+    JobworkerProtocol protocol = mock(JobworkerProtocol.class);
+    when(protocol.sendHeartbeat(any(SendHeartbeatRequest.class)))
+        .thenReturn(SendHeartbeatResponseProto.newBuilder()
+            .setJobworkerUUID(ProtobufUtils.toProtobuf(jobworkerDetails.getUuid()))
+            .setTerm(term)
+            .setOmServiceId(OM_SERVICE_ID)
+            .addAllCommands(Arrays.asList(commands))
+            .build());
+    JobworkerEndpointStateMachine endpointStateMachine =
+        new JobworkerEndpointStateMachine(TEST_OM_ENDPOINT, protocol, conf, "test-", OM_SERVICE_ID);
+    endpointStateMachine.setOmServiceId(OM_SERVICE_ID);
+    endpointStateMachine.setState(EndpointStates.HEARTBEAT);
+    getHeartbeatEndpointTask(context, endpointStateMachine).call();
+  }
+
+  private static OMJobworkerCommandProto mockCommand(long cmdId, long term) {
+    return OMJobworkerCommandProto.newBuilder()
+        .setCommandType(OMJobworkerCommandProto.Type.mockCommand)
+        .setJobworkerMockCommandProto(JobworkerMockCommandProto.getDefaultInstance())
+        .setCmdId(cmdId)
+        .setTerm(term)
+        .build();
   }
 
   private HeartbeatEndpointTask getHeartbeatEndpointTask(

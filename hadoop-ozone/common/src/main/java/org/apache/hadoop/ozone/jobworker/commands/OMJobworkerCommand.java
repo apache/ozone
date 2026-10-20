@@ -30,40 +30,15 @@ import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
 public abstract class OMJobworkerCommand<T extends Message> implements
     IdentifiableEventPayload {
   private final long id;
-  private final boolean explicitId;
   private long expirationTimestampMs = 0;
+  private long term = 0;
 
   public OMJobworkerCommand() {
-    // Transient control commands may use JVM-local IDs. Durable jobs require an explicit stable workflow ID.
     this.id = HddsIdFactory.getLongId();
-    this.explicitId = false;
   }
 
   public OMJobworkerCommand(long id) {
     this.id = id;
-    this.explicitId = true;
-  }
-
-  public boolean hasExplicitId() {
-    return explicitId;
-  }
-
-  /** Reconstruct a previously committed command without allocating a new identity. */
-  public static OMJobworkerCommand<OMJobworkerCommandProto> fromEnvelope(OMJobworkerCommandProto envelope) {
-    OMJobworkerCommand<OMJobworkerCommandProto> command = new OMJobworkerCommand<OMJobworkerCommandProto>(
-        envelope.getCmdId()) {
-      @Override
-      public OMJobworkerCommandProto.Type getType() {
-        return envelope.getCommandType();
-      }
-
-      @Override
-      public OMJobworkerCommandProto getProto() {
-        return envelope;
-      }
-    };
-    command.setExpirationTimestampMs(envelope.getExpirationTimestampMs());
-    return command;
   }
 
   /**
@@ -112,6 +87,21 @@ public abstract class OMJobworkerCommand<T extends Message> implements
    */
   public long getExpirationTimestampMs() {
     return expirationTimestampMs;
+  }
+
+  /**
+   * Sets the Raft term of the OM leader that issued this command.
+   * @param term leader term
+   */
+  public void setTerm(long term) {
+    this.term = term;
+  }
+
+  /**
+   * @return The Raft term of the OM leader that issued this command, or zero if it has not been set.
+   */
+  public long getTerm() {
+    return term;
   }
 
 }

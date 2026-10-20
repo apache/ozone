@@ -29,24 +29,6 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "ozone.jobworker")
 public class JobworkerConfiguration {
 
-  @Config(key = "ozone.jobworker.metadata.dir", type = ConfigType.STRING, defaultValue = "",
-      tags = {ConfigTag.JOBWORKER}, description = "Persistent worker identity and command receipts. Defaults to "
-      + "jobworker-state under the first storage volume; must not be a disposable task directory.")
-  private String metadataDir;
-
-  @Config(key = "ozone.jobworker.journal.max.records", type = ConfigType.INT, defaultValue = "10000",
-      tags = {ConfigTag.JOBWORKER}, description = "Maximum retained durable receipts. At capacity, reject new work "
-      + "rather than dropping unacknowledged results or duplicate-execution protection.")
-  private int journalMaxRecords;
-
-  public String getMetadataDir() {
-    return metadataDir;
-  }
-
-  public int getJournalMaxRecords() {
-    return journalMaxRecords;
-  }
-
   @Config(key = "ozone.jobworker.rpc.timeout",
       type = ConfigType.TIME,
       tags = {ConfigTag.JOBWORKER},

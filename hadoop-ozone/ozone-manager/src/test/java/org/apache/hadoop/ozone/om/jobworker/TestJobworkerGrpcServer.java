@@ -65,9 +65,11 @@ public class TestJobworkerGrpcServer {
     when(jobworkerNodemanager.getVersion(any())).thenReturn(
         GetOMVersionResponse.newBuilder().setSoftwareVersion(0).build());
     when(ozoneManager.getJobworkerNodemanager()).thenReturn(jobworkerNodemanager);
-    jobworkerProtocolServer =
-        spy(new JobworkerProtocolServerImpl(ozoneManager, jobworkerNodemanager, mock(EventPublisher.class)));
-    commandManager = new OMJobworkerCommandManager(jobworkerNodemanager, "omServiceId");
+    OMJobworkerLeaderTracker leaderTracker = new OMJobworkerLeaderTracker(ozoneManager);
+    jobworkerProtocolServer = spy(new JobworkerProtocolServerImpl(ozoneManager, jobworkerNodemanager,
+        mock(EventPublisher.class), leaderTracker));
+    commandManager = new OMJobworkerCommandManager(jobworkerNodemanager, "omServiceId",
+        leaderTracker::getTermIfReady);
     server = new JobworkerGrpcServer(conf, jobworkerProtocolServer, null, commandManager);
     server.start();
     conf.setInt("ozone.om.jobworker.grpc.port", server.getPort());

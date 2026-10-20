@@ -87,6 +87,8 @@ public class TestOMJobworkerCommandManager {
     OmTestManagers omTestManagers = new OmTestManagers(conf);
     ozoneManager = omTestManagers.getOzoneManager();
     omServiceId = ozoneManager.getOMServiceId();
+    // Commands are only sent by the ready leader.
+    GenericTestUtils.waitFor(() -> ozoneManager.getJobworkerLeaderTracker().isLeaderReady(), 100, 30000);
 
     conf.setInt("ozone.om.jobworker.grpc.port", ozoneManager.getJobworkerGrpcPort());
     client = new JobworkerClient("localhost", conf);
@@ -311,54 +313,46 @@ public class TestOMJobworkerCommandManager {
   }
 
   @Test
-  public void testLocalTimeoutDoesNotForgetDurableCommand() throws Exception {
+  public void testCommandIsStampedWithLeaderTerm() throws Exception {
     OMJobworkerCommand command = new MockOMJobworkerCommand(1L, OMJobworkerCommandProto.Type.mockCommand);
     commandManager.sendCommand(jobworkerUuid, command);
-    sendHeartbeat();
-    waitAndAssert(testMockCommandListener.sentLatch, testMockCommandListener.sentCount, 1);
-    CommandStatus executing = createCommandStatus(1L, OMJobworkerCommandProto.Type.mockCommand,
-        CommandStatus.Status.EXECUTING);
-    eventQueue.fireEvent(OMJobworkerEvents.JW_COMMAND_STATUS_REPORT, new CommandStatusReportFromJobworker(
-        jobworkerDetails, CommandStatusReportsProto.newBuilder().addCmdStatus(executing).build()));
-    waitAndAssert(testMockCommandListener.executingLatch, testMockCommandListener.executingCount, 1);
-    OMJobworkerCommandManager.CommandTimeoutChecker checker = commandManager.getCommandTimeoutChecker();
-    checker.setClock(() -> Long.MAX_VALUE);
-    checker.checkTimeoutsForProcessor(OMJobworkerCommandProto.Type.mockCommand);
-    assertTrue(commandManager.isCommandInFlight(OMJobworkerCommandProto.Type.mockCommand, 1L));
-    assertEquals(0, testMockCommandListener.timeoutCount.get());
-    assertEquals(0, testMockCommandListener.failureCount.get());
-    assertEquals(CommandStatus.Status.EXECUTING, CommandStatus.parseFrom(ozoneManager.getJobworkerJobManager()
-        .get(JobworkerJobState.key(OMJobworkerCommandProto.Type.mockCommand, 1L)).getStatus()).getStatus());
+
+    long term = ozoneManager.getJobworkerLeaderTracker().getTermIfReady().getAsLong();
+    assertTrue(term > 0);
+    assertEquals(term, command.getTerm());
   }
 
   @Test
-  public void testStaleWorkerPreservesDurableAssignmentsAsUncertain() throws Exception {
+  public void testStatusFromDifferentTermIsIgnored() throws Exception {
+    OMJobworkerCommand command = new MockOMJobworkerCommand(1L, OMJobworkerCommandProto.Type.mockCommand);
+    commandManager.sendCommand(jobworkerUuid, command);
+
+    CommandStatus staleTerm = createCommandStatus(1L, OMJobworkerCommandProto.Type.mockCommand,
+        CommandStatus.Status.SUCCEEDED).toBuilder().setTerm(command.getTerm() + 1).build();
+    commandManager.processStatusUpdate(jobworkerDetails, staleTerm);
+    assertEquals(0, testMockCommandListener.successCount.get());
+    assertTrue(commandManager.isCommandInFlight(OMJobworkerCommandProto.Type.mockCommand, 1L));
+
+    CommandStatus sameTerm = staleTerm.toBuilder().setTerm(command.getTerm()).build();
+    commandManager.processStatusUpdate(jobworkerDetails, sameTerm);
+    assertEquals(1, testMockCommandListener.successCount.get());
+    assertFalse(commandManager.isCommandInFlight(OMJobworkerCommandProto.Type.mockCommand, 1L));
+  }
+
+  @Test
+  public void testLeadershipChangeDropsInFlightCommands() throws Exception {
     commandManager.sendCommand(jobworkerUuid, new MockOMJobworkerCommand(1L, OMJobworkerCommandProto.Type.mockCommand));
     commandManager.sendCommand(jobworkerUuid, new MockOMJobworkerCommand(2L, OMJobworkerCommandProto.Type.mockCommand));
     assertEquals(2, commandManager.getInFlightCommandCount(OMJobworkerCommandProto.Type.mockCommand));
-    org.apache.hadoop.ozone.om.jobworker.node.JobworkerInfo node =
-        nodeManager.getNodeStateManager().getNodeInfo(jobworkerUuid);
-    node.updateLastHeartbeatTime(org.apache.hadoop.util.Time.monotonicNow() - 100_000);
-    node.setNodeStatus(new org.apache.hadoop.ozone.om.jobworker.node.JobworkerNodeStatus(
-        org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE,
-        org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE));
-    ozoneManager.getJobworkerJobManager().reconcileUnavailableWorkers();
-    for (long id : new long[]{1L, 2L}) {
-      assertTrue(commandManager.isCommandInFlight(OMJobworkerCommandProto.Type.mockCommand, id));
-      assertEquals(CommandStatus.Status.UNCERTAIN, CommandStatus.parseFrom(ozoneManager.getJobworkerJobManager()
-          .get(JobworkerJobState.key(OMJobworkerCommandProto.Type.mockCommand, id)).getStatus()).getStatus());
-    }
-    assertEquals(0, testMockCommandListener.failureCount.get());
-    assertEquals(0, testMockCommandListener.timeoutCount.get());
-    String key = JobworkerJobState.key(OMJobworkerCommandProto.Type.mockCommand, 1L);
-    org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.JobworkerJobRecord uncertain =
-        ozoneManager.getJobworkerJobManager().get(key);
-    CommandStatus resolved = CommandStatus.parseFrom(uncertain.getStatus()).toBuilder()
-        .setStatus(CommandStatus.Status.SUCCEEDED).setMsg("Effects reconciled by the owning workflow").build();
-    ozoneManager.getJobworkerJobManager().resolveUncertain(key, uncertain.getRevision(), resolved);
-    assertFalse(commandManager.isCommandInFlight(OMJobworkerCommandProto.Type.mockCommand, 1L));
-    assertTrue(commandManager.isCommandInFlight(OMJobworkerCommandProto.Type.mockCommand, 2L));
-    assertEquals(resolved, CommandStatus.parseFrom(ozoneManager.getJobworkerJobManager().get(key).getStatus()));
+
+    commandManager.onLeadershipChange();
+
+    assertEquals(0, commandManager.getInFlightCommandCount(OMJobworkerCommandProto.Type.mockCommand));
+    assertEquals(2, testMockCommandListener.timeoutCount.get());
+    // A late status of a dropped command is ignored.
+    commandManager.processStatusUpdate(jobworkerDetails,
+        createCommandStatus(1L, OMJobworkerCommandProto.Type.mockCommand, CommandStatus.Status.SUCCEEDED));
+    assertEquals(0, testMockCommandListener.successCount.get());
   }
 
   /**
@@ -432,15 +426,6 @@ public class TestOMJobworkerCommandManager {
         .setType(type)
         .setStatus(status)
         .setOmServiceId(omServiceId);
-    if (type != OMJobworkerCommandProto.Type.reregisterCommand) {
-      try {
-        org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.JobworkerJobRecord record =
-            ozoneManager.getJobworkerJobManager().get(JobworkerJobState.key(type, cmdId));
-        builder.setAttemptId(OMJobworkerCommandProto.parseFrom(record.getCommand()).getAttemptId());
-      } catch (IOException e) {
-        throw new java.io.UncheckedIOException(e);
-      }
-    }
     if (commandExecutionResults != null) {
       builder.setExecutionResults(commandExecutionResults);
     }
@@ -485,7 +470,6 @@ public class TestOMJobworkerCommandManager {
   private void sendRegister() throws IOException {
     JobworkerServiceProtocolProtos.RegisterJobworkerRequest registerJobworkerRequest =
         JobworkerServiceProtocolProtos.RegisterJobworkerRequest.newBuilder()
-            .setDurableJobProtocolVersion(1)
         .setExtendedJobWorkDetailsProto(jobworkerDetails.getExtendedProtoBufMessage())
         .build();
     JobworkerServiceProtocolProtos.RegisterJobworkerResponse registerJobworkerResponse =

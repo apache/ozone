@@ -27,14 +27,13 @@ import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolP
  * Defines the event listener methods that JobWorker command implementations must support
  * to respond to command state changes. Specifies how commands should handle execution
  * events (executing, succeeded, failed) and timeout notifications.
+ * <p>
+ * Command tracking is kept only in the memory of the OM leader. After a leadership change the in-flight commands are
+ * reported through {@link #onStatusUpdateTimeout}, and a command may run again when the owning workflow re-issues it.
+ * Commands must therefore be idempotent, and callbacks must not change persisted state unless this OM is the ready
+ * leader.
  */
 public interface JobworkerCommandListener {
-
-  /** Reconstructs a typed command after OM failover. Override when a listener needs a command-specific Java type. */
-  default org.apache.hadoop.ozone.jobworker.commands.OMJobworkerCommand<?> decodeCommand(
-      OMJobworkerCommandProto envelope) {
-    return org.apache.hadoop.ozone.jobworker.commands.OMJobworkerCommand.fromEnvelope(envelope);
-  }
 
   /**
    * Called when a command is successfully sent to a JobWorker.

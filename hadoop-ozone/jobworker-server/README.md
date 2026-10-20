@@ -30,12 +30,8 @@ OM does not create the Jobworker endpoint or its background services by default.
 Set `ozone.om.jobworker.service.enabled=true` in the OM configuration and restart OM
 to enable the framework.
 
-For HA jobs, upgrade and enable the endpoint on every OM member and finalize the
-`JOBWORKER_HA` layout feature before submitting work. The first durable submission
-verifies each member's finalized protocol and cluster/service identity. The proof
-is committed with the job, allowing subsequent failover with an OM unavailable.
-Membership changes require revalidation. An unavailable or older member blocks
-initial activation instead of receiving an unsupported Ratis request.
+In HA, enable the endpoint on every OM member. Workers register with and heartbeat to
+every member, but only the ready leader sends commands and processes their status.
 
 The OM gRPC port is configured by `ozone.om.jobworker.grpc.port` (default `8982`).
 HA deployments can set `ozone.om.jobworker.grpc.port.<serviceId>.<nodeId>`.
@@ -50,9 +46,6 @@ On the worker, configure:
 - `ozone.jobworker.storage.volume.dirs`: worker-local workspace directories.
 - `ozone.jobworker.heartbeat.interval`: heartbeat interval (default `30s`).
 - `ozone.jobworker.rpc.timeout`: per-request deadline (default `10s`).
-- `ozone.jobworker.metadata.dir`: persistent identity and command journal directory;
-  defaults to `jobworker-state` under the first configured storage volume.
-- `ozone.jobworker.journal.max.records`: retained receipt limit (default `10000`).
 
 Launch the packaged service with `ozone jobworker`; the launcher also supports the
 standard daemon options. Use separate worker-local workspace directories, not datanode
@@ -65,39 +58,27 @@ It does not provide a complete worker authentication/authorization mechanism and
 not be presented as secure-cluster support. Do not expose this endpoint to an
 untrusted network.
 
-Worker membership and delivery cursors are reconstructible local state. Assignments,
-attempt identities and results are committed through OM Ratis into `jobworkerJobTable`.
-The leader commits an assignment before dispatch and a result before acknowledging it.
-A worker keeps the same identity across restart, persists a receipt before enqueue,
-and persists EXECUTING before invoking the handler. An OM election does not create
-a new attempt or restart an executing handler.
+### Term fencing and idempotency
 
-Use an explicit, positive, stable workflow ID when constructing a durable command.
-Do not reuse that ID for different logical work. The JVM-local implicit ID constructor
-is only suitable for transient control commands; durable submission rejects it.
-Result listeners are notified at least once and must commit their effects idempotently
-before returning. Override `decodeCommand` if a listener needs a command-specific
-Java type reconstructed after failover. Worker handlers are statically registered
-through `JobworkerService.createCommandHandlers`; none is registered by default.
+Command dispatch state lives only in the memory of the OM leader; nothing about a
+command is persisted by this framework. The leader stamps every command with its Raft
+term. A worker remembers the highest term it has seen for each OM service and fails a
+command from an older term with `STALE_TERM` instead of running it. A status echoes
+the term of its command, and the leader ignores a status from another term.
 
-Worker restart converts a receipt that was EXECUTING to UNCERTAIN, without rerunning it.
-A missing receipt during reconciliation also stays UNCERTAIN. The owning workflow
-must inspect authoritative effects and, where necessary, fence obsolete mutations
-before calling the internal `resolveUncertain` operation with the current revision.
-There is no automatic reassignment of uncertain work and no generic exactly-once
-guarantee for arbitrary external effects.
+When an OM stops being the ready leader, or the term changes, it drops all in-flight
+and queued commands and reports each of them to its listener through
+`onStatusUpdateTimeout`. The new leader starts with no in-flight commands. A worker
+that stops heartbeating becomes stale and its commands fail or time out. A worker keeps
+no state across restarts and registers with a new identity each time it starts.
 
-Terminal results are retained until an explicit committed acknowledgement, not merely
-a successful heartbeat. Acknowledged receipts remain as duplicate-suppression tombstones.
-The journal manifest detects missing admitted receipts, and missing/corrupt identity,
-manifest or receipt files fail startup closed. Never delete or roll back this metadata
-to make space, and do not share/reuse it between workers or clusters.
-
-Admission stops at the configured receipt limit without dropping safety state.
-Automatic journal/job retirement is not implemented in this foundation; capacity and
-the dependent workflow's retention policy must be planned explicitly. Terminal OM
-job records are also retained. This is a deployment constraint, not permission to
-delete receipts or blindly retry timed-out work.
+As a result a command may run more than once, for example when the old leader's command
+is still executing while the owning workflow re-issues the work on the new leader.
+Workflows must keep what work remains in their own persisted state, make every command
+idempotent (for key rewrites, use the existing atomic rewrite with the expected key
+generation), and change persisted state from listener callbacks only when the OM is
+the ready leader. Worker handlers are statically registered through
+`JobworkerService.createCommandHandlers`; none is registered by default.
 
 Handlers and OM listeners use the existing typed registration/dispatch abstractions.
 A dependent job adds its own command payload/decoder, worker handler, OM listener and

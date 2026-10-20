@@ -24,6 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Arrays;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -36,10 +37,8 @@ import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.upgrade.JobworkerVersion;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
-import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.jobworker.JobworkerStateMachine;
 import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandHandler;
-import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandJournal;
 import org.apache.hadoop.ozone.jobworker.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.jobworker.version.JobworkerBuildVersionInfo;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
@@ -66,7 +65,6 @@ public class JobworkerService extends GenericCli implements Callable<Void> {
   private OzoneConfiguration conf;
   private JobworkerDetails jobworkerDetails;
   private JobworkerStateMachine jobworkerStateMachine;
-  private JobworkerCommandJournal commandJournal;
   private OzoneAdmins admins;
   private boolean printBanner;
   private String[] args;
@@ -154,7 +152,6 @@ public class JobworkerService extends GenericCli implements Callable<Void> {
       String ip = InetAddress.getByName(hostname).getHostAddress();
 
       // Initialize JobworkerDetail
-      commandJournal = new JobworkerCommandJournal(conf);
       jobworkerDetails = initializeJobworkerDetails(hostname, ip);
 
       // Initialize tracing
@@ -166,7 +163,7 @@ public class JobworkerService extends GenericCli implements Callable<Void> {
       // TODO jobworker do we need the layoutStorage?
 
       jobworkerStateMachine = new JobworkerStateMachine(
-          jobworkerDetails, conf, this::terminateJobworker, commandJournal, createCommandHandlers());
+          jobworkerDetails, conf, this::terminateJobworker, createCommandHandlers());
 
       String starterUser =
           UserGroupInformation.getCurrentUser().getShortUserName();
@@ -177,7 +174,6 @@ public class JobworkerService extends GenericCli implements Callable<Void> {
 
       LOG.info("JobworkerService started successfully");
     } catch (IOException | RuntimeException e) {
-      IOUtils.close(LOG, commandJournal);
       throw new RuntimeException("Can't start the JobworkerService", e);
     }
   }
@@ -190,8 +186,9 @@ public class JobworkerService extends GenericCli implements Callable<Void> {
    * @return JobworkerDetails instance
    */
   private JobworkerDetails initializeJobworkerDetails(String hostname, String ip) {
+    // A jobworker keeps no state across restarts, so it registers with a new identity each time it starts.
     return JobworkerDetails.newBuilder()
-        .setUuid(commandJournal.getWorkerId())
+        .setUuid(UUID.randomUUID())
         .setIpAddress(ip)
         .setHostName(hostname)
         .setOperationalState(HddsProtos.NodeOperationalState.IN_SERVICE)
@@ -233,7 +230,6 @@ public class JobworkerService extends GenericCli implements Callable<Void> {
       if (jobworkerStateMachine != null) {
         jobworkerStateMachine.stopDaemon();
       }
-      IOUtils.close(LOG, commandJournal);
       // Only used for compatibility with integration tests
       // that may create multiple different clusters in a JVM
       VersionEndpointTask.resetClusterId();

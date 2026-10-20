@@ -21,12 +21,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.io.IOException;
+import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -45,11 +47,15 @@ import org.junit.jupiter.api.Test;
 class TestJobworkerCommandCompletion {
   private static final String SERVICE = "service";
 
+  private static OMJobworkerCommandManager newManager(JobworkerNodeManager nodes) {
+    return new OMJobworkerCommandManager(nodes, SERVICE, () -> OptionalLong.of(1));
+  }
+
   @Test
   void testDuplicateSubmissionKeepsOriginalTracking() throws Exception {
     JobworkerCommandListener listener = mock(JobworkerCommandListener.class);
     UUID workerId = UUID.randomUUID();
-    try (OMJobworkerCommandManager manager = new OMJobworkerCommandManager(mock(JobworkerNodeManager.class), SERVICE)) {
+    try (OMJobworkerCommandManager manager = newManager(mock(JobworkerNodeManager.class))) {
       manager.registerHandler(Type.mockCommand, listener);
       manager.sendCommand(workerId, new MockOMJobworkerCommand(1L, Type.mockCommand));
       assertThrows(IOException.class,
@@ -59,10 +65,39 @@ class TestJobworkerCommandCompletion {
   }
 
   @Test
+  void testNotReadyLeaderCannotSendCommand() throws Exception {
+    JobworkerNodeManager nodes = mock(JobworkerNodeManager.class);
+    try (OMJobworkerCommandManager manager = new OMJobworkerCommandManager(nodes, SERVICE, OptionalLong::empty)) {
+      manager.registerHandler(Type.mockCommand, mock(JobworkerCommandListener.class));
+      assertThrows(IOException.class,
+          () -> manager.sendCommand(UUID.randomUUID(), new MockOMJobworkerCommand(1L, Type.mockCommand)));
+      assertEquals(0, manager.getInFlightCommandCount(Type.mockCommand));
+      verifyNoInteractions(nodes);
+    }
+  }
+
+  @Test
+  void testLeadershipChangeWhileQueueingRollsBack() throws Exception {
+    long[] term = {1};
+    JobworkerNodeManager nodes = mock(JobworkerNodeManager.class);
+    doAnswer(invocation -> {
+      term[0] = 2;
+      return null;
+    }).when(nodes).addOMJobworkerCommand(any(), any());
+    try (OMJobworkerCommandManager manager =
+        new OMJobworkerCommandManager(nodes, SERVICE, () -> OptionalLong.of(term[0]))) {
+      manager.registerHandler(Type.mockCommand, mock(JobworkerCommandListener.class));
+      assertThrows(IOException.class,
+          () -> manager.sendCommand(UUID.randomUUID(), new MockOMJobworkerCommand(1L, Type.mockCommand)));
+      assertEquals(0, manager.getInFlightCommandCount(Type.mockCommand));
+    }
+  }
+
+  @Test
   void testEnqueueFailureDoesNotLeavePhantomTracking() throws Exception {
     JobworkerNodeManager nodes = mock(JobworkerNodeManager.class);
     doThrow(new IllegalStateException("enqueue failed")).when(nodes).addOMJobworkerCommand(any(), any());
-    try (OMJobworkerCommandManager manager = new OMJobworkerCommandManager(nodes, SERVICE)) {
+    try (OMJobworkerCommandManager manager = newManager(nodes)) {
       manager.registerHandler(Type.mockCommand, mock(JobworkerCommandListener.class));
       assertThrows(IllegalStateException.class,
           () -> manager.sendCommand(UUID.randomUUID(), new MockOMJobworkerCommand(1L, Type.mockCommand)));
@@ -75,7 +110,7 @@ class TestJobworkerCommandCompletion {
     JobworkerDetails owner = MockJobworkerDetails.randomJobworkerDetails();
     JobworkerDetails other = MockJobworkerDetails.randomJobworkerDetails();
     JobworkerCommandListener listener = mock(JobworkerCommandListener.class);
-    try (OMJobworkerCommandManager manager = new OMJobworkerCommandManager(mock(JobworkerNodeManager.class), SERVICE)) {
+    try (OMJobworkerCommandManager manager = newManager(mock(JobworkerNodeManager.class))) {
       manager.registerHandler(Type.mockCommand, listener);
       manager.sendCommand(owner.getUuid(), new MockOMJobworkerCommand(1L, Type.mockCommand));
       manager.processStatusUpdate(other, success(1L, SERVICE));
@@ -91,7 +126,7 @@ class TestJobworkerCommandCompletion {
     UUID workerId = owner.getUuid();
     JobworkerCommandListener listener = mock(JobworkerCommandListener.class);
     ExecutorService executor = Executors.newFixedThreadPool(2);
-    try (OMJobworkerCommandManager manager = new OMJobworkerCommandManager(mock(JobworkerNodeManager.class), SERVICE)) {
+    try (OMJobworkerCommandManager manager = newManager(mock(JobworkerNodeManager.class))) {
       manager.registerHandler(Type.mockCommand, listener);
       OMJobworkerCommandManager.CommandTimeoutChecker checker = manager.getCommandTimeoutChecker();
       checker.setClock(() -> Long.MAX_VALUE);

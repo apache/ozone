@@ -101,7 +101,6 @@ public class TestJobworkerRPCProtocol {
             .build();
     RegisterJobworkerRequest request =
         RegisterJobworkerRequest.newBuilder()
-            .setDurableJobProtocolVersion(1)
             .setExtendedJobWorkDetailsProto(extendedJobWorkDetailsProto)
             .build();
 
@@ -157,7 +156,6 @@ public class TestJobworkerRPCProtocol {
             .build();
     RegisterJobworkerRequest request =
         RegisterJobworkerRequest.newBuilder()
-            .setDurableJobProtocolVersion(1)
             .setExtendedJobWorkDetailsProto(extendedJobWorkDetailsProto)
             .build();
 

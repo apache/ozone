@@ -21,7 +21,6 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.function.Consumer;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandExecutionResultsProto;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandResultCode;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandStatus;
@@ -41,21 +40,8 @@ public class JobworkerCommandStatus {
   private volatile String message;
   private volatile CommandResultCode resultCode;
   private volatile CommandExecutionResultsProto executionResults;
-  private String attemptId;
-  private Consumer<CommandStatus> persistence;
-
-  void setPersistence(Consumer<CommandStatus> persistence) {
-    this.persistence = persistence;
-  }
-
-  static JobworkerCommandStatus fromProto(CommandStatus status) {
-    JobworkerCommandStatus result = new JobworkerCommandStatus(status.getCmdId(), status.getType(),
-        status.getStatus(), status.getOmServiceId(), status.hasMsg() ? status.getMsg() : null,
-        status.hasResultCode() ? status.getResultCode() : null);
-    result.attemptId = status.getAttemptId();
-    result.executionResults = status.hasExecutionResults() ? status.getExecutionResults() : null;
-    return result;
-  }
+  // Term of the OM leader that issued the command, or zero if unknown.
+  private long term;
 
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -118,6 +104,15 @@ public class JobworkerCommandStatus {
   }
 
   /**
+   * Returns the term of the OM leader that issued the command.
+   *
+   * @return term, or zero if unknown
+   */
+  public long getTerm() {
+    return term;
+  }
+
+  /**
    * Check if this command is in a terminal state (SUCCEEDED or FAILED).
    *
    * @return true if the command is in a terminal state
@@ -149,17 +144,6 @@ public class JobworkerCommandStatus {
     Objects.requireNonNull(newStatus, "New status must be not null");
     lock.writeLock().lock();
     try {
-      if (persistence != null) {
-        CommandStatus.Builder proposed = getProtobufMessage().toBuilder().setStatus(newStatus)
-            .clearMsg().clearResultCode();
-        if (msg != null) {
-          proposed.setMsg(msg);
-        }
-        if (code != null) {
-          proposed.setResultCode(code);
-        }
-        persistence.accept(proposed.build());
-      }
       this.status = newStatus;
       this.message = msg;
       this.resultCode = code;
@@ -171,13 +155,6 @@ public class JobworkerCommandStatus {
   public void setExecutionResults(CommandExecutionResultsProto results) {
     lock.writeLock().lock();
     try {
-      if (persistence != null) {
-        CommandStatus.Builder proposed = getProtobufMessage().toBuilder().clearExecutionResults();
-        if (results != null) {
-          proposed.setExecutionResults(results);
-        }
-        persistence.accept(proposed.build());
-      }
       this.executionResults = results;
     } finally {
       lock.writeLock().unlock();
@@ -197,10 +174,9 @@ public class JobworkerCommandStatus {
           .setStatus(status)
           .setType(type)
           .setOmServiceId(omServiceId);
-      if (attemptId != null) {
-        builder.setAttemptId(attemptId);
+      if (term > 0) {
+        builder.setTerm(term);
       }
-
       if (message != null) {
         builder.setMsg(message);
       }
@@ -231,6 +207,7 @@ public class JobworkerCommandStatus {
     private String omServiceId;
     private String message;
     private CommandResultCode resultCode;
+    private long term;
 
     /**
      * Sets command ID.
@@ -298,12 +275,25 @@ public class JobworkerCommandStatus {
     }
 
     /**
+     * Sets the term of the OM leader that issued the command.
+     * @param term, the command's term
+     * @return Builder
+     */
+    public Builder setTerm(long term) {
+      this.term = term;
+      return this;
+    }
+
+    /**
      * Build the JobworkerCommandStatus.
      *
      * @return JobworkerCommandStatus instance
      */
     public JobworkerCommandStatus build() {
-      return new JobworkerCommandStatus(cmdId, type, status, omServiceId, message, resultCode);
+      JobworkerCommandStatus commandStatus =
+          new JobworkerCommandStatus(cmdId, type, status, omServiceId, message, resultCode);
+      commandStatus.term = term;
+      return commandStatus;
     }
   }
 }

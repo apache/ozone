@@ -77,7 +77,7 @@ message JobworkerResponse {
 // Register Message
 message RegisterJobworkerRequest {
   required hadoop.hdds.ExtendedJobWorkDetailsProto extendedJobWorkDetailsProto = 1;
-  optional uint32 durableJobProtocolVersion = 2;
+  reserved 2;
 }
 
 message RegisterJobworkerResponse {
@@ -110,7 +110,7 @@ message SendHeartbeatResponseProto {
   required string omServiceId = 2;
   optional int64 term = 3;
   repeated OMJobworkerCommandProto commands = 4;
-  repeated CommandStatus committedResults = 5;
+  reserved 5;
 }
 
 // Version Message
@@ -120,8 +120,7 @@ message GetOMVersionRequest {
 message GetOMVersionResponse {
   required uint32 softwareVersion = 1;
   repeated hadoop.hdds.KeyValue keys = 2;
-  optional uint32 durableJobProtocolVersion = 3;
-  optional string omNodeId = 4;
+  reserved 3, 4;
 }
 
 // General Message
@@ -139,9 +138,9 @@ message OMJobworkerCommandProto {
   optional JobworkerMockCommandProto jobworkerMockCommandProto = 4;
   reserved 5;
   optional int64 cmdId = 6;
-  optional string attemptId = 7;
-  // Reconcile an assignment that may already have executed; a missing receipt must not start execution.
-  optional bool reconcileOnly = 8 [default = false];
+  reserved 7, 8;
+  // Raft term of the OM leader that issued the command. Jobworkers drop commands from an older term.
+  optional int64 term = 9;
 }
 
 message JobworkerNodeReportProto {
@@ -173,8 +172,7 @@ message CommandStatus {
     EXECUTING = 2;
     SUCCEEDED = 3;
     FAILED = 4;
-    // The worker restarted after execution may have begun. Do not blindly re-execute.
-    UNCERTAIN = 5;
+    reserved 5;
   }
   required int64 cmdId = 1;
   required Status status = 2 [default = PENDING];
@@ -183,18 +181,9 @@ message CommandStatus {
   optional CommandResultCode resultCode = 5;
   required OMJobworkerCommandProto.Type type = 6;
   optional CommandExecutionResultsProto executionResults = 7;
-  optional string attemptId = 8;
-}
-
-message JobworkerCommandRecord {
-  required string omServiceId = 1;
-  required OMJobworkerCommandProto command = 2;
-  required CommandStatus status = 3;
-  optional bool acknowledged = 4 [default = false];
-}
-
-message JobworkerReceiptManifest {
-  repeated string receiptKeys = 1;
+  reserved 8;
+  // Term of the command this status belongs to. The OM leader ignores statuses from another term.
+  optional int64 term = 9;
 }
 
 message CommandExecutionResultsProto {

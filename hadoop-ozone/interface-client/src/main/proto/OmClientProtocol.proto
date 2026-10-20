@@ -172,7 +172,6 @@ enum Type {
   GetCallerIdentity = 156;
   SnapshotCount = 157;
   GetBucketDeletedBytes = 158;
-  UpdateJobworkerJob = 159;
 }
 
 enum SafeMode {
@@ -340,7 +339,6 @@ message OMRequest {
   optional GetCallerIdentityRequest         getCallerIdentityRequest       = 158;
   optional SnapshotCountRequest snapshotCountRequest = 159;
   optional GetBucketDeletedBytesRequest     getBucketDeletedBytesRequest   = 160;
-  optional UpdateJobworkerJobRequest updateJobworkerJobRequest = 161;
 }
 
 message OMResponse {
@@ -492,23 +490,6 @@ message OMResponse {
   optional GetCallerIdentityResponse         getCallerIdentityResponse      = 156;
   optional SnapshotCountResponse snapshotCountResponse = 157;
   optional GetBucketDeletedBytesResponse     getBucketDeletedBytesResponse  = 158;
-  optional JobworkerJobRecord jobworkerJobRecord = 159;
-}
-
-// Internal, Ratis-replicated Jobworker state. Payloads are serialized Jobworker protocol messages.
-message JobworkerJobRecord {
-  required string jobKey = 1;
-  required string workerId = 2;
-  required bytes command = 3;
-  required bytes status = 4;
-  required int64 revision = 5;
-  optional string finalizedMembers = 6;
-}
-
-message UpdateJobworkerJobRequest {
-  required JobworkerJobRecord record = 1;
-  // Zero creates a job; updates must match the previously committed revision.
-  required int64 expectedRevision = 2;
 }
 
 enum Status {

@@ -56,7 +56,6 @@ public class JobworkerGrpcRequestHandlerMock extends
         JobworkerServiceProtocolProtos.GetOMVersionResponse
             versionResponse = JobworkerServiceProtocolProtos.GetOMVersionResponse.newBuilder()
             .setSoftwareVersion(1)
-            .setDurableJobProtocolVersion(1)
             .addKeys(HddsProtos.KeyValue.newBuilder()
                 .setKey(OzoneConsts.OM_ID)
                 .setValue("om1")

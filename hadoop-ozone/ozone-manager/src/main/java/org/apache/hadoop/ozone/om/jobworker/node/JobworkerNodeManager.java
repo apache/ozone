@@ -296,6 +296,13 @@ public class JobworkerNodeManager implements JobworkerNodeProtocol, Closeable {
     this.commandQueue.addCommand(uuid, command);
   }
 
+  /**
+   * Remove the queued commands of all jobworkers, for example after this OM lost leadership.
+   */
+  public void clearAllCommands() {
+    this.commandQueue.clear();
+  }
+
   @VisibleForTesting
   public JobworkerNodeStateManager getNodeStateManager() {
     return nodeStateManager;

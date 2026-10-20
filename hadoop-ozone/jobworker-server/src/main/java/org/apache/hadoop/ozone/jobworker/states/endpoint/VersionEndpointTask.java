@@ -72,10 +72,6 @@ public class VersionEndpointTask implements Callable<EndpointStates> {
         GetOMVersionRequest versionRequest = GetOMVersionRequest.newBuilder().build();
         GetOMVersionResponse versionResponse =
             rpcEndPoint.getEndPoint().getOMVersion(versionRequest);
-        if (versionResponse.getDurableJobProtocolVersion() != 1) {
-          LOG.warn("OM {} has no finalized durable Jobworker protocol; waiting for upgrade/finalization", rpcEndPoint);
-          return rpcEndPoint.getState();
-        }
         Map<String, String> keys = versionResponse.getKeysList().stream()
             .collect(Collectors.toMap(HddsProtos.KeyValue::getKey,
                 HddsProtos.KeyValue::getValue));

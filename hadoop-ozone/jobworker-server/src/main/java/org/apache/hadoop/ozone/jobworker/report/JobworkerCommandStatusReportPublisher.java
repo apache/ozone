@@ -65,7 +65,7 @@ public class JobworkerCommandStatusReportPublisher extends
         }
         // If status is still non-terminal state, then don't remove it from the map as
         // CommandHandler will change its status when it works on this command.
-        if (cmdStatus.isTerminalState() && !cmdStatus.getProtobufMessage().hasAttemptId()) {
+        if (cmdStatus.isTerminalState()) {
           map.remove(key);
         }
         builder.addCmdStatus(cmdStatus.getProtobufMessage());

@@ -36,7 +36,6 @@ import org.apache.hadoop.ozone.jobworker.JobworkerEndpointStateMachine.EndpointS
 import org.apache.hadoop.ozone.jobworker.commands.AbstractJobworkerCommandHandler;
 import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandDispatcher;
 import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandHandler;
-import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandJournal;
 import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandManager;
 import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandProcessor;
 import org.apache.hadoop.ozone.jobworker.report.JobworkerReportManager;
@@ -82,12 +81,11 @@ public class JobworkerStateMachine implements Closeable {
                                ConfigurationSource conf,
                                JobworkerStopService jobworkerStopService
   ) throws IOException {
-    this(jobworkerDetails, conf, jobworkerStopService, null);
+    this(jobworkerDetails, conf, jobworkerStopService, new JobworkerCommandHandler[0]);
   }
 
   public JobworkerStateMachine(JobworkerDetails jobworkerDetails, ConfigurationSource conf,
       JobworkerStopService jobworkerStopService,
-      JobworkerCommandJournal journal,
       JobworkerCommandHandler... handlers) throws IOException {
     this.jobworkerStopService = jobworkerStopService;
     this.conf = conf;
@@ -101,9 +99,6 @@ public class JobworkerStateMachine implements Closeable {
     this.volumeSet = new VolatileJobworkerVolumeSet(jobworkerDetails.getUuidString(), conf, context);
     this.connectionManager = new JobworkerConnectionManager(conf);
     this.commandManager = new JobworkerCommandManager(conf);
-    if (journal != null) {
-      this.commandManager.setJournal(journal);
-    }
     this.context = new JobworkerStateContext(
         this.conf, JobworkerStates.getInitState(), jobworkerDetails, threadNamePrefix, this, commandManager);
     this.nextHB = new AtomicLong(Time.monotonicNow());

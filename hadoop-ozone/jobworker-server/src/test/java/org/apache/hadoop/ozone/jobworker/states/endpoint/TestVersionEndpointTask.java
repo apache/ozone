@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.jobworker.states.endpoint;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -89,7 +88,6 @@ public class TestVersionEndpointTask {
   private GetOMVersionResponse createVersionResponse(String clusterId, String omServiceId, String omId) {
     return GetOMVersionResponse.newBuilder()
         .setSoftwareVersion(1)
-        .setDurableJobProtocolVersion(1)
         .addKeys(HddsProtos.KeyValue.newBuilder()
             .setKey(OzoneConsts.CLUSTER_ID)
             .setValue(clusterId)
@@ -116,16 +114,6 @@ public class TestVersionEndpointTask {
 
     // The next states should be REGISTER
     verify(endpointStateMachine).setState(EndpointStates.REGISTER);
-  }
-
-  @Test
-  void testOldOmCannotEnableDurableExecution() throws Exception {
-    when(protocol.getOMVersion(any(GetOMVersionRequest.class))).thenReturn(
-        createVersionResponse(CLUSTER_ID_1, OM_SERVICE_ID_1, "om1").toBuilder()
-            .clearDurableJobProtocolVersion().build());
-    VersionEndpointTask task = new VersionEndpointTask(endpointStateMachine, mock(JobworkerVolumeSet.class));
-    assertEquals(EndpointStates.GETVERSION, task.call());
-    verify(endpointStateMachine, never()).setState(EndpointStates.REGISTER);
   }
 
   @Test

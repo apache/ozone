@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.JobworkerJobRecord;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -145,11 +144,6 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  *   3. /volumeName/bucketName/keyName
  */
 public final class OMDBDefinition extends DBDefinition.WithMap {
-
-  public static final String JOBWORKER_JOB_TABLE = "jobworkerJobTable";
-  public static final DBColumnFamilyDefinition<String, JobworkerJobRecord> JOBWORKER_JOB_TABLE_DEF
-      = new DBColumnFamilyDefinition<>(JOBWORKER_JOB_TABLE, StringCodec.get(),
-      Proto2Codec.get(JobworkerJobRecord.getDefaultInstance()));
 
   //---------------------------------------------------------------------------
   // User, Token, Secret and Revoked STS Token Tables:
@@ -390,8 +384,7 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           VOLUME_TABLE_DEF,
           S3_REVOKED_STS_TOKEN_TABLE_DEF,
           LIFECYCLE_CONFIGURATION_TABLE_DEF,
-          LIFECYCLE_SCAN_STATE_TABLE_DEF,
-          JOBWORKER_JOB_TABLE_DEF);
+          LIFECYCLE_SCAN_STATE_TABLE_DEF);
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 

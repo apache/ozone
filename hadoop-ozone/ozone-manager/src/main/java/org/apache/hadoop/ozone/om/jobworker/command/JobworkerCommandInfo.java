@@ -81,6 +81,15 @@ public class JobworkerCommandInfo {
   }
 
   /**
+   * Get the Raft term of the OM leader that sent the command.
+   *
+   * @return the leader term
+   */
+  public long getTerm() {
+    return command.getTerm();
+  }
+
+  /**
    * Get the UUID of the target JobWorker.
    *
    * @return the JobWorker UUID

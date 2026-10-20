@@ -107,7 +107,6 @@ public final class RegisterEndpointTask implements Callable<EndpointStates> {
         // TODO jobworker Add Node report (jobworker volume info)
         RegisterJobworkerRequest.Builder requestBuilder = RegisterJobworkerRequest
             .newBuilder()
-            .setDurableJobProtocolVersion(1)
             .setExtendedJobWorkDetailsProto(jobworkerDetails.getExtendedProtoBufMessage());
         // TODO jobworker support save om version
         RegisterJobworkerResponse response = rpcEndPoint.getEndPoint()

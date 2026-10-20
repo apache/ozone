@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
-import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.JobworkerDetails;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.GetOMVersionRequest;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.GetOMVersionResponse;
@@ -44,11 +43,8 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.jobworker.commands.OMJobworkerCommand;
 import org.apache.hadoop.ozone.jobworker.protocol.JobworkerProtocol;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.jobworker.command.OMJobworkerJobManager;
 import org.apache.hadoop.ozone.om.jobworker.node.JobworkerNodeManager;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
-import org.apache.ratis.server.DivisionInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,11 +63,13 @@ public class JobworkerProtocolServerImpl implements JobworkerProtocol {
   private final JobworkerHeartbeatDispatcher jobworkerHeartbeatDispatcher;
 
   private final JobworkerNodeManager jobworkerNodeManager;
+  private final OMJobworkerLeaderTracker leaderTracker;
 
   public JobworkerProtocolServerImpl(OzoneManager om, JobworkerNodeManager jobworkerNodeManager,
-                                     EventPublisher eventPublisher) {
+                                     EventPublisher eventPublisher, OMJobworkerLeaderTracker leaderTracker) {
     this.om = om;
     this.jobworkerNodeManager = jobworkerNodeManager;
+    this.leaderTracker = leaderTracker;
     jobworkerHeartbeatDispatcher =
         new JobworkerHeartbeatDispatcher(jobworkerNodeManager, eventPublisher);
   }
@@ -79,22 +77,12 @@ public class JobworkerProtocolServerImpl implements JobworkerProtocol {
   @Override
   public GetOMVersionResponse getOMVersion(GetOMVersionRequest getOMVersionRequest)
       throws IOException {
-    GetOMVersionResponse version = om.getJobworkerNodemanager().getVersion(getOMVersionRequest);
-    if (om.getJobworkerJobManager() == null) {
-      return version;
-    }
-    return version.toBuilder()
-        .setOmNodeId(om.getOMNodeId())
-        .setDurableJobProtocolVersion(om.getVersionManager().isAllowed(
-            OMLayoutFeature.JOBWORKER_HA) ? 1 : 0).build();
+    return om.getJobworkerNodemanager().getVersion(getOMVersionRequest);
   }
 
   @Override
   public RegisterJobworkerResponse registerJobworker(
       RegisterJobworkerRequest registerJobworkerRequest) throws IOException {
-    if (om.getJobworkerJobManager() != null && registerJobworkerRequest.getDurableJobProtocolVersion() != 1) {
-      throw new IOException("Jobworker must support durable assignment and result acknowledgement protocol version 1");
-    }
     JobworkerDetails jobworkerDetails =
         JobworkerDetails.getFromProtoBuf(registerJobworkerRequest.getExtendedJobWorkDetailsProto());
     Map<String, String> auditMap = Maps.newHashMap();
@@ -120,13 +108,15 @@ public class JobworkerProtocolServerImpl implements JobworkerProtocol {
       Preconditions.checkState(sendHeartbeatRequest.getOmServiceId().equals(om.getOMServiceId()),
           String.format("OM received a heartbeat with mismatched OMServiceId: expected=%s, actual=%s.",
               om.getOMServiceId(), sendHeartbeatRequest.getOmServiceId()));
-      OMJobworkerJobManager jobs = om.getJobworkerJobManager();
-      List<OMJobworkerCommand> commands = jobworkerHeartbeatDispatcher.dispatch(jobs == null
-          ? sendHeartbeatRequest : sendHeartbeatRequest.toBuilder().clearCommandStatusReports().build());
+      List<OMJobworkerCommand> commands = jobworkerHeartbeatDispatcher.dispatch(sendHeartbeatRequest);
+      // Only the ready leader hands out work. Re-registration is safe from any OM.
+      boolean leaderReady = leaderTracker.isLeaderReady();
       for (OMJobworkerCommand command : commands) {
-        responseCommands.add(getCommandResponse(command));
+        if (leaderReady || command.getType() == Type.reregisterCommand) {
+          responseCommands.add(getCommandResponse(command));
+        }
       }
-      final OptionalLong term = getTermIfLeader();
+      final OptionalLong term = leaderTracker.getTermIfLeader();
       auditMap.put("JobworkerUUID", ProtobufUtils.fromProtobuf(jobworkerDetailProto.getUuid128()).toString());
       auditMap.put("JobworkerHostname", jobworkerDetailProto.getHostName());
       term.ifPresent(t -> auditMap.put("Term", String.valueOf(t)));
@@ -136,14 +126,6 @@ public class JobworkerProtocolServerImpl implements JobworkerProtocol {
               .setOmServiceId(om.getOMServiceId())
               .addAllCommands(responseCommands);
       term.ifPresent(builder::setTerm);
-      if (jobs != null && jobs.isAvailable()
-          && jobworkerNodeManager.isJobworkerNodeRegistered(
-              ProtobufUtils.fromProtobuf(jobworkerDetailProto.getUuid128()))) {
-        UUID workerId = ProtobufUtils.fromProtobuf(jobworkerDetailProto.getUuid128());
-        builder.addAllCommittedResults(jobs.reconcile(JobworkerDetails.getFromProtoBuf(jobworkerDetailProto),
-            sendHeartbeatRequest.getCommandStatusReportsList()));
-        builder.addAllCommands(jobs.commandsFor(workerId));
-      }
       if (LOG.isDebugEnabled()) {
         StringBuilder sb = new StringBuilder();
         commands.forEach(command -> sb.append(command.getType()).append(", "));
@@ -160,12 +142,16 @@ public class JobworkerProtocolServerImpl implements JobworkerProtocol {
 
   public static OMJobworkerCommandProto getCommandResponse(OMJobworkerCommand command) {
     if (command.getProto() instanceof OMJobworkerCommandProto) {
-      return (OMJobworkerCommandProto) command.getProto();
+      OMJobworkerCommandProto proto = (OMJobworkerCommandProto) command.getProto();
+      return command.getTerm() > 0 ? proto.toBuilder().setTerm(command.getTerm()).build() : proto;
     }
     OMJobworkerCommandProto.Builder builder =
         OMJobworkerCommandProto
             .newBuilder()
             .setExpirationTimestampMs(command.getExpirationTimestampMs());
+    if (command.getTerm() > 0) {
+      builder.setTerm(command.getTerm());
+    }
 
     switch (command.getType()) {
     case reregisterCommand:
@@ -184,20 +170,6 @@ public class JobworkerProtocolServerImpl implements JobworkerProtocol {
     default:
       throw new IllegalArgumentException("OMJobworker command " + command.getType() + " is not implemented");
     }
-  }
-
-  private OptionalLong getTermIfLeader() {
-    if (om != null &&  om.getOmRatisServer() != null) {
-      try {
-        DivisionInfo divisionInfo = om.getOmRatisServer().getServerDivision().getInfo();
-        if (divisionInfo.isLeader()) {
-          return OptionalLong.of(divisionInfo.getCurrentTerm());
-        }
-      } catch (Exception e) {
-        LOG.debug("Exception when getting leader current term ", e);
-      }
-    }
-    return OptionalLong.empty();
   }
 
   @Override

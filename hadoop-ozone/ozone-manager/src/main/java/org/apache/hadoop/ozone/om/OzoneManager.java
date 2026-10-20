@@ -309,9 +309,9 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.jobworker.JobworkerGrpcServer;
 import org.apache.hadoop.ozone.om.jobworker.JobworkerProtocolServerImpl;
 import org.apache.hadoop.ozone.om.jobworker.OMJobworkerEvents;
+import org.apache.hadoop.ozone.om.jobworker.OMJobworkerLeaderTracker;
 import org.apache.hadoop.ozone.om.jobworker.command.JobworkerCommandStatusReportHandler;
 import org.apache.hadoop.ozone.om.jobworker.command.OMJobworkerCommandManager;
-import org.apache.hadoop.ozone.om.jobworker.command.OMJobworkerJobManager;
 import org.apache.hadoop.ozone.om.jobworker.node.JobworkerNodeManager;
 import org.apache.hadoop.ozone.om.jobworker.node.JobworkerNodeReportHandler;
 import org.apache.hadoop.ozone.om.jobworker.node.NewJobworkerHandler;
@@ -508,7 +508,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private JobworkerNodeManager jobworkerNodemanager;
   private JobworkerProtocolServerImpl jobworkerServerProtocol;
   private OMJobworkerCommandManager omJobworkerCommandManager;
-  private OMJobworkerJobManager jobworkerJobManager;
+  private final OMJobworkerLeaderTracker jobworkerLeaderTracker;
   private EventQueue jobworkerEventQueue;
   private String omComponent;
   private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
@@ -810,6 +810,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     s3OzoneAdmins = OzoneAdmins.getS3Admins(conf);
 
     serviceManager = new OMServiceManager();
+    jobworkerLeaderTracker = new OMJobworkerLeaderTracker(this);
+    serviceManager.register(jobworkerLeaderTracker);
 
     instantiateServices(false);
 
@@ -2751,20 +2753,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         List<String> locations = cachedMapping.resolve(Collections.singletonList(hostname));
         return locations == null || locations.isEmpty() ? null : locations.get(0);
       }, workerTopology, omStorage, omNodeDetails, configuration, jobworkerEventQueue);
-      omJobworkerCommandManager = new OMJobworkerCommandManager(jobworkerNodemanager, getOMServiceId());
-      jobworkerJobManager = new OMJobworkerJobManager(this);
-      omJobworkerCommandManager.setDurableManager(jobworkerJobManager);
+      omJobworkerCommandManager = new OMJobworkerCommandManager(jobworkerNodemanager, getOMServiceId(),
+          jobworkerLeaderTracker::getTermIfReady);
       jobworkerEventQueue.addHandler(OMJobworkerEvents.JW_NODE_REPORT,
           new JobworkerNodeReportHandler(jobworkerNodemanager));
       jobworkerEventQueue.addHandler(OMJobworkerEvents.NEW_JOBWORKER, new NewJobworkerHandler(jobworkerNodemanager));
       jobworkerEventQueue.addHandler(OMJobworkerEvents.STALE_JOBWORKER,
           new StaleJobworkerHandler(jobworkerNodemanager, omJobworkerCommandManager));
       jobworkerEventQueue.addHandler(OMJobworkerEvents.JW_COMMAND_STATUS_REPORT,
-          new JobworkerCommandStatusReportHandler(omJobworkerCommandManager));
-      jobworkerServerProtocol = new JobworkerProtocolServerImpl(this, jobworkerNodemanager, jobworkerEventQueue);
+          new JobworkerCommandStatusReportHandler(omJobworkerCommandManager, jobworkerLeaderTracker::isLeaderReady));
+      jobworkerServerProtocol = new JobworkerProtocolServerImpl(this, jobworkerNodemanager, jobworkerEventQueue,
+          jobworkerLeaderTracker);
       jobworkerGrpcServer = new JobworkerGrpcServer(
           configuration, jobworkerServerProtocol, omNodeDetails, omJobworkerCommandManager);
       jobworkerGrpcServer.start();
+      jobworkerLeaderTracker.attach(omJobworkerCommandManager, jobworkerNodemanager);
     } catch (IOException | RuntimeException e) {
       stopJobworkerService();
       throw e;
@@ -2772,6 +2775,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   private void stopJobworkerService() {
+    jobworkerLeaderTracker.detach();
     if (jobworkerGrpcServer != null) {
       jobworkerGrpcServer.stop();
       jobworkerGrpcServer = null;
@@ -2781,11 +2785,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     jobworkerNodemanager = null;
     omJobworkerCommandManager = null;
     jobworkerServerProtocol = null;
-    jobworkerJobManager = null;
   }
 
-  public OMJobworkerJobManager getJobworkerJobManager() {
-    return jobworkerJobManager;
+  public OMJobworkerLeaderTracker getJobworkerLeaderTracker() {
+    return jobworkerLeaderTracker;
   }
 
   public JobworkerNodeManager getJobworkerNodemanager() {

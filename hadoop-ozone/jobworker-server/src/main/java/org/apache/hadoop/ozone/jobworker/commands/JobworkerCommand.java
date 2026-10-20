@@ -32,15 +32,13 @@ public abstract class JobworkerCommand<T extends Message> {
   private long term;
   private final String omServiceId;
   private long expirationTimestampMs;
-  private String attemptId;
 
-  public String getAttemptId() {
-    return attemptId;
-  }
-
+  /**
+   * Wraps a command received from the OM leader of the given service in the given term.
+   */
   public static JobworkerCommand<OMJobworkerCommandProto> fromEnvelope(
       OMJobworkerCommandProto envelope, String service, long term) {
-    JobworkerCommand<OMJobworkerCommandProto> command = new JobworkerCommand<OMJobworkerCommandProto>(
+    return new JobworkerCommand<OMJobworkerCommandProto>(
         envelope.getCmdId(), service, term, envelope.getExpirationTimestampMs()) {
       @Override
       public OMJobworkerCommandProto.Type getType() {
@@ -52,8 +50,6 @@ public abstract class JobworkerCommand<T extends Message> {
         return envelope;
       }
     };
-    command.attemptId = envelope.getAttemptId();
-    return command;
   }
 
   /**

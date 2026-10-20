@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.jobworker.command;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import org.apache.hadoop.hdds.protocol.JobworkerDetails;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.server.events.EventHandler;
@@ -39,13 +40,20 @@ public class JobworkerCommandStatusReportHandler implements
       LoggerFactory.getLogger(JobworkerCommandStatusReportHandler.class);
 
   private final OMJobworkerCommandManager jobworkerCommandProcessor;
+  private final BooleanSupplier isLeaderReady;
 
   /**
    * Constructs CommandStatusReportHandler.
+   *
+   * @param jobworkerCommandProcessor the command manager that tracks in-flight commands
+   * @param isLeaderReady true if this OM is the ready leader; reports are ignored otherwise
    */
-  public JobworkerCommandStatusReportHandler(OMJobworkerCommandManager jobworkerCommandProcessor) {
+  public JobworkerCommandStatusReportHandler(OMJobworkerCommandManager jobworkerCommandProcessor,
+      BooleanSupplier isLeaderReady) {
     Objects.requireNonNull(jobworkerCommandProcessor);
+    Objects.requireNonNull(isLeaderReady);
     this.jobworkerCommandProcessor = jobworkerCommandProcessor;
+    this.isLeaderReady = isLeaderReady;
   }
 
   @Override
@@ -55,6 +63,11 @@ public class JobworkerCommandStatusReportHandler implements
     JobworkerDetails jobworkerDetails = report.getJobworkerDetails();
     Objects.requireNonNull(jobworkerDetails,
         "CommandStatusReport is missing JobworkerDetails.");
+    if (!isLeaderReady.getAsBoolean()) {
+      LOG.debug("Skip command status report from JobWorker {} since this OM is not the ready leader.",
+          jobworkerDetails);
+      return;
+    }
     List<CommandStatus> commandStatusList = report.getReport().getCmdStatusList();
     Objects.requireNonNull(commandStatusList);
 

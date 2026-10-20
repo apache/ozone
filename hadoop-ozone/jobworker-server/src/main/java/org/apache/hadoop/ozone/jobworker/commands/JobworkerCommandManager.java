@@ -17,15 +17,11 @@
 
 package org.apache.hadoop.ozone.jobworker.commands;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Queue;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -33,7 +29,6 @@ import java.util.function.Consumer;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandResultCode;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandStatus;
-import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.JobworkerCommandRecord;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.OMJobworkerCommandProto;
 import org.apache.hadoop.ozone.jobworker.JobworkerConfiguration;
 import org.slf4j.Logger;
@@ -55,75 +50,6 @@ public class JobworkerCommandManager {
 
   // OM leadership terms, mapped by service ID
   private final Map<String, OptionalLong> termOfLeaderOM;
-  private JobworkerCommandJournal journal;
-  private final Set<String> acceptedAttempts = new HashSet<>();
-
-  public void setJournal(JobworkerCommandJournal journal) {
-    this.journal = journal;
-    for (JobworkerCommandRecord record
-        : journal.records()) {
-      if (!record.getAcknowledged()) {
-        restoreStatus(record.getStatus());
-      }
-    }
-  }
-
-  private void restoreStatus(CommandStatus proto) {
-    JobworkerCommandStatus status = JobworkerCommandStatus.fromProto(proto);
-    status.setPersistence(updated -> {
-      try {
-        journal.update(updated);
-      } catch (IOException e) {
-        throw new UncheckedIOException("Cannot persist Jobworker status", e);
-      }
-    });
-    cmdStatusMap.computeIfAbsent(proto.getOmServiceId(), ignore -> new ConcurrentHashMap<>())
-        .put(proto.getCmdId(), status);
-  }
-
-  public void acceptDurableCommand(OMJobworkerCommandProto command, String service, long term)
-      throws IOException {
-    if (journal == null) {
-      throw new IOException("No persistent Jobworker journal is configured");
-    }
-    lock.lock();
-    try {
-      JobworkerCommandRecord receipt =
-          journal.receipt(service, command);
-      if (receipt.getAcknowledged()) {
-        return;
-      }
-      if (getCmdStatus(service, command.getCmdId()) == null) {
-        restoreStatus(receipt.getStatus());
-      }
-      if (receipt.getStatus().getStatus() == CommandStatus.Status.PENDING
-          && !command.getReconcileOnly()
-          && !acceptedAttempts.contains(command.getAttemptId()) && commandQueue.size() < maxCommandQueueLimit) {
-        commandQueue.add(JobworkerCommand.fromEnvelope(receipt.getCommand(), service, term));
-        acceptedAttempts.add(command.getAttemptId());
-      }
-    } finally {
-      lock.unlock();
-    }
-  }
-
-  public void acknowledge(CommandStatus result) throws IOException {
-    if (journal == null) {
-      return;
-    }
-    lock.lock();
-    try {
-      if (journal.acknowledge(result)) {
-        Map<Long, JobworkerCommandStatus> statuses = cmdStatusMap.get(result.getOmServiceId());
-        if (statuses != null) {
-          statuses.remove(result.getCmdId());
-        }
-        acceptedAttempts.remove(result.getAttemptId());
-      }
-    } finally {
-      lock.unlock();
-    }
-  }
 
   /**
    * Constructs a new JobworkerCommandManager.
@@ -174,6 +100,7 @@ public class JobworkerCommandManager {
         .setType(cmd.getType())
         .setStatus(CommandStatus.Status.PENDING)
         .setOmServiceId(omServiceId)
+        .setTerm(cmd.getTerm())
         .build();
     cmdStatusMap.computeIfAbsent(omServiceId, ignore -> new ConcurrentHashMap<>())
         .put(cmd.getId(), status);
@@ -193,7 +120,8 @@ public class JobworkerCommandManager {
         .setCmdId(cmd.getId())
         .setType(cmd.getType())
         .setStatus(CommandStatus.Status.FAILED)
-        .setOmServiceId(omServiceId);
+        .setOmServiceId(omServiceId)
+        .setTerm(cmd.getTerm());
     if (msg != null) {
       builder.setMsg(msg);
     }
@@ -301,11 +229,6 @@ public class JobworkerCommandManager {
         JobworkerCommand command = commandQueue.poll();
         if (command == null) {
           return null;
-        }
-
-        if (command.getAttemptId() != null) {
-          // A committed assignment remains valid across leader changes; a new term is not a new attempt.
-          return command;
         }
 
         String omServiceId = command.getOmServiceId();

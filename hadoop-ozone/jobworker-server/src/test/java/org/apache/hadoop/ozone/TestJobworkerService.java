@@ -23,8 +23,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.io.IOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -41,7 +39,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -50,15 +47,11 @@ import org.junit.jupiter.params.provider.ValueSource;
  */
 @Timeout(300)
 public class TestJobworkerService {
-  @TempDir
-  private Path directory;
-
   private final OzoneConfiguration conf = new OzoneConfiguration();
   private JobworkerService service;
 
   @BeforeEach
-  public void setUp() throws IOException {
-    conf.set("ozone.jobworker.metadata.dir", directory.resolve("worker-state").toString());
+  public void setUp() {
     service = new JobworkerService(new String[] {});
   }
 

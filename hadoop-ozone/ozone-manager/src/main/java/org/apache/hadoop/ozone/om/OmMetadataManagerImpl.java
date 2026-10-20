@@ -136,7 +136,6 @@ import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.JobworkerJobRecord;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
@@ -150,7 +149,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Ozone metadata manager interface.
  */
-
 public class OmMetadataManagerImpl implements OMMetadataManager,
     S3SecretStore, Closeable {
   private static final Logger LOG =
@@ -183,7 +181,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, String> metaTable;
   private Table<String, OmLifecycleConfiguration> lifecycleConfigurationTable;
   private Table<String, OmLifecycleScanState> lifecycleScanStateTable;
-  private Table<String, JobworkerJobRecord> jobworkerJobTable;
 
   // Tables required for multi-tenancy
   private Table<String, OmDBAccessIdInfo> tenantAccessIdTable;
@@ -551,7 +548,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     lifecycleConfigurationTable = initializer.get(OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE_DEF);
     lifecycleScanStateTable = initializer.get(OMDBDefinition.LIFECYCLE_SCAN_STATE_TABLE_DEF);
-    jobworkerJobTable = initializer.get(OMDBDefinition.JOBWORKER_JOB_TABLE_DEF);
   }
 
   /**
@@ -1732,11 +1728,6 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, String> getMetaTable() {
     return metaTable;
-  }
-
-  @Override
-  public Table<String, JobworkerJobRecord> getJobworkerJobTable() {
-    return jobworkerJobTable;
   }
 
   @Override

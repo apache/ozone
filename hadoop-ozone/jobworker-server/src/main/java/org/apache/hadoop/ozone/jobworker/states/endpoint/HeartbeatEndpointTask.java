@@ -27,13 +27,13 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.protocol.JobworkerDetails;
-import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandStatus;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.OMJobworkerCommandProto;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.SendHeartbeatRequest;
 import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.SendHeartbeatResponseProto;
 import org.apache.hadoop.ozone.jobworker.JobworkerEndpointStateMachine;
 import org.apache.hadoop.ozone.jobworker.JobworkerEndpointStateMachine.EndpointStates;
 import org.apache.hadoop.ozone.jobworker.JobworkerStateContext;
+import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommand;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -160,15 +160,9 @@ public class HeartbeatEndpointTask implements Callable<EndpointStates> {
     if (response.hasTerm()) {
       context.updateTermOfLeaderOM(rpcEndpoint.getOMServiceId(), response.getTerm());
     }
-    for (CommandStatus result
-        : response.getCommittedResultsList()) {
-      Preconditions.checkState(result.getOmServiceId().equals(rpcEndpoint.getOMServiceId()),
-          "Unexpected OM service in committed Jobworker result");
-      context.getCommandManager().acknowledge(result);
-    }
     // Process commands
     for (OMJobworkerCommandProto commandProto : response.getCommandsList()) {
-      processCommandProto(commandProto, response.getOmServiceId(), response.getTerm());
+      processCommandProto(commandProto, response.getOmServiceId());
     }
   }
 
@@ -177,23 +171,23 @@ public class HeartbeatEndpointTask implements Callable<EndpointStates> {
    *
    * @param commandProto the command proto
    */
-  private void processCommandProto(OMJobworkerCommandProto commandProto, String omServiceId, long term)
-      throws IOException {
+  private void processCommandProto(OMJobworkerCommandProto commandProto, String omServiceId) {
     OMJobworkerCommandProto.Type cmdType = commandProto.getCommandType();
     try {
-      if (commandProto.hasAttemptId()) {
-        context.getCommandManager().acceptDurableCommand(commandProto, omServiceId, term);
-        return;
-      }
       switch (cmdType) {
       case reregisterCommand:
         processReregisterCommand();
         break;
       default:
-        LOG.warn("Unknown command type: {} omServiceId {}", cmdType, omServiceId);
+        // Each command carries the term of the leader that issued it, so a late command from an
+        // older leader is dropped even if it arrives in the response of a newer leader.
+        if (!commandProto.hasTerm()) {
+          LOG.warn("Ignoring command {} type {} from omServiceId {} without a leader term",
+              commandProto.getCmdId(), cmdType, omServiceId);
+          return;
+        }
+        context.addCommand(JobworkerCommand.fromEnvelope(commandProto, omServiceId, commandProto.getTerm()));
       }
-    } catch (IOException e) {
-      throw e;
     } catch (Exception e) {
       LOG.error("Error processing command type {} omServiceId {}", cmdType, omServiceId, e);
     }
