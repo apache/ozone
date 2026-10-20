@@ -286,7 +286,7 @@ New keys written to a bucket whose default mode is `COMPLIANCE` get the default 
 **Access types**:
 * OM maps each Object Lock operation to the access type in the [mapping below](#4-action-to-ranger-access-type-mapping) (for example `WRITE` for `PutObjectLegalHold`).
   A principal with that access type on the target resource is allowed, regardless of whether the request comes from S3 Gateway, ofs / o3fs or the Ozone CLI.
-* As with native ACLs, reading lock information uses `READ`. Changing locks uses `WRITE` (plus `DELETE` for the Governance bypass), so both use the same access types as reading and writing data.
+* Reading lock information uses `READ`, and changing locks uses `WRITE` (plus `DELETE` for the Governance bypass), the same access types as reading and writing data.
   Ranger has no administrator role for Object Lock, so `action-matches` is what separates lock management from data access, including setting a Compliance retention (see [Trusted Boundary](#trusted-boundary-and-compliance-scope)).
   A Compliance retention cannot be removed with any Ranger permission; it can only be changed offline with `ozone repair`.
 
@@ -373,32 +373,34 @@ With native ACLs, `PutObjectRetention` means the owner, and setting `COMPLIANCE`
 #### 6. Dependent Permissions
 
 As in AWS S3 ([required permissions for S3 API operations](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-policy-actions.html)),
-the permission to read or write data and the permission to read or manage locks are separate actions.
-With native ACLs, managing locks needs the owner; with Ranger, the actions share the access types (`READ` / `WRITE`) and are told apart by `action-matches`.
-A request that carries Object Lock headers (or, for reads, a key that has lock information) needs the permission of the matching Object Lock action in addition to its own.
-The table lists, for each S3 API, which headers or conditions trigger which extra checks:
+a request that carries Object Lock headers (or, for reads, a key that has lock information) needs extra permissions in addition to its own.
+The two authorization models check them differently: Ranger checks dependent S3 actions with `action-matches`, while native ACLs have no actions and check the owner or the Ozone administrator role.
 
-| S3 API                                                    | Main S3 action   | Header or condition                                                                                    | Dependent S3 action                        | Ranger access type            | Native ACLs                                              | If denied                                   |
-|:----------------------------------------------------------|:-----------------|:-------------------------------------------------------------------------------------------------------|:-------------------------------------------|:------------------------------|:---------------------------------------------------------|:--------------------------------------------|
-| `CreateBucket`                                            | `CreateBucket`   | `x-amz-bucket-object-lock-enabled: true`                                                               | `PutBucketObjectLockConfiguration`         | `WRITE` (bucket)          | Owner                                                    | Request fails                               |
-| `PutObject`, `CopyObject` (destination), `CreateMultipartUpload` | `PutObject` | `x-amz-object-lock-mode`, `-retain-until-date`, `-event-hold`, `-event-hold-duration-days` / `-years` | `PutObjectRetention`                       | `WRITE` (key)             | Owner (`GOVERNANCE`), Ozone administrator (`COMPLIANCE`) | Request fails                               |
-| `PutObject`, `CopyObject` (destination), `CreateMultipartUpload` | `PutObject` | `x-amz-object-lock-legal-hold`                                                                     | `PutObjectLegalHold`                       | `WRITE` (key)             | Owner                                                    | Request fails                               |
-| `GetObject`, `HeadObject`                                 | `GetObject`      | The key read by OM has a retention (`GetObjectRetention`) or a legal hold (`GetObjectLegalHold`)       | `GetObjectRetention`, `GetObjectLegalHold` | `READ` (key, already required by the main action) | `READ` (already required by the main action)             | OM removes that lock information from the response, so S3 Gateway omits the `x-amz-object-lock-*` headers; the request succeeds |
-| `DeleteObject`, `DeleteObjects`                           | `DeleteObject`   | `x-amz-bypass-governance-retention: true` on a key under Governance retention                          | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Owner                                             | Request fails (`DeleteObjects`: per-key `AccessDenied`) |
-| `PutObjectRetention`                                      | `PutObjectRetention` | Shortens or removes a Governance retention (see [Retention Updates](#retention-updates))           | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Owner                                             | Request fails                               |
-| `PutObject`, `CopyObject`, `CompleteMultipartUpload`, rename (Ozone only) | `PutObject` | Overwrites or renames a key under Governance retention with `bypassGovernanceRetention`  | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Owner                                             | Request fails                               |
-
-* With native ACLs, or with Ranger policy items that use `action-matches`, a client that can only write data cannot choose its own retention (for example, a shorter one than the bucket default) by adding a header,
-  and a principal that can manage retention cannot upload data without the write permission.
+Rules for both models:
 * Keys that only get the bucket default retention need no extra check, because the default was already authorized by `PutBucketObjectLockConfiguration`.
-* `GetObjectRetention` / `GetObjectLegalHold` only need their own action, as in AWS S3, and do not need `GetObject`.
-* The last row has no AWS S3 equivalent: AWS S3 writes a new version instead of overwriting, while Ozone rejects overwrites of locked keys unless the Governance bypass applies.
+* `GetObjectRetention` / `GetObjectLegalHold` only need their own permission, as in AWS S3, and do not need `GetObject`.
+* Overwrites and renames with `bypassGovernanceRetention` have no AWS S3 equivalent: AWS S3 writes a new version instead of overwriting, while Ozone rejects overwrites of locked keys unless the Governance bypass applies.
 * Native clients pass the same settings and the `bypassGovernanceRetention` flag as request arguments, and the same rules apply.
+
+##### With Ranger
+
+| S3 API                                                    | Main S3 action       | Header or condition                                                                                    | Dependent S3 action                        | Ranger access type      | If denied                                   |
+|:----------------------------------------------------------|:---------------------|:-------------------------------------------------------------------------------------------------------|:-------------------------------------------|:------------------------|:--------------------------------------------|
+| `CreateBucket`                                            | `CreateBucket`       | `x-amz-bucket-object-lock-enabled: true`                                                               | `PutBucketObjectLockConfiguration`         | `WRITE` (bucket)        | Request fails                               |
+| `PutObject`, `CopyObject` (destination), `CreateMultipartUpload` | `PutObject`   | `x-amz-object-lock-mode`, `-retain-until-date`, `-event-hold`, `-event-hold-duration-days` / `-years` | `PutObjectRetention`                       | `WRITE` (key)           | Request fails                               |
+| `PutObject`, `CopyObject` (destination), `CreateMultipartUpload` | `PutObject`   | `x-amz-object-lock-legal-hold`                                                                         | `PutObjectLegalHold`                       | `WRITE` (key)           | Request fails                               |
+| `GetObject`, `HeadObject`                                 | `GetObject`          | The key read by OM has a retention (`GetObjectRetention`) or a legal hold (`GetObjectLegalHold`)       | `GetObjectRetention`, `GetObjectLegalHold` | `READ` (key)            | OM removes that lock information from the response, so S3 Gateway omits the `x-amz-object-lock-*` headers; the request succeeds |
+| `DeleteObject`, `DeleteObjects`                           | `DeleteObject`       | `x-amz-bypass-governance-retention: true` on a key under Governance retention                          | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails (`DeleteObjects`: per-key `AccessDenied`) |
+| `PutObjectRetention`                                      | `PutObjectRetention` | Shortens or removes a Governance retention (see [Retention Updates](#retention-updates))               | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails                               |
+| `PutObject`, `CopyObject`, `CompleteMultipartUpload`, rename (Ozone only) | `PutObject` | Overwrites or renames a key under Governance retention with `bypassGovernanceRetention`        | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails                               |
+
+* The dependent actions use the same access types as the main actions, so they only make a difference for policy items with `action-matches`.
+  With such items, a client that can only write data cannot choose its own retention (for example, a shorter one than the bucket default) by adding a header,
+  and a principal that can manage retention cannot upload data without the write permission.
 
 **How the check works**: S3 Gateway sends one RPC with one S3 action (the main action). In that RPC, OM calls the authorizer once per required action,
 and each `checkAccess` call carries exactly one access type and one S3 action. The request is allowed only if every call is allowed, as in AWS S3, where each required action is evaluated separately.
 For example, `PutObject` with retention headers is checked as (`CREATE` / `WRITE`, `PutObject`) and then (`WRITE`, `PutObjectRetention`) on the key.
-Without `action-matches`, the second call is allowed whenever the first one is, because both use `WRITE`; the dependent action only matters for policy items with `action-matches`.
 Each call is a separate Ranger audit record, so a denial shows which action was missing.
 
 This follows the existing dependent S3 action check in `OmMetadataReader` (`DEPENDENT_S3_ACTIONS`),
@@ -414,6 +416,22 @@ Today the dependent actions come from a fixed map keyed by the main S3 action; i
 
 Unlike the current dependent action check, which only runs when the request has an S3 action, these checks also run for requests without an S3 action, using the access type only,
 so the rules in [Trusted Boundary](#trusted-boundary-and-compliance-scope) apply to them.
+
+##### With Native ACLs
+
+Native ACLs have no S3 actions, so there are no dependent actions. Instead, OM checks the owner or the Ozone administrator role (see [Native ACL Mapping](#1-native-acl-mapping))
+in the same request, after the existing ACL check of the main operation:
+
+| S3 API                                                    | Header or condition                                                                                    | Extra check                                              | If denied                                   |
+|:----------------------------------------------------------|:-------------------------------------------------------------------------------------------------------|:---------------------------------------------------------|:--------------------------------------------|
+| `CreateBucket`                                            | `x-amz-bucket-object-lock-enabled: true`                                                               | Owner                                                    | Request fails                               |
+| `PutObject`, `CopyObject` (destination), `CreateMultipartUpload` | `x-amz-object-lock-mode`, `-retain-until-date`, `-event-hold`, `-event-hold-duration-days` / `-years` | Owner (`GOVERNANCE`), Ozone administrator (`COMPLIANCE`) | Request fails                               |
+| `PutObject`, `CopyObject` (destination), `CreateMultipartUpload` | `x-amz-object-lock-legal-hold`                                                                  | Owner                                                    | Request fails                               |
+| `GetObject`, `HeadObject`                                 | The key read by OM has a retention or a legal hold                                                     | None: `READ` is already required, so the `x-amz-object-lock-*` headers are always returned | —                  |
+| `DeleteObject`, `DeleteObjects`, `PutObject`, `CopyObject`, `CompleteMultipartUpload`, rename (Ozone only) | `bypassGovernanceRetention` on a key under Governance retention | Owner                                     | Request fails (`DeleteObjects`: per-key `AccessDenied`) |
+
+* `PutObjectRetention` already needs the owner (or an Ozone administrator for `COMPLIANCE`), which also covers shortening or removing a Governance retention.
+* A user who can only write data is not the owner, so it cannot set a retention or a legal hold by adding a header.
 
 ### New Ozone APIs
 
@@ -546,7 +564,10 @@ While AWS S3 can guarantee absolute immutability across all levels because its i
 **Trusted Boundary:**
 The trusted boundary for this Object Lock design is defined at the **Application API Level**.
 * All data and metadata operations routed through the Ozone Java API, S3 Gateway, RPC interfaces, and standard Ozone clients are strictly governed by the Object Lock validation (`validateAndUpdateCache`) and native ACLs or Ranger access policies.
-* Within this boundary, immutability is strictly enforced. A key under Governance retention can only be overwritten or deleted with the bypass flag and the bypass entitlement (the owner or an Ozone administrator with native ACLs, `BypassGovernanceRetention` with Ranger).
+* Within this boundary, immutability is strictly enforced. A key under Governance retention can only be overwritten or deleted with the bypass flag and the bypass entitlement:
+  * With native ACLs: the volume or bucket owner, or an Ozone administrator.
+  * With Ranger: `WRITE` and `DELETE` on the key, and `BypassGovernanceRetention` when the policy item has `action-matches`.
+
   A key under Compliance retention or a legal hold cannot be overwritten or deleted by anyone, including Ozone administrators, until the retention period expires or the legal hold is removed.
 * **With Ranger, `action-matches` is what separates Object Lock permissions.**
   The access type alone does not: `PutObjectRetention`, `PutObjectLegalHold` and `PutBucketObjectLockConfiguration` all map to `WRITE`, the same access type used to write data.
