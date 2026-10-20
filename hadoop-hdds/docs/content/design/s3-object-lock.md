@@ -305,7 +305,7 @@ some requests also need a second action, depending on their headers or on the ke
 | `PutObjectRetention`                                      | `PutObjectRetention` | Shortens or removes a Governance retention                                                             | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails                               |
 | `PutObject`, `CopyObject`, `CompleteMultipartUpload`, rename (native clients) | `PutObject` | Overwrites or renames a key under Governance retention with `bypassGovernanceRetention`    | `BypassGovernanceRetention`                | `WRITE`, `DELETE` (key) | Request fails                               |
 
-A dependent action uses the same access type as the main action, so it only matters for policy items with `action-matches`.
+The dependent actions use the same access types as data (`READ` / `WRITE`, and `DELETE` for the bypass), so they mostly matter for policy items with `action-matches`.
 With such items, a data writer cannot set its own retention with a header, and a retention manager cannot upload data.
 
 **How it works**: S3 Gateway sends one RPC with the main action. OM calls `checkAccess` once per action, each with one access type and one action, and every call must pass.
@@ -476,7 +476,7 @@ This gives least privilege without new access types.
 AWS S3 runs on infrastructure that users cannot reach. Ozone is self-managed, so its protection is limited to a trusted boundary.
 
 **Trusted Boundary**: the API level. Every request through the Ozone Java API, S3 Gateway, RPC and Ozone clients goes through the WORM check (`validateAndUpdateCache`) and authorization.
-* A key under Governance retention can only be overwritten or deleted with the bypass flag and the bypass permission:
+* A key under Governance retention can only be overwritten, deleted or renamed with the bypass flag and the bypass permission:
   * Native ACLs: the volume or bucket owner, or an Ozone administrator.
   * Ranger: `WRITE` and `DELETE` on the key, and `BypassGovernanceRetention` when the policy item has `action-matches`.
 * A key under Compliance retention or a legal hold cannot be overwritten or deleted by anyone, including Ozone administrators, until the retention expires or the hold is removed.
@@ -550,7 +550,7 @@ The work is split into the phases below. Details are left to the individual Jira
 * Bucket: `CreateBucket` with Object Lock, `PutBucketObjectLockConfiguration`, `GetBucketObjectLockConfiguration` (following bucket links).
 * Key: `PutObjectRetention` / `GetObjectRetention` (with event hold), `PutObjectLegalHold` / `GetObjectLegalHold`.
 * The rules in [Event Hold Trigger Workflow](#event-hold-trigger-workflow) and [Retention Updates](#retention-updates).
-* `x-amz-object-lock-*` headers on `HeadObject` / `GetObject`, dropped by OM when the caller lacks the permission.
+* `x-amz-object-lock-*` headers on `HeadObject` / `GetObject`; with Ranger, OM drops them when the caller lacks the dependent permission.
 * `OzoneBucket` APIs and overloads.
 
 ### Phase 4: WORM Enforcement
