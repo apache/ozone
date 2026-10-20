@@ -23,12 +23,14 @@ import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
+import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.concurrent.Callable;
@@ -167,7 +169,8 @@ public class ReconServer extends GenericCli implements Callable<Void> {
           injector.getInstance(ReconSchemaManager.class);
 
       LOG.info("Creating Recon Schema.");
-      reconSchemaManager.createReconSchema();
+      File reconDbDir = injector.getInstance(ReconUtils.class).getReconDbDir(configuration, OZONE_RECON_DB_DIR);
+      reconSchemaManager.createReconSchema(ReconSchemaManager.getFreshInstallVersion(reconDbDir));
       LOG.debug("Recon schema creation done.");
 
       ReconSafeModeManager reconSafeModeMgr = injector.getInstance(ReconSafeModeManager.class);
