@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
 import org.apache.hadoop.hdds.upgrade.ScmUpgradeAction;
-import org.apache.hadoop.hdds.upgrade.ScmUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.ComponentUpgradeActionProvider;
 import org.apache.hadoop.ozone.upgrade.RatisBasedVersionManager;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
@@ -44,21 +43,12 @@ public class ScmVersionManager extends RatisBasedVersionManager {
   private final Map<ComponentVersion, ScmUpgradeAction> upgradeActions;
   private final OzoneStorageContainerManager upgradeActionArg;
 
-  public ScmVersionManager(SCMStorageConfig storage, OzoneStorageContainerManager upgradeActionArg) throws IOException {
-    this(storage, upgradeActionArg, new ScmUpgradeActionProvider());
-  }
-
   // Used by Recon's node manager to track Datanode versions without running SCM specific upgrade actions.
   public ScmVersionManager(SCMStorageConfig storage,
       OzoneStorageContainerManager upgradeActionArg,
       ComponentUpgradeActionProvider<ScmUpgradeAction> upgradeActionProvider)
       throws IOException {
     this(storage, upgradeActionArg, upgradeActionProvider, null);
-  }
-
-  public ScmVersionManager(SCMStorageConfig storage, OzoneStorageContainerManager upgradeActionArg,
-      String metricsSourceComponent) throws IOException {
-    this(storage, upgradeActionArg, new ScmUpgradeActionProvider(), metricsSourceComponent);
   }
 
   public ScmVersionManager(SCMStorageConfig storage, OzoneStorageContainerManager upgradeActionArg,

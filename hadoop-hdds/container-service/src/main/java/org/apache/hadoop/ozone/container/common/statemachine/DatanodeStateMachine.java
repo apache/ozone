@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.upgrade.DatanodeUpgradeActionProvider;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
@@ -161,7 +162,8 @@ public class DatanodeStateMachine implements Closeable {
     storage = new DatanodeStorage(conf,
         datanodeDetails.getUuidString());
 
-    versionManager = new DatanodeVersionManager(storage, this, metricsSourceComponent);
+    versionManager = new DatanodeVersionManager(storage, this, new DatanodeUpgradeActionProvider(),
+        metricsSourceComponent);
     VersionedDatanodeFeatures.initialize(versionManager);
 
     String threadNamePrefix = datanodeDetails.threadNamePrefix();

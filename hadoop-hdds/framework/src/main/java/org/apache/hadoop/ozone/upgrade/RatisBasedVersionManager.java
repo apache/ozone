@@ -32,10 +32,6 @@ public abstract class RatisBasedVersionManager extends ComponentVersionManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(RatisBasedVersionManager.class);
 
-  protected RatisBasedVersionManager(ComponentVersion apparentVersion, ComponentVersion softwareVersion) {
-    super(apparentVersion, softwareVersion);
-  }
-
   protected RatisBasedVersionManager(ComponentVersion apparentVersion, ComponentVersion softwareVersion,
       String metricsSourceComponent) {
     super(apparentVersion, softwareVersion, metricsSourceComponent);

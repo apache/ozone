@@ -51,11 +51,6 @@ public class DatanodeVersionManager extends ComponentVersionManager {
   }
 
   public DatanodeVersionManager(DatanodeStorage storage, DatanodeStateMachine upgradeActionArg,
-      String metricsSourceComponent) throws IOException {
-    this(storage, upgradeActionArg, new DatanodeUpgradeActionProvider(), metricsSourceComponent);
-  }
-
-  public DatanodeVersionManager(DatanodeStorage storage, DatanodeStateMachine upgradeActionArg,
       ComponentUpgradeActionProvider<DatanodeUpgradeAction> upgradeActionProvider,
       String metricsSourceComponent) throws IOException {
     super(HDDSVersionUtils.deserializedPersistedApparentVersion(storage.getApparentVersion()),

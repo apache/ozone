@@ -323,6 +323,7 @@ import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.defrag.SnapshotDefragService;
 import org.apache.hadoop.ozone.om.snapshot.trapped.BucketDeletedDataCalculator;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
+import org.apache.hadoop.ozone.om.upgrade.OMUpgradeActionProvider;
 import org.apache.hadoop.ozone.om.upgrade.OMUpgradeFinalizeService;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OzoneManagerAdminService;
@@ -636,7 +637,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
 
-    versionManager = new OMVersionManager(omStorage, this, MetricUtil.metricsSourceComponent("OM"));
+    versionManager = new OMVersionManager(omStorage, this, new OMUpgradeActionProvider(),
+        MetricUtil.metricsSourceComponent("OM"));
 
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");
