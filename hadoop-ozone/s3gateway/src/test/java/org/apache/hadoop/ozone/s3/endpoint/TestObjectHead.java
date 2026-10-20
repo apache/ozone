@@ -157,8 +157,10 @@ public class TestObjectHead {
   public void testHeadWithInvalidRange() throws Exception {
     assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
     when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=10-20");
+    long failureBefore = keyEndpoint.getMetrics().getHeadKeyFailure();
 
     assertErrorResponse(INVALID_RANGE, () -> keyEndpoint.head(bucketName, RANGE_KEY));
+    assertEquals(1L, keyEndpoint.getMetrics().getHeadKeyFailure() - failureBefore);
   }
 
   @Test
@@ -166,7 +168,7 @@ public class TestObjectHead {
     assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
     String eTag = keyEndpoint.head(bucketName, RANGE_KEY).getHeaderString(HttpHeaders.ETAG);
     when(headers.getHeaderString(IF_NONE_MATCH_HEADER)).thenReturn(eTag);
-    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-4");
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=10-20");
 
     Response response = keyEndpoint.head(bucketName, RANGE_KEY);
 
@@ -177,7 +179,7 @@ public class TestObjectHead {
   public void testHeadIfMatchFailureTakesPrecedenceOverRange() throws Exception {
     assertSucceeds(() -> put(keyEndpoint, bucketName, RANGE_KEY, RANGE_CONTENT));
     when(headers.getHeaderString(IF_MATCH_HEADER)).thenReturn("\"mismatched-etag\"");
-    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-4");
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=10-20");
 
     assertErrorResponse(PRECOND_FAILED, () -> keyEndpoint.head(bucketName, RANGE_KEY));
   }

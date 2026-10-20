@@ -677,6 +677,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
     } catch (Exception ex) {
       auditReadFailure(context.getAction(), ex);
+      getMetrics().updateHeadKeyFailureStats(startNanos);
       throw ex;
     }
 
