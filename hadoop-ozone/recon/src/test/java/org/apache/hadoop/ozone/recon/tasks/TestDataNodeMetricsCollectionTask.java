@@ -68,20 +68,16 @@ class TestDataNodeMetricsCollectionTask {
 
   @Test
   void picksDatanodeQualifiedBeanWhenPresent() throws Exception {
-    String ownBean = BEAN_PREFIX
-        + BlockDeletingServiceMetrics.getSourceName(nodeDetails.getUuidString());
-    String otherBean = BEAN_PREFIX
-        + BlockDeletingServiceMetrics.getSourceName("other-datanode");
-    List<Map<String, Object>> beans =
-        Arrays.asList(bean(LEGACY_BEAN, 7L), bean(otherBean, 11L), bean(ownBean, 42L));
+    String ownBean = BEAN_PREFIX + BlockDeletingServiceMetrics.getSourceName(nodeDetails.getUuidString());
+    String otherBean = BEAN_PREFIX + BlockDeletingServiceMetrics.getSourceName("other-datanode");
+    List<Map<String, Object>> beans = Arrays.asList(bean(LEGACY_BEAN, 7L), bean(otherBean, 11L), bean(ownBean, 42L));
 
     assertEquals(42L, collect(beans).getPendingBlockSize());
   }
 
   @Test
   void fallsBackToLegacyBeanName() throws Exception {
-    assertEquals(7L,
-        collect(Collections.singletonList(bean(LEGACY_BEAN, 7L))).getPendingBlockSize());
+    assertEquals(7L, collect(Collections.singletonList(bean(LEGACY_BEAN, 7L))).getPendingBlockSize());
   }
 
   @Test

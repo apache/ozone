@@ -48,12 +48,10 @@ public final class HttpServer2Metrics implements MetricsSource {
   public static HttpServer2Metrics create(
       QueuedThreadPool threadPool, String name) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME, "HttpServer2 Metrics",
-        new HttpServer2Metrics(threadPool, name, SOURCE_NAME));
+    return ms.register(SOURCE_NAME, "HttpServer2 Metrics", new HttpServer2Metrics(threadPool, name, SOURCE_NAME));
   }
 
-  public static HttpServer2Metrics create(
-      QueuedThreadPool threadPool, String name, String component) {
+  public static HttpServer2Metrics create(QueuedThreadPool threadPool, String name, String component) {
     if (component == null) {
       return create(threadPool, name);
     }
@@ -66,8 +64,7 @@ public final class HttpServer2Metrics implements MetricsSource {
     for (int i = 1; ms.getSource(sourceName) != null; i++) {
       sourceName = base + i;
     }
-    return ms.register(sourceName, "HttpServer2 Metrics",
-        new HttpServer2Metrics(threadPool, name, sourceName));
+    return ms.register(sourceName, "HttpServer2 Metrics", new HttpServer2Metrics(threadPool, name, sourceName));
   }
 
   @Override

@@ -65,8 +65,7 @@ public final class CommandHandlerMetrics implements MetricsSource {
   public static CommandHandlerMetrics create(Map<Type, CommandHandler> handlerMap, String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME, component);
-    return ms.register(sourceName, "CommandHandlerMetrics Metrics",
-        new CommandHandlerMetrics(handlerMap, sourceName));
+    return ms.register(sourceName, "CommandHandlerMetrics Metrics", new CommandHandlerMetrics(handlerMap, sourceName));
   }
 
   /**

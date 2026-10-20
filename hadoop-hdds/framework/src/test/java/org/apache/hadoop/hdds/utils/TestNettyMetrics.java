@@ -94,13 +94,11 @@ class TestNettyMetrics {
   void defaultCreateKeepsStandaloneSourceName() {
     NettyMetrics metrics = NettyMetrics.create();
     try {
-      assertNotNull(DefaultMetricsSystem.instance()
-          .getSource(NettyMetrics.SOURCE_NAME));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME));
     } finally {
       metrics.unregister();
     }
-    assertNull(DefaultMetricsSystem.instance()
-        .getSource(NettyMetrics.SOURCE_NAME));
+    assertNull(DefaultMetricsSystem.instance().getSource(NettyMetrics.SOURCE_NAME));
   }
 
   @Test

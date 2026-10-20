@@ -156,8 +156,7 @@ public class DiskBalancerService extends BackgroundService {
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
       int workerSize, ConfigurationSource conf, Clock clock)
       throws IOException {
-    this(ozoneContainer, serviceCheckInterval, serviceCheckTimeout, timeUnit,
-        workerSize, conf, null, clock);
+    this(ozoneContainer, serviceCheckInterval, serviceCheckTimeout, timeUnit, workerSize, conf, null, clock);
   }
 
   @SuppressWarnings("checkstyle:parameternumber")

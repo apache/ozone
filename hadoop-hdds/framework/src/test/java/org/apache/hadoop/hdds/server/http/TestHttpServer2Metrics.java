@@ -89,8 +89,7 @@ public class TestHttpServer2Metrics {
       verify(recorder).addGauge(HttpServerThreadCount, threadCount);
       verify(recorder).addGauge(HttpServerMaxThreadCount, maxThreadCount);
       verify(recorder).addGauge(HttpServerIdleThreadCount, idleThreadCount);
-      verify(recorder).addGauge(HttpServerThreadQueueWaitingTaskCount,
-          threadQueueWaitingTaskCount);
+      verify(recorder).addGauge(HttpServerThreadQueueWaitingTaskCount, threadQueueWaitingTaskCount);
     } finally {
       server2Metrics.unRegister();
     }
@@ -106,8 +105,7 @@ public class TestHttpServer2Metrics {
     QueuedThreadPool secondPool = mock(QueuedThreadPool.class);
     MetricsSystem ms = DefaultMetricsSystem.instance();
 
-    HttpServer2Metrics firstMetrics =
-        HttpServer2Metrics.create(firstPool, "hddsDatanode", "hddsDatanode");
+    HttpServer2Metrics firstMetrics = HttpServer2Metrics.create(firstPool, "hddsDatanode", "hddsDatanode");
     try {
       HttpServer2Metrics secondMetrics = HttpServer2Metrics.create(secondPool, "hddsDatanode", "hddsDatanode");
       try {
@@ -125,11 +123,9 @@ public class TestHttpServer2Metrics {
 
   @Test
   public void testNullComponentKeepsStandaloneSourceName() {
-    HttpServer2Metrics metrics =
-        HttpServer2Metrics.create(threadPool, "s3g", null);
+    HttpServer2Metrics metrics = HttpServer2Metrics.create(threadPool, "s3g", null);
     try {
-      assertNotNull(DefaultMetricsSystem.instance()
-          .getSource(HttpServer2Metrics.SOURCE_NAME));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(HttpServer2Metrics.SOURCE_NAME));
     } finally {
       metrics.unRegister();
     }

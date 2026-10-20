@@ -127,8 +127,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       VolumeSet volumes, Map<ContainerType, Handler> handlers,
       StateContext context, ContainerMetrics metrics,
       TokenVerifier tokenVerifier) {
-    this(config, contSet, volumes, handlers, context, metrics, tokenVerifier,
-        null);
+    this(config, contSet, volumes, handlers, context, metrics, tokenVerifier, null);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")

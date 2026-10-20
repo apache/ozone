@@ -62,7 +62,6 @@ public abstract class TestDatanodeQueueMetrics implements NonHATests.TestCase {
 
   private long getGauge(String metricName) {
     return getLongGauge(metricName,
-        getMetrics(cluster().getHddsDatanodes().get(0)
-            .getDatanodeStateMachine().getQueueMetrics()));
+        getMetrics(cluster().getHddsDatanodes().get(0).getDatanodeStateMachine().getQueueMetrics()));
   }
 }

@@ -53,8 +53,7 @@ public final class ECReconstructionMetrics {
   public static ECReconstructionMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String sourceName = MetricUtil.qualifySourceName(SOURCE, component);
-    return ms.register(sourceName, "EC Reconstruction Coordinator Metrics",
-        new ECReconstructionMetrics(sourceName));
+    return ms.register(sourceName, "EC Reconstruction Coordinator Metrics", new ECReconstructionMetrics(sourceName));
   }
 
   public void unRegister() {

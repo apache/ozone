@@ -120,8 +120,7 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     // Ensure metrics are unregistered if the volume set initialization fails.
-    this.volumeHealthMetrics = VolumeHealthMetrics.create(
-        MetricUtil.metricsSourceComponent(datanodeUuid), volumeType);
+    this.volumeHealthMetrics = VolumeHealthMetrics.create(MetricUtil.metricsSourceComponent(datanodeUuid), volumeType);
     try {
       initializeVolumeSet();
     } catch (Exception e) {

@@ -53,8 +53,7 @@ public class ReplicationSupervisorMetrics implements MetricsSource {
     return create(supervisor, null);
   }
 
-  public static ReplicationSupervisorMetrics create(ReplicationSupervisor
-      supervisor, String component) {
+  public static ReplicationSupervisorMetrics create(ReplicationSupervisor supervisor, String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String sourceName = MetricUtil.qualifySourceName(SOURCE, component);
     return ms.register(sourceName, "Container Replication Supervisor Metrics",

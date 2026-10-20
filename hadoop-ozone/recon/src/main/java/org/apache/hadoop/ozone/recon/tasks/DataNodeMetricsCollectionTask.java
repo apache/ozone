@@ -43,10 +43,8 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
   private final DatanodeInfo nodeDetails;
   private final boolean httpsEnabled;
   private final MetricsServiceProvider metricsServiceProvider;
-  private static final String DATANODE_METRICS_BEAN_PREFIX =
-      "Hadoop:service=HddsDatanode,name=";
-  private static final String LEGACY_BEAN_NAME =
-      DATANODE_METRICS_BEAN_PREFIX + BlockDeletingServiceMetrics.SOURCE_NAME;
+  private static final String DATANODE_METRICS_BEAN_PREFIX = "Hadoop:service=HddsDatanode,name=";
+  private static final String LEGACY_BEAN_NAME = DATANODE_METRICS_BEAN_PREFIX + BlockDeletingServiceMetrics.SOURCE_NAME;
   private static final String METRICS_KEY = "TotalPendingBlockBytes";
 
   public DataNodeMetricsCollectionTask(
@@ -69,8 +67,7 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
         return new DatanodePendingDeletionMetrics(
             nodeDetails.getHostName(), nodeDetails.getUuidString(), -1L);
       }
-      Map<String, Object> deletionMetrics =
-          ReconUtils.getMetricsData(metrics, getBlockDeletingServiceBeanName());
+      Map<String, Object> deletionMetrics = ReconUtils.getMetricsData(metrics, getBlockDeletingServiceBeanName());
       if (deletionMetrics == null) {
         deletionMetrics = ReconUtils.getMetricsData(metrics, LEGACY_BEAN_NAME);
       }
@@ -96,7 +93,6 @@ public class DataNodeMetricsCollectionTask implements Callable<DatanodePendingDe
   }
 
   private String getBlockDeletingServiceBeanName() {
-    return DATANODE_METRICS_BEAN_PREFIX
-        + BlockDeletingServiceMetrics.getSourceName(nodeDetails.getUuidString());
+    return DATANODE_METRICS_BEAN_PREFIX + BlockDeletingServiceMetrics.getSourceName(nodeDetails.getUuidString());
   }
 }

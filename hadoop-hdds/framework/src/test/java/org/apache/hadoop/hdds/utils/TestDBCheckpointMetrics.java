@@ -30,13 +30,11 @@ class TestDBCheckpointMetrics {
   void defaultCreateKeepsStandaloneSourceName() {
     DBCheckpointMetrics metrics = DBCheckpointMetrics.create("SCM Metrics");
     try {
-      assertNotNull(DefaultMetricsSystem.instance()
-          .getSource(DBCheckpointMetrics.class.getSimpleName()));
+      assertNotNull(DefaultMetricsSystem.instance().getSource(DBCheckpointMetrics.class.getSimpleName()));
     } finally {
       metrics.unRegister();
     }
-    assertNull(DefaultMetricsSystem.instance()
-        .getSource(DBCheckpointMetrics.class.getSimpleName()));
+    assertNull(DefaultMetricsSystem.instance().getSource(DBCheckpointMetrics.class.getSimpleName()));
   }
 
   @Test
