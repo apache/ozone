@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2M
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.HttpServerThreadQueueWaitingTaskCount;
 import static org.apache.hadoop.hdds.server.http.HttpServer2Metrics.HttpServer2MetricsInfo.SERVER_NAME;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyString;
@@ -29,10 +31,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Field;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -87,5 +96,38 @@ public class TestHttpServer2Metrics {
     verify(recorder).addGauge(HttpServerIdleThreadCount, idleThreadCount);
     verify(recorder).addGauge(HttpServerThreadQueueWaitingTaskCount,
         threadQueueWaitingTaskCount);
+  }
+
+  @Test
+  void testUnregisterWithMultipleMetricsSourceIds() throws Exception {
+    MetricsSystem metricsSystem =
+        DefaultMetricsSystem.initialize("TestHttpServer2Metrics");
+    Field field = metricsSystem.getClass().getDeclaredField("allSources");
+    field.setAccessible(true);
+    @SuppressWarnings("unchecked")
+    Map<String, MetricsSource> sources =
+        (Map<String, MetricsSource>) field.get(metricsSystem);
+    Set<String> initialSources = new HashSet<>(sources.keySet());
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    try {
+      HttpServer2Metrics first = HttpServer2Metrics.create(
+          mock(QueuedThreadPool.class), "server", "service1");
+      HttpServer2Metrics second = HttpServer2Metrics.create(
+          mock(QueuedThreadPool.class), "server", "service2");
+      assertEquals(initialSources.size() + 2, sources.size());
+      assertTrue(sources.containsKey(HttpServer2Metrics.NAME + "-service1"));
+      assertTrue(sources.containsKey(HttpServer2Metrics.NAME + "-service2"));
+
+      second.unRegister();
+      first.unRegister();
+      assertEquals(initialSources, sources.keySet());
+    } finally {
+      Set<String> remainingSources = new HashSet<>(sources.keySet());
+      remainingSources.removeAll(initialSources);
+      remainingSources.forEach(metricsSystem::unregisterSource);
+      DefaultMetricsSystem.shutdown();
+      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+    }
   }
 }

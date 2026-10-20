@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 
 /**
@@ -38,17 +39,26 @@ public final class HttpServer2Metrics implements MetricsSource {
 
   private final QueuedThreadPool threadPool;
   private final String name;
+  private final String sourceName;
 
-  private HttpServer2Metrics(QueuedThreadPool threadPool, String name) {
+  private HttpServer2Metrics(QueuedThreadPool threadPool, String name,
+      String sourceId) {
     this.threadPool = threadPool;
     this.name = name;
+    this.sourceName = MetricUtil.getMetricsSourceName(NAME, sourceId);
   }
 
   public static HttpServer2Metrics create(
       QueuedThreadPool threadPool, String name) {
+    return create(threadPool, name, name);
+  }
+
+  public static HttpServer2Metrics create(QueuedThreadPool threadPool,
+      String name, String sourceId) {
+    HttpServer2Metrics metrics =
+        new HttpServer2Metrics(threadPool, name, sourceId);
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(NAME, "HttpServer2 Metrics",
-        new HttpServer2Metrics(threadPool, name));
+    return ms.register(metrics.sourceName, "HttpServer2 Metrics", metrics);
   }
 
   @Override
@@ -69,7 +79,7 @@ public final class HttpServer2Metrics implements MetricsSource {
 
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(NAME);
+    ms.unregisterSource(sourceName);
   }
 
   enum HttpServer2MetricsInfo implements MetricsInfo {

@@ -144,7 +144,7 @@ public class SnapshotRequestAndResponseTests {
     ozoneManager = mock(OzoneManager.class);
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     omMetrics = OMMetrics.create(ozoneConfiguration);
-    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create("om1");
+    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create("service1", "om1");
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         testDir.getAbsolutePath());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,

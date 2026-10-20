@@ -265,6 +265,7 @@ public final class HttpServer2 implements FilterContainer {
   public static class Builder {
     private ArrayList<URI> endpoints = Lists.newArrayList();
     private String name;
+    private String metricsSourceId;
     private MutableConfigurationSource conf;
     private ConfigurationSource sslConf;
     private String[] pathSpecs;
@@ -302,6 +303,11 @@ public final class HttpServer2 implements FilterContainer {
 
     public Builder setName(String serverName) {
       this.name = serverName;
+      return this;
+    }
+
+    public Builder setMetricsSourceId(String sourceId) {
+      this.metricsSourceId = sourceId;
       return this;
     }
 
@@ -730,7 +736,8 @@ public final class HttpServer2 implements FilterContainer {
       threadPool.setMaxThreads(maxThreads);
     }
 
-    metrics = HttpServer2Metrics.create(threadPool, builder.name);
+    metrics = HttpServer2Metrics.create(threadPool, builder.name,
+        builder.metricsSourceId == null ? builder.name : builder.metricsSourceId);
     SessionHandler handler = webAppContext.getSessionHandler();
     handler.setHttpOnly(true);
     handler.getSessionCookieConfig().setSecure(true);

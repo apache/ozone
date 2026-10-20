@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import java.util.Iterator;
 import java.util.Map.Entry;
-import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -31,6 +30,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * A class for collecting and reporting volume utilization metrics.
@@ -52,14 +52,17 @@ public class VolumeUtilizationMetrics implements MetricsSource {
   private final OMMetadataManager metadataManager;
   private final String sourceName;
 
-  public VolumeUtilizationMetrics(OMMetadataManager metadataManager) {
+  public VolumeUtilizationMetrics(OMMetadataManager metadataManager,
+      String omServiceId, String omNodeId) {
     this.metadataManager = metadataManager;
-    sourceName = DefaultMetricsSystem.inMiniClusterMode() ? SOURCE + '-' + UUID.randomUUID() : SOURCE;
+    sourceName = MetricUtil.getMetricsSourceName(SOURCE, omServiceId, omNodeId);
   }
 
-  public static VolumeUtilizationMetrics create(OMMetadataManager metadataManager) {
+  public static VolumeUtilizationMetrics create(OMMetadataManager metadataManager,
+      String omServiceId, String omNodeId) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    VolumeUtilizationMetrics metrics = new VolumeUtilizationMetrics(metadataManager);
+    VolumeUtilizationMetrics metrics = new VolumeUtilizationMetrics(
+        metadataManager, omServiceId, omNodeId);
     return ms.register(metrics.sourceName, "Volume Utilization Metrics", metrics);
   }
 

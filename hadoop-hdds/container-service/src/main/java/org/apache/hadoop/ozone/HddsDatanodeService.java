@@ -336,7 +336,8 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
           dnCertClient, secretKeyClient, this::terminateDatanode,
           reconfigurationHandler);
       try {
-        httpServer = new HddsDatanodeHttpServer(conf);
+        httpServer = new HddsDatanodeHttpServer(conf,
+            datanodeDetails.getUuidString());
         httpServer.start();
         HttpConfig.Policy policy = HttpConfig.getHttpPolicy(conf);
 

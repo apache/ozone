@@ -93,6 +93,12 @@ public abstract class BaseHttpServer implements AutoCloseable {
 
   public BaseHttpServer(MutableConfigurationSource conf, String name)
       throws IOException {
+    this(conf, name, null);
+  }
+
+  public BaseHttpServer(MutableConfigurationSource conf, String name,
+      String metricsSourceId)
+      throws IOException {
     this.name = name;
     this.conf = conf;
     policy = getHttpPolicy(conf);
@@ -106,7 +112,8 @@ public abstract class BaseHttpServer implements AutoCloseable {
       conf.set("hadoop.prometheus.endpoint.enabled", "false");
 
       HttpServer2.Builder builder = newHttpServer2BuilderForOzone(
-          conf, httpAddress, httpsAddress, name);
+          conf, httpAddress, httpsAddress, name)
+          .setMetricsSourceId(metricsSourceId);
 
       LOG.info("Hadoop Security Enabled: {} " +
               "Ozone Security Enabled: {} " +

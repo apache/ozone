@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 
 /**
@@ -83,9 +84,7 @@ public final class SCMMetrics {
         ? ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
         : conf.getInt(ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
-    String sourceName = DefaultMetricsSystem.inMiniClusterMode()
-        ? SOURCE_NAME + '-' + scmId
-        : SOURCE_NAME;
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE_NAME, scmId);
     return ms.register(sourceName, "Storage Container Manager Metrics",
         new SCMMetrics(sourceName, maxRatisEvents));
   }

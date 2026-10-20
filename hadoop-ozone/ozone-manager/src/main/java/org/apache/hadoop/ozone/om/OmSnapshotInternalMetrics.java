@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om;
 
-import java.util.UUID;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -26,6 +25,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * This class contains internal Snapshot Operation metrics.
@@ -82,10 +82,10 @@ public final class OmSnapshotInternalMetrics implements MetricsSource {
     this.registry = new MetricsRegistry(sourceName);
   }
 
-  public static OmSnapshotInternalMetrics create(String omNodeId) {
-    String sourceName = DefaultMetricsSystem.inMiniClusterMode()
-        ? METRICS_SOURCE_NAME + '-' + omNodeId + '-' + UUID.randomUUID()
-        : METRICS_SOURCE_NAME;
+  public static OmSnapshotInternalMetrics create(String omServiceId,
+      String omNodeId) {
+    String sourceName = MetricUtil.getMetricsSourceName(METRICS_SOURCE_NAME,
+        omServiceId, omNodeId);
     OmSnapshotInternalMetrics metrics = new OmSnapshotInternalMetrics(sourceName);
     metrics.register();
     return metrics;

@@ -34,6 +34,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics source to report number of containers in different states.
@@ -55,9 +56,7 @@ public final class SCMContainerMetrics implements MetricsSource {
 
   public static SCMContainerMetrics create(String scmId, SCMMXBean scmmxBean) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    String sourceName = DefaultMetricsSystem.inMiniClusterMode()
-        ? SOURCE + '-' + scmId
-        : SOURCE;
+    String sourceName = MetricUtil.getMetricsSourceName(SOURCE, scmId);
     return ms.register(sourceName, "Storage " +
         "Container Manager Metrics", new SCMContainerMetrics(sourceName, scmmxBean));
   }

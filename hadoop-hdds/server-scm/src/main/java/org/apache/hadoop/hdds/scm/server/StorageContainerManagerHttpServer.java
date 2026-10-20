@@ -33,7 +33,7 @@ public class StorageContainerManagerHttpServer extends BaseHttpServer {
   public StorageContainerManagerHttpServer(MutableConfigurationSource conf,
                                            StorageContainerManager scm)
       throws IOException {
-    super(conf, "scm");
+    super(conf, "scm", scm == null ? null : scm.getScmId());
     addServlet("dbCheckpoint", OZONE_DB_CHECKPOINT_HTTP_ENDPOINT,
         SCMDBCheckpointServlet.class);
     getWebAppContext().setAttribute(OzoneConsts.SCM_CONTEXT_ATTRIBUTE, scm);

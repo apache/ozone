@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 class TestOmSnapshotInternalMetrics {
 
   @Test
-  void testUnregisterWithSameOmNodeId() throws Exception {
+  void testUnregisterWithMultipleOmNodeIds() throws Exception {
     MetricsSystem metricsSystem = DefaultMetricsSystem.initialize("TestOmSnapshotInternalMetrics");
     Field field = metricsSystem.getClass().getDeclaredField("allSources");
     field.setAccessible(true);
@@ -45,10 +45,12 @@ class TestOmSnapshotInternalMetrics {
     boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
     DefaultMetricsSystem.setMiniClusterMode(true);
     try {
-      OmSnapshotInternalMetrics first = OmSnapshotInternalMetrics.create("om1");
+      OmSnapshotInternalMetrics first = OmSnapshotInternalMetrics.create(
+          "service1", "om1");
       Set<String> firstSources = new HashSet<>(sources.keySet());
       assertEquals(initialSources.size() + 1, firstSources.size());
-      OmSnapshotInternalMetrics second = OmSnapshotInternalMetrics.create("om1");
+      OmSnapshotInternalMetrics second = OmSnapshotInternalMetrics.create(
+          "service1", "om2");
       assertNotSame(first, second);
       assertEquals(initialSources.size() + 2, sources.size());
 

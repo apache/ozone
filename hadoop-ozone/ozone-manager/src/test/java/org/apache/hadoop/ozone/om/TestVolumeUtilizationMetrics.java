@@ -89,7 +89,8 @@ public class TestVolumeUtilizationMetrics {
     MetricsCollector metricsCollector = mock(MetricsCollector.class);
     when(metricsCollector.addRecord(anyString())).thenReturn(mb);
 
-    VolumeUtilizationMetrics volumeMetrics = new VolumeUtilizationMetrics(omMetadataManager);
+    VolumeUtilizationMetrics volumeMetrics = new VolumeUtilizationMetrics(
+        omMetadataManager, "service1", "om1");
     volumeMetrics.getMetrics(metricsCollector, true);
 
     verify(mb, times(1)).tag(VolumeMetricsInfo.VolumeName, VOLUME_NAME_1);
@@ -114,10 +115,12 @@ public class TestVolumeUtilizationMetrics {
     boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
     DefaultMetricsSystem.setMiniClusterMode(true);
     try {
-      VolumeUtilizationMetrics first = VolumeUtilizationMetrics.create(mock(OMMetadataManager.class));
+      VolumeUtilizationMetrics first = VolumeUtilizationMetrics.create(
+          mock(OMMetadataManager.class), "service1", "om1");
       Set<String> firstSources = new HashSet<>(sources.keySet());
       assertEquals(initialSources.size() + 1, firstSources.size());
-      VolumeUtilizationMetrics second = VolumeUtilizationMetrics.create(mock(OMMetadataManager.class));
+      VolumeUtilizationMetrics second = VolumeUtilizationMetrics.create(
+          mock(OMMetadataManager.class), "service1", "om2");
       assertNotSame(first, second);
       assertEquals(initialSources.size() + 2, sources.size());
 
