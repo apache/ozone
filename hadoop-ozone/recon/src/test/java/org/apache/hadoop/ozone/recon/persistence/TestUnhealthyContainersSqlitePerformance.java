@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule;
 import org.apache.hadoop.ozone.recon.ReconSchemaManager;
-import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest.DerbyDataSourceConfigurationProvider;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest.SqliteDataSourceConfigurationProvider;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainerRecord;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainersSummary;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
@@ -47,7 +47,6 @@ import org.apache.ozone.recon.schema.ReconSchemaGenerationModule;
 import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
 import org.apache.ozone.test.tag.Slow;
 import org.jooq.DSLContext;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -59,7 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Performance benchmark for the UNHEALTHY_CONTAINERS Derby table at 1 million
+ * Performance benchmark for the UNHEALTHY_CONTAINERS SQLite table at 1 million
  * records scale.
  *
  * <h2>Data layout</h2>
@@ -76,24 +75,21 @@ import org.slf4j.LoggerFactory;
  *
  * <h2>Performance settings applied in this test</h2>
  * <ul>
- *   <li><b>In-memory database</b>: The test uses an in-memory Derby database
- *       ({@code jdbc:derby:memory:...}) to eliminate disk I/O and fsync overhead
- *       during the 1-million-row benchmark.</li>
  *   <li><b>JDBC fetch size</b>: set to {@value #READ_PAGE_SIZE} on each query
- *       so Derby pre-buffers a full page of rows per JDBC round-trip instead
+ *       so the driver pre-buffers a full page of rows per JDBC round-trip instead
  *       of the default 1-row-at-a-time fetch.</li>
  *   <li><b>Large page size</b>: {@value #READ_PAGE_SIZE} rows per SQL fetch
  *       reduces the number of SQL round-trips from 200 (@ 1 K rows) to 40
  *       (@ 5 K rows) per 200 K-row state scan.</li>
  *   <li><b>Large delete chunks</b>: {@value #DELETE_CHUNK_SIZE} IDs per
- *       DELETE statement reduces Derby plan-compilation overhead from 100
+ *       DELETE statement reduces plan-compilation overhead from 100
  *       statements to 20 for a 100 K-ID batch delete.</li>
  * </ul>
  *
  * <h2>What is measured</h2>
  * <ol>
  *   <li><b>Bulk INSERT throughput</b> – 1 M records via JOOQ batchInsert in
- *       chunks of 1,000 inside a single Derby transaction.</li>
+ *       chunks of 1,000 inside a single transaction.</li>
  *   <li><b>COUNT(*) by state</b> – index-covered aggregate, one per state.</li>
  *   <li><b>GROUP BY summary</b> – single pass over the idx_container_state
  *       index to aggregate all states.</li>
@@ -109,7 +105,7 @@ import org.slf4j.LoggerFactory;
  *
  * <h2>Design notes</h2>
  * <ul>
- *   <li>Derby is an embedded, single-file Java database — not designed for
+ *   <li>SQLite is an embedded, single-file database — not designed for
  *       production-scale workloads. Performance numbers here document its
  *       baseline behaviour and will flag regressions, but should not be
  *       compared with PostgreSQL / MySQL numbers.</li>
@@ -122,10 +118,10 @@ import org.slf4j.LoggerFactory;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class TestUnhealthyContainersDerbyPerformance {
+public class TestUnhealthyContainersSqlitePerformance {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(TestUnhealthyContainersDerbyPerformance.class);
+      LoggerFactory.getLogger(TestUnhealthyContainersSqlitePerformance.class);
 
   // -----------------------------------------------------------------------
   // Dataset constants
@@ -186,11 +182,10 @@ public class TestUnhealthyContainersDerbyPerformance {
   private static final int READ_PAGE_SIZE = 5_000;
 
   // -----------------------------------------------------------------------
-  // Performance thresholds (CI-safe; expected run times are significantly faster
-  // than the original file-based Derby baseline after switching to in-memory)
+  // Performance thresholds (CI-safe; expected run times are significantly faster)
   // -----------------------------------------------------------------------
 
-  /** Maximum acceptable time to insert all TOTAL_RECORDS into Derby. */
+  /** Maximum acceptable time to insert all TOTAL_RECORDS. */
   private static final long MAX_INSERT_SECONDS = 300;
 
   /** Maximum acceptable time for a single COUNT(*)-by-state query. */
@@ -219,92 +214,21 @@ public class TestUnhealthyContainersDerbyPerformance {
   private ContainerSchemaDefinition schemaDefinition;
 
   // -----------------------------------------------------------------------
-  // One-time setup: create Derby schema + insert 1 M records
+  // One-time setup: create SQLite schema + insert 1 M records
   // -----------------------------------------------------------------------
 
-  private String inMemoryDbName;
-
   /**
-   * Initialises the embedded in-memory Derby database and creates the Recon schema.
+   * Initialises the SQLite database and creates the Recon schema.
    * Data population is done in dedicated test methods.
-   *
-   * <p>Reuses {@link DerbyDataSourceConfigurationProvider} for all connection settings
-   * and overrides only {@code getJdbcUrl()} to use an in-memory Derby database
-   * ({@code jdbc:derby:memory:...}), eliminating disk I/O and fsync overhead across
-   * the benchmark's insert, replace, and delete transactions.</p>
    */
   @BeforeAll
   public void setUpDatabase(@TempDir Path tempDir) throws Exception {
-    inMemoryDbName = "reconPerf_" + java.util.UUID.randomUUID().toString();
-    LOG.info("=== Derby Performance Benchmark — Setup ===");
+    LOG.info("=== SQLite Performance Benchmark — Setup ===");
     LOG.info("Dataset: {} states × {} container IDs = {} total records",
         TESTED_STATES.size(), CONTAINER_ID_RANGE, TOTAL_RECORDS);
 
     File configDir = Files.createDirectory(tempDir.resolve("Config")).toFile();
-    DataSourceConfiguration base = new DerbyDataSourceConfigurationProvider(configDir).get();
-
-    // Reuse DerbyDataSourceConfigurationProvider settings but point to an in-memory DB.
-    Provider<DataSourceConfiguration> configProvider = () -> new DataSourceConfiguration() {
-      @Override
-      public String getDriverClass() {
-        return base.getDriverClass();
-      }
-
-      @Override
-      public String getJdbcUrl() {
-        return "jdbc:derby:memory:" + inMemoryDbName;
-      }
-
-      @Override
-      public String getUserName() {
-        return base.getUserName();
-      }
-
-      @Override
-      public String getPassword() {
-        return base.getPassword();
-      }
-
-      @Override
-      public boolean setAutoCommit() {
-        return base.setAutoCommit();
-      }
-
-      @Override
-      public long getConnectionTimeout() {
-        return base.getConnectionTimeout();
-      }
-
-      @Override
-      public String getSqlDialect() {
-        return base.getSqlDialect();
-      }
-
-      @Override
-      public Integer getMaxActiveConnections() {
-        return base.getMaxActiveConnections();
-      }
-
-      @Override
-      public long getMaxConnectionAge() {
-        return base.getMaxConnectionAge();
-      }
-
-      @Override
-      public long getMaxIdleConnectionAge() {
-        return base.getMaxIdleConnectionAge();
-      }
-
-      @Override
-      public String getConnectionTestStatement() {
-        return base.getConnectionTestStatement();
-      }
-
-      @Override
-      public long getIdleConnectionTestPeriod() {
-        return base.getIdleConnectionTestPeriod();
-      }
-    };
+    Provider<DataSourceConfiguration> configProvider = new SqliteDataSourceConfigurationProvider(configDir);
 
     Injector injector = Guice.createInjector(
         new JooqPersistenceModule(configProvider),
@@ -323,20 +247,6 @@ public class TestUnhealthyContainersDerbyPerformance {
     dao = injector.getInstance(UnhealthyContainersDao.class);
     schemaDefinition = injector.getInstance(ContainerSchemaDefinition.class);
     schemaManager = new ContainerHealthSchemaManager(schemaDefinition, new OzoneConfiguration());
-  }
-
-  @AfterAll
-  public void tearDownDatabase() {
-    if (inMemoryDbName != null) {
-      try (java.sql.Connection conn = java.sql.DriverManager.getConnection(
-          "jdbc:derby:memory:" + inMemoryDbName + ";drop=true")) {
-        conn.isValid(1);
-      } catch (java.sql.SQLException e) {
-        if (!"08006".equals(e.getSQLState())) {
-          LOG.warn("Unexpected SQLState while dropping in-memory Derby DB: {}", e.getSQLState(), e);
-        }
-      }
-    }
   }
 
   // -----------------------------------------------------------------------
@@ -550,7 +460,7 @@ public class TestUnhealthyContainersDerbyPerformance {
 
   /**
    * Pages through all records for every tested state sequentially, effectively
-   * reading all 1 million rows from Derby through the application layer.
+   * reading all 1 million rows from SQLite through the application layer.
    * This measures aggregate read throughput across the entire dataset.
    */
   @Test

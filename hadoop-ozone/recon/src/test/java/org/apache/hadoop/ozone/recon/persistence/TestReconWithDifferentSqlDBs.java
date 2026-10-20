@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.persistence;
 
 import static org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule.RECON_DAO_LIST;
-import static org.apache.ozone.recon.schema.SqlDbUtils.SQLITE_DRIVER_CLASS;
 import static org.apache.ozone.recon.schema.generated.Tables.RECON_TASK_STATUS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,18 +26,17 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.inject.Provider;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.stream.Stream;
+import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest.SqliteDataSourceConfigurationProvider;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ReconTaskStatus;
 import org.jooq.DSLContext;
-import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -55,8 +53,6 @@ public class TestReconWithDifferentSqlDBs {
 
   public static Stream<Object> parametersSource() throws IOException {
     return Stream.of(
-        new AbstractReconSqlDBTest.DerbyDataSourceConfigurationProvider(
-            Files.createTempDirectory(temporaryFolder, "JunitDerbyDB").toFile()),
         new SqliteDataSourceConfigurationProvider(Files.createTempDirectory(temporaryFolder, "JunitSQLDS").toFile()));
   }
 
@@ -135,84 +131,5 @@ public class TestReconWithDifferentSqlDBs {
         Files.createTempDirectory(temporaryFolder, "derby-old").toFile()));
     reconSqlDB.createReconSchemaForTest(temporaryFolder);
     assertThat(reconSqlDB.getDataSource()).isInstanceOf(SQLiteDataSource.class);
-  }
-
-  /**
-   * Local Sqlite datasource provider.
-   */
-  public static class SqliteDataSourceConfigurationProvider implements
-      Provider<DataSourceConfiguration> {
-
-    private final File tempDir;
-
-    public SqliteDataSourceConfigurationProvider(File tempDir) {
-      this.tempDir = tempDir;
-    }
-
-    @Override
-    public DataSourceConfiguration get() {
-      return new DataSourceConfiguration() {
-        @Override
-        public String getDriverClass() {
-          return SQLITE_DRIVER_CLASS;
-        }
-
-        @Override
-        public String getJdbcUrl() {
-          return "jdbc:sqlite:" + tempDir.getAbsolutePath() +
-              File.separator + "recon_sqlite.db";
-        }
-
-        @Override
-        public String getUserName() {
-          return null;
-        }
-
-        @Override
-        public String getPassword() {
-          return null;
-        }
-
-        @Override
-        public boolean setAutoCommit() {
-          return true;
-        }
-
-        @Override
-        public long getConnectionTimeout() {
-          return 10000;
-        }
-
-        @Override
-        public String getSqlDialect() {
-          return SQLDialect.SQLITE.toString();
-        }
-
-        @Override
-        public Integer getMaxActiveConnections() {
-          return 2;
-        }
-
-        @Override
-        public long getMaxConnectionAge() {
-          return 120;
-        }
-
-        @Override
-        public long getMaxIdleConnectionAge() {
-          return 120;
-        }
-
-        @Override
-        public String getConnectionTestStatement() {
-          return "SELECT 1";
-        }
-
-        @Override
-        public long getIdleConnectionTestPeriod() {
-          return 30;
-        }
-      };
-    }
   }
 }

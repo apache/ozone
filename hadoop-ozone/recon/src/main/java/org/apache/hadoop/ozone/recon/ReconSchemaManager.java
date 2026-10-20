@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
+import java.io.File;
 import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.Set;
@@ -44,6 +45,28 @@ public class ReconSchemaManager {
 
   @VisibleForTesting
   public void createReconSchema() {
+    createReconSchema(ReconVersion.SOFTWARE_VERSION);
+  }
+
+  /**
+   * Version to record for a new SQL DB. A Derby DB left by an older Recon means this is an upgrade, so start from
+   * {@link ReconVersion#INITIAL_VERSION} to run all upgrade actions.
+   */
+  static ReconVersion getFreshInstallVersion(File reconDbDir) {
+    File legacyDerbyDb = new File(reconDbDir, ReconSqlDbConfig.LEGACY_DERBY_DB_NAME);
+    if (legacyDerbyDb.exists()) {
+      LOG.info("Recon now uses SQLite. {} is no longer used and can be deleted.", legacyDerbyDb);
+      return ReconVersion.INITIAL_VERSION;
+    }
+    return ReconVersion.SOFTWARE_VERSION;
+  }
+
+  /**
+   * Create the Recon SQL tables.
+   *
+   * @param freshInstallVersion version recorded when the SQL DB is new
+   */
+  public void createReconSchema(ReconVersion freshInstallVersion) {
     try {
       // Initialize the schema version table first
       reconSchemaDefinitions.stream()
@@ -51,7 +74,7 @@ public class ReconSchemaManager {
           .findFirst()
           .ifPresent(schemaDefinition -> {
             SchemaVersionTableDefinition schemaVersionTable = (SchemaVersionTableDefinition) schemaDefinition;
-            schemaVersionTable.setSoftwareVersion(ReconVersion.SOFTWARE_VERSION.serialize());
+            schemaVersionTable.setSoftwareVersion(freshInstallVersion.serialize());
             try {
               schemaVersionTable.initializeSchema();
             } catch (SQLException e) {

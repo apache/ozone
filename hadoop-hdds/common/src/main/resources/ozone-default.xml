@@ -3630,7 +3630,7 @@
     <value>10000</value>
     <tag>OZONE, RECON</tag>
     <description>
-      Number of rows Derby returns per JDBC round-trip when streaming unhealthy
+      Number of rows the Recon SQL DB returns per JDBC round-trip when streaming unhealthy
       container records during a CSV export. Higher values reduce round-trip
       overhead at the cost of slightly more memory per fetch batch.
     </description>
@@ -4777,7 +4777,7 @@
     <tag>OZONE, RECON, PERFORMANCE</tag>
     <description>
       Maximum threshold number of entries to hold in memory for File Size Count task in hashmap before flushing to
-      recon derby DB
+      Recon DB
     </description>
   </property>
 
