@@ -21,15 +21,11 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
-import org.apache.hadoop.security.KerberosInfo;
 
 /**
  * The protocol used to expose secret keys in SCM.
  */
-@KerberosInfo(
-    serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public interface SecretKeyProtocol {
 
