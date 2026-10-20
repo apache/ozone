@@ -1788,6 +1788,9 @@
                           <path>${project.build.directory}/native/rocksdb</path>
                           <path>${maven.multiModuleProjectDirectory}/hadoop-hdds/rocks-native/target/native/rocksdb</path>
                         </paths>
+                        <includes>
+                          <include>lib*.*</include>
+                        </includes>
                         <normalization>RELATIVE_PATH</normalization>
                       </fileSet>
                     </fileSets>
