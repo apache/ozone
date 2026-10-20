@@ -252,6 +252,8 @@ class TestKeyDeletingService extends OzoneTestBase {
           () -> getDeletedKeyCount() >= initialDeletedCount + keyCount,
           100, 10000);
       assertThat(getRunCount()).isGreaterThan(initialRunCount);
+      // deletedKeyCount is updated once the purge request is applied, before the double buffer flushes it to the DB.
+      om.awaitDoubleBufferFlush();
       try (ReclaimableKeyFilter filter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
           ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
           keyManager, om.getMetadataManager().getLock())) {
@@ -432,6 +434,7 @@ class TestKeyDeletingService extends OzoneTestBase {
           1000, 100000);
       assertThat(getRunCount())
           .isGreaterThan(initialRunCount);
+      om.awaitDoubleBufferFlush();
       try (ReclaimableKeyFilter filter = new ReclaimableKeyFilter(om, om.getOmSnapshotManager(),
           ((OmMetadataManagerImpl)om.getMetadataManager()).getSnapshotChainManager(), null,
           keyManager, om.getMetadataManager().getLock())) {

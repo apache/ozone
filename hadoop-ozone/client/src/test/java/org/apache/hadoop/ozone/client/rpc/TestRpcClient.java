@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
@@ -57,6 +58,7 @@ import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -373,7 +375,7 @@ public class TestRpcClient {
 
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
-      names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "S3_MULTIPART_UPLOAD_ABORT_CONTEXT"})
+      names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
   void testAbortS3MultipartUpload(OzoneManagerVersion version) throws Exception {
     RpcClient client = spy(createRpcClient());
     try {
@@ -382,7 +384,7 @@ public class TestRpcClient {
       FieldUtils.writeField(client, "ozoneManagerClient", om, true);
       doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
           .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(client).getS3VolumeContext();
-      boolean assumeContext = version == OzoneManagerVersion.S3_MULTIPART_UPLOAD_ABORT_CONTEXT;
+      boolean assumeContext = version == OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION;
 
       client.abortS3MultipartUpload("bucket", "key", "upload-id");
 
@@ -622,5 +624,55 @@ public class TestRpcClient {
         return new MockXceiverClientFactory();
       }
     };
+  }
+
+  /**
+   * A task wrapped by withSubmitterContext sees the submitting thread's values of every given thread-local, or none
+   * where it has none, and the running thread's own values are restored afterwards, also when the task throws.
+   */
+  @Test
+  public void testWithSubmitterContextPropagatesAndRestores() {
+    ThreadLocal<S3Auth> auth = new ThreadLocal<>();
+    ThreadLocal<String> hint = new ThreadLocal<>();
+    List<ThreadLocal<?>> context = Arrays.asList(auth, hint);
+    S3Auth submitterAuth = new S3Auth("stringToSign", "signature", "submitter", "submitterUser");
+    S3Auth workerAuth = new S3Auth("stringToSign", "signature", "worker", "workerUser");
+    List<List<Object>> seen = new LinkedList<>();
+    Runnable observe = () -> seen.add(Arrays.asList(auth.get(), hint.get()));
+
+    auth.set(submitterAuth);
+    hint.set("submitterHint");
+    Runnable withSubmitter = RpcClient.withSubmitterContext(observe, context);
+    hint.remove();
+    Runnable withAuthOnly = RpcClient.withSubmitterContext(observe, context);
+    auth.remove();
+    Runnable withNothing = RpcClient.withSubmitterContext(observe, context);
+
+    // the running thread (a pool worker) holds different values
+    auth.set(workerAuth);
+    hint.set("workerHint");
+    for (Runnable task : Arrays.asList(withSubmitter, withAuthOnly, withNothing)) {
+      task.run();
+      assertSame(workerAuth, auth.get());
+      assertEquals("workerHint", hint.get());
+    }
+    assertEquals(Arrays.asList(Arrays.asList(submitterAuth, "submitterHint"), Arrays.asList(submitterAuth, null),
+        Arrays.asList(null, null)), seen);
+
+    // a running thread without values is left without them
+    auth.remove();
+    hint.remove();
+    withSubmitter.run();
+    assertNull(auth.get());
+    assertNull(hint.get());
+
+    auth.set(workerAuth);
+    hint.set("workerHint");
+    Runnable failing = RpcClient.withSubmitterContext(() -> {
+      throw new IllegalStateException("task failed");
+    }, context);
+    assertThrows(IllegalStateException.class, failing::run);
+    assertSame(workerAuth, auth.get());
+    assertEquals("workerHint", hint.get());
   }
 }

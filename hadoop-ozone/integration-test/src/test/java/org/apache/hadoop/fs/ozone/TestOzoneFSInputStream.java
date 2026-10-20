@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
@@ -56,7 +57,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -70,7 +70,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
   private OzoneClient client;
-  private FileSystem ecFs;
+  // EC bucket filesystems reading the cells one at a time and in parallel
+  private FileSystem serialEcFs;
+  private FileSystem parallelEcFs;
   private Path filePath = null;
   private byte[] data = null;
   private String uri = null;
@@ -108,17 +110,32 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
         ecBucket);
     String ecUri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
-    ecFs =  FileSystem.get(URI.create(ecUri), cluster().getConf());
+    serialEcFs = newEcFileSystem(ecUri, false);
+    parallelEcFs = newEcFileSystem(ecUri, true);
+  }
+
+  private FileSystem newEcFileSystem(String ecUri, boolean parallelRead) throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setEcParallelReadEnabled(parallelRead);
+    conf.setFromObject(clientConfig);
+    return FileSystem.newInstance(URI.create(ecUri), conf);
+  }
+
+  private FileSystem ecFs(boolean parallelRead) {
+    return parallelRead ? parallelEcFs : serialEcFs;
   }
 
   @AfterAll
   void shutdown() {
-    closeQuietly(client, ecFs);
+    closeQuietly(client, serialEcFs, parallelEcFs);
   }
 
-  @Test
-  void testConcurrentECPositionedRead() throws Exception {
-    Path path = new Path("/concurrent-ec-reads");
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testConcurrentECPositionedRead(boolean parallelRead) throws Exception {
+    FileSystem ecFs = ecFs(parallelRead);
+    Path path = new Path("/concurrent-ec-reads-" + parallelRead);
     byte[] expected = Arrays.copyOf(data, 7 * 1024 * 1024 + 103);
     try (FSDataOutputStream output = ecFs.create(path)) {
       output.write(expected);
@@ -384,7 +401,8 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  public void testSequenceFileReaderSyncEC() throws IOException {
+  public void testSequenceFileReaderSyncEC(boolean parallelRead) throws IOException {
+    FileSystem ecFs = ecFs(parallelRead);
     File srcfile = new File("src/test/resources/testSequenceFile");
     Path path = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
     InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));

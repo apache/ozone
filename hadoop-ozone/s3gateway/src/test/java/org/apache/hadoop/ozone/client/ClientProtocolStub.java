@@ -679,6 +679,12 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneInputStream readFile(String volumeName, String bucketName, String keyName,
+      boolean requireFileSystemLayout) throws IOException {
+    return null;
+  }
+
+  @Override
   public OzoneOutputStream createFile(String volumeName, String bucketName,
                                       String keyName, long size,
                                       ReplicationType type,
