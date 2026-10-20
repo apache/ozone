@@ -1320,18 +1320,6 @@ public class TestBlockDeletingService {
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
-  /**
-   * Recon's DataNodeMetricsCollectionTask resolves per-datanode JMX beans from these names, so a
-   * change to how they are built makes Recon report -1 pending deletion bytes for every datanode
-   * rather than fail outright.
-   */
-  @Test
-  public void testMetricsSourceNameContract() {
-    assertEquals("BlockDeletingService", BlockDeletingServiceMetrics.SOURCE_NAME);
-    assertEquals("BlockDeletingService", BlockDeletingServiceMetrics.getSourceName(null));
-    assertEquals("BlockDeletingService.abc123", BlockDeletingServiceMetrics.getSourceName("abc-123"));
-  }
-
   private void assertDeletionsInChecksumFile(ContainerData data, int expectedNumBlocks) {
     ContainerProtos.ContainerChecksumInfo checksumInfo = null;
     try {

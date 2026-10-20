@@ -281,11 +281,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
         ? OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
         : conf.getInt(OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
-    String metricsSourceComponent = conf == null
-        ? null : MetricUtil.metricsSourceComponent(conf, "OM");
     return ms.register(SOURCE_NAME,
         "Ozone Manager Metrics",
-        new OMMetrics(maxRatisEvents, metricsSourceComponent));
+        new OMMetrics(maxRatisEvents, MetricUtil.metricsSourceComponent("OM")));
   }
 
   public DBCheckpointMetrics getDBCheckpointMetrics() {

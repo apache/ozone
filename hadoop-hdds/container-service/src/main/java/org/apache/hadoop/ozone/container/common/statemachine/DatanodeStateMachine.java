@@ -154,8 +154,7 @@ public class DatanodeStateMachine implements Closeable {
     this.hddsDatanodeStopService = hddsDatanodeStopService;
     this.conf = conf;
     this.datanodeDetails = datanodeDetails;
-    String metricsSourceComponent =
-        MetricUtil.metricsSourceComponent(conf, datanodeDetails.getUuidString());
+    String metricsSourceComponent = MetricUtil.metricsSourceComponent(datanodeDetails.getUuidString());
 
     Clock clock = Clock.system(ZoneId.systemDefault());
     // Expected to be initialized already.

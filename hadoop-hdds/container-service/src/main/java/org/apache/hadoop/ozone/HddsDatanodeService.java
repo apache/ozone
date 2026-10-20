@@ -449,8 +449,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private void registerMXBean() {
     Map<String, String> jmxProperties = new HashMap<>();
     jmxProperties.put("component", "ServerRuntime");
-    String jmxComponent =
-        MetricUtil.metricsSourceComponent(conf, datanodeDetails.getUuidString());
+    String jmxComponent = MetricUtil.metricsSourceComponent(datanodeDetails.getUuidString());
     if (jmxComponent != null) {
       jmxProperties.put("datanode", jmxComponent);
     }

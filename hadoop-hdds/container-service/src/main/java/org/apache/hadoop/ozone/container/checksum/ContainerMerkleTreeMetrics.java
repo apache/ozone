@@ -82,7 +82,7 @@ public final class ContainerMerkleTreeMetrics {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String sourceName = MetricUtil.qualifySourceName(METRICS_SOURCE_NAME, component);
     // The unqualified name is a singleton, so a repeat create() replaces it rather than throwing.
-    // A qualified name identifies one datanode, where a collision is a bug and must not be hidden.
+    // A qualified name belongs to one datanode; replacing it would unregister that datanode's live source.
     if (component == null && ms.getSource(sourceName) != null) {
       ms.unregisterSource(sourceName);
     }

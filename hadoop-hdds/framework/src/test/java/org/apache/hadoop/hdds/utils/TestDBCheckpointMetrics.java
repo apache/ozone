@@ -26,7 +26,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * {@link DBCheckpointMetrics} registration under a per-instance component, per
- * {@link org.apache.hadoop.hdds.HddsConfigKeys#HDDS_METRICS_SOURCE_DISAMBIGUATION_ENABLED}.
+ * {@link org.apache.hadoop.ozone.util.MetricUtil#metricsSourceComponent(String)}.
  * A second create() in one JVM used to fail as a duplicate metrics source.
  */
 class TestDBCheckpointMetrics {

@@ -636,8 +636,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     omMetaDir = OMStorage.getOmDbDir(configuration);
 
-    versionManager = new OMVersionManager(omStorage, this,
-        MetricUtil.metricsSourceComponent(configuration, "OM"));
+    versionManager = new OMVersionManager(omStorage, this, MetricUtil.metricsSourceComponent("OM"));
 
     this.isSpnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
         .equals("kerberos");

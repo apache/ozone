@@ -64,7 +64,7 @@ class TestComponentVersionManagerMetrics {
     try {
       assertSame(metrics, DefaultMetricsSystem.instance().getSource(
           ComponentVersionManagerMetrics.METRICS_SOURCE_NAME));
-      assertSame(metrics, ComponentVersionManagerMetrics.create(manager, ""));
+      assertSame(metrics, ComponentVersionManagerMetrics.create(manager, null));
     } finally {
       metrics.unRegister();
     }

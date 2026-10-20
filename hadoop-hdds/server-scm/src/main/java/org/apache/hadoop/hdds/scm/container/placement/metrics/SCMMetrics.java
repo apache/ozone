@@ -86,10 +86,8 @@ public class SCMMetrics {
         ? ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT
         : conf.getInt(ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
-    String metricsSourceComponent = conf == null
-        ? null : MetricUtil.metricsSourceComponent(conf, "SCM");
     return ms.register(SOURCE_NAME, "Storage Container Manager Metrics",
-        new SCMMetrics(maxRatisEvents, metricsSourceComponent));
+        new SCMMetrics(maxRatisEvents, MetricUtil.metricsSourceComponent("SCM")));
   }
 
   public void setLastContainerReportSize(long size) {

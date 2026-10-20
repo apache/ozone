@@ -187,8 +187,7 @@ public class OzoneContainer {
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
-    this.metricsSourceComponent =
-        MetricUtil.metricsSourceComponent(conf, datanodeDetails.getUuidString());
+    this.metricsSourceComponent = MetricUtil.metricsSourceComponent(datanodeDetails.getUuidString());
     this.volumeChecker = new StorageVolumeChecker(conf, new Timer(),
         datanodeDetails.threadNamePrefix(), metricsSourceComponent);
 

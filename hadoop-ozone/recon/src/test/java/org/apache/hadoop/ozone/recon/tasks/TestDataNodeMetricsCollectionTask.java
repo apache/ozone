@@ -45,8 +45,7 @@ import org.junit.jupiter.api.Test;
 class TestDataNodeMetricsCollectionTask {
 
   private static final String BEAN_PREFIX = "Hadoop:service=HddsDatanode,name=";
-  private static final String LEGACY_BEAN =
-      BEAN_PREFIX + BlockDeletingServiceMetrics.SOURCE_NAME;
+  private static final String LEGACY_BEAN = BEAN_PREFIX + "BlockDeletingService";
 
   private final DatanodeInfo nodeDetails = new DatanodeInfo(
       MockDatanodeDetails.randomDatanodeDetails(),

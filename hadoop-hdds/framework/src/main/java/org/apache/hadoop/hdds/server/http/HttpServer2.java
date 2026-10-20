@@ -731,8 +731,7 @@ public final class HttpServer2 implements FilterContainer {
       threadPool.setMaxThreads(maxThreads);
     }
 
-    metrics = HttpServer2Metrics.create(threadPool, builder.name,
-        MetricUtil.metricsSourceComponent(builder.conf, builder.name));
+    metrics = HttpServer2Metrics.create(threadPool, builder.name, MetricUtil.metricsSourceComponent(builder.name));
     SessionHandler handler = webAppContext.getSessionHandler();
     handler.setHttpOnly(true);
     handler.getSessionCookieConfig().setSecure(true);

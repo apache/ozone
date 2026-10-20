@@ -483,7 +483,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     registerMXBean();
     registerMetricsSource(this);
-    this.nettyMetrics = NettyMetrics.create(MetricUtil.metricsSourceComponent(conf, "SCM"));
+    this.nettyMetrics = NettyMetrics.create(MetricUtil.metricsSourceComponent("SCM"));
   }
 
   private void initializeEventHandlers() {
@@ -709,8 +709,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       leaseManager = new LeaseManager<>(threadNamePrefix, timeDuration);
     }
 
-    versionManager = new ScmVersionManager(scmStorageConfig, this,
-        MetricUtil.metricsSourceComponent(conf, "SCM"));
+    versionManager = new ScmVersionManager(scmStorageConfig, this, MetricUtil.metricsSourceComponent("SCM"));
     finalizationManager = new FinalizationManagerImpl.Builder()
         .setHAManager(scmHAManager)
         .setFinalizationStore(scmMetadataStore.getMetaTable())

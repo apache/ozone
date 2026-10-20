@@ -380,7 +380,7 @@ public class ReconStorageContainerManagerFacade
     // Use a version manager with no upgrade actions. The version will only be used to track Datanode versions,
     // not run SCM specific reformatting on upgrade.
     this.scmVersionManager = new ScmVersionManager(scmStorageConfig, this, HashMap::new,
-        MetricUtil.metricsSourceComponent(conf, "ReconSCM"));
+        MetricUtil.metricsSourceComponent("ReconSCM"));
     this.scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMDBTransactionBufferImpl());
     this.sequenceIdGen = new SequenceIdGenerator(
