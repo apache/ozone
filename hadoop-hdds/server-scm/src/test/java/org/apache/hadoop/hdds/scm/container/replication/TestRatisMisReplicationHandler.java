@@ -174,7 +174,7 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
   }
 
   @Test
-  public void testMisReplicationWithTargetsNotReducingIt() throws IOException {
+  public void testCopyIsSkippedUntilItReducesMisReplication() throws IOException {
     Set<ContainerReplica> availableReplicas = ReplicationTestUtil
         .createReplicas(Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0), Pair.of(IN_SERVICE, 0));
     // The target doesn't help, e.g. because it is on the same rack as all the existing replicas.
@@ -184,6 +184,9 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
     when(mockedContainerPlacementStatus.misReplicationCount()).thenReturn(1);
     when(placementPolicy.validateContainerPlacement(anyList(), anyInt())).thenReturn(mockedContainerPlacementStatus);
     testMisReplication(availableReplicas, placementPolicy, Collections.emptyList(), 0, 1, 1, 0);
+
+    // On a later run, placement finds a target on another rack, so the copy is sent.
+    testMisReplication(availableReplicas, mockPlacementPolicy(), Collections.emptyList(), 0, 1, 1);
   }
 
   @Test
