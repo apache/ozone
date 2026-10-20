@@ -23,28 +23,44 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
 import org.apache.hadoop.ozone.client.MockXceiverClientFactory;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -61,6 +77,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.mockito.ArgumentCaptor;
 import org.slf4j.event.Level;
 
 /**
@@ -357,6 +374,94 @@ public class TestRpcClient {
   }
 
   @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
+  void testAbortS3MultipartUpload(OzoneManagerVersion version) throws Exception {
+    RpcClient client = spy(createRpcClient());
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "omVersion", version, true);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
+          .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(client).getS3VolumeContext();
+      boolean assumeContext = version == OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION;
+
+      client.abortS3MultipartUpload("bucket", "key", "upload-id");
+
+      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+      if (assumeContext) {
+        verify(om).abortMultipartUpload(args.capture(), eq(true));
+      } else {
+        verify(om).abortMultipartUpload(args.capture());
+      }
+      verify(client, times(assumeContext ? 0 : 1)).getS3VolumeContext();
+      assertEquals(assumeContext ? "s3v" : "tenant-volume", args.getValue().getVolumeName());
+      assertEquals("upload-id", args.getValue().getMultipartUploadID());
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testCreateKeyIfNotExistsRequiresSupportedOmVersion(OzoneManagerVersion version) throws IOException {
+    checkCreateKeyIfNotExistsOmVersion(version, false);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testCreateStreamKeyIfNotExistsRequiresSupportedOmVersion(OzoneManagerVersion version) throws IOException {
+    checkCreateKeyIfNotExistsOmVersion(version, true);
+  }
+
+  private static void checkCreateKeyIfNotExistsOmVersion(OzoneManagerVersion version, boolean streaming)
+      throws IOException {
+    AtomicInteger createKeyRequests = new AtomicInteger();
+    IOException requestSent = new IOException("CreateKey request sent");
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          OMResponse response = super.submitRequest(request);
+          return response.toBuilder().setServiceListResponse(response.getServiceListResponse().toBuilder()
+              .clearServiceInfo().addServiceInfo(om(version).getProtobuf())).build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          createKeyRequests.incrementAndGet();
+          assertThat(request.getCreateKeyRequest().getKeyArgs().hasExpectedDataGeneration()).isTrue();
+          assertEquals(OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT,
+              request.getCreateKeyRequest().getKeyArgs().getExpectedDataGeneration());
+          throw requestSent;
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      IOException error = assertThrows(IOException.class, () -> {
+        if (streaming) {
+          client.createStreamKeyIfNotExists("volume1", "bucket1", "key1", 0,
+              RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+              Collections.emptyMap(), Collections.emptyMap());
+        } else {
+          client.createKeyIfNotExists("volume1", "bucket1", "key1", 0,
+              RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+              Collections.emptyMap(), Collections.emptyMap());
+        }
+      });
+      if (version.serialize() < OzoneManagerVersion.ATOMIC_CREATE_IF_NOT_EXISTS.serialize()) {
+        assertEquals("OzoneManager does not support atomic key creation.", error.getMessage());
+        assertEquals(0, createKeyRequests.get());
+      } else {
+        assertSame(requestSent, error);
+        assertEquals(1, createKeyRequests.get());
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class, names = {
       "ATOMIC_CREATE_IF_NOT_EXISTS", "S3_BUCKET_TAGGING_API", "GET_FILE_STATUS_REJECTS_OBS", "UNKNOWN_VERSION"
   })
@@ -519,5 +624,55 @@ public class TestRpcClient {
         return new MockXceiverClientFactory();
       }
     };
+  }
+
+  /**
+   * A task wrapped by withSubmitterContext sees the submitting thread's values of every given thread-local, or none
+   * where it has none, and the running thread's own values are restored afterwards, also when the task throws.
+   */
+  @Test
+  public void testWithSubmitterContextPropagatesAndRestores() {
+    ThreadLocal<S3Auth> auth = new ThreadLocal<>();
+    ThreadLocal<String> hint = new ThreadLocal<>();
+    List<ThreadLocal<?>> context = Arrays.asList(auth, hint);
+    S3Auth submitterAuth = new S3Auth("stringToSign", "signature", "submitter", "submitterUser");
+    S3Auth workerAuth = new S3Auth("stringToSign", "signature", "worker", "workerUser");
+    List<List<Object>> seen = new LinkedList<>();
+    Runnable observe = () -> seen.add(Arrays.asList(auth.get(), hint.get()));
+
+    auth.set(submitterAuth);
+    hint.set("submitterHint");
+    Runnable withSubmitter = RpcClient.withSubmitterContext(observe, context);
+    hint.remove();
+    Runnable withAuthOnly = RpcClient.withSubmitterContext(observe, context);
+    auth.remove();
+    Runnable withNothing = RpcClient.withSubmitterContext(observe, context);
+
+    // the running thread (a pool worker) holds different values
+    auth.set(workerAuth);
+    hint.set("workerHint");
+    for (Runnable task : Arrays.asList(withSubmitter, withAuthOnly, withNothing)) {
+      task.run();
+      assertSame(workerAuth, auth.get());
+      assertEquals("workerHint", hint.get());
+    }
+    assertEquals(Arrays.asList(Arrays.asList(submitterAuth, "submitterHint"), Arrays.asList(submitterAuth, null),
+        Arrays.asList(null, null)), seen);
+
+    // a running thread without values is left without them
+    auth.remove();
+    hint.remove();
+    withSubmitter.run();
+    assertNull(auth.get());
+    assertNull(hint.get());
+
+    auth.set(workerAuth);
+    hint.set("workerHint");
+    Runnable failing = RpcClient.withSubmitterContext(() -> {
+      throw new IllegalStateException("task failed");
+    }, context);
+    assertThrows(IllegalStateException.class, failing::run);
+    assertSame(workerAuth, auth.get());
+    assertEquals("workerHint", hint.get());
   }
 }

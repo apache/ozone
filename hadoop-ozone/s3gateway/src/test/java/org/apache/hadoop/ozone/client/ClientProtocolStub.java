@@ -495,6 +495,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
+    objectStoreStub.getS3Volume().getBucket(bucketName).abortMultipartUpload(keyName, uploadID);
+  }
+
+  @Override
   public void abortMultipartUpload(String volumeName, String bucketName,
                                    String keyName, String uploadID)
       throws IOException {
@@ -665,6 +670,12 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public OzoneInputStream readFile(String volumeName, String bucketName,
                                    String keyName) throws IOException {
+    return null;
+  }
+
+  @Override
+  public OzoneInputStream readFile(String volumeName, String bucketName, String keyName,
+      boolean requireFileSystemLayout) throws IOException {
     return null;
   }
 

@@ -79,8 +79,10 @@ public class OMExecutionFlow {
         omClientRequest = OzoneManagerRatisUtils.createClientRequest(request, ozoneManager);
         assert (omClientRequest != null);
         final OMClientRequest finalOmClientRequest = omClientRequest;
-        requestToSubmit = captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
+        OMRequest preExecuted = captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
             () -> finalOmClientRequest.preExecute(ozoneManager));
+        requestToSubmit = preExecuted.hasAssumeS3Context()
+            ? preExecuted.toBuilder().clearAssumeS3Context().build() : preExecuted;
       } catch (IOException ex) {
         if (omClientRequest != null) {
           OMAuditLogger.log(omClientRequest.getAuditBuilder());

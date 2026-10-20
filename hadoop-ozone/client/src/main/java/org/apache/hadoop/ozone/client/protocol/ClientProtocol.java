@@ -885,6 +885,9 @@ public interface ClientProtocol {
   void abortMultipartUpload(String volumeName,
       String bucketName, String keyName, String uploadID) throws IOException;
 
+  /** Abort a multipart upload in S3 volume context. */
+  void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException;
+
   /**
    * Returns list of parts of a multipart upload key.
    * @param volumeName
@@ -1159,6 +1162,17 @@ public interface ClientProtocol {
    */
   OzoneInputStream readFile(String volumeName, String bucketName,
       String keyName) throws IOException;
+
+  /**
+   * Creates an input stream for reading file contents, like
+   * {@link #readFile(String, String, String)}.
+   *
+   * @param requireFileSystemLayout if true, OM rejects the read with
+   *     NOT_SUPPORTED_OPERATION if the resolved bucket layout is OBJECT_STORE.
+   *     An OM older than OzoneManagerVersion.GET_KEY_INFO_REJECTS_OBS ignores it.
+   */
+  OzoneInputStream readFile(String volumeName, String bucketName,
+      String keyName, boolean requireFileSystemLayout) throws IOException;
 
   /**
    * Creates an output stream for writing to a file.
