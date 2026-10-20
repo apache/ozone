@@ -208,6 +208,7 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
@@ -222,6 +223,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
+import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.FaultInjector;
@@ -246,6 +248,9 @@ import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.metrics2.util.MBeans;
+import org.apache.hadoop.net.CachedDNSToSwitchMapping;
+import org.apache.hadoop.net.DNSToSwitchMapping;
+import org.apache.hadoop.net.TableMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -261,6 +266,7 @@ import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
+import org.apache.hadoop.ozone.conf.OMJobworkerConfiguration;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -300,6 +306,16 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
+import org.apache.hadoop.ozone.om.jobworker.JobworkerGrpcServer;
+import org.apache.hadoop.ozone.om.jobworker.JobworkerProtocolServerImpl;
+import org.apache.hadoop.ozone.om.jobworker.OMJobworkerEvents;
+import org.apache.hadoop.ozone.om.jobworker.command.JobworkerCommandStatusReportHandler;
+import org.apache.hadoop.ozone.om.jobworker.command.OMJobworkerCommandManager;
+import org.apache.hadoop.ozone.om.jobworker.command.OMJobworkerJobManager;
+import org.apache.hadoop.ozone.om.jobworker.node.JobworkerNodeManager;
+import org.apache.hadoop.ozone.om.jobworker.node.JobworkerNodeReportHandler;
+import org.apache.hadoop.ozone.om.jobworker.node.NewJobworkerHandler;
+import org.apache.hadoop.ozone.om.jobworker.node.StaleJobworkerHandler;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.protocol.OMConfiguration;
@@ -374,6 +390,7 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.KMSUtil;
+import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
@@ -392,6 +409,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Ozone Manager is the metadata manager of ozone.
  */
+
 @InterfaceAudience.LimitedPrivate({"HDFS", "CBLOCK", "OZONE", "HBASE"})
 public final class OzoneManager extends ServiceRuntimeInfoImpl
     implements OzoneManagerProtocol, OMInterServiceProtocol, OMMXBean, Auditor {
@@ -486,6 +504,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isOmGrpcServerEnabled;
   private volatile boolean isOmRpcServerRunning = false;
   private volatile boolean isOmGrpcServerRunning = false;
+  private JobworkerGrpcServer jobworkerGrpcServer;
+  private JobworkerNodeManager jobworkerNodemanager;
+  private JobworkerProtocolServerImpl jobworkerServerProtocol;
+  private OMJobworkerCommandManager omJobworkerCommandManager;
+  private OMJobworkerJobManager jobworkerJobManager;
+  private EventQueue jobworkerEventQueue;
   private String omComponent;
   private OzoneManagerProtocolServerSideTranslatorPB omServerProtocol;
 
@@ -2125,6 +2149,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omS3gGrpcServer.start();
       isOmGrpcServerRunning = true;
     }
+    startJobworkerService();
     registerMXBean();
 
     setStartTime();
@@ -2212,6 +2237,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omS3gGrpcServer.start();
       isOmGrpcServerRunning = true;
     }
+    startJobworkerService();
     setStartTime();
     omState = State.RUNNING;
     auditMap.put("NewOmState", omState.name());
@@ -2633,6 +2659,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         metricsTimer = null;
       }
       omRpcServer.stop();
+      stopJobworkerService();
       if (isOmGrpcServerEnabled) {
         omS3gGrpcServer.stop();
       }
@@ -2705,6 +2732,83 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       LOG.error("OzoneManager stop failed.", e);
     }
     return false;
+  }
+
+  private void startJobworkerService() throws IOException {
+    if (!configuration.getObject(OMJobworkerConfiguration.class).isEnabled()) {
+      return;
+    }
+    try {
+      NetworkTopology workerTopology = new NetworkTopologyImpl(configuration);
+      DNSToSwitchMapping mapping = ReflectionUtils.newInstance(
+          configuration.getClass(
+              CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+              TableMapping.class, DNSToSwitchMapping.class),
+          configuration);
+      DNSToSwitchMapping cachedMapping = new CachedDNSToSwitchMapping(mapping);
+      jobworkerEventQueue = new EventQueue(threadPrefix + "JobworkerEventQueue");
+      jobworkerNodemanager = new JobworkerNodeManager(hostname -> {
+        List<String> locations = cachedMapping.resolve(Collections.singletonList(hostname));
+        return locations == null || locations.isEmpty() ? null : locations.get(0);
+      }, workerTopology, omStorage, omNodeDetails, configuration, jobworkerEventQueue);
+      omJobworkerCommandManager = new OMJobworkerCommandManager(jobworkerNodemanager, getOMServiceId());
+      jobworkerJobManager = new OMJobworkerJobManager(this);
+      omJobworkerCommandManager.setDurableManager(jobworkerJobManager);
+      jobworkerEventQueue.addHandler(OMJobworkerEvents.JW_NODE_REPORT,
+          new JobworkerNodeReportHandler(jobworkerNodemanager));
+      jobworkerEventQueue.addHandler(OMJobworkerEvents.NEW_JOBWORKER, new NewJobworkerHandler(jobworkerNodemanager));
+      jobworkerEventQueue.addHandler(OMJobworkerEvents.STALE_JOBWORKER,
+          new StaleJobworkerHandler(jobworkerNodemanager, omJobworkerCommandManager));
+      jobworkerEventQueue.addHandler(OMJobworkerEvents.JW_COMMAND_STATUS_REPORT,
+          new JobworkerCommandStatusReportHandler(omJobworkerCommandManager));
+      jobworkerServerProtocol = new JobworkerProtocolServerImpl(this, jobworkerNodemanager, jobworkerEventQueue);
+      jobworkerGrpcServer = new JobworkerGrpcServer(
+          configuration, jobworkerServerProtocol, omNodeDetails, omJobworkerCommandManager);
+      jobworkerGrpcServer.start();
+    } catch (IOException | RuntimeException e) {
+      stopJobworkerService();
+      throw e;
+    }
+  }
+
+  private void stopJobworkerService() {
+    if (jobworkerGrpcServer != null) {
+      jobworkerGrpcServer.stop();
+      jobworkerGrpcServer = null;
+    }
+    IOUtils.close(LOG, jobworkerEventQueue, jobworkerNodemanager, omJobworkerCommandManager);
+    jobworkerEventQueue = null;
+    jobworkerNodemanager = null;
+    omJobworkerCommandManager = null;
+    jobworkerServerProtocol = null;
+    jobworkerJobManager = null;
+  }
+
+  public OMJobworkerJobManager getJobworkerJobManager() {
+    return jobworkerJobManager;
+  }
+
+  public JobworkerNodeManager getJobworkerNodemanager() {
+    return jobworkerNodemanager;
+  }
+
+  @VisibleForTesting
+  public JobworkerProtocolServerImpl getJobworkerServerProtocol() {
+    return jobworkerServerProtocol;
+  }
+
+  @VisibleForTesting
+  public OMJobworkerCommandManager getOMJobworkerCommandManager() {
+    return omJobworkerCommandManager;
+  }
+
+  @VisibleForTesting
+  public EventQueue getJobworkerEventQueue() {
+    return jobworkerEventQueue;
+  }
+
+  public int getJobworkerGrpcPort() {
+    return jobworkerGrpcServer == null ? -1 : jobworkerGrpcServer.getPort();
   }
 
   public void shutDown(String message) {

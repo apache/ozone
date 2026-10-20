@@ -53,6 +53,7 @@ import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketAddAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketRemoveAclRequest;
 import org.apache.hadoop.ozone.om.request.bucket.acl.OMBucketSetAclRequest;
 import org.apache.hadoop.ozone.om.request.file.OMRecoverLeaseRequest;
+import org.apache.hadoop.ozone.om.request.jobworker.OMJobworkerJobUpdateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
 import org.apache.hadoop.ozone.om.request.key.OMOpenKeysDeleteRequest;
@@ -121,6 +122,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Utility class used by OzoneManager HA.
  */
+
 public final class OzoneManagerRatisUtils {
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneManagerRatisUtils.class);
@@ -154,6 +156,8 @@ public final class OzoneManagerRatisUtils {
     String bucketName = "";
 
     switch (cmdType) {
+    case UpdateJobworkerJob:
+      return new OMJobworkerJobUpdateRequest(omRequest);
     case CreateVolume:
       return new OMVolumeCreateRequest(omRequest);
     case SetVolumeProperty:

@@ -1,0 +1,230 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * These .proto interfaces are private and unstable.
+ * Please see http://wiki.apache.org/hadoop/Compatibility
+ * for what changes are allowed for a *unstable* .proto interface.
+ */
+
+syntax = "proto2";
+
+option java_package = "org.apache.hadoop.hdds.protocol.jobworker.proto";
+option java_outer_classname = "JobworkerServiceProtocolProtos";
+option java_generic_services = true;
+option java_generate_equals_and_hash = true;
+
+import "hdds.proto";
+
+
+// Job Worker Server Protocol
+service JobworkerService {
+  rpc submitRequest (JobworkerRequest) returns (JobworkerResponse);
+}
+
+/*
+ * These are commands send by jobworker to the OM to execute.
+ */
+enum JobworkerCommandType {
+  UNKNOWN_COMMAND = 0;
+  REGISTER_JOBWORKER = 1;
+  SEND_HEARTBEAT = 2;
+  GET_OM_VERSION = 3;
+}
+
+message JobworkerRequest {
+  required JobworkerCommandType cmdType = 1;
+  optional string traceID = 2;
+
+  optional GetOMVersionRequest getOMVersionRequest = 3;
+  optional RegisterJobworkerRequest registerJobworkerRequest = 4;
+  optional SendHeartbeatRequest sendHeartbeatRequest = 5;
+}
+
+message JobworkerResponse {
+  enum Status {
+    UNKNOWN_STATUS = 0;
+    OK = 1;
+    ERROR = 2;
+  }
+
+  required JobworkerCommandType cmdType = 1;
+  optional string traceID = 2;
+  required Status status = 3;
+  optional string errorMessage = 4;
+
+  optional GetOMVersionResponse getOMVersionResponse = 5;
+  optional RegisterJobworkerResponse registerJobworkerResponse = 6;
+  optional SendHeartbeatResponseProto sendHeartbeatResponseProto = 7;
+}
+
+
+// Register Message
+message RegisterJobworkerRequest {
+  required hadoop.hdds.ExtendedJobWorkDetailsProto extendedJobWorkDetailsProto = 1;
+  optional uint32 durableJobProtocolVersion = 2;
+}
+
+message RegisterJobworkerResponse {
+  enum ReturnCode {
+    UNKNOWN_CODE = 0;
+    SUCCESS = 1;
+    NODE_NOT_PERMITTED = 2;
+  }
+  required ReturnCode returnCode = 1;
+  required hadoop.hdds.UUID jobworkerUUID = 2;
+  required string clusterID = 3;
+  required string omServiceId = 4;
+  optional string hostname = 5;
+  optional string ipAddress = 6;
+  optional string networkName = 7;
+  optional string networkLocation = 8;
+}
+
+// Heartbeat Message
+message SendHeartbeatRequest {
+  required hadoop.hdds.JobworkerDetailsProto jobworkerDetails = 1;
+  required string omServiceId = 2;
+  optional JobworkerNodeReportProto jobworkerNodeReport = 3;
+  repeated CommandStatusReportsProto commandStatusReports = 4;
+  // Add Task report at here
+}
+
+message SendHeartbeatResponseProto {
+  required hadoop.hdds.UUID jobworkerUUID = 1;
+  required string omServiceId = 2;
+  optional int64 term = 3;
+  repeated OMJobworkerCommandProto commands = 4;
+  repeated CommandStatus committedResults = 5;
+}
+
+// Version Message
+message GetOMVersionRequest {
+}
+
+message GetOMVersionResponse {
+  required uint32 softwareVersion = 1;
+  repeated hadoop.hdds.KeyValue keys = 2;
+  optional uint32 durableJobProtocolVersion = 3;
+  optional string omNodeId = 4;
+}
+
+// General Message
+message OMJobworkerCommandProto {
+  enum Type {
+    unknownCommand = 0;
+    reregisterCommand = 1;
+    mockCommand = 2; // Just for test
+    reserved 3;
+    // OM -> Jobworker Command
+  }
+  required Type commandType = 1;
+  optional int64 expirationTimestampMs = 2;
+  optional JobworkerReregisterCommandProto jobworkerReregisterCommandProto = 3;
+  optional JobworkerMockCommandProto jobworkerMockCommandProto = 4;
+  reserved 5;
+  optional int64 cmdId = 6;
+  optional string attemptId = 7;
+  // Reconcile an assignment that may already have executed; a missing receipt must not start execution.
+  optional bool reconcileOnly = 8 [default = false];
+}
+
+message JobworkerNodeReportProto {
+  repeated JobworkerStorageReportProto storageReport = 1;
+}
+
+message JobworkerStorageReportProto {
+  required string storageUuid = 1;
+  required string storageLocation = 2;
+  optional uint64 capacity = 3;
+  optional uint64 remaining = 4;
+  optional bool failed = 5;
+}
+
+message JobworkerReregisterCommandProto {
+}
+
+message JobworkerMockCommandProto {
+}
+
+message CommandStatusReportsProto {
+  repeated CommandStatus cmdStatus = 1;
+}
+
+message CommandStatus {
+  enum Status {
+    UNKNOWN_STATUS = 0;
+    PENDING = 1;
+    EXECUTING = 2;
+    SUCCEEDED = 3;
+    FAILED = 4;
+    // The worker restarted after execution may have begun. Do not blindly re-execute.
+    UNCERTAIN = 5;
+  }
+  required int64 cmdId = 1;
+  required Status status = 2 [default = PENDING];
+  optional string msg = 3;
+  required string omServiceId = 4;
+  optional CommandResultCode resultCode = 5;
+  required OMJobworkerCommandProto.Type type = 6;
+  optional CommandExecutionResultsProto executionResults = 7;
+  optional string attemptId = 8;
+}
+
+message JobworkerCommandRecord {
+  required string omServiceId = 1;
+  required OMJobworkerCommandProto command = 2;
+  required CommandStatus status = 3;
+  optional bool acknowledged = 4 [default = false];
+}
+
+message JobworkerReceiptManifest {
+  repeated string receiptKeys = 1;
+}
+
+message CommandExecutionResultsProto {
+  optional MockCommandResultsProto mockCommandResults = 1;
+  reserved 2;
+  // Can add other command type details here in the future
+}
+
+message MockCommandResultsProto {
+  required CommandResultCode resultCode = 1;
+}
+
+enum CommandResultCode {
+  UNKNOWN_CODE = 0;
+  SUCCESS = 1;
+  OTHER_ERROR = 2;
+  KEY_NOT_FOUND = 3;
+  VOLUME_NOT_FOUND = 4;
+  BUCKET_NOT_FOUND = 5;
+  PERMISSION_DENIED = 6;
+  TYPE_MISMATCH = 7;
+  COMMAND_EXPIRED = 8;
+  STALE_TERM = 9;
+  COMMAND_REJECTED = 10;
+  UNEXPECTED_ERROR = 11;
+  INVALID_COMMAND = 12;
+  UNSUPPORTED_OM_SERVICE = 13;
+  IO_TIMEOUT = 14;
+  reserved 15, 16;
+  COMMAND_QUEUE_FULL = 17;
+  reserved 18 to 20;
+}
+

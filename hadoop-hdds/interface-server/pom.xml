@@ -35,8 +35,24 @@
 
   <dependencies>
     <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
+    <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-protobuf</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-stub</artifactId>
     </dependency>
     <!-- required to use common hdds.proto -->
     <dependency>
@@ -104,9 +120,29 @@
                 <exclude>InterSCMProtocol.proto</exclude>
                 <exclude>SCMUpdateProtocol.proto</exclude>
                 <exclude>SCMRatisProtocol.proto</exclude>
+                <exclude>JobworkerServiceProtocol.proto</exclude>
               </excludes>
               <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf.version}</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
+            </configuration>
+          </execution>
+          <execution>
+            <id>compile-protoc-JobworkerGrpc</id>
+            <goals>
+              <goal>compile</goal>
+              <goal>test-compile</goal>
+              <goal>compile-custom</goal>
+              <goal>test-compile-custom</goal>
+            </goals>
+            <configuration>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <outputDirectory>target/generated-sources/java</outputDirectory>
+              <clearOutputDirectory>false</clearOutputDirectory>
+              <includes>
+                <include>JobworkerServiceProtocol.proto</include>
+              </includes>
+              <pluginId>grpc-java</pluginId>
+              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
             </configuration>
           </execution>
         </executions>

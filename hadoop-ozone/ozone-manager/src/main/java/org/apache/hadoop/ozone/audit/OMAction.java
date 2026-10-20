@@ -23,6 +23,8 @@ package org.apache.hadoop.ozone.audit;
 public enum OMAction implements AuditAction {
 
   // WRITE Actions
+  JW_REGISTER,
+  JW_HEARTBEAT,
   ALLOCATE_BLOCK,
   ALLOCATE_KEY,
   COMMIT_KEY,

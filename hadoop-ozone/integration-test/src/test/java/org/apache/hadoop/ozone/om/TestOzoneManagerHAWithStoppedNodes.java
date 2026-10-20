@@ -26,12 +26,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.ConnectException;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -39,17 +43,32 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.JobworkerDetails;
+import org.apache.hadoop.hdds.protocol.MockJobworkerDetails;
+import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.CommandStatus;
+import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.OMJobworkerCommandProto;
+import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.RegisterJobworkerRequest;
+import org.apache.hadoop.hdds.protocol.jobworker.proto.JobworkerServiceProtocolProtos.SendHeartbeatRequest;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ozone.JobworkerService;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -60,15 +79,24 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.jobworker.JobworkerConnectionManager;
+import org.apache.hadoop.ozone.jobworker.JobworkerStateContext;
+import org.apache.hadoop.ozone.jobworker.commands.AbstractJobworkerCommandHandler;
+import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommand;
+import org.apache.hadoop.ozone.jobworker.commands.JobworkerCommandHandler;
+import org.apache.hadoop.ozone.jobworker.commands.OMJobworkerCommand;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.jobworker.command.JobworkerCommandListener;
+import org.apache.hadoop.ozone.om.jobworker.command.JobworkerJobState;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.JobworkerJobRecord;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
@@ -86,14 +114,18 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 /**
  * Ozone Manager HA tests that stop/restart one or more OM nodes.
  * @see TestOzoneManagerHAWithAllRunning
  */
+
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
+  @TempDir
+  private Path jobworkerDirectory;
   private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(
       TestOzoneManagerHAWithStoppedNodes.class);
 
@@ -108,6 +140,236 @@ public class TestOzoneManagerHAWithStoppedNodes extends OzoneManagerHATests {
   @BeforeEach
   void setup() throws Exception {
     waitForLeaderToBeReady();
+  }
+
+  @Test
+  void testJobworkerRecoversRunningAttemptAndLostCompletionAcknowledgement() throws Exception {
+    MiniOzoneHAClusterImpl cluster = getCluster();
+    CountDownLatch started = new CountDownLatch(1);
+    CountDownLatch finish = new CountDownLatch(1);
+    AtomicInteger executions = new AtomicInteger();
+    AtomicBoolean rejectAcknowledgement = new AtomicBoolean();
+    JobworkerService worker = new JobworkerService(new String[0]) {
+      @Override
+      protected JobworkerCommandHandler[] createCommandHandlers() {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AbstractJobworkerCommandHandler handler =
+            new AbstractJobworkerCommandHandler(
+                OMJobworkerCommandProto.Type.mockCommand, executor) {
+              @Override
+              protected boolean processCommand(JobworkerCommand<?> command,
+                  JobworkerStateContext context,
+                  JobworkerConnectionManager connections) throws Exception {
+                executions.incrementAndGet();
+                started.countDown();
+                return finish.await(120, TimeUnit.SECONDS);
+              }
+
+              @Override
+              public void stop() {
+                ServerUtils.executorServiceShutdownGraceful(executor);
+              }
+            };
+        return new JobworkerCommandHandler[]{handler};
+      }
+    };
+    try {
+      OzoneConfiguration workerConf = enableJobworkerFramework(rejectAcknowledgement);
+      OzoneManager firstLeader = cluster.getOMLeader();
+      worker.start(workerConf);
+      UUID workerId = worker.getJobworkerDetails().getUuid();
+      GenericTestUtils.waitFor(
+          () -> firstLeader.getJobworkerNodemanager().isJobworkerNodeRegistered(workerId), 100, 30_000);
+      OMJobworkerCommandProto envelope =
+          OMJobworkerCommandProto
+              .newBuilder().setCommandType(OMJobworkerCommandProto.Type.mockCommand).setCmdId(42).build();
+      firstLeader.getOMJobworkerCommandManager().sendCommand(workerId,
+          OMJobworkerCommand.fromEnvelope(envelope));
+      assertTrue(started.await(30, TimeUnit.SECONDS));
+      String jobKey = JobworkerJobState.key(envelope.getCommandType(), 42);
+      GenericTestUtils.waitFor(() -> jobworkerHasStatus(firstLeader, jobKey,
+          CommandStatus.Status.EXECUTING),
+          100, 30_000);
+
+      cluster.stopOzoneManager(firstLeader.getOMNodeId());
+      waitForLeaderToBeReady();
+      OzoneManager secondLeader = cluster.getOMLeader();
+      assertNotEquals(firstLeader.getOMNodeId(), secondLeader.getOMNodeId());
+      assertTrue(jobworkerHasStatus(secondLeader, jobKey,
+          CommandStatus.Status.EXECUTING));
+      assertEquals(1, executions.get(), "An OM election must not restart an executing attempt");
+
+      // Restore quorum capacity before the second failure.
+      cluster.restartOzoneManager(firstLeader, true);
+      registerJobworkerResultListener(firstLeader, rejectAcknowledgement);
+      rejectAcknowledgement.set(true);
+      finish.countDown();
+      GenericTestUtils.waitFor(() -> jobworkerHasStatus(secondLeader, jobKey,
+          CommandStatus.Status.SUCCEEDED),
+          100, 30_000);
+      assertNotNull(worker.getJobworkerStateMachine().getContext().getCommandManager()
+          .getCmdStatus(secondLeader.getOMServiceId(), 42L),
+          "A socket response must not retire an unacknowledged result");
+
+      // The result is committed, but its application acknowledgement has not reached the worker.
+      cluster.stopOzoneManager(secondLeader.getOMNodeId());
+      waitForLeaderToBeReady();
+      OzoneManager thirdLeader = cluster.getOMLeader();
+      rejectAcknowledgement.set(false);
+      GenericTestUtils.waitFor(() -> worker.getJobworkerStateMachine().getContext().getCommandManager()
+          .getCmdStatus(thirdLeader.getOMServiceId(), 42L) == null, 100, 30_000);
+      assertTrue(jobworkerHasStatus(thirdLeader, jobKey,
+          CommandStatus.Status.SUCCEEDED));
+      assertEquals(1, executions.get());
+
+      createVolumeTest(true);
+      createKeyTest(true);
+      cluster.restartOzoneManager();
+      waitForLeaderToBeReady();
+      assertTrue(jobworkerHasStatus(cluster.getOMLeader(), jobKey,
+          CommandStatus.Status.SUCCEEDED));
+      assertEquals(1, executions.get(), "Committed work must survive a full OM restart without executing twice");
+      worker.stop();
+      worker.start(workerConf);
+      assertEquals(workerId, worker.getJobworkerDetails().getUuid());
+      GenericTestUtils.waitFor(() -> worker.getJobworkerStateMachine().getConnectionManager().getAllEndpoints().stream()
+          .allMatch(endpoint -> endpoint.getState() == org.apache.hadoop.ozone.jobworker.JobworkerEndpointStateMachine
+              .EndpointStates.HEARTBEAT), 100, 30_000);
+      OMJobworkerCommandProto oldDelivery = OMJobworkerCommandProto.parseFrom(
+          cluster.getOMLeader().getJobworkerJobManager().get(jobKey).getCommand());
+      worker.getJobworkerStateMachine().getContext().getCommandManager()
+          .acceptDurableCommand(oldDelivery, cluster.getOMLeader().getOMServiceId(), 100);
+      assertEquals(1, executions.get(), "Worker restart and delayed delivery must not repeat acknowledged effects");
+    } finally {
+      finish.countDown();
+      worker.stop();
+      for (OzoneManager om : cluster.getOzoneManagersList()) {
+        om.getConfiguration().setBoolean("ozone.om.jobworker.service.enabled", false);
+      }
+    }
+  }
+
+  private OzoneConfiguration enableJobworkerFramework(AtomicBoolean rejectAcknowledgement) throws Exception {
+    MiniOzoneHAClusterImpl cluster = getCluster();
+    cluster.restartOzoneManagersWithConfigCustomizer(conf -> {
+      conf.setBoolean("ozone.om.jobworker.service.enabled", true);
+      conf.setInt("ozone.om.jobworker.grpc.port", 0);
+    });
+    OzoneConfiguration workerConf = new OzoneConfiguration(getConf());
+    for (OzoneManager om : cluster.getOzoneManagersList()) {
+      for (OzoneManager endpoint : cluster.getOzoneManagersList()) {
+        String key = "ozone.om.jobworker.grpc.port." + endpoint.getOMServiceId() + "." + endpoint.getOMNodeId();
+        om.getConfiguration().setInt(key, endpoint.getJobworkerGrpcPort());
+        workerConf.setInt(key, endpoint.getJobworkerGrpcPort());
+      }
+      registerJobworkerResultListener(om, rejectAcknowledgement);
+    }
+    workerConf.set("ozone.jobworker.om.service.ids", cluster.getOMLeader().getOMServiceId());
+    workerConf.set("ozone.jobworker.metadata.dir", jobworkerDirectory.toString());
+    workerConf.set("ozone.jobworker.heartbeat.interval", "100ms");
+    workerConf.set("ozone.jobworker.command.status.report.interval", "100ms");
+    workerConf.set("ozone.jobworker.node.report.interval", "100ms");
+    return workerConf;
+  }
+
+  @Test
+  void testJobworkerDoesNotDispatchAnUncommittedAssignmentWithoutQuorum() throws Exception {
+    MiniOzoneHAClusterImpl cluster = getCluster();
+    ExecutorService submitter = Executors.newSingleThreadExecutor();
+    try {
+      enableJobworkerFramework(new AtomicBoolean());
+      OzoneManager leader = cluster.getOMLeader();
+      JobworkerDetails worker =
+          MockJobworkerDetails.randomJobworkerDetails();
+      RegisterJobworkerRequest register =
+          RegisterJobworkerRequest
+              .newBuilder().setDurableJobProtocolVersion(1)
+              .setExtendedJobWorkDetailsProto(worker.getExtendedProtoBufMessage()).build();
+      leader.getJobworkerServerProtocol().registerJobworker(register);
+      OMJobworkerCommandProto committed = OMJobworkerCommandProto.newBuilder()
+          .setCommandType(OMJobworkerCommandProto.Type.mockCommand).setCmdId(142).build();
+      leader.getOMJobworkerCommandManager().sendCommand(worker.getUuid(), OMJobworkerCommand.fromEnvelope(committed));
+      List<OzoneManager> followers = new ArrayList<>(cluster.getOzoneManagersList());
+      followers.remove(leader);
+      followers.forEach(om -> cluster.stopOzoneManager(om.getOMNodeId()));
+      long committedIndex = leader.getOmRatisServer().getServerDivision().getRaftLog().getLastCommittedIndex();
+      long nextIndex = leader.getOmRatisServer().getServerDivision().getRaftLog().getNextIndex();
+      OMJobworkerCommandProto uncommitted = committed.toBuilder().setCmdId(143).build();
+      Future<Exception> submission = submitter.submit(() -> {
+        try {
+          leader.getOMJobworkerCommandManager().sendCommand(worker.getUuid(),
+              OMJobworkerCommand.fromEnvelope(uncommitted));
+          return null;
+        } catch (IOException e) {
+          return e;
+        }
+      });
+      GenericTestUtils.waitFor(() -> submission.isDone()
+          || leader.getOmRatisServer().getServerDivision().getRaftLog().getNextIndex() > nextIndex, 50, 10_000);
+      if (submission.isDone()) {
+        assertNotNull(submission.get(), "A new assignment cannot commit with only one of three OMs");
+      }
+      assertEquals(committedIndex, leader.getOmRatisServer().getServerDivision().getRaftLog().getLastCommittedIndex());
+      assertNull(leader.getJobworkerJobManager().get(JobworkerJobState.key(uncommitted.getCommandType(), 143)));
+      SendHeartbeatRequest heartbeat =
+          SendHeartbeatRequest.newBuilder()
+              .setOmServiceId(leader.getOMServiceId()).setJobworkerDetails(worker.getProtoBufMessage()).build();
+      try {
+        assertTrue(leader.getJobworkerServerProtocol().sendHeartbeat(heartbeat).getCommandsList().stream()
+            .noneMatch(command -> command.getCmdId() == 143));
+      } catch (IOException e) {
+        // Leadership may be lost between the readiness check and report reconciliation.
+        assertTrue(e.getMessage().contains("ready OM leader"), "Only a leadership refusal is expected: " + e);
+      }
+      assertNull(leader.getJobworkerJobManager().get(JobworkerJobState.key(uncommitted.getCommandType(), 143)));
+
+      for (OzoneManager follower : followers) {
+        cluster.restartOzoneManager(follower, true);
+        registerJobworkerResultListener(follower, new AtomicBoolean());
+      }
+      waitForLeaderToBeReady();
+      Exception firstAttempt = submission.get(30, TimeUnit.SECONDS);
+      if (firstAttempt != null) {
+        assertTrue(firstAttempt instanceof IOException);
+      }
+      OzoneManager recovered = cluster.getOMLeader();
+      // Whether the original request committed after recovery or failed, retrying the stable ID is safe.
+      recovered.getOMJobworkerCommandManager().sendCommand(worker.getUuid(),
+          OMJobworkerCommand.fromEnvelope(uncommitted));
+      assertNotNull(recovered.getJobworkerJobManager().get(JobworkerJobState.key(uncommitted.getCommandType(), 143)));
+    } finally {
+      submitter.shutdownNow();
+      for (OzoneManager om : cluster.getOzoneManagersList()) {
+        om.getConfiguration().setBoolean("ozone.om.jobworker.service.enabled", false);
+      }
+    }
+  }
+
+  private static boolean jobworkerHasStatus(OzoneManager om, String key,
+      CommandStatus.Status expected) {
+    try {
+      JobworkerJobRecord record =
+          om.getJobworkerJobManager().get(key);
+      return record != null && CommandStatus.parseFrom(record.getStatus()).getStatus() == expected;
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private static void registerJobworkerResultListener(OzoneManager om,
+      AtomicBoolean rejectAcknowledgement) {
+    JobworkerCommandListener listener =
+        org.mockito.Mockito.mock(JobworkerCommandListener.class);
+    org.mockito.Mockito.doCallRealMethod().when(listener).decodeCommand(org.mockito.ArgumentMatchers.any());
+    org.mockito.Mockito.doAnswer(invocation -> {
+      if (rejectAcknowledgement.get()) {
+        throw new IllegalStateException("Simulated lost result acknowledgement");
+      }
+      return null;
+    }).when(listener).onCommandSucceeded(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+        org.mockito.ArgumentMatchers.any());
+    om.getOMJobworkerCommandManager().registerHandler(
+        OMJobworkerCommandProto.Type.mockCommand, listener);
   }
 
   /**

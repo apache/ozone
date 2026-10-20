@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.JobworkerJobRecord;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
@@ -526,6 +527,9 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * @return meta table reference.
    */
   Table<String, String> getMetaTable();
+
+  /** Returns the replicated Jobworker assignment/result table. */
+  Table<String, JobworkerJobRecord> getJobworkerJobTable();
 
   /**
    * Gets the S3RevokedStsTokenTable.

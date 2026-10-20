@@ -1,0 +1,111 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.jobworker.report;
+
+import com.google.protobuf.Message;
+import java.io.IOException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.jobworker.JobworkerStateContext;
+import org.apache.hadoop.ozone.jobworker.JobworkerStates;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Abstract class responsible for scheduling the reports based on the
+ * configured interval. All the JobworkerReportPublishers should extend this class.
+ */
+public abstract class JobworkerReportPublisher<T extends Message>
+    implements Runnable {
+
+  private static final Logger LOG = LoggerFactory.getLogger(
+      JobworkerReportPublisher.class);
+
+  private ConfigurationSource config;
+  private JobworkerStateContext context;
+  private JobworkerReportManager reportManager;
+  private ScheduledExecutorService executor;
+
+  /**
+   * Initializes JobworkerReportPublisher with stateContext and executorService.
+   *
+   * @param stateContext Jobworker state context
+   * @param executorService ScheduledExecutorService to schedule reports
+   */
+  public void init(JobworkerStateContext stateContext,
+                   ScheduledExecutorService executorService, JobworkerReportManager jobworkerReportManager) {
+    this.context = stateContext;
+    this.reportManager = jobworkerReportManager;
+    this.executor = executorService;
+    this.executor.scheduleAtFixedRate(this,
+        getReportFrequency(), getReportFrequency(), TimeUnit.MILLISECONDS);
+  }
+
+  public void setConf(ConfigurationSource conf) {
+    config = conf;
+  }
+
+  public ConfigurationSource getConf() {
+    return config;
+  }
+
+  @Override
+  public void run() {
+    if (!executor.isShutdown() &&
+        (context.getState() != JobworkerStates.SHUTDOWN)) {
+      publishReport();
+    }
+  }
+
+  /**
+   * Generates and publishes the report to report manager.
+   */
+  private void publishReport() {
+    try {
+      Message report = getReport();
+      // Send the report to the manager instead of context
+      reportManager.addReport(report);
+    } catch (Exception e) {
+      LOG.error("Exception while publishing report.", e);
+    }
+  }
+
+  /**
+   * Returns the frequency in which this particular report has to be scheduled.
+   *
+   * @return report interval in milliseconds
+   */
+  protected abstract long getReportFrequency();
+
+  /**
+   * Generate and returns the report which has to be sent as part of heartbeat.
+   *
+   * @return jobworker report
+   */
+  protected abstract T getReport() throws IOException;
+
+  /**
+   * Returns {@link JobworkerStateContext}.
+   *
+   * @return stateContext report
+   */
+  protected JobworkerStateContext getContext() {
+    return context;
+  }
+}
