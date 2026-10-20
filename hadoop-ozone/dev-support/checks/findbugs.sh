@@ -33,7 +33,7 @@ REPORT_FILE="$REPORT_DIR/summary.txt"
 source "${DIR}/_lib.sh"
 source "${DIR}/install/spotbugs.sh"
 
-MAVEN_OPTIONS='-B -fae -DskipDocs -DskipRecon -DskipShade --no-transfer-progress'
+MAVEN_OPTIONS='-B -fae -DskipRecon -DskipShade --no-transfer-progress'
 MAVEN_OPTIONS="${MAVEN_OPTIONS} -Dscan.value.check=${CHECK}"
 
 if [[ "${OZONE_WITH_COVERAGE}" != "true" ]]; then
