@@ -1131,11 +1131,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
           throw e;
         }
       }
+    }
 
-      waitForBootstrappedNodeToBeReady(scm, leaderSnapshotIndex);
-      if (updateConfigs) {
-        waitForConfigUpdateOnActiveSCMs(scmNodeId);
-      }
+    waitForBootstrappedNodeToBeReady(scm, leaderSnapshotIndex);
+    if (updateConfigs) {
+      waitForConfigUpdateOnActiveSCMs(scmNodeId);
     }
   }
 
@@ -1181,10 +1181,10 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       // Also, the new SCM should contain each existing active SCM in it's SCM
       // peer list and RatisServer peerList.
       for (StorageContainerManager scm : scmhaService.getActiveServices()) {
-        if (!scm.doesPeerExist(scm.getScmId())) {
+        if (!scm.doesPeerExist(newSCMNode.getScmId())) {
           return false;
         }
-        if (!newSCMNode.doesPeerExist(scm.getSCMNodeId())) {
+        if (!newSCMNode.doesPeerExist(scm.getScmId())) {
           return false;
         }
       }
