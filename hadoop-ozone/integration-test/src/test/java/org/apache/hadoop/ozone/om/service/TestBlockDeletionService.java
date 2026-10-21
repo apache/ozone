@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
@@ -32,8 +31,6 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -44,13 +41,12 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMPerformanceMetrics;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
-import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HddsUpgradeTestUtils;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -60,7 +56,6 @@ import org.apache.hadoop.ozone.common.BlockGroup;
 import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.upgrade.InjectedUpgradeFinalizationExecutor;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -74,12 +69,11 @@ import org.mockito.ArgumentCaptor;
  * DeletionService test to Pass Usage from OM to SCM.
  */
 public class TestBlockDeletionService {
-  private static final String CLIENT_ID = UUID.randomUUID().toString();
   private static final String VOLUME_NAME = "vol1";
   private static final String BUCKET_NAME = "bucket1";
   private static final int KEY_SIZE = 5 * 1024; // 5 KB
   private static MiniOzoneCluster cluster;
-  private static StorageContainerLocationProtocol scmClient;
+  private static ScmBlockLocationProtocol scmBlockClient;
   private static OzoneBucket bucket;
   private static SCMPerformanceMetrics metrics;
 
@@ -98,23 +92,16 @@ public class TestBlockDeletionService {
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 500, TimeUnit.MILLISECONDS);
-    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HBASE_SUPPORT.layoutVersion());
-
-    InjectedUpgradeFinalizationExecutor<SCMUpgradeFinalizationContext>
-        scmFinalizationExecutor = new InjectedUpgradeFinalizationExecutor<>();
-    SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setUpgradeFinalizationExecutor(scmFinalizationExecutor);
+    conf.setInt(SCMStorageConfig.TESTING_INIT_APPARENT_VERSION_KEY, HBASE_SUPPORT.serialize());
 
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(9)
-        .setSCMConfigurator(configurator)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setLayoutVersion(HBASE_SUPPORT.layoutVersion()).build())
+            .setApparentVersion(HBASE_SUPPORT).build())
         .build();
     cluster.waitForClusterToBeReady();
-    scmClient = cluster.getStorageContainerLocationClient();
-    assertEquals(HBASE_SUPPORT.ordinal(),
-        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
+    scmBlockClient = HAUtils.getScmBlockClient(conf);
+    assertEquals(HBASE_SUPPORT, cluster.getStorageContainerManager().getVersionManager().getApparentVersion());
     metrics = cluster.getStorageContainerManager().getBlockProtocolServer().getMetrics();
 
     OzoneClient ozoneClient = cluster.newClient();
@@ -152,17 +139,9 @@ public class TestBlockDeletionService {
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeySuccessBlocks() - initialSuccessBlocks == 1, 50, 1000);
     GenericTestUtils.waitFor(() -> metrics.getDeleteKeyFailedBlocks() - initialFailedBlocks == 0, 50, 1000);
 
-    // UPGRADE SCM (if specified)
     // Step 5: wait for finalizing upgrade
-    Future<?> finalizationFuture = Executors.newSingleThreadExecutor().submit(() -> {
-      try {
-        scmClient.finalizeScmUpgrade(CLIENT_ID);
-      } catch (IOException ex) {
-        fail("finalization client failed", ex);
-      }
-    });
-    finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    scmBlockClient.finalizeUpgrade();
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmBlockClient);
     assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
 
     // POST-UPGRADE

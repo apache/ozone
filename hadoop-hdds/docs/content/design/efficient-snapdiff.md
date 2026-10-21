@@ -198,22 +198,21 @@ Instead of random lookups, the optimization uses native RocksDB **Table Iterator
 
 **1. `toSnapshot` Directory Scan (FSO only):**
 *   Iterates sequentially through the `toSnapshot`'s `directoryTable`.
-*   Extracts `updateID` using the lightweight parser. If `updateID <= fromSnapshot.lastTransactionInfo.txIndex`, the entry is unchanged (not created/renamed/modified) and is skipped. Otherwise, its compare signature is built and it is added to the `newList` and recorded in the `DiffCandidateSet`.
+*   Extracts `updateID` using the lightweight parser. For **every** directory entry, writes **one** `newList` value per `objectId`: if the update-id gate passes (or is disabled), builds the compare signature, adds the entry to `newList`, and records it in the `DiffCandidateSet`; otherwise writes a present-marker to `newList` (membership only, no signature).
 *   **Graph Construction:** Regardless of whether the entry is a candidate, the `parentID` and `name` are extracted to build the foundational edges of the `toSnapshot` directory structure graph. This is done by writing `(parentID, objectID) -> name` entries into a temporary RocksDB Column Family (`jobId-to-edges`).
 
 **2. `fromSnapshot` Directory Scan (FSO only):**
 *   Iterates sequentially through the `fromSnapshot`'s `directoryTable`.
-*   Only processes entries whose `objectID` is in `DiffCandidateSet` during the `toSnapshot` scan. Adds these to the `oldList`.
+*   For **every** directory entry, writes **one** `oldList` value per `objectId` with full compare signature when `objectID` is in `DiffCandidateSet`, otherwise metadata-only (`parentId`, `name`, `isDir`) with an empty signature.
 *   **Graph Construction:** Extracts `parentID` and `name` for all entries to build the `fromSnapshot` directory structure graph by writing to another temporary Column Family (`jobId-from-edges`).
 
 **3. `toSnapshot` Key Scan:**
 *   Iterates sequentially through the `toSnapshot`'s `key/fileTable`.
-*   Applies the same `updateID` gating logic: skips if `updateID <= fromSnapshot.lastTransactionInfo.txIndex`.
-*   Builds the compare signature and adds to `newList`, recording these entries in the `DiffCandidateSet`. No parentID/path checks are performed at this stage.
+*   For **every** key entry, writes **one** `newList` value per `objectId`: if the update-id gate passes (or is disabled), builds the compare signature, adds to `newList`, and records the entry in the `DiffCandidateSet`; otherwise writes a present-marker to `newList` only. No parentID/path checks are performed at this stage.
 
 **4. `fromSnapshot` Key Scan:**
 *   Iterates sequentially through the `fromSnapshot`'s `key/fileTable`.
-*   Only builds compare signature for entries whose `objectID` was marked in `DiffCandidateSet` during the `toSnapshot` file scan. Adds these to the `oldList`.
+*   For **every** key entry, writes **one** `oldList` value per `objectId` with full compare signature when `objectID` was marked in `DiffCandidateSet` during the `toSnapshot` file scan, otherwise metadata-only with an empty signature.
 
 
 ### Stage 2: Merge Join & Classification

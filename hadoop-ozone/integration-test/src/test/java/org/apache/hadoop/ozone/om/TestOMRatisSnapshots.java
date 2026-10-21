@@ -37,8 +37,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -86,6 +89,7 @@ import org.junit.jupiter.api.Test;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
 /**
@@ -301,14 +305,16 @@ public class TestOMRatisSnapshots {
     assertLogCapture(logCapture, msg);
     assertLogCapture(logCapture, "Install Checkpoint is finished");
 
-    // Wait for the follower to apply everything the leader has applied; all
+    // Wait for the follower to apply everything the leader has committed; all
     // writes have completed on the leader, so after this no further snapshot
     // install (and DB reload) can occur and the follower DB reads below are
     // safe from "Rocks Database is closed" races.
-    long leaderApplied = leaderOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
+    // The applied index only advances on double buffer flush, so it can lag
+    // acked writes; the commit index covers them all.
+    long leaderCommitted = leaderRatisServer.getServerDivision().getRaftLog()
+        .getLastCommittedIndex();
     GenericTestUtils.waitFor(() -> followerOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex() >= leaderApplied, 100, 30_000);
+        .getLastAppliedTermIndex().getIndex() >= leaderCommitted, 100, 30_000);
 
     long followerOMLastAppliedIndex =
         followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
@@ -373,6 +379,12 @@ public class TestOMRatisSnapshots {
     long leaderOMSnapshotIndex = leaderOMTermIndex.getIndex();
     long leaderOMSnapshotTermIndex = leaderOMTermIndex.getTerm();
 
+    // The snapshot index above only advances on double buffer flush, so it can
+    // lag the keys written above; the commit index covers them all. Read after
+    // the snapshot index, so it is never behind it.
+    long leaderCommitted = leaderRatisServer.getServerDivision().getRaftLog()
+        .getLastCommittedIndex();
+
     // Start the inactive OM. Checkpoint installation will happen spontaneously.
     OzoneManager.setTestInstallSnapshot(true);
     cluster.startInactiveOM(followerNodeId);
@@ -395,12 +407,11 @@ public class TestOMRatisSnapshots {
     });
     readFuture.get();
 
-    // The recently started OM should be lagging behind the leader OM.
-    // Wait & for follower to update transactions to leader snapshot index.
-    // Timeout error if follower does not load update within 3s
+    // The recently started OM should be lagging behind the leader OM. Wait for
+    // it to catch up, which covers the snapshot index and all the keys.
     GenericTestUtils.waitFor(() -> {
       return followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex()
-          >= leaderOMSnapshotIndex - 1;
+          >= leaderCommitted;
     }, 100, 30_000);
 
     long followerOMLastAppliedIndex =
@@ -469,10 +480,12 @@ public class TestOMRatisSnapshots {
 
     // Wait for the follower to finish applying in-flight transactions, so
     // that the TermIndex read below matches what installCheckpoint observes.
-    long leaderAppliedIndex = leaderOM.getOmRatisServer()
-        .getLastAppliedTermIndex().getIndex();
+    // The applied index only advances on double buffer flush, so it can lag
+    // acked writes; the commit index covers them all.
+    long leaderCommitted = leaderOM.getOmRatisServer().getServerDivision()
+        .getRaftLog().getLastCommittedIndex();
     GenericTestUtils.waitFor(() -> followerRatisServer
-        .getLastAppliedTermIndex().getIndex() >= leaderAppliedIndex, 100, 10_000);
+        .getLastAppliedTermIndex().getIndex() >= leaderCommitted, 100, 10_000);
 
     // Install the old checkpoint on the follower OM. This should fail as the
     // followerOM is already ahead of that transactionLogIndex and the OM
@@ -630,6 +643,82 @@ public class TestOMRatisSnapshots {
       assertEquals(dbInodeBefore, getINode(followerDbDir),
           OM_DB_NAME + " was replaced rather than restored");
     } finally {
+      followerOM.setCheckpointBackupInjector(null);
+      cluster.setupExitManagerForTesting();
+    }
+  }
+
+  /**
+   * An apply offered while installCheckpoint has the state machine paused is rejected, and Ratis moves
+   * past it. If the install then fails, the old DB is kept and Ratis does not reload the state machine,
+   * so the entry would never be applied: the OM must exit instead of resuming applies, so that a restart
+   * replays it from the Raft log. A failed install with no such entry must not exit.
+   *
+   * The install is called directly on a follower that keeps receiving entries, which is wider than a
+   * Ratis driven install: there the follower refuses appendEntries, so only entries already committed in
+   * its log but not yet applied can be rejected.
+   */
+  @Test
+  public void testFailedInstallExitsAfterApplyRejectedDuringPause() throws Exception {
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    // The active follower, so it keeps receiving entries while it installs.
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (!cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+
+    writeKeys(1);
+    DBCheckpoint leaderDbCheckpoint = leaderOM.getMetadataManager().getStore().getCheckpoint(true);
+    Path leaderCheckpointLocation = leaderDbCheckpoint.getCheckpointLocation();
+    assertNotNull(leaderCheckpointLocation);
+    Path omDbDir = leaderCheckpointLocation.resolve(OM_DB_NAME);
+    Files.createDirectory(omDbDir);
+    moveCheckpointContentsToOmDbDir(leaderCheckpointLocation, omDbDir);
+    TransactionInfo trxnInfo = OzoneManagerRatisUtils.getTrxnInfoFromCheckpoint(conf, omDbDir);
+    // The follower is caught up, so claim a newer checkpoint to let the replacement start. It fails
+    // at the first backup move, before anything from the checkpoint is installed.
+    TransactionInfo aheadTrxnInfo = TransactionInfo.valueOf(trxnInfo.getTerm(), trxnInfo.getTransactionIndex() + 1000);
+
+    DummyExitManager exitManager = new DummyExitManager();
+    followerOM.setExitManagerForTesting(exitManager);
+    LogCapturer updaterLog =
+        LogCapturer.captureLogs(LoggerFactory.getLogger("org.apache.ratis.server.impl.StateMachineUpdater"));
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    BlockThenThrowFaultInjector injector = new BlockThenThrowFaultInjector();
+    try {
+      // Nothing left to apply on the follower, so this install fails with no entry rejected.
+      long leaderIndex = leaderOM.getOmRatisServer().getLastAppliedTermIndex().getIndex();
+      GenericTestUtils.waitFor(
+          () -> followerOM.getOmRatisServer().getLastAppliedTermIndex().getIndex() >= leaderIndex, 100, 30_000);
+      followerOM.setCheckpointBackupInjector(new ThrowOnNthPauseFaultInjector(1, "Simulated backup move failure"));
+      assertNull(followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation, aheadTrxnInfo));
+      assertThat(exitManager.messages).isEmpty();
+
+      followerOM.setCheckpointBackupInjector(injector);
+      Future<TermIndex> install = executor.submit(
+          () -> followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation, aheadTrxnInfo));
+      assertTrue(injector.paused.await(60, TimeUnit.SECONDS));
+      String key = createKey(ozoneBucket);
+      OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName).setBucketName(bucketName)
+          .setKeyName(key).build();
+      long keyIndex = leaderOM.lookupKey(keyArgs).getUpdateID();
+      // Ratis logs the rejected apply of the key's commit on the follower.
+      String follower = followerNodeId + "@";
+      String index = "applying txn index=" + keyIndex + ",";
+      GenericTestUtils.waitFor(() -> Arrays.stream(updaterLog.getOutput().split("\n"))
+          .anyMatch(line -> line.contains(follower) && line.contains(index)), 100, 30_000);
+      injector.resume();
+      assertNull(install.get(60, TimeUnit.SECONDS));
+
+      assertThat(exitManager.messages)
+          .as("follower resumed applies on its old DB after the entry at index %d was skipped", keyIndex)
+          .singleElement().asString().contains("rejected while the state machine was paused");
+    } finally {
+      injector.resume();
+      executor.shutdownNow();
+      updaterLog.stopCapturing();
       followerOM.setCheckpointBackupInjector(null);
       cluster.setupExitManagerForTesting();
     }
@@ -861,10 +950,37 @@ public class TestOMRatisSnapshots {
   }
 
   private static class DummyExitManager extends ExitManager {
+    private final List<String> messages = new CopyOnWriteArrayList<>();
+
     @Override
     public void exitSystem(int status, String message, Throwable throwable,
         Logger log) {
+      messages.add(throwable == null ? message : message + " " + throwable.getMessage());
       log.error("System Exit: " + message, throwable);
+    }
+  }
+
+  /**
+   * FaultInjector that blocks pause() until resume(), then throws IOException.
+   */
+  private static class BlockThenThrowFaultInjector extends FaultInjector {
+    private final CountDownLatch paused = new CountDownLatch(1);
+    private final CountDownLatch released = new CountDownLatch(1);
+
+    @Override
+    public void pause() throws IOException {
+      paused.countDown();
+      try {
+        released.await();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+      throw new IOException("Simulated backup move failure");
+    }
+
+    @Override
+    public void resume() {
+      released.countDown();
     }
   }
 

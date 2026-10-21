@@ -17,6 +17,17 @@
 
 package org.apache.hadoop.ozone;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HANDLER_COUNT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,6 +37,7 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -272,9 +284,31 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected Builder(OzoneConfiguration conf) {
       this.conf = conf;
       setClusterId();
+      setDefaultConfigs();
       // Use default SCM configurations if no override is provided.
       setSCMConfigurator(new SCMConfigurator());
       ExitUtils.disableSystemExit();
+    }
+
+    /**
+     * Applies test-friendly defaults that reduce memory/disk needs for MiniOzoneCluster.
+     * Explicit values from the caller or from {@code *-site.xml} are preserved.
+     */
+    protected void setDefaultConfigs() {
+      ClientConfigForTesting.newBuilder(StorageUnit.MB)
+          .setChunkSize(1)
+          .applyTo(conf, true);
+
+      conf.setIfUnset(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, "true");
+      conf.setIfUnset(HDDS_HEARTBEAT_INTERVAL, "1s");
+      conf.setIfUnset(OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME, "1s");
+      conf.setIfUnset(OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "1s");
+      conf.setIfUnset(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, "100ms");
+      conf.setIfUnset(OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, "4MB");
+      conf.setIfUnset(OZONE_SCM_HA_RAFT_LOG_APPENDER_QUEUE_BYTE_LIMIT, "4MB");
+      conf.setIfUnset(HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME, "4");
+      conf.setIfUnset(OZONE_OM_HANDLER_COUNT_KEY, "20");
+      conf.setIfUnset(OZONE_SCM_HANDLER_COUNT_KEY, "20");
     }
 
     /** Prepare the builder for another call to {@link #build()}, avoiding conflict

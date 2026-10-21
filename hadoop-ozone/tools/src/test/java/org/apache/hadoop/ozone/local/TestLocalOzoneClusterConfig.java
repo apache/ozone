@@ -41,16 +41,15 @@ class TestLocalOzoneClusterConfig {
         config.getFormatMode());
     assertEquals(1, config.getDatanodes());
     assertEquals("127.0.0.1", config.getHost());
-    assertEquals("0.0.0.0", config.getBindHost());
+    assertEquals("127.0.0.1", config.getBindHost());
     assertEquals(0, config.getScmPort());
     assertEquals(0, config.getOmPort());
     assertEquals(0, config.getS3gPort());
     assertTrue(config.isS3gEnabled());
+    assertEquals(0, config.getReconPort());
+    assertFalse(config.isReconEnabled());
     assertFalse(config.isEphemeral());
     assertEquals(Duration.ofMinutes(2), config.getStartupTimeout());
-    assertEquals("admin", config.getS3AccessKey());
-    assertEquals("admin123", config.getS3SecretKey());
-    assertEquals("us-east-1", config.getS3Region());
   }
 
   @Test
@@ -66,6 +65,9 @@ class TestLocalOzoneClusterConfig {
     assertEquals(Boolean.parseBoolean(
         LocalOzoneClusterConfig.DEFAULT_S3G_ENABLED_VALUE),
         LocalOzoneClusterConfig.DEFAULT_S3G_ENABLED);
+    assertEquals(Boolean.parseBoolean(
+        LocalOzoneClusterConfig.DEFAULT_RECON_ENABLED_VALUE),
+        LocalOzoneClusterConfig.DEFAULT_RECON_ENABLED);
     assertEquals(Boolean.parseBoolean(
         LocalOzoneClusterConfig.DEFAULT_EPHEMERAL_VALUE),
         LocalOzoneClusterConfig.DEFAULT_EPHEMERAL);
@@ -86,11 +88,10 @@ class TestLocalOzoneClusterConfig {
         .setOmPort(9862)
         .setS3gPort(9878)
         .setS3gEnabled(false)
+        .setReconPort(9888)
+        .setReconEnabled(true)
         .setEphemeral(true)
         .setStartupTimeout(Duration.ofSeconds(45))
-        .setS3AccessKey("dev")
-        .setS3SecretKey("secret")
-        .setS3Region("ap-south-1")
         .build();
 
     assertEquals(Paths.get("target", "custom-local-ozone")
@@ -104,11 +105,10 @@ class TestLocalOzoneClusterConfig {
     assertEquals(9862, config.getOmPort());
     assertEquals(9878, config.getS3gPort());
     assertFalse(config.isS3gEnabled());
+    assertEquals(9888, config.getReconPort());
+    assertTrue(config.isReconEnabled());
     assertTrue(config.isEphemeral());
     assertEquals(Duration.ofSeconds(45), config.getStartupTimeout());
-    assertEquals("dev", config.getS3AccessKey());
-    assertEquals("secret", config.getS3SecretKey());
-    assertEquals("ap-south-1", config.getS3Region());
   }
 
   @Test

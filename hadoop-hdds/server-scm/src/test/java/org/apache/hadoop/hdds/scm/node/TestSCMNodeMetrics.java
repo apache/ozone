@@ -17,13 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.hadoop.hdds.scm.upgrade.ScmUpgradeTestUtils.mockVersionManager;
 import static org.apache.ozone.test.MetricsAsserts.assertGauge;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,8 +37,8 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
+import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -63,9 +61,7 @@ public class TestSCMNodeMetrics {
     EventQueue publisher = new EventQueue();
     SCMStorageConfig config =
         new SCMStorageConfig(NodeType.DATANODE, new File("/tmp"), "storage");
-    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
-    when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
+    ScmVersionManager versionManager = mockVersionManager();
     nodeManager = new SCMNodeManager(source, config, publisher,
         new NetworkTopologyImpl(source), SCMContext.emptyContext(),
             versionManager);
@@ -174,8 +170,6 @@ public class TestSCMNodeMetrics {
 
     assertGauge("InServiceHealthyNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("InServiceHealthyReadonlyNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("InServiceStaleNodes", 0,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("InServiceDeadNodes", 0,
@@ -247,7 +241,6 @@ public class TestSCMNodeMetrics {
     GenericTestUtils.waitFor(
         () -> nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) == 1, 100, 5000);
     metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
-    assertGauge("InServiceHealthyReadonlyNodes", 0, metricsSource);
     assertGauge("InServiceHealthyNodes", 1, metricsSource);
 
   }

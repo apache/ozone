@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 @Produces(MediaType.APPLICATION_JSON)
 public class VolumeEndpoint {
 
-  @Inject
   private ReconOMMetadataManager omMetadataManager;
 
   @Inject

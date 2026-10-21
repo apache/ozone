@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_COMMAND_STATUS_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
@@ -47,7 +46,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
-import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -85,6 +83,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
@@ -94,9 +93,9 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
@@ -112,9 +111,7 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -150,6 +147,7 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
@@ -160,7 +158,6 @@ import org.slf4j.LoggerFactory;
  */
 public class TestStorageContainerManager {
   private static final int KEY_COUNT = 5;
-  private static final String LOCALHOST_IP = "127.0.0.1";
   private static final Logger LOG = LoggerFactory.getLogger(
       TestStorageContainerManager.class);
 
@@ -169,12 +166,16 @@ public class TestStorageContainerManager {
   void test(@TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
-    configureTopology(conf);
     configureBlockDeletion(conf);
     Path scmPath = tempDir.resolve("scm-meta");
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
+    String host = NetUtils.normalizeHostName(HddsUtils.getHostName(conf));
 
-    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(1).build()) {
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf)
+        .setNumDatanodes(1)
+        .setHosts(new String[] {host})
+        .setRacks(new String[] {"/rack1"})
+        .build()) {
       cluster.waitForClusterToBeReady();
 
       // non-destructive test cases
@@ -481,7 +482,7 @@ public class TestStorageContainerManager {
     // on datanodes.
     Set<Long> containerNames = new HashSet<>();
     for (Map.Entry<String, OmKeyInfo> entry : keyLocations.entrySet()) {
-      entry.getValue().getLatestVersionLocations().getLocationList()
+      entry.getValue().getLatestVersionLocations().createLocationList()
           .forEach(loc -> containerNames.add(loc.getContainerID()));
     }
 
@@ -499,7 +500,7 @@ public class TestStorageContainerManager {
     Map<Long, List<DeletedBlock>> containerBlocks = Maps.newHashMap();
     for (OmKeyInfo info : keyLocations.values()) {
       List<OmKeyLocationInfo> list =
-          info.getLatestVersionLocations().getLocationList();
+          info.getLatestVersionLocations().createLocationList();
       list.forEach(location -> {
         if (containerBlocks.containsKey(location.getContainerID())) {
           containerBlocks.get(location.getContainerID()).add(new DeletedBlock(location.getBlockID(),
@@ -626,6 +627,39 @@ public class TestStorageContainerManager {
     }
   }
 
+  @Test
+  void testStateMachineCloseTerminatesWithFailureStatus(@TempDir Path tempDir) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempDir.resolve("scm-meta").toString());
+    StorageContainerManager.scmInit(conf, UUID.randomUUID().toString());
+    ExitUtils.disableSystemExit();
+    StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
+    try {
+      scm.start();
+      waitForStateMachineReady(scm);
+      scm.stop();
+      scm.join();
+      assertThat(ExitUtils.isTerminated()).isFalse();
+
+      scm = HddsTestUtils.getScmSimple(conf);
+      scm.start();
+      waitForStateMachineReady(scm);
+      SCMStateMachine stateMachine = scm.getScmHAManager().getRatisServer().getSCMStateMachine();
+      ExitUtils.ExitException exit = assertThrows(ExitUtils.ExitException.class, stateMachine::close);
+      assertThat(exit.getStatus()).isEqualTo(1);
+      assertThat(scm.isStopped()).isTrue();
+    } finally {
+      scm.stop();
+      ExitUtils.clear();
+    }
+  }
+
+  /** Waits until the state machine is ready. */
+  private static void waitForStateMachineReady(StorageContainerManager scm) throws Exception {
+    SCMStateMachine stateMachine = scm.getScmHAManager().getRatisServer().getSCMStateMachine();
+    GenericTestUtils.waitFor(stateMachine::getIsStateMachineReady, 100, 30_000);
+  }
+
   /**
    * Test datanode heartbeat well processed with a 4-layer network topology.
    */
@@ -641,17 +675,6 @@ public class TestStorageContainerManager {
       assertEquals(datanodeInfo.getID().toString(), datanodeInfo.getNetworkName());
       assertEquals("/rack1", datanodeInfo.getNetworkLocation());
     }
-  }
-
-  private static void configureTopology(OzoneConfiguration conf) throws UnknownHostException {
-    String rackName = "/rack1";
-    conf.setClass(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-        StaticMapping.class, DNSToSwitchMapping.class);
-    StaticMapping.addNodeToRack(NetUtils.normalizeHostName(HddsUtils.getHostName(conf)),
-        rackName);
-    // In case of JDK17, the IP address is resolved to localhost mapped to 127.0.0.1 which is not in sync with JDK8
-    // and hence need to make following entry under HDDS-10132
-    StaticMapping.addNodeToRack(LOCALHOST_IP, rackName);
   }
 
   @Test
@@ -674,16 +697,14 @@ public class TestStorageContainerManager {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
-      DataTestUtil.createKeys(cluster, 10);
-      GenericTestUtils.waitFor(() ->
-          cluster.getStorageContainerManager().getContainerManager()
-              .getContainers() != null, 1000, 10000);
+      OmKeyInfo key = DataTestUtil.createKeys(cluster, 10)
+          .values().iterator().next();
+      long containerID = key.getLatestVersionLocations()
+          .createLocationList().get(0).getContainerID();
 
       StorageContainerManager scm = cluster.getStorageContainerManager();
-      List<ContainerInfo> containers = cluster.getStorageContainerManager()
-          .getContainerManager().getContainers();
-      assertNotNull(containers);
-      ContainerInfo selectedContainer = containers.iterator().next();
+      ContainerInfo selectedContainer = scm.getContainerManager()
+          .getContainer(ContainerID.valueOf(containerID));
 
       // Stop processing HB
       scm.getDatanodeProtocolServer().stop();
@@ -701,9 +722,10 @@ public class TestStorageContainerManager {
       }
 
       cluster.restartStorageContainerManager(false);
-      scm = cluster.getStorageContainerManager();
+      StorageContainerManager restartedScm =
+          cluster.getStorageContainerManager();
 
-      ReplicationManager rm = scm.getReplicationManager();
+      ReplicationManager rm = restartedScm.getReplicationManager();
 
       NodeManager nodeManager = mock(NodeManager.class);
       setInternalState(rm, "nodeManager", nodeManager);
@@ -715,18 +737,17 @@ public class TestStorageContainerManager {
           new CloseContainerCommand(selectedContainer.getContainerID(),
               selectedContainer.getPipelineID(), false);
 
+      // processAll cannot send the close command until ReplicationManager is ready
+      // and SCM has received the replica report.
       GenericTestUtils.waitFor(() -> {
-        SCMContext scmContext
-            = cluster.getStorageContainerManager().getScmContext();
-        return !scmContext.isInSafeMode() && scmContext.isLeader();
-      }, 1000, 25000);
-
-      // After safe mode is off, ReplicationManager starts to run with a delay.
-      Thread.sleep(5000);
-      // Give ReplicationManager some time to process the containers.
-      cluster.getStorageContainerManager()
-          .getReplicationManager().processAll();
-      Thread.sleep(5000);
+        try {
+          return rm.shouldRun() && !restartedScm.getContainerManager()
+              .getContainerReplicas(selectedContainer.containerID()).isEmpty();
+        } catch (ContainerNotFoundException e) {
+          return false;
+        }
+      }, 100, 30000);
+      rm.processAll();
       verify(nodeManager).addDatanodeCommand(dnUuid, closeContainerCommand);
     }
   }

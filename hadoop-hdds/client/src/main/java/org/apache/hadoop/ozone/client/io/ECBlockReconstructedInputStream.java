@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
@@ -47,6 +48,17 @@ public class ECBlockReconstructedInputStream extends BlockExtendedInputStream {
     this.repConfig = repConfig;
     this.byteBufferPool = byteBufferPool;
     this.stripeReader = stripeReader;
+  }
+
+  @Override
+  protected int readPositioned(long offset, ByteBuffer buffer) {
+    throw new UnsupportedOperationException("Use ECBlockInputStreamProxy for positioned reads");
+  }
+
+  @Override
+  public boolean hasCapability(String capability) {
+    return !StreamCapabilities.PREADBYTEBUFFER.equalsIgnoreCase(capability)
+        && super.hasCapability(capability);
   }
 
   @Override

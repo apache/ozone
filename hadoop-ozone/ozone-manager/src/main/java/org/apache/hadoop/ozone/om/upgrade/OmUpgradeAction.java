@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
  * Upgrade Action for OzoneManager which takes in an 'OM' instance.

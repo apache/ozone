@@ -1342,6 +1342,18 @@
               {
                 "name": "DIFF_REPORT_GEN",
                 "integer": 5
+              },
+              {
+                "name": "PATH_RESOLUTION_FSO",
+                "integer": 6
+              },
+              {
+                "name": "OBJECT_ID_MAP_GEN_FSO_FILE",
+                "integer": 7
+              },
+              {
+                "name": "OBJECT_ID_MAP_GEN_FSO_DIR",
+                "integer": 8
               }
             ]
           },
@@ -8102,6 +8114,12 @@
                 "id": 5,
                 "name": "subStatus",
                 "type": "SubStatus",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "progressPercent",
+                "type": "double",
                 "optional": true
               }
             ]

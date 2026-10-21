@@ -53,8 +53,8 @@ const NavBar: React.FC<NavBarProps> = ({
   onCollapse = () => { }
 }) => {
   const location = useLocation();
-  
-  const { data: disabledFeatures, error } = useApiData<string[]>(
+
+  const { data: disabledFeatures, success: disabledFeaturesLoaded } = useApiData<string[]>(
     '/api/v1/features/disabledFeatures',
     [],
     {
@@ -73,7 +73,7 @@ const NavBar: React.FC<NavBarProps> = ({
     }
   );
 
-  const isHeatmapEnabled = !disabledFeatures.includes('HEATMAP');
+  const isHeatmapEnabled = disabledFeaturesLoaded && !disabledFeatures.includes('HEATMAP');
   const isChatbotEnabled = chatbotHealthLoaded && chatbotHealth.enabled;
 
   const menuItems = [(
@@ -144,11 +144,7 @@ const NavBar: React.FC<NavBarProps> = ({
     <Menu.Item key='/Heatmap'
       icon={<LayoutOutlined />}>
       <span>Heatmap</span>
-      <Link to={{
-        pathname: '/Heatmap',
-        state: { isHeatmapEnabled: isHeatmapEnabled }
-      }}
-      />
+      <Link to='/Heatmap' />
     </Menu.Item>
   ),(
     isChatbotEnabled &&

@@ -78,6 +78,10 @@ To get a more detailed status, including the history of iterations:
 ozone admin containerbalancer status -v --history
 ```
 
+With `-v`/`--verbose`, when failures occur, a **Failed container moves** section lists each failure reason
+(e.g. `REPLICATION_FAIL_TIME_OUT`, `ITERATION_MOVE_TIMEOUT`, `PRE_MOVE_CONTAINER_NOT_FOUND` and more)
+with the total count and a per-datanode breakdown of which source and target nodes were involved.
+
 ### Stop
 
 To stop the Container Balancer:
@@ -101,7 +105,7 @@ The Container Balancer can also be configured through the `ozone-site.xml` file.
 | `hdds.container.balancer.exclude.containers`           | A comma-separated list of container IDs to exclude from balancing.                                                                     | ""            |
 | `hdds.container.balancer.move.timeout`                 | The amount of time to allow a single container to move from source to target.                                                          | 65m           |
 | `hdds.container.balancer.move.replication.timeout`     | The amount of time to allow a single container's replication from source to target as part of a container move.                        | 50m           |
-| `hdds.container.balancer.balancing.iteration.interval` | The interval period between each iteration of Container Balancer.                                                                      | 70m           |
+| `hdds.container.balancer.balancing.iteration.interval` | The interval to wait between iterations. The balancer runs continuously, this wait lets SCM receive refreshed Datanode usage information before the next iteration starts.  | 3m            |
 | `hdds.container.balancer.include.datanodes`            | A comma-separated list of Datanode hostnames or IP addresses. Only the Datanodes specified in this list are balanced.                  | ""            |
 | `hdds.container.balancer.exclude.datanodes`            | A comma-separated list of Datanode hostnames or IP addresses. The Datanodes specified in this list are excluded from balancing.        | ""            |
 | `hdds.container.balancer.move.networkTopology.enable`  | Whether to take network topology into account when selecting a target for a source.                                                    | false         |

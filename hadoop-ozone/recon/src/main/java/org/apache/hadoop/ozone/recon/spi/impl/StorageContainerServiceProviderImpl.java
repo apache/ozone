@@ -31,6 +31,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -41,7 +42,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
@@ -64,7 +65,7 @@ public class StorageContainerServiceProviderImpl
 
   private static final Logger LOG =
       LoggerFactory.getLogger(StorageContainerServiceProviderImpl.class);
-  private StorageContainerLocationProtocol scmClient;
+  private StorageContainerLocationInternalInterface scmClient;
   private final OzoneConfiguration configuration;
   private File scmSnapshotDBParentDir;
   private ReconUtils reconUtils;
@@ -73,7 +74,7 @@ public class StorageContainerServiceProviderImpl
 
   @Inject
   public StorageContainerServiceProviderImpl(
-      StorageContainerLocationProtocol scmClient,
+      StorageContainerLocationInternalInterface scmClient,
       ReconUtils reconUtils,
       OzoneConfiguration configuration,
       ReconStorageConfig reconStorage,
@@ -114,7 +115,7 @@ public class StorageContainerServiceProviderImpl
   @Override
   public List<HddsProtos.Node> getNodes() throws IOException {
     return scmClient.queryNode(null, null, HddsProtos.QueryScope.CLUSTER,
-        "", ClientVersion.CURRENT_VERSION);
+        "", ClientVersion.CURRENT);
   }
 
   @Override
@@ -138,7 +139,7 @@ public class StorageContainerServiceProviderImpl
       try {
         List<String> ratisRoles = scmClient.getScmInfo().getPeerRoles();
         for (String ratisRole : ratisRoles) {
-          String[] role = ratisRole.split(":");
+          String[] role = HddsUtils.parseRatisRoleString(ratisRole);
           if (role[2].equals(RaftProtos.RaftPeerRole.LEADER.toString())) {
             String hostAddress = role[4].trim();
             int grpcPort = configuration.getInt(

@@ -92,7 +92,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
     }
 
     final byte[] fileMD5 = digester.digest();
-    setOutBytes(digester.digest());
+    setOutBytes(fileMD5);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Number of chunks={}, md5hash={}",

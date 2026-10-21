@@ -83,6 +83,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    */
   private final BufferPool bufferPool;
   private OmMultipartCommitUploadPartInfo commitUploadPartInfo;
+  private long modificationTime;
   private final long openID;
   private final ExcludeList excludeList;
   private final ContainerClientMetrics clientMetrics;
@@ -329,8 +330,9 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       if (keyArgs.getIsMultipartKey()) {
         commitUploadPartInfo =
             omClient.commitMultipartUploadPart(buildKeyArgs(), openID);
+        modificationTime = commitUploadPartInfo.getModificationTime();
       } else {
-        omClient.commitKey(buildKeyArgs(), openID);
+        modificationTime = omClient.commitKey(buildKeyArgs(), openID);
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");
@@ -366,7 +368,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     }
   }
 
-  BlockOutputStreamEntry getCurrentStreamEntry() {
+  synchronized BlockOutputStreamEntry getCurrentStreamEntry() {
     if (streamEntries.isEmpty() || streamEntries.size() <= currentStreamIndex) {
       return null;
     } else {
@@ -405,7 +407,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return bufferPool.computeBufferData();
   }
 
-  void cleanup() {
+  synchronized void cleanup() {
     if (excludeList != null) {
       excludeList.clear();
     }
@@ -422,11 +424,15 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return commitUploadPartInfo;
   }
 
+  public long getModificationTime() {
+    return modificationTime;
+  }
+
   public ExcludeList getExcludeList() {
     return excludeList;
   }
 
-  boolean isEmpty() {
+  synchronized boolean isEmpty() {
     return streamEntries.isEmpty();
   }
 

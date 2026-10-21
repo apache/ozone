@@ -18,12 +18,15 @@
 package org.apache.hadoop.ozone.protocol.commands;
 
 import java.util.Objects;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.upgrade.HDDSVersionUtils;
 
 /**
  * SCM command to request push-replication of a container to a target datanode.
@@ -36,10 +39,14 @@ public final class ReplicateContainerCommand
   private int replicaIndex = 0;
   private ReplicationCommandPriority priority =
       ReplicationCommandPriority.NORMAL;
+  private ComponentVersion apparentVersion = HDDSVersion.DEFAULT_VERSION;
 
   public static ReplicateContainerCommand toTarget(long containerID,
-      DatanodeDetails target) {
-    return new ReplicateContainerCommand(containerID, target);
+      DatanodeDetails target, ComponentVersion apparentVersion) {
+    ReplicateContainerCommand cmd =
+        new ReplicateContainerCommand(containerID, target);
+    cmd.apparentVersion = apparentVersion;
+    return cmd;
   }
 
   private ReplicateContainerCommand(long containerID, DatanodeDetails target) {
@@ -63,6 +70,15 @@ public final class ReplicateContainerCommand
     this.priority = priority;
   }
 
+  /**
+   * @return the apparent version that should be used to carry out this
+   *     replication. SCM computes this as the lowest apparent version among the
+   *     nodes involved.
+   */
+  public ComponentVersion getApparentVersion() {
+    return apparentVersion;
+  }
+
   @Override
   public Type getType() {
     return SCMCommandProto.Type.replicateContainerCommand;
@@ -80,7 +96,8 @@ public final class ReplicateContainerCommand
         .setContainerID(containerID)
         .setReplicaIndex(replicaIndex)
         .setTarget(targetDatanode.getProtoBufMessage())
-        .setPriority(priority);
+        .setPriority(priority)
+        .setApparentVersion(apparentVersion.serialize());
     return builder.build();
   }
 
@@ -99,6 +116,10 @@ public final class ReplicateContainerCommand
     }
     if (protoMessage.hasPriority()) {
       cmd.setPriority(protoMessage.getPriority());
+    }
+    if (protoMessage.hasApparentVersion()) {
+      cmd.apparentVersion = HDDSVersionUtils.deserializeHDDSVersionOrLayoutVersion(
+          protoMessage.getApparentVersion());
     }
     return cmd;
   }
@@ -129,6 +150,7 @@ public final class ReplicateContainerCommand
         + ", containerId=" + getContainerID()
         + ", replicaIndex=" + getReplicaIndex()
         + ", targetNode=" + targetDatanode
-        + ", priority=" + priority;
+        + ", priority=" + priority
+        + ", apparentVersion=" + apparentVersion;
   }
 }

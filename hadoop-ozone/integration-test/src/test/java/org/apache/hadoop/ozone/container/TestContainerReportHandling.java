@@ -215,7 +215,7 @@ public class TestContainerReportHandling {
     OmKeyInfo keyInfo = cluster.getOzoneManager().lookupKey(keyArgs);
     OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
     assertNotNull(locations);
-    return locations.getLocationList();
+    return locations.createLocationList();
   }
 
   private static class TestCase extends ImmutablePair<LifeCycleState, ReplicationInput> {

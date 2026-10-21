@@ -39,7 +39,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequestWithFSO;
 import org.apache.hadoop.ozone.om.response.OMResponseTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -98,7 +97,6 @@ public class TestOMDirectoryCreateResponseWithFSO {
     OMDirectoryCreateResponseWithFSO omDirectoryCreateResponseWithFSO =
         new OMDirectoryCreateResponseWithFSO(omResponse, volumeId, bucketId,
                 omDirInfo, new ArrayList<>(),
-                OMDirectoryCreateRequestWithFSO.Result.SUCCESS,
                 BucketLayout.FILE_SYSTEM_OPTIMIZED, omBucketInfo);
 
     omDirectoryCreateResponseWithFSO

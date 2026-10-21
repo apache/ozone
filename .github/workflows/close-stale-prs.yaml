@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-slim
     steps:
       - name: Close Stale PRs
-        uses: actions/stale@1e223db275d687790206a7acac4d1a11bd6fe629 # v10.4.0
+        uses: actions/stale@v11
         with:
           stale-pr-label: 'stale'
           exempt-pr-labels: 'design'

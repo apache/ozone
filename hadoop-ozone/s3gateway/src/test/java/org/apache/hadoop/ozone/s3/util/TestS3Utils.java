@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.stream.Stream;
+import javax.ws.rs.core.MediaType;
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -81,7 +82,10 @@ public class TestS3Utils {
       for (String s3StorageConfig : S3STORAGECONFIG) {
         for (ReplicationConfig clientReplConfig : REPLICATIONS) {
           for (ReplicationConfig bucketReplConfig: REPLICATIONS) {
-            args.add(Arguments.of(s3StorageType, s3StorageConfig, clientReplConfig, bucketReplConfig));
+            for (boolean standardUsesClientDefault : new boolean[] {false, true}) {
+              args.add(Arguments.of(s3StorageType, s3StorageConfig, clientReplConfig, bucketReplConfig,
+                  standardUsesClientDefault));
+            }
           }
         }
       }
@@ -92,11 +96,11 @@ public class TestS3Utils {
   @ParameterizedTest
   @MethodSource("validS3ReplicationConfigs")
   public void testValidResolveS3ClientSideReplicationConfig(String s3StorageType, String s3StorageConfig,
-      ReplicationConfig clientConfiguredReplConfig, ReplicationConfig bucketReplConfig)
-      throws OS3Exception {
+      ReplicationConfig clientConfiguredReplConfig, ReplicationConfig bucketReplConfig,
+      boolean standardUsesClientDefault) throws OS3Exception {
     ReplicationConfig replicationConfig = S3Utils
         .resolveS3ClientSideReplicationConfig(s3StorageType, s3StorageConfig,
-            clientConfiguredReplConfig, bucketReplConfig);
+            clientConfiguredReplConfig, bucketReplConfig, standardUsesClientDefault);
 
     final ReplicationConfig expectedReplConfig;
     if (!StringUtils.isEmpty(s3StorageType)) {
@@ -107,7 +111,8 @@ public class TestS3Utils {
           expectedReplConfig = EC32REPLICATIONCONFIG;
         }
       } else if (S3StorageType.STANDARD.name().equals(s3StorageType)) {
-        expectedReplConfig = RATIS3REPLICATIONCONFIG;
+        expectedReplConfig = standardUsesClientDefault && clientConfiguredReplConfig != null
+            ? clientConfiguredReplConfig : RATIS3REPLICATIONCONFIG;
       } else {
         expectedReplConfig = RATIS1REPLICATIONCONFIG;
       }
@@ -145,13 +150,21 @@ public class TestS3Utils {
       throws OS3Exception {
     OS3Exception exception = assertThrows(OS3Exception.class, () -> S3Utils.
         resolveS3ClientSideReplicationConfig(
-            s3StorageType, s3StorageConfig, clientConfiguredReplConfig, bucketReplConfig));
+            s3StorageType, s3StorageConfig, clientConfiguredReplConfig, bucketReplConfig, false));
     assertEquals(S3ErrorTable.INVALID_STORAGE_CLASS.getCode(), exception.getCode());
   }
 
   @Test
   public void testGenerateCanonicalUserId() {
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, S3Utils.generateCanonicalUserId("ozone"));
+  }
+
+  @Test
+  public void testWrapOS3ExceptionContentType() {
+    OS3Exception exception = S3ErrorTable.newError(
+        S3ErrorTable.ACCESS_DENIED, "bucket");
+    assertEquals(MediaType.APPLICATION_XML_TYPE,
+        S3Utils.wrapOS3Exception(exception).getResponse().getMediaType());
   }
 
   static Stream<Arguments> wrongContentMD5Provider() throws Exception {

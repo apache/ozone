@@ -133,6 +133,10 @@ public final class DomainSocketFactory {
     return instance;
   }
 
+  public static boolean isNativeLibraryLoaded() {
+    return nativeLibraryLoaded;
+  }
+
   private DomainSocketFactory(ConfigurationSource conf) {
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     boolean shortCircuitEnabled = clientConfig.isShortCircuitEnabled();

@@ -44,7 +44,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.ratis.conf.RatisClientConfig;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -86,9 +85,7 @@ public class TestClientRetryContainerStateMachineFailures {
     conf.setLong(OZONE_SCM_PIPELINE_PER_METADATA_VOLUME, 1);
     conf.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "150s");
 
-    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
-    clientConfig.setStreamBufferFlushDelay(false);
-    conf.setFromObject(clientConfig);
+    conf.setBoolean("ozone.client.stream.buffer.flush.delay", false);
 
     // update watch timeout to 10 second to finish test for client
     RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);

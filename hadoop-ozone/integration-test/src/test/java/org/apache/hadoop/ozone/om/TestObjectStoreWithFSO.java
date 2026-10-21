@@ -575,7 +575,7 @@ public abstract class TestObjectStoreWithFSO implements NonHATests.TestCase {
 
     // Read using filesystem.
     String rootPath = String.format("%s://%s.%s/", OZONE_URI_SCHEME,
-        bucketName, volumeName, StandardCharsets.UTF_8);
+        bucketName, volumeName);
     OzoneFileSystem o3fs = (OzoneFileSystem) FileSystem.get(new URI(rootPath),
         conf);
     try (InputStream fsDataInputStream = o3fs.open(new Path(key))) {

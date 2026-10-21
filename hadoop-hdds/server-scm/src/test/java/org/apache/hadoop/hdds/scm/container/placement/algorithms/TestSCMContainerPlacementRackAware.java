@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.placement.algorithms;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
@@ -113,7 +114,7 @@ public class TestSCMContainerPlacementRackAware {
       cluster.add(datanodeDetails);
       DatanodeInfo datanodeInfo = new DatanodeInfo(
           datanodeDetails, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto(),
+          UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
@@ -458,7 +459,7 @@ public class TestSCMContainerPlacementRackAware {
           hostname + i, null);
       DatanodeInfo dnInfo = new DatanodeInfo(
           dn, NodeStatus.inServiceHealthy(),
-          UpgradeUtils.defaultLayoutVersionProto(),
+          UpgradeUtils.defaultVersionProto(),
           HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
@@ -679,6 +680,65 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   @Test
+  public void chooseNodeWhenUsedNodeRackHasOnlyDecommissionedNodes() throws SCMException {
+    setup(3 * NODE_PER_RACK);
+    // rack1 has no usable node left: node5 already has a replica, and nodes 6-9 are decommissioned.
+    for (int i = 6; i < 10; i++) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    // The container has replicas on node5 (rack1) and node0 (rack0). rack1 is tried first.
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(5), datanodes.get(0)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, new ArrayList<>(), null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // Instead of giving up after rack1, placement tries rack0 and finds a node there.
+    assertTrue(cluster.isSameParent(datanodes.get(0), datanodeDetails.get(0)));
+    assertNotEquals(datanodes.get(0), datanodeDetails.get(0));
+  }
+
+  @Test
+  public void fallbackWhenUsedNodeRacksHaveOnlyDecommissionedNodes() throws SCMException {
+    setup(3 * NODE_PER_RACK);
+    // The replicas are on node0 (rack0) and node5 (rack1), and neither rack has another usable node:
+    // node1 and node6 are excluded because their replicas are being decommissioned, and the rest are decommissioned.
+    dnInfos.get(1).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    for (int i : new int[] {2, 3, 4, 6, 7, 8, 9}) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(5)));
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(Arrays.asList(datanodes.get(1), datanodes.get(6)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // After both racks fail, placement falls back to rack2, the only rack with usable nodes.
+    assertTrue(cluster.isSameParent(datanodes.get(10), datanodeDetails.get(0)));
+  }
+
+  @Test
+  public void fallbackDoesNotSkipRackOfExcludedNode() throws SCMException {
+    setup(4 * NODE_PER_RACK);
+    // The replicas are on node0 (rack0), node5 (rack1) and node15 (rack3), and those racks have no other usable
+    // node. node10 on rack2 has a replica that is being decommissioned, so it is excluded.
+    for (int i : new int[] {1, 2, 3, 4, 6, 7, 8, 9, 16, 17, 18, 19}) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    dnInfos.get(10).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    List<DatanodeDetails> usedNodes =
+        new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(5), datanodes.get(15)));
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(Arrays.asList(datanodes.get(10)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // The fallback looks for a rack with no replica on it. That is rack2, and the excluded node there must not
+    // rule out the whole rack.
+    assertTrue(cluster.isSameParent(datanodes.get(10), datanodeDetails.get(0)));
+    assertNotEquals(datanodes.get(10), datanodeDetails.get(0));
+  }
+
+  @Test
   public void chooseSingleNodeRackWithUsedAndExcludeNodes()
       throws SCMException {
     int datanodeCount = 5;
@@ -881,11 +941,9 @@ public class TestSCMContainerPlacementRackAware {
 
   @Test
   public void testSourceDatanodeIsNotChosenAsTarget() {
-    setup(2);
+    setup(1);
     List<DatanodeDetails> usedNodes = new ArrayList<>();
     usedNodes.add(datanodes.get(0));
-    dnInfos.get(1).setNodeStatus(NodeStatus.inServiceHealthyReadOnly());
-
     assertThrows(SCMException.class,
             () -> policy.chooseDatanodes(usedNodes, null, null, 1, 0, 0),
             "No target datanode, this call should fail");

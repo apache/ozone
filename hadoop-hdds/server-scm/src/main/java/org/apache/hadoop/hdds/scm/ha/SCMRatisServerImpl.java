@@ -21,13 +21,16 @@ import static org.apache.hadoop.hdds.scm.ha.HASecurityUtils.createSCMRatisTLSCon
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.net.InetAddresses;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -59,6 +62,7 @@ import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.protocol.SnapshotManagementRequest;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.server.DivisionInfo;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -211,6 +215,18 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     return division;
   }
 
+  @Override
+  public long getFollowerReplicationLag() {
+    final DivisionInfo info = division.getInfo();
+    if (!info.isLeader()) {
+      return 0;
+    }
+    final long leaderIndex = info.getLastAppliedIndex();
+    final long minFollowerIndex = Arrays.stream(info.getFollowerNextIndices())
+        .min().orElse(leaderIndex);
+    return Math.max(0, leaderIndex - minFollowerIndex);
+  }
+
   @VisibleForTesting
   public SCMStateMachine getStateMachine() {
     return stateMachine;
@@ -289,13 +305,28 @@ public class SCMRatisServerImpl implements SCMRatisServer {
         LOG.error("SCM Ratis PeerInetAddress {} is unresolvable",
             peer.getAddress());
       }
-      ratisRoles.add((peer.getAddress() == null ? "" :
-          peer.getAddress().concat(peer.equals(leader) ?
-                  ":".concat(RaftProtos.RaftPeerRole.LEADER.toString()) :
-                  ":".concat(RaftProtos.RaftPeerRole.FOLLOWER.toString()))
-                  .concat(":".concat(peer.getId().toString()))
-                  .concat(":".concat(peerInetAddress == null ? "" :
-                      peerInetAddress.getHostAddress()))));
+      if (peer.getAddress() == null) {
+        ratisRoles.add("");
+        continue;
+      }
+      String host = HddsUtils.getHostName(peer.getAddress()).orElse("");
+      OptionalInt portOpt = HddsUtils.getHostPort(peer.getAddress());
+      if (!portOpt.isPresent()) {
+        LOG.error("SCM Ratis peer address {} has no port, skipping",
+            peer.getAddress());
+        continue;
+      }
+      String normalizedAddress = HddsUtils.getHostPortString(host, portOpt.getAsInt());
+      String role = peer.equals(leader)
+          ? RaftProtos.RaftPeerRole.LEADER.toString()
+          : RaftProtos.RaftPeerRole.FOLLOWER.toString();
+      String hostIp = "";
+      if (peerInetAddress != null) {
+        hostIp = InetAddresses.toUriString(peerInetAddress);
+      }
+      String roleEntry = normalizedAddress + ":" + role + ":"
+          + peer.getId().toString() + ":" + hostIp;
+      ratisRoles.add(roleEntry);
     }
     return ratisRoles;
   }
@@ -339,7 +370,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       if (raftClientReply.isSuccess()) {
         LOG.info("Successfully added new SCM: {}.", request.getScmId());
       } else {
-        LOG.error("Failed to add new SCM: {}. Ratis reply: {}" +
+        LOG.error("Failed to add new SCM: {}. Ratis reply: {}",
             request.getScmId(), raftClientReply);
         throw new IOException(raftClientReply.getException());
       }
@@ -375,7 +406,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
       if (raftClientReply.isSuccess()) {
         LOG.info("Successfully removed SCM: {}.", request.getScmId());
       } else {
-        LOG.error("Failed to remove SCM: {}. Ratis reply: {}" +
+        LOG.error("Failed to remove SCM: {}. Ratis reply: {}",
             request.getScmId(), raftClientReply);
         throw new IOException(raftClientReply.getException());
       }

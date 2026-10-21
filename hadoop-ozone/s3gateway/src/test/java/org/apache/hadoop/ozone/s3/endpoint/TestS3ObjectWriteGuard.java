@@ -120,6 +120,37 @@ class TestS3ObjectWriteGuard {
     assertCommitBlockedBy(guard, failure);
   }
 
+  @Test
+  void keyOpenedFailureBlocksEmptyCommit() {
+    RuntimeException failure = new IllegalStateException("key-open callback failed");
+    S3ObjectWriteGuard guard = newGuard(0);
+
+    RuntimeException thrown = assertThrows(RuntimeException.class,
+        () -> guard.onKeyOpened(key -> {
+          throw failure;
+        }));
+
+    assertSame(failure, thrown);
+    assertCommitBlockedBy(guard, failure);
+  }
+
+  @Test
+  void datastreamKeyOpenedFailureBlocksEmptyCommit() {
+    RuntimeException failure = new IllegalStateException("key-open callback failed");
+    S3ObjectStreamingWriteGuard guard = new S3ObjectStreamingWriteGuard(
+        new OzoneDataStreamOutput(
+            new KeyMetadataAwareByteBufferStreamOutput(Collections.emptyMap()), null),
+        0, KEY_PATH);
+
+    RuntimeException thrown = assertThrows(RuntimeException.class,
+        () -> guard.onKeyOpened(key -> {
+          throw failure;
+        }));
+
+    assertSame(failure, thrown);
+    assertCommitBlockedBy(guard, failure);
+  }
+
   private static S3ObjectWriteGuard newGuard(long expectedLength) {
     KeyMetadataAwareOutputStream keyOutputStream =
         new KeyMetadataAwareOutputStream(Collections.emptyMap());

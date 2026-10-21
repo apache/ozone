@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -29,6 +31,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -44,10 +49,12 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests for TestXceiverClientGrpc, to ensure topology aware reads work
@@ -269,7 +276,7 @@ public class TestXceiverClientGrpc {
             .setContainerID(1)
             .setLocalID(1)
             .setBlockCommitSequenceId(1)
-            .build()), null, client.getPipeline().getReplicaIndexes());
+            .build()), null, client.getPipeline());
   }
 
   private void invokeXceiverClientReadChunk(XceiverClientSpi client)
@@ -300,7 +307,7 @@ public class TestXceiverClientGrpc {
   /** streamRead() calls onNext() immediately when isReady() is true from the start. */
   @Test
   public void testStreamReadSendsImmediatelyWhenReady() throws Exception {
-    TrackingStreamObserver obs = new TrackingStreamObserver(0);
+    TrackingStreamObserver obs = new TrackingStreamObserver(true);
     StreamingReadResponse response = new StreamingReadResponse(
         MockDatanodeDetails.randomDatanodeDetails(), obs);
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
@@ -315,21 +322,41 @@ public class TestXceiverClientGrpc {
         "isReady() must be checked exactly once when stream is immediately ready");
   }
 
-  /** streamRead() spin-waits until isReady() becomes true, then calls onNext(). */
+  /** streamRead() blocks until the onReadyHandler fires and isReady() becomes true, then calls onNext(). */
   @Test
   public void testStreamReadWaitsUntilReadyThenSends() throws Exception {
-    TrackingStreamObserver obs = new TrackingStreamObserver(3);
-    StreamingReadResponse response = new StreamingReadResponse(
-        MockDatanodeDetails.randomDatanodeDetails(), obs);
+    TrackingStreamObserver obs = new TrackingStreamObserver(false);
+    StreamingReaderSpi reader = mock(StreamingReaderSpi.class);
+    new XceiverClientGrpc.ReadyAwareResponseObserver(MockDatanodeDetails.randomDatanodeDetails(), reader)
+        .beforeStart(obs);
+    ArgumentCaptor<StreamingReadResponse> captured = ArgumentCaptor.forClass(StreamingReadResponse.class);
+    verify(reader).setStreamingReadResponse(captured.capture());
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
 
-    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf)) {
-      client.streamRead(request, response);
+    OzoneConfiguration longTimeout = new OzoneConfiguration();
+    longTimeout.set("ozone.client.stream.read.timeout", "60s");
+    try (XceiverClientGrpc client = new XceiverClientGrpc(pipeline, longTimeout)) {
+      FutureTask<Void> send = new FutureTask<>(() -> {
+        client.streamRead(request, captured.getValue());
+        return null;
+      });
+      Thread sender = new Thread(send);
+      sender.start();
+      try {
+        GenericTestUtils.waitFor(() -> sender.getState() == Thread.State.TIMED_WAITING, 10, 5_000);
+        assertThrows(TimeoutException.class, () -> send.get(200, TimeUnit.MILLISECONDS));
+        assertThat(obs.getSent()).isEmpty();
+        obs.markReady();
+        send.get(5, TimeUnit.SECONDS);
+        assertThat(obs.getReadyCalls().get()).as("isReady() calls must stay bounded while waiting").isBetween(3, 5);
+      } finally {
+        sender.interrupt();
+        sender.join(TimeUnit.SECONDS.toMillis(5));
+      }
     }
 
     assertEquals(1, obs.getSent().size(), "onNext must be called exactly once");
     assertEquals(request, obs.getSent().get(0));
-    assertThat(obs.getReadyCalls().get()).isGreaterThanOrEqualTo(4);
   }
 
   /**
@@ -340,7 +367,7 @@ public class TestXceiverClientGrpc {
     OzoneConfiguration timeoutConf = new OzoneConfiguration();
     timeoutConf.set("ozone.client.stream.read.timeout", "1s");
 
-    TrackingStreamObserver obs = new TrackingStreamObserver(Integer.MAX_VALUE);
+    TrackingStreamObserver obs = new TrackingStreamObserver(false);
     StreamingReadResponse response = new StreamingReadResponse(
         MockDatanodeDetails.randomDatanodeDetails(), obs);
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
@@ -357,10 +384,10 @@ public class TestXceiverClientGrpc {
     assertThat(elapsed).isLessThan(10_000L);
   }
 
-  /** streamRead() exits the spin-wait immediately on interrupt and restores the interrupt flag. */
+  /** streamRead() exits the ready wait immediately on interrupt and restores the interrupt flag. */
   @Test
   public void testStreamReadRestoresInterruptFlagOnInterruption() throws Exception {
-    TrackingStreamObserver obs = new TrackingStreamObserver(Integer.MAX_VALUE);
+    TrackingStreamObserver obs = new TrackingStreamObserver(false);
     StreamingReadResponse response = new StreamingReadResponse(
         MockDatanodeDetails.randomDatanodeDetails(), obs);
     ContainerProtos.ContainerCommandRequestProto request = buildReadBlockRequest();
@@ -390,16 +417,28 @@ public class TestXceiverClientGrpc {
     }
   }
 
-  /** Records onNext() calls and controls when isReady() starts returning true. */
+  /**
+   * Records onNext() calls and models gRPC flow control: isReady() reflects a flag that {@link #markReady()} flips,
+   * after which the registered onReadyHandler is invoked, as gRPC does when the transport becomes writable.
+   */
   private static final class TrackingStreamObserver
       extends ClientCallStreamObserver<ContainerProtos.ContainerCommandRequestProto> {
 
     private final List<ContainerProtos.ContainerCommandRequestProto> sent = new ArrayList<>();
     private final AtomicInteger readyCalls = new AtomicInteger();
-    private final int readyAfter;
+    private volatile boolean ready;
+    private volatile Runnable onReadyHandler;
 
-    TrackingStreamObserver(int readyAfter) {
-      this.readyAfter = readyAfter;
+    TrackingStreamObserver(boolean ready) {
+      this.ready = ready;
+    }
+
+    void markReady() {
+      ready = true;
+      final Runnable handler = onReadyHandler;
+      if (handler != null) {
+        handler.run();
+      }
     }
 
     List<ContainerProtos.ContainerCommandRequestProto> getSent() {
@@ -412,7 +451,8 @@ public class TestXceiverClientGrpc {
 
     @Override
     public boolean isReady() {
-      return readyCalls.incrementAndGet() > readyAfter;
+      readyCalls.incrementAndGet();
+      return ready;
     }
 
     @Override
@@ -426,6 +466,7 @@ public class TestXceiverClientGrpc {
 
     @Override
     public void setOnReadyHandler(Runnable r) {
+      onReadyHandler = r;
     }
 
     @Override

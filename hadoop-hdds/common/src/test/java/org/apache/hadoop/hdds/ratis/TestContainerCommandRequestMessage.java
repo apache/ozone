@@ -90,7 +90,7 @@ public class TestContainerCommandRequestMessage {
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(UUID.randomUUID().toString())
         .setPutSmallFile(putSmallFileRequest)
-        .setVersion(ClientVersion.CURRENT.toProtoValue())
+        .setVersion(ClientVersion.CURRENT.serialize())
         .build();
   }
 
@@ -113,7 +113,7 @@ public class TestContainerCommandRequestMessage {
         .setContainerID(blockID.getContainerID())
         .setDatanodeUuid(UUID.randomUUID().toString())
         .setWriteChunk(writeChunkRequest)
-        .setVersion(ClientVersion.CURRENT.toProtoValue())
+        .setVersion(ClientVersion.CURRENT.serialize())
         .build();
   }
 

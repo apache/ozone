@@ -24,6 +24,8 @@ Suite Setup         Get Security Enabled From Config
 
 *** Variables ***
 ${TOKEN_FILE}    ${TEMP_DIR}/ozone.token
+${DTUTIL_OFS_TOKEN_FILE}    ${TEMP_DIR}/dtutil-ofs.token
+${DTUTIL_O3_TOKEN_FILE}     ${TEMP_DIR}/dtutil-o3.token
 
 *** Keywords ***
 Get and use Token in Secure Cluster
@@ -48,6 +50,13 @@ Get Token in Unsecure Cluster
 Print Valid Token File
     ${output} =                  Execute             ozone sh token print -t ${TOKEN_FILE}
     Should Not Be Empty          ${output}
+
+Get Token With Dtutil
+    [Arguments]                  ${uri}    ${token_file}
+    Remove File                  ${token_file}
+    Execute                      ozone dtutil get ${uri} ${token_file}
+    ${output} =                  Execute             ozone dtutil print ${token_file}
+    Should Contain               ${output}           OzoneToken
 
 Print Nonexistent Token File
     ${output} =                  Execute             ozone sh token print -t /asdf
@@ -74,6 +83,8 @@ Cancel Token in Unsecure Cluster
 Token Test in Secure Cluster
     Get and use Token in Secure Cluster
     Print Valid Token File
+    Get Token With Dtutil        ofs://${OM_SERVICE_ID}/    ${DTUTIL_OFS_TOKEN_FILE}
+    Get Token With Dtutil        o3://${OM_SERVICE_ID}/     ${DTUTIL_O3_TOKEN_FILE}
     Renew Token in Secure Cluster
     Cancel Token in Secure Cluster
 

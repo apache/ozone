@@ -272,7 +272,7 @@ public class TestBlockDeletion {
         .getDatanodeStateMachine().getContainer().getContainerSet();
     GenericTestUtils.waitFor(() -> {
       return !(omKeyLocationInfoGroupList.stream().anyMatch((group) ->
-        group.getLocationList().stream().anyMatch((info) ->
+        group.createLocationList().stream().anyMatch((info) ->
           containerSet.getContainer(info.getContainerID()).getContainerData()
               .getState() != ContainerProtos.ContainerDataProto.State.CLOSED
         )
@@ -496,7 +496,7 @@ public class TestBlockDeletion {
         containerIdList.toArray(new Long[0]));
     // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      List<OmKeyLocationInfo> locationInfo = group.createLocationList();
       locationInfo.forEach(
           (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
               .getContainer().getContainerSet()
@@ -520,7 +520,6 @@ public class TestBlockDeletion {
 
     // Delete key
     writeClient.deleteKey(keyArgs);
-    Thread.sleep(10000);
 
     GenericTestUtils.waitFor(() -> {
       try {
@@ -531,7 +530,7 @@ public class TestBlockDeletion {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 100, 10 * 1000);
+    }, 100, 20 * 1000);
 
     // Container state should be empty now as key got deleted
     assertTrue(getContainerFromDN(
@@ -626,7 +625,7 @@ public class TestBlockDeletion {
         containerIdList.toArray(new Long[0]));
     // Make sure the containers are closed on the DN.
     omKeyLocationInfoGroupList.forEach((group) -> {
-      List<OmKeyLocationInfo> locationInfo = group.getLocationList();
+      List<OmKeyLocationInfo> locationInfo = group.createLocationList();
       locationInfo.forEach(
           (info) -> cluster.getHddsDatanodes().get(0).getDatanodeStateMachine()
               .getContainer().getContainerSet()
@@ -649,7 +648,6 @@ public class TestBlockDeletion {
 
     // Delete key
     writeClient.deleteKey(keyArgs);
-    Thread.sleep(5000);
 
     // Ensure isEmpty are true for all replica after delete key
     GenericTestUtils.waitFor(() -> {
@@ -661,7 +659,7 @@ public class TestBlockDeletion {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-    }, 500, 5 * 2000);
+    }, 500, 15 * 1000);
 
     // Update container replica by making invalid keyCount in one replica
     ContainerReplica replicaOne = ContainerReplica.newBuilder()
@@ -676,9 +674,9 @@ public class TestBlockDeletion {
     containerStateManager.updateContainerReplica(replicaOne);
 
     // Check replica updated with wrong keyCount
-    scm.getContainerManager().getContainerReplicas(
+    assertTrue(scm.getContainerManager().getContainerReplicas(
             ContainerID.valueOf(containerInfos.get(0).getContainerID()))
-        .stream().anyMatch(replica -> replica.getKeyCount() == 10);
+        .stream().anyMatch(replica -> replica.getKeyCount() == 10));
 
     // Process delete container in SCM, ensure containers gets deleted,
     // even though keyCount is invalid in one of the replica

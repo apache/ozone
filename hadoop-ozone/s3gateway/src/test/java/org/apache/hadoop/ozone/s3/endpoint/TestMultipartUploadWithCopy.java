@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -94,9 +95,8 @@ public class TestMultipartUploadWithCopy {
         .createKey(EXISTING_KEY, keyContent.length,
             ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
             ReplicationFactor.THREE),
-            new HashMap<String, String>() {{
-              put(OzoneConsts.ETAG, DigestUtils.md5Hex(EXISTING_KEY_CONTENT));
-            }}
+            ImmutableMap.of(OzoneConsts.ETAG,
+                DigestUtils.md5Hex(EXISTING_KEY_CONTENT))
         )) {
       stream.write(keyContent);
     }
@@ -125,7 +125,7 @@ public class TestMultipartUploadWithCopy {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("UNSIGNED-PAYLOAD");
 
     endpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
@@ -383,7 +383,7 @@ public class TestMultipartUploadWithCopy {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("UNSIGNED-PAYLOAD");
 
     additionalHeaders
         .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));

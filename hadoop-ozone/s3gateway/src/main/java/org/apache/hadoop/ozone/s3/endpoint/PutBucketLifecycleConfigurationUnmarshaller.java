@@ -19,62 +19,66 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.s3.util.S3Consts.S3_XML_NAMESPACE;
 
-import java.io.InputStream;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Type;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.ext.MessageBodyReader;
-import javax.xml.XMLConstants;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.UnmarshallerHandler;
-import javax.xml.parsers.SAXParserFactory;
-import org.xml.sax.InputSource;
-import org.xml.sax.XMLReader;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
 
 /**
- * Custom unmarshaller to read Lifecycle configuration namespace.
+ * Custom unmarshaller to read Lifecycle configuration.
  */
 public class PutBucketLifecycleConfigurationUnmarshaller
-    implements MessageBodyReader<S3LifecycleConfiguration>  {
-
-  private final JAXBContext context;
-  private final XMLReader xmlReader;
+    extends MessageUnmarshaller<S3LifecycleConfiguration> {
+  // Newly supported lifecycle actions and fields must be added to this map.
+  private static final ImmutableMap<String, ImmutableSet<String>> ALLOWED_CHILDREN =
+      ImmutableMap.<String, ImmutableSet<String>>builder()
+          .put("", ImmutableSet.of("LifecycleConfiguration"))
+          .put("LifecycleConfiguration", ImmutableSet.of("Rule"))
+          .put("Rule", ImmutableSet.of("ID", "Status", "Prefix", "Expiration", "AbortIncompleteMultipartUpload",
+              "Filter", "Transition"))
+          .put("Expiration", ImmutableSet.of("Days", "Date"))
+          .put("AbortIncompleteMultipartUpload", ImmutableSet.of("DaysAfterInitiation"))
+          .put("Filter", ImmutableSet.of("Prefix", "Tag", "And"))
+          .put("And", ImmutableSet.of("Prefix", "Tag"))
+          .put("Tag", ImmutableSet.of("Key", "Value"))
+          .put("Transition", ImmutableSet.of("Days", "Date", "StorageClass"))
+          .build();
 
   public PutBucketLifecycleConfigurationUnmarshaller() {
-    try {
-      context = JAXBContext.newInstance(S3LifecycleConfiguration.class);
-      SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
-      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-      xmlReader = saxParserFactory.newSAXParser().getXMLReader();
-    } catch (Exception ex) {
-      throw new AssertionError("Can not instantiate " +
-          "PutBucketLifecycleConfiguration parser", ex);
-    }
+    super(S3LifecycleConfiguration.class);
   }
 
   @Override
-  public boolean isReadable(Class<?> type, Type genericType,
-      Annotation[] annotations, MediaType mediaType) {
-    return type.equals(S3LifecycleConfiguration.class);
+  protected XmlNamespaceFilter createNamespaceFilter() {
+    return new LifecycleNamespaceFilter();
   }
 
-  @Override
-  public S3LifecycleConfiguration readFrom(Class<S3LifecycleConfiguration> type,
-      Type genericType, Annotation[] annotations, MediaType mediaType,
-      MultivaluedMap<String, String> httpHeaders, InputStream inputStream)
-      throws WebApplicationException {
-    try {
-      UnmarshallerHandler unmarshallerHandler =
-          context.createUnmarshaller().getUnmarshallerHandler();
-      XmlNamespaceFilter filter = new XmlNamespaceFilter(S3_XML_NAMESPACE);
-      filter.setContentHandler(unmarshallerHandler);
-      filter.setParent(xmlReader);
-      filter.parse(new InputSource(inputStream));
-      return (S3LifecycleConfiguration)(unmarshallerHandler.getResult());
-    } catch (Exception e) {
-      throw new WebApplicationException("Can't parse request body to XML.", e);
+  private static class LifecycleNamespaceFilter extends XmlNamespaceFilter {
+    private final Deque<String> parents = new ArrayDeque<>();
+
+    LifecycleNamespaceFilter() {
+      super(S3_XML_NAMESPACE);
+    }
+
+    @Override
+    public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
+      // Match JAXB's name selection when the SAX parser is not namespace-aware.
+      String name = localName == null || localName.isEmpty() ? qName : localName;
+      String parent = parents.isEmpty() ? "" : parents.peek();
+      if (!ALLOWED_CHILDREN.getOrDefault(parent, ImmutableSet.of()).contains(name)) {
+        throw new SAXException("Unsupported or invalid lifecycle element: " + name);
+      }
+      parents.push(name);
+      super.startElement(uri, localName, qName, attributes);
+    }
+
+    @Override
+    public void endElement(String uri, String localName, String qName) throws SAXException {
+      super.endElement(uri, localName, qName);
+      parents.pop();
     }
   }
+
 }

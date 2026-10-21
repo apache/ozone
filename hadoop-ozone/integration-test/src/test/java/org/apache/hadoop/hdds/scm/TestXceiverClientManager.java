@@ -90,7 +90,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       assertEquals(1, client1.getRefcount());
       // although allowShortCircuit true when calling acquireClientForReadData,
       // XceiverClientGrpc client will be allocated since short-circuit is by default disabled.
-      assertThat(client1 instanceof XceiverClientGrpc);
+      assertThat(client1).isInstanceOf(XceiverClientGrpc.class);
 
       ContainerWithPipeline container2 = storageContainerLocationClient
           .allocateContainer(
@@ -100,7 +100,7 @@ public abstract class TestXceiverClientManager implements NonHATests.TestCase {
       XceiverClientSpi client2 = clientManager
           .acquireClient(container2.getPipeline());
       assertEquals(1, client2.getRefcount());
-      assertThat(client2 instanceof XceiverClientGrpc);
+      assertThat(client2).isInstanceOf(XceiverClientGrpc.class);
 
       XceiverClientSpi client3 = clientManager
           .acquireClient(container1.getPipeline());

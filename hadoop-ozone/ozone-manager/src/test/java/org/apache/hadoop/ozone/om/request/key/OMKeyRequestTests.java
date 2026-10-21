@@ -51,7 +51,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -71,7 +71,6 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -83,7 +82,8 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
@@ -110,12 +110,11 @@ public class OMKeyRequestTests {
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected AuditLogger auditLogger;
-  protected OzoneManagerPrepareState prepareState;
 
   protected ScmClient scmClient;
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
   protected ScmBlockLocationProtocol scmBlockLocationProtocol;
-  protected StorageContainerLocationProtocol scmContainerLocationProtocol;
+  protected StorageContainerLocationInternalInterface scmContainerLocationProtocol;
   protected OMPerformanceMetrics perfMetrics;
   protected DeletingServiceMetrics delMetrics;
 
@@ -154,9 +153,8 @@ public class OMKeyRequestTests {
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
-    OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
-    when(lvm.isAllowed(anyString())).thenReturn(true);
-    when(ozoneManager.getVersionManager()).thenReturn(lvm);
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
+    when(ozoneManager.getVersionManager()).thenReturn(versionManager);
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
     auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
@@ -189,7 +187,7 @@ public class OMKeyRequestTests {
     when(ozoneManager.getOMServiceId()).thenReturn(
         UUID.randomUUID().toString());
     when(scmClient.getBlockClient()).thenReturn(scmBlockLocationProtocol);
-    scmContainerLocationProtocol = Mockito.mock(StorageContainerLocationProtocol.class);
+    scmContainerLocationProtocol = Mockito.mock(StorageContainerLocationInternalInterface.class);
     when(scmClient.getContainerClient()).thenReturn(scmContainerLocationProtocol);
 
     when(ozoneManager.getKeyManager()).thenReturn(keyManager);
@@ -203,9 +201,6 @@ public class OMKeyRequestTests {
     OmMetadataReader omMetadataReader = mock(OmMetadataReader.class);
     when(omMetadataReader.isNativeAuthorizerEnabled()).thenReturn(true);
     when(rcOmMetadataReader.get()).thenReturn(omMetadataReader);
-
-    prepareState = new OzoneManagerPrepareState(ozoneConfiguration);
-    when(ozoneManager.getPrepareState()).thenReturn(prepareState);
 
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)

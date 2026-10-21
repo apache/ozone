@@ -181,6 +181,13 @@ public class SnapshotDiffHandler extends Handler {
     if (StringUtils.isNotEmpty(diffResponse.getReason())) {
       diffResponseNode.put("reason", diffResponse.getReason());
     }
+    if (diffResponse.getSubStatus() != null) {
+      SnapshotDiffResponse.SubStatus sub = diffResponse.getSubStatus();
+      diffResponseNode.put("subStatus", sub.name());
+      if (sub.hasProgress()) {
+        diffResponseNode.put("progressPercent", diffResponse.getProgressPercent());
+      }
+    }
     return diffResponseNode;
   }
 

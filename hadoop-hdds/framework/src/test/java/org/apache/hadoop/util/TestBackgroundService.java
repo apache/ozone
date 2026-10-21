@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.util;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -163,5 +164,28 @@ public class TestBackgroundService {
     // Verify that all tasks have completed.
     assertEquals(expFinalValues, IntStream.range(0, nTasks).boxed().map(map::get).collect(Collectors.toList()));
     assertTrue(queue.isEmpty());
+  }
+
+  @Test
+  public void testServiceKeepsRunningAfterGetTasksThrows() throws InterruptedException, TimeoutException {
+    int interval = 100;
+    int serviceTimeout = 3000;
+    AtomicInteger getTasksCalls = new AtomicInteger();
+    Map<Integer, Integer> map = new HashMap<>();
+    queue.add(new TestTask(0, map, new HashMap<>()));
+    backgroundService = new BackgroundService("testGetTasksThrows", interval, TimeUnit.MILLISECONDS, 1,
+        serviceTimeout) {
+      @Override
+      public BackgroundTaskQueue getTasks() {
+        if (getTasksCalls.incrementAndGet() == 1) {
+          throw new RuntimeException("simulated failure");
+        }
+        return queue;
+      }
+    };
+    backgroundService.start();
+    // The first run throws, the periodic task must not be cancelled and the task runs in a later interval.
+    GenericTestUtils.waitFor(() -> map.get(0) == 1, interval / 5, serviceTimeout);
+    assertThat(getTasksCalls.get()).isGreaterThan(1);
   }
 }

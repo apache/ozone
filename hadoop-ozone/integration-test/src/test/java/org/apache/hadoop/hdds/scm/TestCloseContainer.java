@@ -199,9 +199,9 @@ public class TestCloseContainer {
       GenericTestUtils.waitFor(() -> containerChecksumFileExists(hddsDatanode, container.getContainerID()), 100, 5000);
     }
 
-    for (ContainerReplica replica : getContainerReplicas(container)) {
-      assertNotEquals(0, replica.getDataChecksum());
-    }
+    // Wait for SCM to receive container reports with non-zero checksums for all replicas
+    GenericTestUtils.waitFor(() -> getContainerReplicas(container).stream()
+        .allMatch(r -> r.getDataChecksum() != 0), 200, 5000);
 
     assertThrows(IOException.class,
         () -> cluster.getStorageContainerLocationClient()

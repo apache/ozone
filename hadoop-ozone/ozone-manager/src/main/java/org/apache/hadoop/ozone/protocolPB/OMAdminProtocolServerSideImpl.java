@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
@@ -37,6 +38,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.Co
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.CompactResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.DecommissionOMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetPeerUpgradeStatusRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.GetPeerUpgradeStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMConfigurationResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
@@ -59,6 +62,18 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
   @Override
   public OMConfigurationResponse getOMConfiguration(RpcController controller,
       OMConfigurationRequest request) throws ServiceException {
+
+    try {
+      if (ozoneManager.isAdminAuthorizationEnabled() &&
+          !ozoneManager.isAdmin(getRemoteUser())) {
+        throw new OMException("Only administrators are authorized to get OM configuration.", PERMISSION_DENIED);
+      }
+    } catch (IOException ex) {
+      return OMConfigurationResponse.newBuilder()
+          .setSuccess(false)
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
+          .build();
+    }
 
     List<OMNodeDetails> oldOMNodesList = ozoneManager.getAllOMNodesInMemory();
     List<OMNodeDetails> newOMNodesList = ozoneManager.getAllOMNodesInNewConf();
@@ -153,5 +168,13 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
           .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
           .build();
     }
+  }
+
+  @Override
+  public GetPeerUpgradeStatusResponse getPeerUpgradeStatus(RpcController controller,
+      GetPeerUpgradeStatusRequest request) throws ServiceException {
+    return GetPeerUpgradeStatusResponse.newBuilder()
+        .setOmSoftwareVersion(OzoneManagerVersion.SOFTWARE_VERSION.serialize())
+        .build();
   }
 }

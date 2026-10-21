@@ -171,6 +171,16 @@ public class BlockManagerImpl implements BlockManager {
     }
   }
 
+  @Override
+  public void updateContainerBcsId(Container container, long bcsId) throws IOException {
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+    try (DBHandle db = BlockUtils.getDB(containerData, config)) {
+      Objects.requireNonNull(db, "db == null");
+      db.getStore().getMetadataTable().put(containerData.getBcsIdKey(), bcsId);
+    }
+    container.updateBlockCommitSequenceId(bcsId);
+  }
+
   public long persistPutBlock(KeyValueContainer container,
       BlockData data, boolean endOfBlock)
       throws IOException {
@@ -326,9 +336,8 @@ public class BlockManagerImpl implements BlockManager {
           .initBatchOperation()) {
         db.getStore().getFinalizeBlocksTable().putWithBatch(batch,
             kvContainer.getContainerData().getBlockKey(localID), localID);
-        db.getStore().getBatchHandler().commitBatchOperation(batch);
-
         mergeLastChunkForBlockFinalization(blockId, db, kvContainer, batch, localID);
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
       }
     }
   }

@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.UUID;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -89,6 +90,12 @@ public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
     OMKeyDeleteRequest omKeyDeleteRequest =
             getOmKeyDeleteRequest(modifiedOmRequest);
 
+    // The key was added straight to the table, so charge the bucket for it here; the delete
+    // releases it on a copy that only reaches the cache if the request publishes it.
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    omMetadataManager.getBucketTable().getCacheValue(new CacheKey<>(bucketKey))
+        .getCacheValue().incrUsedNamespace(1L);
+
     OMClientResponse omClientResponse =
         omKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
 
@@ -99,6 +106,7 @@ public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
     omKeyInfo = omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey);
 
     assertNull(omKeyInfo);
+    assertEquals(0, omMetadataManager.getBucketTable().get(bucketKey).getUsedNamespace());
   }
 
   @Test

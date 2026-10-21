@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
@@ -346,10 +347,7 @@ public class SequenceIdGenerator {
     // scm.db from leader SCM, and drop its own scm.db. Thus the upgrade
     // operations can take effect exactly once in a SCM HA cluster.
     if (sequenceIdTable.get(SequenceIdType.localId) == null) {
-      long millisSinceEpoch = TimeUnit.DAYS.toMillis(
-          LocalDate.of(LocalDate.now().getYear() + 1, 1, 1).toEpochDay());
-
-      long localId = millisSinceEpoch << Short.SIZE;
+      long localId = computeInitialLocalId(LocalDate.now(ZoneOffset.UTC).getYear());
       Preconditions.checkArgument(localId > UniqueId.next());
 
       sequenceIdTable.put(SequenceIdType.localId, localId);
@@ -384,6 +382,17 @@ public class SequenceIdGenerator {
     }
 
     upgradeToCertificateSequenceId(scmMetadataStore, false);
+  }
+
+  /**
+   * Compute the initial localId for a new SCM based on the UTC calendar year.
+   * Uses Jan 2 of (utcYear + 1) so the value stays above legacy UniqueId values
+   * even if the UTC year rolls over before UniqueId.next() is checked.
+   */
+  static long computeInitialLocalId(int utcYear) {
+    long millisSinceEpoch = TimeUnit.DAYS.toMillis(
+        LocalDate.of(utcYear + 1, 1, 2).toEpochDay());
+    return millisSinceEpoch << Short.SIZE;
   }
 
   public static void upgradeToCertificateSequenceId(
