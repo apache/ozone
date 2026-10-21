@@ -23,7 +23,9 @@ import static org.apache.hadoop.hdds.scm.container.export.ExportLimits.DEFAULT_P
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -56,12 +58,19 @@ import org.slf4j.LoggerFactory;
  * and the operator must re-submit on the new leader. {@link ExportFileManager} owns on-disk layout,
  * locking, part files, and completed archives; this class tracks {@link ExportJob} state and
  * schedules work.
+ *
+ * <p>Retention: only the {@code maxRetained} most recently finished jobs stay queryable through
+ * {@link #getExportStatus}, and only the {@code maxRetained} newest completed archives stay on disk. Older
+ * ones are dropped when a job finishes and when the manager starts, so an unknown job id can also mean an
+ * evicted one.
  */
 public class ContainerExportManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ContainerExportManager.class);
 
   private static final long SHUTDOWN_TIMEOUT_MS = 5_000;
+  //TODO: make ozone.scm.container.export.max.terminal.jobs configurable.
+  private static final int DEFAULT_MAX_RETAINED = 10;
 
   private final Map<ExportJob.Id, ExportJob> jobMap = new ConcurrentHashMap<>();
   private final AtomicReference<ExportJob> runningJob = new AtomicReference<>();
@@ -70,20 +79,25 @@ public class ContainerExportManager {
   private final ExportFileManager fileManager;
   private final BooleanSupplier isLeaderReady;
   private final ExportSizing defaultSizing;
+  private final int maxRetained;
+  // Both deque are only touched by the single worker thread, and by start() before any job is submitted.
+  private final Deque<ExportJob.Id> finishedJobIds = new ArrayDeque<>();
+  private final Deque<String> completedArchiveNames = new ArrayDeque<>();
 
   public ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
       OzoneConfiguration conf) {
     this(scmId, containerManager, isLeaderReady,
-        ExportFileManager.resolveExportDirectory(conf), DEFAULT_PART_SIZE, DEFAULT_BATCH_SIZE);
+        ExportFileManager.resolveExportDirectory(conf), DEFAULT_PART_SIZE, DEFAULT_BATCH_SIZE, DEFAULT_MAX_RETAINED);
   }
 
   ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
-      String exportDirectory, int partSize, int batchSize) {
+      String exportDirectory, int partSize, int batchSize, int maxRetained) {
     this.defaultSizing = new ExportSizing(0, 0, 0, batchSize, partSize);
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");
     this.fileManager = new ExportFileManager(exportDirectory);
     this.workerPool = newWorkerPool(scmId);
+    this.maxRetained = maxRetained;
   }
 
   private ExecutorService newWorkerPool(String scmId) {
@@ -104,8 +118,11 @@ public class ContainerExportManager {
    */
   public void start() throws IOException {
     fileManager.start();
-    LOG.info("ContainerExportManager started (dir={}, partSize={}, batchSize={})",
-        fileManager.getExportDirectory(), defaultSizing.getPartSize(), defaultSizing.getBatchSize());
+    completedArchiveNames.clear();
+    completedArchiveNames.addAll(fileManager.listCompletedArchiveNames());
+    trimCompletedArchives();
+    LOG.info("ContainerExportManager started (dir={}, partSize={}, batchSize={}, maxRetained={})",
+        fileManager.getExportDirectory(), defaultSizing.getPartSize(), defaultSizing.getBatchSize(), maxRetained);
   }
 
   /**
@@ -212,6 +229,8 @@ public class ContainerExportManager {
       if (failure != null) {
         fileManager.cleanupFailedJob(job);
       }
+      // Evict before publishing the result, so a client that sees this job done also sees the eviction.
+      retain(job, failure == null && idsWritten > 0);
       final boolean cleared = runningJob.compareAndSet(job, null);
       if (failure == null) {
         job.getFuture().complete(idsWritten);
@@ -219,6 +238,24 @@ public class ContainerExportManager {
         job.getFuture().completeExceptionally(failure);
       }
       Preconditions.assertTrue(cleared);
+    }
+  }
+
+  /** Records a finished job and drops the oldest job records and archives beyond {@code maxRetained}. */
+  private void retain(ExportJob job, boolean hasArchive) {
+    finishedJobIds.addLast(job.getId());
+    while (finishedJobIds.size() > maxRetained) {
+      jobMap.remove(finishedJobIds.removeFirst());
+    }
+    if (hasArchive) {
+      completedArchiveNames.addLast(job.getFileName());
+      trimCompletedArchives();
+    }
+  }
+
+  private void trimCompletedArchives() {
+    while (completedArchiveNames.size() > maxRetained) {
+      fileManager.deleteArchive(completedArchiveNames.removeFirst());
     }
   }
 

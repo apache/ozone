@@ -71,6 +71,7 @@ public class TestContainerExportManager {
 
   private static final int TEST_BATCH_SIZE = 2;
   private static final int TEST_PART_SIZE = 3;
+  private static final int TEST_MAX_RETAINED = 2;
   private static final String TEST_SCM_ID = "test-scm";
 
   @TempDir
@@ -82,7 +83,7 @@ public class TestContainerExportManager {
   @BeforeEach
   public void setup() throws Exception {
     containerManager = mock(ContainerManager.class);
-    exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, () -> true);
+    exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_MAX_RETAINED, () -> true);
   }
 
   @AfterEach
@@ -101,7 +102,7 @@ public class TestContainerExportManager {
   @Test
   public void testRejectSubmitWhenNotLeader() throws Exception {
     exportManager.shutdown();
-    exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, () -> false);
+    exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_MAX_RETAINED, () -> false);
     SCMException e = assertThrows(SCMException.class, () ->
         submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
     assertEquals(SCMException.ResultCodes.SCM_NOT_LEADER, e.getResult());
@@ -118,9 +119,9 @@ public class TestContainerExportManager {
   @Test
   public void testRejectNonPositiveSizes() {
     assertThrows(IllegalArgumentException.class, () ->
-        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 0, 1));
+        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 0, 1, 1));
     assertThrows(IllegalArgumentException.class, () ->
-        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 1, 0));
+        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 1, 0, 1));
   }
 
   @Test
@@ -153,7 +154,7 @@ public class TestContainerExportManager {
     final CountDownLatch archivingStarted = new CountDownLatch(1);
     final CountDownLatch releaseArchiving = new CountDownLatch(1);
     exportManager.shutdown();
-    exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, () -> {
+    exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_MAX_RETAINED, () -> {
       // submitJob also calls this on the caller thread; only hold the worker.
       if (allIdsWritten.get() && Thread.currentThread().getName().endsWith("-ContainerExportWorker")) {
         archivingStarted.countDown();
@@ -260,7 +261,7 @@ public class TestContainerExportManager {
   @Test
   public void testSinglePartExportCreatesTar() throws Exception {
     exportManager.shutdown();
-    exportManager = newExportManager(100, TEST_BATCH_SIZE, () -> true);
+    exportManager = newExportManager(100, TEST_BATCH_SIZE, TEST_MAX_RETAINED, () -> true);
 
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
@@ -399,6 +400,77 @@ public class TestContainerExportManager {
   }
 
   @Test
+  public void testOldestFinishedJobAndArchiveEvictedOverCap() throws Exception {
+    final ExportJob first = exportOneContainer(ContainerHealthState.MISSING, 1);
+    final ExportJob second = exportOneContainer(ContainerHealthState.EMPTY, 10);
+    assertTrue(archiveFile(first).exists());
+    assertTrue(archiveFile(second).exists());
+
+    final ExportJob third = exportOneContainer(ContainerHealthState.UNDER_REPLICATED, 20);
+
+    assertNull(exportManager.getExportStatus(first.getId()));
+    assertFalse(archiveFile(first).exists());
+    assertNotNull(exportManager.getExportStatus(second.getId()));
+    assertTrue(archiveFile(second).exists());
+    assertNotNull(exportManager.getExportStatus(third.getId()));
+    assertTrue(archiveFile(third).exists());
+  }
+
+  @Test
+  public void testFailedJobsDoNotEvictArchives() throws Exception {
+    final ExportJob archived = exportOneContainer(ContainerHealthState.MISSING, 1);
+
+    // More failed jobs than the cap: their records are evicted, but they own no archive to push out the first one.
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.EMPTY)))
+        .thenThrow(new RuntimeException("listing failed"));
+    final List<ExportJob> failed = new ArrayList<>();
+    for (int i = 0; i < TEST_MAX_RETAINED + 1; i++) {
+      final ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY);
+      assertNotNull(waitForDone(job.getId()).getException());
+      failed.add(job);
+    }
+
+    assertNull(exportManager.getExportStatus(archived.getId()));
+    assertTrue(archiveFile(archived).exists());
+    assertNull(exportManager.getExportStatus(failed.get(0).getId()));
+    assertNotNull(exportManager.getExportStatus(failed.get(failed.size() - 1).getId()));
+  }
+
+  @Test
+  public void testCompletedArchivesTrimmedAndOthersKeptOnRestart() throws Exception {
+    final ExportJob first = exportOneContainer(ContainerHealthState.MISSING, 1);
+    final ExportJob second = exportOneContainer(ContainerHealthState.EMPTY, 10);
+    exportManager.shutdown();
+
+    // Two more archives left by earlier runs, plus a file that is not an export archive.
+    final File oldest = new File(tempDir, ExportFileManager.archiveFileName(
+        ExportScope.of(null, ContainerHealthState.MISSING), "2020-01-01-00-00-00", ExportJob.Id.newId()));
+    final File newest = new File(tempDir, ExportFileManager.archiveFileName(
+        ExportScope.of(null, ContainerHealthState.MISSING), "2099-01-01-00-00-00", ExportJob.Id.newId()));
+    final List<File> unrelated = Arrays.asList(
+        new File(tempDir, "notes.tar.gz"),
+        // Same shape as an archive name, but no export prefix.
+        new File(tempDir, "backup_of_something_important_job" + ExportJob.Id.newId() + ".tar.gz"),
+        // Export prefix, but the part before "_job" is not a timestamp.
+        new File(tempDir, "container-ids_health-MISSING_lifecycle-ANY_not-a-timestamp-ab_job"
+            + ExportJob.Id.newId() + ".tar.gz"));
+    assertTrue(oldest.createNewFile());
+    assertTrue(newest.createNewFile());
+    for (File file : unrelated) {
+      assertTrue(file.createNewFile());
+    }
+
+    exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_MAX_RETAINED, () -> true);
+
+    // Four archives, cap two: the two oldest by job start time are removed, other files are untouched.
+    assertFalse(oldest.exists());
+    assertTrue(newest.exists());
+    assertTrue(unrelated.stream().allMatch(File::exists));
+    assertEquals(1, Stream.of(first, second).filter(job -> archiveFile(job).exists()).count());
+  }
+
+  @Test
   public void testSubmitAfterPreviousJobCompletes() throws Exception {
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
@@ -427,7 +499,7 @@ public class TestContainerExportManager {
   public void testFailsWhenLeadershipLostDuringExport() throws Exception {
     AtomicBoolean leader = new AtomicBoolean(true);
     exportManager.shutdown();
-    exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, leader::get);
+    exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_MAX_RETAINED, leader::get);
 
     when(containerManager.getContainerIDs(
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
@@ -486,12 +558,24 @@ public class TestContainerExportManager {
     return new File(tempDir, job.getFileName());
   }
 
-  private ContainerExportManager newExportManager(int partSize, int batchSize,
+  private ContainerExportManager newExportManager(int partSize, int batchSize, int maxRetained,
       BooleanSupplier isLeaderReady) throws Exception {
     ContainerExportManager manager = new ContainerExportManager(TEST_SCM_ID, containerManager, isLeaderReady,
-        tempDir.getAbsolutePath(), partSize, batchSize);
+        tempDir.getAbsolutePath(), partSize, batchSize, maxRetained);
     manager.start();
     return manager;
+  }
+
+  /** Runs an export that matches exactly one container, so it produces an archive. */
+  private ExportJob exportOneContainer(ContainerHealthState health, long containerId) throws Exception {
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(health))).thenReturn(ids(containerId));
+    when(containerManager.getContainerIDs(
+        eq(ContainerID.valueOf(containerId + 1)), anyInt(), isNull(), eq(health)))
+        .thenReturn(Collections.emptyList());
+    ExportJob job = submit(ContainerID.valueOf(0), null, health);
+    assertNull(waitForDone(job.getId()).getException());
+    return job;
   }
 
   private static List<ContainerID> ids(long... values) {
