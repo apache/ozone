@@ -136,7 +136,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.BucketInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -1356,7 +1356,7 @@ public class RpcClient implements ClientProtocol {
     }
     // Volume name is not important, as we call InfoBucket with
     // assumeS3Context = true, OM will infer the correct s3 volume.
-    BucketInfoWithVolumeContext bucketInfo =
+    BucketInfoWithS3Context bucketInfo =
         ozoneManagerClient.getBucketInfo(OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT, bucketName, true);
     bucketInfo.getUserPrincipal().ifPresent(this::updateS3Principal);
     return buildOzoneBucket(bucketInfo.getBucketInfo());

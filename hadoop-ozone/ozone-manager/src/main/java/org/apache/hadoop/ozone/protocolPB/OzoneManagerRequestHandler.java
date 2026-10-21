@@ -71,7 +71,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
-import org.apache.hadoop.ozone.om.helpers.BucketInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -689,7 +689,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     InfoBucketResponse.Builder resp =
         InfoBucketResponse.newBuilder();
     boolean assumeS3Context = request.hasAssumeS3Context() && request.getAssumeS3Context();
-    BucketInfoWithVolumeContext context = impl.getBucketInfo(
+    BucketInfoWithS3Context context = impl.getBucketInfo(
         infoBucketRequest.getVolumeName(), infoBucketRequest.getBucketName(), assumeS3Context);
     resp.setBucketInfo(context.getBucketInfo().getProtobuf());
     if (assumeS3Context) {

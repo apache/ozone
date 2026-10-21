@@ -24,11 +24,11 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 /**
  * Wrapper class to return BucketInfo and optionally the S3 user principal.
  */
-public final class BucketInfoWithVolumeContext {
+public final class BucketInfoWithS3Context {
   private final OmBucketInfo bucketInfo;
   private final String userPrincipal;
 
-  private BucketInfoWithVolumeContext(Builder builder) {
+  private BucketInfoWithS3Context(Builder builder) {
     this.bucketInfo = builder.bucketInfo;
     this.userPrincipal = builder.userPrincipal;
   }
@@ -45,7 +45,7 @@ public final class BucketInfoWithVolumeContext {
     return new Builder();
   }
 
-  public static BucketInfoWithVolumeContext fromProtobuf(OMResponse proto) throws IOException {
+  public static BucketInfoWithS3Context fromProtobuf(OMResponse proto) throws IOException {
     return newBuilder()
         .setUserPrincipal(proto.hasUserPrincipal() ? proto.getUserPrincipal() : null)
         .setBucketInfo(OmBucketInfo.getFromProtobuf(proto.getInfoBucketResponse().getBucketInfo()))
@@ -53,7 +53,7 @@ public final class BucketInfoWithVolumeContext {
   }
 
   /**
-   * Builder for BucketInfoWithVolumeContext.
+   * Builder for BucketInfoWithS3Context.
    */
   public static class Builder {
     private OmBucketInfo bucketInfo;
@@ -69,8 +69,8 @@ public final class BucketInfoWithVolumeContext {
       return this;
     }
 
-    public BucketInfoWithVolumeContext build() {
-      return new BucketInfoWithVolumeContext(this);
+    public BucketInfoWithS3Context build() {
+      return new BucketInfoWithS3Context(this);
     }
   }
 }

@@ -62,7 +62,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
-import org.apache.hadoop.ozone.om.helpers.BucketInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -633,7 +633,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public BucketInfoWithVolumeContext getBucketInfo(String volume, String bucket, boolean assumeS3Context)
+  public BucketInfoWithS3Context getBucketInfo(String volume, String bucket, boolean assumeS3Context)
       throws IOException {
     InfoBucketRequest.Builder req =
         InfoBucketRequest.newBuilder();
@@ -647,7 +647,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMResponse resp = handleError(submitRequest(omRequest));
 
-    return BucketInfoWithVolumeContext.fromProtobuf(resp);
+    return BucketInfoWithS3Context.fromProtobuf(resp);
   }
 
   /**

@@ -270,7 +270,7 @@ import org.apache.hadoop.ozone.om.ha.OMHANodeDetails;
 import org.apache.hadoop.ozone.om.ha.OMServiceManager;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
-import org.apache.hadoop.ozone.om.helpers.BucketInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -3293,10 +3293,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   @Override
-  public BucketInfoWithVolumeContext getBucketInfo(String volume, String bucket, boolean assumeS3Context)
+  public BucketInfoWithS3Context getBucketInfo(String volume, String bucket, boolean assumeS3Context)
       throws IOException {
     String resolvedVolumeName = volume;
-    BucketInfoWithVolumeContext.Builder builder = BucketInfoWithVolumeContext.newBuilder();
+    BucketInfoWithS3Context.Builder builder = BucketInfoWithS3Context.newBuilder();
     if (assumeS3Context) {
       S3VolumeContext context = getS3VolumeContext(true);
       resolvedVolumeName = context.getOmVolumeArgs().getVolume();

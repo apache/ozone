@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
-import org.apache.hadoop.ozone.om.helpers.BucketInfoWithVolumeContext;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
@@ -219,12 +219,12 @@ public interface OzoneManagerProtocol
    * @param bucketName - Bucket name.
    * @param assumeS3Context if true OM will automatically lookup the S3
    *                        volume context info.
-   * @return BucketInfoWithVolumeContext or exception is thrown.
+   * @return BucketInfoWithS3Context or exception is thrown.
    * @throws IOException
    */
-  default BucketInfoWithVolumeContext getBucketInfo(String volumeName, String bucketName,
+  default BucketInfoWithS3Context getBucketInfo(String volumeName, String bucketName,
                                      boolean assumeS3Context) throws IOException {
-    return BucketInfoWithVolumeContext.newBuilder().setBucketInfo(getBucketInfo(volumeName, bucketName)).build();
+    return BucketInfoWithS3Context.newBuilder().setBucketInfo(getBucketInfo(volumeName, bucketName)).build();
   }
 
   /**
