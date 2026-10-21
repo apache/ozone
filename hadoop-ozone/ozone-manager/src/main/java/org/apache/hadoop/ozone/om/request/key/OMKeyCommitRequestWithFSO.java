@@ -424,7 +424,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
       state.correctedSpace -= keyToDelete.getReplicatedSize();
       checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
           state.correctedSpace);
-    } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
+    } else if (keyToDelete != null && !omBucketInfo.isVersionEnabled()) {
       // If bucket versioning is turned on during the update, between key
       // creation and key commit, old versions will be just overwritten and
       // not kept. Bucket versioning will be effective from the first key

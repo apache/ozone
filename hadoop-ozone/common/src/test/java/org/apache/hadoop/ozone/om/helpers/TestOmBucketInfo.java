@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
@@ -52,6 +53,77 @@ public class TestOmBucketInfo {
 
     assertEquals(bucket,
         OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+  }
+
+  @Test
+  public void deprecatedVersionFlagIsIgnoredWhenRead() {
+    // A record carrying only the deprecated flag has no versioning status and
+    // reads as UNVERSIONED, whatever the flag says.
+    OzoneManagerProtocolProtos.BucketInfo oldRecord =
+        OzoneManagerProtocolProtos.BucketInfo.newBuilder()
+            .setVolumeName("vol1")
+            .setBucketName("bucket")
+            .setIsVersionEnabled(true)
+            .setStorageType(HddsProtos.StorageTypeProto.DISK)
+            .build();
+    OmBucketInfo bucket = OmBucketInfo.getFromProtobuf(oldRecord);
+    assertFalse(bucket.hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        bucket.getVersioningStatus());
+    assertFalse(bucket.isVersionEnabled());
+    assertFalse(bucket.getProtobuf().hasVersioningStatus());
+    assertFalse(bucket.getProtobuf().getIsVersionEnabled());
+    assertEquals(bucket, OmBucketInfo.getFromProtobuf(bucket.getProtobuf()));
+  }
+
+  @Test
+  public void versioningStatusProtobufConversion() {
+    for (BucketVersioningStatus status : BucketVersioningStatus.values()) {
+      OmBucketInfo bucket = OmBucketInfo.newBuilder()
+          .setBucketName("bucket")
+          .setVolumeName("vol1")
+          .setVersioningStatus(status)
+          .build();
+      boolean enabled = status == BucketVersioningStatus.ENABLED;
+      assertEquals(enabled, bucket.isVersionEnabled());
+      // the deprecated flag is still written for older readers
+      assertEquals(enabled, bucket.getProtobuf().getIsVersionEnabled());
+
+      OmBucketInfo recovered =
+          OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+      assertEquals(status, recovered.getVersioningStatus());
+      assertEquals(bucket, recovered);
+    }
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void deprecatedBuilderFlagMapsOntoVersioningStatus() {
+    OmBucketInfo.Builder builder = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1");
+
+    // false on a bucket that never had versioning enabled sets nothing
+    builder.setIsVersionEnabled(false);
+    assertFalse(builder.build().hasVersioningStatus());
+    assertEquals(BucketVersioningStatus.UNVERSIONED,
+        builder.build().getVersioningStatus());
+
+    builder.setIsVersionEnabled(true);
+    assertEquals(BucketVersioningStatus.ENABLED,
+        builder.build().getVersioningStatus());
+    assertTrue(builder.build().isVersionEnabled());
+
+    // once enabled, false suspends
+    builder.setIsVersionEnabled(false);
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        builder.build().getVersioningStatus());
+    assertFalse(builder.build().isVersionEnabled());
+
+    // a null status is a no-op (records without the new field)
+    builder.setVersioningStatus(null);
+    assertEquals(BucketVersioningStatus.SUSPENDED,
+        builder.build().getVersioningStatus());
   }
 
   @Test
@@ -105,7 +177,7 @@ public class TestOmBucketInfo {
         .setBucketName("source")
         .setBucketLayout(BucketLayout.OBJECT_STORE)
         .setStorageType(StorageType.SSD)
-        .setIsVersionEnabled(true)
+        .setVersioningStatus(BucketVersioningStatus.ENABLED)
         .setQuotaInBytes(1000)
         .setQuotaInNamespace(10)
         .setUsedBytes(500)
@@ -136,7 +208,7 @@ public class TestOmBucketInfo {
 
     assertEquals(BucketLayout.OBJECT_STORE, resolvedLink.getBucketLayout());
     assertEquals(StorageType.SSD, resolvedLink.getStorageType());
-    assertTrue(resolvedLink.getIsVersionEnabled());
+    assertTrue(resolvedLink.isVersionEnabled());
     assertEquals(1000, resolvedLink.getQuotaInBytes());
     assertEquals(10, resolvedLink.getQuotaInNamespace());
     assertEquals(500, resolvedLink.getUsedBytes());

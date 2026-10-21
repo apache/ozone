@@ -77,7 +77,7 @@ public class BucketObjectDBInfo extends ObjectDBInfo {
     this.volumeName = omBucketInfo.getVolumeName();
     this.sourceBucket = omBucketInfo.getSourceBucket();
     this.sourceVolume = omBucketInfo.getSourceVolume();
-    this.isVersioningEnabled = omBucketInfo.getIsVersionEnabled();
+    this.isVersioningEnabled = omBucketInfo.isVersionEnabled();
     this.storageType = omBucketInfo.getStorageType();
     this.defaultReplicationConfig = omBucketInfo.getDefaultReplicationConfig();
     this.bucketLayout = omBucketInfo.getBucketLayout();

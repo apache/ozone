@@ -413,6 +413,38 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     }
   }
 
+  @Test
+  public void testVersioningStatusRejectedAtCreation() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    addCreateVolumeToTable(volumeName, omMetadataManager);
+
+    OMRequest request = newCreateBucketRequest(
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setVersioningStatus(OzoneManagerProtocolProtos
+                .BucketVersioningStatusProto.VERSIONING_ENABLED)).build();
+
+    OMException omException = assertThrows(OMException.class,
+        () -> new OMBucketCreateRequest(request).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST,
+        omException.getResult());
+
+    // so is the deprecated isVersionEnabled flag from an older client
+    OMRequest legacyRequest = newCreateBucketRequest(
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setIsVersionEnabled(true)).build();
+    omException = assertThrows(OMException.class,
+        () -> new OMBucketCreateRequest(legacyRequest).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST,
+        omException.getResult());
+
+    // the same request without a status is accepted
+    OMRequest withoutStatus = newCreateBucketRequest(
+        newBucketInfoBuilder(bucketName, volumeName)).build();
+    assertNotNull(
+        new OMBucketCreateRequest(withoutStatus).preExecute(ozoneManager));
+  }
+
   private void acceptBucketCreationHelper(String volumeName, String bucketName)
         throws Exception {
     OMBucketCreateRequest omBucketCreateRequest = 
