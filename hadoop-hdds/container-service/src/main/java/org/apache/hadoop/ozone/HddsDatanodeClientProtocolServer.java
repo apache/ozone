@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolDatanodePB;
 import org.apache.hadoop.hdds.protocolPB.ReconfigureProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
+import org.apache.hadoop.hdds.server.TracingBlockingService;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.VersionInfo;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -118,17 +119,17 @@ public class HddsDatanodeClientProtocolServer extends ServiceRuntimeInfoImpl {
         HDDS_DATANODE_READ_THREADPOOL_DEFAULT);
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
         = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
-    BlockingService reconfigureService = ReconfigureProtocolProtos
+    BlockingService reconfigureService = TracingBlockingService.wrap(ReconfigureProtocolProtos
         .ReconfigureProtocolService.newReflectiveBlockingService(
-            reconfigureServerProtocol);
+            reconfigureServerProtocol));
 
     RPC.Server server = startRpcServer(configuration, rpcAddress,
         ReconfigureProtocolDatanodePB.class, reconfigureService, handlerCount, readThreads);
     if (diskBalancerProtocol != null) {
       DiskBalancerProtocolServerSideTranslatorPB diskBalancerTranslator =
           new DiskBalancerProtocolServerSideTranslatorPB(diskBalancerProtocol);
-      BlockingService diskBalancerService = DiskBalancerProtocolProtos
-          .DiskBalancerProtocolService.newReflectiveBlockingService(diskBalancerTranslator);
+      BlockingService diskBalancerService = TracingBlockingService.wrap(DiskBalancerProtocolProtos
+          .DiskBalancerProtocolService.newReflectiveBlockingService(diskBalancerTranslator));
       HddsServerUtil.addPBProtocol(configuration, DiskBalancerProtocolPB.class,
           diskBalancerService, server);
     }

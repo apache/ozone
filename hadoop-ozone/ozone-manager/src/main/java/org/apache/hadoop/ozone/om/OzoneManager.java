@@ -220,6 +220,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.server.OzoneBlacklist;
 import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
+import org.apache.hadoop.hdds.server.TracingBlockingService;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.FaultInjector;
@@ -1564,21 +1565,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     OMInterServiceProtocolServerSideImpl omInterServerProtocol =
         new OMInterServiceProtocolServerSideImpl(this, omRatisServer);
-    BlockingService omInterService =
+    BlockingService omInterService = TracingBlockingService.wrap(
         OzoneManagerInterService.newReflectiveBlockingService(
-            omInterServerProtocol);
+            omInterServerProtocol));
 
     OMAdminProtocolServerSideImpl omMetadataServerProtocol =
         new OMAdminProtocolServerSideImpl(this);
-    BlockingService omAdminService =
+    BlockingService omAdminService = TracingBlockingService.wrap(
         OzoneManagerAdminService.newReflectiveBlockingService(
-            omMetadataServerProtocol);
+            omMetadataServerProtocol));
 
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
         = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
-    BlockingService reconfigureService =
+    BlockingService reconfigureService = TracingBlockingService.wrap(
         ReconfigureProtocolService.newReflectiveBlockingService(
-            reconfigureServerProtocol);
+            reconfigureServerProtocol));
 
     return startRpcServer(conf, omNodeRpcAddr, omService,
         omInterService, omAdminService, reconfigureService);

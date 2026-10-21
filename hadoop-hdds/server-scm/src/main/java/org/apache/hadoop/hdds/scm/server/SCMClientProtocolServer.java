@@ -108,6 +108,7 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.server.TracingBlockingService;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
@@ -188,9 +189,9 @@ public class SCMClientProtocolServer implements
     // Add reconfigureProtocolService.
     ReconfigureProtocolServerSideTranslatorPB reconfigureServerProtocol
         = new ReconfigureProtocolServerSideTranslatorPB(reconfigurationHandler);
-    BlockingService reconfigureService =
+    BlockingService reconfigureService = TracingBlockingService.wrap(
         ReconfigureProtocolService.newReflectiveBlockingService(
-            reconfigureServerProtocol);
+            reconfigureServerProtocol));
     HddsServerUtil.addPBProtocol(conf, ReconfigureProtocolPB.class,
         reconfigureService, clientRpcServer);
 
