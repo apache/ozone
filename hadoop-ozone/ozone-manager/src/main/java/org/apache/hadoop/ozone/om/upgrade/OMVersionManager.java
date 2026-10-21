@@ -40,14 +40,17 @@ public class OMVersionManager extends RatisBasedVersionManager {
   // argument for upgrade actions when they are run.
   private final OzoneManager upgradeActionArg;
 
-  public OMVersionManager(OMStorage storage, OzoneManager upgradeActionArg) throws IOException {
-    this(storage, upgradeActionArg, new OMUpgradeActionProvider());
-  }
-
   @VisibleForTesting
   public OMVersionManager(OMStorage storage, OzoneManager upgradeActionArg,
       ComponentUpgradeActionProvider<OmUpgradeAction> upgradeActionProvider) throws IOException {
-    super(computeApparentVersionInternal(storage.getApparentVersion()), OzoneManagerVersion.SOFTWARE_VERSION);
+    this(storage, upgradeActionArg, upgradeActionProvider, null);
+  }
+
+  public OMVersionManager(OMStorage storage, OzoneManager upgradeActionArg,
+      ComponentUpgradeActionProvider<OmUpgradeAction> upgradeActionProvider,
+      String metricsSourceComponent) throws IOException {
+    super(computeApparentVersionInternal(storage.getApparentVersion()), OzoneManagerVersion.SOFTWARE_VERSION,
+        metricsSourceComponent);
     this.storage = storage;
     this.upgradeActionArg = upgradeActionArg;
     upgradeActions = upgradeActionProvider.load();

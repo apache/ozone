@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.metrics2.impl.MetricsRecordImpl;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -108,8 +109,8 @@ class TestDatanodeStorageMetrics {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     String uuidA = "dn-" + UUID.randomUUID();
     String uuidB = "dn-" + UUID.randomUUID();
-    String nameA = DatanodeStorageMetrics.SOURCE_NAME + '-' + uuidA;
-    String nameB = DatanodeStorageMetrics.SOURCE_NAME + '-' + uuidB;
+    String nameA = MetricUtil.qualifySourceName(DatanodeStorageMetrics.SOURCE_NAME, uuidA);
+    String nameB = MetricUtil.qualifySourceName(DatanodeStorageMetrics.SOURCE_NAME, uuidB);
     DatanodeStorageMetrics a = null;
     DatanodeStorageMetrics b = null;
     try {

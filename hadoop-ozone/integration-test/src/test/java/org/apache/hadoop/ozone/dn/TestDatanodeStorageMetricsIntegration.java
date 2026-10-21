@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.volume.DatanodeStorageMetrics;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -129,6 +130,6 @@ public class TestDatanodeStorageMetricsIntegration {
     // shared-JVM source leak), so look it up by the per-datanode name.
     MutableVolumeSet volumeSet = cluster.getHddsDatanodes().get(0)
         .getDatanodeStateMachine().getContainer().getVolumeSet();
-    return getMetrics(DatanodeStorageMetrics.SOURCE_NAME + '-' + volumeSet.getDatanodeUuid());
+    return getMetrics(MetricUtil.qualifySourceName(DatanodeStorageMetrics.SOURCE_NAME, volumeSet.getDatanodeUuid()));
   }
 }

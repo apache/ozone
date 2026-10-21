@@ -73,6 +73,7 @@ import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
@@ -705,10 +706,10 @@ public class TestBlockDeletingService {
     createToDeleteBlocks(containerSet, 1, 3, 1);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
-    BlockDeletingServiceMetrics blockDeletingServiceMetrics = BlockDeletingServiceMetrics.create();
     KeyValueHandler keyValueHandler =
         ContainerTestUtils.getKeyValueHandler(conf, datanodeUuid, containerSet, volumeSet, metrics);
     createBlockDeletingService(containerSet, conf, keyValueHandler);
+    BlockDeletingServiceMetrics blockDeletingServiceMetrics = blockDeletingService.getMetrics();
     blockDeletingService.start();
     GenericTestUtils.waitFor(blockDeletingService::isStarted, 100, 3000);
 
@@ -915,6 +916,21 @@ public class TestBlockDeletingService {
     }
   }
 
+  @Test
+  public void testUpdateAndRestartKeepsMetricsRegistered() throws Exception {
+    OzoneContainer ozoneContainer = mockDependencies(newContainerSet(), null);
+    BlockDeletingService svc = new BlockDeletingService(ozoneContainer, 1000, 1000, TimeUnit.MILLISECONDS, 10, conf,
+        new ContainerChecksumTreeManager(conf));
+    try {
+      OzoneConfiguration updatedConf = new OzoneConfiguration(conf);
+      updatedConf.setInt(OZONE_BLOCK_DELETING_SERVICE_WORKERS, 20);
+      svc.updateAndRestart(updatedConf);
+      assertNotNull(DefaultMetricsSystem.instance().getSource(BlockDeletingServiceMetrics.SOURCE_NAME));
+    } finally {
+      svc.shutdown();
+    }
+  }
+
   @ContainerTestVersionInfo.ContainerTest
   public void testBlockDeletionTimeout(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -957,7 +973,8 @@ public class TestBlockDeletingService {
     timeout  = 0;
     svc = new BlockDeletingService(ozoneContainer,
         TimeUnit.MILLISECONDS.toNanos(1000), timeout, TimeUnit.MILLISECONDS,
-        10, conf, "", mock(ContainerChecksumTreeManager.class), mock(ReconfigurationHandler.class));
+        10, conf, "", null, mock(ContainerChecksumTreeManager.class),
+        mock(ReconfigurationHandler.class));
     svc.start();
 
     // get container meta data

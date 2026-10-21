@@ -70,6 +70,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
+import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
@@ -133,10 +134,18 @@ public class TestDeleteBlocksCommandHandler {
     return volume;
   }
 
+  private static OzoneContainer mockOzoneContainer() {
+    BlockDeletingService blockDeletingService = mock(BlockDeletingService.class);
+    when(blockDeletingService.getMetrics()).thenReturn(BlockDeletingServiceMetrics.create(null));
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    when(ozoneContainer.getBlockDeletingService()).thenReturn(blockDeletingService);
+    return ozoneContainer;
+  }
+
   private void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
-    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    OzoneContainer ozoneContainer = mockOzoneContainer();
     containerSet = newContainerSet();
     volume1 = mockHddsVolume("uuid-1");
     for (int i = 0; i <= 10; i++) {
@@ -171,7 +180,7 @@ public class TestDeleteBlocksCommandHandler {
   @AfterEach
   public void tearDown() {
     handler.stop();
-    BlockDeletingServiceMetrics.unRegister();
+    handler.getBlockDeleteMetrics().unregister();
     ExitUtils.clear();
   }
 
@@ -430,7 +439,7 @@ public class TestDeleteBlocksCommandHandler {
     OzoneConfiguration tmpConf = new OzoneConfiguration();
     tmpConf.setTimeDuration(BLOCK_DELETE_COMMAND_WORKER_INTERVAL, 3,
         TimeUnit.SECONDS);
-    OzoneContainer container = mock(OzoneContainer.class);
+    OzoneContainer container = mockOzoneContainer();
     DatanodeConfiguration dnConf =
         tmpConf.getObject(DatanodeConfiguration.class);
     DeleteBlocksCommandHandler commandHandler =
@@ -444,6 +453,18 @@ public class TestDeleteBlocksCommandHandler {
     DeleteBlocksCommandHandler.DeleteCmdWorker deleteCmdWorker =
         commandHandler.new DeleteCmdWorker(4000);
     assertEquals(deleteCmdWorker.getInterval(), 4000);
+  }
+
+  @Test
+  public void handlerSharesBlockDeletingServiceMetrics() throws IOException {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, folder.toString());
+    configuration.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, folder.toString());
+    OzoneContainer container =
+        ContainerTestUtils.getOzoneContainer(MockDatanodeDetails.randomDatanodeDetails(), configuration);
+    handler = new DeleteBlocksCommandHandler(container, configuration,
+        configuration.getObject(DatanodeConfiguration.class), "");
+    assertSame(container.getBlockDeletingService().getMetrics(), handler.getBlockDeleteMetrics());
   }
 
   @Test
@@ -608,7 +629,7 @@ public class TestDeleteBlocksCommandHandler {
     schemaVersion = SCHEMA_V3;
     OzoneConfiguration conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
-    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    OzoneContainer ozoneContainer = mockOzoneContainer();
     ContainerLayoutVersion layout = ContainerLayoutVersion.FILE_PER_BLOCK;
     ContainerSet realSet = newContainerSet();
     volume1 = mockHddsVolume("uuid-1");

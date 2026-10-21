@@ -27,13 +27,14 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.hadoop.util.Time;
 
 /**
  * This class is for maintaining StorageContainerManager statistics.
  */
 @Metrics(about = "Storage Container Manager Metrics", context = "dfs")
-public class SCMMetrics {
+public final class SCMMetrics {
   public static final String SOURCE_NAME =
       SCMMetrics.class.getSimpleName();
 
@@ -66,8 +67,8 @@ public class SCMMetrics {
     return dbCheckpointMetrics;
   }
 
-  public SCMMetrics(int maxRatisEvents) {
-    dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics");
+  private SCMMetrics(int maxRatisEvents, String metricsSourceComponent) {
+    dbCheckpointMetrics = DBCheckpointMetrics.create("SCM Metrics", metricsSourceComponent);
     this.maxRatisEvents = maxRatisEvents;
   }
 
@@ -82,7 +83,7 @@ public class SCMMetrics {
         : conf.getInt(ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_EVENTS_MAX_LIMIT_DEFAULT);
     return ms.register(SOURCE_NAME, "Storage Container Manager Metrics",
-        new SCMMetrics(maxRatisEvents));
+        new SCMMetrics(maxRatisEvents, MetricUtil.metricsSourceComponent("SCM")));
   }
 
   public void setLastContainerReportSize(long size) {
@@ -190,6 +191,9 @@ public class SCMMetrics {
   }
 
   public void unRegister() {
+    if (dbCheckpointMetrics != null) {
+      dbCheckpointMetrics.unRegister();
+    }
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }

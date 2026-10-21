@@ -43,7 +43,7 @@
                 })
                 });
 
-            $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=SCMConnectionManager")
+            $http.get("jmx?qry=Hadoop:service=HddsDatanode,name=SCMConnectionManager,*")
                 .then(function (result) {
                     ctrl.heartbeatmetrics = result.data.beans;
                     ctrl.heartbeatmetrics.forEach(scm => {

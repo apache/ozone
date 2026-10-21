@@ -23,6 +23,7 @@ import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics related to DiskBalancer Service running on Datanode.
@@ -31,9 +32,9 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
     + "background disk balancer service on Datanode", context = "dfs")
 public final class DiskBalancerServiceMetrics {
 
-  private static DiskBalancerServiceMetrics instance;
   public static final String SOURCE_NAME =
       DiskBalancerServiceMetrics.class.getSimpleName();
+  private final String sourceName;
 
   @Metric(about = "The number of successful balance job")
   private MutableCounterLong successCount;
@@ -59,26 +60,19 @@ public final class DiskBalancerServiceMetrics {
   @Metric(about = "The number of idle loop due to bandwidth limits.")
   private MutableCounterLong idleLoopExceedsBandwidthCount;
 
-  private DiskBalancerServiceMetrics() {
+  private DiskBalancerServiceMetrics(String sourceName) {
+    this.sourceName = sourceName;
   }
 
-  public static DiskBalancerServiceMetrics create() {
-    if (instance == null) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      instance = ms.register(SOURCE_NAME, "DiskBalancerService",
-          new DiskBalancerServiceMetrics());
-    }
-
-    return instance;
-  }
-
-  /**
-   * Unregister the metrics instance.
-   */
-  public static void unRegister() {
-    instance = null;
+  public static DiskBalancerServiceMetrics create(String component) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME, component);
+    return ms.register(sourceName, "DiskBalancerService", new DiskBalancerServiceMetrics(sourceName));
+  }
+
+  public void unregister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(sourceName);
   }
 
   public void incrSuccessCount(long count) {

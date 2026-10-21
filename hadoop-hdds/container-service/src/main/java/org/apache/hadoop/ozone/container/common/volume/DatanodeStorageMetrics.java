@@ -27,6 +27,7 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Node-level storage totals for a DataNode, aggregated over its HDDS data volumes only
@@ -69,17 +70,9 @@ public final class DatanodeStorageMetrics implements MetricsSource {
    * with the default Metrics2 system.
    */
   public static DatanodeStorageMetrics create(MutableVolumeSet volumeSet) {
-    // In mini-cluster mode many datanodes share one metrics system, so the
-    // metrics system uniquifies the constant source name on registration
-    // (DatanodeStorageMetrics-1, -2, ...). Unregistering by the constant base
-    // name would then leak every source past the first, and each leaked source
-    // pins a shut-down datanode's MutableVolumeSet. Make the name unique per
-    // datanode up front so register and unregister stay symmetric. In
-    // production there is one instance per JVM, so keep the plain name for
-    // stable JMX and Prometheus metric names.
-    String sourceName = DefaultMetricsSystem.inMiniClusterMode()
-        ? SOURCE_NAME + '-' + volumeSet.getDatanodeUuid()
-        : SOURCE_NAME;
+    // A leaked source pins a shut-down datanode's MutableVolumeSet.
+    String sourceName = MetricUtil.qualifySourceName(SOURCE_NAME,
+        MetricUtil.metricsSourceComponent(volumeSet.getDatanodeUuid()));
     DatanodeStorageMetrics datanodeStorageMetrics = new DatanodeStorageMetrics(volumeSet, sourceName);
     DefaultMetricsSystem.instance().register(sourceName,
         "DataNode node-level storage totals", datanodeStorageMetrics);

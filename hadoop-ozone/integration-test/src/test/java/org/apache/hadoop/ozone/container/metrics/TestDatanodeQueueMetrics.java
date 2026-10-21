@@ -23,9 +23,13 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueu
 import static org.apache.ozone.test.MetricsAsserts.getLongGauge;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetrics;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -47,8 +51,17 @@ public abstract class TestDatanodeQueueMetrics implements NonHATests.TestCase {
     }
   }
 
+  @Test
+  public void testQueueMetricsSourcePerDatanode() {
+    for (HddsDatanodeService datanode : cluster().getHddsDatanodes()) {
+      String sourceName = MetricUtil.qualifySourceName(DatanodeQueueMetrics.METRICS_SOURCE_NAME,
+          datanode.getDatanodeDetails().getUuidString());
+      assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName), sourceName);
+    }
+  }
+
   private long getGauge(String metricName) {
     return getLongGauge(metricName,
-        getMetrics(DatanodeQueueMetrics.METRICS_SOURCE_NAME));
+        getMetrics(cluster().getHddsDatanodes().get(0).getDatanodeStateMachine().getQueueMetrics()));
   }
 }

@@ -24,6 +24,7 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
+import org.apache.hadoop.ozone.util.MetricUtil;
 
 /**
  * Metrics related to Block Deleting Service running on Datanode.
@@ -32,9 +33,9 @@ import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
     + "background block deleting service on Datanode", context = "dfs")
 public final class BlockDeletingServiceMetrics {
 
-  private static BlockDeletingServiceMetrics instance;
   public static final String SOURCE_NAME =
       BlockDeletingService.class.getSimpleName();
+  private final String sourceName;
 
   @Metric(about = "The number of successful delete blocks")
   private MutableCounterLong successCount;
@@ -84,26 +85,27 @@ public final class BlockDeletingServiceMetrics {
   @Metric(about = "The number of delete block transactions failed.")
   private MutableGaugeLong processedTransactionFailCount;
 
-  private BlockDeletingServiceMetrics() {
+  private BlockDeletingServiceMetrics(String sourceName) {
+    this.sourceName = sourceName;
   }
 
-  public static synchronized BlockDeletingServiceMetrics create() {
-    if (instance == null) {
-      MetricsSystem ms = DefaultMetricsSystem.instance();
-      instance = ms.register(SOURCE_NAME, "BlockDeletingService",
-          new BlockDeletingServiceMetrics());
-    }
-
-    return instance;
+  public static BlockDeletingServiceMetrics create(String component) {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    String sourceName = getSourceName(component);
+    return ms.register(sourceName, "BlockDeletingService", new BlockDeletingServiceMetrics(sourceName));
   }
 
   /**
-   * Unregister the metrics instance.
+   * Returns the metrics source name registered by {@link #create(String)} for the given component,
+   * e.g. for looking up the JMX bean of a specific datanode.
    */
-  public static synchronized void unRegister() {
-    instance = null;
+  public static String getSourceName(String component) {
+    return MetricUtil.qualifySourceName(SOURCE_NAME, component);
+  }
+
+  public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(sourceName);
   }
 
   public void incrSuccessCount(long count) {

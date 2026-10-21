@@ -20,6 +20,9 @@ package org.apache.hadoop.ozone.local;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_SYNC_TASK_INTERVAL_DELAY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,8 +36,12 @@ import java.util.List;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.upgrade.ComponentVersionManagerMetrics;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -64,6 +71,14 @@ class TestLocalOzoneRecon {
 
       assertEquals(reconEnabled, syncThreadRunning());
       if (reconEnabled) {
+        String metricsName = ComponentVersionManagerMetrics.METRICS_SOURCE_NAME;
+        MetricsSource scm = DefaultMetricsSystem.instance().getSource(metricsName + ".SCM");
+        MetricsSource om = DefaultMetricsSystem.instance().getSource(metricsName + ".OM");
+        MetricsSource recon = DefaultMetricsSystem.instance().getSource(metricsName + ".ReconSCM");
+        assertNotNull(scm);
+        assertNotNull(om);
+        assertNotNull(recon);
+
         assertEquals(200, responseCode(cluster.getReconEndpoint() + "/api/v1/clusterState"));
         endpoints.add(cluster.getReconEndpoint());
       }
@@ -98,6 +113,30 @@ class TestLocalOzoneRecon {
       assertThrows(IllegalArgumentException.class, cluster::start);
       assertThat(httpLogs.getOutput()).contains("HTTP server of recon listening");
       assertThrows(ConnectException.class, () -> responseCode(cluster.getReconEndpoint()));
+    }
+  }
+
+  @Test
+  void reconVersionMetricsUnregisterOnCloseAndRebindOnSecondStart() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(
+            tempDir.resolve("local-ozone-recon-restart"))
+        .setS3gEnabled(false)
+        .setReconEnabled(true)
+        .setStartupTimeout(Duration.ofMinutes(2))
+        .build();
+    String reconSource = ComponentVersionManagerMetrics.METRICS_SOURCE_NAME + ".ReconSCM";
+    MetricsSource firstRecon;
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
+      cluster.start();
+      firstRecon = DefaultMetricsSystem.instance().getSource(reconSource);
+      assertNotNull(firstRecon);
+    }
+    assertNull(DefaultMetricsSystem.instance().getSource(reconSource));
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, new OzoneConfiguration())) {
+      cluster.start();
+      MetricsSource secondRecon = DefaultMetricsSystem.instance().getSource(reconSource);
+      assertNotNull(secondRecon);
+      assertNotSame(firstRecon, secondRecon);
     }
   }
 

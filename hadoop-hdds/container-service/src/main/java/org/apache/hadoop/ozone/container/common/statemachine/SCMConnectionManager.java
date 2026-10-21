@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.management.ObjectName;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
@@ -70,14 +72,18 @@ public class SCMConnectionManager
   private ObjectName jmxBean;
 
   public SCMConnectionManager(ConfigurationSource conf) {
+    this(conf, null);
+  }
+
+  public SCMConnectionManager(ConfigurationSource conf, String component) {
     this.mapLock = new ReentrantReadWriteLock();
     Long timeOut = getScmRpcTimeOutInMilliseconds(conf);
     this.rpcTimeout = timeOut.intValue();
     this.scmMachines = new HashMap<>();
     this.conf = conf;
-    jmxBean = MBeans.register("HddsDatanode",
-        "SCMConnectionManager",
-        this);
+    Map<String, String> jmxProperties =
+        component == null ? Collections.emptyMap() : Collections.singletonMap("datanode", component);
+    jmxBean = HddsUtils.registerWithJmxProperties("HddsDatanode", "SCMConnectionManager", jmxProperties, this);
   }
 
   /**
