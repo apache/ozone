@@ -27,12 +27,19 @@ ${ENDPOINT_URL}         http://s3g:9878
 ${BUCKET}               generated
 
 *** Keywords ***
-#   Export access key and secret to the environment
+#   Export access key and secret to the environment for Freon (AWS SDK v1)
 Setup aws credentials
-    ${accessKey} =      Execute     aws configure get aws_access_key_id
-    ${secret} =         Execute     aws configure get aws_secret_access_key
-    Set Environment Variable        AWS_SECRET_ACCESS_KEY  ${secret}
-    Set Environment Variable        AWS_ACCESS_KEY_ID  ${accessKey}
+    IF    '${AWS_CLI}' == 'aws2'
+        ${accessKey} =      Execute     ${AWS_CLI} configure get aws_access_key_id --output text
+        ${secret} =         Execute     ${AWS_CLI} configure get aws_secret_access_key --output text
+    ELSE
+        ${accessKey} =      Execute     ${AWS_CLI} configure get aws_access_key_id
+        ${secret} =         Execute     ${AWS_CLI} configure get aws_secret_access_key
+    END
+    ${accessKey} =      Strip String    ${accessKey}
+    ${secret} =         Strip String    ${secret}
+    Set Environment Variable    AWS_ACCESS_KEY_ID    ${accessKey}
+    Set Environment Variable    AWS_SECRET_ACCESS_KEY    ${secret}
 
 Freon S3BG
     [arguments]    ${prefix}=s3bg    ${n}=100    ${threads}=10   ${args}=${EMPTY}
@@ -47,12 +54,12 @@ Freon S3KG
 *** Test Cases ***
 Run Freon S3BG
     [Setup]    Setup aws credentials
-    Freon S3BG   s3bg-${BUCKET}
+    Freon S3BG   s3bg-${PREFIX}-${BUCKET}
 
 Run Freon S3KG
     [Setup]    Setup aws credentials
-    Freon S3KG   s3kg-${BUCKET}
+    Freon S3KG   s3kg-${PREFIX}-${BUCKET}
 
 Run Freon S3KG MPU
     [Setup]    Setup aws credentials
-    Freon S3KG   s3kg-mpu-${BUCKET}  10  1  --multi-part-upload --parts=2 --size=5242880
+    Freon S3KG   s3kg-mpu-${PREFIX}-${BUCKET}  10  1  --multi-part-upload --parts=2 --size=5242880

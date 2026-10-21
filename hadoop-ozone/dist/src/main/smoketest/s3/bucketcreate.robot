@@ -115,8 +115,9 @@ Test buckets named like web endpoints
     ${path} =    Create Random File KB    64
 
     FOR  ${name}   IN    conf    jmx    logs    logstream    prof    prom    secret    stacks    static
-        Create bucket with name    ${name}
-        Put object to bucket    bucket=${name}    key=testkey    path=${path}
+        ${bucket} =    Set Variable    ${PREFIX}-${name}
+        Create bucket with name    ${bucket}
+        Put object to bucket    bucket=${bucket}    key=testkey    path=${path}
     END
 
 Check bucket ownership verification

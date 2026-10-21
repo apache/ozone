@@ -31,24 +31,24 @@ ${BUCKET}             generated
 
 Conditional Put If-None-Match Star Creates New Key
     [Documentation]    If-None-Match: * should succeed when key does not exist
-    ${key} =           Set Variable    condput-ifnonematch-new
+    ${key} =           Set Variable    ${PREFIX}-condput-ifnonematch-new
                        Execute         echo "test-content" > /tmp/${key}
-    ${result} =        Execute AWSS3APICli    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key} --if-none-match "*"
+    ${result} =        Execute AWSS3APICli    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key} --if-none-match '*'
                        Should contain    ${result}    ETag
 
 Conditional Put If-None-Match Star Fails For Existing Key
     [Documentation]    If-None-Match: * should fail with 412 when key already exists
-    ${key} =           Set Variable    condput-ifnonematch-existing
+    ${key} =           Set Variable    ${PREFIX}-condput-ifnonematch-existing
                        Execute         echo "initial-content" > /tmp/${key}
     ${result} =        Execute AWSS3APICli    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key}
                        Should contain    ${result}    ETag
     # Now try again with If-None-Match: *
-    ${result} =        Execute AWSS3APICli and ignore error    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key} --if-none-match "*"
+    ${result} =        Execute AWSS3APICli and ignore error    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key} --if-none-match '*'
                        Should contain    ${result}    PreconditionFailed
 
 Conditional Put If-Match With Correct ETag Succeeds
     [Documentation]    If-Match with correct ETag should succeed
-    ${key} =           Set Variable    condput-ifmatch-success
+    ${key} =           Set Variable    ${PREFIX}-condput-ifmatch-success
                        Execute         echo "initial-content" > /tmp/${key}
     ${result} =        Execute AWSS3APICli    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key}
                        Should contain    ${result}    ETag
@@ -66,7 +66,7 @@ Conditional Put If-Match With Correct ETag Succeeds
 
 Conditional Put If-Match With Wrong ETag Fails
     [Documentation]    If-Match with wrong ETag should fail with 412
-    ${key} =           Set Variable    condput-ifmatch-fail
+    ${key} =           Set Variable    ${PREFIX}-condput-ifmatch-fail
                        Execute         echo "initial-content" > /tmp/${key}
     ${result} =        Execute AWSS3APICli    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key}
                        Should contain    ${result}    ETag
@@ -80,7 +80,7 @@ Conditional Put If-Match With Wrong ETag Fails
 
 Conditional Put If-Match On Non-Existent Key Fails
     [Documentation]    If-Match on a key that does not exist should fail with 412
-    ${key} =           Set Variable    condput-ifmatch-nonexistent
+    ${key} =           Set Variable    ${PREFIX}-condput-ifmatch-nonexistent
                        Execute         echo "test-content" > /tmp/${key}
     ${result} =        Execute AWSS3APICli and ignore error    put-object --bucket ${BUCKET} --key ${key} --body /tmp/${key} --if-match some-etag
                        Should contain    ${result}    PreconditionFailed

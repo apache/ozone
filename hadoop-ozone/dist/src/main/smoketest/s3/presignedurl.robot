@@ -32,8 +32,8 @@ ${BUCKET}             generated
 Presigned URL PUT Object
     [Documentation]    Test presigned URL PUT object
     Execute                  echo "Randomtext" > /tmp/testfile
-    ${ACCESS_KEY} =          Execute    aws configure get aws_access_key_id
-    ${SECRET_ACCESS_KEY} =   Execute    aws configure get aws_secret_access_key
+    ${ACCESS_KEY} =          Execute    ${AWS_CLI} configure get aws_access_key_id
+    ${SECRET_ACCESS_KEY} =   Execute    ${AWS_CLI} configure get aws_secret_access_key
     ${presigned_url}=        Generate Presigned Put Object Url    ${ACCESS_KEY}    ${SECRET_ACCESS_KEY}    ${BUCKET}    test-presigned-put    us-east-1    3600    ${EMPTY}    ${ENDPOINT_URL}
     ${SHA256} =              Compute Sha256 File    /tmp/testfile
     ${result} =              Execute    curl -X PUT -T "/tmp/testfile" -H "x-amz-content-sha256: ${SHA256}" "${presigned_url}"
@@ -44,8 +44,8 @@ Presigned URL PUT Object
 Presigned URL PUT Object using wrong x-amz-content-sha256
     [Documentation]    Test presigned URL PUT object with wrong x-amz-content-sha256
     Execute                  echo "Randomtext" > /tmp/testfile
-    ${ACCESS_KEY} =          Execute    aws configure get aws_access_key_id
-    ${SECRET_ACCESS_KEY} =   Execute    aws configure get aws_secret_access_key
+    ${ACCESS_KEY} =          Execute    ${AWS_CLI} configure get aws_access_key_id
+    ${SECRET_ACCESS_KEY} =   Execute    ${AWS_CLI} configure get aws_secret_access_key
     ${presigned_url}=        Generate Presigned Put Object Url    ${ACCESS_KEY}    ${SECRET_ACCESS_KEY}    ${BUCKET}    test-presigned-put-wrong-sha    us-east-1    3600    ${EMPTY}    ${ENDPOINT_URL}
     ${result} =              Execute    curl -X PUT -T "/tmp/testfile" -H "x-amz-content-sha256: wronghash" "${presigned_url}"
     Should Contain           ${result}    The provided 'x-amz-content-sha256' header does not match the computed hash.

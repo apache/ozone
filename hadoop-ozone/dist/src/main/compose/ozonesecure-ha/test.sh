@@ -48,7 +48,7 @@ execute_robot_test s3g basic/links.robot
 
 exclude=""
 for bucket in link; do
-  execute_robot_test s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
+  execute_s3_smoketests s3g -v BUCKET:${bucket} -N s3-${bucket} ${exclude}
   # some tests are independent of the bucket type, only need to be run once
   exclude="--exclude no-bucket-type"
 done

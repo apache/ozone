@@ -30,4 +30,4 @@ export COMPOSE_FILE=docker-compose.yaml:vault.yaml
 
 start_docker_env
 
-execute_robot_test scm s3
+execute_s3_smoketests scm

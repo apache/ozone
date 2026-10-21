@@ -17,7 +17,7 @@
 
 start_docker_env 5
 
-execute_robot_test scm -v BUCKET:erasure s3
+execute_s3_smoketests scm -N s3 -v BUCKET:erasure
 
 execute_robot_test scm ec/rewrite.robot
 

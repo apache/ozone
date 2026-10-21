@@ -32,7 +32,7 @@ start_docker_env
 
 exclude=""
 for bucket in generated; do
-  execute_robot_test ${SCM} -v BUCKET:${bucket} -N s3-${bucket} ${exclude} s3
+  execute_s3_smoketests ${SCM} -v BUCKET:${bucket} -N s3-${bucket} ${exclude}
   # some tests are independent of the bucket type, only need to be run once
   exclude="--exclude no-bucket-type"
 done
