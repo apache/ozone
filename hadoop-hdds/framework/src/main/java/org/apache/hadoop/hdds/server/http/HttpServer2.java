@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.servlet.Filter;
@@ -737,7 +738,7 @@ public final class HttpServer2 implements FilterContainer {
     }
 
     metrics = HttpServer2Metrics.create(threadPool, builder.name,
-        builder.metricsSourceId == null ? builder.name : builder.metricsSourceId);
+        builder.metricsSourceId == null ? builder.name + '-' + UUID.randomUUID() : builder.metricsSourceId);
     SessionHandler handler = webAppContext.getSessionHandler();
     handler.setHttpOnly(true);
     handler.getSessionCookieConfig().setSecure(true);
@@ -1523,11 +1524,12 @@ public final class HttpServer2 implements FilterContainer {
       // clear & stop webAppContext attributes to avoid memory leaks.
       webAppContext.clearAttributes();
       webAppContext.stop();
-      metrics.unRegister();
     } catch (Exception e) {
       LOG.error("Error while stopping web app context for webapp "
           + webAppContext.getDisplayName(), e);
       exception = addMultiException(exception, e);
+    } finally {
+      metrics.unRegister();
     }
 
     try {
