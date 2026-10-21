@@ -27,29 +27,27 @@ import org.apache.ratis.util.function.CheckedFunction;
  */
 final class ChunkReader {
   private final ChunkInfo chunkInfo;
-  private final long length;
   private final boolean verifyChecksum;
-  private final CheckedFunction<ChunkInfo, ByteBuffer[], IOException> readChunk;
+  private final CheckedFunction<ChunkInfo, ByteBuffer[], IOException> readChunkPositioned;
 
   ChunkReader(ChunkInfo chunkInfo, boolean verifyChecksum,
-      CheckedFunction<ChunkInfo, ByteBuffer[], IOException> readChunk) {
+      CheckedFunction<ChunkInfo, ByteBuffer[], IOException> readChunkPositioned) {
     this.chunkInfo = chunkInfo;
-    this.length = chunkInfo.getLen();
     this.verifyChecksum = verifyChecksum;
-    this.readChunk = readChunk;
+    this.readChunkPositioned = readChunkPositioned;
   }
 
   int read(long position, ByteBuffer destination) throws IOException {
     if (!destination.hasRemaining()) {
       return 0;
     }
-    if (position < 0 || position >= length) {
+    if (position < 0 || position >= chunkInfo.getLen()) {
       return -1;
     }
-    final int toRead = (int) Math.min(destination.remaining(), length - position);
+    final int toRead = (int) Math.min(destination.remaining(), chunkInfo.getLen() - position);
     final ChunkInfo range = getChunkInfo(position, toRead);
     final long skip = position - (range.getOffset() - chunkInfo.getOffset());
-    return copyRange(readChunk.apply(range), skip, toRead, destination);
+    return copyRange(readChunkPositioned.apply(range), skip, toRead, destination);
   }
 
   ChunkInfo getChunkInfo(long chunkRelativePosition, int toRead) {
@@ -57,7 +55,7 @@ final class ChunkReader {
     final long adjustedLen;
     if (verifyChecksum) {
       /*
-       * bytesPerChecksum = 20, chunkRelativePosition = 53, toRead = 15, length = 75
+       * bytesPerChecksum = 20, chunkRelativePosition = 53, toRead = 15, chunkInfo.getLen() = 75
        *
        * 40           53     60      68     75   80
        * +-------------------+--------------+----+
@@ -66,18 +64,18 @@ final class ChunkReader {
        * |<--------adjustedLen = 35-------->|
        * ^                                  ^    ^
        * adjustedOffset                     |    endIndex
-       *                                    min(endIndex, length)
+       *                                    min(endIndex, chunkInfo.getLen())
        */
       int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
       adjustedOffset = (chunkRelativePosition / bytesPerChecksum) * bytesPerChecksum;
       long endIndex = ((chunkRelativePosition + toRead - 1) / bytesPerChecksum + 1) * bytesPerChecksum;
-      adjustedLen = Math.min(endIndex, length) - adjustedOffset;
+      adjustedLen = Math.min(endIndex, chunkInfo.getLen()) - adjustedOffset;
     } else {
       adjustedOffset = chunkRelativePosition;
       adjustedLen = toRead;
     }
 
-    if (adjustedOffset == 0 && adjustedLen == length) {
+    if (adjustedOffset == 0 && adjustedLen == chunkInfo.getLen()) {
       return chunkInfo;
     }
     return ChunkInfo.newBuilder(chunkInfo)

@@ -377,7 +377,7 @@ public class ChunkInputStream extends InputStream
     // successful read in adjustBufferPosition()
     storePosition();
 
-    final ChunkInfo adjustedChunkInfo = getChunkInfo(startByteIndex, len);
+    final ChunkInfo adjustedChunkInfo = reader.getChunkInfo(startByteIndex, len);
 
     readChunkDataIntoBuffers(adjustedChunkInfo);
     bufferOffsetWrtChunkData = adjustedChunkInfo.getOffset() - chunkInfo.getOffset();
@@ -390,10 +390,6 @@ public class ChunkInputStream extends InputStream
     //    2. Chunk was read from index < the current position to account for
     //    checksum boundaries.
     adjustBufferPosition(startByteIndex - bufferOffsetWrtChunkData);
-  }
-
-  ChunkInfo getChunkInfo(long chunkRelativePosition, int toRead) {
-    return reader.getChunkInfo(chunkRelativePosition, toRead);
   }
 
   protected void readChunkDataIntoBuffers(ChunkInfo readChunkInfo)
