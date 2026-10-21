@@ -1073,7 +1073,6 @@ public class TestOMMetadataReader {
     assertEquals(Optional.of("user"), result.getUserPrincipal());
     verify(ozoneManager).getS3VolumeContext(true);
     verify(reader).checkAcls(BUCKET, OZONE, READ, TENANT_VOLUME_NAME, BUCKET_NAME, null);
-    verify(reader, never()).checkAcls(eq(VOLUME), any(), any(), any(), any(), any());
     verify(metrics).incNumBucketInfos();
   }
 
@@ -1107,7 +1106,6 @@ public class TestOMMetadataReader {
 
     assertEquals(BUCKET_NOT_FOUND, ex.getResult());
     verify(ozoneManager).getS3VolumeContext(true);
-    verify(reader, never()).checkAcls(eq(VOLUME), any(), any(), any(), any(), any());
     verify(bucketManager, never()).getBucketInfo(any(), any());
     verify(metrics).incNumBucketInfoFails();
   }

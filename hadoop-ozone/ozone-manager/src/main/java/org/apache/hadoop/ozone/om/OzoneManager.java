@@ -3302,7 +3302,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       resolvedVolumeName = context.getOmVolumeArgs().getVolume();
       builder.setUserPrincipal(context.getUserPrincipal());
     }
-    
+
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(resolvedVolumeName);
     auditMap.put(OzoneConsts.BUCKET, bucket);
