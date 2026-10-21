@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE;
@@ -25,8 +26,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.security.PrivilegedExceptionAction;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -50,8 +51,9 @@ import org.junit.jupiter.api.Test;
 /**
  * Tests authorization of the OzoneManager getDBUpdates RPC (OmClientProtocol DBUpdates).
  * getDBUpdates streams the raw RocksDB delta of the whole OM metadata DB and backs
- * OM->Recon replication, so it is restricted to admins and read-only admins, like the
- * other whole-system reads (listOpenFiles, getQuotaRepairStatus).
+ * OM->Recon replication, so it is restricted to admins, read-only admins, and the configured
+ * Recon service principal ({@code ozone.recon.kerberos.principal}), matching
+ * {@link OMDBCheckpointServlet} checkpoint download access.
  */
 public class TestGetDBUpdatesAuthorization {
 
@@ -61,17 +63,12 @@ public class TestGetDBUpdatesAuthorization {
   private static final String VOL = "vol1";
   private static final String BUCKET = "bucket1";
   private static final String KEY = "key1";
+  private static final String READONLY_ADMIN = "roadmin";
   private static final String RECON_PRINCIPAL = "reconsvc";
 
   @BeforeAll
   static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.setBoolean(OZONE_ACL_ENABLED, true);
-    conf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
-    conf.set(OZONE_ADMINISTRATORS, "admin");
-    conf.set(OZONE_READONLY_ADMINISTRATORS, RECON_PRINCIPAL);
-    // Make admin authorization effective without a KDC so the gate actually runs.
-    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
+    conf = authTestConfiguration();
     cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(3).build();
     cluster.waitForClusterToBeReady();
 
@@ -98,11 +95,25 @@ public class TestGetDBUpdatesAuthorization {
     }
   }
 
-  private static DBUpdates getDBUpdates(UserGroupInformation user) throws Exception {
+  private static OzoneConfiguration authTestConfiguration() {
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    testConf.setBoolean(OZONE_ACL_ENABLED, true);
+    testConf.set(OZONE_ACL_AUTHORIZER_CLASS, OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    testConf.set(OZONE_ADMINISTRATORS, "admin");
+    testConf.set(OZONE_READONLY_ADMINISTRATORS, READONLY_ADMIN);
+    // Recon is allowed by its service principal alone, without being listed as an admin.
+    testConf.set(OZONE_RECON_KERBEROS_PRINCIPAL_KEY, RECON_PRINCIPAL);
+    // Make admin authorization effective without a KDC so the gate actually runs.
+    testConf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
+    return testConf;
+  }
+
+  private static DBUpdates getDBUpdates(OzoneConfiguration ozoneConf, UserGroupInformation user)
+      throws Exception {
     return user.doAs((PrivilegedExceptionAction<DBUpdates>) () -> {
       OzoneManagerProtocolClientSideTranslatorPB omClient =
           new OzoneManagerProtocolClientSideTranslatorPB(
-              OmTransportFactory.create(conf, user, null),
+              OmTransportFactory.create(ozoneConf, user, null),
               ClientId.randomId().toString());
       DBUpdatesRequest req = DBUpdatesRequest.newBuilder()
           .setSequenceNumber(0)
@@ -111,11 +122,16 @@ public class TestGetDBUpdatesAuthorization {
     });
   }
 
+  private static void assertDbUpdatesNonEmpty(DBUpdates updates) {
+    assertNotNull(updates.getData());
+    assertFalse(updates.getData().isEmpty());
+  }
+
   @Test
   void nonAdminIsDenied() {
     UserGroupInformation nonAdmin =
         UserGroupInformation.createUserForTesting("nonadmin", new String[] {"users"});
-    OMException ex = assertThrows(OMException.class, () -> getDBUpdates(nonAdmin));
+    OMException ex = assertThrows(OMException.class, () -> getDBUpdates(conf, nonAdmin));
     assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
   }
 
@@ -123,15 +139,38 @@ public class TestGetDBUpdatesAuthorization {
   void adminIsAllowed() throws Exception {
     UserGroupInformation admin =
         UserGroupInformation.createUserForTesting("admin", new String[] {"admins"});
-    DBUpdates updates = getDBUpdates(admin);
-    assertFalse(updates.getData().isEmpty());
+    assertDbUpdatesNonEmpty(getDBUpdates(conf, admin));
   }
 
   @Test
   void readOnlyAdminIsAllowed() throws Exception {
+    UserGroupInformation readOnlyAdmin =
+        UserGroupInformation.createUserForTesting(READONLY_ADMIN, new String[] {"users"});
+    assertDbUpdatesNonEmpty(getDBUpdates(conf, readOnlyAdmin));
+  }
+
+  @Test
+  void reconPrincipalIsAllowed() throws Exception {
     UserGroupInformation recon =
         UserGroupInformation.createUserForTesting(RECON_PRINCIPAL, new String[] {"recon"});
-    DBUpdates updates = getDBUpdates(recon);
-    assertTrue(updates.getData() != null && !updates.getData().isEmpty());
+    assertDbUpdatesNonEmpty(getDBUpdates(conf, recon));
+  }
+
+  @Test
+  void accessDeniedWhenReconPrincipalNotConfigured() throws Exception {
+    OzoneConfiguration noReconConf = authTestConfiguration();
+    noReconConf.unset(OZONE_RECON_KERBEROS_PRINCIPAL_KEY);
+    MiniOzoneCluster denyCluster =
+        MiniOzoneCluster.newBuilder(noReconConf).setNumDatanodes(1).build();
+    try {
+      denyCluster.waitForClusterToBeReady();
+      UserGroupInformation reconLikeUser =
+          UserGroupInformation.createUserForTesting(RECON_PRINCIPAL, new String[] {"recon"});
+      OMException ex = assertThrows(OMException.class,
+          () -> getDBUpdates(noReconConf, reconLikeUser));
+      assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+    } finally {
+      denyCluster.shutdown();
+    }
   }
 }

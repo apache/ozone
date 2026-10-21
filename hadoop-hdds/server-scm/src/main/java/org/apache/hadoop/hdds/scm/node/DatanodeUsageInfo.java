@@ -22,6 +22,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.ozone.ClientVersion;
 
 /**
  * Bundles datanode details with usage statistics.
@@ -221,11 +222,11 @@ public class DatanodeUsageInfo {
    *
    * @return Protobuf HddsProtos.DatanodeUsageInfo
    */
-  public DatanodeUsageInfoProto toProto(int clientVersion) {
+  public DatanodeUsageInfoProto toProto(ClientVersion clientVersion) {
     return toProtoBuilder(clientVersion).build();
   }
 
-  private DatanodeUsageInfoProto.Builder toProtoBuilder(int clientVersion) {
+  private DatanodeUsageInfoProto.Builder toProtoBuilder(ClientVersion clientVersion) {
     DatanodeUsageInfoProto.Builder builder =
         DatanodeUsageInfoProto.newBuilder();
 

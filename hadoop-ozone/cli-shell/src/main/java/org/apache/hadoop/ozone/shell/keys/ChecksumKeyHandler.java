@@ -59,8 +59,9 @@ public class ChecksumKeyHandler extends KeyHandler {
   protected FileChecksum getFileChecksum(OzoneVolume vol, OzoneBucket bucket,
       String keyName, long dataSize, ClientProtocol clientProxy)
       throws IOException {
-    return getFileChecksumWithCombineMode(vol, bucket, keyName, dataSize, mode,
-        clientProxy);
+    // LookupKey, not LookupFile: the CLI must keep working on OBJECT_STORE buckets.
+    return getFileChecksumWithCombineMode(vol.getName(), bucket.getName(), keyName, dataSize, mode,
+        clientProxy, false);
   }
 
   /**

@@ -40,7 +40,6 @@ import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -54,9 +53,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -83,8 +81,9 @@ import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.ScmNodeAddress;
 import org.apache.hadoop.metrics2.util.MBeans;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
@@ -123,6 +122,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       HddsDatanodeService.class);
 
   public static final String TESTING_DATANODE_VERSION_INITIAL = "testing.hdds.datanode.version.initial";
+  // TODO(HDDS-16044): TESTING_DATANODE_VERSION_CURRENT is unused until SCM-side version setting lands.
   public static final String TESTING_DATANODE_VERSION_CURRENT = "testing.hdds.datanode.version.current";
 
   private OzoneConfiguration conf;
@@ -289,7 +289,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         LOG.info("Hdds Datanode login successful.");
       }
 
-      DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+      DatanodeStorage layoutStorage = new DatanodeStorage(conf,
           datanodeDetails.getUuidString());
       if (layoutStorage.getState() != INITIALIZED) {
         layoutStorage.initialize();
@@ -479,8 +479,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       details = DatanodeDetails.newBuilder().setID(DatanodeID.randomID()).build();
       details.setInitialVersion(getInitialVersion());
     }
-    // Current version is always overridden to the latest
-    details.setCurrentVersion(getCurrentVersion());
     return details;
   }
 
@@ -783,12 +781,12 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     LOG.info("Reconfiguring SCM nodes for service ID {} with new SCM nodes {} and remove SCM nodes {}",
         scmServiceId, scmNodesIdsToAdd, scmNodesIdsToRemove);
 
-    final Collection<Pair<String, HostAndPort>> scmToAdd = HddsServerUtil.getSCMAddressForDatanodes(
+    final List<ScmNodeAddress> scmToAdd = HddsServerUtil.getSCMAddressForDatanodes(
         getConf(), scmServiceId, scmNodesIdsToAdd);
     if (scmToAdd == null) {
       throw new IllegalStateException("Reconfiguration failed to get SCM address to add due to wrong configuration");
     }
-    final Collection<Pair<String, HostAndPort>> scmToRemove = HddsServerUtil.getSCMAddressForDatanodes(
+    final List<ScmNodeAddress> scmToRemove = HddsServerUtil.getSCMAddressForDatanodes(
         getConf(), scmServiceId, scmNodesIdsToRemove);
     if (scmToRemove == null) {
       throw new IllegalArgumentException(
@@ -809,9 +807,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
 
     // Add the new SCM servers
-    for (Pair<String, HostAndPort> pair : scmToAdd) {
-      String scmNodeId = pair.getLeft();
-      final HostAndPort scmAddress = pair.getRight();
+    for (ScmNodeAddress nodeAddress : scmToAdd) {
+      String scmNodeId = nodeAddress.getScmNodeId();
+      final HostAndPort scmAddress = nodeAddress.getHostAndPort();
       if (scmAddress.getAddress().isUnresolved()) {
         LOG.warn("Reconfiguration failed to add SCM address {} for SCM service {} since it can't " +
             "be resolved, skipping", scmAddress, scmServiceId);
@@ -828,9 +826,9 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     }
 
     // Remove the old SCM server
-    for (Pair<String, HostAndPort> pair : scmToRemove) {
-      String scmNodeId = pair.getLeft();
-      final HostAndPort scmAddress = pair.getRight();
+    for (ScmNodeAddress nodeAddress : scmToRemove) {
+      String scmNodeId = nodeAddress.getScmNodeId();
+      final HostAndPort scmAddress = nodeAddress.getHostAndPort();
       try {
         connectionManager.removeSCMServer(scmAddress);
         context.removeEndpoint(scmAddress);
@@ -855,14 +853,8 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   /**
    * Returns the initial version of the datanode.
    */
-  private int getInitialVersion() {
-    return conf.getInt(TESTING_DATANODE_VERSION_INITIAL, DatanodeVersion.CURRENT_VERSION);
-  }
-
-  /**
-   * Returns the current version of the datanode.
-   */
-  private int getCurrentVersion() {
-    return conf.getInt(TESTING_DATANODE_VERSION_CURRENT, DatanodeVersion.CURRENT_VERSION);
+  private HDDSVersion getInitialVersion() {
+    return HDDSVersion.deserialize(
+        conf.getInt(TESTING_DATANODE_VERSION_INITIAL, HDDSVersion.SOFTWARE_VERSION.serialize()));
   }
 }

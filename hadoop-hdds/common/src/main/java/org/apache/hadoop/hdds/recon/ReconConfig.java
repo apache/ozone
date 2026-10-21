@@ -32,7 +32,8 @@ public class ReconConfig {
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.RECON, ConfigTag.OZONE },
-      description = "This Kerberos principal is used by the Recon service."
+      description = "This Kerberos principal is used by the Recon service. SCM issues a Recon certificate only to this"
+          + " service user, so the property must be set in the configuration of SCM as well."
   )
   private String principal;
 

@@ -109,6 +109,21 @@ public class TestS3RevokeSTSTokenRequest {
   }
 
   @Test
+  public void testPreExecuteFailsWithoutRpcUser() throws Exception {
+    final String originalAccessKeyId = "original-access-key-id";
+
+    OMException ex;
+    try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
+      configureOzoneManagerForPreExecute(ozoneManager, originalAccessKeyId, true);
+      when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+
+      final OMClientRequest omClientRequest = new S3RevokeSTSTokenRequest(buildRevokeOmRequest(originalAccessKeyId));
+      ex = assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
+    }
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
+  }
+
+  @Test
   public void testPreExecuteSucceedsForOriginalAccessKeyOwner() throws Exception {
     // Verify that preExecute allows the owner of the original access key ID from the revoke request
     // to revoke the temporary credentials.

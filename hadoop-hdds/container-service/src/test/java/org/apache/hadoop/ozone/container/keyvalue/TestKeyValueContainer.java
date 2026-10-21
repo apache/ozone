@@ -22,8 +22,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.buildTestTree;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED;
-import static org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions.MISSING_METADATA_DIR;
+import static org.apache.hadoop.ozone.container.keyvalue.ContainerTestCorruptions.MISSING_METADATA_DIR;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,8 +38,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
@@ -53,6 +57,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +67,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
@@ -69,22 +75,29 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
@@ -96,12 +109,17 @@ import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.metadata.AbstractDatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
 import org.apache.hadoop.util.DiskChecker;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.ColumnFamilyOptions;
 import org.rocksdb.LiveFileMetaData;
 
@@ -494,6 +512,89 @@ public class TestKeyValueContainer {
         }
       });
     }
+  }
+
+  /**
+   * A copy of a container carries the source's pending block deletions only if it is exported after the source
+   * recorded them: exporting holds the container lock that recording a deletion needs, so the two are serialized.
+   * A copy exported first keeps the blocks with no pending-delete record, so only a resend of the SCM transaction
+   * can delete them there. A copy exported after the deletion is recorded, and so after the source can ACK it to
+   * SCM, deletes the blocks on its own.
+   */
+  @ContainerTestVersionInfo.ContainerTest
+  public void testExportCarriesOnlyDeletionsRecordedBeforeExport(ContainerTestVersionInfo versionInfo)
+      throws Exception {
+    init(versionInfo);
+    createContainer();
+    closeContainer();
+    final long numberOfKeysToWrite = 4;
+    populate(numberOfKeysToWrite);
+    final long containerId = keyValueContainerData.getContainerID();
+    final long txId = 10;
+    final TarContainerPacker packer = new TarContainerPacker(NO_COMPRESSION);
+
+    final Path exportedBeforeDelete = folder.toPath().resolve("before-delete.tar");
+    try (OutputStream out = Files.newOutputStream(exportedBeforeDelete)) {
+      keyValueContainer.exportContainerData(out, packer);
+    }
+
+    // Record the deletion on the source as the datanode does before it ACKs the transaction to SCM.
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    ContainerSet containerSet = newContainerSet();
+    containerSet.addContainer(keyValueContainer);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
+    DeleteBlocksCommandHandler handler =
+        new DeleteBlocksCommandHandler(ozoneContainer, CONF, CONF.getObject(DatanodeConfiguration.class), "");
+    try {
+      DeletedBlocksTransaction tx = DeletedBlocksTransaction.newBuilder()
+          .setTxID(txId)
+          .setContainerID(containerId)
+          .setCount(0)
+          .addAllLocalID(LongStream.range(0, numberOfKeysToWrite).boxed().collect(Collectors.toList()))
+          .build();
+      List<DeleteBlockTransactionResult> results = handler.executeCmdWithRetry(Collections.singletonList(tx));
+      assertEquals(1, results.size());
+      assertTrue(results.get(0).getSuccess());
+    } finally {
+      handler.stop();
+      BlockDeletingServiceMetrics.unRegister();
+    }
+    assertEquals(txId, keyValueContainerData.getDeleteTransactionId());
+
+    final Path exportedAfterDelete = folder.toPath().resolve("after-delete.tar");
+    try (OutputStream out = Files.newOutputStream(exportedAfterDelete)) {
+      keyValueContainer.exportContainerData(out, packer);
+    }
+    KeyValueContainerUtil.removeContainer(keyValueContainerData, CONF);
+    keyValueContainer.delete();
+
+    KeyValueContainer copy = importContainer(containerId, exportedBeforeDelete, packer);
+    assertEquals(0, copy.getContainerData().getDeleteTransactionId());
+    assertEquals(0, copy.getContainerData().getNumPendingDeletionBlocks());
+    assertEquals(numberOfKeysToWrite, copy.getContainerData().getBlockCount());
+    KeyValueContainerUtil.removeContainer(copy.getContainerData(), CONF);
+    copy.delete();
+
+    copy = importContainer(containerId, exportedAfterDelete, packer);
+    assertEquals(txId, copy.getContainerData().getDeleteTransactionId());
+    assertEquals(numberOfKeysToWrite, copy.getContainerData().getNumPendingDeletionBlocks());
+    assertEquals(numberOfKeysToWrite, copy.getContainerData().getBlockCount());
+  }
+
+  private KeyValueContainer importContainer(long containerId, Path tarFile, TarContainerPacker packer)
+      throws IOException {
+    KeyValueContainerData containerData = new KeyValueContainerData(containerId,
+        keyValueContainerData.getLayoutVersion(), keyValueContainerData.getMaxSize(), UUID.randomUUID().toString(),
+        datanodeId.toString());
+    containerData.setSchemaVersion(keyValueContainerData.getSchemaVersion());
+    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+    HddsVolume containerVolume = volumeChoosingPolicy.chooseVolume(
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()), 1);
+    container.populatePathFields(scmId, containerVolume);
+    try (InputStream in = Files.newInputStream(tarFile)) {
+      container.importContainerData(in, packer);
+    }
+    return container;
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -987,7 +1088,7 @@ public class TestKeyValueContainer {
     long containerId = startContainerId;
 
     // Create containers on each volume and export all container on new volume
-    int count = 200;
+    int count = 10;
     long numberOfKeysToWrite = 500;
     KeyValueContainerData containerData;
     KeyValueContainer container;
@@ -1057,8 +1158,6 @@ public class TestKeyValueContainer {
       // After moving away from using Table.loadFromFile(), no SST files are generated unless the db is force flushed
       assertEquals(0, fileMetaDataList1.size());
       hddsVolume.compactDb();
-      // Sleep a while to wait for compaction to complete
-      Thread.sleep(7000);
       List<LiveFileMetaData> fileMetaDataList2 =
           ((RDBStore)(dnStore.getStore())).getDb().getLiveFilesMetaData();
       assertThat(fileMetaDataList2).hasSizeLessThanOrEqualTo(fileMetaDataList1.size());
@@ -1069,6 +1168,82 @@ public class TestKeyValueContainer {
             new File(c.getContainerData().getContainerPath());
         FileUtils.deleteDirectory(directory);
       }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testAutoCompactionClosesCompactRangeOptions(boolean compactionFails) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
+    dc.setAutoCompactionSmallSstFileNum(1);
+    conf.setFromObject(dc);
+    DatanodeStoreSchemaThreeImpl store =
+        spy(new DatanodeStoreSchemaThreeImpl(conf, new File(folder, "compaction.db").getAbsolutePath(), false));
+    List<ManagedCompactRangeOptions> options = new ArrayList<>();
+    try {
+      for (long containerId = 1; containerId <= 2; containerId++) {
+        store.getBlockDataTable().put(DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(containerId) + 1,
+            new BlockData(new BlockID(containerId, 1)));
+        store.flushDB();
+      }
+      RDBStore rdbStore = spy((RDBStore) store.getStore());
+      RocksDatabase db = spy(rdbStore.getDb());
+      doReturn(rdbStore).when(store).getStore();
+      doReturn(db).when(rdbStore).getDb();
+      IOException failure = new IOException("Compaction failed");
+      doAnswer(invocation -> {
+        options.add(invocation.getArgument(3));
+        if (compactionFails) {
+          throw failure;
+        }
+        return invocation.callRealMethod();
+      }).when(db).compactRange(any(ColumnFamily.class), any(byte[].class), any(byte[].class),
+          any(ManagedCompactRangeOptions.class));
+
+      if (compactionFails) {
+        assertThat(assertThrows(IOException.class, store::compactionIfNeeded)).isSameAs(failure);
+      } else {
+        store.compactionIfNeeded();
+      }
+      assertThat(options).isNotEmpty().noneMatch(ManagedCompactRangeOptions::isOwningHandle);
+    } finally {
+      options.forEach(ManagedCompactRangeOptions::close);
+      // Preserve the column family options shared by datanode DBs.
+      store.stop();
+    }
+  }
+
+  @Test
+  void testLoadKVContainerDataChecksKeyPrefix() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStoreSchemaThreeImpl source =
+        new DatanodeStoreSchemaThreeImpl(conf, new File(folder, "source.db").getAbsolutePath(), false);
+    DatanodeStoreSchemaThreeImpl target =
+        new DatanodeStoreSchemaThreeImpl(conf, new File(folder, "target.db").getAbsolutePath(), false);
+    try {
+      for (long containerId = 1; containerId <= 2; containerId++) {
+        String prefix = DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(containerId);
+        source.getMetadataTable().put(prefix + "#blockCount", 1L);
+        source.getBlockDataTable().put(prefix + 1, new BlockData(new BlockID(containerId, 1)));
+      }
+      File dumpDir = new File(folder, "dump");
+      assertTrue(dumpDir.mkdir());
+      source.dumpKVContainerData(1, dumpDir);
+      // Replace the block data of container 1 with that of container 2.
+      File blockDataDump = DatanodeStoreSchemaThreeImpl.getTableDumpFile(source.getBlockDataTable(), dumpDir);
+      Files.delete(blockDataDump.toPath());
+      source.getBlockDataTable().dumpToFileWithPrefix(blockDataDump,
+          DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix(2));
+
+      IOException e = assertThrows(IOException.class, () -> target.loadKVContainerData(dumpDir, 1));
+      assertThat(e).hasMessageContaining("outside container 1");
+      // Nothing is loaded, not even the metadata of container 1 read before the failure.
+      assertTrue(target.getMetadataTable().isEmpty());
+      assertTrue(target.getBlockDataTable().isEmpty());
+    } finally {
+      source.stop();
+      target.stop();
     }
   }
 

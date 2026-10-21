@@ -454,6 +454,25 @@ class TestNetworkTopologyImpl {
     }
   }
 
+  @Test
+  void testChooseRandomWithExcludedScopePrefix() {
+    NodeSchema[] schemas = {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
+    Node datanodeA = createDatanode("datanode-A", "/r1");
+    Node datanodeB = createDatanode("datanode-B", "/r10");
+
+    Node[] nodeArray = {datanodeA, datanodeB};
+    initNetworkTopology(schemas, nodeArray);
+
+    List<String> excludedScopes = new ArrayList<>();
+    excludedScopes.add(datanodeB.getNetworkFullPath());
+
+    Node chosenNode = cluster.chooseRandom(
+        ROOT, excludedScopes, null, null, 0);
+
+    assertEquals(datanodeA, chosenNode,
+        "datanode-A should be selected when datanode-B is excluded");
+  }
+
   /**
    * Following test checks that chooseRandom works for an excluded nodes.
    */

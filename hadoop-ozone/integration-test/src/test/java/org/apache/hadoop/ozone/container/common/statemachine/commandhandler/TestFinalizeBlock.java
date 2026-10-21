@@ -108,7 +108,8 @@ public class TestFinalizeBlock {
     conf.setFromObject(scmConfig);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(1).build();
+        .setNumDatanodes(1)
+        .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(ONE, 30000);
 

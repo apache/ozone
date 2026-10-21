@@ -28,7 +28,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.fs.ByteBufferReadable;
 import org.apache.hadoop.fs.CanUnbuffer;
 import org.apache.hadoop.fs.Seekable;
@@ -403,9 +402,9 @@ public class ChunkInputStream extends InputStream
     final long adjustedOffset;
     final long adjustedLen;
     if (verifyChecksum) {
-      Pair<Long, Long> boundaries = computeChecksumBoundaries(chunkRelativePosition, toRead);
-      adjustedOffset = boundaries.getLeft();
-      adjustedLen = boundaries.getRight();
+      ChecksumBoundaries boundaries = computeChecksumBoundaries(chunkRelativePosition, toRead);
+      adjustedOffset = boundaries.offset;
+      adjustedLen = boundaries.length;
     } else {
       adjustedOffset = chunkRelativePosition;
       adjustedLen = toRead;
@@ -447,13 +446,13 @@ public class ChunkInputStream extends InputStream
    * @return number of bytes copied into {@code dst}, or {@link #EOF} at EOF
    */
   int readPositioned(long chunkRelativePosition, ByteBuffer dst) throws IOException {
+    if (!dst.hasRemaining()) {
+      return 0;
+    }
     if (chunkRelativePosition < 0 || chunkRelativePosition >= length) {
       return EOF;
     }
     final int toRead = (int) Math.min(dst.remaining(), length - chunkRelativePosition);
-    if (toRead == 0) {
-      return 0;
-    }
 
     final ChunkInfo readChunkInfo = getChunkInfo(chunkRelativePosition, toRead);
     final long adjustedOffset = readChunkInfo.getOffset() - chunkInfo.getOffset();
@@ -608,8 +607,7 @@ public class ChunkInputStream extends InputStream
    * @return Adjusted (Chunk Offset, Chunk Length) which needs to be read
    * from Container
    */
-  private Pair<Long, Long> computeChecksumBoundaries(long startByteIndex,
-      int dataLen) {
+  private ChecksumBoundaries computeChecksumBoundaries(long startByteIndex, int dataLen) {
 
     int bytesPerChecksum = chunkInfo.getChecksumData().getBytesPerChecksum();
     // index of the last byte to be read from chunk, inclusively.
@@ -620,7 +618,21 @@ public class ChunkInputStream extends InputStream
     final long endIndex = ((endByteIndex / bytesPerChecksum) + 1)
         * bytesPerChecksum; // exclusive
     long adjustedChunkLen = Math.min(endIndex, length) - adjustedChunkOffset;
-    return Pair.of(adjustedChunkOffset, adjustedChunkLen);
+    return new ChecksumBoundaries(adjustedChunkOffset, adjustedChunkLen);
+  }
+
+  /**
+   * Represents a byte range (offset and length) expanded to align with
+   * checksum chunk boundaries required for verification.
+   */
+  private static final class ChecksumBoundaries {
+    private final long offset;
+    private final long length;
+
+    private ChecksumBoundaries(long offset, long length) {
+      this.offset = offset;
+      this.length = length;
+    }
   }
 
   /**

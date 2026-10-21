@@ -20,7 +20,9 @@ package org.apache.hadoop.ozone.om;
 import static com.google.common.collect.Sets.newHashSet;
 import static java.util.Arrays.asList;
 import static org.apache.hadoop.hdds.client.ReplicationConfig.fromTypeAndFactor;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.eq;
@@ -40,6 +42,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -50,7 +53,8 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
+import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -61,13 +65,20 @@ import org.junit.jupiter.params.provider.MethodSource;
  * ScmClient test-cases.
  */
 public class TestScmClient {
-  private StorageContainerLocationProtocol containerLocationProtocol;
+  /**
+   * Wire values that are not defined in {@link HDDSVersion} on this OM deserialize to
+   * {@link HDDSVersion#UNKNOWN_VERSION} while {@link DatanodeDetails#getSerializedCurrentVersion()}
+   * keeps the original int.
+   */
+  private static final int UNKNOWN_WIRE_VERSION_A = 500;
+  private static final int UNKNOWN_WIRE_VERSION_B = 501;
+  private StorageContainerLocationInternalInterface containerLocationProtocol;
   private ScmClient scmClient;
 
   @BeforeEach
   public void setUp() {
     ScmBlockLocationProtocol scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
-    containerLocationProtocol = mock(StorageContainerLocationProtocol.class);
+    containerLocationProtocol = mock(StorageContainerLocationInternalInterface.class);
     OzoneConfiguration conf = new OzoneConfiguration();
     scmClient = new ScmClient(scmBlockLocationProtocol,
         containerLocationProtocol, conf);
@@ -210,6 +221,28 @@ public class TestScmClient {
     assertSame(updated, datanodeDetailsCache.getIfPresent(original.getID()));
   }
 
+  @Test
+  public void testReloadScmNodesDelegatesToBothProviders() {
+    SCMFailoverProxyProviderBase<?> blockProvider =
+        mock(SCMFailoverProxyProviderBase.class);
+    SCMFailoverProxyProviderBase<?> containerProvider =
+        mock(SCMFailoverProxyProviderBase.class);
+    ScmClient client = new ScmClient(mock(ScmBlockLocationProtocol.class),
+        mock(StorageContainerLocationInternalInterface.class), blockProvider,
+        containerProvider, new OzoneConfiguration());
+
+    client.reloadScmNodes();
+
+    verify(blockProvider, times(1)).changeConfig();
+    verify(containerProvider, times(1)).changeConfig();
+  }
+
+  @Test
+  public void testReloadScmNodesIsNoOpWithoutProviders() {
+    // Ignore reload when providers are null (e.g., in unit tests).
+    assertDoesNotThrow(scmClient::reloadScmNodes);
+  }
+
   ContainerWithPipeline createPipeline(long containerId,
                                        List<DatanodeDetails> dnList) {
     ContainerInfo containerInfo = new ContainerInfo.Builder()
@@ -233,4 +266,72 @@ public class TestScmClient {
         .build();
   }
 
+  @Test
+  public void testDatanodeDetailsCacheUpdatesCurrentVersionChange() {
+    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache = CacheBuilder.newBuilder().build();
+    DatanodeDetails original = randomDatanode();
+    original.setCurrentVersion(HDDSVersion.STREAM_BLOCK_SUPPORT);
+    DatanodeDetails upgraded = DatanodeDetails.newBuilder()
+        .setDatanodeDetails(original)
+        .setCurrentVersion(HDDSVersion.SHORT_CIRCUIT_READS)
+        .build();
+
+    ScmClient.newPipelineWithDNCache(createPipeline(1L, asList(original)).getPipeline(), datanodeDetailsCache);
+    Pipeline refreshed = ScmClient.newPipelineWithDNCache(
+        createPipeline(2L, asList(upgraded)).getPipeline(), datanodeDetailsCache);
+
+    assertSame(upgraded, refreshed.getNodes().get(0));
+    assertEquals(HDDSVersion.SHORT_CIRCUIT_READS, refreshed.getNodes().get(0).getCurrentVersion());
+    assertSame(upgraded, datanodeDetailsCache.getIfPresent(original.getID()));
+  }
+
+  @Test
+  public void testDatanodeDetailsCacheUpdatesKnownVersionToUnknownWireVersion() {
+    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache = CacheBuilder.newBuilder().build();
+    DatanodeDetails original = randomDatanode();
+    original.setCurrentVersion(HDDSVersion.SHORT_CIRCUIT_READS);
+    DatanodeDetails upgraded = sameNodeWithWireVersion(original, UNKNOWN_WIRE_VERSION_A);
+
+    ScmClient.newPipelineWithDNCache(
+        createPipeline(1L, asList(original)).getPipeline(), datanodeDetailsCache);
+    Pipeline refreshed = ScmClient.newPipelineWithDNCache(
+        createPipeline(2L, asList(upgraded)).getPipeline(), datanodeDetailsCache);
+
+    DatanodeDetails refreshedNode = refreshed.getNodes().get(0);
+    assertSame(upgraded, refreshedNode);
+    assertEquals(HDDSVersion.UNKNOWN_VERSION, refreshedNode.getCurrentVersion());
+    assertEquals(UNKNOWN_WIRE_VERSION_A, refreshedNode.getSerializedCurrentVersion());
+    assertSame(upgraded, datanodeDetailsCache.getIfPresent(original.getID()));
+  }
+
+  @Test
+  public void testDatanodeDetailsCacheUpdatesDifferentUnknownWireVersions() {
+    Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache = CacheBuilder.newBuilder().build();
+    DatanodeDetails original = sameNodeWithWireVersion(randomDatanode(), UNKNOWN_WIRE_VERSION_A);
+    DatanodeDetails upgraded = sameNodeWithWireVersion(original, UNKNOWN_WIRE_VERSION_B);
+
+    assertEquals(HDDSVersion.UNKNOWN_VERSION, original.getCurrentVersion());
+    assertEquals(HDDSVersion.UNKNOWN_VERSION, upgraded.getCurrentVersion());
+    assertNotEquals(original.getSerializedCurrentVersion(), upgraded.getSerializedCurrentVersion());
+
+    ScmClient.newPipelineWithDNCache(
+        createPipeline(1L, asList(original)).getPipeline(), datanodeDetailsCache);
+    Pipeline refreshed = ScmClient.newPipelineWithDNCache(
+        createPipeline(2L, asList(upgraded)).getPipeline(), datanodeDetailsCache);
+
+    DatanodeDetails refreshedNode = refreshed.getNodes().get(0);
+    assertSame(upgraded, refreshedNode);
+    assertEquals(HDDSVersion.UNKNOWN_VERSION, refreshedNode.getCurrentVersion());
+    assertEquals(UNKNOWN_WIRE_VERSION_B, refreshedNode.getSerializedCurrentVersion());
+    assertSame(upgraded, datanodeDetailsCache.getIfPresent(original.getID()));
+    assertEquals(UNKNOWN_WIRE_VERSION_B,
+        datanodeDetailsCache.getIfPresent(original.getID()).getSerializedCurrentVersion());
+  }
+
+  private static DatanodeDetails sameNodeWithWireVersion(DatanodeDetails base, int wireVersion) {
+    return DatanodeDetails.newBuilder()
+        .setDatanodeDetails(base)
+        .setCurrentVersion(wireVersion)
+        .build();
+  }
 }

@@ -41,10 +41,9 @@ env:
   # BUILD_ARGS and TEST_JAVA_VERSION are duplicated in populate-cache.yml, please keep in sync
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
   TEST_JAVA_VERSION: 25 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
-  # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml and populate-cache.yml, please keep in sync
-  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
-  # Maven 3.9 downloads dependencies via maven-resolver-transport-http, which reads aether.* and ignores maven.wagon.*
-  MAVEN_OPTS: -Dhttp.keepAlive=false -Daether.connector.http.retryHandler.count=10
+  # MAVEN_ARGS and MAVEN_OPTS are duplicated in several workflows, please keep in sync
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml -Ddevelocity.user.config=${{ github.workspace }}/.mvn/develocity-asf.xml
+  MAVEN_OPTS: -Daether.connector.http.connectionMaxTtl=25 -Daether.connector.http.retryHandler.count=5 -Daether.connector.http.retryHandler.intervalMax=30000
   OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
 
 permissions: { }
@@ -56,34 +55,37 @@ jobs:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
-      integration-suites: ${{ steps.integration-suites.outputs.suites }}
-      needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
+      acceptance-versions: ${{ steps.acceptance-suites.outputs.versions }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
+      integration-suites: ${{ steps.integration-suites.outputs.suites }}
+      kubernetes-suites: ${{ steps.kubernetes-suites.outputs.suites }}
+      needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
       needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
       sha: ${{ steps.get-sha.outputs.sha }}
+      test-classes: ${{ steps.selective-checks.outputs.test-classes }}
       # `env` context cannot be used when calling reusable workflow, so we need to convert these to `outputs`
       build-args: ${{ env.BUILD_ARGS }}
       java-version: ${{ env.TEST_JAVA_VERSION }}
       with-coverage: ${{ env.OZONE_WITH_COVERAGE }}
     steps:
       - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
         if: github.event_name  == 'push'
       - name: "Checkout ${{ github.sha }} with its parent (pull request)"
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
           persist-credentials: false
         if: github.event_name  == 'pull_request'
       - name: "Checkout ${{ inputs.ref }} given in workflow input (manual dispatch)"
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
@@ -116,6 +118,9 @@ jobs:
       - name: Integration suites
         id: integration-suites
         run: dev-support/ci/integration_suites.sh
+      - name: Kubernetes suites
+        id: kubernetes-suites
+        run: dev-support/ci/kubernetes_suites.sh
       - name: Categorize Basic Checks
         id: categorize-basic-checks
         env:
@@ -174,7 +179,7 @@ jobs:
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
       matrix:
-        java: [ 17, 25 ]
+        java: [ 25 ]
         include:
           - os: ubuntu-24.04
           - java: 21
@@ -187,7 +192,7 @@ jobs:
       ratis-args: ${{ inputs.ratis_args }}
       runner: ${{ matrix.os }}
       script: compile
-      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings -Dmaven.compiler.release=${{ matrix.java }}"
+      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings -Dozone.java.version.server=${{ matrix.java }}"
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.java }}
       timeout-minutes: 45
@@ -213,7 +218,26 @@ jobs:
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
+        exclude:
+          - check: errorprone
       fail-fast: false
+
+  errorprone:
+    needs:
+      - build-info
+      - build
+      - basic
+    if: contains(needs.build-info.outputs.basic-checks, 'errorprone')
+    uses: $/.github/workflows/check.yml
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: true
+      ratis-args: ${{ inputs.ratis_args }}
+      script: errorprone
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 30
 
   dependency:
     needs:
@@ -304,6 +328,35 @@ jobs:
     strategy:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
+        exclude:
+          - suite: compat-old
+      fail-fast: false
+
+  # acceptance (compat-old), split by old Ozone version
+  compat-old:
+    name: acceptance (compat-old)
+    needs:
+      - build-info
+      - build
+      - basic
+      - dependency
+      - license
+    if: needs.build-info.outputs.needs-compose-tests == 'true'
+    uses: $/.github/workflows/check.yml
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    with:
+      needs-ozone-binary-tarball: true
+      ratis-args: ${{ inputs.ratis_args }}
+      script: acceptance
+      script-args: compat-old ${{ matrix.version }}
+      sha: ${{ needs.build-info.outputs.sha }}
+      split: compat-old-${{ matrix.version }}
+      timeout-minutes: 30
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    strategy:
+      matrix:
+        version: ${{ fromJson(needs.build-info.outputs.acceptance-versions) }}
       fail-fast: false
 
   kubernetes:
@@ -321,9 +374,15 @@ jobs:
       needs-ozone-binary-tarball: true
       ratis-args: ${{ inputs.ratis_args }}
       script: kubernetes
+      script-args: ${{ matrix.suite }}
       sha: ${{ needs.build-info.outputs.sha }}
-      timeout-minutes: 60
+      split: ${{ matrix.suite }}
+      timeout-minutes: 10
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    strategy:
+      matrix:
+        suite: ${{ fromJson(needs.build-info.outputs.kubernetes-suites) }}
+      fail-fast: false
 
   integration:
     needs:
@@ -338,6 +397,7 @@ jobs:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
     with:
       java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: ${{ matrix.profile == 'filesystem' }}
       pre-script: sudo hostname localhost
       ratis-args: ${{ inputs.ratis_args }}
       script: integration
@@ -351,6 +411,31 @@ jobs:
         profile: ${{ fromJson(needs.build-info.outputs.integration-suites) }}
       fail-fast: false
 
+  # same as integration, but runs specific tests instead of profiles
+  specific-tests:
+    name: integration
+    needs:
+      - build-info
+      - build
+      - basic
+      - dependency
+      - license
+    if: |
+      needs.build-info.outputs.test-classes != '' &&
+      needs.build-info.outputs.needs-integration-tests != 'true'
+    uses: $/.github/workflows/check.yml
+    secrets:
+      DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      pre-script: sudo hostname localhost
+      ratis-args: ${{ inputs.ratis_args }}
+      script: integration
+      script-args: -Drocks_tools_native -DskipShade -Dtest=${{ needs.build-info.outputs.test-classes }}
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 90
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+
   coverage:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -358,16 +443,17 @@ jobs:
     needs:
       - build-info
       - acceptance
+      - compat-old
       - integration
     steps:
       - name: Checkout project
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -376,7 +462,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Download artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@v8
         with:
           path: target/artifacts
       - name: Untar binaries
@@ -384,7 +470,7 @@ jobs:
           mkdir -p hadoop-ozone/dist/target
           tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Setup java ${{ env.TEST_JAVA_VERSION }}
-        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
@@ -398,7 +484,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Archive build results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: target/coverage

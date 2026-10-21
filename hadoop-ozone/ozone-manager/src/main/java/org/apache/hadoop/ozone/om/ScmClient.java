@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATIO
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_CONTAINER_LOCATION_DATANODE_CACHE_SIZE_DEFAULT;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -45,7 +46,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
+import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.apache.hadoop.ozone.util.CacheMetrics;
 
 /**
@@ -54,16 +56,28 @@ import org.apache.hadoop.ozone.util.CacheMetrics;
 public class ScmClient {
 
   private final ScmBlockLocationProtocol blockClient;
-  private final StorageContainerLocationProtocol containerClient;
+  private final StorageContainerLocationInternalInterface containerClient;
+  private final SCMFailoverProxyProviderBase<?> blockProxyProvider;
+  private final SCMFailoverProxyProviderBase<?> containerProxyProvider;
   private final LoadingCache<Long, Pipeline> containerLocationCache;
   private final CacheMetrics containerCacheMetrics;
   private final CacheMetrics datanodeDetailsCacheMetrics;
 
   ScmClient(ScmBlockLocationProtocol blockClient,
-            StorageContainerLocationProtocol containerClient,
+            StorageContainerLocationInternalInterface containerClient,
+            OzoneConfiguration configuration) {
+    this(blockClient, containerClient, null, null, configuration);
+  }
+
+  ScmClient(ScmBlockLocationProtocol blockClient,
+            StorageContainerLocationInternalInterface containerClient,
+            SCMFailoverProxyProviderBase<?> blockProxyProvider,
+            SCMFailoverProxyProviderBase<?> containerProxyProvider,
             OzoneConfiguration configuration) {
     this.containerClient = containerClient;
     this.blockClient = blockClient;
+    this.blockProxyProvider = blockProxyProvider;
+    this.containerProxyProvider = containerProxyProvider;
     Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache =
         createDatanodeDetailsCache(configuration);
     this.containerLocationCache =
@@ -77,7 +91,7 @@ public class ScmClient {
 
   static LoadingCache<Long, Pipeline> createContainerLocationCache(
       OzoneConfiguration configuration,
-      StorageContainerLocationProtocol containerClient,
+      StorageContainerLocationInternalInterface containerClient,
       Cache<DatanodeID, DatanodeDetails> datanodeDetailsCache) {
     int maxSize = configuration.getInt(OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE,
         OZONE_OM_CONTAINER_LOCATION_CACHE_SIZE_DEFAULT);
@@ -132,8 +146,11 @@ public class ScmClient {
     for (DatanodeDetails node : pipeline.getNodes()) {
       DatanodeDetails datanodeDetails =
           datanodeDetailsCache.getIfPresent(node.getID());
-      // Call compareNodeValues to handle IP / hostname changes
-      if (datanodeDetails != null && node.compareNodeValues(datanodeDetails)) {
+      // Use the cached entry only when it matches on both network identity
+      // (compareNodeValues: hostname / IP / ports) and wire-protocol capability
+      // version (compareNodeVersions: currentVersion).
+      if (datanodeDetails != null && node.compareNodeValues(datanodeDetails)
+          && node.compareNodeVersions(datanodeDetails)) {
         nodes.add(datanodeDetails);
       } else {
         datanodeDetailsCache.put(node.getID(), node);
@@ -144,11 +161,34 @@ public class ScmClient {
     return builder.build();
   }
 
+  /**
+   * Reloads block/container SCM proxies on reconfiguration without an OM restart.
+   * No-op if providers are unavailable (e.g., test mocks).
+   */
+  public void reloadScmNodes() {
+    if (blockProxyProvider != null) {
+      blockProxyProvider.changeConfig();
+    }
+    if (containerProxyProvider != null) {
+      containerProxyProvider.changeConfig();
+    }
+  }
+
+  @VisibleForTesting
+  public SCMFailoverProxyProviderBase<?> getBlockProxyProvider() {
+    return blockProxyProvider;
+  }
+
+  @VisibleForTesting
+  public SCMFailoverProxyProviderBase<?> getContainerProxyProvider() {
+    return containerProxyProvider;
+  }
+
   public ScmBlockLocationProtocol getBlockClient() {
     return this.blockClient;
   }
 
-  public StorageContainerLocationProtocol getContainerClient() {
+  public StorageContainerLocationInternalInterface getContainerClient() {
     return this.containerClient;
   }
 

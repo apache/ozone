@@ -21,8 +21,7 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
 if [[ -z "${RANGER_VERSION:-}" ]]; then
-  # shellcheck source=/dev/null
-  source "${COMPOSE_DIR}/.env"
+  export RANGER_VERSION="${ranger.version}"
 fi
 
 # shellcheck source=/dev/null

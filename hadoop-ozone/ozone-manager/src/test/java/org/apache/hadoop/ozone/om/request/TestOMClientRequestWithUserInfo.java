@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import io.grpc.Context;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,7 +50,8 @@ import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
 import org.apache.hadoop.ozone.om.request.key.OMKeyCommitRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
+import org.apache.hadoop.ozone.om.upgrade.OMVersionManagerTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -92,9 +94,7 @@ public class TestOMClientRequestWithUserInfo {
     when(omConfig.isFileSystemPathEnabled()).thenReturn(false);
     when(ozoneManager.getConfig()).thenReturn(omConfig);
 
-    // Mock version manager to avoid NPE in preExecute
-    OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
-    when(versionManager.getMetadataLayoutVersion()).thenReturn(0);
+    OMVersionManager versionManager = OMVersionManagerTestUtils.mockFinalizedOmVersionManager();
     when(ozoneManager.getVersionManager()).thenReturn(versionManager);
 
     inetAddress = InetAddress.getByName("127.0.0.1");
@@ -186,6 +186,19 @@ public class TestOMClientRequestWithUserInfo {
   }
 
   @Test
+  public void testUserInfoWithoutRemoteAddress() throws Exception {
+    when(ozoneManager.getOmRpcServerAddr()).thenReturn(new InetSocketAddress(inetAddress, 9862));
+
+    OMRequest request = createRequestWithS3Credentials("AccessId", "Signature", "StringToSign");
+    OMClientRequest omClientRequest = new OMKeyCommitRequest(request, mock(BucketLayout.class));
+
+    OzoneManagerProtocolProtos.UserInfo userInfo = omClientRequest.getUserIfNotExists(ozoneManager);
+
+    assertEquals("AccessId", userInfo.getUserName());
+    assertEquals(inetAddress.getHostAddress(), userInfo.getRemoteAddress());
+  }
+
+  @Test
   public void testUserInfoWithSTSToken() throws IOException {
     final String accessId = "ASIA12345";
     final String signature = "Signature";
@@ -237,6 +250,8 @@ public class TestOMClientRequestWithUserInfo {
       final String originalAccessKeyId = "AKIAORIGINAL";
       final String roleArn = "arn:aws:iam::123456789012:role/test-role";
       final String sessionPolicy = "test-session-policy";
+      final String assumedRoleId = "AROATEST123456789:testsess";
+      final String assumedRoleUserArn = "arn:aws:sts::123456789012:assumed-role/test-role/testsess";
       final UUID secretKeyId = UUID.randomUUID();
 
       final STSTokenIdentifier stsTokenIdentifier = mock(STSTokenIdentifier.class);
@@ -245,6 +260,8 @@ public class TestOMClientRequestWithUserInfo {
       when(stsTokenIdentifier.getOriginalAccessKeyId()).thenReturn(originalAccessKeyId);
       when(stsTokenIdentifier.getTempAccessKeyId()).thenReturn(accessId);
       when(stsTokenIdentifier.getSecretKeyId()).thenReturn(secretKeyId);
+      when(stsTokenIdentifier.getAssumedRoleId()).thenReturn(assumedRoleId);
+      when(stsTokenIdentifier.getAssumedRoleUserArn()).thenReturn(assumedRoleUserArn);
 
       final S3Authentication s3Authentication = S3Authentication.newBuilder()
           .setAccessId(accessId)
@@ -256,6 +273,8 @@ public class TestOMClientRequestWithUserInfo {
           .setResolvedStsOriginalAccessKeyId("client-original-access-key-id")
           .setResolvedStsTempAccessKeyId("client-temp-access-key-id")
           .setResolvedStsSecretKeyId("client-secret-key-id")
+          .setResolvedStsAssumedRoleId("client-assumed-role-id")
+          .setResolvedStsAssumedRoleUserArn("client-assumed-role-user-arn")
           .build();
 
       OzoneManager.setS3Auth(s3Authentication);
@@ -282,6 +301,8 @@ public class TestOMClientRequestWithUserInfo {
         assertEquals(originalAccessKeyId, modifiedS3Auth.getResolvedStsOriginalAccessKeyId());
         assertEquals(accessId, modifiedS3Auth.getResolvedStsTempAccessKeyId());
         assertEquals(secretKeyId.toString(), modifiedS3Auth.getResolvedStsSecretKeyId());
+        assertEquals(assumedRoleId, modifiedS3Auth.getResolvedStsAssumedRoleId());
+        assertEquals(assumedRoleUserArn, modifiedS3Auth.getResolvedStsAssumedRoleUserArn());
       } finally {
         OzoneManager.setStsTokenIdentifier(null);
         OzoneManager.setS3Auth(null);

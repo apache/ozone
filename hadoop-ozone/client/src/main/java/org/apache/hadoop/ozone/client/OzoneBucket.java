@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -557,6 +558,14 @@ public class OzoneBucket extends WithMetadata {
         replicationConfig, metadata, tags, derivedKeyPiggyBacking);
   }
 
+  /** Creates a key if its current ETag differs, or if the key is absent. */
+  public OzoneOutputStream createKeyIfNoneMatch(String keyName, long size, String excludedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return proxy.createKeyIfNoneMatch(volumeName, name, keyName, size, excludedETag, replicationConfig,
+        metadata, tags, derivedKeyPiggyBacking);
+  }
+
   /**
    * Rewrites a key only if its ETag matches (S3 If-Match semantics).
    *
@@ -682,6 +691,17 @@ public class OzoneBucket extends WithMetadata {
     }
     return proxy.createStreamKeyIfNotExists(volumeName, name, key, size,
         replicationConfig, keyMetadata, tags, derivedKeyPiggyBacking);
+  }
+
+  /** Creates a stream key if its current ETag differs, or if the key is absent. */
+  public OzoneDataStreamOutput createStreamKeyIfNoneMatch(String keyName, long size, String excludedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    if (replicationConfig == null) {
+      replicationConfig = defaultReplication;
+    }
+    return proxy.createStreamKeyIfNoneMatch(volumeName, name, keyName, size, excludedETag, replicationConfig,
+        metadata, tags, derivedKeyPiggyBacking);
   }
 
   /**
@@ -862,8 +882,9 @@ public class OzoneBucket extends WithMetadata {
   /**
    * Deletes the given list of keys from the bucket.
    * @param keyList List of the key name to be deleted.
-   * @param quiet flag to not throw exception if delete fails
-   * @throws IOException
+   * @param quiet if true, per-key failures are returned in the result map instead of being thrown
+   * @return key name to error for each key that could not be deleted, empty if all keys were deleted
+   * @throws IOException if the request fails as a whole (e.g. bucket not found), even when quiet is true
    */
   public Map<String, ErrorInfo> deleteKeys(List<String> keyList, boolean quiet) throws IOException {
     return proxy.deleteKeys(volumeName, name, keyList, quiet);
@@ -1023,6 +1044,14 @@ public class OzoneBucket extends WithMetadata {
       String uploadID, Map<Integer, String> partsMap) throws IOException {
     return proxy.completeMultipartUpload(volumeName, name, key, uploadID,
         partsMap);
+  }
+
+  /** Completes a multipart upload with an additional If-None-Match entity ETag condition. */
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String key, String uploadID,
+      Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag, String excludedETag)
+      throws IOException {
+    return proxy.completeMultipartUpload(volumeName, name, key, uploadID, partsMap, expectedDataGeneration,
+        expectedETag, excludedETag);
   }
 
   /**
@@ -1214,6 +1243,26 @@ public class OzoneBucket extends WithMetadata {
   public List<OzoneFileStatusLight> listStatusLight(String keyName, boolean recursive,
       String startKey, long numEntries) throws IOException {
     return proxy.listStatusLight(volumeName, name, keyName, recursive, startKey, numEntries, false);
+  }
+
+  /**
+   * Like {@link #listStatus(String, boolean, String, long)}, but also returns whether OM reported that no
+   * entries follow this page.
+   */
+  public ListStatusResult<OzoneFileStatus> listStatusPage(String keyName, boolean recursive,
+      String startKey, long numEntries) throws IOException {
+    return proxy.listStatusPage(
+        ListStatusLightOptions.of(volumeName, name, keyName, recursive, startKey, numEntries, false));
+  }
+
+  /**
+   * Like {@link #listStatusLight(String, boolean, String, long)}, but also returns whether OM reported that
+   * no entries follow this page.
+   */
+  public ListStatusResult<OzoneFileStatusLight> listStatusLightPage(String keyName, boolean recursive,
+      String startKey, long numEntries) throws IOException {
+    return proxy.listStatusLightPage(
+        ListStatusLightOptions.of(volumeName, name, keyName, recursive, startKey, numEntries, false));
   }
 
   /**

@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REVOKED_TOKEN;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -31,9 +32,12 @@ import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
@@ -49,6 +53,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -173,6 +178,56 @@ public class TestS3SecurityUtil {
         new TestConfig()
             .setRevocationCutoffOffsetMs(0)
             .setExpectedResult(null));
+  }
+
+  @Test
+  public void testValidateS3CredentialFailsWhenNotLeader() throws Exception {
+    try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
+      when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+      final OMNotLeaderException notLeaderException = new OMNotLeaderException("om1 is not the leader");
+      doThrow(notLeaderException).when(ozoneManager).checkLeaderStatus();
+
+      try (MockedStatic<STSSecurityUtil> stsSecurityUtilMock = mockStatic(STSSecurityUtil.class, CALLS_REAL_METHODS)) {
+        final OMRequest omRequest = createRequestWithSessionToken(TEMP_ACCESS_KEY_ID, true);
+
+        final ServiceException serviceException = assertThrows(
+            ServiceException.class, () -> S3SecurityUtil.validateS3Credential(omRequest, ozoneManager));
+        assertSame(notLeaderException, serviceException.getCause());
+
+        // A follower must reject before it reads its own revocation metadata, which may be stale.
+        stsSecurityUtilMock.verify(
+            () -> STSSecurityUtil.constructValidateAndDecryptSTSToken(anyString(), any(SecretKeyClient.class),
+                any(Clock.class)),
+            never());
+      }
+    }
+  }
+
+  @Test
+  public void testValidateS3CredentialDoesNotCheckLeaderOutsideStsPath() throws Exception {
+    try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
+      when(ozoneManager.isSecurityEnabled()).thenReturn(true);
+      doThrow(new OMNotLeaderException("om1 is not the leader")).when(ozoneManager).checkLeaderStatus();
+
+      final OzoneDelegationTokenSecretManager delegationTokenMgr = mock(OzoneDelegationTokenSecretManager.class);
+      when(ozoneManager.getDelegationTokenMgr()).thenReturn(delegationTokenMgr);
+
+      final OMRequest omRequest = OMRequest.newBuilder()
+          .setClientId(UUID.randomUUID().toString())
+          .setCmdType(Type.CreateVolume)
+          .setS3Authentication(S3Authentication.newBuilder()
+              .setStringToSign("string-to-sign")
+              .setSignature("signature")
+              .setAccessId(TEMP_ACCESS_KEY_ID)
+              .build())
+          .build();
+
+      // Permanent S3 credentials get their leader check from OzoneDelegationTokenSecretManager.retrievePassword,
+      // so validateS3Credential must not add a second one outside the session token branch.
+      assertDoesNotThrow(() -> S3SecurityUtil.validateS3Credential(omRequest, ozoneManager));
+      verify(ozoneManager, never()).checkLeaderStatus();
+      verify(delegationTokenMgr).retrievePassword(any(OzoneTokenIdentifier.class));
+    }
   }
 
   private void validateS3CredentialHelper(TestConfig config) throws Exception {

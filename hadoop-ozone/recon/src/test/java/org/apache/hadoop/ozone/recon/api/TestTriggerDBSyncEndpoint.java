@@ -40,7 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -146,8 +146,8 @@ public class TestTriggerDBSyncEndpoint {
             .addBinding(NodeEndpoint.class)
             .addBinding(MetricsServiceProviderFactory.class)
             .addBinding(ReconUtils.class, reconUtilsMock)
-            .addBinding(StorageContainerLocationProtocol.class,
-                mock(StorageContainerLocationProtocol.class))
+            .addBinding(StorageContainerLocationInternalInterface.class,
+                mock(StorageContainerLocationInternalInterface.class))
             .build();
   }
 

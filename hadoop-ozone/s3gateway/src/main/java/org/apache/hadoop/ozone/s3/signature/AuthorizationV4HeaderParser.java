@@ -17,14 +17,17 @@
 
 package org.apache.hadoop.ozone.s3.signature;
 
-import static java.time.temporal.ChronoUnit.DAYS;
+import static java.time.temporal.ChronoUnit.SECONDS;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.REQUEST_TIME_TOO_SKEWED;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.AWS4_SIGNING_ALGORITHM;
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.DATE_FORMATTER;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.Collection;
 import org.apache.commons.codec.DecoderException;
@@ -36,6 +39,9 @@ import org.apache.hadoop.util.StringUtils;
  * Class to parse v4 auth information from header.
  */
 public class AuthorizationV4HeaderParser implements SignatureParser {
+
+  /** Max allowed clock skew for SigV4 authorization-header requests (15 minutes). */
+  private static final long SIGV4_MAX_REQUEST_SKEW_SECONDS = 15 * 60;
 
   private static final String CREDENTIAL = "Credential=";
   private static final String SIGNEDHEADERS = "SignedHeaders=";
@@ -65,6 +71,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
     if (authHeader == null || !authHeader.startsWith("AWS4")) {
       return null;
     }
+    validateDateHeader();
     int firstSep = authHeader.indexOf(' ');
     if (firstSep < 0) {
       throw new MalformedResourceException(authHeader);
@@ -175,15 +182,16 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
           "AWS service is empty. credential:" + credential, authHeader);
     }
 
-    // Date should not be empty and within valid range.
+    // Date should not be empty and must match X-Amz-Date.
     if (!credentialObj.getDate().isEmpty()) {
       try {
-        validateDateRange(credentialObj);
+        LocalDate.parse(credentialObj.getDate(), DATE_FORMATTER);
+        Credential.validateScopeDateMatchesAmzDate(credentialObj.getDate(), dateHeader,
+            authHeader);
       } catch (DateTimeParseException ex) {
         throw new MalformedResourceException(
             "AWS date format is invalid. credential:" + credential, authHeader);
       }
-
     } else {
       throw new MalformedResourceException(
           "AWS date is empty. credential:{}" + credential, authHeader);
@@ -191,17 +199,26 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
     return credentialObj;
   }
 
+  /**
+   * Validates {@code X-Amz-Date} clock skew for authorization-header SigV4.
+   * AWS SigV4 clients send this timestamp in UTC.
+   */
   @VisibleForTesting
-  public void validateDateRange(Credential credentialObj)
-      throws MalformedResourceException, DateTimeParseException {
-    LocalDate date = LocalDate.parse(credentialObj.getDate(), DATE_FORMATTER);
-    LocalDate now = LocalDate.now();
-    if (date.isBefore(now.minus(1, DAYS)) ||
-        date.isAfter(now.plus(1, DAYS))) {
+  void validateDateHeader() throws MalformedResourceException {
+    if (dateHeader == null || dateHeader.isEmpty()) {
+      throw new MalformedResourceException("Missing X-Amz-Date header.", authHeader);
+    }
+    try {
+      LocalDateTime date = LocalDateTime.parse(dateHeader,
+          StringToSignProducer.TIME_FORMATTER);
+      LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
+      if (date.isBefore(now.minus(SIGV4_MAX_REQUEST_SKEW_SECONDS, SECONDS))
+          || date.isAfter(now.plus(SIGV4_MAX_REQUEST_SKEW_SECONDS, SECONDS))) {
+        throw new MalformedResourceException(REQUEST_TIME_TOO_SKEWED, dateHeader);
+      }
+    } catch (DateTimeParseException ex) {
       throw new MalformedResourceException(
-          "AWS date not in valid range. Date: " + date + " should not be older "
-              + "than 1 day(i.e yesterday) and "
-              + "greater than 1 day(i.e tomorrow).", authHeader);
+          "Invalid X-Amz-Date format: " + dateHeader, authHeader);
     }
   }
 

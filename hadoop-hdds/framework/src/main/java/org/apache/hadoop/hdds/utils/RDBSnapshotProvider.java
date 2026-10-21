@@ -193,7 +193,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
    * @return  path of untarred dbDir.
    * @throws IOException
    */
-  private Path untarContentsOfTarball(File snapshot,
+  protected Path untarContentsOfTarball(File snapshot,
       File untarDir, boolean deleteSnapshot) throws IOException {
     // Untar the checkpoint file.
     Path untarredDbDir = untarDir.toPath();

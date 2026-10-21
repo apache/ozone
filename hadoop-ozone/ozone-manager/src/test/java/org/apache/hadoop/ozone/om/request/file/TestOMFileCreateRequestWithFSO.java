@@ -163,6 +163,35 @@ public class TestOMFileCreateRequestWithFSO extends TestOMFileCreateRequest {
     testNonRecursivePath(key, false, false, true);
   }
 
+  @Test
+  public void testCreateFileUnderMissingParentWithSameNameAtAncestor()
+      throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
+
+    // A committed file "key1" sitting directly under the bucket.
+    String fileName = "key1";
+    OmKeyInfo existingFile =
+        OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, fileName,
+                RatisReplicationConfig.getInstance(ONE))
+            .setObjectID(bucketId + 1L)
+            .setParentObjectID(bucketId)
+            .setUpdateID(100L)
+            .build();
+    String existingDbKey = OMRequestTestUtils.addFileToKeyTable(false, false,
+        fileName, existingFile, -1, 100L, omMetadataManager);
+
+    // "d1" does not exist, so the path walk stops at the bucket: the deepest known parent of the leaf
+    // is the bucket itself, which is also the parent of the committed "key1". Creating "d1/key1" must
+    // still succeed - it is a different path, and "d1" is created by this transaction.
+    testNonRecursivePath("d1/" + fileName, false, true, false);
+
+    // The file at the bucket root is untouched.
+    assertNotNull(omMetadataManager.getKeyTable(getBucketLayout())
+        .get(existingDbKey));
+  }
+
   @Override
   @Test
   public void testCreateFileInheritParentDefaultAcls()

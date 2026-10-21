@@ -58,6 +58,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -556,9 +557,21 @@ public class TestContainerReconciliationWithMockDatanodes {
      * Triggers a synchronous scan of the container. This method will block until the scan completes.
      */
     public void scanContainer(long containerID) {
-      Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID),
-          TEST_SCAN);
-      assertTrue(scanFuture.isPresent());
+      // A previously triggered on-demand scan may still be registered as in progress, for example the
+      // fire-and-forget scan that reconciliation schedules in a finally block. While it is, the scanner
+      // returns an empty Optional instead of scheduling a new one. Wait for the prior scan to drain so
+      // this synchronous scan is actually scheduled.
+      AtomicReference<Future<?>> scanFuture = new AtomicReference<>();
+      try {
+        GenericTestUtils.waitFor(() -> {
+          Optional<Future<?>> future =
+              onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID), TEST_SCAN);
+          future.ifPresent(scanFuture::set);
+          return future.isPresent();
+        }, 100, 10_000);
+      } catch (InterruptedException | TimeoutException e) {
+        fail("On demand container scan was not scheduled", e);
+      }
 
       try {
         scanFuture.get().get();
@@ -696,7 +709,7 @@ public class TestContainerReconciliationWithMockDatanodes {
         int size = blockDataList.size();
         for (int i = 0; i < numBlocksToRemove; i++) {
           BlockData blockData = reverse ? blockDataList.get(size - 1 - i) : blockDataList.get(i);
-          File blockFile = TestContainerCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
+          File blockFile = ContainerTestCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
           Assertions.assertTrue(blockFile.delete());
           handle.getStore().getBlockDataTable().deleteWithBatch(batch,
               containerData.getBlockKey(blockData.getLocalID()));
@@ -715,7 +728,7 @@ public class TestContainerReconciliationWithMockDatanodes {
         int blockIndex = reverse ? size - 1 - (i % size) : i % size;
         BlockData blockData = blockDataList.get(blockIndex);
         int chunkIndex = i / size;
-        File blockFile = TestContainerCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
+        File blockFile = ContainerTestCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
         List<ContainerProtos.ChunkInfo> chunks = new ArrayList<>(blockData.getChunks());
         ContainerProtos.ChunkInfo chunkInfo = chunks.remove(chunkIndex);
         corruptFileAtOffset(blockFile, chunkInfo.getOffset(), chunkInfo.getLen());

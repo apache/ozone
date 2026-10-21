@@ -20,19 +20,18 @@ package org.apache.hadoop.ozone.s3.signature;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.SIGNATURE_DOES_NOT_MATCH;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 
-import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Locale;
-import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.security.HmacSha256;
 
 /**
- * Verifies the per-chunk signatures of a SigV4 chunked upload
- * ({@code STREAMING-AWS4-HMAC-SHA256-PAYLOAD}).
+ * Verifies the per-chunk and trailing-header signatures of a SigV4 chunked upload
+ * ({@code STREAMING-AWS4-HMAC-SHA256-PAYLOAD} and its trailer variant).
  * <p>
  * Each chunk signature is {@code hex(HMAC-SHA256(signingKey, stringToSign))},
  * where the string-to-sign is:
@@ -57,20 +56,13 @@ public class ChunksValidator {
 
   private static final String CHUNK_STRING_TO_SIGN_ALGORITHM =
       "AWS4-HMAC-SHA256-PAYLOAD";
-  private static final String HMAC_SHA256 = "HmacSHA256";
+  private static final String TRAILER_STRING_TO_SIGN_ALGORITHM =
+      "AWS4-HMAC-SHA256-TRAILER";
   private static final String NEWLINE = "\n";
 
   /** SHA-256 hex of the empty string (the hashed empty headers slot). */
   private static final String EMPTY_STRING_SHA256 =
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-
-  private static final ThreadLocal<Mac> HMAC = ThreadLocal.withInitial(() -> {
-    try {
-      return Mac.getInstance(HMAC_SHA256);
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException(HMAC_SHA256 + " not available", e);
-    }
-  });
 
   /** The signing key is fixed for the request, so the key spec is built once instead of per chunk. */
   private final SecretKeySpec signingKey;
@@ -81,7 +73,7 @@ public class ChunksValidator {
 
   public ChunksValidator(byte[] signingKey, String dateTime,
       String credentialScope, String seedSignature, String resource) {
-    this.signingKey = new SecretKeySpec(signingKey, HMAC_SHA256);
+    this.signingKey = new SecretKeySpec(signingKey, HmacSha256.ALGORITHM);
     this.dateTime = dateTime;
     this.credentialScope = credentialScope;
     this.previousSignature = seedSignature;
@@ -101,24 +93,49 @@ public class ChunksValidator {
     String stringToSign = String.join(NEWLINE,
         CHUNK_STRING_TO_SIGN_ALGORITHM, dateTime, credentialScope,
         previousSignature, EMPTY_STRING_SHA256, payloadSha256Hex);
-    byte[] expected = hmacSha256(stringToSign);
-    // Constant-time comparison to avoid leaking the signature via timing. Decoding the hex also
-    // makes the comparison case-insensitive, as the signature may be sent in either case.
-    if (!MessageDigest.isEqual(expected, DatatypeConverter.parseHexBinary(chunkSignature))) {
-      throw newError(SIGNATURE_DOES_NOT_MATCH, resource);
-    }
+    validateSignature(chunkSignature, stringToSign);
     // The chain feeds this chunk's signature, in hex, into the next chunk's string-to-sign.
     // chunkSignature equals expected (verified above), so reuse it normalized to lower-case.
     previousSignature = chunkSignature.toLowerCase(Locale.ROOT);
   }
 
+  /**
+   * Verify the signature of the trailing headers and complete the signature chain.
+   *
+   * @param trailerSignature the signature from the {@code x-amz-trailer-signature} header
+   * @param trailingHeadersSha256Hex SHA-256 of the canonical trailing headers
+   * @throws OS3Exception if the computed signature does not match
+   */
+  public void validateTrailer(String trailerSignature, String trailingHeadersSha256Hex)
+      throws OS3Exception {
+    String stringToSign = String.join(NEWLINE,
+        TRAILER_STRING_TO_SIGN_ALGORITHM, dateTime, credentialScope,
+        previousSignature, trailingHeadersSha256Hex);
+    validateSignature(trailerSignature, stringToSign);
+  }
+
+  private void validateSignature(String signature, String stringToSign) {
+    byte[] decodedSignature;
+    try {
+      decodedSignature = DatatypeConverter.parseHexBinary(signature);
+    } catch (IllegalArgumentException ex) {
+      throw newError(SIGNATURE_DOES_NOT_MATCH, resource);
+    }
+    byte[] expected = hmacSha256(stringToSign);
+    // Constant-time comparison to avoid leaking the signature via timing. Decoding the hex also
+    // makes the comparison case-insensitive, as the signature may be sent in either case.
+    if (!MessageDigest.isEqual(expected, decodedSignature)) {
+      throw newError(SIGNATURE_DOES_NOT_MATCH, resource);
+    }
+  }
+
   private byte[] hmacSha256(String msg) {
     try {
-      Mac mac = HMAC.get();
-      mac.init(signingKey);
-      return mac.doFinal(msg.getBytes(StandardCharsets.UTF_8));
+      return HmacSha256.sign(signingKey, msg);
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException(HmacSha256.ALGORITHM + " not available", e);
     } catch (InvalidKeyException e) {
-      throw new IllegalStateException("Failed to compute " + HMAC_SHA256, e);
+      throw new IllegalStateException("Failed to compute " + HmacSha256.ALGORITHM, e);
     }
   }
 }
