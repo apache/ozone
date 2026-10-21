@@ -390,6 +390,23 @@ public class BasicRootedOzoneClientAdapterImpl
         config);
     String key = ofsPath.getKeyName();
     try {
+      // An empty bucket name takes the getBucket path, which reports it as FileNotFoundException.
+      if (!ofsPath.getBucketName().isEmpty()
+          && proxy.getOmVersion().compareTo(OzoneManagerVersion.GET_KEY_INFO_REJECTS_OBS) >= 0) {
+        // Ask OM to reject an OBJECT_STORE bucket (HDDS-16948), so read without fetching the bucket first.
+        try {
+          return proxy.readFile(ofsPath.getVolumeName(), ofsPath.getBucketName(), key, true).getInputStream();
+        } catch (OMException e) {
+          if (e.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+            // Surface it as IllegalArgumentException, matching the client-side
+            // layout check of the fallback path below.
+            throw new IllegalArgumentException(e.getMessage());
+          }
+          throw e;
+        }
+      }
+      // Older OM has no server-side OBJECT_STORE check; validate the bucket
+      // layout on the client, matching pre-HDDS-16948 behavior.
       OzoneBucket bucket = getBucket(ofsPath, false);
       return bucket.readFile(key).getInputStream();
     } catch (OMException ex) {

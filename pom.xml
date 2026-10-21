@@ -161,7 +161,7 @@
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>24.17.0</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
-    <opentelemetry.version>1.66.0</opentelemetry.version>
+    <opentelemetry.version>1.67.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <ozone.java.version.client>8</ozone.java.version.client>
     <ozone.java.version.server>17</ozone.java.version.server>
@@ -1780,7 +1780,10 @@
                         <paths>
                           <path>${maven.multiModuleProjectDirectory}/target/native-lib</path>
                         </paths>
-                        <normalization>RELATIVE_PATH</normalization>
+                        <normalization>
+                          <strategy>RELATIVE_PATH</strategy>
+                          <ignoreEmptyDirectories>true</ignoreEmptyDirectories>
+                        </normalization>
                       </fileSet>
                       <fileSet>
                         <name>rocksdb-native-lib</name>
@@ -1788,7 +1791,13 @@
                           <path>${project.build.directory}/native/rocksdb</path>
                           <path>${maven.multiModuleProjectDirectory}/hadoop-hdds/rocks-native/target/native/rocksdb</path>
                         </paths>
-                        <normalization>RELATIVE_PATH</normalization>
+                        <includes>
+                          <include>lib*.*</include>
+                        </includes>
+                        <normalization>
+                          <strategy>RELATIVE_PATH</strategy>
+                          <ignoreEmptyDirectories>true</ignoreEmptyDirectories>
+                        </normalization>
                       </fileSet>
                     </fileSets>
                   </inputs>
