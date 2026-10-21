@@ -791,6 +791,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (args.getExpectedETag() != null) {
       keyArgs.setExpectedETag(args.getExpectedETag());
     }
+    if (args.getExcludedETag() != null) {
+      keyArgs.setExcludedETag(args.getExcludedETag());
+    }
 
     req.setKeyArgs(keyArgs.build());
     req.setDerivedKeyPiggyBacking(args.isDerivedKeyPiggyBacking());
@@ -944,6 +947,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     GetKeyInfoRequest.Builder req = GetKeyInfoRequest.newBuilder();
     req.setKeyArgs(args.toProtobuf());
     req.setAssumeS3Context(assumeS3Context);
+    if (args.isRequireFileSystemLayout()) {
+      req.setRequireFileSystemLayout(true);
+    }
 
     OMRequest omRequest = createOMRequest(Type.GetKeyInfo)
         .setGetKeyInfoRequest(req)
@@ -1902,6 +1908,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     if (omKeyArgs.getExpectedETag() != null) {
       keyArgs.setExpectedETag(omKeyArgs.getExpectedETag());
     }
+    if (omKeyArgs.getExcludedETag() != null) {
+      keyArgs.setExcludedETag(omKeyArgs.getExcludedETag());
+    }
 
     multipartUploadCompleteRequest.setKeyArgs(keyArgs.build());
     multipartUploadCompleteRequest.addAllPartsList(multipartUploadList
@@ -1924,6 +1933,11 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public void abortMultipartUpload(OmKeyArgs omKeyArgs) throws IOException {
+    abortMultipartUpload(omKeyArgs, false);
+  }
+
+  @Override
+  public void abortMultipartUpload(OmKeyArgs omKeyArgs, boolean assumeS3Context) throws IOException {
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(omKeyArgs.getVolumeName())
         .setBucketName(omKeyArgs.getBucketName())
@@ -1937,6 +1951,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     OMRequest omRequest = createOMRequest(
         Type.AbortMultiPartUpload)
         .setAbortMultiPartUploadRequest(multipartUploadAbortRequest.build())
+        .setAssumeS3Context(assumeS3Context)
         .build();
 
     handleError(submitRequest(omRequest));
@@ -2360,6 +2375,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @SkipTracing
   public ThreadLocal<S3Auth> getS3CredentialsProvider() {
     return this.threadLocalS3Auth;
+  }
+
+  @Override
+  @SkipTracing
+  public ThreadLocal<ReadConsistencyHint> getReadConsistencyHintProvider() {
+    return this.threadLocalReadConsistencyHint;
   }
 
   @Override
