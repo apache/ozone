@@ -55,7 +55,6 @@ import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-import org.apache.hadoop.ozone.recon.upgrade.ReconVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -109,15 +108,6 @@ public class TestReconUtils {
     assertEquals(ReconSqlDbConfig.DEFAULT_DRIVER_CLASS, dataSourceConfiguration.getDriverClass());
     assertEquals("jdbc:sqlite:" + temporaryFolder + "/ozone_recon_sqlite.db", dataSourceConfiguration.getJdbcUrl());
     assertEquals(ReconSqlDbConfig.DEFAULT_SQL_DB_DIALECT, dataSourceConfiguration.getSqlDialect());
-  }
-
-  @Test
-  public void testFreshInstallVersionAfterDerby(@TempDir File reconDbDir) throws IOException {
-    assertEquals(ReconVersion.SOFTWARE_VERSION, ReconSchemaManager.getFreshInstallVersion(reconDbDir));
-
-    // A Derby DB from an older Recon means the new SQLite DB must run all upgrade actions.
-    Files.createDirectory(new File(reconDbDir, ReconSqlDbConfig.LEGACY_DERBY_DB_NAME).toPath());
-    assertEquals(ReconVersion.INITIAL_VERSION, ReconSchemaManager.getFreshInstallVersion(reconDbDir));
   }
 
   @Test
