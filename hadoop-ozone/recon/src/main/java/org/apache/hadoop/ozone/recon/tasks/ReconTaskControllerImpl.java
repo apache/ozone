@@ -25,6 +25,9 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_TA
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.Inject;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -49,6 +52,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconConstants;
@@ -253,11 +257,13 @@ public class ReconTaskControllerImpl implements ReconTaskController {
             return CompletableFuture.supplyAsync(() -> {
               LOG.info("Task {} started execution on thread {}", 
                   task.getTaskName(), Thread.currentThread().getName());
-              try {
+              Span span = TracingUtil.createInternalSpan(task.getTaskName());
+              try (Scope ignored = span.makeCurrent()) {
                 ReconOmTask.TaskResult result = task.call();
                 LOG.info("Task {} completed execution", task.getTaskName());
                 return result;
               } catch (Exception e) {
+                span.recordException(e).setStatus(StatusCode.ERROR);
                 // Track reprocess failure per task
                 taskMetrics.incrTaskReprocessFailures(task.getTaskName());
 
@@ -266,6 +272,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
                 }
                 // Wrap the exception with the task name
                 throw new TaskExecutionException(task.getTaskName(), e);
+              } finally {
+                span.end();
               }
             }, executorService).thenAccept(result -> {
               // Update reprocess duration after task completes (includes queue time)
@@ -439,7 +447,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
           // Track task delta processing duration
           long taskStartTime = Time.monotonicNow();
 
-          try {
+          Span span = TracingUtil.createInternalSpan(task.getTaskName());
+          try (Scope ignored = span.makeCurrent()) {
             ReconOmTask.TaskResult result = task.call();
 
             // Update task delta processing duration
@@ -448,11 +457,14 @@ public class ReconTaskControllerImpl implements ReconTaskController {
 
             return result;
           } catch (Exception e) {
+            span.recordException(e).setStatus(StatusCode.ERROR);
             if (e instanceof InterruptedException) {
               Thread.currentThread().interrupt();
             }
             // Wrap the exception with the task name
             throw new TaskExecutionException(task.getTaskName(), e);
+          } finally {
+            span.end();
           }
         }, executorService).thenAccept(result -> {
           String taskName = result.getTaskName();

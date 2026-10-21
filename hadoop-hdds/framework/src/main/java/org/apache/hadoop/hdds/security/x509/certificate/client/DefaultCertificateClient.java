@@ -32,6 +32,9 @@ import static org.apache.hadoop.hdds.security.x509.exception.CertificateExceptio
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigInteger;
@@ -92,6 +95,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignReq
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.slf4j.Logger;
 
@@ -1395,13 +1399,17 @@ public abstract class DefaultCertificateClient implements CertificateClient {
 
     @Override
     public void run() {
-      try {
+      Span span = TracingUtil.createInternalSpan("CertificateRenewerService");
+      try (Scope ignored = span.makeCurrent()) {
         renewCertificateIfNeeded();
       } catch (RuntimeException e) {
+        span.recordException(e).setStatus(StatusCode.ERROR);
         // This task is scheduled at a fixed rate: an exception escaping it cancels every future
         // execution, and the component stops renewing its certificate without any further notice.
         getLogger().error("Certificate renewal for {} failed unexpectedly, keeping the renewal "
             + "schedule.", component, e);
+      } finally {
+        span.end();
       }
     }
 

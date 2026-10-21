@@ -22,6 +22,9 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_NETWORK_TOPOLOGY_REFRESH_DURATION_DEFAULT;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
@@ -37,6 +40,7 @@ import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,7 +120,8 @@ public class ScmTopologyClient {
 
   private synchronized void checkAndRefresh(ConfigurationSource conf) {
     InnerNode current = (InnerNode) cache.get().getNode(ROOT);
-    try {
+    Span span = TracingUtil.createInternalSpan("NetworkTopologyPoller");
+    try (Scope ignored = span.makeCurrent()) {
       InnerNode newTopology = scmBlockLocationProtocol.getNetworkTopology();
       if (!newTopology.equals(current)) {
         cache.set(new NetworkTopologyImpl(conf.get(
@@ -126,8 +131,11 @@ public class ScmTopologyClient {
         LOG.info("Updated network topology fetched from SCM: {}.", newTopology);
       }
     } catch (IOException e) {
+      span.recordException(e).setStatus(StatusCode.ERROR);
       throw new UncheckedIOException(
           "Error fetching updated network topology from SCM", e);
+    } finally {
+      span.end();
     }
   }
 }

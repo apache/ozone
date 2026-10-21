@@ -17,11 +17,15 @@
 
 package org.apache.hadoop.ozone.om.ha;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,13 +68,17 @@ public abstract class OMPeriodicMetrics {
     });
     // Schedule periodic updates
     updateTask = updateExecutor.scheduleWithFixedDelay(() -> {
-      try {
+      Span span = TracingUtil.createInternalSpan(metricsTaskName);
+      try (Scope ignored = span.makeCurrent()) {
         boolean success = updateMetrics();
         if (success) {
           lastUpdateTime.set(System.currentTimeMillis());
         }
       } catch (Exception e) {
+        span.recordException(e).setStatus(StatusCode.ERROR);
         LOG.error("Failed to update metrics for periodic metrics", e);
+      } finally {
+        span.end();
       }
     }, 0, updateInterval, TimeUnit.MILLISECONDS);
     started = true;

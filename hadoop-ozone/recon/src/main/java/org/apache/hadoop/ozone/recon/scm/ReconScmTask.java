@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.slf4j.Logger;
@@ -94,7 +95,7 @@ public abstract class ReconScmTask {
 
   protected void initializeAndRunTask() throws Exception {
     taskStatusUpdater.recordRunStart();
-    runTask();
+    TracingUtil.executeInSpan(TracingUtil.createInternalSpan(getTaskName()), this::runTask);
     taskStatusUpdater.recordRunCompletion();
   }
 

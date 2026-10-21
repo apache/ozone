@@ -38,6 +38,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.opentelemetry.api.trace.StatusCode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -67,6 +68,7 @@ import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignReq
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
@@ -628,10 +630,13 @@ public class TestDefaultCertificateClient {
       }
     };
 
-    try {
+    try (TestSpanCollector spans = TestSpanCollector.install("TestDefaultCertificateClient")) {
       // Runs exactly what the scheduled task runs.
       assertDoesNotThrow(client.new CertificateRenewerService(true, () -> { })::run);
       assertThat(attempts.get()).isPositive();
+      // the failure is recorded on the renewer span
+      assertThat(spans.named("CertificateRenewerService")).hasSize(1)
+          .allSatisfy(span -> assertThat(span.toSpanData().getStatus().getStatusCode()).isEqualTo(StatusCode.ERROR));
     } finally {
       client.close();
     }

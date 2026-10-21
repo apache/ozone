@@ -19,6 +19,9 @@ package org.apache.hadoop.ozone.lease;
 
 import static org.apache.hadoop.ozone.lease.Lease.messageForResource;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -261,7 +265,8 @@ public class LeaseManager<T> {
         long sleepTime = Long.MAX_VALUE;
 
         for (T resource : activeLeases.keySet()) {
-          try {
+          Span span = TracingUtil.createInternalSpan(name + ".LeaseMonitor");
+          try (Scope ignored = span.makeCurrent()) {
             Lease<T> lease = get(resource);
             long remainingTime = lease.getRemainingTime();
             if (remainingTime <= 0) {
@@ -275,6 +280,9 @@ public class LeaseManager<T> {
             }
           } catch (LeaseNotFoundException | LeaseExpiredException ex) {
             //Ignore the exception, someone might have released the lease
+            span.recordException(ex).setStatus(StatusCode.ERROR);
+          } finally {
+            span.end();
           }
         }
 

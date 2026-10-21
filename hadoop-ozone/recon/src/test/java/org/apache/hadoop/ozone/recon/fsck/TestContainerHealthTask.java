@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -25,10 +26,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Duration;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -75,6 +78,26 @@ public class TestContainerHealthTask {
     RuntimeException thrown =
         assertThrows(RuntimeException.class, task::runTask);
     assertEquals("processAll failed", thrown.getMessage());
+  }
+
+  @Test
+  public void testTracing() throws Exception {
+    ReconStorageContainerManagerFacade reconScm = mock(ReconStorageContainerManagerFacade.class);
+    when(reconScm.getReplicationManager()).thenReturn(mock(ReconReplicationManager.class));
+    ContainerHealthTask task =
+        new ContainerHealthTask(createTaskConfig(), createTaskStatusUpdaterManagerMock(), reconScm);
+
+    try (TestSpanCollector spans = TestSpanCollector.install("TestContainerHealthTask")) {
+      task.start();
+      try {
+        GenericTestUtils.waitFor(() -> !spans.named("ContainerHealthTask").isEmpty(), 10, 3000);
+      } finally {
+        task.stop();
+      }
+
+      assertThat(spans.named("ContainerHealthTask"))
+          .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+    }
   }
 
   private ReconTaskConfig createTaskConfig() {

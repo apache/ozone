@@ -43,6 +43,9 @@ import static org.apache.ratis.proto.RaftProtos.RaftPeerRole.LEADER;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -68,6 +71,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
@@ -342,7 +346,8 @@ public class OzoneManagerServiceProviderImpl
         TimeUnit.MILLISECONDS);
     LOG.debug("Started the OM DB sync scheduler.");
     scheduler.scheduleWithFixedDelay(() -> {
-      try {
+      Span span = TracingUtil.createInternalSpan("ReconOmDbSync");
+      try (Scope ignored = span.makeCurrent()) {
         LOG.info("Last known sequence number before sync: {}", getCurrentOMDBSequenceNumber());
         boolean isSuccess = syncDataFromOM();
         if (!isSuccess) {
@@ -350,7 +355,10 @@ public class OzoneManagerServiceProviderImpl
         }
         LOG.info("Sequence number after sync: {}", getCurrentOMDBSequenceNumber());
       } catch (Throwable t) {
+        span.recordException(t).setStatus(StatusCode.ERROR);
         LOG.error("Unexpected exception while syncing data from OM.", t);
+      } finally {
+        span.end();
       }
     },
         initialDelay,

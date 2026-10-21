@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.om.AWSV4AuthValidator;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -655,7 +656,8 @@ public class OzoneDelegationTokenSecretManager
           long now = Time.now();
           if (lastTokenCacheCleanup + getTokenRemoverScanInterval()
               < now) {
-            removeExpiredToken();
+            TracingUtil.executeInSpan(TracingUtil.createInternalSpan("ExpiredTokenRemover"),
+                OzoneDelegationTokenSecretManager.this::removeExpiredToken);
             lastTokenCacheCleanup = now;
           }
 

@@ -22,6 +22,9 @@ import static org.apache.hadoop.io.retry.RetryPolicy.RetryAction.FAIL;
 import static org.apache.hadoop.io_.retry.RetryPolicies.exponentialBackoffRetry;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Duration;
@@ -35,6 +38,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.RetriableTask;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.slf4j.Logger;
@@ -159,16 +163,20 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
     // when the current key passes the rotation cycle, fetch the next one
     // from SCM.
     if (nextRotate.isBefore(Instant.now())) {
-      try {
+      Span span = TracingUtil.createInternalSpan("SecretKeyPoller");
+      try (Scope ignored = span.makeCurrent()) {
         ManagedSecretKey newKey = secretKeyProtocol.getCurrentSecretKey();
         if (!newKey.equals(current)) {
           cache.set(newKey);
           LOG.info("New secret key fetched from SCM: {}.", newKey);
         }
       } catch (IOException e) {
+        span.recordException(e).setStatus(StatusCode.ERROR);
         // TODO: emic failure metrics.
         throw new UncheckedIOException(
             "Error fetching current key from SCM", e);
+      } finally {
+        span.end();
       }
     }
   }

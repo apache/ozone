@@ -21,6 +21,9 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKP
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.FS_TRASH_CHECKPOINT_INTERVAL_KEY;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.DateFormat;
@@ -38,6 +41,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.ozone.OzoneTrashPolicy;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -154,7 +158,8 @@ class TrashPolicyOzone extends OzoneTrashPolicy {
           break;                                  // exit on interrupt
         }
 
-        try {
+        Span span = TracingUtil.createInternalSpan("TrashEmptier");
+        try (Scope ignored = span.makeCurrent()) {
           om.getMetrics().incNumTrashActiveCycles();
           now = Time.now();
           if (now >= end) {
@@ -174,8 +179,11 @@ class TrashPolicyOzone extends OzoneTrashPolicy {
             }
           }
         } catch (Exception e) {
+          span.recordException(e).setStatus(StatusCode.ERROR);
           om.getMetrics().incNumTrashFails();
           LOG.warn("RuntimeException during Trash.Emptier.run(): ", e);
+        } finally {
+          span.end();
         }
       }
       try {
