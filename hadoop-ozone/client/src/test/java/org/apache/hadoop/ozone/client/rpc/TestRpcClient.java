@@ -34,6 +34,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -63,6 +64,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ServiceListResponse;
@@ -589,6 +591,56 @@ public class TestRpcClient {
       assertThat(error).hasMessage("Captured CreateKey request");
       assertThat(captured.get()).isNotNull();
       assertThat(captured.get().getDerivedKeyPiggyBacking()).isEqualTo(expected);
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
+  public void testIfNoneMatchETagReachesOMOrRejectsOldVersion(OzoneManagerVersion version) throws IOException {
+    List<KeyArgs> requests = new ArrayList<>();
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.ServiceList) {
+          return OMResponse.newBuilder().setCmdType(Type.ServiceList)
+              .setStatus(org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK)
+              .setSuccess(true).setServiceListResponse(ServiceListResponse.newBuilder().addServiceInfo(
+                  new ServiceInfo.Builder().setNodeType(HddsProtos.NodeType.OM).setHostname("localhost")
+                      .setOmVersion(version).build().getProtobuf())).build();
+        }
+        if (request.getCmdType() == Type.CreateKey) {
+          requests.add(request.getCreateKeyRequest().getKeyArgs());
+          throw new IOException("captured");
+        }
+        if (request.getCmdType() == Type.CompleteMultiPartUpload) {
+          requests.add(request.getCompleteMultiPartUploadRequest().getKeyArgs());
+          throw new IOException("captured");
+        }
+        return super.submitRequest(request);
+      }
+    };
+    RpcClient client = createRpcClient(transport);
+    try {
+      RatisReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE);
+      IOException putError = assertThrows(IOException.class, () -> client.createKeyIfNoneMatch("vol", "bucket", "key",
+          1L, "excluded-etag", replication, Collections.emptyMap(), Collections.emptyMap(), false));
+      IOException streamError = assertThrows(IOException.class, () -> client.createStreamKeyIfNoneMatch("vol", "bucket",
+          "key", 1L, "excluded-etag", replication, Collections.emptyMap(), Collections.emptyMap(), false));
+      IOException completeError = assertThrows(IOException.class, () -> client.completeMultipartUpload("vol", "bucket",
+          "key", "upload-id", Collections.singletonMap(1, "part-etag"), null, null, "excluded-etag"));
+      if (version == OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG) {
+        assertEquals("captured", putError.getMessage());
+        assertEquals("captured", streamError.getMessage());
+        assertEquals("captured", completeError.getMessage());
+        assertThat(requests).hasSize(3).allSatisfy(args -> assertEquals("excluded-etag", args.getExcludedETag()));
+      } else {
+        assertThat(requests).isEmpty();
+        assertThat(putError.getMessage()).contains("does not support If-None-Match");
+        assertThat(streamError.getMessage()).contains("does not support If-None-Match");
+        assertThat(completeError.getMessage()).contains("does not support If-None-Match");
+      }
     } finally {
       client.close();
     }

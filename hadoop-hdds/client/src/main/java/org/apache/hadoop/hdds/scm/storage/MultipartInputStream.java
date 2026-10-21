@@ -56,7 +56,7 @@ public class MultipartInputStream extends ExtendedInputStream {
   // can be reset if a new position is seeked.
   private int prevPartIndex;
 
-  private boolean initialized = false;
+  private volatile boolean initialized = false;
 
   public MultipartInputStream(String keyName,
                               List<? extends PartInputStream> inputStreams) {
@@ -185,6 +185,10 @@ public class MultipartInputStream extends ExtendedInputStream {
     if (!buffer.hasRemaining()) {
       return 0;
     }
+    if (!initialized) {
+      // Update the key length, e.g. for the under-construction last block of an hsync-ed key.
+      initialize();
+    }
     long pos = position;
     int bytesRead = 0;
     while (buffer.hasRemaining() && pos < length) {
@@ -225,6 +229,8 @@ public class MultipartInputStream extends ExtendedInputStream {
     for (PartInputStream partInputStream : partStreams) {
       if (partInputStream instanceof BlockInputStream) {
         ((BlockInputStream) partInputStream).initialize();
+      } else if (partInputStream instanceof StreamBlockInputStream) {
+        ((StreamBlockInputStream) partInputStream).updateBlockLength();
       }
     }
 

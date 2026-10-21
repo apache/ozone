@@ -86,6 +86,31 @@ public class TestMiniOzoneCluster {
   }
 
   @Test
+  void testHAServiceReturnsDefensiveCopy() {
+    List<String> active = new ArrayList<>();
+    active.add("active");
+    List<String> inactive = new ArrayList<>();
+    inactive.add("inactive");
+    MiniOzoneHAClusterImpl.MiniOzoneHAService<String> service =
+        new MiniOzoneHAClusterImpl.MiniOzoneHAService<>("test", active, inactive, "service", id -> id);
+    List<String> snapshot = service.getServices();
+    List<String> expected = new ArrayList<>(snapshot);
+
+    snapshot.clear();
+    assertEquals(expected, service.getServices());
+    for (int i = 0; i < expected.size(); i++) {
+      assertEquals(expected.get(i), service.getServiceByIndex(i));
+      assertEquals(expected.get(i), service.getServiceById(expected.get(i)));
+    }
+
+    service.addInstance("new", true);
+    List<String> beforeRemoval = service.getServices();
+    assertTrue(service.removeInstance("new"));
+    assertTrue(beforeRemoval.contains("new"));
+    assertEquals(expected, service.getServices());
+  }
+
+  @Test
   public void testStartMultipleDatanodes() throws Exception {
     final int numberOfNodes = 3;
     cluster = MiniOzoneCluster.newBuilder(conf)
