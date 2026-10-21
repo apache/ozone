@@ -575,11 +575,12 @@ public class TestDirectoryDeletingService {
   /**
    * Regression test for HDDS-16164. Snapshot workers must wait for the task-owned handle to close before submitting.
    * AOS workers own their handles and can finish scanning while a sibling waits for double-buffer capacity.
+   * A worker failure with DB handles open must also release its handles and let the remaining workers finish.
    */
-  @ParameterizedTest(name = "activeStore={0}")
-  @ValueSource(booleans = {false, true})
+  @ParameterizedTest(name = "activeStore={0}, workerThrows={1}")
+  @CsvSource({"false, false", "true, false", "false, true", "true, true"})
   @DisplayName("DirectoryDeletingService must not deadlock at the unflushed transaction limit")
-  void testNoUnflushedTransactionDeadlock(boolean activeStore) throws Exception {
+  void testNoUnflushedTransactionDeadlock(boolean activeStore, boolean workerThrows) throws Exception {
     int threadCount = 3;
     OzoneConfiguration conf = createConfAndInitValues(threadCount);
     conf.setInt(OMConfigKeys.OZONE_OM_UNFLUSHED_TRANSACTION_MAX_COUNT, 1);
@@ -602,42 +603,34 @@ public class TestDirectoryDeletingService {
         OmBucketInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
             .setObjectID(1).setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED).build());
 
-    String purgeSnapshotName = "purge";
-    writeClient.createSnapshot(volumeName, bucketName, purgeSnapshotName);
-    String previousSnapshotName = "previous";
-    writeClient.createSnapshot(volumeName, bucketName, previousSnapshotName);
-    String deepCleanSnapshotName = "deep-clean";
-    if (activeStore) {
-      writeClient.createSnapshot(volumeName, bucketName, deepCleanSnapshotName);
-    }
-    om.awaitDoubleBufferFlush();
+    SnapshotInfo deepCleanInfo = prepareSnapshotsForDeadlock(writeClient, metadataManager, threadCount, activeStore);
+    String purgeKey = SnapshotInfo.getTableKey(volumeName, bucketName, "purge");
 
-    addDeletedDirectories(metadataManager, threadCount);
-    if (!activeStore) {
-      writeClient.createSnapshot(volumeName, bucketName, deepCleanSnapshotName);
-    }
-    om.awaitDoubleBufferFlush();
+    OzoneManager ozoneManager = Mockito.spy(om);
+    OmSnapshotManager snapshotManager = Mockito.spy(om.getOmSnapshotManager());
+    Mockito.doReturn(snapshotManager).when(ozoneManager).getOmSnapshotManager();
+    AtomicInteger openSnapshotDbHandles = new AtomicInteger();
+    trackSnapshotDbHandles(snapshotManager, openSnapshotDbHandles);
 
-    String deepCleanKey = SnapshotInfo.getTableKey(volumeName, bucketName, deepCleanSnapshotName);
-    SnapshotInfo deepCleanInfo = metadataManager.getSnapshotInfoTable().get(deepCleanKey);
-    assertNotNull(deepCleanInfo);
-    awaitSnapshotFlushed(metadataManager, deepCleanInfo);
-
-    writeClient.deleteSnapshot(volumeName, bucketName, purgeSnapshotName);
-    om.awaitDoubleBufferFlush();
-    String purgeKey = SnapshotInfo.getTableKey(volumeName, bucketName, purgeSnapshotName);
-    assertNotNull(metadataManager.getSnapshotInfoTable().get(purgeKey));
-
+    AtomicInteger purgeRequests = new AtomicInteger();
+    AtomicBoolean submittedWithDbLock = new AtomicBoolean();
     CountDownLatch ddsAtSubmit = new CountDownLatch(1);
     CountDownLatch ddsMayProceed = new CountDownLatch(1);
     DirectoryDeletingService service = Mockito.spy(new DirectoryDeletingService(1, TimeUnit.HOURS, 1,
-        om, conf, threadCount, true) {
+        ozoneManager, conf, threadCount, true) {
       @Override
       protected OzoneManagerProtocolProtos.OMResponse submitRequest(
           OzoneManagerProtocolProtos.OMRequest omRequest) throws ServiceException {
         assertThat(omRequest.getCmdType()).isIn(
             OzoneManagerProtocolProtos.Type.PurgeDirectories,
             OzoneManagerProtocolProtos.Type.SetSnapshotProperty);
+        if (metadataManager.getLock().getReadHoldCount(SNAPSHOT_DB_LOCK,
+            deepCleanInfo.getSnapshotId().toString()) != 0 || (!activeStore && openSnapshotDbHandles.get() != 0)) {
+          submittedWithDbLock.set(true);
+        }
+        if (omRequest.getCmdType() == OzoneManagerProtocolProtos.Type.PurgeDirectories) {
+          purgeRequests.incrementAndGet();
+        }
         ddsAtSubmit.countDown();
         try {
           ddsMayProceed.await();
@@ -652,6 +645,7 @@ public class TestDirectoryDeletingService {
     CountDownLatch workersPrepared = new CountDownLatch(threadCount);
     CountDownLatch finishScanning = new CountDownLatch(1);
     AtomicBoolean pauseScan = new AtomicBoolean();
+    AtomicBoolean workerFailureInjected = new AtomicBoolean();
     Mockito.doAnswer(invocation -> {
       workersPrepared.countDown();
       if (pauseScan.compareAndSet(false, true)) {
@@ -659,14 +653,17 @@ public class TestDirectoryDeletingService {
         assertThat(metadataManager.getLock().getReadHoldCount(SNAPSHOT_DB_LOCK,
             deepCleanInfo.getSnapshotId().toString())).isPositive();
         assertTrue(finishScanning.await(30, TimeUnit.SECONDS));
+        if (workerThrows) {
+          workerFailureInjected.set(true);
+          throw new IllegalStateException("Injected failure with previous-snapshot DB handles open");
+        }
       }
       return invocation.callRealMethod();
     }).when(service).optimizeDirDeletesAndSubmitRequest(
         Mockito.anyList(), Mockito.anyList(), Mockito.any(), Mockito.anyLong(), Mockito.any(), Mockito.any(),
         Mockito.any(), Mockito.anyMap(), Mockito.any(), Mockito.anyLong(), Mockito.any(), Mockito.any());
 
-    OzoneManagerDoubleBuffer doubleBuffer =
-        om.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
+    OzoneManagerDoubleBuffer doubleBuffer = om.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
     Semaphore unflushedTransactions =
         (Semaphore) HddsWhiteboxTestUtils.getInternalState(doubleBuffer, "unFlushedTransactions");
     ThreadPoolExecutor deletionThreadPool = service.getDeletionThreadPool();
@@ -700,8 +697,7 @@ public class TestDirectoryDeletingService {
         purgeDone.set(true);
         return null;
       });
-      GenericTestUtils.waitFor(
-          () -> unflushedTransactions.availablePermits() == 0 || purgeDone.get(), 50, 30000);
+      GenericTestUtils.waitFor(() -> unflushedTransactions.availablePermits() == 0 || purgeDone.get(), 50, 30000);
 
       ddsMayProceed.countDown();
       if (activeStore) {
@@ -721,7 +717,12 @@ public class TestDirectoryDeletingService {
           completedTaskCountBefore + threadCount, 100, 5000);
       assertThat(deletionThreadPool.getCompletedTaskCount() - completedTaskCountBefore)
           .as("store processing should use all configured deletion workers").isEqualTo(threadCount);
-      assertThat(service.getDeletedDirsCount()).isEqualTo(threadCount);
+      int expectedPurges = workerThrows ? threadCount - 1 : threadCount;
+      assertThat(workerFailureInjected.get()).isEqualTo(workerThrows);
+      assertThat(purgeRequests).hasValue(expectedPurges);
+      assertThat(submittedWithDbLock).as("snapshot DB locks must be released before submitting requests").isFalse();
+      assertThat(openSnapshotDbHandles).as("all handles must close, including after a worker failure").hasValue(0);
+      assertThat(service.getDeletedDirsCount()).isEqualTo(expectedPurges);
     } finally {
       finishScanning.countDown();
       ddsMayProceed.countDown();
@@ -781,6 +782,59 @@ public class TestDirectoryDeletingService {
       taskExecutor.shutdownNow();
       service.shutdown();
     }
+  }
+
+  private SnapshotInfo prepareSnapshotsForDeadlock(OzoneManagerProtocol writeClient, OMMetadataManager metadataManager,
+      int threadCount, boolean activeStore) throws Exception {
+    writeClient.createSnapshot(volumeName, bucketName, "purge");
+    writeClient.createSnapshot(volumeName, bucketName, "previous");
+    String deepCleanSnapshotName = "deep-clean";
+    if (activeStore) {
+      writeClient.createSnapshot(volumeName, bucketName, deepCleanSnapshotName);
+    }
+    om.awaitDoubleBufferFlush();
+
+    addDeletedDirectories(metadataManager, threadCount);
+    if (!activeStore) {
+      writeClient.createSnapshot(volumeName, bucketName, deepCleanSnapshotName);
+    }
+    om.awaitDoubleBufferFlush();
+
+    String deepCleanKey = SnapshotInfo.getTableKey(volumeName, bucketName, deepCleanSnapshotName);
+    SnapshotInfo deepCleanInfo = metadataManager.getSnapshotInfoTable().get(deepCleanKey);
+    assertNotNull(deepCleanInfo);
+    awaitSnapshotFlushed(metadataManager, deepCleanInfo);
+
+    writeClient.deleteSnapshot(volumeName, bucketName, "purge");
+    om.awaitDoubleBufferFlush();
+    assertNotNull(metadataManager.getSnapshotInfoTable().get(
+        SnapshotInfo.getTableKey(volumeName, bucketName, "purge")));
+    return deepCleanInfo;
+  }
+
+  private void trackSnapshotDbHandles(OmSnapshotManager snapshotManager, AtomicInteger openSnapshotDbHandles)
+      throws IOException {
+    Mockito.doAnswer(invocation -> {
+      UncheckedAutoCloseableSupplier<OmSnapshot> delegate =
+          (UncheckedAutoCloseableSupplier<OmSnapshot>) invocation.callRealMethod();
+      openSnapshotDbHandles.incrementAndGet();
+      return new UncheckedAutoCloseableSupplier<OmSnapshot>() {
+        private final AtomicBoolean closed = new AtomicBoolean();
+
+        @Override
+        public OmSnapshot get() {
+          return delegate.get();
+        }
+
+        @Override
+        public void close() {
+          if (closed.compareAndSet(false, true)) {
+            delegate.close();
+            openSnapshotDbHandles.decrementAndGet();
+          }
+        }
+      };
+    }).when(snapshotManager).getActiveSnapshot(Mockito.anyString(), Mockito.anyString(), Mockito.anyString());
   }
 
   private void addDeletedDirectories(OMMetadataManager metadataManager, int count) throws Exception {
