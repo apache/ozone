@@ -165,12 +165,13 @@ public abstract class MisReplicationHandler implements
       // Copying there doesn't help: the container is still mis-replicated, the extra copy gets deleted, and the
       // next run copies it again, over and over.
       List<DatanodeDetails> dnsAfterCopy = new ArrayList<>(usedDns);
+      replicasToBeReplicated.forEach(r -> dnsAfterCopy.remove(r.getDatanodeDetails()));
       dnsAfterCopy.addAll(targetDatanodes);
       ContainerPlacementStatus placementAfterCopy =
           containerPlacement.validateContainerPlacement(dnsAfterCopy, usedDns.size());
       if (!placementAfterCopy.isPolicySatisfied()
           && placementAfterCopy.misReplicationCount() >= placementStatus.misReplicationCount()) {
-        LOG.info("Not copying container {} to {}, as that would not reduce its mis-replication.",
+        LOG.debug("Not copying container {} to {}, as that would not reduce its mis-replication.",
             container.getContainerID(), targetDatanodes);
         return 0;
       }

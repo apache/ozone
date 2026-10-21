@@ -493,7 +493,7 @@ public final class SCMContainerPlacementRackAware
       }
       // Decommissioned and maintenance nodes stay in the topology, so a place can use up all its tries on them,
       // e.g. the only other rack while a whole rack is being decommissioned. Then move on to the next place.
-      outOfRetries = retries == 0;
+      outOfRetries |= retries == 0;
     }
     if (outOfRetries) {
       String errMsg = "No writable datanode with enough space was found. "
