@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -71,6 +72,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
+import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -167,9 +169,12 @@ public class TestOzoneContainer {
       // Full reports use the container monitor and must not wait for local service startup.
       DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
       when(datanode.getContainer()).thenReturn(container);
+      SCMConnectionManager connections = mock(SCMConnectionManager.class);
+      when(datanode.getConnectionManager()).thenReturn(connections);
+      when(connections.getValues()).thenReturn(Collections.emptyList());
       StateContext reportContext = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
       assertThat(executor.submit(() -> {
-        return reportContext.getFullContainerReportDiscardPendingICR();
+        return reportContext.getFullContainerReport();
       })
           .get(5, TimeUnit.SECONDS).getReportsCount()).isZero();
       Future<?> second = executor.submit(() -> {

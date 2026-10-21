@@ -21,6 +21,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -37,6 +38,7 @@ import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -69,12 +71,16 @@ import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.DatanodeStorage;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
@@ -94,6 +100,97 @@ import org.mockito.ArgumentCaptor;
 public class TestHeartbeatEndpointTask {
 
   private static final HostAndPort TEST_SCM_ENDPOINT = new HostAndPort("test-scm-1", 9861);
+
+  @Test
+  void testVolumeFailurePreservesICRsWhileWaitingForLease() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanode = mockDatanodeStateMachine();
+    ContainerSet containers = newContainerSet();
+    HddsVolume healthyVolume = mock(HddsVolume.class);
+    HddsVolume failedVolume = mock(HddsVolume.class);
+    for (long containerId = 1; containerId <= 2; containerId++) {
+      KeyValueContainerData data = new KeyValueContainerData(containerId, ContainerLayoutVersion.FILE_PER_CHUNK,
+          1024, UUID.randomUUID().toString(), datanode.getDatanodeDetails().getUuidString());
+      data.setVolume(containerId == 1 ? healthyVolume : failedVolume);
+      data.closeContainer();
+      containers.addContainer(new KeyValueContainer(data, conf));
+    }
+    OzoneContainer container = mock(OzoneContainer.class);
+    when(datanode.getContainer()).thenReturn(container);
+    when(container.getContainerSet()).thenReturn(containers);
+    when(container.getPipelineReport()).thenReturn(PipelineReportsProto.getDefaultInstance());
+    when(datanode.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanode, "");
+    SCMConnectionManager connections = mock(SCMConnectionManager.class);
+    when(datanode.getConnectionManager()).thenReturn(connections);
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> requests = ArgumentCaptor.forClass(SCMHeartbeatRequestProto.class);
+    AtomicBoolean grantLease = new AtomicBoolean();
+    when(scm.sendHeartbeat(requests.capture())).thenAnswer(invocation -> {
+      SCMHeartbeatRequestProto request = invocation.getArgument(0);
+      SCMHeartbeatResponseProto.Builder response = SCMHeartbeatResponseProto.newBuilder()
+          .setDatanodeUUID(request.getDatanodeDetails().getUuid());
+      if (request.getRequestFullContainerReportLease() && grantLease.get()) {
+        response.setFullContainerReportLease(FullContainerReportLeaseProto.newBuilder().setId(99).setTerm(7));
+      }
+      return response.build();
+    });
+    HostAndPort otherAddress = new HostAndPort("other-scm", 9861);
+    HostAndPort legacyAddress = new HostAndPort("legacy-scm", 9861);
+    HostAndPort reconAddress = new HostAndPort("recon", 9861);
+    VersionResponse capability = VersionResponse.newBuilder().setVersion(1)
+        .addValue(OzoneConsts.SCM_FCR_LEASE_SUPPORTED, Boolean.TRUE.toString()).build();
+    try (EndpointStateMachine waiting = new EndpointStateMachine(TEST_SCM_ENDPOINT, scm, conf, "");
+         EndpointStateMachine other = new EndpointStateMachine(otherAddress, scm, conf, "");
+         EndpointStateMachine legacy = new EndpointStateMachine(legacyAddress, scm, conf, "");
+         EndpointStateMachine recon = new EndpointStateMachine(reconAddress, scm, conf, "")) {
+      waiting.setState(EndpointStateMachine.EndPointStates.HEARTBEAT);
+      waiting.setVersion(capability);
+      other.setVersion(capability);
+      legacy.setVersion(VersionResponse.newBuilder().setVersion(1).build());
+      recon.setVersion(capability);
+      recon.setPassive(true);
+      List<EndpointStateMachine> endpoints = Arrays.asList(waiting, other, legacy, recon);
+      when(connections.getValues()).thenReturn(endpoints);
+      endpoints.forEach(endpoint -> context.addEndpoint(endpoint.getAddress()));
+      IncrementalContainerReportProto icr = IncrementalContainerReportProto.newBuilder()
+          .addReport(containers.getContainer(1).getContainerReport()).build();
+      context.addIncrementalReport(icr);
+      when(failedVolume.isFailed()).thenReturn(true);
+
+      containers.handleVolumeFailures(context);
+
+      assertTrue(containers.getMissingContainerSet().contains(2L));
+      assertEquals(1, containers.containerCount());
+      ContainerReportsProto expected = containers.getContainerReport();
+      assertEquals(Collections.singletonList(expected), context.getAllAvailableReports(legacyAddress));
+      assertEquals(Collections.singletonList(expected), context.getAllAvailableReports(reconAddress));
+      verify(datanode).triggerHeartbeat();
+      HeartbeatEndpointTask task = HeartbeatEndpointTask.newBuilder().setConfig(conf).setContext(context)
+          .setEndpointStateMachine(waiting).build();
+
+      task.call();
+
+      assertEquals(1, requests.getAllValues().size());
+      assertTrue(requests.getValue().getRequestFullContainerReportLease());
+      assertFalse(requests.getValue().hasContainerReport());
+      assertEquals(Collections.singletonList(icr), requests.getValue().getIncrementalContainerReportList());
+      assertTrue(context.isFullContainerReportReady(TEST_SCM_ENDPOINT));
+      grantLease.set(true);
+
+      task.call();
+
+      assertEquals(3, requests.getAllValues().size());
+      assertEquals(expected.getReportsList(), requests.getValue().getContainerReport().getReportsList());
+      assertEquals(99, requests.getValue().getContainerReport().getFullContainerReportLease().getId());
+      assertEquals(0, requests.getValue().getIncrementalContainerReportCount());
+      assertFalse(context.isFullContainerReportReady(TEST_SCM_ENDPOINT));
+      assertEquals(Collections.singletonList(icr),
+          context.getAllAvailableReports(otherAddress, StateContext.CONTAINER_REPORTS_PROTO_NAME));
+      assertTrue(context.isFullContainerReportReady(otherAddress));
+    }
+  }
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})

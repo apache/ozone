@@ -225,7 +225,7 @@ public class TestStateContext {
         StateContext.CONTAINER_REPORTS_PROTO_NAME, 1);
 
     // Get FCR
-    ctx.getFullContainerReportDiscardPendingICR();
+    ctx.getFullContainerReport();
 
     // Only FCR should be part of all available reports.
     expectedReportCount.put(
@@ -298,7 +298,7 @@ public class TestStateContext {
       if (endpointReport) {
         context.getFullContainerReportDiscardPendingICR(scm1);
       } else {
-        context.getFullContainerReportDiscardPendingICR();
+        context.getFullContainerReport();
       }
     });
 
@@ -942,6 +942,9 @@ public class TestStateContext {
     OzoneContainer o = mock(OzoneContainer.class);
     ContainerSet s = mock(ContainerSet.class);
     when(datanodeStateMachineMock.getContainer()).thenReturn(o);
+    SCMConnectionManager connections = mock(SCMConnectionManager.class);
+    when(datanodeStateMachineMock.getConnectionManager()).thenReturn(connections);
+    when(connections.getValues()).thenReturn(Collections.emptyList());
     when(o.getContainerSet()).thenReturn(s);
     when(s.getContainerReport())
         .thenReturn(

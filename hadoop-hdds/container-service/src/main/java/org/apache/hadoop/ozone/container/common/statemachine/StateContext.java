@@ -426,17 +426,6 @@ public class StateContext {
     return getFullContainerReportDiscardPendingICR(endpoint -> !leasedEndpoints.contains(endpoint));
   }
 
-  /**
-   * Gets a point in time snapshot of all containers, any pending incremental
-   * container reports (ICR) for containers will be included in this report
-   * and this call will drop any pending ICRs.
-   * @return Full Container Report
-   */
-  public ContainerReportsProto getFullContainerReportDiscardPendingICR()
-      throws IOException {
-    return getFullContainerReportDiscardPendingICR(endpoint -> true);
-  }
-
   private ContainerReportsProto getFullContainerReportDiscardPendingICR(Predicate<HostAndPort> discardPendingICR)
       throws IOException {
     ContainerSet containerSet =
