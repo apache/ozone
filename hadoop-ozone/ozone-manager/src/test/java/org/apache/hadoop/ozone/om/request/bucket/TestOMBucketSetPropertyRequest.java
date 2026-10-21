@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -47,7 +48,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
@@ -580,7 +580,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     OMVersionManager preFinalizedVersionManager =
         mock(OMVersionManager.class);
     when(preFinalizedVersionManager
-        .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)).thenReturn(false);
+        .isAllowed(OzoneManagerVersion.S3_OBJECT_VERSIONING)).thenReturn(false);
     ValidationContext preFinalizedContext = ValidationContext.of(
         preFinalizedVersionManager, omMetadataManager);
 
@@ -607,7 +607,7 @@ public class TestOMBucketSetPropertyRequest extends BucketRequestTests {
     OMVersionManager finalizedVersionManager =
         mock(OMVersionManager.class);
     when(finalizedVersionManager
-        .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)).thenReturn(true);
+        .isAllowed(OzoneManagerVersion.S3_OBJECT_VERSIONING)).thenReturn(true);
     ValidationContext finalizedContext = ValidationContext.of(
         finalizedVersionManager, omMetadataManager);
     assertSame(request, OMBucketSetPropertyRequest

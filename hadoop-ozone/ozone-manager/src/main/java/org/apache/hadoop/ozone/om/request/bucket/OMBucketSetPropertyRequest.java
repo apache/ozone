@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.common.BekInfoUtils;
@@ -392,8 +393,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   )
   public static OMRequest disallowSetBucketPropertyWithVersioningStatus(
       OMRequest req, ValidationContext ctx) throws OMException {
-    if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.OBJECT_VERSIONING)) {
+    if (!ctx.versionManager().isAllowed(OzoneManagerVersion.S3_OBJECT_VERSIONING)) {
       SetBucketPropertyRequest propReq =
           req.getSetBucketPropertyRequest();
       // The deprecated isVersionEnabled flag also maps to a versioning status.
