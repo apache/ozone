@@ -118,6 +118,16 @@ OTEL_TRACES_SAMPLER_ARG=0.01
 
 This configuration will record 1% of the requests to limit the performance overhead.
 
+### Background tasks
+
+Each run of an Ozone background task starts its own trace, so the log lines it writes can be matched to that run. Examples are the SCM `ReplicationManager`, `BackgroundPipelineCreator` and `NodeStateManager.healthCheck`, the datanode `HeartbeatEndpointTask` and container scanners, the OM `TrashEmptier`, and the Recon tasks. The span is named after the task, or after the background service or thread for tasks that run on a shared service. The time a task spends waiting for its next run is not part of the span.
+
+Some of these tasks run every few seconds (for example the heartbeat checks), so with tracing on they produce many traces. Background task spans are root spans: their volume is controlled by `ozone.tracing.sampler` (`OTEL_TRACES_SAMPLER_ARG`), not by `ozone.tracing.span.sampling`, which only applies to child spans. To keep only some of them, use tail sampling in the collector, for example by dropping traces by span name.
+
+### Trace IDs in logs
+
+When tracing is on, the current trace and span IDs are available to log patterns as `%X{trace_id}` and `%X{span_id}`. IDs are also set for traces that are not sampled, so a trace ID found in a log line may not exist in Jaeger. Most background tasks log errors from a `catch` block that runs after the task's span is no longer current, so those messages have no trace ID; the error itself is recorded on the span.
+
 ## ozone insight
 
 Ozone insight is a swiss-army-knife tool to for checking the current state of Ozone cluster. It can show logging, metrics and configuration for a particular component.
