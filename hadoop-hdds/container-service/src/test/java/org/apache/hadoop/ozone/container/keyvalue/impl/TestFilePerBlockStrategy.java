@@ -29,7 +29,9 @@ import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUti
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.AdditionalAnswers.delegatesTo;
@@ -56,6 +58,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -68,6 +71,7 @@ import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -78,6 +82,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.ratis.util.ReferenceCountedObject;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -203,6 +208,31 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     newSha.update(newdata);
     assertEquals(Hex.encodeHexString(oldSha.digest()),
         Hex.encodeHexString(newSha.digest()));
+  }
+
+  @Test
+  public void testDrainStreamBuffers() throws Exception {
+    final KeyValueContainer container = getKeyValueContainer();
+    final BlockID blockID = getBlockID();
+    final File blockFile = FILE_PER_BLOCK.getChunkFile(getKeyValueContainerData(), blockID, null);
+    final ChunkManager subject = createTestSubject();
+    final KeyValueStreamDataChannel channel = assertInstanceOf(KeyValueStreamDataChannel.class,
+        subject.getStreamDataChannel(container, blockID, null, mock(ContainerMetrics.class)));
+    final byte[] data = RandomUtils.secure().randomBytes(100);
+    final ReferenceCountedObject<ByteBuffer> ref =
+        ReferenceCountedObject.wrap(ByteBuffer.wrap(data), () -> { }, () -> { });
+    ref.retain();
+    channel.write(ref);
+    ref.release();
+    // the data stream keeps the end of the stream in memory
+    assertEquals(0, blockFile.length());
+
+    // the stream is found by container and local ID; the block ID of a PutBlock also has a bcsId
+    final BlockID putBlockID = new BlockID(blockID.getContainerID(), blockID.getLocalID());
+    putBlockID.setBlockCommitSequenceId(10);
+    subject.drainStreamBuffers(container, putBlockID, data.length);
+    assertArrayEquals(data, Files.readAllBytes(blockFile.toPath()));
+    channel.cleanUp();
   }
 
   /**

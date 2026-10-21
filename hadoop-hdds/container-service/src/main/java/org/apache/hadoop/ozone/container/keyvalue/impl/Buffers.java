@@ -89,6 +89,16 @@ class Buffers {
     return polled;
   }
 
+  /** @return the first buffer, or null if the deque is empty. */
+  ReferenceCountedObject<ByteBuffer> pollFirst() {
+    if (deque.isEmpty()) {
+      return null;
+    }
+    final ReferenceCountedObject<ByteBuffer> polled = poll();
+    length -= polled.get().remaining();
+    return polled;
+  }
+
   /**
    * Poll all the buffers from the deque and combine them into a single read-only {@link ByteBuf}.
    *
