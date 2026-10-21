@@ -982,9 +982,9 @@ public class TestKeyValueHandler {
   @Test
   public void testCreateContainerReleasesSpaceOnUncheckedFailure() throws Exception {
     final long containerID = 1L;
-    HandlerWithVolumeSet handlerWithVolume =
-        createCreateContainerHandlerWithVolumeSet(tempDir, true);
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(tempDir);
     HddsVolume hddsVolume = (HddsVolume) handlerWithVolume.getVolumeSet().getVolumesList().get(0);
+    hddsVolume.setDbParentDir(null);
     String datanodeId = handlerWithVolume.getHandler().getDatanodeId();
 
     ContainerCommandResponseProto response = handlerWithVolume.getHandler().handle(
@@ -999,8 +999,7 @@ public class TestKeyValueHandler {
   @Test
   public void testCreateContainerKeepsSpaceOfCreatedContainer() throws Exception {
     final long containerID = 1L;
-    HandlerWithVolumeSet handlerWithVolume =
-        createCreateContainerHandlerWithVolumeSet(tempDir, false);
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(tempDir);
     HddsVolume hddsVolume = (HddsVolume) handlerWithVolume.getVolumeSet().getVolumesList().get(0);
     String datanodeId = handlerWithVolume.getHandler().getDatanodeId();
     KeyValueHandler kvHandler = handlerWithVolume.getHandler();
@@ -1020,29 +1019,6 @@ public class TestKeyValueHandler {
     assertEquals(ContainerProtos.Result.SUCCESS, response2.getResult());
     assertEquals(committedAfterFirst, hddsVolume.getCommittedBytes());
     assertTrue(container.getContainerData().isCommittedSpace());
-  }
-
-  private HandlerWithVolumeSet createCreateContainerHandlerWithVolumeSet(
-      Path volumeRoot, boolean unsetDbParentDir) throws IOException {
-    final String clusterId = UUID.randomUUID().toString();
-    final String datanodeId = UUID.randomUUID().toString();
-    OzoneConfiguration testConf = new OzoneConfiguration();
-    testConf.set(HDDS_DATANODE_DIR_KEY, volumeRoot.toString());
-    ContainerSet containerSet = newContainerSet();
-    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
-    HddsVolume hddsVolume = new HddsVolume.Builder(volumeRoot.toString()).conf(testConf)
-        .clusterID(clusterId).datanodeUuid(datanodeId).volumeSet(volumeSet).build();
-    hddsVolume.format(clusterId);
-    hddsVolume.createWorkingDir(clusterId, null);
-    hddsVolume.createTmpDirs(clusterId);
-    if (unsetDbParentDir) {
-      hddsVolume.setDbParentDir(null);
-    }
-    when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
-    KeyValueHandler kvHandler = new KeyValueHandler(testConf, datanodeId, containerSet, volumeSet,
-        ContainerMetrics.create(testConf), c -> { }, new ContainerChecksumTreeManager(testConf));
-    kvHandler.setClusterID(clusterId);
-    return new HandlerWithVolumeSet(kvHandler, volumeSet, containerSet);
   }
 
   private static ContainerCommandRequestProto createContainerRequest(
