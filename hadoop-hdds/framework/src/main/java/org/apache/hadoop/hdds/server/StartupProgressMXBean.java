@@ -58,9 +58,9 @@ public interface StartupProgressMXBean {
   List<PhaseInfo> getPhases();
 
   /**
-   * JMX view of a startup phase.
+   * JMX view of a startup phase or of a step within a phase.
    */
-  interface PhaseInfo {
+  interface ProgressInfo {
     String getName();
 
     Status getStatus();
@@ -69,29 +69,17 @@ public interface StartupProgressMXBean {
 
     long getRemainingTime();
 
-    /** @return sum of the number of completed work items of all steps. */
+    /** @return number of completed work items, summed over all steps for a phase. */
     long getDone();
 
-    /** @return sum of the total number of work items of all steps. */
+    /** @return total number of work items, summed over all steps for a phase. */
     long getTotal();
-
-    List<StepInfo> getSteps();
   }
 
   /**
-   * JMX view of a step within a startup phase.
+   * JMX view of a startup phase.
    */
-  interface StepInfo {
-    String getName();
-
-    Status getStatus();
-
-    long getElapsedTime();
-
-    long getRemainingTime();
-
-    long getDone();
-
-    long getTotal();
+  interface PhaseInfo extends ProgressInfo {
+    List<ProgressInfo> getSteps();
   }
 }

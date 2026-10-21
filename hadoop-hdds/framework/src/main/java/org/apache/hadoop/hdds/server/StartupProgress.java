@@ -58,7 +58,8 @@ public class StartupProgress<P extends Enum<P>> implements StartupProgressMXBean
   }
 
   /**
-   * Begins the phase, ending all earlier phases. Has no effect if the phase has already begun.
+   * Begins the phase, ending all earlier phases. Has no effect if the phase has already begun or ended,
+   * e.g. when the datanode gets the version from each SCM.
    */
   public void beginPhase(P phase) {
     for (Map.Entry<P, Phase> entry : phases.entrySet()) {
@@ -244,7 +245,7 @@ public class StartupProgress<P extends Enum<P>> implements StartupProgressMXBean
     }
 
     @Override
-    public List<StepInfo> getSteps() {
+    public List<ProgressInfo> getSteps() {
       return new ArrayList<>(steps);
     }
   }
@@ -252,7 +253,7 @@ public class StartupProgress<P extends Enum<P>> implements StartupProgressMXBean
   /**
    * A part of a phase which processes a known number of work items.
    */
-  public static final class Step extends Tracked implements StepInfo {
+  public static final class Step extends Tracked implements ProgressInfo {
     private final AtomicLong done = new AtomicLong();
     private volatile long total;
 
@@ -282,7 +283,8 @@ public class StartupProgress<P extends Enum<P>> implements StartupProgressMXBean
       if (status != Status.RUNNING || doneCount <= 0 || totalCount <= 0) {
         return -1;
       }
-      return Math.max(0, getElapsedTime() * (totalCount - doneCount) / doneCount);
+      // average time per work item * remaining work items
+      return Math.max(0, (long) ((double) getElapsedTime() / doneCount * (totalCount - doneCount)));
     }
 
     @Override

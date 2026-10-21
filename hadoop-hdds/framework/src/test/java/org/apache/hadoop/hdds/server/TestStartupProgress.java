@@ -73,6 +73,13 @@ public class TestStartupProgress {
     assertTrue(progress.isComplete());
     assertFalse(progress.isFailed());
     assertEquals(150, progress.getElapsedTime());
+
+    // beginning a phase that has already ended has no effect
+    progress.beginPhase(TestPhase.SECOND);
+    assertEquals(Status.COMPLETE, phase(TestPhase.SECOND).getStatus());
+    assertEquals(50, phase(TestPhase.SECOND).getElapsedTime());
+    assertTrue(progress.isComplete());
+    assertEquals(150, progress.getElapsedTime());
   }
 
   @Test
