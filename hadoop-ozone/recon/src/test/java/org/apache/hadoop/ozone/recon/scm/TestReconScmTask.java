@@ -46,12 +46,11 @@ import org.mockito.InOrder;
 class TestReconScmTask {
   private ReconTaskStatusUpdater updater;
   private ReconScmTask task;
-  private ReconTaskStatusUpdaterManager manager;
 
   @BeforeEach
   void setUp() {
     updater = mock(ReconTaskStatusUpdater.class);
-    manager = mock(ReconTaskStatusUpdaterManager.class);
+    ReconTaskStatusUpdaterManager manager = mock(ReconTaskStatusUpdaterManager.class);
     when(manager.getTaskStatusUpdater(anyString())).thenReturn(updater);
     task = mock(ReconScmTask.class, org.mockito.Mockito.withSettings().useConstructor(manager)
         .defaultAnswer(org.mockito.Mockito.CALLS_REAL_METHODS));
