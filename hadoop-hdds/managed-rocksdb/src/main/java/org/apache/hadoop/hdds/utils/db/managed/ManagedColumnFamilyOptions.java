@@ -52,7 +52,7 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
   /** Creates options that request compaction when an SST's deletion ratio reaches the given threshold. */
   public static ManagedColumnFamilyOptions withDeletionRatio(double deletionRatio) {
     if (!Double.isFinite(deletionRatio) || deletionRatio < 0 || deletionRatio > 1) {
-      throw new IllegalArgumentException("Deletion ratio must be between 0 and 1: " + deletionRatio);
+      throw new IllegalArgumentException("Deletion ratio must be between 0 and 1 inclusive: " + deletionRatio);
     }
     if (deletionRatio == 0) {
       return new ManagedColumnFamilyOptions();

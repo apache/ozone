@@ -110,13 +110,22 @@ public class TestDBStoreBuilder {
           throw new IllegalStateException(e);
         }
       }, 100, 10000);
-      assertEquals(250, table.getEstimatedKeyCount());
+      int count = 0;
+      try (Table.KeyValueIterator<byte[], byte[]> iterator = table.iterator()) {
+        while (iterator.hasNext()) {
+          Table.KeyValue<byte[], byte[]> entry = iterator.next();
+          assertArrayEquals(StringCodec.get().toPersistedFormat(String.format("%04d", 750 + count)), entry.getKey());
+          assertArrayEquals(new byte[100], entry.getValue());
+          count++;
+        }
+      }
+      assertEquals(250, count);
     }
   }
 
   @ParameterizedTest
   @ValueSource(doubles = {0, 1})
-  public void testDeletionRatioBelowThreshold(double ratio, @TempDir Path tempDir) throws Exception {
+  public void testCompactionNotTriggered(double ratio, @TempDir Path tempDir) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     if (ratio != 0) {
       conf.setDouble("hadoop.hdds.db.rocksdb.compaction.deletion.ratio", ratio);
