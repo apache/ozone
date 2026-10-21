@@ -93,6 +93,12 @@ public abstract class ReconScmTask {
 
   protected abstract void run();
 
+  /**
+   * Runs one iteration and records it in the task status table. Exceptions from {@link #runTask()}
+   * are logged and recorded as a failed run instead of being thrown; {@link InterruptedException}
+   * and {@link Error} are recorded as failed and rethrown. The run starts as successful, so
+   * {@link #runTask()} may set -1 to report a partial failure.
+   */
   protected void initializeAndRunTask() throws InterruptedException {
     taskStatusUpdater.recordRunStart();
     try {

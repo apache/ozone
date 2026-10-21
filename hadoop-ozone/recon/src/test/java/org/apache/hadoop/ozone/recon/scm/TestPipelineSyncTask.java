@@ -19,10 +19,15 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static java.util.Collections.emptyList;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,6 +45,50 @@ import org.mockito.InOrder;
  * Tests for {@link PipelineSyncTask}.
  */
 class TestPipelineSyncTask {
+
+  @Test
+  void testPipelineInterruptionCompletesRunOnce() throws Exception {
+    ReconTaskStatusUpdater updater = mock(ReconTaskStatusUpdater.class);
+    ReconTaskStatusUpdaterManager manager = mock(ReconTaskStatusUpdaterManager.class);
+    when(manager.getTaskStatusUpdater("PipelineSyncTask")).thenReturn(updater);
+    ReconTaskConfig config = new ReconTaskConfig();
+    PipelineSyncTask pipelineTask = spy(new PipelineSyncTask(null, null, null, config, manager));
+    doReturn(true).when(pipelineTask).canRun();
+    doAnswer(invocation -> {
+      throw new InterruptedException("Stopping task");
+    }).when(pipelineTask).runTask();
+
+    try {
+      pipelineTask.run();
+      assertTrue(Thread.currentThread().isInterrupted());
+      verify(updater).recordRunCompletion();
+    } finally {
+      Thread.interrupted();
+    }
+  }
+
+  @Test
+  void testPipelineSleepInterruptionDoesNotFailCompletedRun() throws Exception {
+    ReconTaskStatusUpdater updater = mock(ReconTaskStatusUpdater.class);
+    ReconTaskStatusUpdaterManager manager = mock(ReconTaskStatusUpdaterManager.class);
+    when(manager.getTaskStatusUpdater("PipelineSyncTask")).thenReturn(updater);
+    ReconTaskConfig config = new ReconTaskConfig();
+    PipelineSyncTask pipelineTask = spy(new PipelineSyncTask(null, null, null, config, manager));
+    doReturn(true).when(pipelineTask).canRun();
+    doAnswer(invocation -> {
+      Thread.currentThread().interrupt();
+      return null;
+    }).when(pipelineTask).runTask();
+
+    try {
+      pipelineTask.run();
+      assertTrue(Thread.currentThread().isInterrupted());
+      verify(updater).recordRunCompletion();
+      verify(updater, times(0)).setLastTaskRunStatus(-1);
+    } finally {
+      Thread.interrupted();
+    }
+  }
 
   @Test
   void keepsRunningAfterFailedSync() throws Exception {

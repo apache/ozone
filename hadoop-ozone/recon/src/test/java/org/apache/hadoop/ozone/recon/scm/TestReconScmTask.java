@@ -24,21 +24,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,44 +87,6 @@ class TestReconScmTask {
   }
 
   @Test
-  void testPipelineInterruptionCompletesRunOnce() throws Exception {
-    ReconTaskConfig config = new ReconTaskConfig();
-    PipelineSyncTask pipelineTask = spy(new PipelineSyncTask(null, null, null, config, manager));
-    doReturn(true).when(pipelineTask).canRun();
-    doAnswer(invocation -> {
-      throw new InterruptedException("Stopping task");
-    }).when(pipelineTask).runTask();
-
-    try {
-      pipelineTask.run();
-      assertTrue(Thread.currentThread().isInterrupted());
-      verify(updater).recordRunCompletion();
-    } finally {
-      Thread.interrupted();
-    }
-  }
-
-  @Test
-  void testPipelineSleepInterruptionDoesNotFailCompletedRun() throws Exception {
-    ReconTaskConfig config = new ReconTaskConfig();
-    PipelineSyncTask pipelineTask = spy(new PipelineSyncTask(null, null, null, config, manager));
-    doReturn(true).when(pipelineTask).canRun();
-    doAnswer(invocation -> {
-      Thread.currentThread().interrupt();
-      return null;
-    }).when(pipelineTask).runTask();
-
-    try {
-      pipelineTask.run();
-      assertTrue(Thread.currentThread().isInterrupted());
-      verify(updater).recordRunCompletion();
-      verify(updater, times(0)).setLastTaskRunStatus(-1);
-    } finally {
-      Thread.interrupted();
-    }
-  }
-
-  @Test
   void testFailureCompletesRunAndAllowsRetry() throws Exception {
     doThrow(new IOException("Task failed")).doNothing().when(task).runTask();
 
@@ -146,20 +103,6 @@ class TestReconScmTask {
     order.verify(updater).setLastTaskRunStatus(0);
     order.verify(task).runTask();
     order.verify(updater).recordRunCompletion();
-  }
-
-  @Test
-  void testPipelineSyncRetriesAfterFailure() throws Exception {
-    ReconTaskConfig config = new ReconTaskConfig();
-    config.setPipelineSyncTaskInterval(Duration.ofMillis(10));
-    PipelineSyncTask pipelineTask = spy(new PipelineSyncTask(null, null, null, config, manager));
-    doReturn(true, true, false).when(pipelineTask).canRun();
-    doThrow(new IOException("SCM unavailable")).doNothing().when(pipelineTask).runTask();
-
-    pipelineTask.run();
-
-    verify(pipelineTask, times(2)).runTask();
-    verify(updater, times(2)).recordRunCompletion();
   }
 
   @Test
