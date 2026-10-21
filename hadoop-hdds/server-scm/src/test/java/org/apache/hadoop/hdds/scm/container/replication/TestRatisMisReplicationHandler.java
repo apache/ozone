@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
@@ -26,12 +28,16 @@ import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,19 +46,32 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
+import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
+import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests the RatisReplicationHandling functionality.
@@ -187,6 +206,51 @@ public class TestRatisMisReplicationHandler extends MisReplicationHandlerTests {
 
     // On a later run, placement finds a target on another rack, so the copy is sent.
     testMisReplication(availableReplicas, mockPlacementPolicy(), Collections.emptyList(), 0, 1, 1);
+  }
+
+  @Test
+  public void testCopyWaitsForUsableNodeOnAnotherRack() throws IOException {
+    // rack0 has the replicas on node0-2 and a free node3. Both nodes of rack1 are decommissioned.
+    NetworkTopology topology = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.getClusterNetworkTopologyMap()).thenReturn(topology);
+    when(nodeManager.hasAvailableSpace(any())).thenReturn(true);
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    List<DatanodeInfo> nodeInfos = new ArrayList<>();
+    for (int i = 0; i < 6; i++) {
+      DatanodeDetails node = MockDatanodeDetails.createDatanodeDetails("node" + i, "/rack" + i / 4);
+      topology.add(node);
+      NodeStatus status = i < 4 ? NodeStatus.inServiceHealthy() : NodeStatus.valueOf(DECOMMISSIONED, HEALTHY);
+      DatanodeInfo nodeInfo =
+          new DatanodeInfo(node, status, UpgradeUtils.defaultVersionProto(), HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT);
+      when(nodeManager.getNode(node.getID())).thenReturn(nodeInfo);
+      nodes.add(node);
+      nodeInfos.add(nodeInfo);
+    }
+    PlacementPolicy placementPolicy = new SCMContainerPlacementRackAware(nodeManager, new OzoneConfiguration(),
+        topology, true, mock(SCMContainerPlacementMetrics.class));
+    ContainerInfo container = ReplicationTestUtil.createContainer(LifeCycleState.CLOSED,
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+    Set<ContainerReplica> replicas = new HashSet<>();
+    for (DatanodeDetails node : nodes.subList(0, 3)) {
+      replicas.add(ReplicationTestUtil.createContainerReplica(container.containerID(), 0, IN_SERVICE, State.CLOSED,
+          123L, 1234L, node, node.getID()));
+    }
+    ContainerHealthResult.MisReplicatedHealthResult result =
+        mock(ContainerHealthResult.MisReplicatedHealthResult.class);
+    when(result.getContainerInfo()).thenReturn(container);
+    MisReplicationHandler handler =
+        getMisreplicationHandler(placementPolicy, new OzoneConfiguration(), getReplicationManager());
+
+    // Placement can only offer node3, on the same rack as the replicas.
+    assertEquals(0, handler.processAndSendCommands(replicas, Collections.emptyList(), result, 0));
+
+    // node4 on rack1 is back in service.
+    nodeInfos.get(4).setNodeStatus(NodeStatus.inServiceHealthy());
+    assertEquals(1, handler.processAndSendCommands(replicas, Collections.emptyList(), result, 0));
+    ArgumentCaptor<DatanodeDetails> target = ArgumentCaptor.forClass(DatanodeDetails.class);
+    verify(getReplicationManager()).sendThrottledReplicationCommand(eq(container), anyList(), target.capture(), eq(0));
+    assertEquals(nodes.get(4), target.getValue());
   }
 
   @Test

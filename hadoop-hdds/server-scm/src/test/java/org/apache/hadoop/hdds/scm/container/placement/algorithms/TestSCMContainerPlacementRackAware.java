@@ -763,6 +763,26 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   @Test
+  public void fallbackThrowsWhenNoRackHasUsableNode() {
+    setup(2 * NODE_PER_RACK);
+    // Two replicas are on rack0, and every other node is decommissioned.
+    for (int i = 2; i < 2 * NODE_PER_RACK; i++) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(1)));
+
+    // The other-racks step and then the any-rack step use up their 3 tries each.
+    SCMException e = assertThrows(SCMException.class, () -> policy.chooseDatanodes(usedNodes, null, null, 1, 0, 5));
+    assertThat(e.getMessage()).startsWith("No writable datanode");
+    assertEquals(6, metrics.getDatanodeChooseAttemptCount());
+
+    // The same when the any-rack step runs out of nodes to try before it uses up its tries.
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(datanodes.subList(2, NODE_PER_RACK));
+    e = assertThrows(SCMException.class, () -> policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5));
+    assertThat(e.getMessage()).startsWith("No writable datanode");
+  }
+
+  @Test
   public void chooseSingleNodeRackWithUsedAndExcludeNodes()
       throws SCMException {
     int datanodeCount = 5;
