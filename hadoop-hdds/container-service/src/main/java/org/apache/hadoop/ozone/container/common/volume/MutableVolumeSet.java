@@ -361,13 +361,10 @@ public class MutableVolumeSet implements VolumeSet {
     }
     volumeMap.clear();
 
-    // Shut down failed volumes too: their VolumeInfoMetrics is registered on
-    // creation (HDDS-7086) and must be unregistered on shutdown.
+    // Failed volumes keep VolumeInfoMetrics registered (HDDS-7086) while the datanode runs.
     for (StorageVolume volume : failedVolumeMap.values()) {
-      try {
-        volume.shutdown();
-      } catch (Exception ex) {
-        LOG.error("Failed to shutdown failed volume : " + volume.getStorageDir(), ex);
+      if (volume instanceof HddsVolume && ((HddsVolume) volume).getVolumeInfoStats() != null) {
+        ((HddsVolume) volume).getVolumeInfoStats().unregister();
       }
     }
     failedVolumeMap.clear();

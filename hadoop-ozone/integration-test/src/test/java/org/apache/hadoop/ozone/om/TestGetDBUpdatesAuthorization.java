@@ -64,7 +64,7 @@ public class TestGetDBUpdatesAuthorization {
   private static final String BUCKET = "bucket1";
   private static final String KEY = "key1";
   private static final String READONLY_ADMIN = "roadmin";
-  private static final String RECON_PRINCIPAL = "reconsvc";
+  static final String RECON_PRINCIPAL = "reconsvc";
 
   @BeforeAll
   static void init() throws Exception {

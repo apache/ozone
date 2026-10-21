@@ -17,14 +17,9 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
-import java.lang.reflect.Field;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.junit.jupiter.api.Test;
@@ -35,33 +30,26 @@ import org.junit.jupiter.api.Test;
 class TestOmSnapshotInternalMetrics {
 
   @Test
-  void testUnregisterWithMultipleOmNodeIds() throws Exception {
+  void testUnregisterWithMultipleOmNodeIds() {
     MetricsSystem metricsSystem = DefaultMetricsSystem.initialize("TestOmSnapshotInternalMetrics");
-    Field field = metricsSystem.getClass().getDeclaredField("allSources");
-    field.setAccessible(true);
-    @SuppressWarnings("unchecked")
-    Map<String, MetricsSource> sources = (Map<String, MetricsSource>) field.get(metricsSystem);
-    Set<String> initialSources = new HashSet<>(sources.keySet());
+    String firstName = OmSnapshotInternalMetrics.METRICS_SOURCE_NAME + "-service1-om1";
+    String secondName = OmSnapshotInternalMetrics.METRICS_SOURCE_NAME + "-service1-om2";
     boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
     DefaultMetricsSystem.setMiniClusterMode(true);
     try {
-      OmSnapshotInternalMetrics first = OmSnapshotInternalMetrics.create(
-          "service1", "om1");
-      Set<String> firstSources = new HashSet<>(sources.keySet());
-      assertEquals(initialSources.size() + 1, firstSources.size());
-      OmSnapshotInternalMetrics second = OmSnapshotInternalMetrics.create(
-          "service1", "om2");
-      assertNotSame(first, second);
-      assertEquals(initialSources.size() + 2, sources.size());
+      OmSnapshotInternalMetrics first = OmSnapshotInternalMetrics.create("service1", "om1");
+      OmSnapshotInternalMetrics second = OmSnapshotInternalMetrics.create("service1", "om2");
+      assertSame(first, metricsSystem.getSource(firstName));
+      assertSame(second, metricsSystem.getSource(secondName));
 
       second.unregister();
-      assertEquals(firstSources, sources.keySet());
+      assertNull(metricsSystem.getSource(secondName));
+      assertSame(first, metricsSystem.getSource(firstName));
       first.unregister();
-      assertEquals(initialSources, sources.keySet());
+      assertNull(metricsSystem.getSource(firstName));
     } finally {
-      Set<String> remainingSources = new HashSet<>(sources.keySet());
-      remainingSources.removeAll(initialSources);
-      remainingSources.forEach(metricsSystem::unregisterSource);
+      metricsSystem.unregisterSource(firstName);
+      metricsSystem.unregisterSource(secondName);
       DefaultMetricsSystem.shutdown();
       DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
     }

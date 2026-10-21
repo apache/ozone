@@ -51,7 +51,6 @@ public final class MetricsLeakAssertion {
    */
   private static final List<String> EXPECTED_LEFTOVER_SOURCES = Arrays.asList(
       "JvmMetrics*", // per service, via HddsServerUtil.initializeMetrics
-      "JvmMetricsCpu",
       "UgiMetrics", // Hadoop security UGI metrics
       "ManagedRocksObjectMetrics",
       "ContainerCacheMetrics" // ContainerCache singleton, created once per JVM
@@ -70,7 +69,6 @@ public final class MetricsLeakAssertion {
       // RPC / HTTP server metrics (name embeds the listening port).
       "RpcActivityForPort*",
       "RpcDetailedActivityForPort*",
-      "HttpServer2*",
       "LocalJobRunnerMetrics*",
 
       // Datanode per-instance metrics.
@@ -162,6 +160,7 @@ public final class MetricsLeakAssertion {
       Set<String> leaked = new TreeSet<>(sources.keySet());
       leaked.removeIf(MetricsLeakAssertion::isExpectedLeftover);
       if (!leaked.isEmpty()) {
+        leaked.forEach(ms::unregisterSource);
         throw new AssertionError("Found " + leaked.size() +
             " metrics source(s) still registered after cluster shutdown: " + leaked);
       }
@@ -210,21 +209,7 @@ public final class MetricsLeakAssertion {
   }
 
   private static String stripNumericSuffix(String name) {
-    int idx = name.lastIndexOf('-');
-    if (idx > 0 && idx < name.length() - 1) {
-      String tail = name.substring(idx + 1);
-      boolean numeric = true;
-      for (int i = 0; i < tail.length(); i++) {
-        if (!Character.isDigit(tail.charAt(i))) {
-          numeric = false;
-          break;
-        }
-      }
-      if (numeric) {
-        return name.substring(0, idx);
-      }
-    }
-    return name;
+    return name.replaceFirst("-\\d+$", "");
   }
 
   private static Field findAllSourcesField(Class<?> clazz) {

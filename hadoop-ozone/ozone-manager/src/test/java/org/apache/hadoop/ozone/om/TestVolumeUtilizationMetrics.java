@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -28,17 +28,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.lang.reflect.Field;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.Set;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.om.VolumeUtilizationMetrics.VolumeMetricsInfo;
@@ -105,33 +101,28 @@ public class TestVolumeUtilizationMetrics {
   }
 
   @Test
-  void testUnregisterWithMultipleInstances() throws Exception {
+  void testUnregisterWithMultipleInstances() {
     MetricsSystem metricsSystem = DefaultMetricsSystem.initialize("TestVolumeUtilizationMetrics");
-    Field field = metricsSystem.getClass().getDeclaredField("allSources");
-    field.setAccessible(true);
-    @SuppressWarnings("unchecked")
-    Map<String, MetricsSource> sources = (Map<String, MetricsSource>) field.get(metricsSystem);
-    Set<String> initialSources = new HashSet<>(sources.keySet());
+    String firstName = VolumeUtilizationMetrics.class.getSimpleName() + "-service1-om1";
+    String secondName = VolumeUtilizationMetrics.class.getSimpleName() + "-service1-om2";
     boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
     DefaultMetricsSystem.setMiniClusterMode(true);
     try {
-      VolumeUtilizationMetrics first = VolumeUtilizationMetrics.create(
-          mock(OMMetadataManager.class), "service1", "om1");
-      Set<String> firstSources = new HashSet<>(sources.keySet());
-      assertEquals(initialSources.size() + 1, firstSources.size());
-      VolumeUtilizationMetrics second = VolumeUtilizationMetrics.create(
-          mock(OMMetadataManager.class), "service1", "om2");
-      assertNotSame(first, second);
-      assertEquals(initialSources.size() + 2, sources.size());
+      VolumeUtilizationMetrics first =
+          VolumeUtilizationMetrics.create(mock(OMMetadataManager.class), "service1", "om1");
+      VolumeUtilizationMetrics second =
+          VolumeUtilizationMetrics.create(mock(OMMetadataManager.class), "service1", "om2");
+      assertSame(first, metricsSystem.getSource(firstName));
+      assertSame(second, metricsSystem.getSource(secondName));
 
       second.unRegister();
-      assertEquals(firstSources, sources.keySet());
+      assertNull(metricsSystem.getSource(secondName));
+      assertSame(first, metricsSystem.getSource(firstName));
       first.unRegister();
-      assertEquals(initialSources, sources.keySet());
+      assertNull(metricsSystem.getSource(firstName));
     } finally {
-      Set<String> remainingSources = new HashSet<>(sources.keySet());
-      remainingSources.removeAll(initialSources);
-      remainingSources.forEach(metricsSystem::unregisterSource);
+      metricsSystem.unregisterSource(firstName);
+      metricsSystem.unregisterSource(secondName);
       DefaultMetricsSystem.shutdown();
       DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
     }

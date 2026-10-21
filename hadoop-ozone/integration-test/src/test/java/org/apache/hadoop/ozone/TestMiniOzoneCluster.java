@@ -120,7 +120,7 @@ public class TestMiniOzoneCluster {
     try (MockedStatic<DefaultMetricsSystem> metricsSystem =
         mockStatic(DefaultMetricsSystem.class, CALLS_REAL_METHODS)) {
       AssertionError error = assertThrows(AssertionError.class, cluster::shutdown);
-      assertTrue(error.getMessage().contains(sourceName));
+      assertThat(error).hasMessageContaining(sourceName);
       metricsSystem.verify(DefaultMetricsSystem::shutdown);
     } finally {
       DefaultMetricsSystem.instance().unregisterSource(sourceName);

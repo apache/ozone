@@ -29,13 +29,18 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -135,6 +140,11 @@ public class TestVolumeSet {
   public void testFailVolume() throws Exception {
     assertNumVolumes(volumeSet, 2, 0);
 
+    String volumeRoot = HddsVolumeUtil.getHddsRoot(volume1);
+    Map<String, StorageVolume> volumeMap = new HashMap<>(volumeSet.getVolumeMap());
+    StorageVolume failedVolume = spy(volumeMap.get(volumeRoot));
+    volumeMap.put(volumeRoot, failedVolume);
+    volumeSet.setVolumeMapForTesting(volumeMap);
     volumeSet.failVolume(HddsVolumeUtil.getHddsRoot(volume1));
 
     assertEquals(1, volumeSet.getVolumesList().size());
@@ -146,6 +156,13 @@ public class TestVolumeSet {
     assertThat(volumeSet.getVolumeMap()).doesNotContainKey(volume1);
 
     assertNumVolumes(volumeSet, 1, 1);
+
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    String sourceName = VolumeInfoMetrics.class.getSimpleName() + "-" + volume1;
+    assertNotNull(ms.getSource(sourceName));
+    volumeSet.shutdown();
+    verify(failedVolume, never()).shutdown();
+    assertNull(ms.getSource(sourceName));
   }
 
   @Test

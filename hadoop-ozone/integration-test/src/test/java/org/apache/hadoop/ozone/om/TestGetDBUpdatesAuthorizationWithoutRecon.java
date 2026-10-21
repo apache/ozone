@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.ozone.om.TestGetDBUpdatesAuthorization.RECON_PRINCIPAL;
 import static org.apache.hadoop.ozone.om.TestGetDBUpdatesAuthorization.authTestConfiguration;
 import static org.apache.hadoop.ozone.om.TestGetDBUpdatesAuthorization.getDBUpdates;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,7 +43,7 @@ class TestGetDBUpdatesAuthorizationWithoutRecon {
     try {
       cluster.waitForClusterToBeReady();
       UserGroupInformation reconLikeUser =
-          UserGroupInformation.createUserForTesting("reconsvc", new String[] {"recon"});
+          UserGroupInformation.createUserForTesting(RECON_PRINCIPAL, new String[] {"recon"});
       OMException ex = assertThrows(OMException.class, () -> getDBUpdates(conf, reconLikeUser));
       assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
     } finally {

@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -64,12 +66,17 @@ class TestMetricsLeakAssertion {
     }
   }
 
-  @Test
-  void testUnexpectedSourceFails() {
-    registerSource("LeakedMetricsSource");
+  @ParameterizedTest
+  @ValueSource(strings = {"LeakedMetricsSource", "HttpServer2Metrics-service1"})
+  void testUnexpectedSourceFails(String sourceName) {
+    registerSource("ContainerCacheMetrics");
+    registerSource(sourceName);
 
     AssertionError error = assertThrows(AssertionError.class, MetricsLeakAssertion::assertNoLeaks);
-    assertThat(error).hasMessageContaining("LeakedMetricsSource");
+    assertThat(error).hasMessageContaining(sourceName);
+    assertNull(metricsSystem.getSource(sourceName));
+    assertNotNull(metricsSystem.getSource("ContainerCacheMetrics"));
+    assertDoesNotThrow(MetricsLeakAssertion::assertNoLeaks);
   }
 
   @ParameterizedTest
