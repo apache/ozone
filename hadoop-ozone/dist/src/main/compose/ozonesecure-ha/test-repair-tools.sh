@@ -45,7 +45,7 @@ repair_and_restart_om() {
   local om_id="$2"
   echo "Waiting for container '${om_container}' to stop..."
   # Loop until the container is not running
-  timeout=60  # seconds
+  timeout=120  # seconds, longer than OM shutdown hook timeout (60s)
   start_time=$(date +%s)
   while [ "$(docker inspect -f '{{.State.Running}}' "${om_container}" 2>/dev/null)" == "true" ]; do
     current_time=$(date +%s)
