@@ -353,11 +353,12 @@ public class TestOMMetadataReader {
     final List<OzoneFileStatus> statuses = omMetadataReader.listStatus(args, false, "", MAX_KEYS, false);
     assertTrue(statuses.isEmpty());
 
-    final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 2);
+    // Volume READ with each of bucket LIST and bucket READ.
+    final List<AclCheck> checks = captureAclChecks(accessAuthorizer, 4);
     assertContainsVolumeReadCheck(checks);
     assertContainsBucketListCheck(checks);
-    assertFalse(checks.stream().anyMatch(check -> check.getObj().getResourceType() == OzoneObj.ResourceType.BUCKET
-        && check.getContext().getAclRights() == READ), "Bucket root listing should not check bucket READ");
+    assertTrue(checks.stream().anyMatch(check -> check.getObj().getResourceType() == OzoneObj.ResourceType.BUCKET
+        && check.getContext().getAclRights() == READ), "Expected a BUCKET READ ACL check");
   }
 
   @Test

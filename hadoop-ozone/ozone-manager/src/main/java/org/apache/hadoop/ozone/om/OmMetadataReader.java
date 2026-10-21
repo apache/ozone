@@ -891,14 +891,11 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
       return;
     }
 
-    // Listing the bucket root, or the keys matching a name prefix, needs LIST on the bucket, as listKeys does.
-    final ResourceType resourceType = getResourceType(args);
-    if (allowPartialPrefixes || resourceType == ResourceType.BUCKET) {
+    // Listing the bucket root, or the keys matching a name prefix, also needs LIST on the bucket, as listKeys does.
+    if (allowPartialPrefixes || getResourceType(args) == ResourceType.BUCKET) {
       checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, bucket, args.getKeyName());
     }
-    if (resourceType == ResourceType.KEY) {
-      checkAcls(ResourceType.KEY, StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
-    }
+    checkAcls(getResourceType(args), StoreType.OZONE, ACLType.READ, bucket, args.getKeyName());
   }
 
   private static String getStsListStatusAclKey(OmKeyArgs args) throws OMException {
