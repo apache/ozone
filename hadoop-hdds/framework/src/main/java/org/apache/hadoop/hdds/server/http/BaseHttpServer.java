@@ -154,6 +154,9 @@ public abstract class BaseHttpServer implements AutoCloseable {
       builder.allowEncodedDotSegments(shouldAllowEncodedDotSegments());
 
       httpServer = builder.build();
+      if (shouldAddTracingFilter()) {
+        httpServer.addGlobalFilter("tracing", HttpTracingFilter.class.getName(), null);
+      }
 
       // TODO move these to HttpServer2.addDefaultApps
       if (addDefaultApps) {
@@ -563,6 +566,11 @@ public abstract class BaseHttpServer implements AutoCloseable {
 
   /** Override to disable the default servlets. */
   protected boolean shouldAddDefaultApps() {
+    return true;
+  }
+
+  /** Override to disable the HTTP tracing filter, e.g. when the server already traces its requests. */
+  protected boolean shouldAddTracingFilter() {
     return true;
   }
 

@@ -45,6 +45,11 @@ public class S3GatewayHttpServer extends BaseHttpServer {
   }
 
   @Override
+  protected boolean shouldAddTracingFilter() {
+    return false;
+  }
+
+  @Override
   protected boolean shouldAllowAmbiguousUri() {
     return true;
   }

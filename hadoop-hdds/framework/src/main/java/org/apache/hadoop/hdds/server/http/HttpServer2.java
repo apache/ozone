@@ -25,6 +25,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanContext;
+import io.opentelemetry.context.Scope;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -104,7 +107,9 @@ import org.eclipse.jetty.server.CustomRequestLog;
 import org.eclipse.jetty.server.Handler;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
+import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.RequestLog;
+import org.eclipse.jetty.server.Response;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -1957,6 +1962,20 @@ public final class HttpServer2 implements FilterContainer {
     String loggerName = "http.requests." + name;
     Slf4jRequestLogWriter writer = new Slf4jRequestLogWriter();
     writer.setLoggerName(loggerName);
-    return new CustomRequestLog(writer, CustomRequestLog.EXTENDED_NCSA_FORMAT);
+    // Jetty writes the request log after the filter chain has returned, so the request's span is
+    // no longer current: make it current again so the log line carries the request's trace ID.
+    return new CustomRequestLog(writer, CustomRequestLog.EXTENDED_NCSA_FORMAT) {
+      @Override
+      public void log(Request request, Response response) {
+        Object spanContext = request.getAttribute(HttpTracingFilter.SPAN_CONTEXT_ATTRIBUTE);
+        if (!(spanContext instanceof SpanContext)) {
+          super.log(request, response);
+          return;
+        }
+        try (Scope ignored = Span.wrap((SpanContext) spanContext).makeCurrent()) {
+          super.log(request, response);
+        }
+      }
+    };
   }
 }

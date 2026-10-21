@@ -666,4 +666,31 @@ public final class TracingUtil {
       span.end();
     };
   }
+
+  /**
+   * Create a SERVER span for an inbound HTTP request, continuing the W3C trace context in its headers.
+   * Without a valid incoming context it starts a new trace only when {@code ozone.tracing.enabled=true}.
+   * The caller makes it current and ends it.
+   * Returns an invalid span when tracing is not enabled.
+   */
+  public static Span createServerSpanFromW3cHttpHeaders(String spanName, Function<String, String> getHeader) {
+    if (!hasUsableTracer()) {
+      return Span.getInvalid();
+    }
+    Context remote = W3CTraceContextPropagator.getInstance()
+        .extract(Context.current(), getHeader, new HttpHeaderGetter());
+    if (!Span.fromContext(remote).getSpanContext().isValid()) {
+      if (!canStartSpanWithoutParent()) {
+        return Span.getInvalid();
+      }
+      return tracer.spanBuilder(spanName)
+          .setNoParent()
+          .setSpanKind(SpanKind.SERVER)
+          .startSpan();
+    }
+    return tracer.spanBuilder(spanName)
+        .setParent(remote)
+        .setSpanKind(SpanKind.SERVER)
+        .startSpan();
+  }
 }

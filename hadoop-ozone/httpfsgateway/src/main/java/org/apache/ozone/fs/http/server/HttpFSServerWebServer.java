@@ -31,6 +31,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
+import org.apache.hadoop.hdds.server.http.HttpTracingFilter;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.security.AuthenticationFilterInitializer;
 import org.apache.hadoop.security.authentication.server.ProxyUserAuthenticationFilterInitializer;
@@ -133,6 +135,7 @@ public class HttpFSServerWebServer {
         .allowAmbiguousUri(true)
         .addEndpoint(endpoint)
         .build();
+    httpServer.addGlobalFilter("tracing", HttpTracingFilter.class.getName(), null);
   }
 
   /**
@@ -184,6 +187,7 @@ public class HttpFSServerWebServer {
   public static void main(String[] args) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     startupShutdownMessage(OZONE_VERSION_INFO, HttpFSServerWebServer.class, args, LOG, conf);
+    TracingUtil.initTracing("HttpFS", conf);
     Configuration sslConf = SSLFactory.readSSLConfiguration(conf,
         SSLFactory.Mode.SERVER);
     HttpFSServerWebServer webServer =

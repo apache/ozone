@@ -17,22 +17,34 @@
 
 package org.apache.hadoop.hdds.server.http;
 
+import static org.apache.hadoop.hdds.tracing.OzoneContextStorageProvider.MDC_TRACE_ID;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.opentelemetry.api.trace.Span;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.net.HttpURLConnection;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.net.URL;
 import java.nio.file.Path;
 import java.util.stream.Stream;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.authentication.server.KerberosAuthenticationHandler;
+import org.apache.log4j.PatternLayout;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.GenericTestUtils.PortAllocator;
 import org.eclipse.jetty.ee8.servlet.FilterHolder;
 import org.eclipse.jetty.ee8.webapp.WebAppContext;
@@ -46,6 +58,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.MDC;
 
 /**
  * Test Common ozone/hdds web methods.
@@ -202,6 +215,35 @@ class TestBaseHttpServer {
       }
     } finally {
       subject.stop();
+    }
+  }
+
+  @Test
+  void testTracing() throws Exception {
+    MutableConfigurationSource conf = newConfig(HttpConfig.Policy.HTTP_ONLY);
+    String traceId = "4bf92f3577b34da6a3ce929d0e0e4736";
+    try (TestSpanCollector spans = TestSpanCollector.install("TestBaseHttpServer");
+         LogCapturer requestLog = LogCapturer.captureLogs(
+             org.apache.log4j.Logger.getLogger("http.requests.testing"), new PatternLayout("%X{trace_id} %m%n"))) {
+      BaseHttpServer subject = new TestingHttpServer(conf);
+      httpServer2Of(subject).addServlet("trace", "/trace/*", TraceServlet.class);
+      try {
+        subject.start();
+        URL url = new URL("http://localhost:" + subject.getHttpAddress().getPort() + "/trace/a/b");
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestProperty("traceparent", "00-" + traceId + "-00f067aa0ba902b7-01");
+        assertThat(connection.getResponseCode()).isEqualTo(HttpURLConnection.HTTP_OK);
+        GenericTestUtils.waitFor(() -> !spans.named("GET /trace/a/b").isEmpty()
+            && requestLog.getOutput().contains("/trace/a/b"), 10, 5000);
+      } finally {
+        subject.stop();
+      }
+
+      assertThat(spans.named("GET /trace/a/b")).hasSize(1)
+          .allSatisfy(span -> assertThat(span.getSpanContext().getTraceId()).isEqualTo(traceId));
+      assertThat(TraceServlet.traceIdInRequest).isEqualTo(traceId);
+      assertThat(TraceServlet.mdcTraceIdInRequest).isEqualTo(traceId);
+      assertThat(requestLog.getOutput()).contains(traceId + " ").contains("\"GET /trace/a/b HTTP/1.1\" 200");
     }
   }
 
@@ -425,6 +467,19 @@ class TestBaseHttpServer {
     @Override
     protected String getHttpAuthConfigPrefix() {
       return HTTP_AUTH_CONFIG_PREFIX;
+    }
+  }
+
+  /** Records the trace seen while serving a request. */
+  public static class TraceServlet extends HttpServlet {
+    private static volatile String traceIdInRequest;
+    private static volatile String mdcTraceIdInRequest;
+
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+      traceIdInRequest = Span.current().getSpanContext().getTraceId();
+      mdcTraceIdInRequest = MDC.get(MDC_TRACE_ID);
+      resp.setStatus(HttpServletResponse.SC_OK);
     }
   }
 
