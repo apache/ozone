@@ -1441,6 +1441,9 @@ public class KeyValueHandler extends Handler {
     KeyValueContainer container = createNewContainer(targetTempContainerData);
     HddsVolume targetVolume = targetTempContainerData.getVolume();
     populateContainerPathFields(container, targetVolume);
+    // The container file on the target volume is in RECOVERING state at this point, as in a replication import.
+    // The new container object is OPEN, and parsing it as OPEN would not load its data checksum and empty flag.
+    container.getContainerData().setState(RECOVERING);
     container.importContainerData((KeyValueContainerData) targetTempContainerData);
     return container;
   }
