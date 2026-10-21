@@ -750,8 +750,9 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals(initialResult.getETag(), existingObjectMetadata.getETag());
   }
 
-  @Test
-  public void testPutObjectIfMatchMissingKeyFail() {
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testPutObjectIfMatchMissingKeyFail(String ifMatch) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(bucketName);
@@ -759,14 +760,14 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     InputStream is = new ByteArrayInputStream("bar2".getBytes(
         StandardCharsets.UTF_8));
     PutObjectRequest request = new PutObjectRequest(
-        bucketName, keyName, is, new ObjectMetadata()).ifMatch("some-etag");
+        bucketName, keyName, is, new ObjectMetadata()).ifMatch(ifMatch);
 
     AmazonServiceException ase = assertThrows(AmazonServiceException.class,
         () -> s3Client.putObject(request));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
-    assertEquals(412, ase.getStatusCode());
-    assertEquals("PreconditionFailed", ase.getErrorCode());
+    assertEquals(404, ase.getStatusCode());
+    assertEquals("NoSuchKey", ase.getErrorCode());
 
     AmazonServiceException missingKey = assertThrows(AmazonServiceException.class,
         () -> s3Client.getObject(bucketName, keyName));
@@ -1343,8 +1344,9 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals("PreconditionFailed", ase.getErrorCode());
   }
 
-  @Test
-  public void testCompleteMultipartUploadIfMatchMissingKeyFail() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testCompleteMultipartUploadIfMatchMissingKeyFail(String ifMatch) throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(bucketName);
@@ -1371,14 +1373,14 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     List<PartETag> partETags = Collections.singletonList(uploadResult.getPartETag());
     CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
         bucketName, keyName, uploadId, partETags);
-    completeRequest.putCustomRequestHeader("If-Match", "\"some-etag\"");
+    completeRequest.putCustomRequestHeader("If-Match", ifMatch);
 
     AmazonServiceException ase = assertThrows(AmazonServiceException.class,
         () -> s3Client.completeMultipartUpload(completeRequest));
 
     assertEquals(ErrorType.Client, ase.getErrorType());
-    assertEquals(412, ase.getStatusCode());
-    assertEquals("PreconditionFailed", ase.getErrorCode());
+    assertEquals(404, ase.getStatusCode());
+    assertEquals("NoSuchKey", ase.getErrorCode());
   }
 
   @Test

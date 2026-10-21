@@ -197,6 +197,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         normalizeKeyArgs(bucket.update(resolvedVolumeArgs), bucket);
 
     try {
+      if (resolvedArgs.isRequireFileSystemLayout()) {
+        validateFileSystemLayout(bucket);
+      }
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
             checkAcls(ResourceType.KEY,
@@ -320,8 +323,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   /**
    * Rejects file system reads on a bucket whose link-resolved layout is
    * OBJECT_STORE, so file system clients need no InfoBucket to check it.
-   * listStatus and listStatusLight call it only when the client asked for it,
-   * because they also serve object store callers (S3 shallow key listing).
+   * listStatus, listStatusLight and getKeyInfo call it only when the client
+   * asked for it, because they also serve object store callers (S3 shallow key
+   * listing, S3 GetObject and HeadObject, readKey).
    */
   private static void validateFileSystemLayout(ResolvedBucket bucket) throws OMException {
     if (bucket.bucketLayout() != null) {

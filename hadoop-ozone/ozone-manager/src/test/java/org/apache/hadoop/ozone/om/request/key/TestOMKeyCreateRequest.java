@@ -361,6 +361,51 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
         openKeyInfo.getCreationTime());
   }
 
+  public static Collection<Object[]> ifNoneMatchData() {
+    List<Object[]> cases = new ArrayList<>();
+    for (Object[] lockOptions : data()) {
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], false, null});
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], true, null});
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], true, "excluded-etag"});
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], true, "different-etag"});
+    }
+    return cases;
+  }
+
+  @ParameterizedTest
+  @MethodSource("ifNoneMatchData")
+  public void testCreateWithExcludedETag(boolean setKeyPathLock, boolean setFileSystemPaths,
+      boolean keyExists, String existingETag) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    if (keyExists) {
+      OmKeyInfo.Builder existing = createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig).setUpdateID(1L);
+      if (existingETag != null) {
+        existing.addMetadata(OzoneConsts.ETAG, existingETag);
+      }
+      omMetadataManager.getKeyTable(getBucketLayout()).put(getOzoneKey(), existing.build());
+    }
+
+    OMRequest request = createKeyRequestWithExpectedETag(null);
+    OMRequest modified = doPreExecute(request.toBuilder().setCreateKeyRequest(
+        request.getCreateKeyRequest().toBuilder().setKeyArgs(
+            request.getCreateKeyRequest().getKeyArgs().toBuilder().setExcludedETag("excluded-etag"))).build());
+    OMClientResponse response = getOMKeyCreateRequest(modified).validateAndUpdateCache(ozoneManager, 100L);
+    OmKeyInfo openKey = omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getOpenKey(modified.getCreateKeyRequest().getClientID()));
+    if ("excluded-etag".equals(existingETag)) {
+      assertEquals(KEY_ALREADY_EXISTS, response.getOMResponse().getStatus());
+      assertNull(openKey);
+      assertEquals(existingETag, omMetadataManager.getKeyTable(getBucketLayout()).get(getOzoneKey())
+          .getMetadata().get(OzoneConsts.ETAG));
+    } else {
+      assertEquals(OK, response.getOMResponse().getStatus());
+      assertNotNull(openKey);
+      assertEquals(keyExists ? 1L : OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT, openKey.getExpectedDataGeneration());
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCache(

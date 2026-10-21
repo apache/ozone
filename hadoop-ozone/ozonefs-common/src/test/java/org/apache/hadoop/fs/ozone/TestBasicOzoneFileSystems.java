@@ -20,6 +20,7 @@ package org.apache.hadoop.fs.ozone;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -44,7 +45,10 @@ import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.Collection;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
@@ -289,6 +293,27 @@ public class TestBasicOzoneFileSystems {
     // HostAndPort rejects ports outside 0-65535, unlike a bare Integer.parseInt.
     assertThrows(IllegalArgumentException.class,
         () -> ofs.initialize(new URI("ofs://host:99999/"), new OzoneConfiguration()));
+  }
+
+  @ParameterizedTest(autoCloseArguments = false)
+  @MethodSource("data")
+  public void fileBlockLocationsHonorRange(FileSystem subject) throws IOException {
+    BlockLocation[] blocks = {
+        new BlockLocation(null, null, 0, 100),
+        new BlockLocation(null, null, 100, 100),
+        new BlockLocation(null, null, 200, 50),
+    };
+    LocatedFileStatus status = new LocatedFileStatus(new FileStatus(250, false, 3, 100, 0, new Path("/f")), blocks);
+
+    assertThat(subject.getFileBlockLocations(status, 0, 250)).containsExactly(blocks);
+    assertThat(subject.getFileBlockLocations(status, 0, Long.MAX_VALUE)).containsExactly(blocks);
+    assertThat(subject.getFileBlockLocations(status, 150, Long.MAX_VALUE)).containsExactly(blocks[1], blocks[2]);
+    assertThat(subject.getFileBlockLocations(status, 99, 2)).containsExactly(blocks[0], blocks[1]);
+    assertThat(subject.getFileBlockLocations(status, 100, 100)).containsExactly(blocks[1]);
+    assertThat(subject.getFileBlockLocations(status, 120, 0)).containsExactly(blocks[1]);
+    assertThat(subject.getFileBlockLocations(status, 250, 10)).isEmpty();
+    assertThrows(IllegalArgumentException.class, () -> subject.getFileBlockLocations(status, -1, 10));
+    assertThrows(IllegalArgumentException.class, () -> subject.getFileBlockLocations(status, 0, -1));
   }
 
   private void assertDefaultBlockSize(long expected, FileSystem subject) {
