@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -43,6 +44,8 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.storage.PositionedReadTestHelper;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.ozone.DataTestUtil;
@@ -67,7 +70,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
   private OzoneClient client;
-  private FileSystem ecFs;
+  // EC bucket filesystems reading the cells one at a time and in parallel
+  private FileSystem serialEcFs;
+  private FileSystem parallelEcFs;
   private Path filePath = null;
   private byte[] data = null;
   private String uri = null;
@@ -105,12 +110,62 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
         ecBucket);
     String ecUri = String.format("%s://%s.%s/",
         OzoneConsts.OZONE_URI_SCHEME, ecBucket, bucket.getVolumeName());
-    ecFs =  FileSystem.get(URI.create(ecUri), cluster().getConf());
+    serialEcFs = newEcFileSystem(ecUri, false);
+    parallelEcFs = newEcFileSystem(ecUri, true);
+  }
+
+  private FileSystem newEcFileSystem(String ecUri, boolean parallelRead) throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setEcParallelReadEnabled(parallelRead);
+    conf.setFromObject(clientConfig);
+    return FileSystem.newInstance(URI.create(ecUri), conf);
+  }
+
+  private FileSystem ecFs(boolean parallelRead) {
+    return parallelRead ? parallelEcFs : serialEcFs;
   }
 
   @AfterAll
   void shutdown() {
-    closeQuietly(client, ecFs);
+    closeQuietly(client, serialEcFs, parallelEcFs);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testConcurrentECPositionedRead(boolean parallelRead) throws Exception {
+    FileSystem ecFs = ecFs(parallelRead);
+    Path path = new Path("/concurrent-ec-reads-" + parallelRead);
+    byte[] expected = Arrays.copyOf(data, 7 * 1024 * 1024 + 103);
+    try (FSDataOutputStream output = ecFs.create(path)) {
+      output.write(expected);
+    }
+    try (FSDataInputStream stream = ecFs.open(path)) {
+      stream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(expected, stream::readFully);
+      assertEquals(123, stream.getPos());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testConcurrentPositionedRead(boolean streaming) throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
+    conf.setBoolean("ozone.client.stream.readblock.enable", streaming);
+    try (FileSystem fs = FileSystem.newInstance(URI.create(uri), conf);
+         FSDataInputStream stream = fs.open(filePath)) {
+      stream.seek(123);
+      PositionedReadTestHelper.runConcurrentPositionedReads(data, (offset, buffer) -> {
+        if ((offset & 1) == 0) {
+          stream.readFully(offset, buffer);
+        } else {
+          byte[] bytes = new byte[buffer.remaining()];
+          stream.readFully(offset, bytes);
+          buffer.put(bytes);
+        }
+      });
+      assertEquals(123, stream.getPos());
+    }
   }
 
   @ParameterizedTest
@@ -346,7 +401,8 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  public void testSequenceFileReaderSyncEC() throws IOException {
+  public void testSequenceFileReaderSyncEC(boolean parallelRead) throws IOException {
+    FileSystem ecFs = ecFs(parallelRead);
     File srcfile = new File("src/test/resources/testSequenceFile");
     Path path = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
     InputStream input = new BufferedInputStream(Files.newInputStream(srcfile.toPath()));

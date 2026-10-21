@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
 import org.apache.hadoop.hdds.scm.ha.SCMSnapshotDownloader;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
@@ -65,7 +65,7 @@ public class StorageContainerServiceProviderImpl
 
   private static final Logger LOG =
       LoggerFactory.getLogger(StorageContainerServiceProviderImpl.class);
-  private StorageContainerLocationProtocol scmClient;
+  private StorageContainerLocationInternalInterface scmClient;
   private final OzoneConfiguration configuration;
   private File scmSnapshotDBParentDir;
   private ReconUtils reconUtils;
@@ -74,7 +74,7 @@ public class StorageContainerServiceProviderImpl
 
   @Inject
   public StorageContainerServiceProviderImpl(
-      StorageContainerLocationProtocol scmClient,
+      StorageContainerLocationInternalInterface scmClient,
       ReconUtils reconUtils,
       OzoneConfiguration configuration,
       ReconStorageConfig reconStorage,

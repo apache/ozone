@@ -25,6 +25,7 @@ import java.time.format.DateTimeParseException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -60,6 +61,8 @@ public class OzoneLocal extends GenericCli {
   static final String ENV_OM_PORT = "OZONE_LOCAL_OM_PORT";
   static final String ENV_S3G_ENABLED = "OZONE_LOCAL_S3G_ENABLED";
   static final String ENV_S3G_PORT = "OZONE_LOCAL_S3G_PORT";
+  static final String ENV_RECON_ENABLED = "OZONE_LOCAL_RECON_ENABLED";
+  static final String ENV_RECON_PORT = "OZONE_LOCAL_RECON_PORT";
   static final String ENV_EPHEMERAL = "OZONE_LOCAL_EPHEMERAL";
   static final String ENV_STARTUP_TIMEOUT = "OZONE_LOCAL_STARTUP_TIMEOUT";
 
@@ -83,6 +86,12 @@ public class OzoneLocal extends GenericCli {
       + LocalOzoneClusterConfig.DEFAULT_S3G_ENABLED_VALUE + "}";
   private static final String DEFAULT_S3G_PORT_VALUE = "${env:" + ENV_S3G_PORT
       + ":-" + LocalOzoneClusterConfig.DEFAULT_PORT_VALUE + "}";
+  private static final String DEFAULT_RECON_ENABLED_VALUE = "${env:"
+      + ENV_RECON_ENABLED + ":-"
+      + LocalOzoneClusterConfig.DEFAULT_RECON_ENABLED_VALUE + "}";
+  private static final String DEFAULT_RECON_PORT_VALUE = "${env:"
+      + ENV_RECON_PORT + ":-" + LocalOzoneClusterConfig.DEFAULT_PORT_VALUE
+      + "}";
   private static final String DEFAULT_EPHEMERAL_VALUE = "${env:"
       + ENV_EPHEMERAL + ":-"
       + LocalOzoneClusterConfig.DEFAULT_EPHEMERAL_VALUE + "}";
@@ -150,7 +159,7 @@ public class OzoneLocal extends GenericCli {
   }
 
   @Command(name = "run",
-      description = "Start SCM, OM, datanodes, and optional S3 Gateway in one local process")
+      description = "Start SCM, OM, datanodes, and optional S3 Gateway and Recon in one local process")
   static class RunCommand extends AbstractSubcommand implements Callable<Void> {
 
     @Option(names = "--data-dir",
@@ -201,6 +210,18 @@ public class OzoneLocal extends GenericCli {
         description = "Enable S3 Gateway")
     private boolean s3gEnabled;
 
+    @Option(names = "--recon-port",
+        defaultValue = DEFAULT_RECON_PORT_VALUE,
+        description = "Recon HTTP port (0 means auto-allocate)")
+    private int reconPort;
+
+    @Option(names = "--recon",
+        negatable = true,
+        defaultValue = DEFAULT_RECON_ENABLED_VALUE,
+        fallbackValue = "true",
+        description = "Enable Recon")
+    private boolean reconEnabled;
+
     @Option(names = "--ephemeral",
         negatable = true,
         defaultValue = DEFAULT_EPHEMERAL_VALUE,
@@ -241,8 +262,8 @@ public class OzoneLocal extends GenericCli {
     private void printSummary(LocalOzoneRuntime runtime, LocalOzoneClusterConfig config) {
       PrintWriter writer = out();
       writer.println("Local Ozone is running from " + config.getDataDir());
-      writer.println("SCM RPC: " + runtime.getDisplayHost() + ":" + runtime.getScmPort());
-      writer.println("OM RPC: " + runtime.getDisplayHost() + ":" + runtime.getOmPort());
+      writer.println("SCM RPC: " + HddsUtils.getHostPortString(runtime.getDisplayHost(), runtime.getScmPort()));
+      writer.println("OM RPC: " + HddsUtils.getHostPortString(runtime.getDisplayHost(), runtime.getOmPort()));
       if (config.isS3gEnabled()) {
         writer.println("S3 endpoint: " + runtime.getS3Endpoint());
         writer.println("Suggested local AWS settings:");
@@ -252,6 +273,9 @@ public class OzoneLocal extends GenericCli {
         writer.println("AWS_ENDPOINT_URL_S3=" + runtime.getS3Endpoint());
         writer.println("Use path-style addressing (AWS CLI: aws configure set default.s3.addressing_style path).");
         writer.println("With security off (the default), the S3 Gateway accepts any credentials.");
+      }
+      if (config.isReconEnabled()) {
+        writer.println("Recon endpoint: " + runtime.getReconEndpoint());
       }
       writer.println("Press Ctrl+C to stop.");
       writer.flush();
@@ -292,6 +316,7 @@ public class OzoneLocal extends GenericCli {
       validatePort(scmPort, "--scm-port");
       validatePort(omPort, "--om-port");
       validatePort(s3gPort, "--s3g-port");
+      validatePort(reconPort, "--recon-port");
       validateStartupTimeout();
 
       return LocalOzoneClusterConfig.builder(dataDir)
@@ -303,6 +328,8 @@ public class OzoneLocal extends GenericCli {
           .setOmPort(omPort)
           .setS3gPort(s3gPort)
           .setS3gEnabled(s3gEnabled)
+          .setReconPort(reconPort)
+          .setReconEnabled(reconEnabled)
           .setEphemeral(ephemeral)
           .setStartupTimeout(startupTimeout)
           .build();

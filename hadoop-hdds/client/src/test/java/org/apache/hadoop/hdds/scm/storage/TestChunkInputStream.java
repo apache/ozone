@@ -159,6 +159,16 @@ public class TestChunkInputStream {
   }
 
   @Test
+  public void testReadChunkRequestOmitsChecksums() {
+    ChunkInfo request = chunkStream.getChunkInfo(30, 25);
+    assertThat(request.getChecksumData().getChecksumsList()).isEmpty();
+    assertThat(chunkInfo.getChecksumData().getChecksumsList()).isNotEmpty();
+    assertEquals(chunkInfo.getChecksumData().getBytesPerChecksum(), request.getChecksumData().getBytesPerChecksum());
+    assertEquals(20, request.getOffset());
+    assertEquals(40, request.getLen());
+  }
+
+  @Test
   public void testPositionedReadIsStateless() throws Exception {
     // Advance the stream's own cursor with a normal sequential read.
     byte[] seq = new byte[10];
@@ -189,6 +199,9 @@ public class TestChunkInputStream {
     ByteBuffer dst = ByteBuffer.allocate(10);
     assertEquals(-1, chunkStream.readPositioned(CHUNK_SIZE, dst));
     assertEquals(-1, chunkStream.readPositioned(CHUNK_SIZE + 1, dst));
+    for (long position : new long[] {0, CHUNK_SIZE, CHUNK_SIZE + 1}) {
+      assertEquals(0, chunkStream.readPositioned(position, ByteBuffer.allocate(0)));
+    }
   }
 
   @Test

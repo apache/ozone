@@ -110,7 +110,7 @@ public class TestOMHALeaderSpecificACLEnforcement {
   public void restoreLeadership() throws IOException, InterruptedException, TimeoutException {
     OzoneManager currentLeader = cluster.getOMLeader();
     if (!currentLeader.getOMNodeId().equals(theLeaderOM.getOMNodeId())) {
-      currentLeader.transferLeadership(theLeaderOM.getOMNodeId());
+      client.getProxy().getOzoneManagerClient().transferLeadership(theLeaderOM.getOMNodeId());
       GenericTestUtils.waitFor(() -> {
         try {
           OzoneManager currentLeaderCheck = cluster.getOMLeader();

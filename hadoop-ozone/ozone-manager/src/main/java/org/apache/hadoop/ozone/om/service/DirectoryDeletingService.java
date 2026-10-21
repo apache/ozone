@@ -33,12 +33,14 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -324,7 +326,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   void optimizeDirDeletesAndSubmitRequest(
-      long dirNum, long subDirNum, long subFileNum,
       List<Pair<String, OmKeyInfo>> allSubDirList,
       List<PurgePathRequest> purgePathRequestList,
       String snapTableKey, long startTime,
@@ -337,7 +338,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
 
     // Optimization to handle delete sub-dir and keys to remove quickly
     // This case will be useful to handle when depth of directory is high
-    int subdirDelNum = 0;
+    // Bucket grouping can submit recursive requests before some of the initial requests.
+    Set<PurgePathRequest> initialRequests = Collections.newSetFromMap(new IdentityHashMap<>());
+    initialRequests.addAll(purgePathRequestList);
     int subDirRecursiveCnt = 0;
     while (subDirRecursiveCnt < allSubDirList.size() && remainNum.get() > 0) {
       try {
@@ -350,14 +353,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         if (!request.isPresent()) {
           continue;
         }
-        PurgePathRequest requestVal = request.get();
-        purgePathRequestList.add(requestVal);
-        // Count up the purgeDeletedDir, subDirs and subFiles
-        if (requestVal.hasDeletedDir() && !StringUtils.isBlank(requestVal.getDeletedDir())) {
-          subdirDelNum++;
-        }
-        subDirNum += requestVal.getMarkDeletedSubDirsCount();
-        subFileNum += requestVal.getDeletedSubFilesCount();
+        purgePathRequestList.add(request.get());
       } catch (IOException e) {
         LOG.error("Error while running delete directories and files " +
             "background task. Will retry at next run for subset.", e);
@@ -366,11 +362,25 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     }
     beforeSubmit.run();
 
-    if (!purgePathRequestList.isEmpty()) {
-      submitPurgePathsWithBatching(purgePathRequestList, snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap);
+    List<PurgePathRequest> submitted = submitPurgePathsWithBatching(purgePathRequestList, snapTableKey,
+        expectedPreviousSnapshotId, bucketNameInfoMap);
+    long dirNum = 0;
+    long subdirDelNum = 0;
+    long subDirNum = 0;
+    long subFileNum = 0;
+    for (PurgePathRequest request : submitted) {
+      if (request.hasDeletedDir() && !StringUtils.isBlank(request.getDeletedDir())) {
+        if (initialRequests.contains(request)) {
+          dirNum++;
+        } else {
+          subdirDelNum++;
+        }
+      }
+      subDirNum += request.getMarkDeletedSubDirsCount();
+      subFileNum += request.getDeletedSubFilesCount();
     }
 
-    if (dirNum != 0 || subDirNum != 0 || subFileNum != 0) {
+    if (dirNum != 0 || subdirDelNum != 0 || subDirNum != 0 || subFileNum != 0) {
       long subdirMoved = subDirNum - subdirDelNum;
       deletedDirsCount.addAndGet(dirNum + subdirDelNum);
       movedDirsCount.addAndGet(subdirMoved);
@@ -538,7 +548,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     return purgePathsRequest.build();
   }
 
-  private List<OzoneManagerProtocolProtos.OMResponse> submitPurgePathsWithBatching(List<PurgePathRequest> requests,
+  private List<PurgePathRequest> submitPurgePathsWithBatching(List<PurgePathRequest> requests,
       String snapTableKey, UUID expectedPreviousSnapshotId, Map<VolumeBucketId, BucketNameInfo> bucketNameInfoMap) {
 
     // Group purge paths by their owning bucket so that every submitted purge transaction contains paths from a single
@@ -550,7 +560,7 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           k -> new ArrayList<>()).add(req);
     }
 
-    List<OzoneManagerProtocolProtos.OMResponse> responses = new ArrayList<>();
+    List<PurgePathRequest> submitted = new ArrayList<>();
     for (List<PurgePathRequest> bucketRequests : requestsByBucket.values()) {
       List<PurgePathRequest> purgePathRequestBatch = new ArrayList<>();
       long batchBytes = 0;
@@ -563,9 +573,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           OzoneManagerProtocolProtos.OMResponse resp =
               submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
           if (resp == null || !resp.getSuccess()) {
-            return Collections.emptyList();
+            return submitted;
           }
-          responses.add(resp);
+          submitted.addAll(purgePathRequestBatch);
           purgePathRequestBatch.clear();
           batchBytes = 0;
         }
@@ -580,13 +590,13 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         OzoneManagerProtocolProtos.OMResponse resp =
             submitPurgeRequest(snapTableKey, expectedPreviousSnapshotId, bucketNameInfoMap, purgePathRequestBatch);
         if (resp == null || !resp.getSuccess()) {
-          return Collections.emptyList();
+          return submitted;
         }
-        responses.add(resp);
+        submitted.addAll(purgePathRequestBatch);
       }
     }
 
-    return responses;
+    return submitted;
   }
 
   @VisibleForTesting
@@ -811,9 +821,6 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           ReclaimableKeyFilter reclaimableFileFilter = new ReclaimableKeyFilter(getOzoneManager(),
               omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock)) {
         long startTime = Time.monotonicNow();
-        long dirNum = 0L;
-        long subDirNum = 0L;
-        long subFileNum = 0L;
         List<PurgePathRequest> purgePathRequestList = new ArrayList<>();
         Map<VolumeBucketId, BucketNameInfo> bucketNameInfos = new HashMap<>();
         AtomicInteger remainNum = new AtomicInteger(remaining);
@@ -842,18 +849,10 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
           if (!request.isPresent()) {
             continue;
           }
-          PurgePathRequest purgePathRequest = request.get();
-          purgePathRequestList.add(purgePathRequest);
-          // Count up the purgeDeletedDir, subDirs and subFiles
-          if (purgePathRequest.hasDeletedDir() && !StringUtils.isBlank(purgePathRequest.getDeletedDir())) {
-            dirNum++;
-          }
-          subDirNum += purgePathRequest.getMarkDeletedSubDirsCount();
-          subFileNum += purgePathRequest.getDeletedSubFilesCount();
+          purgePathRequestList.add(request.get());
         }
 
-        optimizeDirDeletesAndSubmitRequest(dirNum, subDirNum,
-            subFileNum, allSubDirList, purgePathRequestList, snapshotTableKey,
+        optimizeDirDeletesAndSubmitRequest(allSubDirList, purgePathRequestList, snapshotTableKey,
             startTime, getOzoneManager().getKeyManager(),
             reclaimableDirFilter, reclaimableFileFilter, bucketNameInfos, expectedPreviousSnapshotId,
             runCount, remainNum, () -> {

@@ -22,12 +22,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -89,6 +91,12 @@ public class TestNodeStateManager {
     eventPublisher = new MockEventPublisher();
     clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
     nsm = new NodeStateManager(conf, eventPublisher, clusterMap, scmContext);
+  }
+
+  @Test
+  public void testCloseDoesNotWaitForPendingHealthCheck() {
+    // The next health check is scheduled a heartbeat check interval (3s by default) in the future.
+    assertTimeout(Duration.ofSeconds(1), nsm::close);
   }
 
   @Test
