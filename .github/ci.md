@@ -9,6 +9,12 @@ This is the most important [workflow](./workflows/ci.yml).  It runs the tests th
 
 It is triggered each time a pull request is created or synchronized (i.e. when the remote branch is pushed to).  These trigger events are defined in the [build-branch workflow](./workflows/post-commit.yml).
 
+The default branch requires the merge queue configured in [`.asf.yaml`](../.asf.yaml).
+Queued pull requests trigger the same workflow through `merge_group`, running all checks against the queued commit.
+The required `CI passed` check waits for the reusable CI workflow and fails if it fails, is cancelled, or is skipped.
+Only one queued build runs at a time, with a six-hour timeout, and each pull request is squash-merged separately.
+Committers can enable auto-merge on an individual pull request or add a ready pull request to the queue.
+
 The full-ci workflow is divided into a number of different jobs, most of which run in parallel.  Each job is described below.
 
 Some of the jobs are defined using GA's "build matrix" feature.  This allows you define similar jobs with a single job definition. Any differences are specified by a list of values for a specific key.  For example, the "compile" job uses the matrix feature to generate the images with different versions of java.  There, the matrix is specified by the "java" key which has a list of values describing which version of java to use, (8 or 11.)

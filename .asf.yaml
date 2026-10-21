@@ -37,6 +37,8 @@ github:
     squash_commit_message: PR_TITLE
     merge: false
     rebase: false
+  pull_requests:
+    allow_auto_merge: true
   copilot_code_review:
     enabled: true
     review_drafts: true
@@ -52,3 +54,28 @@ github:
         - root
       restrict_deletion: true
       restrict_force_push: true
+    - name: "Required CI"
+      type: branch
+      restrict_deletion: false
+      restrict_force_push: false
+      required_status_checks:
+        - name: "CI passed"
+          app_slug: github-actions
+    - name: "Merge Queue"
+      target: branch
+      enforcement: active
+      conditions:
+        ref_name:
+          include:
+            - "~DEFAULT_BRANCH"
+          exclude: []
+      rules:
+        - type: merge_queue
+          parameters:
+            merge_method: SQUASH
+            grouping_strategy: ALLGREEN
+            max_entries_to_build: 1
+            min_entries_to_merge: 1
+            max_entries_to_merge: 1
+            min_entries_to_merge_wait_minutes: 0
+            check_response_timeout_minutes: 360

@@ -16,7 +16,11 @@ name: build-branch
 on:
   pull_request:
     types: [opened, ready_for_review, synchronize]
+  merge_group:
+    types: [checks_requested]
   push:
+    branches-ignore:
+      - 'gh-readonly-queue/**'
     paths-ignore:
       # ignore files/dirs irrelevant for CI
       - '.asf.yaml'
@@ -55,3 +59,14 @@ jobs:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.OZONE_DEVELOCITY_ACCESS_KEY }}
       OZONE_WEBSITE_BUILD: ${{ secrets.OZONE_WEBSITE_BUILD }}
       SONARCLOUD_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
+
+  ci-status:
+    name: CI passed
+    needs: CI
+    if: always()
+    runs-on: ubuntu-slim
+    steps:
+      - name: Check CI result
+        env:
+          CI_RESULT: ${{ needs.CI.result }}
+        run: test "$CI_RESULT" = success
