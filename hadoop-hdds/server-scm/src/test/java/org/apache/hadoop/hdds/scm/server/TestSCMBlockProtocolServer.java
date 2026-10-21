@@ -80,7 +80,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
@@ -417,7 +417,7 @@ public class TestSCMBlockProtocolServer {
   @Test
   public void testFinalizeProceedsWhenAllPeersMatch() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
+    StorageContainerLocationInternalInterface matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
 
     try (SCMBlockProtocolServer testServer =
              buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
@@ -431,8 +431,8 @@ public class TestSCMBlockProtocolServer {
   @Test
   public void testFinalizeRejectsOlderPeerUnlessForced() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
-    StorageContainerLocationProtocol older = peerClient(HDDSVersion.DEFAULT_VERSION);
+    StorageContainerLocationInternalInterface matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
+    StorageContainerLocationInternalInterface older = peerClient(HDDSVersion.DEFAULT_VERSION);
 
     try (SCMBlockProtocolServer testServer =
              buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
@@ -450,9 +450,9 @@ public class TestSCMBlockProtocolServer {
   @Test
   public void testFinalizeRejectsUnknownFuturePeerUnlessForced() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
+    StorageContainerLocationInternalInterface matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
     // A version not recognized by this binary deserializes to UNKNOWN_VERSION in the client translator.
-    StorageContainerLocationProtocol unknown = peerClient(HDDSVersion.UNKNOWN_VERSION);
+    StorageContainerLocationInternalInterface unknown = peerClient(HDDSVersion.UNKNOWN_VERSION);
 
     try (SCMBlockProtocolServer testServer =
              buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
@@ -471,7 +471,7 @@ public class TestSCMBlockProtocolServer {
   @Test
   public void testFinalizeRejectsUnreachablePeerUnlessForced() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    StorageContainerLocationProtocol unreachable = mock(StorageContainerLocationProtocol.class);
+    StorageContainerLocationInternalInterface unreachable = mock(StorageContainerLocationInternalInterface.class);
     when(unreachable.getPeerUpgradeStatus()).thenThrow(new IOException("connection refused"));
 
     try (SCMBlockProtocolServer testServer =
@@ -635,8 +635,8 @@ public class TestSCMBlockProtocolServer {
     return mockScm;
   }
 
-  private StorageContainerLocationProtocol peerClient(HDDSVersion version) throws IOException {
-    StorageContainerLocationProtocol client = mock(StorageContainerLocationProtocol.class);
+  private StorageContainerLocationInternalInterface peerClient(HDDSVersion version) throws IOException {
+    StorageContainerLocationInternalInterface client = mock(StorageContainerLocationInternalInterface.class);
     when(client.getPeerUpgradeStatus()).thenReturn(version);
     return client;
   }

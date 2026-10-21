@@ -17,12 +17,16 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmUtils.checkIfCertSignRequestAllowed;
 import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_ENABLED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecretKeyException.ErrorCode.SECRET_KEY_NOT_INITIALIZED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.CERTIFICATE_NOT_FOUND;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CA_CERT_FAILED;
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.GET_CERTIFICATE_FAILED;
+import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.UNABLE_TO_ISSUE_CERTIFICATE;
 import static org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateApprover.ApprovalType.KERBEROS_TRUSTED;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec.getPEMEncodedString;
 import static org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest.getCertificationRequest;
@@ -342,6 +346,7 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       // SCM role certificates are CA certificates and are issued to SCM admins only, the check addSCM applies.
       storageContainerManager.checkAdminAccess(getRpcRemoteUser(), false);
     }
+    checkRequesterIsService(nodeType);
     Future<CertPath> future;
     PKCS10CertificationRequest csr = getCertificationRequest(certSignReq);
     if (nodeType == NodeType.SCM && rootCertificateServer != null) {
@@ -366,6 +371,35 @@ public class SCMSecurityProtocolServer implements SCMSecurityProtocol,
       } else {
         throw generateException(e, nodeType);
       }
+    }
+  }
+
+  /**
+   * A certificate for a role is only issued to the service user of that role.
+   */
+  private void checkRequesterIsService(NodeType role) throws IOException {
+    final String principalKey = getKerberosPrincipalKey(role);
+    final UserGroupInformation user = HddsServerUtil.getRemoteUser();
+    if (principalKey == null || !HddsServerUtil.isServiceUser(user, config.get(principalKey, ""))) {
+      throw new SCMSecurityException("User " + user.getUserName() + " is not allowed to request a " + role
+          + " certificate, it does not match the principal configured as " + principalKey + " on SCM.",
+          UNABLE_TO_ISSUE_CERTIFICATE);
+    }
+  }
+
+  private static String getKerberosPrincipalKey(NodeType role) {
+    switch (role) {
+    case DATANODE:
+      return HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY;
+    case OM:
+      // TODO: move OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY to hdds-common.
+      return "ozone.om.kerberos.principal";
+    case SCM:
+      return HDDS_SCM_KERBEROS_PRINCIPAL_KEY;
+    case RECON:
+      return OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+    default:
+      return null;
     }
   }
 

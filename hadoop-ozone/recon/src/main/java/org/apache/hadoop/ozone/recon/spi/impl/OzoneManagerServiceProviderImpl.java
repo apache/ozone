@@ -508,8 +508,8 @@ public class OzoneManagerServiceProviderImpl
       // Do not wipe the candidate dir here. The shared RDBSnapshotProvider's
       // checkLeaderConsistency() manages it on the next attempt: kept for the
       // same leader (so a future batched/chunked transfer can resume the parts
-      // already received), reset on a leader change. This matches how the OM
-      // follower handles a failed download.
+      // already received), reset on a leader change. It only holds fully
+      // extracted files, see ReconRDBSnapshotProvider#untarContentsOfTarball.
       return null;
     }
   }
