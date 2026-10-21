@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
@@ -976,6 +977,72 @@ public class TestKeyValueHandler {
     } finally {
       FileUtils.deleteDirectory(tempDir.toFile());
     }
+  }
+
+  @Test
+  public void testCreateContainerReleasesSpaceOnUncheckedFailure() throws Exception {
+    final long containerID = 1L;
+    HandlerWithVolumeSet handlerWithVolume =
+        createCreateContainerHandlerWithVolumeSet(tempDir, true);
+    HddsVolume hddsVolume = (HddsVolume) handlerWithVolume.getVolumeSet().getVolumesList().get(0);
+    String datanodeId = handlerWithVolume.getHandler().getDatanodeId();
+
+    ContainerCommandResponseProto response = handlerWithVolume.getHandler().handle(
+        createContainerRequest(datanodeId, containerID), null, null);
+
+    assertEquals(CONTAINER_INTERNAL_ERROR, response.getResult());
+    assertThat(response.getMessage()).contains("dbParentDir == null");
+    assertEquals(0, hddsVolume.getCommittedBytes());
+    assertNull(handlerWithVolume.getContainerSet().getContainer(containerID));
+  }
+
+  @Test
+  public void testCreateContainerKeepsSpaceOfCreatedContainer() throws Exception {
+    final long containerID = 1L;
+    HandlerWithVolumeSet handlerWithVolume =
+        createCreateContainerHandlerWithVolumeSet(tempDir, false);
+    HddsVolume hddsVolume = (HddsVolume) handlerWithVolume.getVolumeSet().getVolumesList().get(0);
+    String datanodeId = handlerWithVolume.getHandler().getDatanodeId();
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+
+    ContainerCommandResponseProto response =
+        kvHandler.handleCreateContainer(createContainerRequest(datanodeId, containerID), null);
+    assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+    KeyValueContainer container =
+        (KeyValueContainer) handlerWithVolume.getContainerSet().getContainer(containerID);
+    assertNotNull(container);
+    assertEquals(maxContainerSize, hddsVolume.getCommittedBytes());
+    assertTrue(container.getContainerData().isCommittedSpace());
+
+    long committedAfterFirst = hddsVolume.getCommittedBytes();
+    ContainerCommandResponseProto response2 =
+        kvHandler.handleCreateContainer(createContainerRequest(datanodeId, containerID), null);
+    assertEquals(ContainerProtos.Result.SUCCESS, response2.getResult());
+    assertEquals(committedAfterFirst, hddsVolume.getCommittedBytes());
+    assertTrue(container.getContainerData().isCommittedSpace());
+  }
+
+  private HandlerWithVolumeSet createCreateContainerHandlerWithVolumeSet(
+      Path volumeRoot, boolean unsetDbParentDir) throws IOException {
+    final String clusterId = UUID.randomUUID().toString();
+    final String datanodeId = UUID.randomUUID().toString();
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    testConf.set(HDDS_DATANODE_DIR_KEY, volumeRoot.toString());
+    ContainerSet containerSet = newContainerSet();
+    MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    HddsVolume hddsVolume = new HddsVolume.Builder(volumeRoot.toString()).conf(testConf)
+        .clusterID(clusterId).datanodeUuid(datanodeId).volumeSet(volumeSet).build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+    hddsVolume.createTmpDirs(clusterId);
+    if (unsetDbParentDir) {
+      hddsVolume.setDbParentDir(null);
+    }
+    when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
+    KeyValueHandler kvHandler = new KeyValueHandler(testConf, datanodeId, containerSet, volumeSet,
+        ContainerMetrics.create(testConf), c -> { }, new ContainerChecksumTreeManager(testConf));
+    kvHandler.setClusterID(clusterId);
+    return new HandlerWithVolumeSet(kvHandler, volumeSet, containerSet);
   }
 
   private static ContainerCommandRequestProto createContainerRequest(
