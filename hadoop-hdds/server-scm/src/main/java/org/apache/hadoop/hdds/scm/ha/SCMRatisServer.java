@@ -54,6 +54,14 @@ public interface SCMRatisServer {
   RaftServer.Division getDivision();
 
   /**
+   * Returns the maximum replication lag of SCM Ratis followers in Raft log entries.
+   * Returns 0 when this node is not the leader or non-HA (no throttling signal applies.)
+   */
+  default long getFollowerReplicationLag() {
+    return 0;
+  }
+
+  /**
    * Returns roles of ratis peers.
    */
   List<String> getRatisRoles();
