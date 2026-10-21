@@ -131,6 +131,29 @@ public class TestMultipartUploadComplete {
   }
 
   @Test
+  public void testMultipartIfNoneMatchETag() throws Exception {
+    String key = OzoneConsts.KEY;
+    String uploadID = initiateMultipartUpload(key);
+    Part part = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "original-content");
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part));
+    String etag = client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET).getKey(key)
+        .getMetadata().get(OzoneConsts.ETAG);
+
+    String replacementUploadID = initiateMultipartUpload(key);
+    Part replacementPart = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, replacementUploadID, "new-content");
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"" + etag + "\"");
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, replacementUploadID,
+            singletonList(replacementPart)));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key, "original-content");
+
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, replacementUploadID, singletonList(replacementPart));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key, "new-content");
+  }
+
+  @Test
   public void testMultipartWithCustomMetadata() throws Exception {
     String key = UUID.randomUUID().toString();
 

@@ -49,6 +49,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -141,6 +142,22 @@ public class TestUploadWithStream {
     OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
     assertKeyContent(bucket, S3_COPY_EXISTING_KEY, S3_COPY_EXISTING_KEY_CONTENT);
     assertThrows(IOException.class, () -> bucket.getKey(S3KEY));
+  }
+
+  @Test
+  public void testUploadIfNoneMatchETag() throws Exception {
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+    Response response = put(rest, S3BUCKET, S3KEY, S3_COPY_EXISTING_KEY_CONTENT);
+    OzoneBucket bucket = client.getObjectStore().getS3Bucket(S3BUCKET);
+    assertKeyContent(bucket, S3KEY, S3_COPY_EXISTING_KEY_CONTENT);
+
+    when(headers.getHeaderString("If-None-Match")).thenReturn(response.getHeaderString(HttpHeaders.ETAG));
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED, () -> put(rest, S3BUCKET, S3KEY, "new-content"));
+    assertKeyContent(bucket, S3KEY, S3_COPY_EXISTING_KEY_CONTENT);
+
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, "new-content"));
+    assertKeyContent(bucket, S3KEY, "new-content");
   }
 
   @Test
