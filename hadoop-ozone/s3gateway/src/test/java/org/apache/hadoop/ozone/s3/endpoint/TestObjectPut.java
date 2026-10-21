@@ -1059,16 +1059,18 @@ class TestObjectPut {
         () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
   }
 
-  @Test
-  void testCopyObjectWithDestinationIfMatchKeyNotFound() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  void testCopyObjectWithDestinationIfMatchKeyNotFound(String ifMatch) throws Exception {
     assertSucceeds(() -> putObject(CONTENT));
 
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         BUCKET_NAME + "/" + urlEncode(KEY_NAME));
-    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn("\"some-etag\"");
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(ifMatch);
 
-    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.NO_SUCH_KEY,
         () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertEquals(DEST_KEY, ex.getResource());
   }
 
   @Test
@@ -1255,14 +1257,25 @@ class TestObjectPut {
     assertNotNull(ex);
   }
 
-  @Test
-  void testIfMatchKeyNotFoundPreconditionFailed() throws Exception {
-    // Try If-Match on a non-existent key
-    when(headers.getHeaderString("If-Match")).thenReturn("\"some-etag\"");
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  void testIfMatchKeyNotFound(String ifMatch) throws Exception {
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(ifMatch);
 
-    OS3Exception ex = assertErrorResponse(
-        S3ErrorTable.PRECOND_FAILED, () -> putObject(CONTENT));
-    assertNotNull(ex);
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.NO_SUCH_KEY, () -> putObject(CONTENT));
+    assertEquals(KEY_NAME, ex.getResource());
+    assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  void testCopyObjectWithIfMatchSourceKeyNotFound(String ifMatch) throws Exception {
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(ifMatch);
+
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.NO_SUCH_KEY,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertEquals(KEY_NAME, ex.getResource());
   }
 
   @Test
