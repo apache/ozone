@@ -19,10 +19,13 @@ package org.apache.hadoop.hdds.utils.db.managed;
 
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
+import java.util.Collections;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.BlockBasedTableConfig;
 import org.rocksdb.ColumnFamilyOptions;
+import org.rocksdb.Options;
 import org.rocksdb.TableFormatConfig;
+import org.rocksdb.TablePropertiesCollectorFactory;
 
 /**
  * Managed ColumnFamilyOptions.
@@ -40,6 +43,27 @@ public class ManagedColumnFamilyOptions extends ColumnFamilyOptions {
 
   public ManagedColumnFamilyOptions(ColumnFamilyOptions columnFamilyOptions) {
     super(columnFamilyOptions);
+  }
+
+  private ManagedColumnFamilyOptions(Options options) {
+    super(options);
+  }
+
+  /** Creates options that request compaction when an SST's deletion ratio reaches the given threshold. */
+  public static ManagedColumnFamilyOptions withDeletionRatio(double deletionRatio) {
+    if (!Double.isFinite(deletionRatio) || deletionRatio < 0 || deletionRatio > 1) {
+      throw new IllegalArgumentException("Deletion ratio must be between 0 and 1: " + deletionRatio);
+    }
+    if (deletionRatio == 0) {
+      return new ManagedColumnFamilyOptions();
+    }
+    // RocksDB exposes the collector setter only on Options. The native options retain a shared pointer to the factory.
+    try (ManagedOptions options = new ManagedOptions();
+         TablePropertiesCollectorFactory factory =
+             TablePropertiesCollectorFactory.NewCompactOnDeletionCollectorFactory(0, 0, deletionRatio)) {
+      options.setTablePropertiesCollectorFactory(Collections.singletonList(factory));
+      return new ManagedColumnFamilyOptions(options);
+    }
   }
 
   @Override
