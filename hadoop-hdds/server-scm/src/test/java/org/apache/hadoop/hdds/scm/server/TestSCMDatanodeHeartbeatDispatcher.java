@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,6 +40,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.CommandStatusReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
@@ -141,9 +144,10 @@ public class TestSCMDatanodeHeartbeatDispatcher {
   }
 
   @Test
-  public void testVersionReportProcessedOnlyWhenPresent() throws IOException {
+  public void testVersionReportProcessedOnlyWhenPresent() throws IOException, NodeNotFoundException {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceStale());
 
     SCMDatanodeHeartbeatDispatcher dispatcher =
         new SCMDatanodeHeartbeatDispatcher(mockNodeManager, mock(EventPublisher.class));
@@ -164,6 +168,52 @@ public class TestSCMDatanodeHeartbeatDispatcher {
         .setDatanodeVersion(version)
         .build());
     verify(mockNodeManager, times(1)).processVersionReport(any(), any());
+  }
+
+  @Test
+  public void testStaleNodeWithIncompatibleVersionGetsReregisterCommand() throws Exception {
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceStale());
+    when(mockNodeManager.shouldFenceDatanode(any(), any())).thenReturn(true);
+
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(mockNodeManager, mock(EventPublisher.class));
+
+    DatanodeVersionProto version = DatanodeVersionProto.newBuilder()
+        .setApparentVersion(1).setSoftwareVersion(1).build();
+    SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(randomDatanodeDetails().getProtoBufMessage())
+        .setDatanodeVersion(version)
+        .build();
+
+    dispatcher.dispatch(heartbeat);
+
+    verify(mockNodeManager, times(1)).addDatanodeCommand(any(DatanodeID.class), any(ReregisterCommand.class));
+    verify(mockNodeManager, never()).processHeartbeat(any(), any());
+  }
+
+  @Test
+  public void testDeadNodeWithIncompatibleVersionGetsReregisterCommand() throws Exception {
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceDead());
+    when(mockNodeManager.shouldFenceDatanode(any(), any())).thenReturn(true);
+
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(mockNodeManager, mock(EventPublisher.class));
+
+    DatanodeVersionProto version = DatanodeVersionProto.newBuilder()
+        .setApparentVersion(1).setSoftwareVersion(1).build();
+    SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(randomDatanodeDetails().getProtoBufMessage())
+        .setDatanodeVersion(version)
+        .build();
+
+    dispatcher.dispatch(heartbeat);
+
+    verify(mockNodeManager, times(1)).addDatanodeCommand(any(DatanodeID.class), any(ReregisterCommand.class));
+    verify(mockNodeManager, never()).processHeartbeat(any(), any());
   }
 
   /**

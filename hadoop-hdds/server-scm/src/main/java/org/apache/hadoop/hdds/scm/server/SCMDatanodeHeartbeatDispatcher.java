@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.IEventInfo;
 import org.apache.hadoop.ozone.protocol.commands.ReregisterCommand;
@@ -104,6 +105,19 @@ public final class SCMDatanodeHeartbeatDispatcher {
       if (heartbeat.hasCommandQueueReport()) {
         commandQueueReport = heartbeat.getCommandQueueReport();
       }
+
+      // Stale and dead nodes must pass a version compatibility check before their heartbeat
+      // timestamp is updated. Without this gate a node that went unhealthy during a rolling
+      // upgrade could resurrect at an incompatible software version. If the check fails, ask
+      // the node to re-register so the full registration fence runs with current version info.
+      if (isUnhealthyWithIncompatibleVersion(datanodeDetails, heartbeat)) {
+        LOG.info("Node {} is not healthy and reported an incompatible version. Asking to re-register.",
+            datanodeDetails);
+        DatanodeID dnID = datanodeDetails.getID();
+        nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
+        return nodeManager.getCommandQueue(dnID);
+      }
+
       // should we dispatch heartbeat through eventPublisher?
       commands = nodeManager.processHeartbeat(datanodeDetails, commandQueueReport);
       if (heartbeat.hasNodeReport()) {
@@ -180,6 +194,25 @@ public final class SCMDatanodeHeartbeatDispatcher {
     LOG.debug("Heartbeat dispatched for datanode {} with commands {}", datanodeDetails, commands);
 
     return commands;
+  }
+
+  /**
+   * Returns true if the node is not healthy (stale or dead) and its reported version is
+   * incompatible with this SCM. Healthy nodes are always allowed through — their version was
+   * already validated at registration. If the node status cannot be determined, returns false
+   * so the heartbeat is processed normally.
+   */
+  private boolean isUnhealthyWithIncompatibleVersion(DatanodeDetails datanodeDetails,
+      SCMHeartbeatRequestProto heartbeat) {
+    if (!heartbeat.hasDatanodeVersion()) {
+      return false;
+    }
+    try {
+      return !nodeManager.getNodeStatus(datanodeDetails).isHealthy()
+          && nodeManager.shouldFenceDatanode(datanodeDetails, heartbeat.getDatanodeVersion());
+    } catch (NodeNotFoundException e) {
+      return false;
+    }
   }
 
   /**
