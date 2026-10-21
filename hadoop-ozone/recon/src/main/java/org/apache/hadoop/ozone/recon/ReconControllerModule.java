@@ -86,7 +86,6 @@ import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDa
 import org.apache.ratis.protocol.ClientId;
 import org.jooq.Configuration;
 import org.jooq.DAO;
-import org.jooq.SQLDialect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -235,8 +234,7 @@ public class ReconControllerModule extends AbstractModule {
     ReconSqlDbConfig sqlDbConfig =
         ozoneConfiguration.getObject(ReconSqlDbConfig.class);
 
-    if (StringUtils.startsWith(sqlDbConfig.getJdbcUrl(), "jdbc:derby:")
-        || SQLDialect.DERBY.name().equalsIgnoreCase(sqlDbConfig.getSqlDbDialect())) {
+    if (StringUtils.startsWith(sqlDbConfig.getJdbcUrl(), "jdbc:derby:")) {
       LOG.warn("Derby is no longer supported for the Recon SQL DB. Ignoring the configured {} and using the SQLite "
           + "defaults.", sqlDbConfig.getJdbcUrl());
       sqlDbConfig.setDriverClass(ReconSqlDbConfig.DEFAULT_DRIVER_CLASS);
