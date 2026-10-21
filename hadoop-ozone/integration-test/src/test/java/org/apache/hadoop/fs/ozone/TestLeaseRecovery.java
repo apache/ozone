@@ -41,7 +41,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ConnectException;
-import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.StringUtils;
@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
@@ -75,6 +76,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.utils.FaultInjectorImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -364,7 +366,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
       // close the pipeline
       StorageContainerManager scm = cluster.getStorageContainerManager();
-      ContainerInfo container = closeLatestContainer();
+      ContainerInfo container = closeContainerForLastBlock(stream);
       GenericTestUtils.waitFor(() -> {
         try {
           return scm.getPipelineManager().getPipeline(container.getPipelineID()).isClosed();
@@ -410,7 +412,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
         stream.flush();
 
         // close the pipeline and container
-        closeLatestContainer();
+        closeContainerForLastBlock(stream);
         // pause getCommittedBlockLength handling on all DNs to make sure all getCommittedBlockLength will time out
         FaultInjectorImpl injector = new FaultInjectorImpl();
         injector.setType(ContainerProtos.Type.GetCommittedBlockLength);
@@ -458,7 +460,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
       stream.flush();
 
       // close the pipeline and container
-      ContainerInfo container = closeLatestContainer();
+      ContainerInfo container = closeContainerForLastBlock(stream);
       // throw exception on first DN getCommittedBlockLength handling
       FaultInjectorImpl injector = new FaultInjectorImpl();
       KeyValueHandler.setInjector(injector);
@@ -576,7 +578,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
       StorageContainerManager scm = cluster.getStorageContainerManager();
       // Close container so that new data won't be written into the same block
       // block1 is partially filled
-      ContainerInfo container = closeLatestContainer();
+      ContainerInfo container = closeContainerForLastBlock(stream);
       GenericTestUtils.waitFor(() -> {
         try {
           return scm.getPipelineManager().getPipeline(container.getPipelineID()).isClosed();
@@ -609,9 +611,14 @@ public class TestLeaseRecovery extends OzoneTestBase {
     verifyData(data, (blockSize - 1) * 2, file, fs);
   }
 
-  private ContainerInfo closeLatestContainer() throws IOException, TimeoutException, InterruptedException {
+  /** Closes the container (and its pipeline) holding the last block written to {@code stream}. */
+  private ContainerInfo closeContainerForLastBlock(FSDataOutputStream stream)
+      throws IOException, TimeoutException, InterruptedException {
     StorageContainerManager scm = cluster.getStorageContainerManager();
-    ContainerInfo container = new LinkedList<>(scm.getContainerManager().getContainers()).getLast();
+    List<OmKeyLocationInfo> locations = ((OzoneFSOutputStream) stream.getWrappedStream())
+        .getWrappedOutputStream().getKeyOutputStream().getLocationInfoList();
+    ContainerInfo container = scm.getContainerManager().getContainer(
+        ContainerID.valueOf(locations.get(locations.size() - 1).getContainerID()));
     OzoneTestUtils.closeContainer(scm, container);
     return container;
   }

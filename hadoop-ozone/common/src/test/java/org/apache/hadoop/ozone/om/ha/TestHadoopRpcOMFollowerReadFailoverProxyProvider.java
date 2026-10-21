@@ -512,7 +512,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     for (int i = 0; i < omNodeCount; i++) {
       String nodeId = NODE_ID_BASE_STR + (i + 1); // 1-th indexed
       config.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
-          nodeId),  "0.0.0.0:" + i);
+          nodeId),  "localhost:" + i);
       allNodeIds.add(nodeId);
       omNodeIds[i] = nodeId;
       omNodeAnswers[i] = new OMAnswer();

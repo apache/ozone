@@ -185,10 +185,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             " considered as Unix Paths. Path has Violated FS Semantics " +
             "which caused put operation to fail.");
         throw os3Exception;
-      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
-          && getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER) != null) {
-        // If-Match failed because the key doesn't exist
-        throw newError(PRECOND_FAILED, keyPath, ex);
       }
 
       throw newError(bucketName, keyPath, ex);
@@ -320,18 +316,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             output.addPreCommit(checkContentMD5Hook);
           }
 
-          // If sha256Digest exists, this request must validate x-amz-content-sha256
-          MessageDigest sha256Digest = multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH);
-          if (sha256Digest != null) {
-            final String actualSha256 = DatatypeConverter.printHexBinary(
-                sha256Digest.digest()).toLowerCase();
-            CheckedRunnable<IOException> checkSha256Hook = () -> {
-              if (!amzContentSha256Header.equals(actualSha256)) {
-                throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
-              }
-            };
-            output.addPreCommit(checkSha256Hook);
-          }
+          output.checkContentSha256(multiDigestInputStream, amzContentSha256Header);
         }
       }
       getMetrics().incPutKeySuccessLength(putLength);
@@ -862,14 +847,14 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       Long expectedDataGeneration = null;
       String expectedETag = null;
-      if (writeConditions.hasIfNoneMatch()) {
+      if (writeConditions.isCreateIfAbsent()) {
         expectedDataGeneration = OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT;
       } else if (writeConditions.hasIfMatch()) {
         expectedETag = writeConditions.getExpectedETag();
       }
 
       omMultipartUploadCompleteInfo = ozoneBucket.completeMultipartUpload(
-          key, uploadID, partsMap, expectedDataGeneration, expectedETag);
+          key, uploadID, partsMap, expectedDataGeneration, expectedETag, writeConditions.getExcludedETag());
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
           new CompleteMultipartUploadResponse();
       completeMultipartUploadResponse.setBucket(bucket);
@@ -898,9 +883,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS
           || ex.getResult() == ResultCodes.ETAG_MISMATCH
           || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
-        throw newError(PRECOND_FAILED, key, ex);
-      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
-          && writeConditions.hasIfMatch()) {
         throw newError(PRECOND_FAILED, key, ex);
       }
       throw newError(bucket, key, ex);
@@ -1060,6 +1042,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             };
             writeGuard.addPreCommit(checkContentMD5Hook);
           }
+          writeGuard.checkContentSha256(multiDigestInputStream,
+              getHeaders().getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256));
           writeGuard.getMetadata().put(OzoneConsts.ETAG, md5Hash);
           writeGuard.addPreCommit(
               () -> requirePartETag(writeGuard.getMetadata()));
@@ -1103,7 +1087,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         throw os3Exception;
       }
       throw newError(bucketName, key, ex);
-    } catch (IOException ex) {
+    } catch (IOException | RuntimeException ex) {
       // Ensure we handle permission failures - these can surface as IOException wrapping OMException.
       if (copyHeader != null) {
         getMetrics().updateCopyObjectFailureStats(startNanos);
@@ -1192,6 +1176,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
     String sourceBucket = result.getLeft();
     String sourceKey = result.getRight();
+    String keyForError = sourceKey;
     final MessageDigest md5Digest = getMD5DigestInstance();
 
     if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
@@ -1294,6 +1279,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           // Nothing reads the digest in this case, so do not hash the copied bytes at all.
           sourceDigestInputStream.on(false);
         }
+        keyForError = destkey;
         final CopyResult copyResult = runWithS3ActionString("PutObject", () ->
             copy(volume, sourceDigestInputStream, reusedETag, sourceKeyLen, destkey, destinationBucket,
               replicationConfig, customMetadata, perf, startNanos, tags, writeConditions));
@@ -1306,10 +1292,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        if (getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER) != null) {
-          throw newError(PRECOND_FAILED, destkey, ex);
-        }
-        throw newError(S3ErrorTable.NO_SUCH_KEY, sourceKey, ex);
+        throw newError(S3ErrorTable.NO_SUCH_KEY, keyForError, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket, ex);
       } else if (ex.getResult() == ResultCodes.ATOMIC_WRITE_CONFLICT
@@ -1337,10 +1320,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       Map<String, String> tags,
       S3ConditionalRequest.WriteConditions writeConditions, boolean derivedKeyPiggyBacking)
       throws IOException {
-    if (writeConditions.hasIfNoneMatch()) {
+    if (writeConditions.isCreateIfAbsent()) {
       return getClientProtocol().createKeyIfNotExists(
           volumeName, bucketName, keyPath, length, replicationConfig,
           customMetadata, tags, derivedKeyPiggyBacking);
+    } else if (writeConditions.hasIfNoneMatch()) {
+      return getClientProtocol().createKeyIfNoneMatch(volumeName, bucketName, keyPath, length,
+          writeConditions.getExcludedETag(), replicationConfig, customMetadata, tags, derivedKeyPiggyBacking);
     } else if (writeConditions.hasIfMatch()) {
       return getClientProtocol().rewriteKeyIfMatch(
           volumeName, bucketName, keyPath, length,

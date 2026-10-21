@@ -1000,7 +1000,7 @@ public class TestSCMNodeManager {
   @ParameterizedTest
   @MethodSource("ineligibleHealthStates")
   public void testDatanodeFinalizedCounterExcludesNonHealthyNodes(NodeStatus expectedStatus)
-      throws IOException, AuthenticationException, NodeNotFoundException, InterruptedException {
+      throws IOException, AuthenticationException, NodeNotFoundException, InterruptedException, TimeoutException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, MILLISECONDS);
     conf.setTimeDuration(HDDS_HEARTBEAT_INTERVAL, 1, SECONDS);
@@ -1022,15 +1022,10 @@ public class TestSCMNodeManager {
           "Both nodes should start as healthy");
 
       // Only heartbeat the baseline node until transitionNode reaches the expected state.
-      // STALE requires > 3s (wait 4s), DEAD requires > 6s (wait 7s total).
-      boolean waitForDead = expectedStatus.equals(NodeStatus.inServiceDead());
-      Thread.sleep(2000);
-      nodeManager.processHeartbeat(heartbeatingNode);
-      Thread.sleep(2000);
-      if (waitForDead) {
+      GenericTestUtils.waitFor(() -> {
         nodeManager.processHeartbeat(heartbeatingNode);
-        Thread.sleep(3000);
-      }
+        return nodeManager.getNodeCount(expectedStatus) == 1;
+      }, 100, WAIT_FOR_TIMEOUT_MS);
 
       assertEquals(expectedStatus, nodeManager.getNodeStatus(transitionNode),
           "Node should have transitioned to " + expectedStatus);

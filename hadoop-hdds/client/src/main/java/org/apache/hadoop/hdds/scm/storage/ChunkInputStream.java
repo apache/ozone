@@ -446,13 +446,13 @@ public class ChunkInputStream extends InputStream
    * @return number of bytes copied into {@code dst}, or {@link #EOF} at EOF
    */
   int readPositioned(long chunkRelativePosition, ByteBuffer dst) throws IOException {
+    if (!dst.hasRemaining()) {
+      return 0;
+    }
     if (chunkRelativePosition < 0 || chunkRelativePosition >= length) {
       return EOF;
     }
     final int toRead = (int) Math.min(dst.remaining(), length - chunkRelativePosition);
-    if (toRead == 0) {
-      return 0;
-    }
 
     final ChunkInfo readChunkInfo = getChunkInfo(chunkRelativePosition, toRead);
     final long adjustedOffset = readChunkInfo.getOffset() - chunkInfo.getOffset();

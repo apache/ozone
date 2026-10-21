@@ -21,6 +21,7 @@ import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getHostPortString;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedHost;
 import static org.apache.hadoop.ozone.OzoneConsts.DOUBLE_SLASH_OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
@@ -161,12 +162,19 @@ public final class OmUtils {
    * @param conf configuration
    * @param confKey configuration key to lookup address from
    * @return Target InetSocketAddress for the OM RPC server.
+   * @throws ConfigurationException if the configured host cannot be advertised
+   *         to the other OMs of the service
    */
   public static String getOmRpcAddress(ConfigurationSource conf,
       String confKey) {
     final Optional<String> host = getHostNameFromConfigKeys(conf, confKey);
 
     if (host.isPresent()) {
+      // Without a service and node suffix this is the non-HA OM's own RPC
+      // address, which defaults to a wildcard.
+      if (!OZONE_OM_ADDRESS_KEY.equals(confKey)) {
+        validateAdvertisedHost(confKey, host.get());
+      }
       return getHostPortString(host.get(),
           getPortNumberFromConfigKeys(conf, confKey)
               .orElse(OZONE_OM_PORT_DEFAULT));
