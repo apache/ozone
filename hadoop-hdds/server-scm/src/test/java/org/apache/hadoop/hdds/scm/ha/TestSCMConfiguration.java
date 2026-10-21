@@ -240,6 +240,31 @@ class TestSCMConfiguration {
     assertThat(e.getMessage()).contains(addressKey).contains(address);
   }
 
+  /**
+   * SCM node addresses configured as IP literals stay literals in the Ratis peer addresses, so all SCMs agree on them
+   * regardless of reverse DNS.
+   */
+  @Test
+  void testRatisAddressKeepsIpLiteral() throws Exception {
+    String scmServiceId = "scmserviceId";
+    conf.set(ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
+    conf.set(ScmConfigKeys.OZONE_SCM_NODES_KEY + "." + scmServiceId, "scm1,scm2");
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, "scm1"), "127.0.0.1");
+    conf.set(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId, "scm2"), "192.0.2.2");
+    conf.set(OZONE_SCM_RATIS_PORT_KEY, "10000");
+
+    SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getState()).thenReturn(Storage.StorageState.NOT_INITIALIZED);
+    SCMHANodeDetails scmhaNodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
+
+    SCMNodeDetails local = scmhaNodeDetails.getLocalNodeDetails();
+    assertEquals("scm1", local.getNodeId());
+    assertEquals("127.0.0.1:10000", local.getRatisHostPortStr());
+    assertThat(scmhaNodeDetails.getPeerNodeDetails())
+        .extracting(SCMNodeDetails::getRatisHostPortStr)
+        .containsExactly("192.0.2.2:10000");
+  }
+
   @Test
   public void testSamePortConfig() throws Exception {
     String scmServiceId = "scmserviceId";

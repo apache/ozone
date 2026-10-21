@@ -469,4 +469,29 @@ public class TestOMNodeDetails {
 
     assertEquals("[2001:db8::1]:" + RPC_PORT, nodeDetails.getRpcAddressString());
   }
+
+  /**
+   * An IP literal in the configuration stays a literal in the Ratis peer address, even after a reverse lookup of the
+   * same address. A host name stored for the same IP address in an existing Ratis configuration still matches.
+   */
+  @Test
+  public void testRatisAddressKeepsIpLiteral() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID, OM_NODE_ID),
+        "127.0.0.1:" + RPC_PORT);
+    conf.setInt(ConfUtils.addKeySuffixes(OMConfigKeys.OZONE_OM_RATIS_PORT_KEY, OM_SERVICE_ID, OM_NODE_ID),
+        RATIS_PORT);
+
+    OMNodeDetails nodeDetails = OMNodeDetails.getOMNodeDetailsFromConf(conf, OM_SERVICE_ID, OM_NODE_ID);
+    assertNotNull(nodeDetails);
+    nodeDetails.getHostName();
+
+    assertEquals("127.0.0.1", nodeDetails.getHostAddress());
+    assertEquals("127.0.0.1:" + RATIS_PORT, nodeDetails.getRatisHostPortStr());
+    assertTrue(nodeDetails.isRatisAddress("127.0.0.1:" + RATIS_PORT));
+    assertTrue(nodeDetails.isRatisAddress("localhost:" + RATIS_PORT));
+    assertFalse(nodeDetails.isRatisAddress("127.0.0.1:" + RPC_PORT));
+    assertFalse(nodeDetails.isRatisAddress("127.0.0.2:" + RATIS_PORT));
+    assertFalse(nodeDetails.isRatisAddress("127.0.0.1"));
+  }
 }
