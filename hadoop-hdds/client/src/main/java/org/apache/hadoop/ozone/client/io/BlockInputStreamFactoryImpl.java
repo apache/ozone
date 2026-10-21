@@ -55,15 +55,33 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
         ecReconstructExecutorSupplier);
   }
 
+  /**
+   * @param ecParallelReadExecutorSupplier executor for reading the cells of a healthy EC block in parallel, or
+   *     null to always read them one at a time
+   */
+  public static BlockInputStreamFactory getInstance(
+      ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier,
+      Supplier<ExecutorService> ecParallelReadExecutorSupplier) {
+    return new BlockInputStreamFactoryImpl(byteBufferPool,
+        ecReconstructExecutorSupplier, ecParallelReadExecutorSupplier);
+  }
+
   public BlockInputStreamFactoryImpl() {
     this(new ElasticByteBufferPool(), Executors::newSingleThreadExecutor);
   }
 
   public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool,
       Supplier<ExecutorService> ecReconstructExecutorSupplier) {
+    this(byteBufferPool, ecReconstructExecutorSupplier, null);
+  }
+
+  public BlockInputStreamFactoryImpl(ByteBufferPool byteBufferPool,
+      Supplier<ExecutorService> ecReconstructExecutorSupplier,
+      Supplier<ExecutorService> ecParallelReadExecutorSupplier) {
     this.ecBlockStreamFactory =
         ECBlockInputStreamFactoryImpl.getInstance(this, byteBufferPool,
-            ecReconstructExecutorSupplier);
+            ecReconstructExecutorSupplier, ecParallelReadExecutorSupplier);
   }
 
   /**
@@ -90,8 +108,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
           blockInfo, xceiverFactory, refreshFunction,
           ecBlockStreamFactory, config);
     } else if (config.isStreamReadBlock() && allDataNodesSupportStreamBlock(pipeline)) {
-      return new StreamBlockInputStream(blockInfo.getBlockID(), blockInfo.getLength(), pipeline, token, xceiverFactory,
-          refreshFunction, config);
+      return new StreamBlockInputStream(blockInfo, pipeline, token, xceiverFactory, refreshFunction, config);
     } else {
       return new BlockInputStream(blockInfo,
           pipeline, token, xceiverFactory, refreshFunction,
