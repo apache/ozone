@@ -990,7 +990,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
    * @return the new leader OM after transfer
    */
   public OzoneManager transferOMLeadershipToAnotherNode(OzoneManager currentLeader) throws Exception {
-    List<OzoneManager> omList = new ArrayList<>(getOzoneManagersList());
+    List<OzoneManager> omList = getOzoneManagersList();
     OzoneManager targetOM = omList.stream()
         .filter(om -> om != currentLeader && om.isRunning())
         .findFirst()
@@ -1239,7 +1239,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
     }
 
     public List<Type> getServices() {
-      return services;
+      return new ArrayList<>(services);
     }
 
     public List<Type> getActiveServices() {
@@ -1323,7 +1323,7 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
 
   @Override
   public List<StorageContainerManager> getStorageContainerManagers() {
-    return new ArrayList<>(this.scmhaService.getServices());
+    return this.scmhaService.getServices();
   }
 
   @Override

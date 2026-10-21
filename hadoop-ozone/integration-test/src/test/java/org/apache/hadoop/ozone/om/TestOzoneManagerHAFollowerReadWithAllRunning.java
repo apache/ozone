@@ -589,7 +589,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends OzoneManagerHA
       assertEquals(leaderOMNodeId, leaderProxyProvider.getCurrentProxyOMNodeId());
 
       // Try to transfer leadership
-      List<OzoneManager> originalOMs = new ArrayList<>(getCluster().getOzoneManagersList());
+      List<OzoneManager> originalOMs = getCluster().getOzoneManagersList();
       OzoneManager newLeader = getCluster().transferOMLeadershipToAnotherNode(currentLeader);
       assertNotEquals(currentLeader.getOMNodeId(), newLeader.getOMNodeId());
       assertEquals(originalOMs, getCluster().getOzoneManagersList());
