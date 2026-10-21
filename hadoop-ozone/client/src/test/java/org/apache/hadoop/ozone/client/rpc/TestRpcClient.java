@@ -34,13 +34,16 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -48,6 +51,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
+import org.apache.hadoop.hdds.scm.storage.TestClientThreadShutdown;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
@@ -74,6 +78,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -86,6 +91,25 @@ import org.slf4j.event.Level;
  * Run RPC Client tests.
  */
 public class TestRpcClient {
+  @Test
+  void ratisWriteDoesNotPreventJvmShutdown(@TempDir Path tempDir) throws Exception {
+    TestClientThreadShutdown.assertExitsWithoutClosingClient(
+        tempDir.resolve("ratis-write.log"), RatisWriteClient.class, "RATIS_WRITE");
+  }
+
+  /** Child JVM for the HDDS-10564 regression test, using the actual RpcClient write executor. */
+  public static final class RatisWriteClient {
+    private static RpcClient client;
+
+    public static void main(String[] args) throws Exception {
+      client = createRpcClient();
+      @SuppressWarnings("unchecked")
+      Supplier<ExecutorService> executor =
+          (Supplier<ExecutorService>) FieldUtils.readField(client, "writeExecutor", true);
+      TestClientThreadShutdown.writeRatisBlock(executor.get());
+    }
+  }
+
   private enum ValidateOmVersionTestCases {
     NULL_EXPECTED_NO_OM(
         null, // Expected version

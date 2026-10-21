@@ -43,7 +43,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
 import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
 import org.apache.hadoop.net.unix.DomainSocket;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
@@ -69,10 +71,15 @@ public class TestClientThreadShutdown {
   @EnumSource(Client.class)
   void exitsWithoutClosingClient(Client client) throws Exception {
     Path output = tempDir.resolve(client + ".log");
+    assertExitsWithoutClosingClient(output, TestClientThreadShutdown.class, client.name());
+  }
+
+  /** Also used by higher-level client tests with their production executor suppliers. */
+  public static void assertExitsWithoutClosingClient(Path output, Class<?> mainClass, String client) throws Exception {
     Process process = new ProcessBuilder(
         Paths.get(System.getProperty("java.home"), "bin", "java").toString(),
         "-cp", System.getProperty("surefire.test.class.path", System.getProperty("java.class.path")),
-        TestClientThreadShutdown.class.getName(), client.name())
+        mainClass.getName(), client)
         .redirectErrorStream(true).redirectOutput(output.toFile()).start();
     try {
       boolean exited = process.waitFor(30, TimeUnit.SECONDS);
@@ -84,6 +91,27 @@ public class TestClientThreadShutdown {
       process.destroyForcibly();
       assertTrue(process.waitFor(10, TimeUnit.SECONDS), "Child JVM did not terminate");
     }
+  }
+
+  /** Exercises a Ratis write with the executor owned by RpcClient, without closing either resource. */
+  public static void writeRatisBlock(ExecutorService executor) throws Exception {
+    MockDatanodePipeline pipeline = new MockDatanodePipeline();
+    OzoneClientConfig config = new OzoneClientConfig();
+    config.setStreamBufferSize(100);
+    config.setStreamBufferFlushSize(400);
+    config.setStreamBufferMaxSize(800);
+    config.setIncrementalChunkList(false);
+    config.setEnablePutblockPiggybacking(false);
+    config.setChecksumType(ContainerProtos.ChecksumType.NONE);
+    StreamBufferArgs bufferArgs = StreamBufferArgs.getDefaultStreamBufferArgs(
+        pipeline.getPipeline().getReplicationConfig(), config);
+    RatisBlockOutputStream stream = new RatisBlockOutputStream(pipeline.getBlockID(), -1,
+        pipeline.getClientFactory(), pipeline.getPipeline(), new BufferPool(100, 8), config, null,
+        ContainerClientMetrics.acquire(), bufferArgs, () -> executor);
+    retainedClient = stream;
+    stream.write(new byte[100]);
+    stream.getResponseExecutor().submit(() -> { }).get(10, TimeUnit.SECONDS);
+    System.out.println(READY);
   }
 
   @Test
