@@ -334,11 +334,12 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
 
   /**
    * A failure after an earlier snapshot in the same request updated the cache and snapshot chain must be reported
-   * as INTERNAL_ERROR, so that OM terminates instead of continuing with the partial purge.
+   * as INTERNAL_ERROR, so that OM terminates instead of continuing with the partial purge. A failure before any
+   * update keeps its original status.
    */
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  public void testFailureAfterPartialPurgeIsInternalError(boolean partialPurge) throws Exception {
+  public void testNextSnapshotNotFoundStatus(boolean partialPurge) throws Exception {
     List<String> snapshotKeys = createSnapshots(3);
     // s3 has no next snapshot, so purging it first updates the cache and chain before the lookup of s2 fails.
     List<String> keysToPurge = partialPurge ? Arrays.asList(snapshotKeys.get(2), snapshotKeys.get(0))
@@ -354,6 +355,11 @@ public class TestOMSnapshotPurgeRequestAndResponse extends SnapshotRequestAndRes
         omSnapshotPurgeRequest.validateAndUpdateCache(getOzoneManager(), 200L);
 
     assertEquals(partialPurge ? INTERNAL_ERROR : FILE_NOT_FOUND, omSnapshotPurgeResponse.getOMResponse().getStatus());
+    if (partialPurge) {
+      assertNull(snapshotInfoTable.get(snapshotKeys.get(2)));
+    } else {
+      assertNotNull(snapshotInfoTable.get(snapshotKeys.get(2)));
+    }
   }
 
   // TODO: clean up: Do we this test after
