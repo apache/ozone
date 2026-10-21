@@ -1780,7 +1780,10 @@
                         <paths>
                           <path>${maven.multiModuleProjectDirectory}/target/native-lib</path>
                         </paths>
-                        <normalization>RELATIVE_PATH</normalization>
+                        <normalization>
+                          <strategy>RELATIVE_PATH</strategy>
+                          <ignoreEmptyDirectories>true</ignoreEmptyDirectories>
+                        </normalization>
                       </fileSet>
                       <fileSet>
                         <name>rocksdb-native-lib</name>
@@ -1788,7 +1791,13 @@
                           <path>${project.build.directory}/native/rocksdb</path>
                           <path>${maven.multiModuleProjectDirectory}/hadoop-hdds/rocks-native/target/native/rocksdb</path>
                         </paths>
-                        <normalization>RELATIVE_PATH</normalization>
+                        <includes>
+                          <include>lib*.*</include>
+                        </includes>
+                        <normalization>
+                          <strategy>RELATIVE_PATH</strategy>
+                          <ignoreEmptyDirectories>true</ignoreEmptyDirectories>
+                        </normalization>
                       </fileSet>
                     </fileSets>
                   </inputs>
