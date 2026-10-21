@@ -175,7 +175,6 @@ public class BucketEndpoint extends BucketOperationHandler {
     response.setContinueToken(continueToken);
     response.setStartAfter(EncodingTypeObject.createNullable(startAfter, encodingType));
 
-    final String keyMarker = isListObjectVersions() ? marker : null;
     String prevDir = decodedToken != null ? decodedToken.getLastDir() : null;
     String lastKey = null;
     int count = 0;
@@ -202,8 +201,8 @@ public class BucketEndpoint extends BucketOperationHandler {
               if (!dirName.equals(prevDir)) {
                 prevDir = dirName;
                 String commonPrefix = prefix + dirName + delimiter;
-                // ListObjectVersions excludes common prefixes at or before key-marker.
-                if (StringUtils.startsWith(keyMarker, commonPrefix)) {
+                // ListObjects V1 and ListObjectVersions exclude common prefixes at or before the marker.
+                if (StringUtils.startsWith(marker, commonPrefix)) {
                   continue;
                 }
                 response.addPrefix(EncodingTypeObject.createNullable(commonPrefix, encodingType));

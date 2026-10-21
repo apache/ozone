@@ -815,6 +815,27 @@ public class TestBucketList {
     assertThat(second.getNextVersionIdMarker()).isNull();
   }
 
+  @Test
+  public void listObjectsV1PaginatesCommonPrefixes() throws Exception {
+    setup("dir:a", "dir:b", "file");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, ":");
+    bucketEndpoint.queryParamsForTest().setInt(QueryParams.MAX_KEYS, 1);
+    ListObjectResponse first = (ListObjectResponse) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertThat(first.getCommonPrefixes()).extracting(p -> p.getPrefix().getName()).containsExactly("dir:");
+    assertThat(first.getContents()).isEmpty();
+    assertThat(first.isTruncated()).isTrue();
+    assertThat(first.getNextMarker()).isEqualTo("dir:a");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.MARKER, first.getNextMarker());
+    ListObjectResponse second = (ListObjectResponse) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertThat(second.getCommonPrefixes()).isEmpty();
+    assertThat(second.getContents()).extracting(k -> k.getKey().getName()).containsExactly("file");
+    assertThat(second.isTruncated()).isFalse();
+  }
+
   @ParameterizedTest
   @CsvSource({"p:di, true", "p:dir:, false", "p:dir:a, false"})
   public void listObjectVersionsFiltersCommonPrefixesByKeyMarker(String keyMarker, boolean includeMarkerPrefix)
