@@ -474,6 +474,70 @@ public class TestStreamBlockInputStream {
     }
   }
 
+  /**
+   * The length from OM may be stale for an under construction block, e.g. the last block of an hsync-ed file,
+   * so the block length must be taken from the datanode.
+   */
+  @Test
+  public void testUnderConstructionBlockUsesLengthFromDatanode() throws Exception {
+    byte[] data = {1, 2, 3, 4};
+    BlockLocationInfo blockInfo = new BlockLocationInfo.Builder().setBlockID(new BlockID(1L, 30L)).setLength(2).build();
+    blockInfo.setUnderConstruction(true);
+    Pipeline pipeline = mockStandalonePipeline();
+    XceiverClientGrpc client = mockGetBlockClient(data, pipeline);
+    try (StreamBlockInputStream sbis = newStreamForBlock(blockInfo, pipeline, client)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length + 1);
+      assertEquals(data.length, sbis.read(buf));
+      assertArrayEquals(data, Arrays.copyOf(buf.array(), data.length));
+      assertEquals(data.length, sbis.getLength());
+      assertEquals(-1, sbis.read(buf));
+      sbis.seek(data.length);
+    }
+    verify(client, times(1)).sendCommand(any(ContainerCommandRequestProto.class), any());
+  }
+
+  @Test
+  public void testCompletedBlockDoesNotGetBlockFromDatanode() throws Exception {
+    byte[] data = {1, 2, 3, 4};
+    BlockLocationInfo blockInfo = new BlockLocationInfo.Builder().setBlockID(new BlockID(1L, 31L))
+        .setLength(data.length).build();
+    Pipeline pipeline = mockStandalonePipeline();
+    XceiverClientGrpc client = mockGetBlockClient(data, pipeline);
+    try (StreamBlockInputStream sbis = newStreamForBlock(blockInfo, pipeline, client)) {
+      ByteBuffer buf = ByteBuffer.allocate(data.length);
+      assertEquals(data.length, sbis.read(buf));
+      assertArrayEquals(data, buf.array());
+      sbis.seek(0);
+    }
+    verify(client, never()).sendCommand(any(ContainerCommandRequestProto.class), any());
+  }
+
+  private XceiverClientGrpc mockGetBlockClient(byte[] data, Pipeline pipeline) throws Exception {
+    XceiverClientGrpc client = mockOffsetAwareStreamingReadClient(data, mock(ClientCallStreamObserver.class));
+    when(client.getPipeline()).thenReturn(pipeline);
+    DatanodeDetails datanode = pipeline.getFirstNode();
+    when(pipeline.getClosestNode(any())).thenReturn(datanode);
+    when(client.sendCommand(any(ContainerCommandRequestProto.class), any())).thenAnswer(inv -> {
+      ContainerCommandRequestProto request = inv.getArgument(0);
+      return ContainerCommandResponseProto.newBuilder()
+          .setCmdType(Type.GetBlock)
+          .setResult(ContainerProtos.Result.SUCCESS)
+          .setGetBlock(ContainerProtos.GetBlockResponseProto.newBuilder()
+              .setBlockData(ContainerProtos.BlockData.newBuilder()
+                  .setBlockID(request.getGetBlock().getBlockID())
+                  .setSize(data.length)))
+          .build();
+    });
+    return client;
+  }
+
+  private StreamBlockInputStream newStreamForBlock(BlockLocationInfo blockInfo, Pipeline pipeline,
+      XceiverClientGrpc client) throws Exception {
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any(Pipeline.class))).thenReturn(client);
+    return new StreamBlockInputStream(blockInfo, pipeline, null, factory, NO_REFRESH, newStreamReadConfig());
+  }
+
   private StreamBlockInputStream newStreamForData(byte[] data) throws Exception {
     BlockID blockID = new BlockID(1L, 17L);
     Pipeline pipeline = mockStandalonePipeline();

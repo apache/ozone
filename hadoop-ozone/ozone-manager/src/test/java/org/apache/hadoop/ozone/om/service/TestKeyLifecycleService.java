@@ -45,6 +45,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVA
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -260,6 +261,48 @@ class TestKeyLifecycleService extends OzoneTestBase {
     writeClient = omTestManagers.getWriteClient();
     om = omTestManagers.getOzoneManager();
     metadataManager = omTestManagers.getMetadataManager();
+  }
+
+  private static OmDirectoryInfo dirInfoWithName(String name) {
+    return OmDirectoryInfo.newBuilder().setName(name)
+        .setObjectID(Math.abs((long) name.hashCode()) + 1).setParentObjectID(1L).build();
+  }
+
+  @Test
+  void testDirectoryListSortByName() {
+    KeyLifecycleService.DirectoryList list = new KeyLifecycleService.DirectoryList();
+    // Add children out of order, as a cache-resident dir (lower name) followed by table siblings would.
+    list.addSubDir("keyC", dirInfoWithName("dirC"), "root/dirC");
+    list.addSubDir("keyA", dirInfoWithName("dirA"), "root/dirA");
+    list.addSubDir("keyB", dirInfoWithName("dirB"), "root/dirB");
+
+    list.sortByName();
+
+    // Ascending name order means the LIFO stack pops siblings in strictly descending name order,
+    // which is the property canSkipDir depends on when deciding a resumed directory was already scanned.
+    assertThat(list.getSubDirList())
+        .extracting(OmDirectoryInfo::getName)
+        .containsExactly("dirA", "dirB", "dirC");
+    // Parallel key list must remain index-aligned with the sorted directories.
+    assertThat(list.getSubDirKeyList()).containsExactly("keyA", "keyB", "keyC");
+  }
+
+  @Test
+  void testDirectoryListRemoveIf() {
+    KeyLifecycleService.DirectoryList list = new KeyLifecycleService.DirectoryList();
+    list.addSubDir("keyA", dirInfoWithName("dirA"), "root/dirA");
+    list.addSubDir("keyB", dirInfoWithName("dirB"), "root/dirB");
+    list.addSubDir("keyC", dirInfoWithName("dirC"), "root/dirC");
+
+    // Remove first and last (multiple backward removals), as prefix filtering might.
+    list.removeIf(i -> i == 0 || i == 2);
+
+    assertThat(list.getSubDirCount()).isEqualTo(1);
+    assertThat(list.getSubDirList()).hasSize(1);
+    assertThat(list.getSubDirKeyList()).hasSize(1);
+    assertThat(list.getSubDirList().get(0).getName()).isEqualTo("dirB");
+    assertThat(list.getSubDirKeyList().get(0)).isEqualTo("keyB");
+    assertThat(list.getLastSubDirPath()).isEqualTo("root/dirB");
   }
 
   /**

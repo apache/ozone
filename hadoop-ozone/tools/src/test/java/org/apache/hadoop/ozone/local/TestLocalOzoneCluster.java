@@ -499,6 +499,25 @@ class TestLocalOzoneCluster {
   }
 
   @Test
+  void prepareConfigurationBracketsIpv6Host() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(tempDir.resolve("local-ozone"))
+        .setHost("::1")
+        .setScmPort(9860)
+        .setOmPort(9862)
+        .setReconEnabled(true)
+        .setReconPort(9888)
+        .build();
+
+    try (LocalOzoneCluster cluster = newCluster(config)) {
+      OzoneConfiguration conf = cluster.prepareConfiguration().getConfiguration();
+
+      assertEquals("[::1]:9860", conf.get(OZONE_SCM_CLIENT_ADDRESS_KEY));
+      assertEquals("[::1]:9862", conf.get(OZONE_OM_ADDRESS_KEY));
+      assertEquals("http://[::1]:9888", cluster.getReconEndpoint());
+    }
+  }
+
+  @Test
   void prepareConfigurationSkipsReconWhenDisabled() throws Exception {
     Path dataDir = tempDir.resolve("local-ozone");
     LocalOzoneClusterConfig config =
