@@ -97,6 +97,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -924,6 +925,12 @@ public abstract class EndpointBase {
     boolean verifyChunkSignature = signatureInfo.isSignPayload()
         && (STREAMING_AWS4_HMAC_SHA256_PAYLOAD.equals(amzContentSha256Header)
         || STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(amzContentSha256Header));
+    if (verifyChunkSignature && OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())
+        && !OzoneManagerVersion.S3_DERIVED_KEY.isSupportedBy(getClientProtocol().getOmVersion())) {
+      OS3Exception ex = newError(S3ErrorTable.NOT_IMPLEMENTED, keyPath);
+      ex.setErrorMessage("The connected Ozone Manager does not support signed chunk verification.");
+      throw ex;
+    }
     return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength, verifyChunkSignature);
   }
 
@@ -932,7 +939,7 @@ public abstract class EndpointBase {
    * the signing key OM derived (HDDS-15140). Called after the key is opened
    * (when the derived key is available) and before the payload is read.
    *
-   * <p>In secure mode OM always returns the derived key for a signed upload, so
+   * <p>In secure mode a supporting OM returns the derived key for a signed upload, so
    * a missing key is treated as a server-side anomaly and the request is
    * rejected rather than stored unverified. In non-secure mode there is no
    * secret to verify against, so verification is skipped.

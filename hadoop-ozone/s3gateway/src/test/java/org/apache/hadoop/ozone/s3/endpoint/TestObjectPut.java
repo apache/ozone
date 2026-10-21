@@ -58,7 +58,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.anyMap;
+import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -94,6 +98,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneBucketStub;
@@ -399,6 +404,36 @@ class TestObjectPut {
     assertErrorResponse(S3ErrorTable.INTERNAL_ERROR, () -> putObject(signedChunkedBody("")));
 
     assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testPutObjectRejectsUnsupportedOmBeforeOpeningKey(boolean datastream) throws Exception {
+    objectEndpoint.getOzoneConfiguration().setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
+    configureSignedChunkHeaders(CONTENT.length());
+    doReturn(datastream).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    OzoneClient client = spy(objectEndpoint.getClient());
+    ClientProtocol protocol = spy(client.getProxy());
+    when(protocol.getOmVersion()).thenReturn(OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS);
+    doReturn(protocol).when(client).getProxy();
+    objectEndpoint.setClient(client);
+    // Rebuild the handler chain to use the spied endpoint and client.
+    objectEndpoint.init();
+    byte[] payload = signedChunkedBody(CONTENT).getBytes(StandardCharsets.UTF_8);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH)).thenReturn(String.valueOf(payload.length));
+    when(objectEndpoint.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+
+    try (MockedStatic<ObjectEndpointStreaming> streaming = mockStatic(ObjectEndpointStreaming.class);
+         ByteArrayInputStream body = new ByteArrayInputStream(payload)) {
+      assertErrorResponse(S3ErrorTable.NOT_IMPLEMENTED, () -> objectEndpoint.put(BUCKET_NAME, KEY_NAME, body));
+      assertThat(body.available()).isEqualTo(payload.length);
+      verify(protocol).getOmVersion();
+      verify(protocol, never()).createKey(anyString(), anyString(), anyString(), anyLong(), any(), anyMap(), anyMap(),
+          anyBoolean());
+      streaming.verifyNoInteractions();
+      assertKeyWasNotCommitted();
+    }
   }
 
   @Test
@@ -981,6 +1016,22 @@ class TestObjectPut {
   }
 
   @Test
+  void testCopyObjectWithDestinationIfNoneMatchETag() throws Exception {
+    String etag = putObject(CONTENT).getHeaderString(HttpHeaders.ETAG);
+    when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(BUCKET_NAME + "/" + urlEncode(KEY_NAME));
+    when(headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER)).thenReturn(etag);
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+
+    when(headers.getHeaderString(S3Consts.IF_NONE_MATCH_HEADER)).thenReturn("\"different-etag\"");
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
+    assertKeyContent(destBucket, DEST_KEY, CONTENT);
+  }
+
+  @Test
   void testCopyObjectWithDestinationIfMatchSuccess() throws Exception {
     assertSucceeds(() -> putObject(CONTENT));
 
@@ -1245,14 +1296,40 @@ class TestObjectPut {
     assertThat(ex.getErrorMessage()).contains("If-Match header cannot be empty");
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testIfNoneMatchETagMatchesPreconditionFailed(boolean quoted) throws Exception {
+    String etag = putObject(CONTENT).getHeaderString(HttpHeaders.ETAG);
+    when(headers.getHeaderString("If-None-Match")).thenReturn(quoted ? etag : parseETag(etag));
+
+    assertErrorResponse(S3ErrorTable.PRECOND_FAILED, () -> putObject("new-content"));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
+  }
+
   @Test
-  void testIfNoneMatchNotStarInvalidRequest() throws Exception {
+  void testIfNoneMatchETagMismatchSuccess() throws Exception {
+    putObject(CONTENT);
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"different-etag\"");
+
+    assertSucceeds(() -> putObject("new-content"));
+    assertKeyContent(bucket, KEY_NAME, "new-content");
+  }
+
+  @Test
+  void testIfNoneMatchETagKeyAbsentSuccess() throws Exception {
     when(headers.getHeaderString("If-None-Match")).thenReturn("\"etag\"");
 
-    OS3Exception ex = assertErrorResponse(
-        INVALID_REQUEST, () -> putObject(CONTENT));
-    assertThat(ex.getErrorMessage()).contains(
-        "Only If-None-Match: * is supported");
+    assertSucceeds(() -> putObject(CONTENT));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
+  }
+
+  @Test
+  void testIfNoneMatchETagKeyWithoutETagSuccess() throws Exception {
+    createSourceKeyWithETag(KEY_NAME, null);
+    when(headers.getHeaderString("If-None-Match")).thenReturn("\"etag\"");
+
+    assertSucceeds(() -> putObject("new-content"));
+    assertKeyContent(bucket, KEY_NAME, "new-content");
   }
 
   @Test

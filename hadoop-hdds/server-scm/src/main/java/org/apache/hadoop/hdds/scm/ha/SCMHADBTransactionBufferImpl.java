@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -193,6 +194,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
   private void flushUnderWriteLock()
       throws RocksDatabaseException, CodecException {
+    final long startNanos = Time.monotonicNowNanos();
     // write latest trx info into trx table in the same batch
     Table<String, TransactionInfo> transactionInfoTable
         = metadataStore.getTransactionInfoTable();
@@ -213,6 +215,7 @@ public class SCMHADBTransactionBufferImpl implements SCMHADBTransactionBuffer {
 
     txFlushPending.set(0);
     lastSnapshotTimeMs = scm.getSystemClock().millis();
+    scm.getPerfMetrics().updateFlushTransactionBufferLatencyNs(startNanos);
   }
 
   @Override

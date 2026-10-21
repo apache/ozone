@@ -1,9 +1,10 @@
 ---
+title: Zero Downtime Upgrade (ZDU)
+summary: Upgrade the software of a running Ozone cluster without downtime
+date: 2026-01-23
 jira: HDDS-14496
-authors:
-- Stephen O'Donnell
-- Ethan Rose
-- Istvan Fajth
+status: accepted
+author: Stephen O'Donnell, Ethan Rose, Istvan Fajth
 ---
 
 <!--
