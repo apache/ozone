@@ -185,10 +185,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             " considered as Unix Paths. Path has Violated FS Semantics " +
             "which caused put operation to fail.");
         throw os3Exception;
-      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
-          && getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER) != null) {
-        // If-Match failed because the key doesn't exist
-        throw newError(PRECOND_FAILED, keyPath, ex);
       }
 
       throw newError(bucketName, keyPath, ex);
@@ -888,9 +884,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           || ex.getResult() == ResultCodes.ETAG_MISMATCH
           || ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
         throw newError(PRECOND_FAILED, key, ex);
-      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
-          && writeConditions.hasIfMatch()) {
-        throw newError(PRECOND_FAILED, key, ex);
       }
       throw newError(bucket, key, ex);
     } catch (Exception ex) {
@@ -1183,6 +1176,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
     String sourceBucket = result.getLeft();
     String sourceKey = result.getRight();
+    String keyForError = sourceKey;
     final MessageDigest md5Digest = getMD5DigestInstance();
 
     if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
@@ -1285,6 +1279,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           // Nothing reads the digest in this case, so do not hash the copied bytes at all.
           sourceDigestInputStream.on(false);
         }
+        keyForError = destkey;
         final CopyResult copyResult = runWithS3ActionString("PutObject", () ->
             copy(volume, sourceDigestInputStream, reusedETag, sourceKeyLen, destkey, destinationBucket,
               replicationConfig, customMetadata, perf, startNanos, tags, writeConditions));
@@ -1297,10 +1292,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
-        if (getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER) != null) {
-          throw newError(PRECOND_FAILED, destkey, ex);
-        }
-        throw newError(S3ErrorTable.NO_SUCH_KEY, sourceKey, ex);
+        throw newError(S3ErrorTable.NO_SUCH_KEY, keyForError, ex);
       } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, sourceBucket, ex);
       } else if (ex.getResult() == ResultCodes.ATOMIC_WRITE_CONFLICT
