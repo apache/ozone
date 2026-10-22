@@ -399,6 +399,17 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    * @return delay in milliseconds
    */
   public synchronized long getWaitTime() {
+    // OMs are being contacted in Round Robin way. If all the OMs have been
+    // contacted once in this attempt, clear the list. The OMs will be retried
+    // in a Round Robin fashion again after a fixed delay. This is checked first
+    // because with a single OM, Round Robin selects the same OM again, which is
+    // not a retry on the same OM based on response from OM.
+    if (attemptedOMs.containsAll(omProxies.getNodeIds())) {
+      attemptedOMs.clear();
+      numAttemptsOnSameOM = 0;
+      return waitBetweenRetries;
+    }
+
     if (omProxies.getNodeId(nextProxyIndex).equals(lastAttemptedOM)) {
       // Clear attemptedOMs list as the same OM has been selected again.
       attemptedOMs.clear();
@@ -409,19 +420,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     }
     // Reset numAttemptsOnSameOM as we failed over to a different OM.
     numAttemptsOnSameOM = 0;
-
-    // OMs are being contacted in Round Robin way. Check if all the OMs have
-    // been contacted in this attempt.
-    for (String omNodeID : omProxies.getNodeIds()) {
-      if (!attemptedOMs.contains(omNodeID)) {
-        return 0;
-      }
-    }
-    // This implies all the OMs have been contacted once. Return true and
-    // clear the list. The OMs will be retried in a Round Robin fashion again
-    // after a delay.
-    attemptedOMs.clear();
-    return waitBetweenRetries;
+    return 0;
   }
 
   public List<OMProxyInfo<T>> getOMProxies() {
