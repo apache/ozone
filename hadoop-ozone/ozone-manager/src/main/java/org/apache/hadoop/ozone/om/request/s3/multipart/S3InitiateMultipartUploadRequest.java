@@ -92,27 +92,29 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
 
-    final OmBucketInfo bucketInfo = ozoneManager
-        .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
-
     KeyArgs.Builder newKeyArgs = keyArgs.toBuilder()
             .setMultipartUploadID(
                 OMMultipartUploadUtils.getMultipartUploadId())
             .setModificationTime(Time.now())
             .setKeyName(keyPath);
 
+    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
+
+    final KeyArgs.Builder resolvedArgsBuilder = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
+        ozoneManager, ACLType.CREATE).toBuilder();
+
     // Stamp the policy only once finalized: an OM without storage policy support ignores the field, so stamping it
     // earlier would make old and new OMs apply this request differently. Clearing also drops a client-sent value.
     if (ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.STORAGE_POLICY_SUPPORT)) {
-      newKeyArgs.setStoragePolicy(OzoneStoragePolicy.toProto(getStoragePolicy(bucketInfo, keyArgs)));
+      // Read the bucket the link resolves to straight from the metadata manager. ozoneManager.getBucketInfo would
+      // also require READ on the bucket, which creating an upload does not need.
+      final OmBucketInfo bucketInfo = getBucketInfo(ozoneManager.getMetadataManager(),
+          resolvedArgsBuilder.getVolumeName(), resolvedArgsBuilder.getBucketName());
+      resolvedArgsBuilder.setStoragePolicy(OzoneStoragePolicy.toProto(getStoragePolicy(bucketInfo, keyArgs)));
     } else {
-      newKeyArgs.clearStoragePolicy();
+      resolvedArgsBuilder.clearStoragePolicy();
     }
-
-    generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
-
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
-        ozoneManager, ACLType.CREATE);
+    final KeyArgs resolvedArgs = resolvedArgsBuilder.build();
     int schemaVersion = resolveMultipartSchemaVersion(ozoneManager);
     MultipartInfoInitiateRequest.Builder requestBuilder =
         multipartInfoInitiateRequest.toBuilder()

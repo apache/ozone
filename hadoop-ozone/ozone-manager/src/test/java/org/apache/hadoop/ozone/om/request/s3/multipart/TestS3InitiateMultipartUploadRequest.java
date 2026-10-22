@@ -22,6 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -35,6 +38,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -280,13 +284,7 @@ public class TestS3InitiateMultipartUploadRequest
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, getBucketLayout());
-    when(ozoneManager.getBucketInfo(volumeName, bucketName)).thenReturn(OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setStoragePolicy(OzoneStoragePolicy.COLD)
-        .build());
+    addVolumeAndBucketWithPolicy(volumeName, bucketName, OzoneStoragePolicy.COLD);
 
     OMRequest clientRequest = OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName, keyName,
         Collections.emptyMap(), Collections.emptyMap(), OzoneStoragePolicy.HOT);
@@ -307,6 +305,41 @@ public class TestS3InitiateMultipartUploadRequest
   }
 
   /**
+   * Creating an upload needs CREATE on the key, not READ on the bucket. ozoneManager.getBucketInfo checks READ, so
+   * the bucket policy must be read without it.
+   */
+  @Test
+  public void testPreExecuteDoesNotRequireReadAccessOnBucket() throws Exception {
+    finalizeStoragePolicySupport();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    addVolumeAndBucketWithPolicy(volumeName, bucketName, OzoneStoragePolicy.COLD);
+    when(ozoneManager.getBucketInfo(anyString(), anyString()))
+        .thenThrow(new OMException("No READ access on the bucket", OMException.ResultCodes.PERMISSION_DENIED));
+
+    OMRequest clientRequest = OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName,
+        UUID.randomUUID().toString(), Collections.emptyMap(), Collections.emptyMap(), null);
+    OMRequest preExecuted = getS3InitiateMultipartUploadReq(clientRequest).preExecute(ozoneManager);
+
+    assertThat(preExecuted.getInitiateMultiPartUploadRequest().getKeyArgs().getStoragePolicy())
+        .isEqualTo(OzoneStoragePolicy.toProto(OzoneStoragePolicy.COLD));
+    verify(ozoneManager, never()).getBucketInfo(anyString(), anyString());
+  }
+
+  /** Adds the bucket with {@code storagePolicy}, or without a policy if null. */
+  private void addVolumeAndBucketWithPolicy(String volumeName, String bucketName, StoragePolicy storagePolicy)
+      throws Exception {
+    OmBucketInfo.Builder bucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setBucketLayout(getBucketLayout());
+    if (storagePolicy != null) {
+      bucketInfo.setStoragePolicy(storagePolicy);
+    }
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager, bucketInfo);
+  }
+
+  /**
    * Initiates an upload on a bucket with {@code bucketPolicy} (none if null), asking for
    * {@code requestedPolicy} (none if null), and checks that {@code expectedPolicy} is stamped on the
    * request and stored on both the multipart info and the open key.
@@ -317,15 +350,7 @@ public class TestS3InitiateMultipartUploadRequest
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
     String keyName = UUID.randomUUID().toString();
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
-        omMetadataManager, getBucketLayout());
-    OmBucketInfo.Builder bucketInfo = OmBucketInfo.newBuilder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName);
-    if (bucketPolicy != null) {
-      bucketInfo.setStoragePolicy(bucketPolicy);
-    }
-    when(ozoneManager.getBucketInfo(volumeName, bucketName)).thenReturn(bucketInfo.build());
+    addVolumeAndBucketWithPolicy(volumeName, bucketName, bucketPolicy);
 
     OMRequest clientRequest = OMRequestTestUtils.createInitiateMPURequest(volumeName, bucketName, keyName,
         Collections.emptyMap(), Collections.emptyMap(), requestedPolicy);
