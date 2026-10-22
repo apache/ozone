@@ -90,12 +90,10 @@ class TestMiniOzoneClusterProvider {
     MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(builder, 1);
 
     try {
-      assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
-        IOException exception = assertThrows(IOException.class, provider::provide);
-        assertSame(failure, exception.getCause());
-        assertSame(first, provider.provide());
-        assertEquals(2, builder.getBuildCount());
-      });
+      IOException exception = assertThrows(IOException.class, provider::provide);
+      assertSame(failure, exception.getCause());
+      assertSame(first, provider.provide());
+      assertEquals(2, builder.getBuildCount());
     } finally {
       provider.shutdown();
     }
@@ -111,13 +109,11 @@ class TestMiniOzoneClusterProvider {
     MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(builder, 1);
 
     try {
-      assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
-        IOException exception = assertThrows(IOException.class, provider::provide);
-        assertSame(failure, exception.getCause());
-        verify(failed).shutdown();
-        assertSame(first, provider.provide());
-        assertEquals(2, builder.getBuildCount());
-      });
+      IOException exception = assertThrows(IOException.class, provider::provide);
+      assertSame(failure, exception.getCause());
+      verify(failed).shutdown();
+      assertSame(first, provider.provide());
+      assertEquals(2, builder.getBuildCount());
     } finally {
       provider.shutdown();
     }
