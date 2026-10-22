@@ -140,7 +140,7 @@ public class XceiverClientShortCircuit extends XceiverClientSpi {
     domainSocket = domainSocketFactory.createSocket(readTimeoutMs, writeTimeoutMs, dnAddr);
     isDomainSocketOpen.set(true);
     prefix = XceiverClientShortCircuit.class.getSimpleName() + "-" + domainSocket.toString();
-    timer = new Timer(prefix + "-Timer");
+    timer = new Timer(prefix + "-Timer", true);
     readDaemon.start();
     LOG.info("{} is started", prefix);
   }
