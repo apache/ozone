@@ -239,10 +239,10 @@ public class TestDecommissionAndMaintenance {
     waitForContainerReplicas(ecContainer, 5);
 
     cluster.restartHddsDatanode(dnIndex, true);
-    scmClient.recommissionNodes(Arrays.asList(
-        getDNHostAndPort(toDecommission)));
-    waitForDnToReachOpState(nm, toDecommission, IN_SERVICE);
-    waitForDnToReachPersistedOpState(nm.getNode(dnID), IN_SERVICE);
+    DatanodeDetails newDn = nm.getNode(dnID);
+    scmClient.recommissionNodes(Arrays.asList(getDNHostAndPort(newDn)));
+    waitForDnToReachOpState(nm, newDn, IN_SERVICE);
+    waitForDnToReachPersistedOpState(newDn, IN_SERVICE);
   }
 
   @Test
