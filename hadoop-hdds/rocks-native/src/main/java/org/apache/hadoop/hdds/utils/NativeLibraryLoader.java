@@ -165,12 +165,22 @@ public class NativeLibraryLoader {
       }
 
       final String nativeLibDir = getSystemProperty(NATIVE_LIB_TMP_DIR);
+      final boolean useWorkingDir = nativeLibDir == null || nativeLibDir.isEmpty();
+      final File dir = new File(useWorkingDir ? getSystemProperty("user.dir") : nativeLibDir).getAbsoluteFile();
 
-      // create a temporary dir to copy the library to, under java.io.tmpdir unless NATIVE_LIB_TMP_DIR is set,
-      // since the working directory may not be writable.
-      final Path tempPath = nativeLibDir == null || nativeLibDir.isEmpty()
-          ? Files.createTempDirectory(libraryName)
-          : Files.createTempDirectory(new File(nativeLibDir).getAbsoluteFile().toPath(), libraryName);
+      // create a temporary dir to copy the library to
+      Path tempPath;
+      try {
+        tempPath = Files.createTempDirectory(dir.toPath(), libraryName);
+      } catch (IOException e) {
+        if (!useWorkingDir) {
+          throw e;
+        }
+        // The working directory may not be writable, fall back to java.io.tmpdir.
+        LOG.info("Unable to extract {} under working directory {}, using java.io.tmpdir instead: {}",
+            libraryName, dir, e.toString());
+        tempPath = Files.createTempDirectory(libraryName);
+      }
       final File tempDir = tempPath.toFile();
       if (!tempDir.exists()) {
         return Pair.of(Optional.empty(), null);

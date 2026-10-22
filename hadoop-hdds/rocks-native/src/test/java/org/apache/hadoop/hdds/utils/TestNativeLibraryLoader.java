@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.same;
 
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
 
@@ -54,6 +56,19 @@ public class TestNativeLibraryLoader {
 
   private static Stream<String> nativeLibraryDirectoryLocations() {
     return Stream.of("", tempDir.toAbsolutePath().toString(), null);
+  }
+
+  private static Stream<Arguments> dummyLibraryLocations() {
+    String workingDir = System.getProperty("user.dir");
+    // A regular file cannot be used as a parent directory, so extraction under it fails.
+    String unwritableDir = tempDir.resolve("not-a-dir").toAbsolutePath().toString();
+    String javaTmpDir = System.getProperty("java.io.tmpdir");
+    return Stream.of(
+        Arguments.of("", workingDir, workingDir),
+        Arguments.of(null, workingDir, workingDir),
+        Arguments.of(tempDir.toAbsolutePath().toString(), workingDir, tempDir.toAbsolutePath().toString()),
+        Arguments.of(null, unwritableDir, javaTmpDir),
+        Arguments.of("", unwritableDir, javaTmpDir));
   }
 
   @EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
@@ -73,14 +88,17 @@ public class TestNativeLibraryLoader {
   }
 
   @ParameterizedTest
-  @MethodSource("nativeLibraryDirectoryLocations")
-  public void testDummyLibrary(String nativeLibraryDirectoryLocation) {
+  @MethodSource("dummyLibraryLocations")
+  public void testDummyLibrary(String nativeLibraryDirectoryLocation, String workingDir, String expectedDir)
+      throws Exception {
     Map<String, Boolean> libraryLoadedMap = new HashMap<>();
     NativeLibraryLoader loader = new NativeLibraryLoader(libraryLoadedMap);
     try (MockedStatic<NativeLibraryLoader> mockedNativeLibraryLoader = mockStatic(NativeLibraryLoader.class,
         CALLS_REAL_METHODS)) {
       mockedNativeLibraryLoader.when(() -> NativeLibraryLoader.getSystemProperty(same(NATIVE_LIB_TMP_DIR)))
           .thenReturn(nativeLibraryDirectoryLocation);
+      mockedNativeLibraryLoader.when(() -> NativeLibraryLoader.getSystemProperty(eq("user.dir")))
+          .thenReturn(workingDir);
       mockedNativeLibraryLoader.when(NativeLibraryLoader::getInstance).thenReturn(loader);
       // Mocking to force copy random bytes to create a lib file to
       // nativeLibraryDirectoryLocation. But load library will fail.
@@ -88,10 +106,8 @@ public class TestNativeLibraryLoader {
           .thenReturn(new ByteArrayInputStream(new byte[]{0, 1, 2, 3}));
       String dummyLibraryName = "dummy_lib";
       List<String> dependencies = Arrays.asList("dep1", "dep2");
-      // Without NATIVE_LIB_TMP_DIR the library goes to java.io.tmpdir, not the working directory.
-      File absDir = nativeLibraryDirectoryLocation == null || nativeLibraryDirectoryLocation.isEmpty()
-          ? new File(System.getProperty("java.io.tmpdir")).getAbsoluteFile()
-          : new File(nativeLibraryDirectoryLocation).getAbsoluteFile();
+      FileUtils.touch(tempDir.resolve("not-a-dir").toFile());
+      File absDir = new File(expectedDir).getAbsoluteFile();
 
       NativeLibraryLoader.getInstance().loadLibrary(dummyLibraryName, dependencies);
 
