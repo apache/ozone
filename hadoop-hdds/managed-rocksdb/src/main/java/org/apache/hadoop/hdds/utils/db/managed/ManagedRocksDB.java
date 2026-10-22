@@ -168,7 +168,10 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
    * Open a RocksDB option with the latest options. Other than {@link ManagedConfigOptions} and
    * path, the other options and handles should be empty since it will be populated with
    * loadLatestOptions. Nevertheless, the caller is still responsible in cleaning up / closing the resources.
-   * @param configOptions Config options.
+   * <p>
+   * Unknown options are ignored if the OPTIONS file was written by a newer RocksDB version, e.g. after a downgrade.
+   * RocksDB still rejects unknown options in OPTIONS files written by the same or an older version.
+   * @param configOptions Config options. {@code ignore_unknown_options} is set to true.
    * @param options DBOptions. This would be modified based on the latest options.
    * @param path DB path.
    * @param columnFamilyDescriptors Column family descriptors. These would be modified based on the latest options.
@@ -182,6 +185,7 @@ public class ManagedRocksDB extends ManagedObject<RocksDB> {
       final List<ColumnFamilyDescriptor> columnFamilyDescriptors,
       final List<ColumnFamilyHandle> columnFamilyHandles)
       throws RocksDBException {
+    configOptions.setIgnoreUnknownOptions(true);
     // Preserve all the previous DB options
     OptionsUtil.loadLatestOptions(configOptions, path, options, columnFamilyDescriptors);
     return new ManagedRocksDB(
