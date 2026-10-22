@@ -79,6 +79,15 @@ public abstract class XceiverClientSpi implements Closeable {
     cleanup();
   }
 
+  /**
+   * Like {@link #setEvicted()}, but leaves closing the client to the caller.
+   * @return true if the caller must close it now; false if it is still referenced and closes on its last release
+   */
+  boolean setEvictedWithoutClose() {
+    isEvicted = true;
+    return referenceCount.get() == 0;
+  }
+
   // close the xceiverClient only if,
   // 1) there is no refcount on the client
   // 2) it has been evicted from the cache.

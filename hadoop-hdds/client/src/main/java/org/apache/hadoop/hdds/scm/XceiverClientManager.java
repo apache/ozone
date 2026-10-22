@@ -29,10 +29,16 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.Config;
@@ -71,6 +77,8 @@ public class XceiverClientManager extends XceiverClientCreator {
   private final CacheMetrics cacheMetrics;
   private static XceiverClientMetrics metrics;
   private final ConcurrentHashMap<String, DatanodeDetails> localDNCache;
+  /** Unreferenced clients evicted by {@link #close()}, to be closed by it; guarded by {@link #clientCache}. */
+  private List<XceiverClientSpi> clientsToClose;
 
   /**
    * Creates a new XceiverClientManager for non secured ozone cluster.
@@ -104,7 +112,12 @@ public class XceiverClientManager extends XceiverClientCreator {
               synchronized (clientCache) {
                 // Mark the entry as evicted
                 XceiverClientSpi info = removalNotification.getValue();
-                info.setEvicted();
+                if (clientsToClose == null) {
+                  info.setEvicted();
+                } else if (info.setEvictedWithoutClose()) {
+                  // close() of this manager closes them in parallel
+                  clientsToClose.add(info);
+                }
               }
             }
           }).build();
@@ -276,9 +289,18 @@ public class XceiverClientManager extends XceiverClientCreator {
   @Override
   public void close() {
     super.close();
-    //closing is done through RemovalListener
-    clientCache.invalidateAll();
-    clientCache.cleanUp();
+    final List<XceiverClientSpi> unreferenced = new ArrayList<>();
+    synchronized (clientCache) {
+      // the RemovalListener collects the unreferenced clients instead of closing them one by one
+      clientsToClose = unreferenced;
+      try {
+        clientCache.invalidateAll();
+        clientCache.cleanUp();
+      } finally {
+        clientsToClose = null;
+      }
+    }
+    closeInParallel(unreferenced);
     if (LOG.isDebugEnabled()) {
       LOG.debug("XceiverClient cache stats: {}", clientCache.stats());
     }
@@ -287,6 +309,35 @@ public class XceiverClientManager extends XceiverClientCreator {
 
     if (metrics != null) {
       metrics.unRegister();
+    }
+  }
+
+  /**
+   * Close the clients concurrently. Closing a Ratis client can wait seconds for its gRPC channels to shut down
+   * gracefully, and closing the clients one after another adds those waits up (HDDS-15255).
+   */
+  private static void closeInParallel(List<XceiverClientSpi> clients) {
+    if (clients.size() <= 1) {
+      clients.forEach(XceiverClientManager::closeClient);
+      return;
+    }
+    // one thread per client, so all the waits overlap; the cache size bounds the number of clients
+    final ExecutorService executor = Executors.newFixedThreadPool(clients.size(),
+        new ThreadFactoryBuilder().setNameFormat("XceiverClientManager-close-%d").setDaemon(true).build());
+    try {
+      CompletableFuture.allOf(clients.stream()
+          .map(client -> CompletableFuture.runAsync(() -> closeClient(client), executor))
+          .toArray(CompletableFuture[]::new)).join();
+    } finally {
+      executor.shutdown();
+    }
+  }
+
+  private static void closeClient(XceiverClientSpi client) {
+    try {
+      client.close();
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to close {}", client, e);
     }
   }
 
