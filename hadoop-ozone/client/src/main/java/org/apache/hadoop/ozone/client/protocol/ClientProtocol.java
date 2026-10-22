@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.CallerIdentityInfo;
 import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -358,6 +359,18 @@ public interface ClientProtocol {
                                 String prevBucket, int maxListResult,
                                 boolean hasSnapshot)
       throws IOException;
+
+  /** Creates a key if its current ETag differs, or if the key is absent. */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneOutputStream createKeyIfNoneMatch(String volumeName, String bucketName, String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException;
+
+  /** Creates a stream key if its current ETag differs, or if the key is absent. */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneDataStreamOutput createStreamKeyIfNoneMatch(String volumeName, String bucketName, String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException;
 
   /**
    * Writes a key in an existing bucket.
@@ -873,6 +886,12 @@ public interface ClientProtocol {
       Map<Integer, String> partsMap,
       Long expectedDataGeneration, String expectedETag) throws IOException;
 
+  /** Completes a multipart upload with an additional If-None-Match entity ETag condition. */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
+      String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
+      String excludedETag) throws IOException;
+
   /**
    * Abort Multipart upload request for the given key with given uploadID.
    * @param volumeName
@@ -883,6 +902,9 @@ public interface ClientProtocol {
    */
   void abortMultipartUpload(String volumeName,
       String bucketName, String keyName, String uploadID) throws IOException;
+
+  /** Abort a multipart upload in S3 volume context. */
+  void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException;
 
   /**
    * Returns list of parts of a multipart upload key.
@@ -1160,6 +1182,17 @@ public interface ClientProtocol {
       String keyName) throws IOException;
 
   /**
+   * Creates an input stream for reading file contents, like
+   * {@link #readFile(String, String, String)}.
+   *
+   * @param requireFileSystemLayout if true, OM rejects the read with
+   *     NOT_SUPPORTED_OPERATION if the resolved bucket layout is OBJECT_STORE.
+   *     An OM older than OzoneManagerVersion.GET_KEY_INFO_REJECTS_OBS ignores it.
+   */
+  OzoneInputStream readFile(String volumeName, String bucketName,
+      String keyName, boolean requireFileSystemLayout) throws IOException;
+
+  /**
    * Creates an output stream for writing to a file.
    *
    * @param volumeName Volume name
@@ -1273,6 +1306,24 @@ public interface ClientProtocol {
    */
   List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
       throws IOException;
+
+  /**
+   * Like {@link #listStatus(ListStatusLightOptions)}, but also returns whether OM reported that no entries
+   * follow this page.
+   */
+  default ListStatusResult<OzoneFileStatus> listStatusPage(ListStatusLightOptions options)
+      throws IOException {
+    return ListStatusResult.unknown(listStatus(options));
+  }
+
+  /**
+   * Like {@link #listStatusLight(ListStatusLightOptions)}, but also returns whether OM reported that no
+   * entries follow this page.
+   */
+  default ListStatusResult<OzoneFileStatusLight> listStatusLightPage(ListStatusLightOptions options)
+      throws IOException {
+    return ListStatusResult.unknown(listStatusLight(options));
+  }
 
   /**
    * Lightweight listStatus API (convenience overload without listPrefix).

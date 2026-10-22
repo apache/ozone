@@ -650,6 +650,21 @@ class TestSnapshotCache {
   }
 
   @Test
+  @DisplayName("get() surfaces a retriable load TIMEOUT as OMException, not IllegalStateException")
+  void testGetPropagatesLoadTimeout() throws Exception {
+    clearInvocations(lock);
+    final UUID snapshotId = UUID.randomUUID();
+    when(cacheLoader.load(eq(snapshotId)))
+        .thenThrow(new OMException("snapshot has not been flushed yet", OMException.ResultCodes.TIMEOUT));
+
+    final OMException thrown = assertThrows(OMException.class, () -> snapshotCache.get(snapshotId));
+    assertEquals(OMException.ResultCodes.TIMEOUT, thrown.getResult());
+    assertFalse(snapshotCache.getDbMap().containsKey(snapshotId));
+    verify(lock, times(1)).acquireReadLock(eq(SNAPSHOT_DB_LOCK), eq(snapshotId.toString()));
+    verify(lock, times(1)).releaseReadLock(eq(SNAPSHOT_DB_LOCK), eq(snapshotId.toString()));
+  }
+
+  @Test
   @DisplayName("lock supplier releases write lock if cleanup throws an exception")
   void testLockSupplierReleasesWriteLockOnCleanupException() throws Exception {
     IOzoneManagerLock acquiringLock = newAcquiringLock();

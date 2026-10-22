@@ -21,10 +21,13 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.SIGNATURE_DOES_N
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Locale;
+import org.apache.hadoop.ozone.om.AWSV4AuthValidator;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
@@ -184,6 +187,27 @@ class TestChunksValidator {
     assertDoesNotThrow(() -> correct.validateChunk(CHUNK1_SIGNATURE, sha65536));
     assertSignatureMismatch(() -> wrongKey.validateChunk(CHUNK1_SIGNATURE, sha65536));
     assertDoesNotThrow(() -> correct.validateChunk(CHUNK2_SIGNATURE, sha1024));
+  }
+
+  @Test
+  void requestAndChunkSignaturesCanBeInterleaved() {
+    String stringToSign = "AWS4-HMAC-SHA256\n20150830T123600Z\n20150830/us-east-1/iam/aws4_request\n"
+        + "f536975d06c0309214f805bb90ccff089219ecd68b2577efef23edd43b7e1a59";
+    String requestSignature = "5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7";
+    String requestKey = "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY";
+    ChunksValidator validator = newValidator();
+    byte[] chunk1 = repeat('a', 65536);
+    byte[] chunk2 = repeat('a', 1024);
+
+    assertDoesNotThrow(() -> validator.validateChunk(CHUNK1_SIGNATURE,
+        SignatureTestUtils.sha256Hex(chunk1, 0, chunk1.length)));
+    assertTrue(AWSV4AuthValidator.validateRequest(stringToSign, requestSignature, requestKey));
+    assertDoesNotThrow(() -> validator.validateChunk(CHUNK2_SIGNATURE,
+        SignatureTestUtils.sha256Hex(chunk2, 0, chunk2.length)));
+    assertFalse(AWSV4AuthValidator.validateRequest(stringToSign, requestSignature, "wrong-secret"));
+    assertDoesNotThrow(() -> validator.validateChunk(FINAL_CHUNK_SIGNATURE,
+        SignatureTestUtils.sha256Hex(new byte[0], 0, 0)));
+    assertTrue(AWSV4AuthValidator.validateRequest(stringToSign, requestSignature, requestKey));
   }
 
   private static byte[] repeat(char c, int count) {

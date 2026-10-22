@@ -361,9 +361,9 @@ public final class OzoneTestHelper {
 
         // make sure the container gets created first
         assertFalse(isContainerClosed(cluster, containerID, details));
-        // send the order to close the container
-        scm.getEventQueue().fireEvent(SCMEvents.CLOSE_CONTAINER, ContainerID.valueOf(containerID));
       }
+      // Close only after every replica is checked: a lagging follower can apply the create and the close together.
+      scm.getEventQueue().fireEvent(SCMEvents.CLOSE_CONTAINER, ContainerID.valueOf(containerID));
     }
     int index = 0;
     for (long containerID : containerIdList) {

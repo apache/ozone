@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAnd
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_PART;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -295,6 +296,23 @@ public class TestOMFileCreateRequest extends OMKeyRequestTests {
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(BUCKET_NOT_FOUND,
         omFileCreateResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithInvalidPartNumber() throws Exception {
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    for (int partNumber : new int[] {0, -1}) {
+      OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
+          HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS, false, true);
+      CreateFileRequest createFileRequest = omRequest.getCreateFileRequest();
+      omRequest = omRequest.toBuilder().setCreateFileRequest(createFileRequest.toBuilder().setKeyArgs(
+          createFileRequest.getKeyArgs().toBuilder().setIsMultipartKey(true).setMultipartNumber(partNumber))).build();
+
+      OMRequest modifiedOmRequest = getOMFileCreateRequest(omRequest).preExecute(ozoneManager);
+      OMClientResponse response = getOMFileCreateRequest(modifiedOmRequest).validateAndUpdateCache(ozoneManager, 100L);
+      assertEquals(INVALID_PART, response.getOMResponse().getStatus());
+    }
   }
 
   @Test

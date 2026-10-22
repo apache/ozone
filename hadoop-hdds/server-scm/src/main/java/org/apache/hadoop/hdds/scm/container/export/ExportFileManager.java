@@ -78,7 +78,6 @@ final class ExportFileManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(ExportFileManager.class);
 
-  static final String EXPORT_SUBDIR = "exports";
   static final String EXPORT_JOB_DIR_PREFIX = "export_";
   static final String EXPORT_ARCHIVE_JOB_INFIX = "_job";
   static final String EXPORT_ARCHIVE_SUFFIX = ".tar.gz";
@@ -96,7 +95,7 @@ final class ExportFileManager {
 
   static String resolveExportDirectory(OzoneConfiguration conf) {
     File scmDbDir = ServerUtils.getScmDbDir(conf);
-    return new File(scmDbDir, EXPORT_SUBDIR).getAbsolutePath();
+    return new File(scmDbDir, ExportLimits.EXPORT_SUBDIR).getAbsolutePath();
   }
 
   String getExportDirectory() {

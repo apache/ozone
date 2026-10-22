@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -196,6 +197,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
         normalizeKeyArgs(bucket.update(resolvedVolumeArgs), bucket);
 
     try {
+      if (resolvedArgs.isRequireFileSystemLayout()) {
+        validateFileSystemLayout(bucket);
+      }
       if (isAclEnabled) {
         captureLatencyNs(perfMetrics.getGetKeyInfoAclCheckLatencyNs(), () ->
             checkAcls(ResourceType.KEY,
@@ -232,17 +236,22 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     }
   }
 
+  /**
+   * The number of entries listStatus and listStatusLight return at most for a request of {@code numEntries}:
+   * capped by {@code ozone.fs.listing.page.size.max} and at least 2.
+   */
+  public static long listStatusPageSize(ConfigurationSource conf, long numEntries) {
+    long maxListingPageSize = conf.getInt(OZONE_FS_LISTING_PAGE_SIZE_MAX, OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
+    return OzoneConfigUtil.limitValue(numEntries, OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
+        maxListingPageSize);
+  }
+
   @Override
   public List<OzoneFileStatus> listStatus(OmKeyArgs args, boolean recursive,
       String startKey, long numEntries, boolean allowPartialPrefixes)
       throws IOException {
 
-    long maxListingPageSize = ozoneManager.getConfiguration().getInt(
-        OZONE_FS_LISTING_PAGE_SIZE_MAX,
-        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
-    maxListingPageSize = OzoneConfigUtil.limitValue(numEntries,
-        OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
-        maxListingPageSize);
+    long maxListingPageSize = listStatusPageSize(ozoneManager.getConfiguration(), numEntries);
 
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
 
@@ -279,12 +288,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   public List<OzoneFileStatusLight> listStatusLight(OmKeyArgs args,
       boolean recursive, String startKey, long numEntries,
       boolean allowPartialPrefixes) throws IOException {
-    long maxListingPageSize = ozoneManager.getConfiguration().getInt(
-        OZONE_FS_LISTING_PAGE_SIZE_MAX,
-        OZONE_FS_LISTING_PAGE_SIZE_DEFAULT);
-    maxListingPageSize = OzoneConfigUtil.limitValue(numEntries,
-        OZONE_FS_LISTING_PAGE_SIZE, OZONE_FS_LISTING_PAGE_SIZE_MAX,
-        maxListingPageSize);
+    long maxListingPageSize = listStatusPageSize(ozoneManager.getConfiguration(), numEntries);
 
     ResolvedBucket bucket = ozoneManager.resolveBucketLink(args);
     Map<String, String> auditMap = bucket.audit(args.toAuditMap());
@@ -319,8 +323,9 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
   /**
    * Rejects file system reads on a bucket whose link-resolved layout is
    * OBJECT_STORE, so file system clients need no InfoBucket to check it.
-   * listStatus and listStatusLight call it only when the client asked for it,
-   * because they also serve object store callers (S3 shallow key listing).
+   * listStatus, listStatusLight and getKeyInfo call it only when the client
+   * asked for it, because they also serve object store callers (S3 shallow key
+   * listing, S3 GetObject and HeadObject, readKey).
    */
   private static void validateFileSystemLayout(ResolvedBucket bucket) throws OMException {
     if (bucket.bucketLayout() != null) {

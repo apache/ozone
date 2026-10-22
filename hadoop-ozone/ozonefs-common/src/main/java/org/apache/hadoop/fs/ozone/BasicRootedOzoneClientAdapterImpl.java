@@ -96,6 +96,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.ListStatusResult;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
@@ -389,6 +390,23 @@ public class BasicRootedOzoneClientAdapterImpl
         config);
     String key = ofsPath.getKeyName();
     try {
+      // An empty bucket name takes the getBucket path, which reports it as FileNotFoundException.
+      if (!ofsPath.getBucketName().isEmpty()
+          && proxy.getOmVersion().compareTo(OzoneManagerVersion.GET_KEY_INFO_REJECTS_OBS) >= 0) {
+        // Ask OM to reject an OBJECT_STORE bucket (HDDS-16948), so read without fetching the bucket first.
+        try {
+          return proxy.readFile(ofsPath.getVolumeName(), ofsPath.getBucketName(), key, true).getInputStream();
+        } catch (OMException e) {
+          if (e.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
+            // Surface it as IllegalArgumentException, matching the client-side
+            // layout check of the fallback path below.
+            throw new IllegalArgumentException(e.getMessage());
+          }
+          throw e;
+        }
+      }
+      // Older OM has no server-side OBJECT_STORE check; validate the bucket
+      // layout on the client, matching pre-HDDS-16948 behavior.
       OzoneBucket bucket = getBucket(ofsPath, false);
       return bucket.readFile(key).getInputStream();
     } catch (OMException ex) {
@@ -941,6 +959,19 @@ public class BasicRootedOzoneClientAdapterImpl
   public List<FileStatusAdapter> listStatus(String pathStr, boolean recursive,
       String startPath, long numEntries, URI uri,
       Path workingDir, String username, boolean lite) throws IOException {
+    return listStatusPage(pathStr, recursive, startPath, numEntries, uri, workingDir, username, lite)
+        .getStatuses();
+  }
+
+  /**
+   * {@link #listStatus} that also returns whether OM reported that no entries follow. Only listings inside a
+   * bucket can report it; root, volume and snapshot listings do not.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  @Override
+  public ListStatusResult<FileStatusAdapter> listStatusPage(String pathStr, boolean recursive,
+      String startPath, long numEntries, URI uri,
+      Path workingDir, String username, boolean lite) throws IOException {
 
     incrementCounter(Statistic.OBJECTS_LIST, 1);
     // Remove authority from startPath if it exists
@@ -958,19 +989,19 @@ public class BasicRootedOzoneClientAdapterImpl
 
     OFSPath ofsPath = new OFSPath(pathStr, config);
     if (ofsPath.isRoot()) {
-      return listStatusRoot(
-          recursive, startPath, numEntries, uri, workingDir, username, lite);
+      return ListStatusResult.unknown(listStatusRoot(
+          recursive, startPath, numEntries, uri, workingDir, username, lite));
     }
     OFSPath ofsStartPath = new OFSPath(startPath, config);
     if (ofsPath.isVolume()) {
       String startBucketPath = ofsStartPath.getNonKeyPath();
-      return listStatusVolume(ofsPath.getVolumeName(),
-          recursive, startBucketPath, numEntries, uri, workingDir, username, lite);
+      return ListStatusResult.unknown(listStatusVolume(ofsPath.getVolumeName(),
+          recursive, startBucketPath, numEntries, uri, workingDir, username, lite));
     }
 
     if (ofsPath.isSnapshotPath()) {
-      return listStatusBucketSnapshot(ofsPath.getVolumeName(),
-          ofsPath.getBucketName(), uri, ofsStartPath.getSnapshotName(), numEntries);
+      return ListStatusResult.unknown(listStatusBucketSnapshot(ofsPath.getVolumeName(),
+          ofsPath.getBucketName(), uri, ofsStartPath.getSnapshotName(), numEntries));
     }
     List<FileStatusAdapter> result = new ArrayList<>();
     String keyName = ofsPath.getKeyName();
@@ -979,6 +1010,7 @@ public class BasicRootedOzoneClientAdapterImpl
     try {
       List<OzoneFileStatus> statuses = Collections.emptyList();
       List<OzoneFileStatusLight> lightStatuses = Collections.emptyList();
+      boolean complete = false;
       if (proxy.getOmVersion().compareTo(OzoneManagerVersion.LIST_STATUS_REJECTS_OBS) >= 0) {
         // Ask OM to reject an OBJECT_STORE bucket (HDDS-16760), so list without
         // fetching the bucket first. The bucket is fetched only when the listing
@@ -995,9 +1027,13 @@ public class BasicRootedOzoneClientAdapterImpl
             .build();
         try {
           if (lite) {
-            lightStatuses = proxy.listStatusLight(options);
+            ListStatusResult<OzoneFileStatusLight> page = proxy.listStatusLightPage(options);
+            lightStatuses = page.getStatuses();
+            complete = page.isComplete();
           } else {
-            statuses = proxy.listStatus(options);
+            ListStatusResult<OzoneFileStatus> page = proxy.listStatusPage(options);
+            statuses = page.getStatuses();
+            complete = page.isComplete();
           }
         } catch (OMException e) {
           if (e.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION) {
@@ -1045,7 +1081,7 @@ public class BasicRootedOzoneClientAdapterImpl
         }
       }
 
-      return result;
+      return complete ? ListStatusResult.of(result, false) : ListStatusResult.unknown(result);
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
         throw new FileNotFoundException(e.getMessage());
