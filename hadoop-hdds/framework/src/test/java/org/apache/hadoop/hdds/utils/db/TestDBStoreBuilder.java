@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -41,6 +42,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.rocksdb.TableProperties;
 
 /**
  * Tests RDBStore creation.
@@ -93,19 +95,11 @@ public class TestDBStoreBuilder {
     try (RDBStore store = DBStoreBuilder.newBuilder(conf).setName("deletions.db")
         .setPath(tempDir).addTable("test").build()) {
       Table<byte[], byte[]> table = store.getTable("test");
-      for (int i = 0; i < 1000; i++) {
-        table.put(StringCodec.get().toPersistedFormat(String.format("%04d", i)), new byte[100]);
-      }
-      store.flushDB();
-      for (int i = 0; i < 750; i++) {
-        table.delete(StringCodec.get().toPersistedFormat(String.format("%04d", i)));
-      }
+      writeThenDelete(store, table);
       store.flushDB();
       GenericTestUtils.waitFor(() -> {
         try {
-          return store.getDb().getManagedRocksDb().get()
-              .getPropertiesOfAllTables(store.getDb().getColumnFamily("test").getHandle()).values().stream()
-              .mapToLong(properties -> properties.getNumDeletions()).sum() == 0;
+          return numDeletions(store) == 0;
         } catch (Exception e) {
           throw new IllegalStateException(e);
         }
@@ -133,19 +127,17 @@ public class TestDBStoreBuilder {
     try (RDBStore store = DBStoreBuilder.newBuilder(conf).setName("deletions.db")
         .setPath(tempDir).addTable("test").setProfile(DBProfile.DISK).build()) {
       Table<byte[], byte[]> table = store.getTable("test");
-      for (int i = 0; i < 1000; i++) {
-        table.put(StringCodec.get().toPersistedFormat(String.format("%04d", i)), new byte[100]);
-      }
-      store.flushDB();
-      for (int i = 0; i < 750; i++) {
-        table.delete(StringCodec.get().toPersistedFormat(String.format("%04d", i)));
-      }
+      writeThenDelete(store, table);
       // Keep the second SST's deletion ratio below 1.
       table.put(StringCodec.get().toPersistedFormat("new-key"), new byte[100]);
       store.flushDB();
-      assertEquals(750, store.getDb().getManagedRocksDb().get()
-          .getPropertiesOfAllTables(store.getDb().getColumnFamily("test").getHandle()).values().stream()
-          .mapToLong(properties -> properties.getNumDeletions()).sum());
+      assertThrows(TimeoutException.class, () -> GenericTestUtils.waitFor(() -> {
+        try {
+          return numDeletions(store) < 750;
+        } catch (Exception e) {
+          throw new IllegalStateException(e);
+        }
+      }, 100, 2000));
     }
   }
 
@@ -154,8 +146,25 @@ public class TestDBStoreBuilder {
   public void testInvalidDeletionRatio(double ratio, @TempDir Path tempDir) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setDouble("hadoop.hdds.db.rocksdb.compaction.deletion.ratio", ratio);
-    assertThrows(IllegalArgumentException.class, () -> DBStoreBuilder.newBuilder(conf)
-        .setName("deletions.db").setPath(tempDir).build());
+    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+        () -> DBStoreBuilder.newBuilder(conf).setName("deletions.db").setPath(tempDir).build());
+    assertTrue(exception.getMessage().contains("hadoop.hdds.db.rocksdb.compaction.deletion.ratio"));
+  }
+
+  private static void writeThenDelete(RDBStore store, Table<byte[], byte[]> table) throws Exception {
+    for (int i = 0; i < 1000; i++) {
+      table.put(StringCodec.get().toPersistedFormat(String.format("%04d", i)), new byte[100]);
+    }
+    store.flushDB();
+    for (int i = 0; i < 750; i++) {
+      table.delete(StringCodec.get().toPersistedFormat(String.format("%04d", i)));
+    }
+  }
+
+  private static long numDeletions(RDBStore store) throws Exception {
+    return store.getDb().getManagedRocksDb().get()
+        .getPropertiesOfAllTables(store.getDb().getColumnFamily("test").getHandle()).values().stream()
+        .mapToLong(TableProperties::getNumDeletions).sum();
   }
 
   @Test

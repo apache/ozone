@@ -21,9 +21,11 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigType;
+import org.apache.hadoop.hdds.conf.PostConstruct;
 
 /**
  * Holds configuration items for OM RocksDB.
@@ -93,6 +95,13 @@ public class RocksDBConfiguration {
           + "Applies to default DB profiles; explicit column family options and options files take precedence. "
           + "Does not flush tombstones from memtables or override disabled automatic compaction. Requires restart.")
   private double compactionDeletionRatio;
+
+  @PostConstruct
+  public void validate() {
+    Preconditions.checkArgument(compactionDeletionRatio >= 0 && compactionDeletionRatio <= 1,
+        "hadoop.hdds.db.rocksdb.compaction.deletion.ratio must be between 0 and 1 inclusive: %s",
+        compactionDeletionRatio);
+  }
 
   public double getCompactionDeletionRatio() {
     return compactionDeletionRatio;
