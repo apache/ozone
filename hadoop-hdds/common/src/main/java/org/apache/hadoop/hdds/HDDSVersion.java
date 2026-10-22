@@ -42,6 +42,8 @@ public enum HDDSVersion implements ComponentVersion {
 
   ZDU(100, "Version that supports zero downtime upgrade"),
 
+  STREAM_PUTBLOCK_WITHOUT_RAFT(101, "PutBlock can be committed through a Ratis data stream without the Raft log."),
+
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this" +
       " component, which may indicate it came from a component in a newer version");
 

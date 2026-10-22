@@ -1435,29 +1435,38 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
   }
 
+  protected void validateIfNoneMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+    if (keyArgs.hasExcludedETag() && dbKeyInfo != null && dbKeyInfo.isEtagEquals(keyArgs.getExcludedETag())) {
+      throw new OMException("ETag matches If-None-Match", OMException.ResultCodes.KEY_ALREADY_EXISTS);
+    }
+  }
+
   /**
-   * Validates If-Match ETag condition and converts it to expectedDataGeneration.
+   * Validates ETag conditions and converts them to expectedDataGeneration.
    * <p>
-   * This method checks if the existing key's ETag matches the expected ETag.
-   * If it matches, the ETag condition is converted to a generation-based condition
+   * This method checks the existing key against the ETag conditions.
+   * If satisfied, the ETag condition is converted to a generation-based condition
    * for atomic commit validation in two-phase operations (CreateKey → CommitKey).
    *
    * @param keyArgs the key arguments containing expected ETag
    * @param dbKeyInfo the existing key info from the database
-   * @return updated KeyArgs with expectedDataGeneration set (if ETag matched)
+   * @return updated KeyArgs with expectedDataGeneration set (if an ETag condition was specified)
    * @throws OMException if validation fails
    */
-  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
+  protected KeyArgs validateAndRewriteETagConditionsAsExpectedGeneration(
       KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
     validateIfMatchETag(keyArgs, dbKeyInfo);
+    validateIfNoneMatchETag(keyArgs, dbKeyInfo);
 
-    if (!keyArgs.hasExpectedETag() || keyArgs.hasExpectedDataGeneration()) {
+    if ((!keyArgs.hasExpectedETag() && !keyArgs.hasExcludedETag()) || keyArgs.hasExpectedDataGeneration()) {
       return keyArgs;
     }
 
     return keyArgs.toBuilder()
-        .setExpectedDataGeneration(dbKeyInfo.getUpdateID())
+        .setExpectedDataGeneration(
+            dbKeyInfo == null ? OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT : dbKeyInfo.getUpdateID())
         .clearExpectedETag()
+        .clearExcludedETag()
         .build();
   }
 }

@@ -132,6 +132,7 @@ non_rolling_restart_all_services() {
 
   wait_for_safemode_exit
   wait_for_om_leader
+  wait_for_all_oms
 }
 
 echo "--- SETTING UP OLD VERSION $OZONE_UPGRADE_FROM ---"
@@ -140,6 +141,7 @@ prepare_for_image "$OZONE_UPGRADE_FROM"
 
 echo "--- RUNNING WITH OLD VERSION $OZONE_UPGRADE_FROM ---"
 start_docker_env
+wait_for_all_oms
 
 callback with_old_version
 

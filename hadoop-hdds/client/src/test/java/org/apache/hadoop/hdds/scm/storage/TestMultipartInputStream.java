@@ -39,6 +39,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -107,6 +108,26 @@ public class TestMultipartInputStream {
       buffer.clear();
       assertThrows(EOFException.class, () -> multipartStream.readFully(position, buffer));
       assertEquals(expectedBytes, buffer.position());
+      verify(part, never()).seek(anyLong());
+    }
+  }
+
+  @Test
+  public void testPositionedReadBeyondStaleLengthOfUnderConstructionBlock() throws Exception {
+    byte[] partData = generateRandomData(1024);
+    int staleLength = 512;
+    StreamBlockInputStream part = stubStreamBlockPart(partData);
+    AtomicLong partLength = new AtomicLong(staleLength);
+    when(part.getLength()).thenAnswer(invocation -> partLength.get());
+    doAnswer(invocation -> {
+      partLength.set(partData.length);
+      return null;
+    }).when(part).updateBlockLength();
+    try (MultipartInputStream multipartStream = new MultipartInputStream("test-key", Collections.singletonList(part))) {
+      ByteBuffer buffer = ByteBuffer.allocate(partData.length - staleLength);
+      multipartStream.readFully(staleLength, buffer);
+      assertArrayEquals(Arrays.copyOfRange(partData, staleLength, partData.length), buffer.array());
+      assertEquals(partData.length, multipartStream.getLength());
       verify(part, never()).seek(anyLong());
     }
   }
