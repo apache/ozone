@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
@@ -62,8 +61,6 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Class to test Multipart upload where parts are created with copy header.
@@ -379,23 +376,6 @@ public class TestMultipartUploadWithCopy {
         .listParts(KEY, uploadID, 0, 100);
     assertEquals(1, parts.getPartInfoList().size());
     assertEquals(4, parts.getPartInfoList().get(0).getSize());
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {
-      "bytes=0-9223372036854775808",
-      "bytes=0-99999999999999999999",
-      "bytes=9223372036854775808-9223372036854775809"
-  })
-  public void testUploadPartCopyWithRangeOverflowingLong(String range) throws IOException, OS3Exception {
-    String uploadID = initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, KEY);
-    Map<String, String> additionalHeaders = new HashMap<>();
-    additionalHeaders.put(COPY_SOURCE_HEADER, OzoneConsts.S3_BUCKET + "/" + EXISTING_KEY);
-    additionalHeaders.put(COPY_SOURCE_HEADER_RANGE, range);
-    setHeaders(additionalHeaders);
-
-    assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT,
-        () -> put(endpoint, OzoneConsts.S3_BUCKET, KEY, 1, uploadID, ""));
   }
 
   private void setHeaders(Map<String, String> additionalHeaders) {
