@@ -51,6 +51,8 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Class to test Multipart upload end to end.
@@ -107,6 +109,25 @@ public class TestMultipartUploadComplete {
     partsList.add(uploadPart(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 2, uploadID, "Multipart Upload 2"));
 
     completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, partsList);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testMultipartIfMatchMissingKey(String ifMatch) throws Exception {
+    String key = OzoneConsts.KEY;
+    String content = "Multipart Upload 1";
+    String uploadID = initiateMultipartUpload(key);
+    Part part = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, content);
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(ifMatch);
+
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.NO_SUCH_KEY,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part)));
+    assertEquals(key, ex.getResource());
+    assertThrows(IOException.class, () -> client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET).getKey(key));
+
+    when(headers.getHeaderString(S3Consts.IF_MATCH_HEADER)).thenReturn(null);
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part));
+    assertKeyContent(client.getObjectStore().getS3Bucket(OzoneConsts.S3_BUCKET), key, content);
   }
 
   @Test

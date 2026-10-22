@@ -190,6 +190,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       int partNumber = keyArgs.getMultipartNumber();
+      validatePartNumber(partNumber);
       partName = getPartName(ozoneKey, uploadID, partNumber);
 
       if (multipartKeyInfo == null) {

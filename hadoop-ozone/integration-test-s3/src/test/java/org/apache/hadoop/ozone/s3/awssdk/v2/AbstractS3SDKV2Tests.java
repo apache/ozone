@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.getOmPartModifica
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.http.HttpStatus.SC_OK;
+import static org.apache.http.HttpStatus.SC_PARTIAL_CONTENT;
 import static org.apache.http.HttpStatus.SC_REQUESTED_RANGE_NOT_SATISFIABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -666,8 +667,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(initialResponse.eTag(), headObjectResponse.eTag());
   }
 
-  @Test
-  public void testPutObjectIfMatchMissingKeyFail() {
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testPutObjectIfMatchMissingKeyFail(String ifMatch) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(b -> b.bucket(bucketName));
@@ -675,11 +677,11 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.putObject(b -> b
             .bucket(bucketName)
             .key(keyName)
-            .ifMatch("some-etag"),
+            .ifMatch(ifMatch),
         RequestBody.fromString("bar2")));
 
-    assertEquals(412, exception.statusCode());
-    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+    assertEquals(404, exception.statusCode());
+    assertEquals("NoSuchKey", exception.awsErrorDetails().errorCode());
     assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
         b -> b.bucket(bucketName).key(keyName)));
   }
@@ -1132,6 +1134,27 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         b -> b.bucket(bucketName).key(keyName).ifMatch(initialResponse.eTag()));
 
     assertEquals(Long.valueOf(content.length()), response.contentLength());
+  }
+
+  @Test
+  public void testHeadObjectRange() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "0123456789";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    HeadObjectResponse response = s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range("bytes=0-4"));
+
+    assertEquals(SC_PARTIAL_CONTENT, response.sdkHttpResponse().statusCode());
+    assertEquals(Long.valueOf(5), response.contentLength());
+    assertEquals("bytes 0-4/10", response.contentRange());
+    assertEquals("bytes", response.acceptRanges());
+
+    // A HEAD error has no body, so only the status code identifies InvalidRange.
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range("bytes=10-20")));
+    assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, exception.statusCode());
   }
 
   /**
@@ -1608,8 +1631,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
   }
 
-  @Test
-  public void testCompleteMultipartUploadIfMatchMissingKeyFail() {
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testCompleteMultipartUploadIfMatchMissingKeyFail(String ifMatch) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(b -> b.bucket(bucketName));
@@ -1640,11 +1664,11 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         .bucket(bucketName)
         .key(keyName)
         .uploadId(uploadId)
-        .ifMatch("\"some-etag\"")
+        .ifMatch(ifMatch)
         .multipartUpload(CompletedMultipartUpload.builder().parts(completedPart).build())));
 
-    assertEquals(412, exception.statusCode());
-    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+    assertEquals(404, exception.statusCode());
+    assertEquals("NoSuchKey", exception.awsErrorDetails().errorCode());
   }
 
   @Test

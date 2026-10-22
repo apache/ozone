@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_PART;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -59,6 +60,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests S3 Multipart upload commit part request.
@@ -862,6 +865,29 @@ public class TestS3MultipartUploadCommitPartRequest
     assertEquals(0, parts.size());
   }
 
+  @ParameterizedTest
+  @ValueSource(ints = {OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION, OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION})
+  public void testValidateAndUpdateCacheWithInvalidPartNumber(int schemaVersion) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    createParentPath(volumeName, bucketName);
+
+    String uploadId = UUID.randomUUID().toString();
+    createMpuEntry(volumeName, bucketName, keyName, uploadId, 1L, schemaVersion);
+
+    for (int partNumber : new int[] {0, -1}) {
+      long clientID = Time.now() + partNumber;
+      addKeyToOpenKeyTableWithETag(volumeName, bucketName, keyName, clientID, UUID.randomUUID().toString());
+
+      OMRequest commitRequest = doPreExecuteCommitMPU(volumeName, bucketName, keyName, clientID, uploadId, partNumber);
+      OMClientResponse response = getS3MultipartUploadCommitReq(commitRequest).validateAndUpdateCache(ozoneManager, 2L);
+      assertEquals(INVALID_PART, response.getOMResponse().getStatus());
+    }
+  }
+
   @Test
   public void testScanPartsReturnsCommittedPart() throws Exception {
     String volumeName = UUID.randomUUID().toString();
@@ -1044,13 +1070,19 @@ public class TestS3MultipartUploadCommitPartRequest
 
   private void createSplitSchemaMpuEntry(String volumeName, String bucketName,
       String keyName, String uploadId, long trxnIdx) throws IOException {
+    createMpuEntry(volumeName, bucketName, keyName, uploadId, trxnIdx,
+        OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION);
+  }
+
+  private void createMpuEntry(String volumeName, String bucketName, String keyName, String uploadId, long trxnIdx,
+      int schemaVersion) throws IOException {
     OmMultipartKeyInfo multipartKeyInfo = new OmMultipartKeyInfo.Builder()
         .setUploadID(uploadId)
         .setCreationTime(Time.now())
         .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
         .setObjectID(trxnIdx)
         .setUpdateID(trxnIdx)
-        .setSchemaVersion(OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION)
+        .setSchemaVersion(schemaVersion)
         .build();
 
     OmKeyInfo omKeyInfo = new OmKeyInfo.Builder()

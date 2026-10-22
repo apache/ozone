@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.security.x509.CertificateTestUtils.createSelfSignedCert;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doReturn;
@@ -41,18 +42,22 @@ import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.time.ZonedDateTime;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
 import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
 import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
 import org.apache.hadoop.hdds.security.x509.certificate.client.SCMCertificateClient;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.SelfSignedCertificate;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -91,7 +96,7 @@ class TestInterSCMGrpcProtocolService {
     int port = PortAllocator.getFreePort();
     OzoneConfiguration conf = setupConfiguration(port);
     SCMCertificateClient
-        scmCertClient = setupCertificateClientForMTLS(conf);
+        scmCertClient = setupCertificateClientForMTLS(conf, true);
     InterSCMGrpcProtocolService service =
         new InterSCMGrpcProtocolService(conf, scmWith(scmCertClient));
     service.start();
@@ -108,6 +113,23 @@ class TestInterSCMGrpcProtocolService {
 
     client.close();
     service.stop();
+  }
+
+  @Test
+  void testInterScmGrpcProtocolServiceRequiresScmCertificate() throws Exception {
+    int port = PortAllocator.getFreePort();
+    OzoneConfiguration conf = setupConfiguration(port);
+    SCMCertificateClient scmCertClient = setupCertificateClientForMTLS(conf, false);
+    InterSCMGrpcProtocolService service = new InterSCMGrpcProtocolService(conf, scmWith(scmCertClient));
+    service.start();
+    InterSCMGrpcClient client = new InterSCMGrpcClient("localhost", port, conf, scmCertClient);
+    try {
+      CompletableFuture<Path> res = client.download(temp.resolve(CP_FILE_NAME));
+      assertThatThrownBy(res::get).isInstanceOf(ExecutionException.class);
+    } finally {
+      client.close();
+      service.stop();
+    }
   }
 
   private void verifyServiceUsedItsCertAndValidatedClientCert()
@@ -196,14 +218,14 @@ class TestInterSCMGrpcProtocolService {
   }
 
   private SCMCertificateClient setupCertificateClientForMTLS(
-      OzoneConfiguration conf
+      OzoneConfiguration conf, boolean clientIsScm
   ) throws Exception {
     KeyPair serviceKeys = CertificateTestUtils.aKeyPair(conf);
     KeyPair clientKeys = CertificateTestUtils.aKeyPair(conf);
 
     serviceCert = createSelfSignedCert(serviceKeys, "service",
         Collections.singletonList("localhost"));
-    clientCert = createSelfSignedCert(clientKeys, "client");
+    clientCert = clientIsScm ? createSelfSignedCert(clientKeys, "client") : createLeafCert(conf, clientKeys);
 
     ReloadingX509TrustManager toSpyServerTrustManager = new ReloadingX509TrustManager(KeyStore.getDefaultType(),
         ImmutableList.of(clientCert));
@@ -222,6 +244,12 @@ class TestInterSCMGrpcProtocolService {
     doReturn(serverKeyManager, clientKeyManager).when(scmCertClient).getKeyManager();
     doReturn(serverTrustManager, clientTrustManager).when(scmCertClient).getTrustManager();
     return scmCertClient;
+  }
+
+  private static X509Certificate createLeafCert(OzoneConfiguration conf, KeyPair keys) throws Exception {
+    ZonedDateTime now = ZonedDateTime.now();
+    return SelfSignedCertificate.newBuilder().setSubject("client").setClusterID("clusterId").setScmID("scmId")
+        .setBeginDate(now).setEndDate(now.plusDays(1)).setConfiguration(new SecurityConfig(conf)).setKey(keys).build();
   }
 
   private OzoneConfiguration setupConfiguration(int port) {
