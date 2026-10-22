@@ -174,7 +174,6 @@ public class TestPermissionCheck {
   @Test
   public void testListKey() throws IOException {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
-    when(objectStore.getS3Volume()).thenReturn(volume);
     doThrow(exception).when(bucket).listKeys(anyString(), isNull(),
         anyBoolean());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
@@ -187,7 +186,6 @@ public class TestPermissionCheck {
   @Test
   public void testDeleteKeys() throws IOException, OS3Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
-    when(objectStore.getS3Volume()).thenReturn(volume);
     final Map<String, ErrorInfo> deleteErrors = Collections.singletonMap(
         "deleteKeyName", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
     when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(deleteErrors);
@@ -207,7 +205,6 @@ public class TestPermissionCheck {
   public void testDeleteKeysTranslatesContainedOMFailures(ResultCodes resultCode, S3ErrorTable expectedError)
       throws IOException {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
-    when(objectStore.getS3Volume()).thenReturn(volume);
     doThrow(new IOException("DeleteObjects failed", new OMException("OM failure", resultCode)))
         .when(bucket).deleteKeys(any(), anyBoolean());
 
@@ -225,7 +222,6 @@ public class TestPermissionCheck {
 
   @Test
   public void testGetAcl() throws Exception {
-    when(objectStore.getS3Volume()).thenReturn(volume);
     doThrow(exception).when(bucket).getAcls();
 
     when(headers.getHeaderString(S3Acl.GRANT_READ))
@@ -275,7 +271,6 @@ public class TestPermissionCheck {
 
   @Test
   public void testPutKey() throws IOException {
-    when(objectStore.getS3Volume()).thenReturn(volume);
     doThrow(exception).when(clientProtocol).createKey(
             anyString(), anyString(), anyString(), anyLong(), any(), anyMap(), anyMap(), anyBoolean());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -303,7 +298,6 @@ public class TestPermissionCheck {
 
   @Test
   public void testMultiUploadKey() throws IOException {
-    when(objectStore.getS3Volume()).thenReturn(volume);
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).initiateMultipartUpload(anyString(), any(), anyMap(), anyMap());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()

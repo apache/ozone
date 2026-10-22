@@ -54,7 +54,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.S3HeadObjectAttributes;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -230,7 +229,6 @@ public class TestS3ActionOverrideForOwnerVerification {
     final OzoneClient client = mock(OzoneClient.class);
     final ObjectStore objectStore = mock(ObjectStore.class);
     final ClientProtocol clientProtocol = mock(ClientProtocol.class);
-    final OzoneVolume volume = mock(OzoneVolume.class);
     final OzoneBucket destBucket = mock(OzoneBucket.class);
     final OzoneBucket sourceBucket = mock(OzoneBucket.class);
 
@@ -243,9 +241,6 @@ public class TestS3ActionOverrideForOwnerVerification {
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-
-    when(volume.getName()).thenReturn("s3Volume");
 
     when(destBucket.getName()).thenReturn(DEST_BUCKET);
     when(destBucket.getVolumeName()).thenReturn("s3Volume");
