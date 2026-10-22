@@ -54,6 +54,8 @@ public class RunningDatanodeState implements DatanodeState {
   private CompletionService<EndPointStates> ecs;
   // Include tasks from earlier heartbeats whose completions have not been collected yet.
   private int executingEndpointCount = 0;
+  // Monotonic time when the next heartbeat to Recon is due.
+  private long nextReconHeartbeat = 0;
 
   public RunningDatanodeState(ConfigurationSource conf,
       SCMConnectionManager connectionManager,
@@ -91,18 +93,15 @@ public class RunningDatanodeState implements DatanodeState {
       ecs = new ExecutorCompletionService<>(executor);
     }
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
+      if (isReconHeartbeatNotDue(endpoint)) {
+        continue;
+      }
       Callable<EndPointStates> endpointTask = buildEndPointTask(endpoint);
       if (endpointTask != null) {
         // Just do a timely wait. A slow EndpointStateMachine won't occupy
         // the thread in executor from DatanodeStateMachine for a long time,
         // so that it won't affect the communication between datanode and
         // other EndpointStateMachine.
-        long heartbeatFrequency;
-        if (endpoint.isPassive()) {
-          heartbeatFrequency = context.getReconHeartbeatFrequency();
-        } else {
-          heartbeatFrequency = context.getHeartbeatFrequency();
-        }
         ecs.submit(() -> {
           try {
             return endpoint.getExecutorService()
@@ -134,6 +133,26 @@ public class RunningDatanodeState implements DatanodeState {
   @VisibleForTesting
   public void setExecutingEndpointCount(int executingEndpointCount) {
     this.executingEndpointCount = executingEndpointCount;
+  }
+
+  /**
+   * The datanode heartbeats Recon at its own interval ({@code hdds.heartbeat.recon.interval}),
+   * which can be longer than the SCM heartbeat interval.
+   * @return true if the endpoint is Recon in HEARTBEAT state and its next heartbeat is not due yet
+   */
+  @VisibleForTesting
+  boolean isReconHeartbeatNotDue(EndpointStateMachine endpoint) {
+    if (!endpoint.isPassive() || endpoint.getState() != EndPointStates.HEARTBEAT) {
+      return false;
+    }
+    final long now = Time.monotonicNow();
+    // Allow half of the SCM heartbeat interval, so that small timing differences between
+    // heartbeat cycles do not delay the Recon heartbeat by a whole cycle.
+    if (now + context.getHeartbeatFrequency() / 2 < nextReconHeartbeat) {
+      return true;
+    }
+    nextReconHeartbeat = now + context.getReconHeartbeatFrequency();
+    return false;
   }
 
   private Callable<EndPointStates> buildEndPointTask(

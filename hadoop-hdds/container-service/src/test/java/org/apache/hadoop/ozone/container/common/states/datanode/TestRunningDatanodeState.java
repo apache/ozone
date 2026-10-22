@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -190,6 +191,32 @@ public class TestRunningDatanodeState {
     } finally {
       executor.shutdownNow();
     }
+  }
+
+  @Test
+  void testReconHeartbeatInterval() throws Exception {
+    StateContext context = mock(StateContext.class);
+    when(context.getHeartbeatFrequency()).thenReturn(100L);
+    when(context.getReconHeartbeatFrequency()).thenReturn(500L);
+    RunningDatanodeState state = new RunningDatanodeState(null, mock(SCMConnectionManager.class), context);
+    EndpointStateMachine recon = mock(EndpointStateMachine.class);
+    when(recon.isPassive()).thenReturn(true);
+    when(recon.getState()).thenReturn(EndPointStates.HEARTBEAT);
+    EndpointStateMachine scm = mock(EndpointStateMachine.class);
+    when(scm.getState()).thenReturn(EndPointStates.HEARTBEAT);
+
+    final long start = Time.monotonicNow();
+    assertThat(state.isReconHeartbeatNotDue(recon)).isFalse();
+    assertThat(state.isReconHeartbeatNotDue(recon)).isTrue();
+    // SCM heartbeat and Recon registration are not delayed
+    assertThat(state.isReconHeartbeatNotDue(scm)).isFalse();
+    when(recon.getState()).thenReturn(EndPointStates.REGISTER);
+    assertThat(state.isReconHeartbeatNotDue(recon)).isFalse();
+
+    when(recon.getState()).thenReturn(EndPointStates.HEARTBEAT);
+    GenericTestUtils.waitFor(() -> !state.isReconHeartbeatNotDue(recon), 10, 5000);
+    // Recon interval minus half of the SCM heartbeat interval
+    assertThat(Time.monotonicNow() - start).isGreaterThanOrEqualTo(450);
   }
 
   private static VersionResponse versionResponse() {
