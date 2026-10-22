@@ -102,4 +102,35 @@ public class TestRangeHeaderParserUtil {
 
   }
 
+  @Test
+  public void testUnsatisfiableRanges() {
+    // start is past the last byte and no end is given
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=10-", 10).isInValidRange());
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=11-", 10).isInValidRange());
+
+    // zero suffix length selects no bytes
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=-0", 10).isInValidRange());
+
+    // an empty object has no bytes to select
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=-5", 0).isInValidRange());
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=0-", 0).isInValidRange());
+    assertTrue(RangeHeaderParserUtil.parseRangeHeader("bytes=0-5", 0).isInValidRange());
+
+    // the last byte is still satisfiable
+    RangeHeader rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=9-", 10);
+    assertEquals(9, rangeHeader.getStartOffset());
+    assertEquals(9, rangeHeader.getEndOffset());
+    assertFalse(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
+  }
+
+  @Test
+  public void testRangeWithoutStartAndEndIsIgnored() {
+    RangeHeader rangeHeader = RangeHeaderParserUtil.parseRangeHeader("bytes=-", 10);
+    assertEquals(0, rangeHeader.getStartOffset());
+    assertEquals(9, rangeHeader.getEndOffset());
+    assertTrue(rangeHeader.isReadFull());
+    assertFalse(rangeHeader.isInValidRange());
+  }
+
 }

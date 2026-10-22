@@ -45,6 +45,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
@@ -208,14 +210,14 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends OMKeyRequestTests 
 
     for (OmKeyInfo purgeFile : purgeDeletedFiles) {
       purgePathsRequest.addDeletedSubFiles(
-          purgeFile.getProtobuf(true, ClientVersion.CURRENT_VERSION));
+          purgeFile.getProtobuf(true, ClientVersion.CURRENT));
     }
 
     // Add these directories to deletedDirTable, so that its sub-paths will be
     // traversed in next iteration to ensure cleanup all sub-children.
     for (OmKeyInfo dir : markDirsAsDeleted) {
       purgePathsRequest.addMarkDeletedSubDirs(
-          dir.getProtobuf(ClientVersion.CURRENT_VERSION));
+          dir.getProtobuf(ClientVersion.CURRENT));
     }
 
     return purgePathsRequest.build();
@@ -311,6 +313,8 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends OMKeyRequestTests 
     IOzoneManagerLock lock = spy(omMetadataManager.getLock());
     Set<Long> acquiredLockIds = new ConcurrentSkipListSet<>();
     Set<String> acquiredLockKeys = new ConcurrentSkipListSet<>();
+    // The lock gate below keys on thread id, so the two requests must run on distinct threads.
+    ExecutorService executor = Executors.newFixedThreadPool(2);
     try {
       doAnswer(i -> {
         long threadId = Thread.currentThread().getId();
@@ -346,15 +350,16 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends OMKeyRequestTests 
           preExecute(createPurgeKeysRequest(null, Arrays.asList(purgePathRequest2, purgePathRequest1),
               bucketInfoList)));
       CompletableFuture future1 = CompletableFuture.runAsync(() ->
-          purgePathRequests1.validateAndUpdateCache(ozoneManager, 100L));
+          purgePathRequests1.validateAndUpdateCache(ozoneManager, 100L), executor);
       CompletableFuture future2 = CompletableFuture.runAsync(() ->
-          purgePathRequests2.validateAndUpdateCache(ozoneManager, 100L));
+          purgePathRequests2.validateAndUpdateCache(ozoneManager, 100L), executor);
       future1.get();
       future2.get();
       assertEquals(Stream.of(bucketInfo1.getVolumeName() + "/" + bucketInfo1.getBucketName(),
               bucketInfo2.getVolumeName() + "/" + bucketInfo2.getBucketName()).collect(Collectors.toSet()),
           acquiredLockKeys);
     } finally {
+      executor.shutdownNow();
       reset(lock);
     }
   }

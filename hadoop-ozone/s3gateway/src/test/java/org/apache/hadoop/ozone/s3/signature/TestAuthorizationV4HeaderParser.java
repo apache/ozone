@@ -43,10 +43,9 @@ public class TestAuthorizationV4HeaderParser {
 
   @BeforeEach
   public void setup() {
-    LocalDate now = LocalDate.now(ZoneOffset.UTC);
+    LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
     curDate = DATE_FORMATTER.format(now);
-    sampleDate = StringToSignProducer.TIME_FORMATTER.format(
-        LocalDateTime.now(ZoneOffset.UTC));
+    sampleDate = StringToSignProducer.TIME_FORMATTER.format(now);
   }
 
   @Test
@@ -114,9 +113,10 @@ public class TestAuthorizationV4HeaderParser {
       throws MalformedResourceException {
     testRequestWithSpecificDate(curDate);
 
-    String amzDatePlus14Min = StringToSignProducer.TIME_FORMATTER.format(
-        LocalDateTime.now(ZoneOffset.UTC).plus(14, MINUTES));
-    testRequestWithSpecificDate(curDate, amzDatePlus14Min);
+    // Scope date must match X-Amz-Date, which may fall on the next day near midnight.
+    LocalDateTime plus14Min = LocalDateTime.now(ZoneOffset.UTC).plus(14, MINUTES);
+    testRequestWithSpecificDate(DATE_FORMATTER.format(plus14Min),
+        StringToSignProducer.TIME_FORMATTER.format(plus14Min));
   }
 
   @Test

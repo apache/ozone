@@ -175,7 +175,7 @@ public final class TestContainerBalancerClusterAnalyzer {
         .setUuid(UUID.randomUUID())
         .build();
     DatanodeUsageInfoProto node = DatanodeUsageInfoProto.newBuilder()
-        .setNode(datanode.toProto(DEFAULT_VERSION.toProtoValue()))
+        .setNode(datanode.toProto(DEFAULT_VERSION))
         .setCapacity(100)
         .setRemaining(10)
         .setUsed(90)
@@ -287,7 +287,7 @@ public final class TestContainerBalancerClusterAnalyzer {
         .build();
     long used = capacity - remaining;
     return DatanodeUsageInfoProto.newBuilder()
-        .setNode(datanode.toProto(DEFAULT_VERSION.toProtoValue()))
+        .setNode(datanode.toProto(DEFAULT_VERSION))
         .setCapacity(capacity)
         .setRemaining(remaining)
         .setUsed(used)

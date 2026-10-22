@@ -24,13 +24,13 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_PART;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -1130,8 +1130,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nonnull long transactionLogIndex, long objectID,
           OmConfig configuration) throws IOException {
 
-    Preconditions.checkArgument(args.getMultipartNumber() > 0,
-            "PartNumber Should be greater than zero");
+    validatePartNumber(args.getMultipartNumber());
     // When key is multipart upload part key, we should take replication
     // type and replication factor from original key which has done
     // initiate multipart upload. If we have not found any such, we throw
@@ -1167,6 +1166,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return createFileInfo(args, locations, partKeyInfo.getReplicationConfig(),
             size, encInfo, prefixManager, omBucketInfo, omPathInfo,
             transactionLogIndex, objectID, configuration);
+  }
+
+  protected static void validatePartNumber(int partNumber) throws OMException {
+    if (partNumber <= 0) {
+      throw new OMException("Part number should be greater than zero, but was " + partNumber, INVALID_PART);
+    }
   }
 
   /**
@@ -1434,29 +1439,38 @@ public abstract class OMKeyRequest extends OMClientRequest {
     }
   }
 
+  protected void validateIfNoneMatchETag(KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
+    if (keyArgs.hasExcludedETag() && dbKeyInfo != null && dbKeyInfo.isEtagEquals(keyArgs.getExcludedETag())) {
+      throw new OMException("ETag matches If-None-Match", OMException.ResultCodes.KEY_ALREADY_EXISTS);
+    }
+  }
+
   /**
-   * Validates If-Match ETag condition and converts it to expectedDataGeneration.
+   * Validates ETag conditions and converts them to expectedDataGeneration.
    * <p>
-   * This method checks if the existing key's ETag matches the expected ETag.
-   * If it matches, the ETag condition is converted to a generation-based condition
+   * This method checks the existing key against the ETag conditions.
+   * If satisfied, the ETag condition is converted to a generation-based condition
    * for atomic commit validation in two-phase operations (CreateKey → CommitKey).
    *
    * @param keyArgs the key arguments containing expected ETag
    * @param dbKeyInfo the existing key info from the database
-   * @return updated KeyArgs with expectedDataGeneration set (if ETag matched)
+   * @return updated KeyArgs with expectedDataGeneration set (if an ETag condition was specified)
    * @throws OMException if validation fails
    */
-  protected KeyArgs validateAndRewriteIfMatchAsExpectedGeneration(
+  protected KeyArgs validateAndRewriteETagConditionsAsExpectedGeneration(
       KeyArgs keyArgs, OmKeyInfo dbKeyInfo) throws OMException {
     validateIfMatchETag(keyArgs, dbKeyInfo);
+    validateIfNoneMatchETag(keyArgs, dbKeyInfo);
 
-    if (!keyArgs.hasExpectedETag() || keyArgs.hasExpectedDataGeneration()) {
+    if ((!keyArgs.hasExpectedETag() && !keyArgs.hasExcludedETag()) || keyArgs.hasExpectedDataGeneration()) {
       return keyArgs;
     }
 
     return keyArgs.toBuilder()
-        .setExpectedDataGeneration(dbKeyInfo.getUpdateID())
+        .setExpectedDataGeneration(
+            dbKeyInfo == null ? OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT : dbKeyInfo.getUpdateID())
         .clearExpectedETag()
+        .clearExcludedETag()
         .build();
   }
 }

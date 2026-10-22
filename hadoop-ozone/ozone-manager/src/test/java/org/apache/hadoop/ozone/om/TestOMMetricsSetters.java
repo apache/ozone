@@ -55,4 +55,25 @@ public class TestOMMetricsSetters {
     assertGauge("NumDirs", 4L, rb);
     assertGauge("NumFiles", 5L, rb);
   }
+
+  @Test
+  public void testSnapshotAndTenantCounts() {
+    metrics = OMMetrics.create(new OzoneConfiguration());
+    metrics.setNumSnapshotActive(5);
+    metrics.setNumSnapshotActive(3);
+    metrics.decNumSnapshotActive();
+    metrics.setNumSnapshotDeleted(1);
+    metrics.setNumSnapshotDeleted(4);
+    metrics.setNumSnapshotDeleted(2);
+    metrics.setNumTenants(5);
+    metrics.setNumTenants(3);
+    metrics.incNumTenants();
+    metrics.incNumTenants();
+    metrics.decNumTenants();
+
+    MetricsRecordBuilder rb = getMetrics("OMMetrics");
+    assertGauge("NumSnapshotActive", 2L, rb);
+    assertGauge("NumSnapshotDeleted", 2L, rb);
+    assertGauge("NumTenants", 4L, rb);
+  }
 }

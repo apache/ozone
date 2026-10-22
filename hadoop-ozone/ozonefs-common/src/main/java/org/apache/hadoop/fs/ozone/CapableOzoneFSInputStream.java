@@ -18,6 +18,7 @@
 package org.apache.hadoop.fs.ozone;
 
 import java.io.InputStream;
+import org.apache.hadoop.fs.ByteBufferPositionedReadable;
 import org.apache.hadoop.fs.FileSystem.Statistics;
 import org.apache.hadoop.fs.StreamCapabilities;
 import org.apache.hadoop.util.StringUtils;
@@ -34,8 +35,9 @@ final class CapableOzoneFSInputStream extends OzoneFSInputStream
     switch (StringUtils.toLowerCase(capability)) {
     case StreamCapabilities.READBYTEBUFFER:
     case StreamCapabilities.UNBUFFER:
-    case StreamCapabilities.PREADBYTEBUFFER:
       return true;
+    case StreamCapabilities.PREADBYTEBUFFER:
+      return getWrappedInputStream() instanceof ByteBufferPositionedReadable;
     default:
       return false;
     }

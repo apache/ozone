@@ -38,6 +38,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
+import org.apache.hadoop.hdds.server.StartupProgress;
+import org.apache.hadoop.ozone.DatanodeStartupPhase;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
@@ -111,6 +113,8 @@ public class TestRunningDatanodeState {
   void testStartupCompletesAfterHeartbeatTimeout(int failureType) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneContainer container = mock(OzoneContainer.class);
+    StartupProgress<DatanodeStartupPhase> startupProgress = new StartupProgress<>(DatanodeStartupPhase.class);
+    when(container.getStartupProgress()).thenReturn(startupProgress);
     DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
     SCMConnectionManager connections = mock(SCMConnectionManager.class);
     when(datanode.getConnectionManager()).thenReturn(connections);
@@ -147,8 +151,10 @@ public class TestRunningDatanodeState {
       if (failureType == 0) {
         assertThat(endpoint.getState()).isEqualTo(EndPointStates.REGISTER);
         assertThat(context.getShutdownOnError()).isFalse();
+        assertThat(startupProgress.isFailed()).isFalse();
       } else {
         assertThat(endpoint.getState()).isEqualTo(SHUTDOWN);
+        assertThat(startupProgress.isFailed()).isTrue();
         assertThat(logs.getOutput()).contains("Failed to start required container services", "scm:9861",
             failure.getClass().getName(), "Corrupt Raft log");
         context.execute(executor, 5, TimeUnit.SECONDS);
@@ -166,6 +172,7 @@ public class TestRunningDatanodeState {
   void testUnavailableScmDoesNotPreventStartup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     OzoneContainer container = mock(OzoneContainer.class);
+    when(container.getStartupProgress()).thenReturn(new StartupProgress<>(DatanodeStartupPhase.class));
     DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
     SCMConnectionManager connections = mock(SCMConnectionManager.class);
     when(datanode.getConnectionManager()).thenReturn(connections);

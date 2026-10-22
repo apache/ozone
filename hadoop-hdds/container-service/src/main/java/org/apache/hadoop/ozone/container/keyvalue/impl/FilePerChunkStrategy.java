@@ -118,8 +118,8 @@ public class FilePerChunkStrategy implements ChunkManager {
 
       File chunkFile = getChunkFile(kvContainer, blockID, info);
 
-      boolean isOverwrite = ChunkUtils.validateChunkForOverwrite(
-          chunkFile, info);
+      long offset = 0; // ignore offset in chunk info
+      boolean isOverwrite = ChunkUtils.validateChunkForOverwrite(chunkFile.length(), info, offset);
       File tmpChunkFile = getTmpChunkFile(chunkFile, dispatcherContext);
       if (LOG.isDebugEnabled()) {
         LOG.debug(
@@ -128,7 +128,6 @@ public class FilePerChunkStrategy implements ChunkManager {
       }
 
       long len = info.getLen();
-      long offset = 0; // ignore offset in chunk info
       switch (stage) {
       case WRITE_DATA:
         if (isOverwrite) {
