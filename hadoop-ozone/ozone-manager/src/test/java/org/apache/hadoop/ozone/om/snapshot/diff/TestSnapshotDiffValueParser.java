@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -34,11 +35,19 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.io.MD5Hash;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.helpers.ObjectRetention;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Rule;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class TestSnapshotDiffValueParser {
   private static final String VOLUME = "volume";
@@ -121,6 +130,49 @@ class TestSnapshotDiffValueParser {
     byte[] latestLocationRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(latestLocationChanged);
     assertFalse(Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(locationCountRaw),
         SnapshotDiffValueParser.computeKeyInfoCompareSignature(latestLocationRaw)));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @MethodSource("objectLockChanges")
+  void testKeyInfoObjectLockSignature(String name, OmKeyInfo before, OmKeyInfo after, boolean same) throws Exception {
+    byte[] beforeRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(before);
+    byte[] afterRaw = OmKeyInfo.getKeyTableCodec().toPersistedFormat(after);
+    assertEquals(same, before.isKeyInfoSame(after, false, false, false, false, true));
+    assertEquals(same, Arrays.equals(SnapshotDiffValueParser.computeKeyInfoCompareSignature(beforeRaw),
+        SnapshotDiffValueParser.computeKeyInfoCompareSignature(afterRaw)));
+  }
+
+  private static Stream<Arguments> objectLockChanges() {
+    OmKeyInfo keyInfo = createKeyInfo(100L, 200L, 1024L, createChecksum((byte) 1),
+        createMetadata("meta", "one"), createTags("tag", "one"), createAcls(),
+        Collections.singletonList(createKeyLocationGroup(1L)));
+    Rule rule = Rule.newBuilder().setTimeUnit(TimeUnit.DAYS).setDuration(1).build();
+    ObjectRetention retention = new ObjectRetention(RetentionMode.GOVERNANCE, 1_800_000_000_000L, null);
+    OmKeyInfo retained = keyInfo.toBuilder().setRetention(retention).setLegalHold(true).build();
+    EventHold eventHold = EventHold.newBuilder().setEnabled(true).setRule(rule).build();
+    OmKeyInfo held = keyInfo.toBuilder()
+        .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null, eventHold)).build();
+    return Stream.of(
+        Arguments.of("unchanged absent fields", keyInfo, keyInfo.copyObject(), true),
+        Arguments.of("unchanged Object Lock fields", retained, retained.copyObject(), true),
+        Arguments.of("retention added", keyInfo, retained, false),
+        Arguments.of("retention removed", retained, retained.toBuilder().setRetention(null).build(), false),
+        Arguments.of("retention date changed", retained, retained.toBuilder()
+            .setRetention(new ObjectRetention(RetentionMode.GOVERNANCE, 1_800_000_000_001L, null)).build(), false),
+        Arguments.of("retention mode changed", retained, retained.toBuilder()
+            .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, retention.getRetentionDate(), null))
+            .build(), false),
+        Arguments.of("event hold without date", keyInfo, held, false),
+        Arguments.of("event hold disabled", held, held.toBuilder()
+            .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null,
+                eventHold.toBuilder().setEnabled(false).build())).build(), false),
+        Arguments.of("event hold rule changed", held, held.toBuilder()
+            .setRetention(new ObjectRetention(RetentionMode.COMPLIANCE, null,
+                eventHold.toBuilder().setRule(rule.toBuilder().setDuration(2)).build())).build(), false),
+        Arguments.of("legal hold enabled", keyInfo, keyInfo.toBuilder().setLegalHold(true).build(), false),
+        Arguments.of("legal hold disabled", retained, retained.toBuilder().setLegalHold(false).build(), false),
+        Arguments.of("legal hold absent versus false", keyInfo,
+            keyInfo.toBuilder().setLegalHold(false).build(), false));
   }
 
   @Test

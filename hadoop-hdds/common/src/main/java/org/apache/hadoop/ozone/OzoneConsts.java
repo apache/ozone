@@ -299,6 +299,8 @@ public final class OzoneConsts {
   public static final String STORAGE_TYPE = "storageType";
   public static final String RESOURCE_TYPE = "resourceType";
   public static final String IS_VERSION_ENABLED = "isVersionEnabled";
+  public static final String OBJECT_LOCK_ENABLED = "objectLockEnabled";
+  public static final String DEFAULT_RETENTION = "defaultRetention";
   public static final String CREATION_TIME = "creationTime";
   public static final String MODIFICATION_TIME = "modificationTime";
   public static final String DATA_SIZE = "dataSize";
