@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.StringJoiner;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -143,6 +144,15 @@ public class TestOMFailoverProxyProvider {
     // Next node failover should reset wait time.
     failoverToNextNode(numNodes - 1, 0);
     failoverToNextNode(1, waitBetweenRetries);
+  }
+
+  /**
+   * Tests that OM proxies do not retry connect timeouts on the same OM, since the provider fails over to the next OM.
+   */
+  @Test
+  public void testNoConnectRetriesOnTimeouts() {
+    OzoneManagerProtocolPB proxy = provider.getProxy().getProxy();
+    assertEquals(0, RPC.getConnectionIdForProxy(proxy).getMaxRetriesOnSocketTimeouts());
   }
 
   /**

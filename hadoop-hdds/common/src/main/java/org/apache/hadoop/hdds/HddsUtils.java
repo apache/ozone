@@ -59,6 +59,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import javax.management.ObjectName;
 import org.apache.hadoop.conf.ConfigRedactor;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -76,6 +77,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ipc_.RpcException;
@@ -868,6 +870,25 @@ public final class HddsUtils {
       }
     }
     return exception instanceof InvalidProtocolBufferException;
+  }
+
+  /**
+   * Returns the Hadoop configuration to create an RPC proxy to one of the servers of a failover proxy provider.
+   * Unless set explicitly, {@code ipc.client.connect.max.retries.on.timeouts} is 0 in the returned copy, so that
+   * a connect timeout fails over to the next server instead of being retried on the same server
+   * (Hadoop default 45 retries with {@code ipc.client.connect.timeout} 20s, about 15 minutes per attempt).
+   */
+  public static Configuration getFailoverProxyConfiguration(ConfigurationSource conf) {
+    final String key = CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY;
+    final Configuration hadoopConf = LegacyHadoopConfigurationSource.asHadoopConfiguration(conf);
+    if (conf.isExplicitlySet(key)) {
+      return hadoopConf;
+    }
+    // Copy to avoid changing the configuration shared with other clients.
+    final Configuration copy = hadoopConf instanceof OzoneConfiguration
+        ? new OzoneConfiguration(hadoopConf) : new Configuration(hadoopConf);
+    copy.setInt(key, 0);
+    return copy;
   }
 
   /**
