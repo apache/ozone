@@ -47,12 +47,10 @@ class TestMiniOzoneClusterProvider {
     MiniOzoneCluster first = mock(MiniOzoneCluster.class);
     MiniOzoneCluster second = mock(MiniOzoneCluster.class);
     TestBuilder builder = new TestBuilder(failure, first, second);
-    MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(builder,
-        2);
+    MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(builder, 2);
 
     try {
-      IOException exception = assertThrows(IOException.class,
-          provider::provide);
+      IOException exception = assertThrows(IOException.class, provider::provide);
       assertSame(failure, exception.getCause());
       assertSame(first, provider.provide());
       assertSame(second, provider.provide());
@@ -70,12 +68,10 @@ class TestMiniOzoneClusterProvider {
     MiniOzoneCluster first = mock(MiniOzoneCluster.class);
     MiniOzoneCluster second = mock(MiniOzoneCluster.class);
     TestBuilder builder = new TestBuilder(failed, first, second);
-    MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(builder,
-        2);
+    MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(builder, 2);
 
     try {
-      IOException exception = assertThrows(IOException.class,
-          provider::provide);
+      IOException exception = assertThrows(IOException.class, provider::provide);
       assertSame(failure, exception.getCause());
       assertSame(first, provider.provide());
       assertSame(second, provider.provide());
@@ -87,8 +83,48 @@ class TestMiniOzoneClusterProvider {
   }
 
   @Test
-  void shutdownDoesNotBlockWhenClusterCreationConsumesInterrupt()
-      throws Exception {
+  void retriesAfterRuntimeBuildFailure() throws Exception {
+    RuntimeException failure = new IllegalStateException("failed");
+    MiniOzoneCluster first = mock(MiniOzoneCluster.class);
+    TestBuilder builder = new TestBuilder(failure, first);
+    MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(builder, 1);
+
+    try {
+      assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+        IOException exception = assertThrows(IOException.class, provider::provide);
+        assertSame(failure, exception.getCause());
+        assertSame(first, provider.provide());
+        assertEquals(2, builder.getBuildCount());
+      });
+    } finally {
+      provider.shutdown();
+    }
+  }
+
+  @Test
+  void retriesAfterRuntimeReadinessFailureAndShutsDownCluster() throws Exception {
+    RuntimeException failure = new IllegalStateException("failed");
+    MiniOzoneCluster failed = mock(MiniOzoneCluster.class);
+    doThrow(failure).when(failed).waitForClusterToBeReady();
+    MiniOzoneCluster first = mock(MiniOzoneCluster.class);
+    TestBuilder builder = new TestBuilder(failed, first);
+    MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(builder, 1);
+
+    try {
+      assertTimeoutPreemptively(Duration.ofSeconds(5), () -> {
+        IOException exception = assertThrows(IOException.class, provider::provide);
+        assertSame(failure, exception.getCause());
+        verify(failed).shutdown();
+        assertSame(first, provider.provide());
+        assertEquals(2, builder.getBuildCount());
+      });
+    } finally {
+      provider.shutdown();
+    }
+  }
+
+  @Test
+  void shutdownDoesNotBlockWhenClusterCreationConsumesInterrupt() throws Exception {
     IOException failure = new IOException("failed");
     MiniOzoneCluster cluster = mock(MiniOzoneCluster.class);
     CountDownLatch readinessStarted = new CountDownLatch(1);
@@ -101,8 +137,7 @@ class TestMiniOzoneClusterProvider {
       }
       return null;
     }).when(cluster).waitForClusterToBeReady();
-    MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(
-        new TestBuilder(failure, cluster), 1);
+    MiniOzoneClusterProvider provider = new MiniOzoneClusterProvider(new TestBuilder(failure, cluster), 1);
 
     assertTrue(readinessStarted.await(5, TimeUnit.SECONDS));
     assertTimeoutPreemptively(Duration.ofSeconds(5), provider::shutdown);
@@ -124,6 +159,9 @@ class TestMiniOzoneClusterProvider {
       Object result = results.remove();
       if (result instanceof IOException) {
         throw (IOException) result;
+      }
+      if (result instanceof RuntimeException) {
+        throw (RuntimeException) result;
       }
       return (MiniOzoneCluster) result;
     }
