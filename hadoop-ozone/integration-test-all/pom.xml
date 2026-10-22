@@ -23,9 +23,10 @@
   <version>2.3.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone Integration Tests All</name>
-  <description>Apache Ozone Integration Tests which may on all Ozone components</description>
+  <description>Apache Ozone Integration Tests which may depend on any Ozone module</description>
 
   <!-- Please keep tests in this module to the minimum. -->
+  <!-- Add Ozone dependencies as needed -->
 
   <dependencies>
     <dependency>
@@ -38,7 +39,6 @@
       <artifactId>hadoop-common</artifactId>
       <scope>test</scope>
     </dependency>
-    <!-- Add Ozone components as dependencies as needed. -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
