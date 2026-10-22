@@ -104,7 +104,7 @@ class TestLocalChunkInputStream extends InputStreamTests {
             (BlockInputStream)keyInputStream.getPartStreams().get(0);
         block0Stream.initialize();
         assertNotNull(block0Stream.getBlockFileInputStream());
-        assertThat(shortCircuitClientLog.getOutput()).contains("XceiverClientShortCircuit is created");
+        assertThat(shortCircuitClientLog.getOutput()).contains("Created: XceiverClientShortCircuit");
 
         // stop XceiverServerDomainSocket server before client sends the second getBlockRequest to server
         XceiverServerSpi server = getCluster().getHddsDatanodes().get(0)
