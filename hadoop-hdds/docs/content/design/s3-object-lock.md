@@ -268,7 +268,8 @@ So a user who can only write data cannot set a lock by adding a header.
 
 * Object Lock uses the same access types as data: `READ` to read lock information, `WRITE` to change it, and `WRITE` and `DELETE` for the Governance bypass.
   They apply to every client: S3 Gateway, ofs / o3fs and the Ozone CLI.
-* Ranger has no administrator role, so setting Compliance needs no special permission: `PutObjectRetention` (`WRITE`) is enough, unlike native ACLs, where it needs an Ozone administrator.
+* Setting Compliance only needs `PutObjectRetention` (`WRITE`), as in AWS S3, so it can be delegated per bucket with Ranger policies.
+  Requiring an Ozone administrator, as with native ACLs, would make it cluster wide.
   Only `action-matches` can limit who sets it. No Ranger permission can remove a Compliance retention; only the offline `ozone repair` command can (see [Offline Compliance Retention Repair](#offline-compliance-retention-repair)).
 
 ##### Access Type Mapping
