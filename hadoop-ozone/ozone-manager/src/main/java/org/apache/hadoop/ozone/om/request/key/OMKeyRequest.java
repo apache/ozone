@@ -1131,10 +1131,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nonnull long transactionLogIndex, long objectID,
           OmConfig configuration) throws IOException {
 
-    if (args.getMultipartNumber() <= 0) {
-      throw new OMException("Part number should be greater than zero, but was " + args.getMultipartNumber(),
-          INVALID_PART);
-    }
+    validatePartNumber(args.getMultipartNumber());
     // When key is multipart upload part key, we should take replication
     // type and replication factor from original key which has done
     // initiate multipart upload. If we have not found any such, we throw
@@ -1170,6 +1167,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return createFileInfo(args, locations, partKeyInfo.getReplicationConfig(),
             size, encInfo, prefixManager, omBucketInfo, omPathInfo,
             transactionLogIndex, objectID, configuration);
+  }
+
+  protected static void validatePartNumber(int partNumber) throws OMException {
+    if (partNumber <= 0) {
+      throw new OMException("Part number should be greater than zero, but was " + partNumber, INVALID_PART);
+    }
   }
 
   /**
