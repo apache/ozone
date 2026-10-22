@@ -32,6 +32,7 @@ import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -42,6 +43,7 @@ import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OMUpgradeTestUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
@@ -185,6 +187,33 @@ public class TestMultiTenantVolume {
     // the s3 volume.
     ObjectStore store2 = getStoreForAccessID(UUID.randomUUID().toString());
     assertS3BucketNotFound(store2, BUCKET_NAME);
+
+    String keyName = "key";
+    String uploadID = bucket.initiateMultipartUpload(keyName).getUploadID();
+    store.getClientProxy().abortS3MultipartUpload(BUCKET_NAME, keyName, uploadID);
+    OMException exception = assertThrows(OMException.class, () -> bucket.abortMultipartUpload(keyName, uploadID));
+    assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, exception.getResult());
+
+    // Abort through a tenant link to an FSO bucket in another volume.
+    String sourceVolumeName = "source-volume";
+    String sourceBucketName = "source-bucket";
+    String linkBucketName = "link-bucket";
+    store.createVolume(sourceVolumeName);
+    OzoneVolume sourceVolume = store.getVolume(sourceVolumeName);
+    sourceVolume.createBucket(sourceBucketName, BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED).build());
+    store.getS3Volume().createBucket(linkBucketName, BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.OBJECT_STORE)
+        .setSourceVolume(sourceVolumeName).setSourceBucket(sourceBucketName).build());
+    OzoneBucket sourceBucket = sourceVolume.getBucket(sourceBucketName);
+    String linkUploadID = sourceBucket.initiateMultipartUpload(keyName).getUploadID();
+    store.getClientProxy().abortS3MultipartUpload(linkBucketName, keyName, linkUploadID);
+    exception = assertThrows(OMException.class, () -> sourceBucket.abortMultipartUpload(keyName, linkUploadID));
+    assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, exception.getResult());
+
+    store.deleteS3Bucket(linkBucketName);
+    sourceVolume.deleteBucket(sourceBucketName);
+    store.deleteVolume(sourceVolumeName);
 
     // Delete bucket.
     store.deleteS3Bucket(BUCKET_NAME);

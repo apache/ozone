@@ -25,8 +25,10 @@ import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.getOmPartModifica
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.apache.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.http.HttpStatus.SC_OK;
+import static org.apache.http.HttpStatus.SC_PARTIAL_CONTENT;
 import static org.apache.http.HttpStatus.SC_REQUESTED_RANGE_NOT_SATISFIABLE;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -64,12 +66,15 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -236,6 +241,12 @@ import software.amazon.awssdk.utils.IoUtils;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonHATests.TestCase {
 
+  /**
+   * Test-only key for the {@code host:port} http address of a gateway, outside the proxy, that has
+   * {@code ozone.client.ec.parallel.read.enabled} set.
+   */
+  public static final String EC_PARALLEL_READ_S3G_HTTP_ADDRESS_KEY = "ozone.test.s3g.ec.parallel.read.http.address";
+
   private static final String READ_CONSISTENCY_HEADER =
       "x-ozone-read-consistency";
   private static final String LOCAL_LEASE_LOG_LIMIT_HEADER =
@@ -341,6 +352,73 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
             }));
 
     assertEquals(content, objectBytes.asUtf8String());
+  }
+
+  /**
+   * Serial reads come first: a serial read asserts that no parallel read thread exists, and the threads of the
+   * parallel read pool outlive the read that starts them.
+   */
+  static Stream<Arguments> multiCellEcGetArguments() {
+    Stream.Builder<Arguments> arguments = Stream.builder();
+    for (boolean parallelRead : new boolean[] {false, true}) {
+      for (String readConsistency : new String[] {"follower-stale", "follower-linearizable", "leader-only"}) {
+        arguments.add(Arguments.of(readConsistency, parallelRead));
+      }
+    }
+    return arguments.build();
+  }
+
+  /**
+   * Gets an object of an EC bucket that spans several cells, so the gateway reads it with the request's S3
+   * authentication and read-consistency hint on the request thread, and, through the gateway at
+   * {@link #EC_PARALLEL_READ_S3G_HTTP_ADDRESS_KEY}, on its parallel read threads.
+   */
+  @ParameterizedTest
+  @MethodSource("multiCellEcGetArguments")
+  public void testGetMultiCellEcObjectWithReadConsistencyHeader(String readConsistency, boolean parallelRead)
+      throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    ECReplicationConfig ecConfig = new ECReplicationConfig("rs-3-2-1024k");
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName, BucketArgs.newBuilder()
+          .setDefaultReplicationConfig(new DefaultReplicationConfig(ecConfig)).build());
+    }
+    // Two full stripes and a partial one.
+    final byte[] content = new byte[7 * (int) OzoneConsts.MB + 100];
+    ThreadLocalRandom.current().nextBytes(content);
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromBytes(content));
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      assertEquals(ecConfig, ozoneClient.getObjectStore().getS3Bucket(bucketName).getKey(keyName)
+          .getReplicationConfig());
+    }
+
+    ResponseBytes<GetObjectResponse> objectBytes;
+    try (S3Client readClient = parallelRead ? createEcParallelReadS3Client() : null) {
+      objectBytes = (parallelRead ? readClient : s3Client).getObjectAsBytes(
+          b -> b.bucket(bucketName)
+              .key(keyName)
+              .overrideConfiguration(c -> {
+                c.putHeader(READ_CONSISTENCY_HEADER, readConsistency);
+                if ("follower-stale".equals(readConsistency)) {
+                  c.putHeader(LOCAL_LEASE_LOG_LIMIT_HEADER, "10");
+                }
+              }));
+    }
+
+    assertArrayEquals(content, objectBytes.asByteArray());
+    // Only the gateway with parallel reads enabled starts the pool.
+    assertEquals(parallelRead, Thread.getAllStackTraces().keySet().stream()
+        .anyMatch(t -> t.getName().startsWith("ec-parallel-reader-")));
+  }
+
+  /** An S3 client bound to the gateway that reads the cells of EC keys in parallel. */
+  private S3Client createEcParallelReadS3Client() throws Exception {
+    String address = cluster.getConf().get(EC_PARALLEL_READ_S3G_HTTP_ADDRESS_KEY);
+    assertNotNull(address, "expected the cluster to run a gateway with EC parallel reads enabled");
+    OzoneConfiguration gatewayConf = new OzoneConfiguration(cluster.getConf());
+    gatewayConf.set(S3GatewayConfigKeys.OZONE_S3G_HTTP_ADDRESS_KEY, address);
+    return new S3ClientFactory(gatewayConf).createS3ClientV2();
   }
 
   @Test
@@ -523,6 +601,25 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testPutObjectIfNoneMatchETag() {
+    String bucketName = getBucketName();
+    String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    PutObjectResponse initial = s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName).ifNoneMatch("\"different-etag\""), RequestBody.fromString("original"));
+
+    S3Exception error = assertThrows(S3Exception.class, () -> s3Client.putObject(
+        b -> b.bucket(bucketName).key(keyName).ifNoneMatch(initial.eTag()), RequestBody.fromString("replacement")));
+    assertEquals(412, error.statusCode());
+    assertEquals("PreconditionFailed", error.awsErrorDetails().errorCode());
+    assertEquals("original", s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String());
+
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName).ifNoneMatch("\"different-etag\""),
+        RequestBody.fromString("replacement"));
+    assertEquals("replacement", s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String());
+  }
+
+  @Test
   public void testPutObjectIfMatch() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -570,8 +667,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(initialResponse.eTag(), headObjectResponse.eTag());
   }
 
-  @Test
-  public void testPutObjectIfMatchMissingKeyFail() {
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testPutObjectIfMatchMissingKeyFail(String ifMatch) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(b -> b.bucket(bucketName));
@@ -579,11 +677,11 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.putObject(b -> b
             .bucket(bucketName)
             .key(keyName)
-            .ifMatch("some-etag"),
+            .ifMatch(ifMatch),
         RequestBody.fromString("bar2")));
 
-    assertEquals(412, exception.statusCode());
-    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+    assertEquals(404, exception.statusCode());
+    assertEquals("NoSuchKey", exception.awsErrorDetails().errorCode());
     assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(
         b -> b.bucket(bucketName).key(keyName)));
   }
@@ -1038,6 +1136,27 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(Long.valueOf(content.length()), response.contentLength());
   }
 
+  @Test
+  public void testHeadObjectRange() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "0123456789";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    HeadObjectResponse response = s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range("bytes=0-4"));
+
+    assertEquals(SC_PARTIAL_CONTENT, response.sdkHttpResponse().statusCode());
+    assertEquals(Long.valueOf(5), response.contentLength());
+    assertEquals("bytes 0-4/10", response.contentRange());
+    assertEquals("bytes", response.acceptRanges());
+
+    // A HEAD error has no body, so only the status code identifies InvalidRange.
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range("bytes=10-20")));
+    assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, exception.statusCode());
+  }
+
   /**
    * A stored object's Content-Type must come back on the wire exactly as it was
    * put, without a charset appended. This asserts the stored-object path through
@@ -1395,6 +1514,36 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testCompleteMultipartUploadIfNoneMatchETag() {
+    String bucketName = getBucketName();
+    String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    String currentETag = null;
+    String currentContent = null;
+    for (int attempt = 0; attempt < 3; attempt++) {
+      String content = "content-" + attempt;
+      String condition = attempt == 1 ? currentETag : "\"different-etag\"";
+      String uploadId = s3Client.createMultipartUpload(b -> b.bucket(bucketName).key(keyName)).uploadId();
+      String partETag = s3Client.uploadPart(b -> b.bucket(bucketName).key(keyName).uploadId(uploadId).partNumber(1),
+          RequestBody.fromString(content)).eTag();
+      CompleteMultipartUploadRequest request = CompleteMultipartUploadRequest.builder()
+          .bucket(bucketName).key(keyName).uploadId(uploadId).ifNoneMatch(condition)
+          .multipartUpload(CompletedMultipartUpload.builder()
+              .parts(CompletedPart.builder().partNumber(1).eTag(partETag).build()).build()).build();
+      if (attempt == 1) {
+        S3Exception error = assertThrows(S3Exception.class, () -> s3Client.completeMultipartUpload(request));
+        assertEquals(412, error.statusCode());
+        assertEquals("PreconditionFailed", error.awsErrorDetails().errorCode());
+        s3Client.abortMultipartUpload(b -> b.bucket(bucketName).key(keyName).uploadId(uploadId));
+      } else {
+        currentETag = s3Client.completeMultipartUpload(request).eTag();
+        currentContent = content;
+      }
+      assertEquals(currentContent, s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName)).asUtf8String());
+    }
+  }
+
+  @Test
   public void testCompleteMultipartUploadIfMatch() {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
@@ -1482,8 +1631,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
   }
 
-  @Test
-  public void testCompleteMultipartUploadIfMatchMissingKeyFail() {
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "\"some-etag\""})
+  public void testCompleteMultipartUploadIfMatchMissingKeyFail(String ifMatch) {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     s3Client.createBucket(b -> b.bucket(bucketName));
@@ -1514,11 +1664,11 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
         .bucket(bucketName)
         .key(keyName)
         .uploadId(uploadId)
-        .ifMatch("\"some-etag\"")
+        .ifMatch(ifMatch)
         .multipartUpload(CompletedMultipartUpload.builder().parts(completedPart).build())));
 
-    assertEquals(412, exception.statusCode());
-    assertEquals("PreconditionFailed", exception.awsErrorDetails().errorCode());
+    assertEquals(404, exception.statusCode());
+    assertEquals("NoSuchKey", exception.awsErrorDetails().errorCode());
   }
 
   @Test
@@ -2090,6 +2240,60 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(content, response.asUtf8String());
     assertEquals(Long.valueOf(content.length()), response.response().contentLength());
     assertNull(response.response().contentRange());
+  }
+
+  @Test
+  public void testGetAndHeadObjectUnsatisfiableRange() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String emptyKeyName = getKeyName("empty");
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString("0123456789"));
+    s3Client.putObject(b -> b.bucket(bucketName).key(emptyKeyName), RequestBody.empty());
+
+    for (String range : Arrays.asList("bytes=10-", "bytes=-0", "bytes=10-20")) {
+      S3Exception exception = assertThrows(S3Exception.class,
+          () -> s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(keyName).range(range)));
+      assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, exception.statusCode(), range);
+      assertEquals("InvalidRange", exception.awsErrorDetails().errorCode(), range);
+
+      // HEAD responses have no body, so only the status code is checked.
+      S3Exception headException = assertThrows(S3Exception.class,
+          () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range(range)));
+      assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, headException.statusCode(), range);
+    }
+
+    S3Exception exception = assertThrows(S3Exception.class,
+        () -> s3Client.getObjectAsBytes(b -> b.bucket(bucketName).key(emptyKeyName).range("bytes=-5")));
+    assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, exception.statusCode());
+    assertEquals("InvalidRange", exception.awsErrorDetails().errorCode());
+
+    S3Exception headException = assertThrows(S3Exception.class,
+        () -> s3Client.headObject(b -> b.bucket(bucketName).key(emptyKeyName).range("bytes=-5")));
+    assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, headException.statusCode());
+  }
+
+  @Test
+  public void testGetAndHeadObjectRangeWithoutNumbers() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "0123456789";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    s3Client.putObject(b -> b.bucket(bucketName).key(keyName), RequestBody.fromString(content));
+
+    // "bytes=-" has neither a first byte nor a suffix length, so it is ignored like AWS GetObject.
+    ResponseBytes<GetObjectResponse> response = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(keyName).range("bytes=-"));
+
+    assertEquals(SC_OK, response.response().sdkHttpResponse().statusCode());
+    assertEquals(content, response.asUtf8String());
+    assertEquals(Long.valueOf(content.length()), response.response().contentLength());
+    assertNull(response.response().contentRange());
+
+    HeadObjectResponse headResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range("bytes=-"));
+    assertEquals(SC_OK, headResponse.sdkHttpResponse().statusCode());
+    assertEquals(Long.valueOf(content.length()), headResponse.contentLength());
+    assertNull(headResponse.contentRange());
   }
 
   @Test

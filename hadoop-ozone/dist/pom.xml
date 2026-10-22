@@ -406,6 +406,7 @@
                     <argument>${basedir}/dev-support/bin/dist-tar-stitching</argument>
                     <argument>${hdds.version}</argument>
                     <argument>${project.build.directory}</argument>
+                    <argument>${project.build.outputTimestamp}</argument>
                   </arguments>
                 </configuration>
               </execution>

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeEmptyOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
@@ -29,6 +30,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -48,12 +50,20 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.hdds.utils.Archiver;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
@@ -325,6 +335,45 @@ public class TestOzoneManagerServiceProviderImpl {
     File[] files = checkpoint.getCheckpointLocation().toFile().listFiles();
     assertNotNull(files);
     assertEquals(2, files.length);
+  }
+
+  @Test
+  public void testCandidateDirClearedAfterFailedDownload(@TempDir File dirReconMetadata) throws Exception {
+    File completeSst = new File(dirReconMetadata, "000009.sst");
+    File truncatedSst = new File(dirReconMetadata, "000010.sst");
+    FileUtils.writeByteArrayToFile(completeSst, new byte[10_000]);
+    FileUtils.writeByteArrayToFile(truncatedSst, new byte[100_000]);
+    List<List<String>> requestedExclusions = new ArrayList<>();
+    ReconRDBSnapshotProvider snapshotProvider = new ReconRDBSnapshotProvider(omSnapshotDbParentDir, null, false,
+        HttpConfig.Policy.HTTP_ONLY, false, true, () -> null) {
+      @Override
+      public void downloadSnapshot(String leaderNodeID, File targetFile) throws IOException {
+        // The files the request tells the leader not to send again.
+        requestedExclusions.add(HAUtils.getExistingFiles(getCandidateDir()));
+        // The leader stream ends in the middle of the second, larger SST file.
+        try (ArchiveOutputStream<TarArchiveEntry> out = Archiver.tar(Files.newOutputStream(targetFile.toPath()))) {
+          Archiver.includeFile(completeSst, completeSst.getName(), out);
+          Archiver.includeFile(truncatedSst, truncatedSst.getName(), out);
+        }
+        try (RandomAccessFile file = new RandomAccessFile(targetFile, "rw")) {
+          file.setLength(file.length() / 2);
+        }
+      }
+    };
+    ReconUtils reconUtilsMock = getMockReconUtils();
+    when(reconUtilsMock.getReconNodeDetails(any(OzoneConfiguration.class)))
+        .thenReturn(ReconTestUtils.getReconNodeDetails());
+    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider = new OzoneManagerServiceProviderImpl(configuration,
+        mock(ReconOMMetadataManager.class), getMockTaskController(), reconUtilsMock, ozoneManagerProtocol,
+        reconContext, getMockTaskStatusUpdaterManager());
+    ozoneManagerServiceProvider.setReconSnapshotProvider(snapshotProvider);
+
+    assertNull(ozoneManagerServiceProvider.getOzoneManagerDBSnapshot());
+    assertNull(ozoneManagerServiceProvider.getOzoneManagerDBSnapshot());
+
+    // The failed attempt leaves nothing behind, so the retry does not ask the leader to skip the truncated file.
+    assertThat(requestedExclusions).containsExactly(emptyList(), emptyList());
+    assertThat(snapshotProvider.getCandidateDir().list()).isEmpty();
   }
 
   static RocksDatabase getRocksDatabase(OMMetadataManager om) {
