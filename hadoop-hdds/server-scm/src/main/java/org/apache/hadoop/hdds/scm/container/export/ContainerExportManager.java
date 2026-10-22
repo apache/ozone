@@ -92,6 +92,10 @@ public class ContainerExportManager {
 
   ContainerExportManager(String scmId, ContainerManager containerManager, BooleanSupplier isLeaderReady,
       String exportDirectory, int partSize, int batchSize, int maxRetained) {
+    // With maxRetained 0, a finished job would be dropped from jobMap at once, so its status could never be read.
+    if (maxRetained < 1) {
+      throw new IllegalArgumentException("maxRetained must be at least 1 but is " + maxRetained);
+    }
     this.defaultSizing = new ExportSizing(0, 0, 0, batchSize, partSize);
     this.containerManager = Objects.requireNonNull(containerManager, "containerManager == null");
     this.isLeaderReady = Objects.requireNonNull(isLeaderReady, "isLeaderReady == null");

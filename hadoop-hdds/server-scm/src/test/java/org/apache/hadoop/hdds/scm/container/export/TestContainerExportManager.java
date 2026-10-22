@@ -117,11 +117,16 @@ public class TestContainerExportManager {
   }
 
   @Test
-  public void testRejectNonPositiveSizes() {
+  public void testRejectNonPositiveValues() {
+    // part size
     assertThrows(IllegalArgumentException.class, () ->
         new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 0, 1, 1));
+    // batch size
     assertThrows(IllegalArgumentException.class, () ->
         new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 1, 0, 1));
+    // max retained
+    assertThrows(IllegalArgumentException.class, () ->
+        new ContainerExportManager(TEST_SCM_ID, containerManager, () -> true, tempDir.getAbsolutePath(), 1, 1, 0));
   }
 
   @Test
