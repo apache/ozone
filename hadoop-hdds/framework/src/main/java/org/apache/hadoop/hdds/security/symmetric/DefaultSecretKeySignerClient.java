@@ -103,10 +103,10 @@ public class DefaultSecretKeySignerClient implements SecretKeySignerClient {
 
   @VisibleForTesting
   static RetryPolicy initialSecretKeyRetryPolicy() {
-    // Exponential backoff policy, 100 max retries. The base wait time doubles
-    // up to 16s and each wait is randomized by +/-50%. The base wait times are:
-    // 2 4 8 16 16 16 ... (seconds)
-    // A single wait is at most 24s, and maximum total delay is around 26min.
+    // Exponential backoff policy, 100 max attempts. The base wait time doubles up to 16s
+    // and each wait is randomized by +/-50%. The base wait times are (retries start from 1):
+    // 4 8 16 16 16 ... (seconds)
+    // A single wait is at most 23s, and maximum total delay is around 26min.
     int maxRetries = 100;
     int maxBackoffExponent = 3;
     int baseWaitTime = 1;
