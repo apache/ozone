@@ -59,6 +59,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainersOnDecomNodeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeAdminErrorResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeStorageTypeUsageInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DeactivatePipelineResponseProto;
@@ -98,6 +99,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.InSafeModeResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListPipelineResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListStorageTypeUsageInfoRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ListStorageTypeUsageInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.QueryUpgradeFinalizationProgressRequestProto;
@@ -767,6 +770,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setSuppressContainerResponse(suppressContainer(request.getSuppressContainerRequest()))
+            .build();
+      case ListStorageTypeUsageInfo:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setListStorageTypeUsageInfoResponseProto(
+                getListStorageTypeUsageInfo(
+                    request.getListStorageTypeUsageInfoRequestProto(), request.getVersion()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -1441,6 +1452,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     List<Long> failedContainerIDs = impl.suppressContainers(request.getContainerIDsList(), request.getSuppress());
     return SuppressContainerResponseProto.newBuilder()
         .addAllFailedContainerIDs(failedContainerIDs)
+        .build();
+  }
+
+  public ListStorageTypeUsageInfoResponseProto getListStorageTypeUsageInfo(
+      ListStorageTypeUsageInfoRequestProto request, int clientVersion) throws IOException {
+    List<DatanodeStorageTypeUsageInfoProto> usageInfoProtos =
+        impl.listStorageTypeUsageInfo(request, clientVersion);
+    return ListStorageTypeUsageInfoResponseProto.newBuilder()
+        .addAllDatanodeStorageTypeUsageInfoProto(usageInfoProtos)
         .build();
   }
 }
