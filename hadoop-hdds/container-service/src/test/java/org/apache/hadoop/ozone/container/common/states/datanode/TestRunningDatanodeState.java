@@ -197,7 +197,7 @@ public class TestRunningDatanodeState {
   void testReconHeartbeatInterval() throws Exception {
     StateContext context = mock(StateContext.class);
     when(context.getHeartbeatFrequency()).thenReturn(100L);
-    when(context.getReconHeartbeatFrequency()).thenReturn(500L);
+    when(context.getReconHeartbeatFrequency()).thenReturn(1000L);
     RunningDatanodeState state = new RunningDatanodeState(null, mock(SCMConnectionManager.class), context);
     EndpointStateMachine recon = mock(EndpointStateMachine.class);
     when(recon.isPassive()).thenReturn(true);
@@ -216,7 +216,7 @@ public class TestRunningDatanodeState {
     when(recon.getState()).thenReturn(EndPointStates.HEARTBEAT);
     GenericTestUtils.waitFor(() -> !state.isReconHeartbeatNotDue(recon), 10, 5000);
     // Recon interval minus half of the SCM heartbeat interval
-    assertThat(Time.monotonicNow() - start).isGreaterThanOrEqualTo(450);
+    assertThat(Time.monotonicNow() - start).isGreaterThanOrEqualTo(950);
   }
 
   private static VersionResponse versionResponse() {
