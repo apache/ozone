@@ -124,6 +124,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         super.preExecute(ozoneManager).getCompleteMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartUploadCompleteRequest.getKeyArgs();
+    OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
     if (keyArgs.hasExcludedETag()) {
       ozoneManager.checkFeatureEnabled(OzoneManagerVersion.S3_IF_NONE_MATCH_ETAG);
     }
