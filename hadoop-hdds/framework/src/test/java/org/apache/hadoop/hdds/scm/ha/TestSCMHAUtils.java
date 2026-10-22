@@ -28,6 +28,7 @@ import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.util.Collection;
+import javax.security.sasl.SaslException;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
@@ -72,7 +73,7 @@ class TestSCMHAUtils {
 
   @ParameterizedTest
   @ValueSource(classes = {ServerNotLeaderException.class, RetriableWithFailOverException.class,
-      RetriableException.class})
+      RetriableException.class, org.apache.hadoop.ipc.RetriableException.class, SaslException.class})
   void failsOverOnRetriableServerException(Class<?> serverException) {
     assertEquals(RetryDecision.FAILOVER_AND_RETRY, getRetryDecision(fromServer(serverException)));
   }
@@ -80,6 +81,11 @@ class TestSCMHAUtils {
   @Test
   void retriesOnRetriableWithNoFailoverServerException() {
     assertNotEquals(RetryDecision.FAIL, getRetryDecision(fromServer(RetriableWithNoFailoverException.class)));
+  }
+
+  @Test
+  void failsOnRemoteException() {
+    assertEquals(RetryDecision.FAIL, getRetryDecision(new RemoteException(IOException.class.getName(), "error")));
   }
 
   @Test

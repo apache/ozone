@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.Time;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -68,6 +69,7 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
       thread.setDaemon(true);
       return thread;
     });
+    Throwable lastError = null;
     try {
       for (long remaining = deadline - Time.monotonicNow(); remaining > 0; remaining = deadline - Time.monotonicNow()) {
         final Future<Boolean> inSafeMode = executor.submit(scmClient::inSafeMode);
@@ -79,8 +81,12 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
           System.out.printf("SCM is in safe mode. Will retry in 1 sec. Remaining time (sec): %s%n",
               getRemainingTimeInSec(deadline));
         } catch (ExecutionException e) {
+          if (e.getCause() instanceof AccessControlException) {
+            throw (AccessControlException) e.getCause();
+          }
+          lastError = e.getCause();
           System.out.printf("SCM is not available (yet?). Error is %s. Will retry in 1 sec. Remaining time (sec): %s%n",
-              e.getCause().getMessage(), getRemainingTimeInSec(deadline));
+              lastError, getRemainingTimeInSec(deadline));
         } catch (TimeoutException e) {
           break;
         }
@@ -89,7 +95,9 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
     } finally {
       executor.shutdownNow();
     }
-    throw new TimeoutException("Safe mode is not ended within the timeout period.");
+    final TimeoutException timeout = new TimeoutException("Safe mode is not ended within the timeout period.");
+    timeout.initCause(lastError);
+    throw timeout;
   }
 
   private static long getRemainingTimeInSec(long deadline) {

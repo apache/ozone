@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.security.sasl.SaslException;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -63,7 +64,11 @@ public final class SCMHAUtils {
       RetriableWithFailOverException.class.getName(),
       RetriableWithNoFailoverException.class.getName(),
       ServerNotLeaderException.class.getName(),
-      RetriableException.class.getName());
+      RetriableException.class.getName(),
+      // Sent by SCM versions before the fork of Hadoop RPC.
+      org.apache.hadoop.ipc.RetriableException.class.getName(),
+      // Authentication can fail temporarily, e.g. Kerberos under load.
+      SaslException.class.getName());
 
   private static final ImmutableList<Class<? extends Exception>>
       NON_RETRIABLE_EXCEPTION_LIST =

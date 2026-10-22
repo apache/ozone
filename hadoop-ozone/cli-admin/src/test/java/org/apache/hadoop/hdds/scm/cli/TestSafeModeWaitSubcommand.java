@@ -17,15 +17,19 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.security.AccessControlException;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
 
@@ -43,12 +47,29 @@ public class TestSafeModeWaitSubcommand {
   @Test
   void retriesUntilOutOfSafeMode() throws Exception {
     ScmClient scmClient = mock(ScmClient.class);
-    when(scmClient.inSafeMode())
-        .thenThrow(new IOException("SCM is not available"))
-        .thenReturn(true)
-        .thenReturn(false);
+    when(scmClient.inSafeMode()).thenThrow(new IOException("SCM is not available")).thenReturn(true, false);
 
     assertTimeoutPreemptively(Duration.ofSeconds(10), () -> newCommand("30").execute(scmClient));
+    verify(scmClient, times(3)).inSafeMode();
+  }
+
+  @Test
+  void timesOutInSafeMode() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.inSafeMode()).thenThrow(new IOException("SCM is not available")).thenReturn(true);
+
+    TimeoutException e = assertThrows(TimeoutException.class, () -> newCommand("2").execute(scmClient));
+    // The last error is kept as the cause.
+    assertThat(e).hasRootCauseMessage("SCM is not available");
+  }
+
+  @Test
+  void failsOnAccessControlException() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    when(scmClient.inSafeMode()).thenThrow(new AccessControlException("denied"));
+
+    assertThrows(AccessControlException.class, () -> newCommand("30").execute(scmClient));
+    verify(scmClient, times(1)).inSafeMode();
   }
 
   @Test
