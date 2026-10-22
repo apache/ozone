@@ -110,8 +110,8 @@ import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Unhealthy;
-import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -1307,10 +1307,9 @@ public class TestBlockDeletingService {
   private void assertDeletionsInChecksumFile(ContainerData data, int expectedNumBlocks) {
     // deleteAndWait only waits for the deleting tasks to be submitted, so the checksum file may not be written yet.
     try {
-      GenericTestUtils.waitFor((CheckedSupplier<Boolean, IOException>) () ->
-          getNumDeletedBlocksInChecksumFile(data) >= expectedNumBlocks, 100, 3000);
+      LambdaTestUtils.await(3000, 100, () -> getNumDeletedBlocksInChecksumFile(data) >= expectedNumBlocks);
       assertEquals(expectedNumBlocks, getNumDeletedBlocksInChecksumFile(data));
-    } catch (IOException | TimeoutException | InterruptedException ex) {
+    } catch (Exception ex) {
       fail("Container checksum tree file did not record " + expectedNumBlocks + " deleted blocks", ex);
     }
   }
