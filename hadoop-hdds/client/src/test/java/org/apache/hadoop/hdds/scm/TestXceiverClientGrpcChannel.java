@@ -63,7 +63,7 @@ class TestXceiverClientGrpcChannel {
   }
 
   @ParameterizedTest(name = "{0}")
-  @CsvSource({"500ms, 500", "30s, 30000", "45, 45000"})
+  @CsvSource({"500ms, 500", "1500ms, 1500", "30s, 30000", "45, 45000"})
   void timeoutIsInMillis(String value, long expectedMillis) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT, value);
