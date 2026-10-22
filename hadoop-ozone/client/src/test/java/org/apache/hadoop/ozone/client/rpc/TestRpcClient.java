@@ -99,10 +99,8 @@ public class TestRpcClient {
 
   /** Child JVM for the HDDS-10564 regression test, using the actual RpcClient write executor. */
   public static final class RatisWriteClient {
-    private static RpcClient client;
-
     public static void main(String[] args) throws Exception {
-      client = createRpcClient();
+      RpcClient client = createRpcClient();
       @SuppressWarnings("unchecked")
       Supplier<ExecutorService> executor =
           (Supplier<ExecutorService>) FieldUtils.readField(client, "writeExecutor", true);

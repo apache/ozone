@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -60,12 +61,12 @@ public class TestClientThreadShutdown {
   // Retain clients until JVM exit, so Timer finalization cannot hide a non-daemon thread.
   private static Object retainedClient;
 
+  @TempDir
+  private Path tempDir;
+
   enum Client {
     STREAM_WRITE, SHORT_CIRCUIT, DOMAIN_SOCKET_FACTORY, EC_RECONSTRUCTION
   }
-
-  @TempDir
-  private Path tempDir;
 
   @ParameterizedTest
   @EnumSource(Client.class)
@@ -111,6 +112,7 @@ public class TestClientThreadShutdown {
     retainedClient = stream;
     stream.write(new byte[100]);
     stream.getResponseExecutor().submit(() -> { }).get(10, TimeUnit.SECONDS);
+    assertNotNull(retainedClient);
     System.out.println(READY);
   }
 
@@ -198,6 +200,7 @@ public class TestClientThreadShutdown {
     default:
       throw new IllegalArgumentException(args[0]);
     }
+    assertNotNull(retainedClient);
     System.out.println(READY);
   }
 
