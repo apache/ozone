@@ -1173,6 +1173,24 @@ class TestObjectPut {
     assertThat(fsoBucket.getKey("dir/").isFile()).isFalse();
   }
 
+  @Test
+  void testDirectoryCreationWithSignedTrailerOnOmWithoutDerivedKey() throws Exception {
+    objectEndpoint.getOzoneConfiguration().setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, true);
+    configureSignedChunksWithTrailer(0);
+    when(headers.getHeaderString(X_AMZ_TRAILER)).thenReturn("x-amz-checksum-crc32");
+    OzoneClient client = spy(objectEndpoint.getClient());
+    ClientProtocol protocol = spy(client.getProxy());
+    when(protocol.getOmVersion()).thenReturn(OzoneManagerVersion.LOOKUP_FILE_REJECTS_OBS);
+    doReturn(protocol).when(client).getProxy();
+    objectEndpoint.setClient(client);
+    // Rebuild the handler chain to use the spied endpoint and client.
+    objectEndpoint.init();
+
+    assertSucceeds(() -> put(objectEndpoint, FSO_BUCKET_NAME, "dir/",
+        signedChunkedBodyWithTrailer("", "x-amz-checksum-crc32", "AAAAAA==")));
+    assertThat(fsoBucket.getKey("dir/").isFile()).isFalse();
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"", "0\r\n", "0\r\nx-amz-checksum-crc32:AAAAAA==\r\n"})
   void testDirectoryCreationRejectsIncompleteUnsignedTrailer(String body) {

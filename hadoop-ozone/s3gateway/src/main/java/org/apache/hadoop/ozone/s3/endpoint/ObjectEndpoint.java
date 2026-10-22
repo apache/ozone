@@ -258,10 +258,10 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         String payloadMode = getHeaders().getHeaderString(S3Consts.X_AMZ_CONTENT_SHA256);
         if (STREAMING_UNSIGNED_PAYLOAD_TRAILER.equals(payloadMode)
             || STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER.equals(payloadMode)) {
-          S3ChunkInputStreamInfo info = getS3ChunkInputStreamInfo(body, length, amzDecodedLength, keyPath);
+          // No key is opened for a directory: verify trailer framing and checksum without a chunk signing key.
+          S3ChunkInputStreamInfo info = getS3ChunkInputStreamInfo(body, length, amzDecodedLength, keyPath, false);
           multiDigestInputStream = info.getMultiDigestInputStream();
           validateContentLength(info.getEffectiveLength(), 0, keyPath).run();
-          // No key is opened for a directory: verify trailer framing and checksum without a chunk signing key.
           S3ObjectWriteGuard.verifyChunksComplete(multiDigestInputStream);
         }
         getClientProtocol()
