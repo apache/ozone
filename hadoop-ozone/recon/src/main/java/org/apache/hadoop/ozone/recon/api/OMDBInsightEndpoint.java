@@ -53,6 +53,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -60,7 +61,9 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.recon.ReconResponseUtils;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
@@ -75,6 +78,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
+import org.apache.hadoop.ozone.recon.tasks.MultipartInfoInsightHandler;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -207,8 +211,8 @@ public class OMDBInsightEndpoint {
           skipPrevKeyDone = true; // Don't use the prevKey for the file table
           KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
           openKeyInsightInfo.getNonFSOKeyInfoList().add(keyEntityInfo); // Add to non-FSO list
-          replicatedTotal += entry.getValue().getReplicatedSize();
-          unreplicatedTotal += entry.getValue().getDataSize();
+          replicatedTotal += keyEntityInfo.getReplicatedSize();
+          unreplicatedTotal += keyEntityInfo.getSize();
           lastKey = entry.getKey(); // Update lastKey
         }
       }
@@ -224,8 +228,8 @@ public class OMDBInsightEndpoint {
           keysFound = true;
           KeyEntityInfo keyEntityInfo = createKeyEntityInfoFromOmKeyInfo(entry.getKey(), entry.getValue());
           openKeyInsightInfo.getFsoKeyInfoList().add(keyEntityInfo); // Add to FSO list
-          replicatedTotal += entry.getValue().getReplicatedSize();
-          unreplicatedTotal += entry.getValue().getDataSize();
+          replicatedTotal += keyEntityInfo.getReplicatedSize();
+          unreplicatedTotal += keyEntityInfo.getSize();
           lastKey = entry.getKey(); // Update lastKey
         }
       }
@@ -306,9 +310,9 @@ public class OMDBInsightEndpoint {
    * This method calculates and returns a summary of open keys.
    *
    * @return The HTTP  response body includes a map with the following entries:
-   * - "totalOpenKeys": the total number of open keys
-   * - "totalReplicatedDataSize": the total replicated size for open keys
-   * - "totalUnreplicatedDataSize": the total unreplicated size for open keys
+   * - "totalOpenKeys": the total number of open keys, with each incomplete multipart upload counted once
+   * - "totalReplicatedDataSize": the total replicated size for open keys, including committed multipart parts
+   * - "totalUnreplicatedDataSize": the total unreplicated size for open keys, including committed multipart parts
    *
    *
    * Example response:
@@ -321,7 +325,7 @@ public class OMDBInsightEndpoint {
   @GET
   @Path("/open/summary")
   public Response getOpenKeySummary() {
-    Map<String, Long> keysSummary = reconGlobalMetricsService.getOpenKeySummary();
+    Map<String, Long> keysSummary = reconGlobalMetricsService.getOpenKeySummaryWithMPU();
     return Response.ok(keysSummary).build();
   }
 
@@ -1167,12 +1171,36 @@ public class OMDBInsightEndpoint {
     keyEntityInfo.setIsKey(keyInfo.isFile());
     String fullKeyPath = ReconUtils.constructFullPath(keyInfo, reconNamespaceSummaryManager);
     keyEntityInfo.setPath(fullKeyPath.isEmpty() ? keyInfo.getKeyName() : fullKeyPath);
-    keyEntityInfo.setSize(keyInfo.getDataSize());
+    if (OMMultipartUploadUtils.isMultipartKeySet(keyInfo)) {
+      Pair<Long, Long> uploadSize = getMultipartUploadSize(dbKey, keyInfo);
+      keyEntityInfo.setSize(uploadSize.getLeft());
+      keyEntityInfo.setReplicatedSize(uploadSize.getRight());
+    } else {
+      keyEntityInfo.setSize(keyInfo.getDataSize());
+      keyEntityInfo.setReplicatedSize(keyInfo.getReplicatedSize());
+    }
     keyEntityInfo.setCreationTime(keyInfo.getCreationTime());
     keyEntityInfo.setModificationTime(keyInfo.getModificationTime());
-    keyEntityInfo.setReplicatedSize(keyInfo.getReplicatedSize());
     keyEntityInfo.setReplicationConfig(keyInfo.getReplicationConfig());
     return keyEntityInfo;
+  }
+
+  /**
+   * Returns the (unreplicated, replicated) size of the committed parts of the multipart upload that a multipart
+   * open key belongs to, or zero if the upload can no longer be found.
+   */
+  private Pair<Long, Long> getMultipartUploadSize(String dbKey, OmKeyInfo keyInfo) throws IOException {
+    String uploadId = OMMultipartUploadUtils.getUploadIdFromDbKey(dbKey);
+    if (uploadId == null) {
+      return Pair.of(0L, 0L);
+    }
+    String multipartKey = omMetadataManager.getMultipartKey(
+        keyInfo.getVolumeName(), keyInfo.getBucketName(), keyInfo.getKeyName(), uploadId);
+    OmMultipartKeyInfo multipartKeyInfo = omMetadataManager.getMultipartInfoTable().get(multipartKey);
+    if (multipartKeyInfo == null) {
+      return Pair.of(0L, 0L);
+    }
+    return MultipartInfoInsightHandler.getCommittedPartsSize(multipartKeyInfo, omMetadataManager);
   }
 
   private void createSummaryForDeletedDirectories(
