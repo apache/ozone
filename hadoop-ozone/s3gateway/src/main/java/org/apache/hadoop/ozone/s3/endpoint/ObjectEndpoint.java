@@ -977,8 +977,14 @@ public class ObjectEndpoint extends ObjectOperationHandler {
               || matcher.group("end").isEmpty()) {
             throw newError(S3ErrorTable.INVALID_ARGUMENT, range);
           }
-          long startOffset = Long.parseLong(matcher.group("start"));
-          long endOffset = Long.parseLong(matcher.group("end"));
+          long startOffset;
+          long endOffset;
+          try {
+            startOffset = Long.parseLong(matcher.group("start"));
+            endOffset = Long.parseLong(matcher.group("end"));
+          } catch (NumberFormatException e) {
+            throw newError(S3ErrorTable.INVALID_ARGUMENT, range, e);
+          }
           long sourceSize = sourceKeyDetails.getDataSize();
           if (startOffset > endOffset || endOffset >= sourceSize) {
             throw newError(S3ErrorTable.INVALID_RANGE, range);

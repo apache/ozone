@@ -383,7 +383,10 @@ public class TestObjectHead {
         Arguments.of("bytes=5-", HttpStatus.SC_PARTIAL_CONTENT, 5L, "bytes 5-9/10"),
         Arguments.of("bytes=-3", HttpStatus.SC_PARTIAL_CONTENT, 3L, "bytes 7-9/10"),
         Arguments.of("bytes=8-20", HttpStatus.SC_PARTIAL_CONTENT, 2L, "bytes 8-9/10"),
-        Arguments.of("bytes=5-2", HttpStatus.SC_OK, 10L, null));
+        Arguments.of("bytes=5-2", HttpStatus.SC_OK, 10L, null),
+        Arguments.of("bytes=0-" + Long.MAX_VALUE, HttpStatus.SC_PARTIAL_CONTENT, 10L, "bytes 0-9/10"),
+        Arguments.of("bytes=0-9223372036854775808", HttpStatus.SC_OK, 10L, null),
+        Arguments.of("bytes=0-99999999999999999999", HttpStatus.SC_OK, 10L, null));
   }
 
   private byte[] createKey(String keyPath) throws IOException {

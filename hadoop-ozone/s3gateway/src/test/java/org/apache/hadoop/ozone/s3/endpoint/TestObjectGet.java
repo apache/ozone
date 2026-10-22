@@ -64,6 +64,8 @@ import org.apache.hadoop.ozone.s3.util.RFC1123Util;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test get object.
@@ -333,6 +335,28 @@ public class TestObjectGet {
         response.getHeaderString("Content-Range"));
 
     assertNull(response.getHeaderString(TAG_COUNT_HEADER));
+  }
+
+  @Test
+  public void getRangeHeaderWithLongMaxValue() throws IOException, OS3Exception {
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-" + Long.MAX_VALUE);
+
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.PARTIAL_CONTENT.getStatusCode(), response.getStatus());
+    assertEquals(String.valueOf(CONTENT.length()), response.getHeaderString("Content-Length"));
+    assertEquals(String.format("bytes 0-%s/%s", CONTENT.length() - 1, CONTENT.length()),
+        response.getHeaderString("Content-Range"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"bytes=0-9223372036854775808", "bytes=0-99999999999999999999"})
+  public void getRangeHeaderOverflowingLongIsIgnored(String range) throws IOException, OS3Exception {
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
+
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    assertEquals(String.valueOf(CONTENT.length()), response.getHeaderString("Content-Length"));
+    assertNull(response.getHeaderString("Content-Range"));
   }
 
   @Test
