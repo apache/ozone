@@ -83,6 +83,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
@@ -92,7 +93,6 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -662,16 +662,14 @@ public class TestStorageContainerManager {
       cluster.waitForClusterToBeReady();
       cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 30000);
 
-      DataTestUtil.createKeys(cluster, 10);
-      GenericTestUtils.waitFor(() ->
-          cluster.getStorageContainerManager().getContainerManager()
-              .getContainers() != null, 1000, 10000);
+      OmKeyInfo key = DataTestUtil.createKeys(cluster, 10)
+          .values().iterator().next();
+      long containerID = key.getLatestVersionLocations()
+          .createLocationList().get(0).getContainerID();
 
       StorageContainerManager scm = cluster.getStorageContainerManager();
-      List<ContainerInfo> containers = cluster.getStorageContainerManager()
-          .getContainerManager().getContainers();
-      assertNotNull(containers);
-      ContainerInfo selectedContainer = containers.iterator().next();
+      ContainerInfo selectedContainer = scm.getContainerManager()
+          .getContainer(ContainerID.valueOf(containerID));
 
       // Stop processing HB
       scm.getDatanodeProtocolServer().stop();
@@ -689,9 +687,10 @@ public class TestStorageContainerManager {
       }
 
       cluster.restartStorageContainerManager(false);
-      scm = cluster.getStorageContainerManager();
+      StorageContainerManager restartedScm =
+          cluster.getStorageContainerManager();
 
-      ReplicationManager rm = scm.getReplicationManager();
+      ReplicationManager rm = restartedScm.getReplicationManager();
 
       NodeManager nodeManager = mock(NodeManager.class);
       setInternalState(rm, "nodeManager", nodeManager);
@@ -703,18 +702,17 @@ public class TestStorageContainerManager {
           new CloseContainerCommand(selectedContainer.getContainerID(),
               selectedContainer.getPipelineID(), false);
 
+      // processAll cannot send the close command until ReplicationManager is ready
+      // and SCM has received the replica report.
       GenericTestUtils.waitFor(() -> {
-        SCMContext scmContext
-            = cluster.getStorageContainerManager().getScmContext();
-        return !scmContext.isInSafeMode() && scmContext.isLeader();
-      }, 1000, 25000);
-
-      // After safe mode is off, ReplicationManager starts to run with a delay.
-      Thread.sleep(5000);
-      // Give ReplicationManager some time to process the containers.
-      cluster.getStorageContainerManager()
-          .getReplicationManager().processAll();
-      Thread.sleep(5000);
+        try {
+          return rm.shouldRun() && !restartedScm.getContainerManager()
+              .getContainerReplicas(selectedContainer.containerID()).isEmpty();
+        } catch (ContainerNotFoundException e) {
+          return false;
+        }
+      }, 100, 30000);
+      rm.processAll();
       verify(nodeManager).addDatanodeCommand(dnUuid, closeContainerCommand);
     }
   }

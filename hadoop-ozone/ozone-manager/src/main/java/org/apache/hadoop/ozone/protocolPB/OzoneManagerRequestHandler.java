@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -1336,9 +1337,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
     boolean allowPartialPrefixes =
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
+    final long numEntries = limitListSize(request.getNumEntries());
     List<OzoneFileStatus> statuses =
         impl.listStatus(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), limitListSize(request.getNumEntries()),
+            request.getStartKey(), numEntries,
             allowPartialPrefixes);
     ListStatusResponse.Builder
         listStatusResponseBuilder =
@@ -1346,6 +1348,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (OzoneFileStatus status : statuses) {
       listStatusResponseBuilder.addStatuses(status.getProtobuf(clientVersion));
     }
+    listStatusResponseBuilder.setIsTruncated(isListStatusTruncated(statuses.size(), numEntries));
     return listStatusResponseBuilder.build();
   }
 
@@ -1365,9 +1368,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     OmKeyArgs omKeyArgs = omKeyArgsBuilder.build();
     boolean allowPartialPrefixes =
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
+    final long numEntries = limitListSize(request.getNumEntries());
     List<OzoneFileStatusLight> statuses =
         impl.listStatusLight(omKeyArgs, request.getRecursive(),
-            request.getStartKey(), limitListSize(request.getNumEntries()),
+            request.getStartKey(), numEntries,
             allowPartialPrefixes);
     ListStatusLightResponse.Builder
         listStatusLightResponseBuilder =
@@ -1375,7 +1379,17 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     for (OzoneFileStatusLight status : statuses) {
       listStatusLightResponseBuilder.addStatuses(status.getProtobuf());
     }
+    listStatusLightResponseBuilder.setIsTruncated(isListStatusTruncated(statuses.size(), numEntries));
     return listStatusLightResponseBuilder.build();
+  }
+
+  /**
+   * More entries may follow a listing page only if it is full. listStatus returns
+   * {@code min(page size, remaining entries)}, where the page size is the request
+   * capped by both server limits, so a shorter page is the last one.
+   */
+  private boolean isListStatusTruncated(int returned, long numEntries) {
+    return returned >= OmMetadataReader.listStatusPageSize(impl.getConfiguration(), numEntries);
   }
 
   @RequestFeatureValidator(

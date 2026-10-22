@@ -260,20 +260,20 @@ public class DatanodeStoreSchemaThreeImpl extends DatanodeStoreWithIncrementalCh
             }
 
             // Do the range compaction
-            ManagedCompactRangeOptions options =
-                new ManagedCompactRangeOptions();
-            options.setBottommostLevelCompaction(
-                ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
-            LOG.info("CF {} level {} small file number {} exceeds threshold {}"
-                    + ". Auto compact small sst files.", entry.getKey(),
-                innerEntry.getKey(), innerEntry.getValue().size(),
-                numThreshold);
-            rocksDB.compactRange(columnFamily,
-                DatanodeSchemaThreeDBDefinition
-                    .getContainerKeyPrefixBytes(startCId),
-                DatanodeSchemaThreeDBDefinition
-                    .getContainerKeyPrefixBytes(endCId + 1),
-                options);
+            try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
+              options.setBottommostLevelCompaction(
+                  ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+              LOG.info("CF {} level {} small file number {} exceeds threshold {}"
+                      + ". Auto compact small sst files.", entry.getKey(),
+                  innerEntry.getKey(), innerEntry.getValue().size(),
+                  numThreshold);
+              rocksDB.compactRange(columnFamily,
+                  DatanodeSchemaThreeDBDefinition
+                      .getContainerKeyPrefixBytes(startCId),
+                  DatanodeSchemaThreeDBDefinition
+                      .getContainerKeyPrefixBytes(endCId + 1),
+                  options);
+            }
           } else {
             LOG.warn("Failed to find cf {} in DB {}", entry.getKey(),
                 getDbDef().getClass());
