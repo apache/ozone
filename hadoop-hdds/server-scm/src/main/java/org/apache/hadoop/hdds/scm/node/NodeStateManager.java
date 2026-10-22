@@ -354,15 +354,19 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Update node.
+   * Update node, in the network topology as well. The topology is updated first, because that sets the parent of
+   * {@code datanodeDetails}, and the new {@link DatanodeInfo} is copied from {@code datanodeDetails}.
+   * <p>
+   * This is synchronized with {@link #checkNodesHealth()}, so the health check cannot remove the node from the
+   * topology as DEAD in the middle of the update.
    *
    * @param datanodeDetails the datanode details
    * @param versionInfo the datanode version information
    * @throws NodeNotFoundException the node not found exception
    */
-  public void updateNode(DatanodeDetails datanodeDetails,
-                         DatanodeVersionProto versionInfo)
-          throws NodeNotFoundException {
+  public synchronized void updateNode(DatanodeDetails datanodeDetails, DatanodeVersionProto versionInfo)
+      throws NodeNotFoundException {
+    clusterMap.update(getNode(datanodeDetails), datanodeDetails);
     final DatanodeInfo newInfo = newDatanodeInfo(datanodeDetails, versionInfo);
     final DatanodeInfo oldInfo = nodeStateMap.updateNode(newInfo);
     LOG.info("Updated datanode {} {} to {} {}",
@@ -705,8 +709,12 @@ public class NodeStateManager implements Runnable, Closeable {
     scheduleNextHealthCheck();
   }
 
+  /**
+   * This method is synchronized with {@link #updateNode}, so a node that registers again cannot be removed from
+   * the network topology as DEAD in the middle of its update.
+   */
   @VisibleForTesting
-  public void checkNodesHealth() {
+  public synchronized void checkNodesHealth() {
 
     /*
      *
