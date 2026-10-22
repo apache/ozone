@@ -2257,11 +2257,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
       assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, exception.statusCode(), range);
       assertEquals("InvalidRange", exception.awsErrorDetails().errorCode(), range);
 
-      // TODO: enable once HDDS-14224 adds Range support to HeadObject.
       // HEAD responses have no body, so only the status code is checked.
-      // S3Exception headException = assertThrows(S3Exception.class,
-      //     () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range(range)));
-      // assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, headException.statusCode(), range);
+      S3Exception headException = assertThrows(S3Exception.class,
+          () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range(range)));
+      assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, headException.statusCode(), range);
     }
 
     S3Exception exception = assertThrows(S3Exception.class,
@@ -2269,10 +2268,9 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, exception.statusCode());
     assertEquals("InvalidRange", exception.awsErrorDetails().errorCode());
 
-    // TODO: enable once HDDS-14224 adds Range support to HeadObject.
-    // S3Exception headException = assertThrows(S3Exception.class,
-    //     () -> s3Client.headObject(b -> b.bucket(bucketName).key(emptyKeyName).range("bytes=-5")));
-    // assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, headException.statusCode());
+    S3Exception headException = assertThrows(S3Exception.class,
+        () -> s3Client.headObject(b -> b.bucket(bucketName).key(emptyKeyName).range("bytes=-5")));
+    assertEquals(SC_REQUESTED_RANGE_NOT_SATISFIABLE, headException.statusCode());
   }
 
   @Test
@@ -2292,11 +2290,10 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals(Long.valueOf(content.length()), response.response().contentLength());
     assertNull(response.response().contentRange());
 
-    // TODO: enable once HDDS-14224 adds Range support to HeadObject.
-    // HeadObjectResponse headResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range("bytes=-"));
-    // assertEquals(SC_OK, headResponse.sdkHttpResponse().statusCode());
-    // assertEquals(Long.valueOf(content.length()), headResponse.contentLength());
-    // assertNull(headResponse.contentRange());
+    HeadObjectResponse headResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName).range("bytes=-"));
+    assertEquals(SC_OK, headResponse.sdkHttpResponse().statusCode());
+    assertEquals(Long.valueOf(content.length()), headResponse.contentLength());
+    assertNull(headResponse.contentRange());
   }
 
   @Test
