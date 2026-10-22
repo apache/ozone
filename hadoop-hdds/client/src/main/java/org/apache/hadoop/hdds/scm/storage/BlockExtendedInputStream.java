@@ -19,12 +19,20 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
@@ -40,6 +48,9 @@ public abstract class BlockExtendedInputStream extends ExtendedInputStream
     implements PartInputStream {
 
   private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(BlockExtendedInputStream.class);
+
+  protected static final List<Validator> VALIDATORS =
+      ContainerProtocolCalls.toValidatorList((request, response) -> validate(response));
 
   public abstract BlockID getBlockID();
 
@@ -94,6 +105,35 @@ public abstract class BlockExtendedInputStream extends ExtendedInputStream
       return true;
     }
     return false;
+  }
+
+  protected BlockData getBlockDataUsingGRPCClient(XceiverClientSpi client, Pipeline pipeline,
+      Token<OzoneBlockTokenIdentifier> token) throws IOException {
+    LOG.debug("Get block info for block {}", getBlockID());
+    return ContainerProtocolCalls.getBlock(client, VALIDATORS, getBlockID(), token, pipeline).getBlockData();
+  }
+
+  private static void validate(ContainerCommandResponseProto response) throws IOException {
+    if (!response.hasGetBlock()) {
+      throw new IllegalArgumentException("Not GetBlock: response=" + response);
+    }
+    final GetBlockResponseProto b = response.getGetBlock();
+    final long blockLength = b.getBlockData().getSize();
+    final List<ChunkInfo> chunks = b.getBlockData().getChunksList();
+    for (int i = 0; i < chunks.size(); i++) {
+      final ChunkInfo c = chunks.get(i);
+      // HDDS-10682 caused an empty chunk to get written to the end of some EC blocks. Due to this
+      // validation, these blocks will not be readable. In the EC case, the empty chunk is always
+      // the last chunk and the offset is the block length. We can safely ignore this case and not fail.
+      if (c.getLen() <= 0 && i == chunks.size() - 1 && c.getOffset() == blockLength) {
+        DatanodeBlockID blockID = b.getBlockData().getBlockID();
+        LOG.warn("The last chunk is empty for container/block {}/{} with an offset of the block length. " +
+            "Likely due to HDDS-10682. This is safe to ignore.", blockID.getContainerID(), blockID.getLocalID());
+      } else if (c.getLen() <= 0) {
+        throw new IOException("Failed to get chunkInfo["
+            + i + "]: len == " + c.getLen());
+      }
+    }
   }
 
   protected RetryPolicy getReadRetryPolicy(OzoneClientConfig config) {
