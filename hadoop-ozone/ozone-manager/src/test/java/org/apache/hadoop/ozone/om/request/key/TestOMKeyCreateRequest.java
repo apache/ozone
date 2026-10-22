@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createOmKeyInfo;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_PART;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
@@ -361,6 +362,51 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
         openKeyInfo.getCreationTime());
   }
 
+  public static Collection<Object[]> ifNoneMatchData() {
+    List<Object[]> cases = new ArrayList<>();
+    for (Object[] lockOptions : data()) {
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], false, null});
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], true, null});
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], true, "excluded-etag"});
+      cases.add(new Object[]{lockOptions[0], lockOptions[1], true, "different-etag"});
+    }
+    return cases;
+  }
+
+  @ParameterizedTest
+  @MethodSource("ifNoneMatchData")
+  public void testCreateWithExcludedETag(boolean setKeyPathLock, boolean setFileSystemPaths,
+      boolean keyExists, String existingETag) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    if (keyExists) {
+      OmKeyInfo.Builder existing = createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig).setUpdateID(1L);
+      if (existingETag != null) {
+        existing.addMetadata(OzoneConsts.ETAG, existingETag);
+      }
+      omMetadataManager.getKeyTable(getBucketLayout()).put(getOzoneKey(), existing.build());
+    }
+
+    OMRequest request = createKeyRequestWithExpectedETag(null);
+    OMRequest modified = doPreExecute(request.toBuilder().setCreateKeyRequest(
+        request.getCreateKeyRequest().toBuilder().setKeyArgs(
+            request.getCreateKeyRequest().getKeyArgs().toBuilder().setExcludedETag("excluded-etag"))).build());
+    OMClientResponse response = getOMKeyCreateRequest(modified).validateAndUpdateCache(ozoneManager, 100L);
+    OmKeyInfo openKey = omMetadataManager.getOpenKeyTable(getBucketLayout())
+        .get(getOpenKey(modified.getCreateKeyRequest().getClientID()));
+    if ("excluded-etag".equals(existingETag)) {
+      assertEquals(KEY_ALREADY_EXISTS, response.getOMResponse().getStatus());
+      assertNull(openKey);
+      assertEquals(existingETag, omMetadataManager.getKeyTable(getBucketLayout()).get(getOzoneKey())
+          .getMetadata().get(OzoneConsts.ETAG));
+    } else {
+      assertEquals(OK, response.getOMResponse().getStatus());
+      assertNotNull(openKey);
+      assertEquals(keyExists ? 1L : OzoneConsts.EXPECTED_GEN_CREATE_IF_ABSENT, openKey.getExpectedDataGeneration());
+    }
+  }
+
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCache(
@@ -578,6 +624,20 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
         omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
 
     assertNull(omKeyInfo);
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testValidateAndUpdateCacheWithInvalidPartNumber(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    for (int partNumber : new int[] {0, -1}) {
+      OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(true, partNumber));
+      OMClientResponse response = getOMKeyCreateRequest(modifiedOmRequest).validateAndUpdateCache(ozoneManager, 100L);
+      assertEquals(INVALID_PART, response.getOMResponse().getStatus());
+    }
   }
 
   @ParameterizedTest

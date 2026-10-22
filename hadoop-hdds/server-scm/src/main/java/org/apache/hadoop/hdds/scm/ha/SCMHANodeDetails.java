@@ -232,7 +232,8 @@ public class SCMHANodeDetails {
 
         InetSocketAddress addr = null;
         try {
-          addr = NetUtils.createSocketAddr(rpcAddrStr, ratisPort);
+          addr = NetUtils.createSocketAddr(HddsUtils.getHostPortString(HddsUtils.getHostName(rpcAddrStr).get(),
+              HddsUtils.getHostPort(rpcAddrStr).orElse(ratisPort)));
         } catch (Exception e) {
           LOG.error("Couldn't create socket address for SCM {} : {}", nodeId,
               rpcAddrStr, e);

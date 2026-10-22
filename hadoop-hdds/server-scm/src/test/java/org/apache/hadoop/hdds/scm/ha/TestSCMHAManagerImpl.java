@@ -32,6 +32,7 @@ import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -114,6 +115,7 @@ class TestSCMHAManagerImpl {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         storageBaseDir.resolve(scmId).resolve("metadata").toString());
     conf.set(ScmConfigKeys.OZONE_SCM_RATIS_PORT_KEY, String.valueOf(ratisPort));
+    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HA_RATIS_LEADER_ELECTION_TIMEOUT, 1, TimeUnit.SECONDS);
     return conf;
   }
 
