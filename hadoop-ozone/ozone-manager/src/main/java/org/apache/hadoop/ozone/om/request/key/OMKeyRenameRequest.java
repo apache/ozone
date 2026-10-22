@@ -176,6 +176,12 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
       }
 
+      if (renameKeyRequest.hasUpdateID() && fromKeyValue.getUpdateID() != renameKeyRequest.getUpdateID()) {
+        throw new OMException("UpdateID does not match. Key: " + fromKeyName +
+            ", Expected UpdateID: " + fromKeyValue.getUpdateID() +
+            ", Given UpdateID: " + renameKeyRequest.getUpdateID(), OMException.ResultCodes.UPDATE_ID_NOT_MATCH);
+      }
+
       fromKeyValue = fromKeyValue.toBuilder()
           .setUpdateID(trxnLogIndex)
           .build();

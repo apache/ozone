@@ -419,14 +419,8 @@ class TestReconAndAdminContainerCLI {
 
     // Verify Recon picked up the new keys and
     // updated its container key mappings.
-    GenericTestUtils.waitFor(() -> {
-      try {
-        return reconContainerMetadataManager
-                   .getKeyCountForContainer(containerID) > 0;
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }, 1000, 20000);
+    ReconOmMetaManagerTestUtils.waitUntilReconKeyCounts(reconContainerMetadataManager,
+        Collections.singletonMap(containerID, 1));
 
     return containerID;
   }

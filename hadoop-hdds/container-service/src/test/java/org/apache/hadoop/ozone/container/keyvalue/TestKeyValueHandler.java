@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
@@ -58,6 +59,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
@@ -80,6 +82,7 @@ import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -114,6 +117,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSpi;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -125,6 +129,7 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -164,6 +169,7 @@ public class TestKeyValueHandler {
   // Deliberately not a multiple of BYTES_PER_CHECKSUM, so an offset past the end of the block can still have its
   // checksum aligned floor inside the block.
   private static final int BLOCK_SIZE = 1000;
+  private static final int GET_BLOCK_TEST_CHUNK_LEN = 1024;
 
   private HddsDispatcher dispatcher;
   private KeyValueHandler handler;
@@ -622,6 +628,32 @@ public class TestKeyValueHandler {
     }
   }
 
+  @Test
+  public void testDeleteRecoveringContainer() throws IOException {
+    HandlerWithVolumeSet handlerCtx = createKeyValueHandler(tempDir);
+    KeyValueHandler keyValueHandler = handlerCtx.getHandler();
+    ContainerSet containerSet = handlerCtx.getContainerSet();
+    try {
+      ContainerCommandRequestProto.Builder request = createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID)
+          .toBuilder();
+      request.getCreateContainerBuilder().setState(State.RECOVERING);
+      assertThat(keyValueHandler.handleCreateContainer(request.build(), null).getResult())
+          .isEqualTo(ContainerProtos.Result.SUCCESS);
+      Container<?> container = containerSet.getContainer(DUMMY_CONTAINER_ID);
+      assertThat(container).isNotNull();
+      assertThat(container.getContainerState()).isEqualTo(State.RECOVERING);
+      assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
+
+      keyValueHandler.deleteContainer(container, true);
+
+      assertThat(containerSet.getContainer(DUMMY_CONTAINER_ID)).isNull();
+      assertThat(containerSet.getRecoveringContainerMap()).doesNotContainKey(DUMMY_CONTAINER_ID);
+    } finally {
+      keyValueHandler.stop();
+      handlerCtx.getVolumeSet().getVolumesList().forEach(StorageVolume::shutdown);
+    }
+  }
+
   /**
    * Tests that deleting a container decrements the cached used space of its volume.
    */
@@ -973,6 +1005,48 @@ public class TestKeyValueHandler {
     }
   }
 
+  @Test
+  public void testCreateContainerReleasesSpaceOnUncheckedFailure() throws Exception {
+    final long containerID = 1L;
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(tempDir);
+    HddsVolume hddsVolume = (HddsVolume) handlerWithVolume.getVolumeSet().getVolumesList().get(0);
+    hddsVolume.setDbParentDir(null);
+    String datanodeId = handlerWithVolume.getHandler().getDatanodeId();
+
+    ContainerCommandResponseProto response = handlerWithVolume.getHandler().handle(
+        createContainerRequest(datanodeId, containerID), null, null);
+
+    assertEquals(CONTAINER_INTERNAL_ERROR, response.getResult());
+    assertThat(response.getMessage()).contains("dbParentDir == null");
+    assertEquals(0, hddsVolume.getCommittedBytes());
+    assertNull(handlerWithVolume.getContainerSet().getContainer(containerID));
+  }
+
+  @Test
+  public void testCreateContainerKeepsSpaceOfCreatedContainer() throws Exception {
+    final long containerID = 1L;
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(tempDir);
+    HddsVolume hddsVolume = (HddsVolume) handlerWithVolume.getVolumeSet().getVolumesList().get(0);
+    String datanodeId = handlerWithVolume.getHandler().getDatanodeId();
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+
+    ContainerCommandResponseProto response =
+        kvHandler.handleCreateContainer(createContainerRequest(datanodeId, containerID), null);
+    assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+    KeyValueContainer container =
+        (KeyValueContainer) handlerWithVolume.getContainerSet().getContainer(containerID);
+    assertNotNull(container);
+    assertEquals(maxContainerSize, hddsVolume.getCommittedBytes());
+    assertTrue(container.getContainerData().isCommittedSpace());
+
+    long committedAfterFirst = hddsVolume.getCommittedBytes();
+    ContainerCommandResponseProto response2 =
+        kvHandler.handleCreateContainer(createContainerRequest(datanodeId, containerID), null);
+    assertEquals(ContainerProtos.Result.SUCCESS, response2.getResult());
+    assertEquals(committedAfterFirst, hddsVolume.getCommittedBytes());
+    assertTrue(container.getContainerData().isCommittedSpace());
+  }
+
   private static ContainerCommandRequestProto createContainerRequest(
       String datanodeId, long containerID) {
     return ContainerCommandRequestProto.newBuilder()
@@ -1097,11 +1171,18 @@ public class TestKeyValueHandler {
     private final KeyValueHandler handler;
     private final MutableVolumeSet volumeSet;
     private final ContainerSet containerSet;
+    private final ContainerMetrics containerMetrics;
 
     HandlerWithVolumeSet(KeyValueHandler handler, MutableVolumeSet volumeSet, ContainerSet containerSet) {
+      this(handler, volumeSet, containerSet, null);
+    }
+
+    HandlerWithVolumeSet(KeyValueHandler handler, MutableVolumeSet volumeSet,
+        ContainerSet containerSet, ContainerMetrics containerMetrics) {
       this.handler = handler;
       this.volumeSet = volumeSet;
       this.containerSet = containerSet;
+      this.containerMetrics = containerMetrics;
     }
 
     KeyValueHandler getHandler() {
@@ -1115,12 +1196,22 @@ public class TestKeyValueHandler {
     ContainerSet getContainerSet() {
       return containerSet;
     }
+
+    ContainerMetrics getContainerMetrics() {
+      return containerMetrics;
+    }
   }
 
   private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(Path path) throws IOException {
+    return createKeyValueHandlerWithVolumeSet(path, null);
+  }
+
+  private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(Path path, OzoneContainer ozoneContainer)
+      throws IOException {
     ContainerMetrics.remove();
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+    final ContainerMetrics containerMetrics = ContainerMetrics.create(conf);
 
     HddsVolume hddsVolume = new HddsVolume.Builder(path.toString()).conf(conf)
         .clusterID(CLUSTER_ID).datanodeUuid(DATANODE_UUID)
@@ -1132,7 +1223,8 @@ public class TestKeyValueHandler {
     when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
 
     final KeyValueHandler kvHandler = ContainerTestUtils.getKeyValueHandler(conf,
-        DATANODE_UUID, containerSet, volumeSet);
+        DATANODE_UUID, containerSet, volumeSet, containerMetrics,
+        new ContainerChecksumTreeManager(conf), ozoneContainer);
     kvHandler.setClusterID(CLUSTER_ID);
     hddsVolume.getVolumeInfoStats().unregister();
     hddsVolume.getVolumeIOStats().unregister();
@@ -1143,7 +1235,96 @@ public class TestKeyValueHandler {
         conf.getObject(ContainerScannerConfiguration.class), controller);
     containerSet.registerOnDemandScanner(onDemandScanner);
 
-    return new HandlerWithVolumeSet(kvHandler, volumeSet, containerSet);
+    return new HandlerWithVolumeSet(kvHandler, volumeSet, containerSet, containerMetrics);
+  }
+
+  private HddsDispatcher createGetBlockDispatcher(HandlerWithVolumeSet handlerWithVolume) throws IOException {
+    DatanodeDetails datanodeDetails =
+        MockDatanodeDetails.createDatanodeDetails(DatanodeID.fromUuidString(DATANODE_UUID));
+    StateContext context = ContainerTestUtils.getMockContext(datanodeDetails, conf);
+    HashMap<ContainerType, Handler> handlers = new HashMap<>();
+    handlers.put(ContainerType.KeyValueContainer, handlerWithVolume.getHandler());
+    return new HddsDispatcher(conf, handlerWithVolume.getContainerSet(), handlerWithVolume.getVolumeSet(), handlers,
+        context, handlerWithVolume.getContainerMetrics(), null);
+  }
+
+  private void writeTestBlockForGetBlock(
+      KeyValueHandler kvHandler, KeyValueContainer container, BlockID blockID) throws IOException {
+    BlockData blockData = new BlockData(blockID);
+    ChunkInfo chunkInfo = new ChunkInfo("chunk1", 0, GET_BLOCK_TEST_CHUNK_LEN);
+    blockData.addChunk(chunkInfo.getProtoBufMessage());
+    kvHandler.getBlockManager().putBlock(container, blockData);
+    ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.allocate(GET_BLOCK_TEST_CHUNK_LEN));
+    kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, data,
+        DispatcherContext.getHandleWriteChunk());
+  }
+
+  private static ContainerCommandRequestProto newGetBlockRequest(
+      long containerID, BlockID blockID, boolean requestShortCircuitAccess) {
+    ContainerProtos.GetBlockRequestProto.Builder getBlock = ContainerProtos.GetBlockRequestProto.newBuilder()
+        .setBlockID(blockID.getDatanodeBlockIDProtobuf());
+    if (requestShortCircuitAccess) {
+      getBlock.setRequestShortCircuitAccess(true);
+    }
+    return ContainerCommandRequestProto.newBuilder()
+        .setCmdType(ContainerProtos.Type.GetBlock)
+        .setContainerID(containerID)
+        .setDatanodeUuid(DATANODE_UUID)
+        .setGetBlock(getBlock)
+        .build();
+  }
+
+  private static OzoneContainer mockOzoneContainerWithSCDomainSocket() {
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    XceiverServerSpi domainSocketServer = mock(XceiverServerSpi.class);
+    when(ozoneContainer.getReadDomainSocketChannel()).thenReturn(domainSocketServer);
+    when(domainSocketServer.isStarted()).thenReturn(true);
+    return ozoneContainer;
+  }
+
+  @Test
+  public void testGetBlockMetrics() throws Exception {
+    Path testDir = Files.createTempDirectory("testGetBlockMetrics");
+    try {
+      conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir,
+          mockOzoneContainerWithSCDomainSocket());
+      KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+      HddsDispatcher getBlockDispatcher = createGetBlockDispatcher(handlerWithVolume);
+
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainer container = createOpenContainer(containerID, handlerWithVolume.getVolumeSet(),
+          handlerWithVolume.getContainerSet());
+      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+      writeTestBlockForGetBlock(kvHandler, container, blockID);
+
+      ContainerCommandResponseProto response = getBlockDispatcher.dispatch(
+          newGetBlockRequest(containerID, blockID, false), null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      long blockMetadataBytes = response.getGetBlock().getBlockData().getSerializedSize();
+
+      MetricsRecordBuilder containerMetrics = getMetrics(
+          ContainerMetrics.STORAGE_CONTAINER_METRICS);
+      assertCounter("numGetBlock", 1L, containerMetrics);
+      assertCounter("bytesGetBlock", blockMetadataBytes, containerMetrics);
+      assertCounter("localBytesGetBlock", 0L, containerMetrics);
+
+      ContainerCommandRequestProto shortCircuitRequest = newGetBlockRequest(containerID, blockID, true);
+      response = getBlockDispatcher.dispatch(shortCircuitRequest, null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+      assertTrue(response.getGetBlock().getShortCircuitAccessGranted());
+      try (RandomAccessFile blockFile = kvHandler.getBlockFile(shortCircuitRequest)) {
+        assertNotNull(blockFile);
+      }
+
+      containerMetrics = getMetrics(ContainerMetrics.STORAGE_CONTAINER_METRICS);
+      assertCounter("numGetBlock", 2L, containerMetrics);
+      assertCounter("bytesGetBlock", 2 * blockMetadataBytes, containerMetrics);
+      assertCounter("localBytesGetBlock", blockMetadataBytes, containerMetrics);
+    } finally {
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
   }
 
   @Test

@@ -117,6 +117,32 @@ public class TestOzoneManagerStarter {
     assertTrue(m.find());
   }
 
+  @Test
+  public void testPassingBootstrapSwitchCallsBootstrap() {
+    assertEquals(OK, executeCommand("--bootstrap"));
+    assertTrue(mock.bootstrapCalled);
+    assertFalse(mock.bootstrapForce);
+  }
+
+  @Test
+  public void testBootstrapForceOptionPassedToReceiver() {
+    assertEquals(OK, executeCommand("--bootstrap", "--force"));
+    assertTrue(mock.bootstrapCalled);
+    assertTrue(mock.bootstrapForce);
+  }
+
+  @Test
+  public void testBootstrapSwitchWithInvalidParamDoesNotRun() {
+    assertEquals(USAGE, executeCommand("--bootstrap", "--invalid"));
+    assertFalse(mock.bootstrapCalled);
+  }
+
+  @Test
+  public void testUnSuccessfulBootstrapThrowsException() {
+    mock.throwOnBootstrap = true;
+    assertEquals(EXECUTION_ERROR_EXIT_CODE, executeCommand("--bootstrap"));
+  }
+
   private int executeCommand(String... args) {
     return new OzoneManagerStarter(mock).execute(args);
   }
@@ -128,6 +154,9 @@ public class TestOzoneManagerStarter {
     private boolean initStatus = true;
     private boolean throwOnStart = false;
     private boolean throwOnInit = false;
+    private boolean bootstrapCalled = false;
+    private boolean bootstrapForce = false;
+    private boolean throwOnBootstrap = false;
 
     @Override
     public void start(OzoneConfiguration conf) throws IOException,
@@ -151,7 +180,11 @@ public class TestOzoneManagerStarter {
     @Override
     public void bootstrap(OzoneConfiguration conf, boolean force)
         throws IOException, AuthenticationException {
-      //TODO: Add test for bootstrap
+      bootstrapCalled = true;
+      bootstrapForce = force;
+      if (throwOnBootstrap) {
+        throw new IOException("Simulated Exception");
+      }
     }
   }
 }

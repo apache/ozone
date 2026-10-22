@@ -342,8 +342,14 @@ public final class ChunkUtils {
    *         false otherwise.
    */
   public static boolean validateChunkForOverwrite(long fileLen, ChunkInfo info) {
+    return validateChunkForOverwrite(fileLen, info, info.getOffset());
+  }
 
-    if (info.getOffset() < fileLen) {
+  /**
+   * Checks for an overwrite using the write offset within the file.
+   */
+  public static boolean validateChunkForOverwrite(long fileLen, ChunkInfo info, long fileOffset) {
+    if (fileOffset < fileLen) {
       if (!isOverWritePermitted(info)) {
         LOG.warn("Duplicate write chunk request. Chunk overwrite " +
             "without explicit request. {}", info);

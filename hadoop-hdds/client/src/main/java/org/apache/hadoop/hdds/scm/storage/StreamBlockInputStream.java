@@ -77,7 +77,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   private final String name = "stream" + STREAM_ID.getAndIncrement();
   private final BlockID blockID;
-  private final long blockLength;
+  private long blockLength;
+  // The block is under construction, so its length from OM may be stale; fetch it from the datanode once.
+  private boolean needUpdateBlockLength;
   private final int responseDataSize;
   private final long preReadSize;
   private final Duration readTimeout;
@@ -100,13 +102,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final Set<DatanodeID> failedStreamingDatanodes = ConcurrentHashMap.newKeySet();
 
   public StreamBlockInputStream(
-      BlockID blockID, long length, Pipeline pipeline,
+      BlockLocationInfo blockInfo, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) throws IOException {
-    this.blockID = blockID;
-    this.blockLength = length;
+    this.blockID = blockInfo.getBlockID();
+    this.blockLength = blockInfo.getLength();
+    this.needUpdateBlockLength = blockInfo.isUnderConstruction();
     pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
@@ -185,13 +188,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
    *
    * @param blockOffset the offset within the block to read from.
    * @param dst the buffer to read into.
-   * @return the number of bytes copied into {@code dst}, or -1 if no byte could be read.
+   * @return the number of bytes copied into {@code dst}, or -1 at EOF.
    */
   @Override
   public int readPositioned(long blockOffset, ByteBuffer dst) throws IOException {
     if (!dst.hasRemaining()) {
-      return EOF;
+      return 0;
     }
+    updateBlockLength();
     if (blockOffset < 0 || blockOffset >= blockLength) {
       return EOF;
     }
@@ -270,6 +274,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private synchronized boolean dataAvailableToRead(int length, boolean preRead) throws IOException {
+    updateBlockLength();
     if (position >= blockLength) {
       return false;
     }
@@ -429,6 +434,26 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       throw new IOException("Unexpected client class: " + acquired.getClass().getName() + ", " + pipeline);
     }
     return (XceiverClientGrpc) acquired;
+  }
+
+  /**
+   * Use the block length from the datanode if the block is under construction,
+   * since the length from OM may be stale (e.g. the last block of an hsync-ed file).
+   */
+  public synchronized void updateBlockLength() throws IOException {
+    while (needUpdateBlockLength) {
+      try {
+        acquireClient();
+        blockLength = getBlockDataUsingGRPCClient(xceiverClient, pipelineRef.get(), tokenRef.get()).getSize();
+        needUpdateBlockLength = false;
+        retries = 0;
+        LOG.debug("{}: Updated block length to {} for block {}", name, blockLength, blockID);
+      } catch (IOException ioe) {
+        handleExceptions(ioe);
+      } finally {
+        releaseClient();
+      }
+    }
   }
 
   private synchronized void initialize() throws IOException {
@@ -643,6 +668,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         // checked first, an item delivered by onNext() just before onCompleted()
         // fired would be silently dropped, causing data corruption.
         if (future.isDone()) {
+          // The stream may have failed while waiting above; surface the error instead of returning EOF.
+          checkError();
           return null; // Stream ended, queue is empty
         }
 
@@ -653,7 +680,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
           if (setFailed(e)) {
             throw e;
           }
-          return null;
+          // The stream completed concurrently: re-check for an error or a queued response instead of returning EOF.
+          continue;
         }
       }
     }
