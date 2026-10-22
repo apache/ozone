@@ -161,6 +161,8 @@ public class TestOMFailoverProxyProvider {
     failoverToSameNode(2);
     // Round Robin failover again should reset waitTime.
     failoverToNextNode(1, waitBetweenRetries);
+    // The next retry on the same OM should start from the base waitTime again.
+    failoverToSameNode(1);
   }
 
   /**

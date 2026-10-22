@@ -392,10 +392,10 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
   /**
    * Get the wait time based on
-   * 1. Is the same OM being retried based on response from OM.
-   * 2. Is this a new OM that is being used.
-   * 3. Were all the OMs visited once and retries need to be resumed after a
+   * 1. Were all the OMs visited once and retries need to be resumed after a
    * delay.
+   * 2. Is the same OM being retried based on response from OM.
+   * 3. Is this a new OM that is being used.
    * @return delay in milliseconds
    */
   public synchronized long getWaitTime() {
