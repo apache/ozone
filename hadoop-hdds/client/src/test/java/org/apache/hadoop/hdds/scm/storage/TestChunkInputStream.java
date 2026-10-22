@@ -174,6 +174,17 @@ public class TestChunkInputStream {
   }
 
   @Test
+  public void testReadChunkRequestOmitsChecksums() {
+    ChunkReader reader = new ChunkReader(chunkInfo, true, chunkStream::readChunk);
+    ChunkInfo request = reader.getChunkInfo(30, 25);
+    assertThat(request.getChecksumData().getChecksumsList()).isEmpty();
+    assertThat(chunkInfo.getChecksumData().getChecksumsList()).isNotEmpty();
+    assertEquals(chunkInfo.getChecksumData().getBytesPerChecksum(), request.getChecksumData().getBytesPerChecksum());
+    assertEquals(20, request.getOffset());
+    assertEquals(40, request.getLen());
+  }
+
+  @Test
   public void testPositionedReadIsStateless() throws Exception {
     // Advance the stream's own cursor with a normal sequential read.
     byte[] seq = new byte[10];
@@ -393,19 +404,22 @@ public class TestChunkInputStream {
   })
   void rangeReadsReuseFullChunkInfo(boolean verifyChecksum, int offset, int length,
       int expectedOffset, int expectedLength) throws Exception {
-    ChunkInfo info = chunkInfo.toBuilder().setOffset(1024).build();
+    ChunkInfo info = chunkInfo.toBuilder().setOffset(1024).setStripeChecksum(ByteString.copyFromUtf8("stripe")).build();
+    AtomicReference<ChunkInfo> request = new AtomicReference<>();
     ChunkReader reader = new ChunkReader(info, verifyChecksum, range -> {
+      request.set(range);
       assertEquals(1024 + expectedOffset, range.getOffset());
       assertEquals(expectedLength, range.getLen());
-      assertEquals(info.getChecksumData(), range.getChecksumData());
-      if (expectedLength == CHUNK_SIZE) {
-        assertSame(info, range);
-      }
+      assertEquals(info.getChecksumData().toBuilder().clearChecksums().build(), range.getChecksumData());
+      assertFalse(range.hasStripeChecksum());
       return new ByteBuffer[] {ByteBuffer.wrap(chunkData, expectedOffset, expectedLength)};
     });
     ByteBuffer destination = ByteBuffer.allocate(length);
     assertEquals(length, reader.read(offset, destination));
     assertArrayEquals(Arrays.copyOfRange(chunkData, offset, offset + length), destination.array());
+    if (expectedLength == CHUNK_SIZE) {
+      assertSame(request.get(), reader.getChunkInfo(offset, length));
+    }
   }
 
   @ParameterizedTest

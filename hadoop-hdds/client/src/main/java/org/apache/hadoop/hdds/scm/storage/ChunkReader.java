@@ -32,7 +32,11 @@ final class ChunkReader {
 
   ChunkReader(ChunkInfo chunkInfo, boolean verifyChecksum,
       CheckedFunction<ChunkInfo, ByteBuffer[], IOException> readChunkPositioned) {
-    this.chunkInfo = chunkInfo;
+    // Datanodes do not verify client reads, so do not send (and get echoed back) the chunk's checksums.
+    this.chunkInfo = chunkInfo.toBuilder()
+        .setChecksumData(chunkInfo.getChecksumData().toBuilder().clearChecksums())
+        .clearStripeChecksum()
+        .build();
     this.verifyChecksum = verifyChecksum;
     this.readChunkPositioned = readChunkPositioned;
   }
