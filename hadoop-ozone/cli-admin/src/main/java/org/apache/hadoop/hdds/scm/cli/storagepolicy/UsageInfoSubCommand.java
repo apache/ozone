@@ -37,6 +37,7 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.util.StringUtils;
 import picocli.CommandLine;
+import picocli.CommandLine.Help.Visibility;
 
 /**
  * Handler of list storage usage info by StorageType command.
@@ -60,14 +61,16 @@ public class UsageInfoSubCommand extends ScmSubcommand {
           + "(IN_SERVICE, DECOMMISSIONING, DECOMMISSIONED, "
           + "ENTERING_MAINTENANCE, IN_MAINTENANCE), "
           + "or ALL to show all operational states",
-      defaultValue = "IN_SERVICE")
+      defaultValue = "IN_SERVICE",
+      showDefaultValue = Visibility.ALWAYS)
   private String nodeOperationalStateStr;
 
   @CommandLine.Option(
       names = {"-n", "--node-state"},
       description = "Show datanodes in a specific health state "
           + "(HEALTHY, STALE, DEAD), or ALL to show all health states",
-      defaultValue = "HEALTHY")
+      defaultValue = "HEALTHY",
+      showDefaultValue = Visibility.ALWAYS)
   private String nodeStateStr;
 
   @CommandLine.Option(
@@ -126,6 +129,7 @@ public class UsageInfoSubCommand extends ScmSubcommand {
         usage.capacity = Math.addExact(usage.capacity, st.getCapacity());
         usage.used = Math.addExact(usage.used, st.getUsed());
         usage.remaining = Math.addExact(usage.remaining, st.getRemaining());
+        usage.reserved = Math.addExact(usage.reserved, st.getReserved());
         usage.committed = Math.addExact(usage.committed, st.getCommitted());
         usage.freeSpaceToSpare = Math.addExact(usage.freeSpaceToSpare, st.getFreeSpaceToSpare());
       }
@@ -157,6 +161,8 @@ public class UsageInfoSubCommand extends ScmSubcommand {
           usage.getUsed() + " B", StringUtils.byteDesc(usage.getUsed()));
       System.out.printf("  %-23s: %s (%s) %n", storageType + " Remaining",
           usage.getRemaining() + " B", StringUtils.byteDesc(usage.getRemaining()));
+      System.out.printf("  %-23s: %s (%s) %n", storageType + " Reserved",
+          usage.getReserved() + " B", StringUtils.byteDesc(usage.getReserved()));
       System.out.printf("  %-23s: %s (%s) %n", storageType + " Committed",
           usage.getCommitted() + " B", StringUtils.byteDesc(usage.getCommitted()));
       System.out.printf("  %-23s: %s (%s) %n", storageType + " FreeSpaceToSpare",
@@ -182,6 +188,8 @@ public class UsageInfoSubCommand extends ScmSubcommand {
           usage.getUsed() + " B", StringUtils.byteDesc(usage.getUsed()));
       System.out.printf("  %-23s: %s (%s) %n", currentType + " Remaining",
           usage.getRemaining() + " B", StringUtils.byteDesc(usage.getRemaining()));
+      System.out.printf("  %-23s: %s (%s) %n", currentType + " Reserved",
+          usage.getReserved() + " B", StringUtils.byteDesc(usage.getReserved()));
       System.out.printf("  %-23s: %s (%s) %n", currentType + " Committed",
           usage.getCommitted() + " B", StringUtils.byteDesc(usage.getCommitted()));
       System.out.printf("  %-23s: %s (%s) %n", currentType + " FreeSpaceToSpare",
@@ -200,6 +208,7 @@ public class UsageInfoSubCommand extends ScmSubcommand {
     private long capacity;
     private long used;
     private long remaining;
+    private long reserved;
     private long committed;
     private long freeSpaceToSpare;
 
@@ -227,6 +236,10 @@ public class UsageInfoSubCommand extends ScmSubcommand {
       return remaining;
     }
 
+    public long getReserved() {
+      return reserved;
+    }
+
     public long getCommitted() {
       return committed;
     }
@@ -246,6 +259,7 @@ public class UsageInfoSubCommand extends ScmSubcommand {
     private final long capacity;
     private final long used;
     private final long remaining;
+    private final long reserved;
     private final long committed;
     private final long freeSpaceToSpare;
 
@@ -255,6 +269,7 @@ public class UsageInfoSubCommand extends ScmSubcommand {
       this.capacity = proto.getCapacity();
       this.used = proto.getUsed();
       this.remaining = proto.getRemaining();
+      this.reserved = proto.getReserved();
       this.committed = proto.getCommitted();
       this.freeSpaceToSpare = proto.getFreeSpaceToSpare();
     }
@@ -277,6 +292,10 @@ public class UsageInfoSubCommand extends ScmSubcommand {
 
     public long getRemaining() {
       return remaining;
+    }
+
+    public long getReserved() {
+      return reserved;
     }
 
     public long getCommitted() {

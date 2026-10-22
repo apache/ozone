@@ -270,7 +270,7 @@ public class TestSCMClientProtocolServer {
     // dn1 only reports DISK; every other StorageType stays at the default zero capacity
     // and must be gated out of the response.
     SCMNodeStat dn1Stat = new SCMNodeStat();
-    dn1Stat.add(2000L, 500L, 1500L, 0L, 0L, 0L, StorageType.DISK);
+    dn1Stat.add(2000L, 500L, 1500L, 0L, 0L, 300L, StorageType.DISK);
 
     SCMNodeStat dn2Stat = new SCMNodeStat();
     dn2Stat.add(1000L, 200L, 800L, 0L, 0L, 0L, StorageType.SSD);
@@ -301,6 +301,7 @@ public class TestSCMClientProtocolServer {
       assertThat(dn1Result.getStorageTypeUsageInfo(0).getStorageType()).isEqualTo(HddsProtos.StorageTypeProto.DISK);
       assertThat(dn1Result.getStorageTypeUsageInfo(0).getCapacity()).isEqualTo(2000L);
       assertThat(dn1Result.getStorageTypeUsageInfo(0).getUsed()).isEqualTo(500L);
+      assertThat(dn1Result.getStorageTypeUsageInfo(0).getReserved()).isEqualTo(300L);
 
       DatanodeStorageTypeUsageInfoProto dn2Result = result.get(1);
       assertThat(dn2Result.getStorageTypeUsageInfoCount()).isEqualTo(1);

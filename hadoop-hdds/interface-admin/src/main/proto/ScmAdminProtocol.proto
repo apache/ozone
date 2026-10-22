@@ -754,6 +754,7 @@ message StorageTypeUsageInfoProto {
   optional int64 remaining = 4;
   optional int64 committed = 5;
   optional int64 freeSpaceToSpare = 6;
+  optional int64 reserved = 7;
 }
 
 message DatanodeStorageTypeUsageInfoProto {

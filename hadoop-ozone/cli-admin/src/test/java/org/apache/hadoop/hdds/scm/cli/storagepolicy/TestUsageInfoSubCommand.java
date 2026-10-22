@@ -29,6 +29,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -89,11 +91,13 @@ public class TestUsageInfoSubCommand {
     assertThat(disk.get("datanodeCount").intValue()).isEqualTo(1);
     assertThat(disk.get("capacity").longValue()).isEqualTo(2000);
     assertThat(disk.get("used").longValue()).isEqualTo(500);
+    assertThat(disk.get("reserved").longValue()).isEqualTo(100);
 
     JsonNode ssd = findByStorageType(summary, "SSD");
     assertThat(ssd).isNotNull();
     assertThat(ssd.get("datanodeCount").intValue()).isEqualTo(1);
     assertThat(ssd.get("capacity").longValue()).isEqualTo(1000);
+    assertThat(ssd.get("reserved").longValue()).isEqualTo(50);
 
     // --with-datanode was not passed, so the per-datanode breakdown must be omitted entirely.
     assertThat(json.has("datanodeUsage")).isFalse();
@@ -131,6 +135,8 @@ public class TestUsageInfoSubCommand {
     assertThat(output).contains("DISK Datanode Count    :");
     assertThat(output).contains("DISK Capacity          :");
     assertThat(output).contains("SSD Capacity           :");
+    assertThat(output).contains("DISK Reserved          : 100 B");
+    assertThat(output).contains("SSD Reserved           : 50 B");
   }
 
   @Test
@@ -139,8 +145,8 @@ public class TestUsageInfoSubCommand {
     // via Math.addExact rather than silently wrap around to a negative total.
     ScmClient scmClient = mock(ScmClient.class);
     DatanodeStorageTypeUsageInfoProto dn1 =
-        datanodeUsage(Long.MAX_VALUE - 1, 0, 0, 0, 0, HddsProtos.StorageTypeProto.DISK);
-    DatanodeStorageTypeUsageInfoProto dn2 = datanodeUsage(2, 0, 0, 0, 0, HddsProtos.StorageTypeProto.DISK);
+        datanodeUsage(Long.MAX_VALUE - 1, 0, 0, 0, 0, 0, HddsProtos.StorageTypeProto.DISK);
+    DatanodeStorageTypeUsageInfoProto dn2 = datanodeUsage(2, 0, 0, 0, 0, 0, HddsProtos.StorageTypeProto.DISK);
     try {
       when(scmClient.listStorageTypeUsageInfo(any())).thenReturn(Arrays.asList(dn1, dn2));
     } catch (IOException e) {
@@ -169,6 +175,20 @@ public class TestUsageInfoSubCommand {
     assertThat(output).containsOnlyOnce("StorageType SSD:");
   }
 
+  @Test
+  public void testHelpOptionShowsDefaultNodeFilters() {
+    CommandLine c = new CommandLine(cmd);
+    StringWriter help = new StringWriter();
+    c.setOut(new PrintWriter(help, true));
+
+    int exitCode = c.execute("--help");
+
+    assertThat(exitCode).isEqualTo(0);
+    // Picocli wraps the description, so collapse line breaks before matching.
+    assertThat(help.toString().replaceAll("\\s+", " "))
+        .contains("Default: IN_SERVICE").contains("Default: HEALTHY");
+  }
+
   private JsonNode findByStorageType(JsonNode summary, String storageType) {
     for (JsonNode node : summary) {
       if (storageType.equals(node.get("storageType").asText())) {
@@ -180,19 +200,19 @@ public class TestUsageInfoSubCommand {
 
   private List<DatanodeStorageTypeUsageInfoProto> twoDatanodesTwoStorageTypes() {
     return Arrays.asList(
-        datanodeUsage(2000, 500, 1500, 0, 0, HddsProtos.StorageTypeProto.DISK),
-        datanodeUsage(1000, 200, 800, 0, 0, HddsProtos.StorageTypeProto.SSD));
+        datanodeUsage(2000, 500, 1500, 100, 0, 0, HddsProtos.StorageTypeProto.DISK),
+        datanodeUsage(1000, 200, 800, 50, 0, 0, HddsProtos.StorageTypeProto.SSD));
   }
 
   private DatanodeStorageTypeUsageInfoProto datanodeWithDiskAndSsd() {
-    return datanodeUsage(2000, 500, 1500, 0, 0, HddsProtos.StorageTypeProto.DISK).toBuilder()
+    return datanodeUsage(2000, 500, 1500, 100, 0, 0, HddsProtos.StorageTypeProto.DISK).toBuilder()
         .addStorageTypeUsageInfo(
-            datanodeUsage(1000, 200, 800, 0, 0, HddsProtos.StorageTypeProto.SSD).getStorageTypeUsageInfo(0))
+            datanodeUsage(1000, 200, 800, 50, 0, 0, HddsProtos.StorageTypeProto.SSD).getStorageTypeUsageInfo(0))
         .build();
   }
 
   private DatanodeStorageTypeUsageInfoProto datanodeUsage(long capacity, long used, long remaining,
-      long committed, long freeSpaceToSpare, HddsProtos.StorageTypeProto storageType) {
+      long reserved, long committed, long freeSpaceToSpare, HddsProtos.StorageTypeProto storageType) {
     return DatanodeStorageTypeUsageInfoProto.newBuilder()
         .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails().getProtoBufMessage())
         .addStorageTypeUsageInfo(StorageTypeUsageInfoProto.newBuilder()
@@ -200,6 +220,7 @@ public class TestUsageInfoSubCommand {
             .setCapacity(capacity)
             .setUsed(used)
             .setRemaining(remaining)
+            .setReserved(reserved)
             .setCommitted(committed)
             .setFreeSpaceToSpare(freeSpaceToSpare)
             .build())

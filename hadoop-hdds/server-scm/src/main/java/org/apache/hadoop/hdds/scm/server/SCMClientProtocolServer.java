@@ -1810,6 +1810,7 @@ public class SCMClientProtocolServer implements
                 .setRemaining(scmNodeStat.getRemaining(storageType).get())
                 .setCommitted(scmNodeStat.getCommitted(storageType).get())
                 .setFreeSpaceToSpare(scmNodeStat.getFreeSpaceToSpare(storageType).get())
+                .setReserved(scmNodeStat.getReserved(storageType).get())
                 .build());
           }
         }
