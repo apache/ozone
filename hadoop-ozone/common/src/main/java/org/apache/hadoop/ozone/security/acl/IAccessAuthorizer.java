@@ -146,7 +146,8 @@ public interface IAccessAuthorizer {
      */
     public static String getACLString(BitSet acls) {
       StringBuffer sb = new StringBuffer();
-      acls.stream().forEach(acl -> {
+      // Skip bits that are not a known ACL type.
+      acls.stream().filter(acl -> acl < ACLType.values().length).forEach(acl -> {
         sb.append(getAclString(ACLType.values()[acl]));
       });
       return sb.toString();

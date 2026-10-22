@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNAUTHORIZED;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -25,6 +26,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
@@ -32,6 +34,7 @@ import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.TableCacheUpdateTracker;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -45,6 +48,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
@@ -56,6 +60,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.security.STSSecurityUtil;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
@@ -630,6 +635,33 @@ public abstract class OMClientRequest implements RequestAuditor {
    */
   public static String isValidKeyPath(String path) throws OMException {
     return OzoneFSUtils.isValidKeyPath(path, true);
+  }
+
+  /**
+   * Converts ACLs sent by the client.
+   * @throws OMException with INVALID_REQUEST if any of the ACLs is malformed
+   */
+  public static List<OzoneAcl> toOzoneAcls(List<OzoneAclInfo> acls) throws OMException {
+    final List<OzoneAcl> ozoneAcls;
+    try {
+      ozoneAcls = OzoneAclUtil.fromProtobuf(acls);
+    } catch (IllegalArgumentException e) {
+      throw new OMException("Invalid ACL: " + e.getMessage(), INVALID_REQUEST);
+    }
+    checkAclRights(ozoneAcls);
+    return ozoneAcls;
+  }
+
+  /**
+   * @throws OMException with INVALID_REQUEST if any of the ACLs has rights that are not a known ACL type
+   */
+  public static void checkAclRights(List<OzoneAcl> acls) throws OMException {
+    for (OzoneAcl acl : acls) {
+      if (acl.hasUnknownRights()) {
+        throw new OMException("Invalid ACL: unknown rights for " + acl.getType() + ":" + acl.getName(),
+            INVALID_REQUEST);
+      }
+    }
   }
 
   public OMLockDetails getOmLockDetails() {

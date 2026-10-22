@@ -28,6 +28,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createOmKeyInfo;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_PART;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
@@ -93,6 +94,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -637,6 +639,26 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
       OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(true, partNumber));
       OMClientResponse response = getOMKeyCreateRequest(modifiedOmRequest).validateAndUpdateCache(ozoneManager, 100L);
       assertEquals(INVALID_PART, response.getOMResponse().getStatus());
+    }
+  }
+
+  @Test
+  public void testRejectInvalidAcl() throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(false, false));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    for (OzoneAclInfo acl : OMRequestTestUtils.invalidAcls()) {
+      OMRequest.Builder request = createKeyRequest(false, 0).toBuilder();
+      request.getCreateKeyRequestBuilder().getKeyArgsBuilder().addAcls(acl);
+      OMException e = assertThrows(OMException.class,
+          () -> getOMKeyCreateRequest(request.build()).preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+
+      OMRequest.Builder modifiedRequest = doPreExecute(createKeyRequest(false, 0)).toBuilder();
+      modifiedRequest.getCreateKeyRequestBuilder().getKeyArgsBuilder().addAcls(acl);
+      OMClientResponse response =
+          getOMKeyCreateRequest(modifiedRequest.build()).validateAndUpdateCache(ozoneManager, 100L);
+      assertEquals(INVALID_REQUEST, response.getOMResponse().getStatus());
     }
   }
 
