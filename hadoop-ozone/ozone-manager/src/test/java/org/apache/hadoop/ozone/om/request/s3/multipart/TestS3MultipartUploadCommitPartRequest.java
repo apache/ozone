@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_PART;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -47,6 +48,8 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests S3 Multipart upload commit part request.
@@ -613,6 +616,25 @@ public class TestS3MultipartUploadCommitPartRequest
     Map<String, RepeatedOmKeyInfo> toDeleteKeyMap =
         ((S3MultipartUploadCommitPartResponse) omClientResponse).getKeyToDelete();
     assertNull(toDeleteKeyMap);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, -1})
+  public void testValidateAndUpdateCacheWithInvalidPartNumber(int partNumber) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = getKeyName();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    createParentPath(volumeName, bucketName);
+
+    OMRequest initiate = doPreExecuteInitiateMPU(volumeName, bucketName, keyName);
+    OMClientResponse initiated = getS3InitiateMultipartUploadReq(initiate).validateAndUpdateCache(ozoneManager, 1L);
+    String uploadId = initiated.getOMResponse().getInitiateMultiPartUploadResponse().getMultipartUploadID();
+    long clientID = Time.now();
+    addKeyToOpenKeyTable(volumeName, bucketName, keyName, clientID);
+    OMRequest commitRequest = doPreExecuteCommitMPU(volumeName, bucketName, keyName, clientID, uploadId, partNumber);
+    OMClientResponse response = getS3MultipartUploadCommitReq(commitRequest).validateAndUpdateCache(ozoneManager, 2L);
+    assertEquals(INVALID_PART, response.getOMResponse().getStatus());
   }
 
   protected void addKeyToOpenKeyTable(String volumeName, String bucketName,
