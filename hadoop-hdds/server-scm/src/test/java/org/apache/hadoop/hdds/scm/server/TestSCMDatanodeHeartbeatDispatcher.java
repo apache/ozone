@@ -216,6 +216,28 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     verify(mockNodeManager, never()).processHeartbeat(any(), any());
   }
 
+  @Test
+  public void testUnhealthyNodeWithoutVersionReportIsNotFenced() throws Exception {
+    // A stale or dead node that omits datanodeVersion (e.g. an older binary) must not be
+    // fenced — the version check is skipped and the heartbeat is processed normally so the
+    // node can still recover its health state without being asked to re-register.
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.isNodeRegistered(any())).thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceDead());
+
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(mockNodeManager, mock(EventPublisher.class));
+
+    SCMHeartbeatRequestProto heartbeat = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(randomDatanodeDetails().getProtoBufMessage())
+        .build();
+
+    dispatcher.dispatch(heartbeat);
+
+    verify(mockNodeManager, never()).addDatanodeCommand(any(DatanodeID.class), any(ReregisterCommand.class));
+    verify(mockNodeManager, times(1)).processHeartbeat(any(), any());
+  }
+
   /**
    * Asserts scm informs datanodes to re-register on a restart.
    *

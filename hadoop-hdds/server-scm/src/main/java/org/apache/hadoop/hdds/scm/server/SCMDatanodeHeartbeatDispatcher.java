@@ -113,9 +113,8 @@ public final class SCMDatanodeHeartbeatDispatcher {
       if (isUnhealthyWithIncompatibleVersion(datanodeDetails, heartbeat)) {
         LOG.info("Node {} is not healthy and reported an incompatible version. Asking to re-register.",
             datanodeDetails);
-        DatanodeID dnID = datanodeDetails.getID();
         nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
-        return nodeManager.getCommandQueue(dnID);
+        return nodeManager.getCommandQueue(datanodeDetails.getID());
       }
 
       // should we dispatch heartbeat through eventPublisher?
@@ -211,6 +210,8 @@ public final class SCMDatanodeHeartbeatDispatcher {
       return !nodeManager.getNodeStatus(datanodeDetails).isHealthy()
           && nodeManager.shouldFenceDatanode(datanodeDetails, heartbeat.getDatanodeVersion());
     } catch (NodeNotFoundException e) {
+      LOG.warn("Node {} not found when checking for version compatibility. " +
+          "This should not happen since the node is registered.", datanodeDetails, e);
       return false;
     }
   }
