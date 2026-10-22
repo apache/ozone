@@ -17,11 +17,14 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
 import java.util.UUID;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -41,6 +44,16 @@ public class TestS3MultipartUploadAbortRequest extends TestS3MultipartRequest {
 
     doPreExecuteAbortMPU(volumeName, bucketName, keyName,
         UUID.randomUUID().toString());
+  }
+
+  @Test
+  public void testPreExecuteWithInvalidUploadId() {
+    OMRequest omRequest = OMRequestTestUtils.createAbortMPURequest(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(), "invalid/" + UUID.randomUUID());
+
+    OMException e = assertThrows(OMException.class,
+        () -> getS3MultipartUploadAbortReq(omRequest).preExecute(ozoneManager));
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
   }
 
   @Test
