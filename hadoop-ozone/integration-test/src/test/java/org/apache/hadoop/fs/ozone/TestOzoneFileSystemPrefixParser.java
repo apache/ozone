@@ -27,9 +27,9 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.debug.om.PrefixParser;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -70,7 +70,7 @@ public class TestOzoneFileSystemPrefixParser {
 
     // create a volume and a bucket to be used by OzoneFileSystem
     try (OzoneClient client = cluster.newClient()) {
-      TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName,
+      DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName,
           BucketLayout.FILE_SYSTEM_OPTIMIZED);
     }
 

@@ -47,7 +47,8 @@ public final class CompactDBUtil {
       options.setBottommostLevelCompaction(compactionType);
       LOG.info("Compacting column family: {} with {} bottommost level compaction",
           tableName, options.bottommostLevelCompaction());
-      options.setExclusiveManualCompaction(true);
+      // Note that setExclusiveManualCompaction should not be set to true
+      // since this can cause write stall in high write throughput cluster. See HDDS-15990.
       RocksDatabase rocksDatabase =
           ((RDBStore) omMetadataManager.getStore()).getDb();
 

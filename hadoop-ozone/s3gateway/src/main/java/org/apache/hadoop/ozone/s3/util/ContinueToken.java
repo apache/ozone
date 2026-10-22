@@ -93,7 +93,14 @@ public class ContinueToken {
         checkHash(key, hex, digest);
 
         ByteBuffer buffer = ByteBuffer.wrap(Hex.decodeHex(hex));
+        if (buffer.remaining() < Integer.BYTES) {
+          throw new DecoderException("Continuation token is too short");
+        }
         int keySize = buffer.getInt();
+        // The token is client supplied, so never allocate more than it actually carries.
+        if (keySize < 0 || keySize > buffer.remaining()) {
+          throw new DecoderException("Invalid key size in continuation token: " + keySize);
+        }
 
         byte[] actualKeyBytes = new byte[keySize];
         buffer.get(actualKeyBytes);

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.assertj.core.api.Fail;
@@ -63,6 +64,17 @@ public class FaultInjectorImpl extends FaultInjector {
       e.printStackTrace();
       Assertions.assertTrue(Fail.fail("resume interrupted"));
     }
+    wait.countDown();
+  }
+
+  /** Wait until someone is paused here, without letting them through. */
+  public void awaitPaused(long timeoutMillis) throws InterruptedException {
+    Assertions.assertTrue(ready.await(timeoutMillis, TimeUnit.MILLISECONDS),
+        "Timed out waiting for the injector to be reached");
+  }
+
+  /** Unlike {@link #resume()}, does not wait for a pause first, so a discarded injector cannot park a thread. */
+  public void release() {
     wait.countDown();
   }
 

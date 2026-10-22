@@ -84,6 +84,21 @@ public final class ChatbotConfigKeys {
   public static final String OZONE_RECON_CHATBOT_MAX_TOOL_CALLS = OZONE_RECON_CHATBOT_PREFIX + "max.tool.calls";
   public static final int OZONE_RECON_CHATBOT_MAX_TOOL_CALLS_DEFAULT = 5;
 
+  /**
+   * Max reply length (output tokens) sent to the provider per LLM call. Default 8192
+   * is safe across providers (e.g. Claude Sonnet caps output at 8192 without an
+   * output-extending beta header). Raise it for reasoning models that need more room
+   * for internal thinking (e.g. gemini-2.5-pro) — providers bill actual usage.
+   */
+  public static final String OZONE_RECON_CHATBOT_MAX_TOKENS = OZONE_RECON_CHATBOT_PREFIX + "max.tokens";
+  public static final int OZONE_RECON_CHATBOT_MAX_TOKENS_DEFAULT = 8192;
+
+  // ── Conversation memory (V1, client-side) ───────────────────
+  /** Max characters of prior conversation sent as context; 0 disables memory. */
+  public static final String OZONE_RECON_CHATBOT_HISTORY_MAX_CHARS =
+      OZONE_RECON_CHATBOT_PREFIX + "history.max.chars";
+  public static final int OZONE_RECON_CHATBOT_HISTORY_MAX_CHARS_DEFAULT = 8000;
+
   // ── Async execution thread pool ──────────────────────────────
   /**
    * Number of threads in the dedicated thread pool used to execute chatbot

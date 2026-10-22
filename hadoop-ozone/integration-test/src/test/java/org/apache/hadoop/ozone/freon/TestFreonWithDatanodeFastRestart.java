@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.statemachine.StateMachine;
@@ -112,6 +112,6 @@ public class TestFreonWithDatanodeFastRestart {
   }
 
   private StateMachine getStateMachine() throws Exception {
-    return TestHelper.getStateMachine(cluster);
+    return OzoneTestHelper.getStateMachine(cluster);
   }
 }

@@ -26,7 +26,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -115,7 +115,7 @@ public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase
   @ParameterizedTest(name = "{0}")
   @MethodSource("parameters")
   void testOmBucketReadWriteKeyOps(ParameterBuilder parameterBuilder) throws Exception {
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client,
         parameterBuilder.getVolumeName(),
         parameterBuilder.getBucketName(),
         parameterBuilder.getBucketArgs().setBucketLayout(BucketLayout.OBJECT_STORE).build()

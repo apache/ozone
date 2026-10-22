@@ -25,4 +25,4 @@ permissions: { }
 
 jobs:
   update:
-    uses: ./.github/workflows/populate-cache.yml
+    uses: $/.github/workflows/populate-cache.yml

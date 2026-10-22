@@ -227,7 +227,7 @@ public final class BlockUtils {
     long containerBCSId = container.getBlockCommitSequenceId();
     if (containerBCSId < bcsId) {
       throw new StorageContainerException(
-          "Unable to find the block with bcsID " + bcsId + " .Container "
+          "Unable to find the block with bcsID " + bcsId + ". Container "
               + container.getContainerData().getContainerID() + " bcsId is "
               + containerBCSId + ".", UNKNOWN_BCSID);
     }
@@ -327,7 +327,7 @@ public final class BlockUtils {
       File metaDir = new File(containerData.getMetadataPath());
       File dumpDir = DatanodeStoreSchemaThreeImpl.getDumpDir(metaDir);
       try {
-        store.loadKVContainerData(dumpDir);
+        store.loadKVContainerData(dumpDir, containerID);
       } catch (IOException e) {
         // Don't delete unloaded or partially loaded files on failure,
         // but delete all partially loaded metadata.
@@ -349,5 +349,12 @@ public final class BlockUtils {
       throw new IOException("Failed to delete dump files under "
           + dumpDir.getAbsolutePath(), e);
     }
+  }
+
+  public static String getBlockMapKey(ContainerProtos.ContainerCommandRequestProto request) {
+    Preconditions.checkArgument(request.getCmdType() == ContainerProtos.Type.GetBlock, "Only support GetBlock command");
+    ContainerProtos.GetBlockRequestProto getBlock = request.getGetBlock();
+    return request.getClientId().toStringUtf8() + ":" + request.getCallId() + ":"
+        + getBlock.getBlockID().getLocalID() + "@" + getBlock.getBlockID().getContainerID();
   }
 }

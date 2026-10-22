@@ -82,8 +82,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    KeyArgs keyArgs = super.preExecute(ozoneManager)
+    final KeyArgs keyArgs = super.preExecute(ozoneManager)
         .getAbortMultiPartUploadRequest().getKeyArgs();
+    OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
@@ -156,7 +157,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
       OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout())
           .get(multipartOpenKey);
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       if (omKeyInfo == null) {
         // In old env, OpenKeycleanupservice may have deleted key from openKeyTable leaving behind
@@ -212,6 +213,9 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       omMetadataManager.getMultipartInfoTable()
           .addCacheEntry(new CacheKey<>(multipartKey),
               CacheValue.get(trxnLogIndex));
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
       omClientResponse = getOmClientResponse(ozoneManager, multipartKeyInfo,
           multipartKey, multipartOpenKey, omResponse, omBucketInfo,

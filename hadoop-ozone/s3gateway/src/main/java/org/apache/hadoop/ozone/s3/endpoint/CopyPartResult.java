@@ -45,9 +45,9 @@ public class CopyPartResult {
   public CopyPartResult() {
   }
 
-  public CopyPartResult(String eTag) {
+  public CopyPartResult(String eTag, Instant lastModified) {
     this.eTag = eTag;
-    this.lastModified = Instant.now();
+    this.lastModified = lastModified;
   }
 
   public Instant getLastModified() {

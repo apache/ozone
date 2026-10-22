@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAnd
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.INVALID_PART;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -145,6 +146,20 @@ public class TestOMFileCreateRequest extends OMKeyRequestTests {
   }
 
   @Test
+  public void testPreExecuteWithInvalidUploadId() {
+    OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
+        HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS, false, false);
+    KeyArgs keyArgs = omRequest.getCreateFileRequest().getKeyArgs().toBuilder()
+        .setIsMultipartKey(true).setMultipartNumber(1).setMultipartUploadID("invalid/" + UUID.randomUUID()).build();
+    OMRequest invalidRequest = omRequest.toBuilder()
+        .setCreateFileRequest(omRequest.getCreateFileRequest().toBuilder().setKeyArgs(keyArgs)).build();
+
+    OMException e = assertThrows(OMException.class,
+        () -> getOMFileCreateRequest(invalidRequest).preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
+  }
+
+  @Test
   public void testValidateAndUpdateCache() throws Exception {
     OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
         HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS,
@@ -175,7 +190,7 @@ public class TestOMFileCreateRequest extends OMKeyRequestTests {
     omKeyInfo = verifyPathInOpenKeyTable(keyName, id, true);
 
     List< OmKeyLocationInfo > omKeyLocationInfoList =
-        omKeyInfo.getLatestVersionLocations().getLocationList();
+        omKeyInfo.getLatestVersionLocations().createLocationList();
     assertEquals(1, omKeyLocationInfoList.size());
 
     OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);
@@ -295,6 +310,23 @@ public class TestOMFileCreateRequest extends OMKeyRequestTests {
         omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
     assertEquals(BUCKET_NOT_FOUND,
         omFileCreateResponse.getOMResponse().getStatus());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheWithInvalidPartNumber() throws Exception {
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    for (int partNumber : new int[] {0, -1}) {
+      OMRequest omRequest = createFileRequest(volumeName, bucketName, keyName,
+          HddsProtos.ReplicationFactor.ONE, HddsProtos.ReplicationType.RATIS, false, true);
+      CreateFileRequest createFileRequest = omRequest.getCreateFileRequest();
+      omRequest = omRequest.toBuilder().setCreateFileRequest(createFileRequest.toBuilder().setKeyArgs(
+          createFileRequest.getKeyArgs().toBuilder().setIsMultipartKey(true).setMultipartNumber(partNumber))).build();
+
+      OMRequest modifiedOmRequest = getOMFileCreateRequest(omRequest).preExecute(ozoneManager);
+      OMClientResponse response = getOMFileCreateRequest(modifiedOmRequest).validateAndUpdateCache(ozoneManager, 100L);
+      assertEquals(INVALID_PART, response.getOMResponse().getStatus());
+    }
   }
 
   @Test
@@ -622,7 +654,7 @@ public class TestOMFileCreateRequest extends OMKeyRequestTests {
       OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(key, id, true);
 
       List< OmKeyLocationInfo > omKeyLocationInfoList =
-          omKeyInfo.getLatestVersionLocations().getLocationList();
+          omKeyInfo.getLatestVersionLocations().createLocationList();
       assertEquals(1, omKeyLocationInfoList.size());
 
       OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);

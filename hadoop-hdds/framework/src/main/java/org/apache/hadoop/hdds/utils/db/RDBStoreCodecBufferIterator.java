@@ -43,7 +43,6 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
     this.valueBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-value", 4 << 10),
         getType().readValue() ? buffer -> getRocksDBIterator().get().value(buffer) : null);
-    seekToFirst();
   }
 
   void assertOpen() {

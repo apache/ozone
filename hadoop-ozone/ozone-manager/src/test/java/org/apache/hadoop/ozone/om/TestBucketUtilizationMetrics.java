@@ -55,15 +55,17 @@ public class TestBucketUtilizationMetrics {
   private static final long QUOTA_IN_BYTES_2 = QUOTA_RESET;
   private static final long QUOTA_IN_NAMESPACE_1 = 1;
   private static final long QUOTA_IN_NAMESPACE_2 = 2;
+  private static final long USED_NAMESPACE_1 = 3;
+  private static final long USED_NAMESPACE_2 = 4;
 
   @Test
   void testBucketUtilizationMetrics() {
     OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
 
     Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry1 = createMockEntry(VOLUME_NAME_1, BUCKET_NAME_1,
-        USED_BYTES_1, SNAPSHOT_USED_BYTES_1, QUOTA_IN_BYTES_1, QUOTA_IN_NAMESPACE_1);
+        USED_BYTES_1, SNAPSHOT_USED_BYTES_1, QUOTA_IN_BYTES_1, QUOTA_IN_NAMESPACE_1, USED_NAMESPACE_1);
     Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry2 = createMockEntry(VOLUME_NAME_2, BUCKET_NAME_2,
-        USED_BYTES_2, SNAPSHOT_USED_BYTES_2, QUOTA_IN_BYTES_2, QUOTA_IN_NAMESPACE_2);
+        USED_BYTES_2, SNAPSHOT_USED_BYTES_2, QUOTA_IN_BYTES_2, QUOTA_IN_NAMESPACE_2, USED_NAMESPACE_2);
 
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>>> bucketIterator = mock(Iterator.class);
     when(bucketIterator.hasNext())
@@ -94,6 +96,7 @@ public class TestBucketUtilizationMetrics {
     verify(mb, times(1)).tag(BucketMetricsInfo.BucketName, BUCKET_NAME_1);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketUsedBytes, USED_BYTES_1);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketSnapshotUsedBytes, SNAPSHOT_USED_BYTES_1);
+    verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketUsedNamespace, USED_NAMESPACE_1);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketQuotaBytes, QUOTA_IN_BYTES_1);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketQuotaNamespace, QUOTA_IN_NAMESPACE_1);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketAvailableBytes,
@@ -102,6 +105,7 @@ public class TestBucketUtilizationMetrics {
     verify(mb, times(1)).tag(BucketMetricsInfo.VolumeName, VOLUME_NAME_2);
     verify(mb, times(1)).tag(BucketMetricsInfo.BucketName, BUCKET_NAME_2);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketUsedBytes, USED_BYTES_2);
+    verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketUsedNamespace, USED_NAMESPACE_2);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketSnapshotUsedBytes, SNAPSHOT_USED_BYTES_2);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketQuotaBytes, QUOTA_IN_BYTES_2);
     verify(mb, times(1)).addGauge(BucketMetricsInfo.BucketQuotaNamespace, QUOTA_IN_NAMESPACE_2);
@@ -109,13 +113,15 @@ public class TestBucketUtilizationMetrics {
   }
 
   private static Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> createMockEntry(String volumeName,
-      String bucketName, long usedBytes, long snapshotUsedBytes, long quotaInBytes, long quotaInNamespace) {
+      String bucketName, long usedBytes, long snapshotUsedBytes, long quotaInBytes, long quotaInNamespace,
+      long usedNamespace) {
     Map.Entry<CacheKey<String>, CacheValue<OmBucketInfo>> entry = mock(Map.Entry.class);
     CacheValue<OmBucketInfo> cacheValue = mock(CacheValue.class);
     OmBucketInfo bucketInfo = mock(OmBucketInfo.class);
 
     when(bucketInfo.getVolumeName()).thenReturn(volumeName);
     when(bucketInfo.getBucketName()).thenReturn(bucketName);
+    when(bucketInfo.getUsedNamespace()).thenReturn(usedNamespace);
     when(bucketInfo.getUsedBytes()).thenReturn(usedBytes);
     when(bucketInfo.getSnapshotUsedBytes()).thenReturn(snapshotUsedBytes);
     when(bucketInfo.getQuotaInBytes()).thenReturn(quotaInBytes);

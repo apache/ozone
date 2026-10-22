@@ -114,7 +114,7 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // check if the directory already existed in OM
       checkDirectoryResult(keyName, pathInfoFSO.getDirectoryResult());
 
-      final OmBucketInfo bucketInfo = getBucketInfo(omMetadataManager,
+      final OmBucketInfo bucketInfo = getBucketInfoForUpdate(omMetadataManager,
           volumeName, bucketName);
 
       // add all missing parents to dir table
@@ -213,6 +213,9 @@ public class S3InitiateMultipartUploadRequestWithFSO
       // Add to cache
       omMetadataManager.getMultipartInfoTable().addCacheEntry(
           multipartKey, multipartKeyInfo, transactionLogIndex);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), bucketInfo, transactionLogIndex);
 
       omClientResponse =
           new S3InitiateMultipartUploadResponseWithFSO(

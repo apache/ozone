@@ -170,6 +170,20 @@ class TestSnapshotCache {
     verify(lock, times(1)).releaseReadLock(eq(SNAPSHOT_DB_LOCK), eq(dbKey.toString()));
   }
 
+  @Test
+  @DisplayName("get() of an inactive snapshot does not count towards cache size")
+  void testGetInactiveSnapshotDoesNotIncrementCacheSize() throws Exception {
+    final UUID dbKey = UUID.randomUUID();
+    when(cacheLoader.load(eq(dbKey)))
+        .thenThrow(new OMException("Snapshot is no longer active", OMException.ResultCodes.FILE_NOT_FOUND));
+    for (int i = 0; i < 3; i++) {
+      OMException ex = assertThrows(OMException.class, () -> snapshotCache.get(dbKey));
+      assertEquals(OMException.ResultCodes.FILE_NOT_FOUND, ex.getResult());
+      assertEquals(0, snapshotCache.size());
+      assertEquals(0, omMetrics.getNumSnapshotCacheSize());
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(ints = {0, 1, 5, 10})
   @DisplayName("Tests get() holds a read lock")
@@ -518,7 +532,15 @@ class TestSnapshotCache {
 
   private static IOzoneManagerLock newAcquiringLock() {
     IOzoneManagerLock acquiringLock = mock(IOzoneManagerLock.class);
+    when(acquiringLock.acquireReadLock(eq(SNAPSHOT_DB_LOCK), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.acquireReadLock(eq(SNAPSHOT_DB_LOCK), any(String.class), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.acquireReadLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseReadLock(eq(SNAPSHOT_DB_LOCK), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseReadLock(eq(SNAPSHOT_DB_LOCK), any(String.class), any(String.class)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.releaseReadLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
@@ -526,7 +548,15 @@ class TestSnapshotCache {
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.releaseResourceWriteLock(eq(SNAPSHOT_DB_LOCK)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
+    when(acquiringLock.acquireWriteLock(eq(SNAPSHOT_DB_LOCK), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.acquireWriteLock(eq(SNAPSHOT_DB_LOCK), any(String.class), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.acquireWriteLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseWriteLock(eq(SNAPSHOT_DB_LOCK), any(String.class)))
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+    when(acquiringLock.releaseWriteLock(eq(SNAPSHOT_DB_LOCK), any(String.class), any(String.class)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.releaseWriteLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
@@ -617,6 +647,21 @@ class TestSnapshotCache {
     assertFalse(snapshotCache.getDbMap().containsKey(snapshotId));
     assertFalse(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
     assertEquals(0, omMetrics.getNumSnapshotCacheSize());
+  }
+
+  @Test
+  @DisplayName("get() surfaces a retriable load TIMEOUT as OMException, not IllegalStateException")
+  void testGetPropagatesLoadTimeout() throws Exception {
+    clearInvocations(lock);
+    final UUID snapshotId = UUID.randomUUID();
+    when(cacheLoader.load(eq(snapshotId)))
+        .thenThrow(new OMException("snapshot has not been flushed yet", OMException.ResultCodes.TIMEOUT));
+
+    final OMException thrown = assertThrows(OMException.class, () -> snapshotCache.get(snapshotId));
+    assertEquals(OMException.ResultCodes.TIMEOUT, thrown.getResult());
+    assertFalse(snapshotCache.getDbMap().containsKey(snapshotId));
+    verify(lock, times(1)).acquireReadLock(eq(SNAPSHOT_DB_LOCK), eq(snapshotId.toString()));
+    verify(lock, times(1)).releaseReadLock(eq(SNAPSHOT_DB_LOCK), eq(snapshotId.toString()));
   }
 
   @Test

@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -47,6 +48,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -86,6 +88,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
         super.preExecute(ozoneManager).getCommitMultiPartUploadRequest();
 
     KeyArgs keyArgs = multipartCommitUploadPartRequest.getKeyArgs();
+    OMMultipartUploadUtils.validateUploadId(keyArgs.getMultipartUploadID());
     String keyPath = keyArgs.getKeyName();
     keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
         keyPath, getBucketLayout());
@@ -187,6 +190,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
 
       int partNumber = keyArgs.getMultipartNumber();
+      validatePartNumber(partNumber);
       partName = getPartName(ozoneKey, uploadID, partNumber);
 
       if (multipartKeyInfo == null) {
@@ -217,7 +221,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           OzoneManagerProtocolProtos.PartKeyInfo.newBuilder();
       partKeyInfo.setPartName(partName);
       partKeyInfo.setPartNumber(partNumber);
-      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf(getOmRequest().getVersion()));
+      partKeyInfo.setPartKeyInfo(omKeyInfo.getProtobuf(
+          ClientVersion.deserialize(getOmRequest().getVersion())));
 
       if (multipartKeyInfo.getSchemaVersion() == OmMultipartKeyInfo.LEGACY_SCHEMA_VERSION) {
         // Add this part information in to multipartKeyInfo.
@@ -260,7 +265,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
           new CacheKey<>(openKey),
           CacheValue.get(trxnLogIndex));
 
-      omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
+      omBucketInfo = getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       // This map should contain maximum of two entries
       // 1. Overwritten part
@@ -312,7 +317,12 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       if (eTag != null) {
         commitResponseBuilder.setETag(eTag);
       }
+      commitResponseBuilder.setModificationTime(keyArgs.getModificationTime());
       omResponse.setCommitMultiPartUploadResponse(commitResponseBuilder);
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
+
       omClientResponse =
           getOmClientResponse(ozoneManager, keyVersionsToDeleteMap, openKey,
               omKeyInfo, multipartKey, multipartKeyInfo, multipartPartKey,

@@ -154,7 +154,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
             " by default, CLOSED and QUASI_CLOSED are allowed.");
 
     return String.format(formatBuilder.toString(),
-        contentList.toArray(new String[0]));
+        contentList.toArray(new Object[0]));
   }
 
   @Override

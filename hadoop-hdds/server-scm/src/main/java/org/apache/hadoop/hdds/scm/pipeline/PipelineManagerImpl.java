@@ -32,7 +32,6 @@ import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import javax.management.ObjectName;
@@ -56,13 +55,13 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
@@ -92,9 +91,6 @@ public class PipelineManagerImpl implements PipelineManager {
   private final SCMHAManager scmhaManager;
   private SCMContext scmContext;
   private final NodeManager nodeManager;
-  // This allows for freezing/resuming the new pipeline creation while the
-  // SCM is already out of SafeMode.
-  private AtomicBoolean freezePipelineCreation;
   private final Clock clock;
 
   @SuppressWarnings("checkstyle:parameterNumber")
@@ -122,7 +118,6 @@ public class PipelineManagerImpl implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL,
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-    this.freezePipelineCreation = new AtomicBoolean();
   }
 
   @SuppressWarnings("checkstyle:parameterNumber")
@@ -159,13 +154,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
     pipelineManager.setBackgroundPipelineCreator(backgroundPipelineCreator);
     serviceManager.register(backgroundPipelineCreator);
-
-    if (FinalizationManager.shouldCreateNewPipelines(
-        scmContext.getFinalizationCheckpoint())) {
-      pipelineManager.resumePipelineCreation();
-    } else {
-      pipelineManager.freezePipelineCreation();
-    }
+    backgroundPipelineCreator.start();
 
     final long scrubberIntervalInMillis = conf.getTimeDuration(
         ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL,
@@ -182,13 +171,8 @@ public class PipelineManagerImpl implements PipelineManager {
             .setServiceName("BackgroundPipelineScrubber")
             .setIntervalInMillis(scrubberIntervalInMillis)
             .setWaitTimeInMillis(safeModeWaitMs)
-            .setPeriodicalTask(() -> {
-              try {
-                pipelineManager.scrubPipelines();
-              } catch (IOException e) {
-                LOG.error("Unexpected error during pipeline scrubbing", e);
-              }
-            }).build();
+            .setPeriodicalTask(pipelineManager::scrubAndClosePipelinesMissingDataStreamPort)
+            .build();
 
     pipelineManager.setBackgroundPipelineScrubber(backgroundPipelineScrubber);
     serviceManager.register(backgroundPipelineScrubber);
@@ -275,19 +259,12 @@ public class PipelineManagerImpl implements PipelineManager {
       throw new IOException("Pipeline creation is not allowed as safe mode " +
           "prechecks have not yet passed");
     }
-
-    if (freezePipelineCreation.get()) {
-      String message = "Cannot create new pipelines while pipeline creation " +
-          "is frozen.";
-      LOG.info(message);
-      throw new IOException(message);
-    }
   }
 
   private void addPipelineToManager(Pipeline pipeline)
       throws IOException {
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT);
     acquireWriteLock();
     try {
       stateManager.addPipeline(pipelineProto);
@@ -563,6 +540,64 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   /**
+   * Scrub pipelines, then close (and delete) OPEN RATIS pipelines whose
+   * registered nodes now advertise the RATIS_DATASTREAM port their stored node
+   * snapshot lacks.
+   */
+  public void scrubAndClosePipelinesMissingDataStreamPort() {
+    try {
+      scrubPipelines();
+    } catch (IOException e) {
+      LOG.error("Unexpected error during pipeline scrubbing", e);
+    }
+    closePipelinesMissingDataStreamPort();
+  }
+
+  void closePipelinesMissingDataStreamPort() {
+    if (!isDataStreamEnabled()) {
+      return;
+    }
+    for (Pipeline pipeline : getPipelines()) {
+      if (!pipeline.isOpen()
+          || pipeline.getType() != ReplicationType.RATIS
+          || !nodesMissingDataStreamPort(pipeline)) {
+        continue;
+      }
+      try {
+        final PipelineID id = pipeline.getId();
+        LOG.info("Closing RATIS pipeline {}", id);
+        closePipeline(id);
+        deletePipeline(id);
+      } catch (IOException e) {
+        LOG.error("Failed to close RATIS pipeline {} missing the datastream "
+            + "port", pipeline.getId(), e);
+      }
+    }
+  }
+
+  private boolean isDataStreamEnabled() {
+    return conf.getBoolean(
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED,
+        OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED_DEFAULT);
+  }
+
+  /**
+   * Whether any registered node of the pipeline now advertises the
+   * RATIS_DATASTREAM port that the pipeline's stored node snapshot lacks.
+   */
+  private boolean nodesMissingDataStreamPort(Pipeline pipeline) {
+    for (DatanodeDetails stored : pipeline.getNodes()) {
+      final DatanodeDetails current = nodeManager.getNode(stored.getID());
+      if (current != null
+          && current.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)
+          && !stored.hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Scrub pipelines.
    */
   @Override
@@ -641,7 +676,7 @@ public class PipelineManagerImpl implements PipelineManager {
       // Refactored to use getNode instead of getDatanodeInfo
       final DatanodeInfo info = nodeManager.getNode(dn.getID());
       if (info == null) {
-        LOG.warn("DatanodeInfo not found for {}", dn.getID());
+        LOG.warn("DatanodeInfo not found for {}", dn);
         return false;
       }
       datanodeInfos.add(info);
@@ -812,24 +847,6 @@ public class PipelineManagerImpl implements PipelineManager {
   public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
       throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException {
     stateManager.reinitialize(pipelineStore);
-  }
-
-  @Override
-  public void freezePipelineCreation() {
-    freezePipelineCreation.set(true);
-    backgroundPipelineCreator.stop();
-  }
-
-  @Override
-  public void resumePipelineCreation() {
-    freezePipelineCreation.set(false);
-    backgroundPipelineCreator.start();
-  }
-
-  @Override
-  public boolean isPipelineCreationFrozen() {
-    return freezePipelineCreation.get() &&
-        !backgroundPipelineCreator.isRunning();
   }
 
   @Override

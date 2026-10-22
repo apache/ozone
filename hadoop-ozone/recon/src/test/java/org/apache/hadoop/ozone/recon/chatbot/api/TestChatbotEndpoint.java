@@ -121,7 +121,7 @@ public class TestChatbotEndpoint {
 
   @Test
   public void testSuccessfulResponseReturnsHttp200WithSuccessTrue() throws Exception {
-    when(mockAgent.processQuery(anyString(), any(), any()))
+    when(mockAgent.processQuery(anyString(), any(), any(), any()))
         .thenReturn("The cluster has 5 healthy datanodes.");
 
     Response response = endpoint.chat(chatRequest("How many datanodes?"));
@@ -143,7 +143,7 @@ public class TestChatbotEndpoint {
     String fallbackText =
         "I can only answer questions about Ozone Recon cluster data such as " +
             "containers, datanodes, pipelines, keys, volumes, and cluster state.";
-    when(mockAgent.processQuery(anyString(), any(), any()))
+    when(mockAgent.processQuery(anyString(), any(), any(), any()))
         .thenReturn(fallbackText);
 
     Response response = endpoint.chat(chatRequest("What is the weather in London?"));
@@ -193,7 +193,7 @@ public class TestChatbotEndpoint {
 
   @Test
   public void testAgentChatbotExceptionReturns500WithGenericMessage() throws Exception {
-    when(mockAgent.processQuery(anyString(), any(), any()))
+    when(mockAgent.processQuery(anyString(), any(), any(), any()))
         .thenThrow(new ChatbotException("LLM API unavailable — rate limit hit"));
 
     Response response = endpoint.chat(chatRequest("What is the state?"));
@@ -220,7 +220,7 @@ public class TestChatbotEndpoint {
         new ChatbotEndpoint(mockAgent, mockLlmClient, conf);
 
     try {
-      when(mockAgent.processQuery(anyString(), any(), any()))
+      when(mockAgent.processQuery(anyString(), any(), any(), any()))
           .thenAnswer(inv -> {
             Thread.sleep(5_000L);
             return "done";
@@ -256,7 +256,7 @@ public class TestChatbotEndpoint {
     AtomicReference<String> capturedQueueErrorMessage = new AtomicReference<>();
 
     try {
-      when(mockAgent.processQuery(anyString(), any(), any()))
+      when(mockAgent.processQuery(anyString(), any(), any(), any()))
           .thenAnswer(inv -> {
             boolean awaited = agentLatch.await(8, TimeUnit.SECONDS);
             if (!awaited) {
@@ -314,14 +314,14 @@ public class TestChatbotEndpoint {
   @Test
   public void testSingleEndpointInstanceHandlesMultipleRequestsWithoutReinit()
       throws Exception {
-    when(mockAgent.processQuery(anyString(), any(), any()))
+    when(mockAgent.processQuery(anyString(), any(), any(), any()))
         .thenReturn("response");
 
     for (int i = 0; i < 5; i++) {
       assertEquals(200, endpoint.chat(chatRequest("query " + i)).getStatus());
     }
 
-    verify(mockAgent, times(5)).processQuery(anyString(), any(), any());
+    verify(mockAgent, times(5)).processQuery(anyString(), any(), any(), any());
   }
 
   // ── Health endpoint ────────────────────────────────────────────────────────

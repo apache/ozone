@@ -41,6 +41,16 @@ class TestOzoneClientConfig {
   }
 
   @Test
+  void nonPositiveEcParallelReadPoolLimit() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt("ozone.client.ec.parallel.read.pool.limit", 0);
+
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+
+    assertEquals(1, subject.getEcParallelReadPoolLimit());
+  }
+
+  @Test
   void testClientHBaseEnhancementsAllowedTrue() {
     // When ozone.client.hbase.enhancements.allowed = true,
     // related client configs should be effective as-is.
@@ -90,5 +100,22 @@ class TestOzoneClientConfig {
     assertEquals(64L << 20, clientConfig.getStreamReadPreReadSize());
     assertEquals(2 << 20, clientConfig.getStreamReadResponseDataSize());
     assertEquals(Duration.ofSeconds(5), clientConfig.getStreamReadTimeout());
+  }
+
+  @Test
+  void testDatastreamPutBlockWithoutRaftEnabledDefault() {
+    OzoneClientConfig subject = new OzoneConfiguration()
+        .getObject(OzoneClientConfig.class);
+    assertFalse(subject.isDatastreamPutBlockWithoutRaftEnabled());
+  }
+
+  @Test
+  void testDatastreamPutBlockWithoutRaftConfigParsing() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setBoolean("ozone.client.datastream.putblock.without.raft.enabled", true);
+
+    OzoneClientConfig subject = conf.getObject(OzoneClientConfig.class);
+
+    assertTrue(subject.isDatastreamPutBlockWithoutRaftEnabled());
   }
 }

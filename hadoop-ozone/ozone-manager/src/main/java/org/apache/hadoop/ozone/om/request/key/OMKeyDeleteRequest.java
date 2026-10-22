@@ -75,7 +75,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
+    final DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
         .getDeleteKeyRequest();
     Objects.requireNonNull(deleteKeyRequest, "deleteKeyRequest == null");
 
@@ -160,7 +160,7 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           CacheValue.get(trxnLogIndex));
 
       OmBucketInfo omBucketInfo =
-          getBucketInfo(omMetadataManager, volumeName, bucketName);
+          getBucketInfoForUpdate(omMetadataManager, volumeName, bucketName);
 
       long quotaReleased = sumBlockLengths(omKeyInfo);
       // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
@@ -185,6 +185,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           LOG.warn("Potentially inconsistent DB state: open key not found with dbOpenKey '{}'", dbOpenKey);
         }
       }
+
+      omMetadataManager.getBucketTable().addCacheEntry(
+          omMetadataManager.getBucketKey(volumeName, bucketName), omBucketInfo, trxnLogIndex);
 
       omClientResponse = new OMKeyDeleteResponse(
           omResponse.setDeleteKeyResponse(DeleteKeyResponse.newBuilder())

@@ -21,6 +21,8 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -35,11 +37,17 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.net.CachedDNSToSwitchMapping;
+import org.apache.hadoop.net.DNSToSwitchMapping;
+import org.apache.hadoop.net.ScriptBasedMapping;
+import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.ratis.util.function.CheckedFunction;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -47,6 +55,31 @@ import org.junit.jupiter.params.provider.MethodSource;
  * Test class for unit tests KeyManagerImpl.
  */
 public class TestKeyManagerImpl {
+
+  @Test
+  void defaultMappingKeepsCachedBehavior() {
+    DNSToSwitchMapping mapping =
+        KeyManagerImpl.createDNSToSwitchMapping(
+            new OzoneConfiguration());
+
+    assertInstanceOf(ScriptBasedMapping.class, mapping);
+    assertInstanceOf(CachedDNSToSwitchMapping.class, mapping);
+  }
+
+  @Test
+  void configuredMappingIsUsedDirectly() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setClass(ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
+        StaticMapping.class, DNSToSwitchMapping.class);
+
+    DNSToSwitchMapping mapping =
+        KeyManagerImpl.createDNSToSwitchMapping(conf);
+
+    assertInstanceOf(StaticMapping.class, mapping);
+    assertFalse(mapping instanceof CachedDNSToSwitchMapping,
+        "Configured mapping should not be wrapped in CachedDNSToSwitchMapping");
+  }
+
   private static Stream<TestCase> getSuccessfulTableIteratorParameters() {
     return Stream.of(
         TestCase.newBuilder("Fetch first 50 entries for volume 0, bucket 0")

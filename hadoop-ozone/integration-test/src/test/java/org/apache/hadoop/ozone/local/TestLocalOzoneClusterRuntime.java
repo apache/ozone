@@ -29,7 +29,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
@@ -99,11 +99,11 @@ class TestLocalOzoneClusterRuntime {
 
       try (OzoneClient client = OzoneClientFactory.getRpcClient(clientConf)) {
         OzoneBucket bucket =
-            TestDataUtil.createVolumeAndBucket(client, volumeName, bucketName);
+            DataTestUtil.createVolumeAndBucket(client, volumeName, bucketName);
         // Writing and reading back a key proves the datanodes registered and
         // SCM left safe mode, so the cluster is actually usable.
-        TestDataUtil.createKey(bucket, keyName, KEY_CONTENT.getBytes(UTF_8));
-        assertEquals(KEY_CONTENT, TestDataUtil.getKey(bucket, keyName));
+        DataTestUtil.createKey(bucket, keyName, KEY_CONTENT.getBytes(UTF_8));
+        assertEquals(KEY_CONTENT, DataTestUtil.getKey(bucket, keyName));
       }
     }
   }
@@ -124,7 +124,7 @@ class TestLocalOzoneClusterRuntime {
         assertEquals(bucketName, bucket.getName());
         // Key data written before the restart is still readable from the
         // persistent datanode storage.
-        assertEquals(KEY_CONTENT, TestDataUtil.getKey(bucket, keyName));
+        assertEquals(KEY_CONTENT, DataTestUtil.getKey(bucket, keyName));
       }
     }
   }

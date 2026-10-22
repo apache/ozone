@@ -30,8 +30,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -103,7 +103,7 @@ public class TestKeyPurging {
     for (int i = 1; i <= NUM_KEYS; i++) {
       String keyName = keyBase + "-" + i;
       keys.add(keyName);
-      TestDataUtil.createKey(bucket, keyName, data);
+      DataTestUtil.createKey(bucket, keyName, data);
     }
 
     // Delete created keys

@@ -34,9 +34,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -223,10 +223,10 @@ public class TestSCMFollowerCatchupWithContainerReport {
   }
 
   /**
-   * Edge case for removing the background polling loop: on an otherwise idle
+   * Edge case for the fallback retry: on an otherwise idle
    * cluster a restarted follower must still start its datanode server (exit safe
-   * mode) and serve replicas after promotion, driven by Ratis heartbeats /
-   * notifyLeaderChanged rather than a steady stream of new transactions.
+   * mode) and serve replicas after promotion without a steady stream of new
+   * transactions.
    */
   @Test
   void testFollowerCatchupOnIdleCluster() throws Exception {
@@ -280,7 +280,7 @@ public class TestSCMFollowerCatchupWithContainerReport {
 
       for (int i = 0; i < NUM_KEYS; i++) {
         String keyName = "key-" + i;
-        TestDataUtil.createKey(bucket, keyName,
+        DataTestUtil.createKey(bucket, keyName,
             RatisReplicationConfig.getInstance(THREE), keyData);
         OzoneKeyDetails keyDetails = bucket.getKey(keyName);
         keyDetails.getOzoneKeyLocations()

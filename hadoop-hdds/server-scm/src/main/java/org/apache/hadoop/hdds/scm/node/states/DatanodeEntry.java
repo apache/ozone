@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.node.states;
 
+import java.util.HashSet;
 import java.util.Set;
-import java.util.TreeSet;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 
@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
  */
 public class DatanodeEntry {
   private final DatanodeInfo info;
-  private final Set<ContainerID> containers = new TreeSet<>();
+  private final Set<ContainerID> containers = new HashSet<>();
 
   DatanodeEntry(DatanodeInfo info) {
     this.info = info;
@@ -43,7 +43,7 @@ public class DatanodeEntry {
   }
 
   public Set<ContainerID> copyContainers() {
-    return new TreeSet<>(containers);
+    return new HashSet<>(containers);
   }
 
   public void add(ContainerID containerId) {

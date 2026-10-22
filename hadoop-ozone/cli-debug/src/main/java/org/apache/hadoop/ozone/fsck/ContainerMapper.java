@@ -87,14 +87,14 @@ public class ContainerMapper {
                 keyValueTableIterator.next();
             OmKeyInfo omKeyInfo = keyValue.getValue();
             byte[] value = omKeyInfo
-                .getProtobuf(true, ClientVersion.CURRENT_VERSION)
+                .getProtobuf(true, ClientVersion.CURRENT)
                 .toByteArray();
             OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(
                 OzoneManagerProtocolProtos.KeyInfo.parseFrom(value));
             for (OmKeyLocationInfoGroup keyLocationInfoGroup : keyInfo
                 .getKeyLocationVersions()) {
               List<OmKeyLocationInfo> keyLocationInfo = keyLocationInfoGroup
-                  .getLocationList();
+                  .createLocationList();
               for (OmKeyLocationInfo keyLocation : keyLocationInfo) {
                 BlockIdDetails blockIdDetails = new BlockIdDetails();
                 Map<Long, BlockIdDetails> innerMap = new HashMap<>();

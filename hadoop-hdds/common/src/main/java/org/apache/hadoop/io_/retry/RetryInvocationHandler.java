@@ -423,6 +423,9 @@ public class RetryInvocationHandler<T> implements RpcInvocationHandler {
     if (proxy instanceof ProtocolTranslator) {
       proxy = ((ProtocolTranslator) proxy).getUnderlyingProxyObject();
     }
+    if (proxy instanceof RpcProxy) {
+      return true;
+    }
     if (!Proxy.isProxyClass(proxy.getClass())) {
       return false;
     }

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.GET_SHORT_CIRCUIT_FD_FAILED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
 import static org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext.WriteChunkStage.COMMIT_DATA;
@@ -57,6 +57,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.BlockManager;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
+import org.apache.hadoop.util.Shell;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.slf4j.Logger;
@@ -155,14 +156,23 @@ public class FilePerBlockStrategy implements ChunkManager {
     HddsVolume volume = containerData.getVolume();
 
     FileChannel channel = null;
-    boolean overwrite;
     try {
       channel = files.getChannel(chunkFile, doSyncWrite);
-      overwrite = validateChunkForOverwrite(channel, info);
     } catch (IOException e) {
       onFailure(volume);
       throw e;
     }
+
+    // Read the block file length once and reuse it for the overwrite check,
+    // the offset validation and the space accounting below.
+    long fileLengthBeforeWrite;
+    try {
+      fileLengthBeforeWrite = channel.size();
+    } catch (IOException e) {
+      throw new UncheckedIOException("Encountered an error while getting the file size for " + chunkFile.getName(), e);
+    }
+
+    boolean overwrite = validateChunkForOverwrite(fileLengthBeforeWrite, info);
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("Writing chunk {} (overwrite: {}) in stage {} to file {}",
@@ -171,15 +181,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     // check whether offset matches block file length if its an overwrite
     if (!overwrite) {
-      ChunkUtils.validateChunkSize(channel, info, chunkFile.getName());
-    }
-
-    long fileLengthBeforeWrite;
-    try {
-      fileLengthBeforeWrite = channel.size();
-    } catch (IOException e) {
-      throw new StorageContainerException("Encountered an error while getting the file size for "
-          + chunkFile.getName(), CHUNK_FILE_INCONSISTENCY);
+      ChunkUtils.validateChunkSize(fileLengthBeforeWrite, info, chunkFile.getName());
     }
 
     ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, chunkLength, volume);
@@ -247,6 +249,25 @@ public class FilePerBlockStrategy implements ChunkManager {
     }
     return ChunkUtils.readData(len, bufferCapacity, chunkFile, offset, volume,
         readMappedBufferThreshold, readMappedBufferMaxCount > 0, mappedBufferManager);
+  }
+
+  @Override
+  public RandomAccessFile getShortCircuitFd(Container container, BlockID blockID) throws StorageContainerException {
+    checkLayoutVersion(container);
+    final File chunkFile = getChunkFile(container, blockID);
+    try {
+      if (!Shell.WINDOWS) {
+        RandomAccessFile rf = new RandomAccessFile(chunkFile, "r");
+        return rf;
+      } else {
+        throw new StorageContainerException("Operation is not supported for platform "
+            + System.getProperty("os.name"), UNSUPPORTED_REQUEST);
+      }
+    } catch (Exception e) {
+      LOG.warn("getShortCircuitFds failed", e);
+      throw new StorageContainerException("getShortCircuitFds " +
+          "for short-circuit local reads failed", GET_SHORT_CIRCUIT_FD_FAILED);
+    }
   }
 
   @Override
@@ -414,5 +435,4 @@ public class FilePerBlockStrategy implements ChunkManager {
       }
     }
   }
-
 }

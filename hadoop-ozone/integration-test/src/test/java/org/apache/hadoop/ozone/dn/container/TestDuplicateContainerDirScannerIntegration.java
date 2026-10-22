@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
@@ -156,7 +156,7 @@ class TestDuplicateContainerDirScannerIntegration {
     byte[] data = ContainerTestHelper
         .getFixedLengthString("sample", 1024 * 1024)
         .getBytes(UTF_8);
-    try (OzoneOutputStream out = TestHelper.createKey(
+    try (OzoneOutputStream out = OzoneTestHelper.createKey(
         keyName, RATIS, ONE, 0, store, volumeName, bucketName)) {
       out.write(data);
       out.flush();
@@ -169,7 +169,7 @@ class TestDuplicateContainerDirScannerIntegration {
 
     cluster.getStorageContainerLocationClient().closeContainer(containerId);
     GenericTestUtils.waitFor(
-        () -> TestHelper.isContainerClosed(cluster, containerId,
+        () -> OzoneTestHelper.isContainerClosed(cluster, containerId,
             cluster.getHddsDatanodes().get(0).getDatanodeDetails()),
         1000, 15000);
 

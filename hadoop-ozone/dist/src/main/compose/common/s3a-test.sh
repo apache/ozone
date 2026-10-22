@@ -100,6 +100,7 @@ EOF
   # - ITestS3AContractRename: HDDS-10665
   mvn ${MAVEN_ARGS:-} --fail-never --show-version \
     -Dtest='ITestS3AContract*, ITestS3ACommitterMRJob, !ITestS3AContractBulkDelete, !ITestS3AContractCreate#testOverwrite*EmptyDirectory[*], !ITestS3AContractDistCp, !ITestS3AContractMkdirWithCreatePerf, !ITestS3AContractRename' \
+    -Dscan.value.testset=s3a \
     clean test
 
   local target="${RESULT_DIR}/junit/${bucket}/target"

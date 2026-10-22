@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.shell;
 
+import io.opentelemetry.api.trace.SpanKind;
 import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -100,7 +101,7 @@ public abstract class Shell extends GenericCli {
     }
 
     String spanName = spec.name() + " " + String.join(" ", parseResult.originalArgs());
-    return TracingUtil.execute("shell", spanName, getOzoneConf(),
+    return TracingUtil.execute("shell", spanName, SpanKind.INTERNAL, getOzoneConf(),
         () -> new CommandLine.RunLast().execute(parseResult));
   }
 

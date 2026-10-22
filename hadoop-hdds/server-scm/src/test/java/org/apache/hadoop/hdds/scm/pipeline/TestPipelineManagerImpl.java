@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_ALLOCA
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.ALLOCATED;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED;
 import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
 import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.apache.ratis.util.Preconditions.assertInstanceOf;
@@ -88,6 +89,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBufferStub;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
@@ -100,7 +102,9 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.MockClock;
@@ -979,5 +983,188 @@ public class TestPipelineManagerImpl {
     SCMException e = assertThrows(SCMException.class, block::run);
     assertEquals(ResultCodes.SCM_NOT_LEADER, e.getResult());
     assertInstanceOf(NotLeaderException.class, e.getCause());
+  }
+
+  private static DatanodeDetails portlessDatanode(DatanodeID id) {
+    return DatanodeDetails.newBuilder()
+        .setID(id)
+        .setHostName("host-" + id)
+        .setIpAddress("127.0.0.1")
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.STANDALONE, 9859))
+        .addPort(DatanodeDetails.newPort(
+            DatanodeDetails.Port.Name.RATIS, 9858))
+        .build();
+  }
+
+  private Pipeline addPipeline(PipelineManagerImpl pipelineManager,
+      Pipeline.PipelineState state, List<DatanodeDetails> nodes)
+      throws IOException {
+    final Pipeline pipeline = Pipeline.newBuilder()
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setNodes(nodes)
+        .setState(state)
+        .setId(PipelineID.randomId())
+        .build();
+    pipelineManager.getStateManager().addPipeline(
+        pipeline.getProtobufMessage(ClientVersion.CURRENT));
+    return pipeline;
+  }
+
+  private static boolean exists(PipelineManagerImpl pipelineManager,
+      PipelineID id) {
+    try {
+      pipelineManager.getPipeline(id);
+      return true;
+    } catch (PipelineNotFoundException e) {
+      return false;
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPorts() throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      // Registered datanodes (MockNodeManager) expose all ports incl datastream.
+      final List<DatanodeInfo> registered = nodeManager.getAllNodes();
+      final List<DatanodeDetails> idsA = new ArrayList<>();
+      final List<DatanodeDetails> idsB = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        idsA.add(portlessDatanode(registered.get(i).getID()));
+        idsB.add(portlessDatanode(registered.get(i + 3).getID()));
+      }
+
+      // OPEN, registered nodes, portless -> legacy pipeline, must be closed.
+      final Pipeline stale = addPipeline(pipelineManager, OPEN, idsA);
+      // OPEN, registered nodes carrying all ports -> not stale, kept.
+      final Pipeline portful = addPipeline(pipelineManager, OPEN,
+          new ArrayList<>(registered.subList(6, 9)));
+      // OPEN, but nodes are NOT registered -> cannot heal, left alone.
+      final List<DatanodeDetails> unregistered = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        unregistered.add(portlessDatanode(DatanodeID.randomID()));
+      }
+      final Pipeline unreg = addPipeline(pipelineManager, OPEN, unregistered);
+      // ALLOCATED (non-open) portless -> skipped.
+      final Pipeline allocated = addPipeline(pipelineManager, ALLOCATED, idsB);
+
+      pipelineManager.closePipelinesMissingDataStreamPort();
+
+      assertFalse(exists(pipelineManager, stale.getId()),
+          "OPEN pipeline whose nodes expose new ports should be closed and deleted");
+      assertTrue(exists(pipelineManager, portful.getId()));
+      assertTrue(exists(pipelineManager, unreg.getId()));
+      assertTrue(exists(pipelineManager, allocated.getId()));
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPortsSkippedWhenDataStreamDisabled()
+      throws Exception {
+    // Datastream disabled (default): even a portless RATIS pipeline is kept.
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      final List<DatanodeInfo> registered = nodeManager.getAllNodes();
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        nodes.add(portlessDatanode(registered.get(i).getID()));
+      }
+      final Pipeline portless = addPipeline(pipelineManager, OPEN, nodes);
+
+      pipelineManager.closePipelinesMissingDataStreamPort();
+
+      assertTrue(exists(pipelineManager, portless.getId()),
+          "portless pipeline must be kept while datastream is disabled");
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPortsSkipsEcPipeline()
+      throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      final List<DatanodeInfo> registered = nodeManager.getAllNodes();
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 5; i++) {
+        nodes.add(portlessDatanode(registered.get(i).getID()));
+      }
+      final Pipeline ec = Pipeline.newBuilder()
+          .setReplicationConfig(new ECReplicationConfig(3, 2))
+          .setNodes(nodes)
+          .setState(OPEN)
+          .setId(PipelineID.randomId())
+          .build();
+      pipelineManager.getStateManager().addPipeline(
+          ec.getProtobufMessage(ClientVersion.CURRENT));
+
+      pipelineManager.closePipelinesMissingDataStreamPort();
+
+      assertTrue(exists(pipelineManager, ec.getId()),
+          "EC pipeline must not be closed by datastream port scrubbing");
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPortsKeepsNotYetRestartedNodes()
+      throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      // Nodes are registered and healthy but still lack the datastream port
+      // (they have not restarted yet during a rolling enablement).
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        final DatanodeDetails portless = portlessDatanode(DatanodeID.randomID());
+        nodeManager.register(new DatanodeInfo(portless,
+            NodeStatus.inServiceHealthy(), UpgradeUtils.defaultVersionProto(),
+            HddsTestUtils.ROLL_INTERVAL_MS_DEFAULT), null, null);
+        nodes.add(portless);
+      }
+      final Pipeline pending = addPipeline(pipelineManager, OPEN, nodes);
+
+      pipelineManager.closePipelinesMissingDataStreamPort();
+
+      assertTrue(exists(pipelineManager, pending.getId()),
+          "pipeline whose registered nodes have not yet advertised the "
+              + "datastream port must be kept");
+    }
+  }
+
+  @Test
+  public void testClosePipelinesExposingNewPortsSwallowsError() throws Exception {
+    conf.setBoolean(HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, true);
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      final List<DatanodeInfo> registered = nodeManager.getAllNodes();
+      final List<DatanodeDetails> nodes = new ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        nodes.add(portlessDatanode(registered.get(i).getID()));
+      }
+      final Pipeline stale = addPipeline(pipelineManager, OPEN, nodes);
+
+      final PipelineManagerImpl spy = spy(pipelineManager);
+      doThrow(new IOException("boom")).when(spy).closePipeline(stale.getId());
+      // The close failure is logged and swallowed; the loop does not throw.
+      spy.closePipelinesMissingDataStreamPort();
+      assertTrue(exists(pipelineManager, stale.getId()));
+    }
+  }
+
+  @Test
+  public void testScrubAndCloseWiring() throws Exception {
+    // The background task scrubs then closes pipelines exposing new ports; on
+    // an empty manager both are no-ops and must not throw.
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      pipelineManager.scrubAndClosePipelinesMissingDataStreamPort();
+    }
+  }
+
+  @Test
+  public void testScrubAndCloseSwallowsScrubError() throws Exception {
+    try (PipelineManagerImpl pipelineManager = createPipelineManager(true)) {
+      final PipelineManagerImpl spy = spy(pipelineManager);
+      doThrow(new IOException("boom")).when(spy).scrubPipelines();
+      // Scrub failure is logged and swallowed; the close pass still runs.
+      spy.scrubAndClosePipelinesMissingDataStreamPort();
+      verify(spy).closePipelinesMissingDataStreamPort();
+    }
   }
 }

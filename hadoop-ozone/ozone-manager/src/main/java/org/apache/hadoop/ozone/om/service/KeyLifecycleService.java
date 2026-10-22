@@ -58,6 +58,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.IntPredicate;
 import java.util.stream.Collectors;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -121,7 +122,6 @@ public class KeyLifecycleService extends BackgroundService {
 
   private final OzoneManager ozoneManager;
   private int keyDeleteBatchSize;
-  private int listMaxSize;
   private int mpuAbortLimitPerTask;
   private long cachedDirMaxCount;
   private final AtomicBoolean suspended;
@@ -152,7 +152,6 @@ public class KeyLifecycleService extends BackgroundService {
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE_DEFAULT);
     Preconditions.checkArgument(keyDeleteBatchSize > 0,
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_BATCH_SIZE + " should be a positive value.");
-    this.listMaxSize = keyDeleteBatchSize >= 10000 ? keyDeleteBatchSize : 10000;
     this.mpuAbortLimitPerTask = conf.getInt(OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK,
         OZONE_KEY_LIFECYCLE_SERVICE_MPU_ABORT_LIMIT_PER_TASK_DEFAULT);
     Preconditions.checkArgument(mpuAbortLimitPerTask > 0,
@@ -190,7 +189,6 @@ public class KeyLifecycleService extends BackgroundService {
         StorageUnit.BYTES);
     // always go to 90% of max limit for request as other header will be added
     this.ratisByteLimit = (int) (limit * 0.9);
-    this.ozoneTrash = ozoneManager.getOzoneTrash();
   }
 
   @Override
@@ -203,7 +201,7 @@ public class KeyLifecycleService extends BackgroundService {
     List<OmLifecycleConfiguration> lifecycleConfigurationList = null;
     try {
       lifecycleConfigurationList = omMetadataManager.listLifecycleConfigurations();
-    } catch (OMException e) {
+    } catch (IOException e) {
       LOG.error("Failed to list lifecycle configurations", e);
       return queue;
     }
@@ -312,6 +310,7 @@ public class KeyLifecycleService extends BackgroundService {
 
     private long lastStateSaveTime = Time.monotonicNow();
     private long lastStateSaveKeyCount = 0;
+    private boolean scanAborted;
 
     private boolean shouldSaveState() {
       if ((Time.monotonicNow() - lastStateSaveTime) > stateSaveIntervalMs ||
@@ -398,8 +397,8 @@ public class KeyLifecycleService extends BackgroundService {
               .collect(Collectors.toList());
 
           if (!expirationRules.isEmpty()) {
-            LimitedExpiredObjectList expiredKeyList = new LimitedExpiredObjectList(listMaxSize);
-            LimitedExpiredObjectList expiredDirList = new LimitedExpiredObjectList(listMaxSize);
+            LimitedExpiredObjectList expiredKeyList = new LimitedExpiredObjectList(keyDeleteBatchSize);
+            LimitedExpiredObjectList expiredDirList = new LimitedExpiredObjectList(keyDeleteBatchSize);
             Table<String, OmKeyInfo> keyTable = omMetadataManager.getKeyTable(bucket.getBucketLayout());
             /**
              * Filter treatment.
@@ -437,9 +436,10 @@ public class KeyLifecycleService extends BackgroundService {
               evaluateBucket(bucket, keyTable, expirationRules, expiredKeyList, scanStateBuilder);
             }
 
+            boolean scanFinished = !scanAborted;
             if (expiredKeyList.isEmpty() && expiredDirList.isEmpty()) {
               LOG.info("No expired keys/dirs found/remained for bucket {}", bucketKey);
-              sendSaveScanStateRequest(scanStateBuilder, true);
+              sendSaveScanStateRequest(scanStateBuilder, scanFinished);
             } else {
               LOG.info("{} expired keys and {} expired dirs found and remained for bucket {}",
                   expiredKeyList.size(), expiredDirList.size(), bucketKey);
@@ -447,12 +447,12 @@ public class KeyLifecycleService extends BackgroundService {
               // If trash is enabled, move files to trash, instead of send delete requests.
               // OBS bucket doesn't support trash.
               if (bucket.getBucketLayout() == OBJECT_STORE) {
-                sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList,
-                    false, scanStateBuilder, true);
+                sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
+                    bucket.getOwner(), expiredKeyList, false, scanStateBuilder, scanFinished);
               } else {
                 // handle keys first, then directories
-                handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, true);
-                handleAndClearFullList(bucket, expiredDirList, true, scanStateBuilder, true);
+                handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, scanFinished);
+                handleAndClearFullList(bucket, expiredDirList, true, scanStateBuilder, scanFinished);
               }
             }
           }
@@ -467,6 +467,11 @@ public class KeyLifecycleService extends BackgroundService {
         }
 
         onSuccess(bucketKey);
+      } else {
+        // The task was registered in inFlight when scheduled, but the service got suspended/disabled
+        // or lost leadership before the task ran. Clear the registration, otherwise this bucket is
+        // skipped as "already running" in every following getTasks() cycle.
+        inFlight.remove(bucketKey);
       }
 
       // By design, no one cares about the results of this call back.
@@ -673,10 +678,9 @@ public class KeyLifecycleService extends BackgroundService {
       HashSet<Long> deletedDirSet = new HashSet<>();
       while (!stack.isEmpty()) {
         if (!shouldRun()) {
-          LOG.info("LifecycleActionTask for bucket {} stopping. " +
-              "Service enabled: {}, suspended: {}, leader ready: {}",
-              bucketName, isServiceEnabled.get(), suspended.get(), 
-              getOzoneManager() != null ? getOzoneManager().isLeaderReady() : "N/A");
+          scanAborted = true;
+          LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
+              bucketName);
           return;
         }
 
@@ -757,30 +761,25 @@ public class KeyLifecycleService extends BackgroundService {
 
         if (item.isFirstEvaluate()) {
           // filter sub directory list
-          if (!subDirSummary.getSubDirList().isEmpty()) {
-            Iterator<OmDirectoryInfo> iterator = subDirSummary.getSubDirList().iterator();
-            while (iterator.hasNext()) {
-              OmDirectoryInfo subDir = iterator.next();
-              String subDirPath = currentDirPath.isEmpty() ? subDir.getName() :
-                  currentDirPath + OM_KEY_PREFIX + subDir.getName();
+          if (!subDirSummary.isEmpty()) {
+            subDirSummary.removeIf(i -> {
+              OmDirectoryInfo subDir = subDirSummary.getSubDirList().get(i);
+              String subDirPath = currentDirPath.isEmpty() ? subDir.getName()
+                  : currentDirPath + OM_KEY_PREFIX + subDir.getName();
               if (subDirPath.startsWith(TRASH_PREFIX)) {
-                iterator.remove();
-                continue;
+                return true;
               }
-              boolean matched = false;
               for (OmLCRule rule : ruleList) {
-                if (rule.getEffectivePrefix() != null && subDirPath.startsWith(rule.getEffectivePrefix())) {
-                  matched = true;
-                  break;
+                if (rule.getEffectivePrefix() != null
+                    && subDirPath.startsWith(rule.getEffectivePrefix())) {
+                  return false;
                 }
               }
-              if (!matched) {
-                iterator.remove();
-              }
-            }
+              return true;
+            });
           }
 
-          if (!subDirSummary.getSubDirList().isEmpty()) {
+          if (!subDirSummary.isEmpty()) {
             item.setDirectoryList(subDirSummary);
             item.setFirstEvaluate(false);
             try {
@@ -822,6 +821,8 @@ public class KeyLifecycleService extends BackgroundService {
         long numKeysExpired = 0;
         HashSet<String> deletedKeySetInCache = new HashSet();
         HashSet<String> keySetInCache = new HashSet();
+        // The cache is scanned separately before the table, so a cache key cannot represent table scan progress.
+        // Only advance lastScannedKey during table iteration to avoid skipping unprocessed table keys on resume.
         Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>> cacheIter = keyTable.cacheIterator();
         while (cacheIter.hasNext()) {
           Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry = cacheIter.next();
@@ -847,7 +848,6 @@ public class KeyLifecycleService extends BackgroundService {
                 break;
               }
             }
-            lastScannedKey = entry.getKey().getCacheKey();
           }
         }
 
@@ -950,6 +950,7 @@ public class KeyLifecycleService extends BackgroundService {
       Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
           cacheIter = dirTable.cacheIterator();
       HashSet<String> deletedDirSet = new HashSet();
+      HashSet<String> dirSet = new HashSet();
       while (cacheIter.hasNext()) {
         Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>> entry =
             cacheIter.next();
@@ -960,6 +961,7 @@ public class KeyLifecycleService extends BackgroundService {
           continue;
         }
         if (cacheOmDirInfo.getParentObjectID() == dirObjID) {
+          dirSet.add(entry.getKey().getCacheKey());
           subDirList.addSubDir(entry.getKey().getCacheKey(), cacheOmDirInfo, cacheOmDirInfo.getName());
         }
       }
@@ -971,13 +973,19 @@ public class KeyLifecycleService extends BackgroundService {
           numDirIterated++;
           Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
           OmDirectoryInfo dir = entry.getValue();
-          if (deletedDirSet.contains(entry.getKey())) {
+          if (deletedDirSet.contains(entry.getKey()) || dirSet.contains(entry.getKey())) {
             continue;
           }
           if (dir.getParentObjectID() == dirObjID) {
             subDirList.addSubDir(entry.getKey(), dir, dir.getName());
           }
         }
+      }
+      // Cache children (hash order) and table children (ascending) are appended in that order; sort
+      // by name so the DFS stack pops siblings in strictly descending name order, which canSkipDir
+      // relies on to decide a resumed directory was already scanned.
+      if (!dirSet.isEmpty()) {
+        subDirList.sortByName();
       }
       return subDirList;
     }
@@ -987,8 +995,8 @@ public class KeyLifecycleService extends BackgroundService {
       boolean saved = false;
       if (expiredKeyList != null && !expiredKeyList.isEmpty()) {
         if (bucket.getBucketLayout() == OBJECT_STORE) {
-          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), expiredKeyList,
-              false, scanStateBuilder, false);
+          sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
+              bucket.getOwner(), expiredKeyList, false, scanStateBuilder, false);
         } else {
           handleAndClearFullList(bucket, expiredKeyList, false, scanStateBuilder, false);
         }
@@ -1024,8 +1032,9 @@ public class KeyLifecycleService extends BackgroundService {
 
         while (keyTblItr.hasNext()) {
           if (!shouldRun()) {
-            LOG.info("KeyLifecycleService is suspended or disabled. " +
-                "Stopping LifecycleActionTask for bucket {}.", bucketName);
+            scanAborted = true;
+            LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
+                bucketName);
             return;
           }
           if (shouldSaveState()) {
@@ -1089,8 +1098,9 @@ public class KeyLifecycleService extends BackgroundService {
                omMetadataManager.getMultipartInfoTable().iterator(bucketPrefix)) {
         while (mpuIterator.hasNext()) {
           if (!shouldRun()) {
-            LOG.info("KeyLifecycleService is suspended or disabled. " +
-                "Stopping multipart upload processing for bucket {}.", bucketName);
+            scanAborted = true;
+            LOG.info("KeyLifecycleService is suspended, disabled, or leader not ready. Stopping task for bucket {}.",
+                bucketName);
             return;
           }
           Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();
@@ -1109,43 +1119,81 @@ public class KeyLifecycleService extends BackgroundService {
           upload.setCreationTime(Instant.ofEpochMilli(mpuKeyInfo.getCreationTime()));
           String keyName = upload.getKeyName();
 
-          String multipartOpenKey;
-          try {
-            multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
-                volumeName, bucketName, keyName, upload.getUploadId(),
-                omMetadataManager, bucketInfo.getBucketLayout());
-          } catch (OMException e) {
-            LOG.warn("Failed to get multipart open key for {}/{}/{}, skipping",
-                volumeName, bucketName, keyName, e);
-            continue;
-          }
-
-          OmKeyInfo openKeyInfo = omMetadataManager.getOpenKeyTable(bucketInfo.getBucketLayout())
-              .get(multipartOpenKey);
-          if (openKeyInfo == null) {
-            LOG.warn("Open key not found for multipart upload {}/{}/{}, skipping",
-                volumeName, bucketName, keyName);
-            continue;
-          }
-
+          OmLCRule matchingRule = null;
+          OmKeyInfo openKeyInfo = null;
+          boolean openKeyFetchAttempted = false;
+          boolean skipUpload = false;
           for (OmLCRule rule : ruleList) {
-            if (shouldAbortUpload(openKeyInfo, upload, keyName, rule)) {
-              if (expiredUploads.isFull()) {
-                LOG.info("Multipart upload batch reached part count limit {}, aborting current batch " +
-                    "({} uploads, {} parts) for bucket {}/{}",
-                    mpuAbortLimitPerTask, expiredUploads.size(), expiredUploads.getPartCount(),
-                    volumeName, bucketName);
-                abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
+            if (!passesAgeAndPrefix(upload, keyName, rule)) {
+              continue;
+            }
+            if (!rule.isTagEnable()) {
+              matchingRule = rule;
+              break;
+            }
+            if (!openKeyFetchAttempted) {
+              openKeyFetchAttempted = true;
+              try {
+                String multipartOpenKey = OMMultipartUploadUtils.getMultipartOpenKey(
+                    volumeName, bucketName, keyName, upload.getUploadId(),
+                    omMetadataManager, bucketInfo.getBucketLayout());
+                openKeyInfo = omMetadataManager.getOpenKeyTable(
+                    bucketInfo.getBucketLayout()).get(multipartOpenKey);
+              } catch (OMException e) {
+                LOG.warn("Failed to get multipart open key for {}/{}/{}, skipping",
+                    volumeName, bucketName, keyName, e);
+                skipUpload = true;
+                break;
+              } catch (IOException e) {
+                LOG.warn("Failed to read open key table for {}/{}/{}, skipping",
+                    volumeName, bucketName, keyName, e);
+                skipUpload = true;
+                break;
               }
-
-              // Get part count for this MPU (at least 1 even if no parts uploaded yet)
-              int partCount = Math.max(1, mpuKeyInfo.getPartKeyInfoMap().size());
-              expiredUploads.add(upload, partCount);
-              LOG.debug("Multipart upload {}/{}/{} with uploadId {} ({} parts) will be aborted",
-                  volumeName, bucketName, keyName, upload.getUploadId(), partCount);
+              if (openKeyInfo == null) {
+                LOG.debug("Orphan multipart upload {}/{}/{} has no open key entry, skipping tag-requiring rules",
+                    volumeName, bucketName, keyName);
+              }
+            }
+            if (openKeyInfo == null) {
+              continue;
+            }
+            OmLCFilter filter = rule.getFilter();
+            if (filter == null || filter.match(openKeyInfo, keyName)) {
+              matchingRule = rule;
               break;
             }
           }
+
+          if (skipUpload || matchingRule == null) {
+            continue;
+          }
+
+          if (expiredUploads.isFull()) {
+            LOG.info("Multipart upload batch reached part count limit {}, aborting current batch " +
+                "({} uploads, {} parts) for bucket {}/{}",
+                mpuAbortLimitPerTask, expiredUploads.size(), expiredUploads.getPartCount(),
+                volumeName, bucketName);
+            abortExpiredMultipartUploadsAndClear(bucketInfo, expiredUploads);
+          }
+
+          // Split-schema MPUs keep parts in multipartPartsTable (the embedded map
+          // is empty); legacy MPUs use the embedded map. An MPU with no uploaded
+          // parts is valid (S3 allows aborting it with an empty parts list).
+          int uploadedParts;
+          try {
+            uploadedParts = mpuKeyInfo.getSchemaVersion()
+                == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION
+                ? OMMultipartUploadUtils.countParts(omMetadataManager, upload.getUploadId())
+                : mpuKeyInfo.getPartKeyInfoMap().size();
+          } catch (IOException e) {
+            LOG.warn("Failed to count parts for MPU {}/{}/{} uploadId {}, skipping",
+                volumeName, bucketName, keyName, upload.getUploadId(), e);
+            continue;
+          }
+          expiredUploads.add(upload, uploadedParts);
+          LOG.debug("Multipart upload {}/{}/{} with uploadId {} ({} parts) will be aborted",
+              volumeName, bucketName, keyName, upload.getUploadId(), uploadedParts);
         }
       } catch (IOException e) {
         LOG.warn("Failed to iterate multipartInfoTable for bucket {}/{}", volumeName, bucketName, e);
@@ -1160,33 +1208,16 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     /**
-     * Check if a multipart upload should be aborted based on the lifecycle rule.
-     *
-     * @param openKeyInfo the open key information with tags
-     * @param upload the multipart upload information
-     * @param keyName the key name of the upload
-     * @param rule the lifecycle rule to evaluate against
-     * @return true if the upload should be aborted, false otherwise
+     * Returns true if the upload passes the age and prefix checks for the given rule,
+     * without consulting the open key table (no tag evaluation).
      */
-    private boolean shouldAbortUpload(OmKeyInfo openKeyInfo, OmMultipartUpload upload,
-                                      String keyName, OmLCRule rule) {
-
+    private boolean passesAgeAndPrefix(OmMultipartUpload upload, String keyName, OmLCRule rule) {
       if (!rule.getAbortIncompleteMultipartUpload().shouldAbort(
           upload.getCreationTime().toEpochMilli())) {
         return false;
       }
-
       String effectivePrefix = rule.getEffectivePrefix();
-      if (effectivePrefix != null && !keyName.startsWith(effectivePrefix)) {
-        return false;
-      }
-
-      OmLCFilter filter = rule.getFilter();
-      if (filter != null && !filter.match(openKeyInfo, keyName)) {
-        return false;
-      }
-
-      return true;
+      return effectivePrefix == null || keyName.startsWith(effectivePrefix);
     }
 
     /**
@@ -1220,7 +1251,7 @@ public class KeyLifecycleService extends BackgroundService {
       OMRequest omRequest = OMRequest.newBuilder()
           .setCmdType(OzoneManagerProtocolProtos.Type.AbortExpiredMultiPartUploads)
           .setMultipartUploadsExpiredAbortRequest(abortRequest)
-          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT.serialize())
           .setClientId(clientId.toString())
           .build();
 
@@ -1336,12 +1367,12 @@ public class KeyLifecycleService extends BackgroundService {
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList,
         boolean dir, OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
-      if (moveToTrashEnabled.get() && bucket.getBucketLayout() != OBJECT_STORE && ozoneTrash != null) {
+      if (moveToTrashEnabled.get() && bucket.getBucketLayout() != OBJECT_STORE && getEffectiveOzoneTrash() != null) {
         moveToTrash(bucket, keysList, dir);
         sendSaveScanStateRequest(scanStateBuilder, scanFinished);
       } else {
-        sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), keysList, dir,
-            scanStateBuilder, scanFinished);
+        sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(),
+            bucket.getOwner(), keysList, dir, scanStateBuilder, scanFinished);
       }
     }
 
@@ -1367,7 +1398,7 @@ public class KeyLifecycleService extends BackgroundService {
 
         OMRequest omRequest = OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.SaveLifecycleScanState)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(clientId.toString())
             .setSaveLifecycleScanStateRequest(saveRequest)
             .build();
@@ -1381,8 +1412,9 @@ public class KeyLifecycleService extends BackgroundService {
       }
     }
 
-    private void sendDeleteKeysRequestAndClearList(String volume, String bucket, LimitedExpiredObjectList keysList,
-        boolean dir, OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
+    private void sendDeleteKeysRequestAndClearList(String volume, String bucket, String bucketOwner,
+        LimitedExpiredObjectList keysList, boolean dir,
+        OmLifecycleScanState.Builder scanStateBuilder, boolean scanFinished) {
       try {
         if (getInjector(1) != null) {
           try {
@@ -1392,6 +1424,7 @@ public class KeyLifecycleService extends BackgroundService {
           }
         }
 
+        UserGroupInformation ugi = UserGroupInformation.createRemoteUser(bucketOwner);
         int batchSize = keyDeleteBatchSize;
         int startIndex = 0;
         for (int i = 0; i < keysList.size();) {
@@ -1430,16 +1463,32 @@ public class KeyLifecycleService extends BackgroundService {
           LOG.debug("request size {} for {} keys", deleteKeysRequest.getSerializedSize(), keyCount);
 
           if (deleteKeysRequest.getSerializedSize() < ratisByteLimit) {
-            // send request out
-            OMRequest omRequest = OMRequest.newBuilder()
+            OMRequest omRequestRaw = OMRequest.newBuilder()
                 .setCmdType(OzoneManagerProtocolProtos.Type.DeleteKeys)
-                .setVersion(ClientVersion.CURRENT_VERSION)
+                .setVersion(ClientVersion.CURRENT.serialize())
                 .setClientId(clientId.toString())
                 .setDeleteKeysRequest(deleteKeysRequest)
                 .build();
             long startTime = System.nanoTime();
-            final OzoneManagerProtocolProtos.OMResponse response = OzoneManagerRatisUtils.submitRequest(
-                getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
+            final OzoneManagerProtocolProtos.OMResponse response;
+            try {
+              final OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(
+                  omRequestRaw, getOzoneManager());
+              response = ugi.doAs(new PrivilegedExceptionAction<OzoneManagerProtocolProtos.OMResponse>() {
+                @Override
+                public OzoneManagerProtocolProtos.OMResponse run() throws Exception {
+                  // perform preExecute as ratis submit does not perform preExecute
+                  OMRequest omRequest = omClientRequest.preExecute(getOzoneManager());
+                  return OzoneManagerRatisUtils.submitRequest(
+                      getOzoneManager(), omRequest, clientId, callId.getAndIncrement());
+                }
+              });
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              throw new ServiceException(e);
+            } catch (IOException e) {
+              throw new ServiceException(e);
+            }
             long endTime = System.nanoTime();
             LOG.debug("DeleteKeys request with {} keys cost {} ns", keyCount, endTime - startTime);
             long deletedCount = keyCount;
@@ -1509,8 +1558,10 @@ public class KeyLifecycleService extends BackgroundService {
       try {
         checkAndCreateTrashDirIfNeeded(bucket, trashCurrent);
       } catch (IOException e) {
-        keysList.clear();
-        return;
+        String message =
+            "Failed to prepare trash root " + trashCurrent + " for bucket " + volumeName + "/" + bucketName;
+        LOG.error(message, e);
+        throw new IllegalStateException(message, e);
       }
 
       for (int i = 0; i < keysList.size(); i++) {
@@ -1542,7 +1593,7 @@ public class KeyLifecycleService extends BackgroundService {
         // send request out
         OMRequest omRequest = OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(clientId.toString())
             .setRenameKeyRequest(renameKeyRequest)
             .build();
@@ -1561,8 +1612,10 @@ public class KeyLifecycleService extends BackgroundService {
               });
           if (omResponse != null) {
             if (!omResponse.getSuccess()) {
+              OzoneManagerProtocolProtos.Status status = omResponse.getStatus();
               // log the failure and continue the iterating
-              LOG.error("RenameKey request failed with source key: {}, dest key: {}", keyName, targetKeyName);
+              LOG.error("RenameKey request failed with source key: {}, dest key: {}, status: {}",
+                  keyName, targetKeyName, status);
               continue;
             }
           }
@@ -1578,6 +1631,9 @@ public class KeyLifecycleService extends BackgroundService {
             metrics.incrSizeKeyRenamed(keysList.getReplicatedSize(i));
           }
         } catch (IOException | InterruptedException e) {
+          if (e instanceof InterruptedException) {
+            Thread.currentThread().interrupt();
+          }
           LOG.error("Failed to send RenameKeysRequest", e);
         }
       }
@@ -1601,7 +1657,7 @@ public class KeyLifecycleService extends BackgroundService {
           OMRequest omRequest = OMRequest.newBuilder().setCreateDirectoryRequest(
                   CreateDirectoryRequest.newBuilder().setKeyArgs(keyArgs))
               .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
-              .setVersion(ClientVersion.CURRENT_VERSION)
+              .setVersion(ClientVersion.CURRENT.serialize())
               .setClientId(clientId.toString())
               .build();
           try {
@@ -1654,13 +1710,16 @@ public class KeyLifecycleService extends BackgroundService {
   }
 
   @VisibleForTesting
-  public void setListMaxSize(int size) {
-    this.listMaxSize = size;
+  public void setKeyDeleteBatchSize(int size) {
+    this.keyDeleteBatchSize = size;
   }
 
-  @VisibleForTesting
-  public void setMpuAbortLimitPerTask(int limit) {
-    this.mpuAbortLimitPerTask = limit;
+  // Returns the test-injected OzoneTrash if set, otherwise the live instance
+  // from OzoneManager. This is needed because startTrashEmptier() runs after
+  // keyManager.start() in all OzoneManager startup paths, so the field cannot
+  // be populated eagerly in the constructor.
+  private OzoneTrash getEffectiveOzoneTrash() {
+    return ozoneTrash != null ? ozoneTrash : ozoneManager.getOzoneTrash();
   }
 
   @VisibleForTesting
@@ -1944,6 +2003,48 @@ public class KeyLifecycleService extends BackgroundService {
       subDirList.add(dir);
       subDirKeyPathList.add(dirPath);
       subDirCount++;
+    }
+
+    /** Removes the entry at {@code index} from all parallel lists. */
+    void removeAt(int index) {
+      subDirList.remove(index);
+      subDirKeyList.remove(index);
+      subDirKeyPathList.remove(index);
+      subDirCount--;
+    }
+
+    /** Removes the entry if shouldRemoveIndex returns true. */
+    void removeIf(IntPredicate shouldRemoveIndex) {
+      for (int i = subDirCount - 1; i >= 0; i--) {
+        if (shouldRemoveIndex.test(i)) {
+          removeAt(i);
+        }
+      }
+    }
+
+    public void sortByName() {
+      if (subDirCount <= 1) {
+        return;
+      }
+      List<Integer> order = new ArrayList<>(subDirCount);
+      for (int i = 0; i < subDirCount; i++) {
+        order.add(i);
+      }
+      order.sort(Comparator.comparing((Integer idx) -> subDirList.get(idx).getName()));
+      List<OmDirectoryInfo> sortedDirs = new ArrayList<>(subDirCount);
+      List<String> sortedKeys = new ArrayList<>(subDirCount);
+      List<String> sortedPaths = new ArrayList<>(subDirCount);
+      for (int idx : order) {
+        sortedDirs.add(subDirList.get(idx));
+        sortedKeys.add(subDirKeyList.get(idx));
+        sortedPaths.add(subDirKeyPathList.get(idx));
+      }
+      subDirList.clear();
+      subDirList.addAll(sortedDirs);
+      subDirKeyList.clear();
+      subDirKeyList.addAll(sortedKeys);
+      subDirKeyPathList.clear();
+      subDirKeyPathList.addAll(sortedPaths);
     }
 
     public OmDirectoryInfo getLastSubDir() {

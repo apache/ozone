@@ -52,7 +52,11 @@ import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartInfo;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartPartKey;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import picocli.CommandLine;
@@ -100,6 +104,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   private Table<String, OmKeyInfo> openFileTable;
   private Table<String, OmKeyInfo> openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
+  private Table<OmMultipartPartKey, OmMultipartPartInfo> multipartPartsTable;
   private DBStore dirTreeDbStore;
   private Table<Long, String> dirTreeTable;
   // Cache volume IDs to avoid repeated lookups
@@ -138,6 +143,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       openFileTable = OMDBDefinition.OPEN_FILE_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
       openKeyTable = OMDBDefinition.OPEN_KEY_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
       multipartInfoTable = OMDBDefinition.MULTIPART_INFO_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
+      multipartPartsTable = OMDBDefinition.MULTIPART_PARTS_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
 
       retrieve(dbPath, writer, containerIDs);
     } catch (Exception e) {
@@ -313,11 +319,18 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         String dbKey = entry.getKey();
         OmMultipartKeyInfo mpuInfo = entry.getValue();
 
-        // Collect all target containers that have parts of this MPU
+        // Collect all target containers that have parts of this MPU. Legacy
+        // (schemaVersion 0) MPUs embed their parts in the multipartInfoTable
+        // value, whereas split (schemaVersion 1) MPUs store each part as a
+        // separate row in the multipartPartsTable.
         Set<Long> matchedContainers = new HashSet<>();
-        for (PartKeyInfo partKeyInfo : mpuInfo.getPartKeyInfoMap()) {
-          OmKeyInfo partKey = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-          matchedContainers.addAll(getKeyContainers(partKey, containerIds));
+        if (mpuInfo.getSchemaVersion() == OmMultipartKeyInfo.SPLIT_PARTS_TABLE_SCHEMA_VERSION) {
+          matchedContainers.addAll(getSplitPartContainers(dbKey, containerIds));
+        } else {
+          for (PartKeyInfo partKeyInfo : mpuInfo.getPartKeyInfoMap()) {
+            OmKeyInfo partKey = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
+            matchedContainers.addAll(getKeyContainers(partKey, containerIds));
+          }
         }
 
         if (!matchedContainers.isEmpty()) {
@@ -332,15 +345,56 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
   }
 
   private Set<Long> getKeyContainers(OmKeyInfo keyInfo, Set<Long> targetContainerIds) {
+    return getContainers(keyInfo.getKeyLocationVersions(), targetContainerIds);
+  }
+
+  /**
+   * Scans the split multipartPartsTable for all parts belonging to the given
+   * multipart upload (its uploadId is the last path component of the
+   * multipartInfoTable db key) and returns the target containers referenced by
+   * those parts' block locations.
+   */
+  private Set<Long> getSplitPartContainers(String multipartInfoDbKey, Set<Long> targetContainerIds) {
+    Set<Long> matchedContainers = new HashSet<>();
+    String uploadId;
+    try {
+      uploadId = OmMultipartUpload.from(multipartInfoDbKey).getUploadId();
+    } catch (IllegalArgumentException e) {
+      err().println("Invalid multipartInfoTable key " + multipartInfoDbKey + ", " + e);
+      return matchedContainers;
+    }
+    OmMultipartPartKey prefix = OmMultipartPartKey.prefix(uploadId);
+    try (TableIterator<OmMultipartPartKey, Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo>>
+             partIterator = multipartPartsTable.iterator(prefix)) {
+      while (partIterator.hasNext()) {
+        Table.KeyValue<OmMultipartPartKey, OmMultipartPartInfo> partEntry = partIterator.next();
+        OmMultipartPartKey partKey = partEntry.getKey();
+        // Prefix iteration can overshoot into the next upload's rows; stop then.
+        if (!uploadId.equals(partKey.getUploadId())) {
+          break;
+        }
+        if (partKey.hasPartNumber()) {
+          matchedContainers.addAll(
+              getContainers(partEntry.getValue().getKeyLocationInfos(), targetContainerIds));
+        }
+      }
+    } catch (Exception e) {
+      err().println("Exception occurred reading multipartPartsTable for upload " + uploadId + ", " + e);
+    }
+    return matchedContainers;
+  }
+
+  private Set<Long> getContainers(List<OmKeyLocationInfoGroup> locationVersions, Set<Long> targetContainerIds) {
     Set<Long> keyContainers = new HashSet<>();
-    keyInfo.getKeyLocationVersions().forEach(
-        e -> e.getLocationList().forEach(
-            blk -> {
-              long cid = blk.getBlockID().getContainerID();
-              if (targetContainerIds.contains(cid)) {
-                keyContainers.add(cid);
-              }
-            }));
+    locationVersions.forEach(
+        e -> e.getLocationLists().forEach(
+            locationList -> locationList.forEach(
+                blk -> {
+                  long cid = blk.getBlockID().getContainerID();
+                  if (targetContainerIds.contains(cid)) {
+                    keyContainers.add(cid);
+                  }
+                })));
     return keyContainers;
   }
 

@@ -70,6 +70,11 @@ public class BucketAclHandler extends BucketOperationHandler {
     return queryParams().get(QueryParams.ACL) != null;
   }
 
+  @Override
+  S3GAction getAction() {
+    return shouldHandle() ? S3GAction.NOT_IMPLEMENTED : null;
+  }
+
   /**
    * Implement acl get.
    * <p>

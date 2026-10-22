@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.recon;
 
 import static java.net.HttpURLConnection.HTTP_CREATED;
 import static java.net.HttpURLConnection.HTTP_OK;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
@@ -29,34 +28,59 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.RECON_OM_DELTA_UPDATE_LIMIT;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmDeltaRequest;
 import static org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl.OmSnapshotTaskName.OmSnapshotRequest;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition.REPLICA_HISTORY_V2;
+import static org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBDefinition.METADATA;
+import static org.apache.ozone.recon.codegen.JooqCodeGenerator.RECON_SCHEMA_NAME;
+import static org.apache.ozone.recon.schema.SchemaVersionTableDefinition.SCHEMA_VERSION_TABLE_NAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.slf4j.event.Level.INFO;
 
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
+import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistory;
+import org.apache.hadoop.ozone.recon.scm.ContainerReplicaHistoryList;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBDefinition;
+import org.apache.hadoop.ozone.recon.upgrade.ReconVersion;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
@@ -69,14 +93,18 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test Ozone Recon.
  */
 public class TestReconWithOzoneManager {
+  private static final AtomicLong OBJECT_ID_SEQUENCE = new AtomicLong();
+
   private static MiniOzoneCluster cluster = null;
   private static OMMetadataManager metadataManager;
   private static CloseableHttpClient httpClient;
+  private static String reconHttpURL;
   private static String taskStatusURL;
   private static ReconService recon;
 
@@ -119,8 +147,9 @@ public class TestReconWithOzoneManager {
 
     cluster.getStorageContainerManager().exitSafeMode();
 
-    String reconHTTPAddress = conf.get(OZONE_RECON_HTTP_ADDRESS_KEY);
-    taskStatusURL = "http://" + reconHTTPAddress + "/api/v1/task/status";
+    // Keep requests on loopback when the HTTP server advertises the machine hostname.
+    reconHttpURL = "http://127.0.0.1:" + recon.getReconServer().getHttpServer().getHttpAddress().getPort();
+    taskStatusURL = reconHttpURL + "/api/v1/task/status";
 
     // initialize HTTPClient
     httpClient = HttpClientBuilder
@@ -393,6 +422,184 @@ public class TestReconWithOzoneManager {
    * Helper function to add voli/bucketi/keyi to containeri to OM Metadata.
    * For test purpose each container will have only one key.
    */
+  @Test
+  public void testManualOMDBRebuild() throws Exception {
+    // 1. Stop Recon
+    recon.stop();
+
+    // 2. Write keys to OM
+    addKeys(20, 25);
+    long omLatestSeqNumber = ((RDBStore) metadataManager.getStore())
+        .getDb().getLatestSequenceNumber();
+    java.io.File omDbDir = metadataManager.getStore().getDbLocation();
+
+    // 3. Stop OM (flush to disk)
+    cluster.getOzoneManager().stop();
+
+    // 4. Copy OM DB into Recon's OM snapshot dir. The dir and the "om.snapshot.db_" prefix must
+    // match what ReconOmMetadataManagerImpl#start looks up via ReconUtils#getLastKnownDB, otherwise
+    // Recon will not load the copied DB on restart.
+    java.io.File reconOmSnapshotDir = new ReconUtils()
+        .getReconDbDir(cluster.getConf(), ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR);
+    java.io.File reconOmDbDir = new java.io.File(reconOmSnapshotDir,
+        ReconConstants.RECON_OM_SNAPSHOT_DB + "_" + System.currentTimeMillis());
+    org.apache.commons.io.FileUtils.deleteDirectory(reconOmDbDir);
+    org.apache.commons.io.FileUtils.copyDirectory(omDbDir, reconOmDbDir);
+
+    // 5. Restart Recon and confirm it loaded the OM DB copy we placed above. Shutting OM down
+    // writes its own trailing records, so the copy is at or ahead of the sequence number we
+    // captured while OM was up.
+    recon.start(cluster.getConf());
+    OzoneManagerServiceProviderImpl reconImpl = (OzoneManagerServiceProviderImpl)
+        recon.getReconServer().getOzoneManagerServiceProvider();
+    long reconLoadedSeqNumber = ((RDBStore) reconImpl.getOMMetadataManagerInstance().getStore())
+        .getDb().getLatestSequenceNumber();
+    assertThat(reconLoadedSeqNumber).isGreaterThanOrEqualTo(omLatestSeqNumber);
+
+    // 6. POST reinit
+    String triggerUrl = reconHttpURL + "/api/v1/triggerdbsync/om/reinit";
+    org.apache.http.client.methods.HttpPost httpPost = new org.apache.http.client.methods.HttpPost(triggerUrl);
+    HttpResponse response = httpClient.execute(httpPost);
+    assertEquals(202, response.getStatusLine().getStatusCode());
+
+    // 7. Wait for reprocess to succeed (REPROCESS_STAGING seq is set by reInitializeTasks)
+    GenericTestUtils.waitFor(() -> {
+      try {
+        String taskStatusResponse = makeHttpCall(taskStatusURL);
+        long reconLatestSeqNumber = getReconTaskAttributeFromJson(
+            taskStatusResponse,
+            "REPROCESS_STAGING",
+            "lastUpdatedSeqNumber");
+        return reconLatestSeqNumber == reconLoadedSeqNumber;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 30000);
+
+    // 8. Start OM
+    cluster.getOzoneManager().restart();
+    // restart() rebuilds the OM metadata manager, so re-fetch the live handle.
+    refreshOmMetadataManager();
+
+    // 9. Write more keys and verify delta resumes
+    addKeys(25, 30);
+    long newOmLatestSeqNumber = ((RDBStore) cluster.getOzoneManager().getMetadataManager().getStore())
+        .getDb().getLatestSequenceNumber();
+
+    OzoneManagerServiceProviderImpl newImpl = (OzoneManagerServiceProviderImpl)
+        recon.getReconServer().getOzoneManagerServiceProvider();
+    newImpl.syncDataFromOM();
+
+    GenericTestUtils.waitFor(() -> {
+      try {
+        String taskStatusResponse = makeHttpCall(taskStatusURL);
+        long reconLatestSeqNumber = getReconTaskAttributeFromJson(
+            taskStatusResponse,
+            OmSnapshotRequest.name(),
+            "lastUpdatedSeqNumber");
+        return reconLatestSeqNumber == newOmLatestSeqNumber;
+      } catch (Exception e) {
+        return false;
+      }
+    }, 1000, 30000);
+  }
+
+  @Test
+  public void testReplicaHistoryMigrationOnUpgradeAndRestart() throws Exception {
+    OzoneConfiguration conf = cluster.getConf();
+    String jdbcUrl = ReconGuiceServletContextListener.getGlobalInjector()
+        .getInstance(DataSourceConfiguration.class).getJdbcUrl();
+    long containerID = 987654321L;
+    Map<DatanodeID, ContainerReplicaHistory> expected = new HashMap<>();
+    for (int i = 0; i < 3; i++) {
+      DatanodeID id = DatanodeID.randomID();
+      expected.put(id, new ContainerReplicaHistory(id, 100L + i, 200L + i, 300L + i,
+          "CLOSED", ContainerChecksums.of(1234L + i, 0L)));
+    }
+
+    try (LogCapturer logs = LogCapturer.captureLogs(LoggerFactory.getLogger("org.apache.hadoop.ozone.recon"))) {
+      recon.stop();
+      // Seed unmigrated history while all Recon writers are stopped, retaining other test data.
+      String migrationMessage;
+      try (DBStore legacy = DBStoreBuilder.createDBStore(conf,
+               new ReconDBDefinition(ReconConstants.RECON_CONTAINER_KEY_DB));
+           DBStore history = DBStoreBuilder.createDBStore(conf, new ReconReplicaHistoryDBDefinition())) {
+        migrationMessage = "Migrated container replica history to " + history.getDbLocation();
+        REPLICA_HISTORY_V2.getTable(legacy).put(containerID,
+            new ContainerReplicaHistoryList(new ArrayList<>(expected.values())));
+        assertNull(REPLICA_HISTORY_V2.getTable(history).get(containerID));
+        METADATA.getTable(history).delete("replicaHistoryMigrated");
+        legacy.flushLog(true);
+        history.flushLog(true);
+      }
+      try (Connection connection = DriverManager.getConnection(jdbcUrl, RECON_SCHEMA_NAME, "");
+           PreparedStatement statement = connection.prepareStatement(
+               "UPDATE " + SCHEMA_VERSION_TABLE_NAME + " SET \"version_number\" = ?")) {
+        statement.setInt(1, ReconVersion.UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX.serialize());
+        assertEquals(1, statement.executeUpdate());
+      }
+      assertEquals(ReconVersion.UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX.serialize(),
+          getReconSchemaVersion(jdbcUrl));
+
+      logs.clearOutput();
+      recon.start(conf);
+      assertEquals(ReconVersion.SOFTWARE_VERSION.serialize(), getReconSchemaVersion(jdbcUrl));
+      assertReplicaHistory(containerID, expected);
+      String startupLogs = logs.getOutput();
+      int migration = startupLogs.indexOf(migrationMessage);
+      int versionPersisted = startupLogs.indexOf(
+          "Updated apparent version to '" + ReconVersion.REPLICA_HISTORY_DB.serialize() + "'.");
+      assertThat(migration).isGreaterThanOrEqualTo(0);
+      assertThat(versionPersisted).isGreaterThan(migration);
+
+      recon.stop();
+      // A second copy would overwrite the migrated record, making repeated migration observable.
+      try (DBStore legacy = DBStoreBuilder.createDBStore(conf,
+               new ReconDBDefinition(ReconConstants.RECON_CONTAINER_KEY_DB));
+           DBStore history = DBStoreBuilder.createDBStore(conf, new ReconReplicaHistoryDBDefinition())) {
+        REPLICA_HISTORY_V2.getTable(legacy).put(containerID, new ContainerReplicaHistoryList(Collections.emptyList()));
+        assertEquals("true", METADATA.getTable(history).get("replicaHistoryMigrated"));
+      }
+      logs.clearOutput();
+      recon.start(conf);
+      assertEquals(ReconVersion.SOFTWARE_VERSION.serialize(), getReconSchemaVersion(jdbcUrl));
+      assertReplicaHistory(containerID, expected);
+      assertThat(logs.getOutput()).doesNotContain(migrationMessage);
+    } finally {
+      if (recon.getReconServer() == null) {
+        recon.start(conf);
+      }
+    }
+  }
+
+  private int getReconSchemaVersion(String jdbcUrl) throws SQLException {
+    try (Connection connection = DriverManager.getConnection(jdbcUrl, RECON_SCHEMA_NAME, "");
+         PreparedStatement statement = connection.prepareStatement(
+             "SELECT \"version_number\" FROM " + SCHEMA_VERSION_TABLE_NAME);
+         ResultSet result = statement.executeQuery()) {
+      assertTrue(result.next());
+      return result.getInt(1);
+    }
+  }
+
+  private void assertReplicaHistory(long containerID, Map<DatanodeID, ContainerReplicaHistory> expected)
+      throws IOException {
+    Map<DatanodeID, ContainerReplicaHistory> actual =
+        recon.getReconServer().getReconContainerMetadataManager().getContainerReplicaHistory(containerID);
+    assertEquals(expected.size(), actual.size());
+    expected.forEach((id, history) -> {
+      assertNotNull(actual.get(id));
+      assertEquals(history.toProto(), actual.get(id).toProto());
+    });
+    List<Map<String, Object>> response = JsonTestUtils.readTreeAsListOfMaps(makeHttpCall(
+        reconHttpURL + "/api/v1/containers/" + containerID + "/replicaHistory"));
+    assertEquals(expected.size(), response.size());
+  }
+
+  private static void refreshOmMetadataManager() {
+    metadataManager = cluster.getOzoneManager().getMetadataManager();
+  }
+
   private void addKeys(int start, int end) throws Exception {
     for (int i = start; i < end; i++) {
       Pipeline pipeline = HddsTestUtils.getRandomPipeline();
@@ -420,6 +627,30 @@ public class TestReconWithOzoneManager {
                                     List<OmKeyLocationInfoGroup>
                                         omKeyLocationInfoGroupList)
       throws IOException {
+
+    // Recon's full reprocess resolves the parent bucket of every key it reads, so the volume
+    // and bucket rows have to exist next to the key entry.
+    String volumeKey = metadataManager.getVolumeKey(volume);
+    if (metadataManager.getVolumeTable().get(volumeKey) == null) {
+      metadataManager.getVolumeTable().put(volumeKey,
+          OmVolumeArgs.newBuilder()
+              .setVolume(volume)
+              .setAdminName("TestUser")
+              .setOwnerName("TestUser")
+              .setObjectID(OBJECT_ID_SEQUENCE.incrementAndGet())
+              .build());
+    }
+
+    String bucketKey = metadataManager.getBucketKey(volume, bucket);
+    if (metadataManager.getBucketTable().get(bucketKey) == null) {
+      metadataManager.getBucketTable().put(bucketKey,
+          OmBucketInfo.newBuilder()
+              .setVolumeName(volume)
+              .setBucketName(bucket)
+              .setBucketLayout(getBucketLayout())
+              .setObjectID(OBJECT_ID_SEQUENCE.incrementAndGet())
+              .build());
+    }
 
     String omKey = metadataManager.getOzoneKey(volume,
         bucket, key);

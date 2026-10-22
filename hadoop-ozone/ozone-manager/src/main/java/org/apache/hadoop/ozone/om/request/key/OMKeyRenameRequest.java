@@ -72,7 +72,7 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-    RenameKeyRequest renameKeyRequest = super.preExecute(ozoneManager)
+    final RenameKeyRequest renameKeyRequest = super.preExecute(ozoneManager)
         .getRenameKeyRequest();
     Objects.requireNonNull(renameKeyRequest, "renameKeyRequest == null");
 
@@ -174,6 +174,12 @@ public class OMKeyRenameRequest extends OMKeyRequest {
       if (fromKeyValue == null) {
           // TODO: Add support for renaming open key
         throw new OMException("Key not found " + fromKey, KEY_NOT_FOUND);
+      }
+
+      if (renameKeyRequest.hasUpdateID() && fromKeyValue.getUpdateID() != renameKeyRequest.getUpdateID()) {
+        throw new OMException("UpdateID does not match. Key: " + fromKeyName +
+            ", Expected UpdateID: " + fromKeyValue.getUpdateID() +
+            ", Given UpdateID: " + renameKeyRequest.getUpdateID(), OMException.ResultCodes.UPDATE_ID_NOT_MATCH);
       }
 
       fromKeyValue = fromKeyValue.toBuilder()

@@ -23,7 +23,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_L
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
-import static org.apache.hadoop.ozone.container.TestHelper.validateData;
+import static org.apache.hadoop.ozone.container.OzoneTestHelper.validateData;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -57,7 +57,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.container.TestHelper;
+import org.apache.hadoop.ozone.container.OzoneTestHelper;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -789,7 +789,7 @@ class TestBlockOutputStream {
 
   static OzoneOutputStream createKey(OzoneClient client, String keyName,
       long size, ReplicationFactor factor) throws Exception {
-    return TestHelper.createKey(keyName, ReplicationType.RATIS, factor, size,
+    return OzoneTestHelper.createKey(keyName, ReplicationType.RATIS, factor, size,
         client.getObjectStore(), VOLUME, BUCKET);
   }
 

@@ -26,26 +26,24 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.EMPTY_SUMMARY;
+import static org.apache.hadoop.hdds.upgrade.HddsUpgradeTestUtils.waitForScmsToFinalize;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -58,18 +56,17 @@ import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
-import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
+import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.DataTestUtil;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.UniformDatanodesFactory;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -80,40 +77,30 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests upgrade finalization failure scenarios and corner cases specific to SCM data distribution feature.
  */
 public class TestScmDataDistributionFinalization {
-  private static final String CLIENT_ID = UUID.randomUUID().toString();
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestScmDataDistributionFinalization.class);
-
-  private StorageContainerLocationProtocol scmClient;
+  private ScmBlockLocationProtocol scmBlockClient;
   private MiniOzoneHAClusterImpl cluster;
   private static final int NUM_DATANODES = 3;
   private static final int NUM_SCMS = 3;
-  private Future<?> finalizationFuture;
   private final String volumeName = UUID.randomUUID().toString();
   private final String bucketName = UUID.randomUUID().toString();
   private OzoneBucket bucket;
   private static final long BLOCK_SIZE = 1024 * 1024; // 1 MB
   private static final long BLOCKS_PER_TX = 5; // 1 MB
 
-  public void init(OzoneConfiguration conf,
-      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor, boolean doFinalize) throws Exception {
+  public void init(OzoneConfiguration conf) throws Exception {
 
     SCMConfigurator configurator = new SCMConfigurator();
-    configurator.setUpgradeFinalizationExecutor(executor);
 
-    conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
+    conf.setInt(SCMStorageConfig.TESTING_INIT_APPARENT_VERSION_KEY, HDDSLayoutFeature.HBASE_SUPPORT.serialize());
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 100, TimeUnit.MILLISECONDS);
@@ -142,14 +129,14 @@ public class TestScmDataDistributionFinalization {
         .setSCMConfigurator(configurator)
         .setNumDatanodes(NUM_DATANODES)
         .setDatanodeFactory(UniformDatanodesFactory.newBuilder()
-            .setLayoutVersion(HDDSLayoutFeature.INITIAL_VERSION.layoutVersion())
+            .setApparentVersion(HDDSLayoutFeature.INITIAL_VERSION)
             .build());
     this.cluster = clusterBuilder.build();
 
-    scmClient = cluster.getStorageContainerLocationClient();
+    scmBlockClient = HAUtils.getScmBlockClient(conf);
     cluster.waitForClusterToBeReady();
-    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion(),
-        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
+    assertEquals(HDDSLayoutFeature.HBASE_SUPPORT,
+        cluster.getStorageContainerManager().getVersionManager().getApparentVersion());
 
     // Create Volume and Bucket
     try (OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(conf)) {
@@ -159,22 +146,6 @@ public class TestScmDataDistributionFinalization {
       BucketArgs.Builder builder = BucketArgs.newBuilder();
       volume.createBucket(bucketName, builder.build());
       bucket = volume.getBucket(bucketName);
-    }
-
-    // Launch finalization from the client. In the current implementation,
-    // this call will block until finalization completes. If the test
-    // involves restarts or leader changes the client may be disconnected,
-    // but finalization should still proceed.
-    if (doFinalize) {
-      finalizationFuture = Executors.newSingleThreadExecutor().submit(
-          () -> {
-            try {
-              scmClient.finalizeScmUpgrade(CLIENT_ID);
-            } catch (IOException ex) {
-              LOG.info("finalization client failed. This may be expected if the" +
-                  " test injected failures.", ex);
-            }
-          });
     }
   }
 
@@ -189,22 +160,20 @@ public class TestScmDataDistributionFinalization {
    * Test for an empty cluster.
    */
   @Test
-  @Flaky("HDDS-14050")
   public void testFinalizationEmptyClusterDataDistribution() throws Exception {
-    init(new OzoneConfiguration(), null, true);
+    init(new OzoneConfiguration());
     assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
-    finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    scmBlockClient.finalizeUpgrade();
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmBlockClient);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
-    assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
-        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
+    assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
 
     HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
+        cluster.getStorageContainerManagersList(), 0);
     HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), 0, CLOSED);
+        cluster.getHddsDatanodes(), 0);
     assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
@@ -218,6 +187,11 @@ public class TestScmDataDistributionFinalization {
     long lastTxId = findLastTx();
     StorageContainerManager activeSCM = cluster.getActiveSCM();
     assertEquals(-1, lastTxId, "Last transaction ID should be -1");
+
+    // Stop deleting service so it cannot race the summary assertions below.
+    for (StorageContainerManager scm : cluster.getStorageContainerManagersList()) {
+      scm.getScmBlockManager().getSCMBlockDeletingService().stop();
+    }
 
     // generate old format deletion tx, summary should keep empty, total DB tx 4
     int txCount = 4;
@@ -246,6 +220,11 @@ public class TestScmDataDistributionFinalization {
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE, summary.getTotalBlockSize());
     assertEquals(txCount * BLOCKS_PER_TX * BLOCK_SIZE * 3, summary.getTotalBlockReplicatedSize());
 
+    // Restart deleting service so transactions are drained below.
+    for (StorageContainerManager scm : cluster.getStorageContainerManagersList()) {
+      scm.getScmBlockManager().getSCMBlockDeletingService().start();
+    }
+
     // wait for all transactions deleted by SCMBlockDeletingService
     GenericTestUtils.waitFor(() -> {
       try {
@@ -256,6 +235,11 @@ public class TestScmDataDistributionFinalization {
         return false;
       }
     }, 100, 5000);
+
+    // Stop deleting service again to prevent it from racing the summary assertions below.
+    for (StorageContainerManager scm : cluster.getStorageContainerManagersList()) {
+      scm.getScmBlockManager().getSCMBlockDeletingService().stop();
+    }
 
     // generate old format deletion tx, summary should keep the same
     deletedBlockLog.addTransactions(generateDeletedBlocks(txCount, false));
@@ -286,7 +270,7 @@ public class TestScmDataDistributionFinalization {
    */
   @Test
   public void testFinalizationNonEmptyClusterDataDistribution() throws Exception {
-    init(new OzoneConfiguration(), null, false);
+    init(new OzoneConfiguration());
     // stop SCMBlockDeletingService
     for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
       scm.getScmBlockManager().getSCMBlockDeletingService().stop();
@@ -299,26 +283,16 @@ public class TestScmDataDistributionFinalization {
     flushDBTransactionBuffer(activeSCM);
     assertEquals(EMPTY_SUMMARY, cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
-    finalizationFuture = Executors.newSingleThreadExecutor().submit(
-        () -> {
-          try {
-            scmClient.finalizeScmUpgrade(CLIENT_ID);
-          } catch (IOException ex) {
-            LOG.info("finalization client failed. This may be expected if the" +
-                " test injected failures.", ex);
-          }
-        });
-    finalizationFuture.get();
-    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
+    scmBlockClient.finalizeUpgrade();
+    HddsUpgradeTestUtils.waitForFinalizationFromClient(scmBlockClient);
     // Make sure old leader has caught up and all SCMs have finalized.
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
-    assertEquals(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION.layoutVersion(),
-        cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
+    assertTrue(VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION));
 
     HddsUpgradeTestUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
+        cluster.getStorageContainerManagersList(), 0);
     HddsUpgradeTestUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), 0, CLOSED);
+        cluster.getHddsDatanodes(), 0);
     assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
@@ -335,7 +309,7 @@ public class TestScmDataDistributionFinalization {
     final String keyName = "key" + System.nanoTime();
     // Create the key
     String value = "sample value";
-    TestDataUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value.getBytes(UTF_8));
+    DataTestUtil.createKey(bucket, keyName, ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value.getBytes(UTF_8));
     // update scmInfo in OM
     OzoneKeyDetails keyDetails = bucket.getKey(keyName);
     // delete the key
@@ -360,7 +334,10 @@ public class TestScmDataDistributionFinalization {
         break;
       }
     }
+    // Leader transfer is async. Wait for the new election to finish.
     cluster.getStorageContainerLocationClient().transferLeadership(newLeaderScmId);
+    GenericTestUtils.waitFor(
+        () -> cluster.getActiveSCM() != null, 100, 10_000);
     StorageContainerManager newActiveSCM = cluster.getActiveSCM();
     deletedBlockLog = (DeletedBlockLogImpl) newActiveSCM.getScmBlockManager().getDeletedBlockLog();
     SCMDeletedBlockTransactionStatusManager newStatusManager =
@@ -391,7 +368,7 @@ public class TestScmDataDistributionFinalization {
         fail("Error while checking container state", e);
         return false;
       }
-    }, 100, 5000);
+    }, 100, 30_000);
 
     // wait for block deletion transactions to be confirmed by DN
     GenericTestUtils.waitFor(
@@ -439,27 +416,6 @@ public class TestScmDataDistributionFinalization {
       }
     }
     return lastTxId;
-  }
-
-  private void waitForScmsToFinalize(Collection<StorageContainerManager> scms)
-      throws Exception {
-    for (StorageContainerManager scm: scms) {
-      waitForScmToFinalize(scm);
-    }
-  }
-
-  private void waitForScmToFinalize(StorageContainerManager scm)
-      throws Exception {
-    GenericTestUtils.waitFor(() -> !scm.isInSafeMode(), 500, 5000);
-    GenericTestUtils.waitFor(() -> {
-      FinalizationCheckpoint checkpoint =
-          scm.getScmContext().getFinalizationCheckpoint();
-      LOG.info("Waiting for SCM {} (leader? {}) to finalize. Current " +
-          "finalization checkpoint is {}",
-          scm.getSCMNodeId(), scm.checkLeader(), checkpoint);
-      return checkpoint.hasCrossed(
-          FinalizationCheckpoint.FINALIZATION_COMPLETE);
-    }, 2_000, 60_000);
   }
 
   private void flushDBTransactionBuffer(StorageContainerManager scm) throws IOException {

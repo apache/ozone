@@ -228,7 +228,7 @@ public abstract class GenericTestUtils {
   /**
    * Class to capture logs for doing assertions.
    */
-  public abstract static class LogCapturer {
+  public abstract static class LogCapturer implements AutoCloseable {
     private final StringWriter sw = new StringWriter();
 
     public static LogCapturer captureLogs(Logger logger) {
@@ -264,6 +264,11 @@ public abstract class GenericTestUtils {
 
     public void clearOutput() {
       writer().getBuffer().setLength(0);
+    }
+
+    @Override
+    public void close() {
+      stopCapturing();
     }
   }
 

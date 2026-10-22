@@ -49,6 +49,12 @@ public interface ReconNamespaceSummaryManager {
 
   NSSummary getNSSummary(long objectId) throws IOException;
 
+  /**
+   * Record that a read-side traversal detected at least one invalid or
+   * repeated child reference in the NSSummary tree.
+   */
+  void recordNSSummaryInvalidTreeDetection();
+
   void commitBatchOperation(RDBBatchOperation rdbBatchOperation)
       throws IOException;
 }
