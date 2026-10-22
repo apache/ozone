@@ -169,7 +169,7 @@ public abstract class ContainerScannerIntegrationTests {
     GenericTestUtils.waitFor(
         () -> OzoneTestHelper.isContainerClosed(cluster, containerID,
             cluster.getHddsDatanodes().get(0).getDatanodeDetails()),
-        1000, 30000);
+        1000, 15000);
 
     // After the container is marked as closed in the datanode, we must wait for the checksum generation from metadata
     // to finish.
