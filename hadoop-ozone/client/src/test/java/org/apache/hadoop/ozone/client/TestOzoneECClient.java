@@ -18,10 +18,12 @@
 package org.apache.hadoop.ozone.client;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
@@ -36,6 +38,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.conf.StorageUnit;
@@ -63,7 +66,9 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.ozone.erasurecode.rawcoder.RSRawErasureCoderFactory;
@@ -74,14 +79,23 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 /**
  * Real unit test for OzoneECClient.
  * <p>
- * Used for testing Ozone client without external network calls.
+ * Used for testing Ozone client without external network calls. Every test runs with EC cells read one at a time
+ * and with them read in parallel.
  */
+@ParameterizedClass
+@ValueSource(booleans = {false, true})
 public class TestOzoneECClient {
+  @Parameter
+  private boolean parallelRead;
   private int chunkSize = 1024;
   private int dataBlocks = 3;
   private int parityBlocks = 2;
@@ -112,8 +126,12 @@ public class TestOzoneECClient {
     createNewClient(config, new MockOmTransport(blkAllocator));
   }
 
-  private void createNewClient(ConfigurationSource config,
+  private void createNewClient(ConfigurationSource source,
       final MockOmTransport transport) throws IOException {
+    OzoneConfiguration config = new OzoneConfiguration(OzoneConfiguration.of(source));
+    OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
+    clientConfig.setEcParallelReadEnabled(parallelRead);
+    config.setFromObject(clientConfig);
     client = new OzoneClient(config, new RpcClient(config, null) {
 
       @Override
@@ -149,6 +167,77 @@ public class TestOzoneECClient {
   @AfterEach
   public void close() throws IOException {
     client.close();
+  }
+
+  /**
+   * A block location refresh made while reading carries the request's S3 authentication and read consistency hint,
+   * also when the refreshing cell is read by a parallel read worker. With the S3 auth check enabled (S3 Gateway), an
+   * OM call without the authentication fails; without the hint it would use the default read consistency.
+   */
+  @Test
+  public void testLocationRefreshDuringReadKeepsRequestContext() throws IOException {
+    List<OzoneManagerProtocolProtos.OMRequest> omRequests = new CopyOnWriteArrayList<>();
+    MockOmTransport recordingTransport = new MockOmTransport(allocator) {
+      @Override
+      public OzoneManagerProtocolProtos.OMResponse submitRequest(OzoneManagerProtocolProtos.OMRequest payload)
+          throws IOException {
+        omRequests.add(payload);
+        return super.submitRequest(payload);
+      }
+    };
+    close();
+    createNewClient(conf, recordingTransport);
+    client.getProxy().setThreadLocalS3Auth(new S3Auth("stringToSign", "signature", "accessId", "user"));
+    try {
+      client.getProxy().setThreadLocalReadConsistency(ReadConsistency.LOCAL_LEASE, 5L, 1000L);
+      OzoneBucket bucket = writeIntoECKey(inputChunks, keyName,
+          new DefaultReplicationConfig(new ECReplicationConfig(dataBlocks, parityBlocks,
+              ECReplicationConfig.EcCodec.RS, chunkSize)));
+
+      // The datanode of the third data cell answers the first GetBlock with CONTAINER_NOT_FOUND, so its stream
+      // refreshes the block locations from OM. In a parallel read that cell is read by a worker thread.
+      HddsProtos.Pipeline pipeline = recordingTransport.getKeys().get(volumeName).get(bucketName)
+          .get(keyName).getKeyLocationListList().get(0).getKeyLocations(0).getPipeline();
+      Map<DatanodeDetails, MockDatanodeStorage> storages = factoryStub.getStorages();
+      MockDatanodeStorage storage =
+          storages.get(getMatchingStorage(storages, DatanodeID.fromProto(pipeline.getMembers(2).getId())));
+      storage.failNextGetBlocks(1);
+      if (parallelRead) {
+        // The reading thread reads the first cell, and any cell whose task has not started yet. Holding it in the
+        // first cell until the third has failed makes a worker read the third, however late the pool starts.
+        storages.get(getMatchingStorage(storages, DatanodeID.fromProto(pipeline.getMembers(0).getId())))
+            .holdGetBlocksUntilFailureOn(storage);
+      }
+      int requestsBeforeRead = omRequests.size();
+
+      byte[] read = new byte[inputSize];
+      try (OzoneInputStream is = bucket.readKey(keyName)) {
+        assertEquals(inputSize, is.read(read));
+      }
+      for (int i = 0; i < dataBlocks; i++) {
+        assertArrayEquals(inputChunks[i], Arrays.copyOfRange(read, i * chunkSize, (i + 1) * chunkSize));
+      }
+
+      assertEquals(1, storage.getFailedGetBlockThreads().size());
+      if (parallelRead) {
+        assertThat(storage.getFailedGetBlockThreads().get(0)).startsWith("ec-parallel-reader-");
+      }
+      // The open, and the refresh after the failed GetBlock
+      List<OzoneManagerProtocolProtos.OMRequest> readRequests =
+          omRequests.subList(requestsBeforeRead, omRequests.size());
+      assertThat(readRequests).hasSizeGreaterThanOrEqualTo(2);
+      for (OzoneManagerProtocolProtos.OMRequest request : readRequests) {
+        assertTrue(request.hasS3Authentication(), request.getCmdType() + " sent without S3 authentication");
+        OzoneManagerProtocolProtos.ReadConsistencyHint hint = request.getReadConsistencyHint();
+        assertEquals(ReadConsistency.LOCAL_LEASE.toProto(), hint.getReadConsistency(),
+            request.getCmdType() + " sent without the request's read consistency");
+        assertEquals(5L, hint.getLocalLeaseContext().getLogLimit());
+        assertEquals(1000L, hint.getLocalLeaseContext().getLeaseTimeMs());
+      }
+    } finally {
+      client.getProxy().clearThreadLocalS3Auth();
+      client.getProxy().clearThreadLocalReadConsistency();
+    }
   }
 
   @Test
@@ -572,6 +661,24 @@ public class TestOzoneECClient {
       assertArrayEquals(lastChunk, Arrays.copyOf(fileContent, lastChunk.length));
       // A further read should give EOF
       assertEquals(-1, is.read(fileContent));
+    }
+  }
+
+  /** A parallel read pool limit below the pool's default core size still reads multi-cell ranges. */
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2})
+  public void testReadWithSmallParallelReadPoolLimit(int poolLimit) throws IOException {
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    clientConfig.setEcParallelReadPoolLimit(poolLimit);
+    conf.setFromObject(clientConfig);
+    createNewClient(conf, transportStub);
+    OzoneBucket bucket = writeIntoECKey(inputChunks, keyName, null);
+    try (OzoneInputStream is = bucket.readKey(keyName)) {
+      byte[] fileContent = new byte[inputSize];
+      assertEquals(inputSize, is.read(fileContent));
+      for (int i = 0; i < dataBlocks; i++) {
+        assertArrayEquals(inputChunks[i], Arrays.copyOfRange(fileContent, i * chunkSize, (i + 1) * chunkSize));
+      }
     }
   }
 

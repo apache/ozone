@@ -97,7 +97,7 @@ import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
@@ -198,7 +198,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
   private static final String PROMETHEUS_TEST_RESPONSE_FILE =
       "prometheus-test-response.txt";
   private ReconUtils reconUtilsMock;
-  private StorageContainerLocationProtocol mockScmClient;
+  private StorageContainerLocationInternalInterface mockScmClient;
 
   private List<HddsProtos.Node> nodes = getNodeDetails(2);
   private Map<String, List<ContainerID>> containerOnDecom = getContainersOnDecomNodes();
@@ -241,7 +241,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         new ContainerWithPipeline(containerInfo, pipeline);
 
     mockScmClient = mock(
-        StorageContainerLocationProtocol.class, Mockito.RETURNS_DEEP_STUBS);
+        StorageContainerLocationInternalInterface.class, Mockito.RETURNS_DEEP_STUBS);
     StorageContainerServiceProvider mockScmServiceProvider = mock(
         StorageContainerServiceProviderImpl.class);
     when(mockScmServiceProvider.getPipeline(
@@ -288,7 +288,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addBinding(ContainerHealthSchemaManager.class)
             .addBinding(UtilizationEndpoint.class)
             .addBinding(ReconUtils.class, reconUtilsMock)
-            .addBinding(StorageContainerLocationProtocol.class, mockScmClient)
+            .addBinding(StorageContainerLocationInternalInterface.class, mockScmClient)
             .build();
 
     reconScm = (ReconStorageContainerManagerFacade)
