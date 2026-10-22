@@ -906,6 +906,10 @@ public final class SnapDiffJobStore implements AutoCloseable {
       return current;
     }
 
+    Map.Entry<Long, byte[]> nextOrNull() {
+      return hasNext() ? next() : null;
+    }
+
     @Override
     public void close() {
       iterator.close();

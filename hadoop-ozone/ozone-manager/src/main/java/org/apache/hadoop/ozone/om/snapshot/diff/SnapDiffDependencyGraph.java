@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot.diff;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
@@ -146,21 +148,22 @@ public final class SnapDiffDependencyGraph {
     // Among nodes whose dependencies are already satisfied, DELETEs are emitted
     // before other types. This retains the baseline "deletes first" ordering
     // wherever the dependency edges leave the order free.
-    ReadyQueues ready = new ReadyQueues(nodeCount);
+    Queue<Integer> deleteReady = new ArrayDeque<>();
+    Queue<Integer> otherReady = new ArrayDeque<>();
     for (int nodeId = 0; nodeId < nodeCount; nodeId++) {
       if (remainingInDegree[nodeId] == 0) {
-        ready.add(nodeId, nodes.get(nodeId).isDelete());
+        enqueueReady(nodeId, deleteReady, otherReady);
       }
     }
 
     List<Integer> orderedNodeIds = new ArrayList<>(nodeCount);
-    while (!ready.isEmpty()) {
-      int nodeId = ready.poll();
+    Integer nodeId;
+    while ((nodeId = pollReady(deleteReady, otherReady)) != null) {
       orderedNodeIds.add(nodeId);
       for (int i = adjOffsets[nodeId]; i < adjOffsets[nodeId + 1]; i++) {
         int dependentNodeId = adjTargets[i];
         if (--remainingInDegree[dependentNodeId] == 0) {
-          ready.add(dependentNodeId, nodes.get(dependentNodeId).isDelete());
+          enqueueReady(dependentNodeId, deleteReady, otherReady);
         }
       }
     }
@@ -178,6 +181,18 @@ public final class SnapDiffDependencyGraph {
           total, MAX_CYCLE_ENTRIES_IN_MESSAGE, sample));
     }
     return orderedNodeIds;
+  }
+
+  private void enqueueReady(int nodeId, Queue<Integer> deleteReady, Queue<Integer> otherReady) {
+    if (nodes.get(nodeId).isDelete()) {
+      deleteReady.add(nodeId);
+    } else {
+      otherReady.add(nodeId);
+    }
+  }
+
+  private static Integer pollReady(Queue<Integer> deleteReady, Queue<Integer> otherReady) {
+    return deleteReady.isEmpty() ? otherReady.poll() : deleteReady.poll();
   }
 
   private List<String> collectUnresolvedNodes(List<Integer> orderedNodeIds) {
@@ -772,44 +787,6 @@ public final class SnapDiffDependencyGraph {
           ? new DiffReportEntry(diffType, sourceBytes, null)
           : new DiffReportEntry(diffType, sourceBytes, targetBytes);
       return new SnapDiffDependencyEntry(objectId, sourceParentObjectId, targetParentObjectId, reportEntry);
-    }
-  }
-
-  /**
-   * FIFO ready set split into DELETE and non-DELETE array queues so that {@link #poll()}
-   * returns DELETE nodes before other nodes. Each node is added at most once,
-   * so buffers sized to the node count are large enough.
-   */
-  private static final class ReadyQueues {
-    private final int[] deleteReady;
-    private final int[] otherReady;
-    private int deleteHead;
-    private int deleteTail;
-    private int otherHead;
-    private int otherTail;
-
-    private ReadyQueues(int nodeCount) {
-      this.deleteReady = new int[nodeCount];
-      this.otherReady = new int[nodeCount];
-    }
-
-    private void add(int nodeId, boolean isDelete) {
-      if (isDelete) {
-        deleteReady[deleteTail++] = nodeId;
-      } else {
-        otherReady[otherTail++] = nodeId;
-      }
-    }
-
-    private boolean isEmpty() {
-      return deleteHead == deleteTail && otherHead == otherTail;
-    }
-
-    private int poll() {
-      if (deleteHead < deleteTail) {
-        return deleteReady[deleteHead++];
-      }
-      return otherReady[otherHead++];
     }
   }
 }
