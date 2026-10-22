@@ -145,25 +145,21 @@ public final class SnapDiffDependencyGraph {
     // Work on a local copy of the in-degrees so the method is idempotent and
     // does not mutate the graph's shared state.
     int[] remainingInDegree = Arrays.copyOf(inDegree, nodeCount);
-    // Among nodes whose dependencies are already satisfied, DELETEs are emitted
-    // before other types. This retains the baseline "deletes first" ordering
-    // wherever the dependency edges leave the order free.
-    Queue<Integer> deleteReady = new ArrayDeque<>();
-    Queue<Integer> otherReady = new ArrayDeque<>();
+    Queue<Integer> ready = new ArrayDeque<>();
     for (int nodeId = 0; nodeId < nodeCount; nodeId++) {
       if (remainingInDegree[nodeId] == 0) {
-        enqueueReady(nodeId, deleteReady, otherReady);
+        ready.add(nodeId);
       }
     }
 
     List<Integer> orderedNodeIds = new ArrayList<>(nodeCount);
     Integer nodeId;
-    while ((nodeId = pollReady(deleteReady, otherReady)) != null) {
+    while ((nodeId = ready.poll()) != null) {
       orderedNodeIds.add(nodeId);
       for (int i = adjOffsets[nodeId]; i < adjOffsets[nodeId + 1]; i++) {
         int dependentNodeId = adjTargets[i];
         if (--remainingInDegree[dependentNodeId] == 0) {
-          enqueueReady(dependentNodeId, deleteReady, otherReady);
+          ready.add(dependentNodeId);
         }
       }
     }
@@ -181,18 +177,6 @@ public final class SnapDiffDependencyGraph {
           total, MAX_CYCLE_ENTRIES_IN_MESSAGE, sample));
     }
     return orderedNodeIds;
-  }
-
-  private void enqueueReady(int nodeId, Queue<Integer> deleteReady, Queue<Integer> otherReady) {
-    if (nodes.get(nodeId).isDelete()) {
-      deleteReady.add(nodeId);
-    } else {
-      otherReady.add(nodeId);
-    }
-  }
-
-  private static Integer pollReady(Queue<Integer> deleteReady, Queue<Integer> otherReady) {
-    return deleteReady.isEmpty() ? otherReady.poll() : deleteReady.poll();
   }
 
   private List<String> collectUnresolvedNodes(List<Integer> orderedNodeIds) {
