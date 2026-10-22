@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,6 +35,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ipc_.RemoteException;
+import org.apache.hadoop.ipc_.RetriableException;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
@@ -56,6 +58,12 @@ public final class SCMHAUtils {
           .add(ReconfigurationTimeoutException.class)
           .add(ResourceUnavailableException.class)
           .build();
+
+  private static final ImmutableSet<String> RETRIABLE_SERVER_EXCEPTIONS = ImmutableSet.of(
+      RetriableWithFailOverException.class.getName(),
+      RetriableWithNoFailoverException.class.getName(),
+      ServerNotLeaderException.class.getName(),
+      RetriableException.class.getName());
 
   private static final ImmutableList<Class<? extends Exception>>
       NON_RETRIABLE_EXCEPTION_LIST =
@@ -163,7 +171,12 @@ public final class SCMHAUtils {
         return true;
       }
     }
-    return false;
+    // Any other exception returned by SCM will not change on retry, unless SCM asks for a retry.
+    // SCM converts Ratis exceptions that are worth a retry (e.g. not leader) to such exceptions.
+    // Compare class names, since not all of them can be unwrapped from RemoteException.
+    final Throwable remote = e instanceof RemoteException ? e : e.getCause();
+    return remote instanceof RemoteException
+        && !RETRIABLE_SERVER_EXCEPTIONS.contains(((RemoteException) remote).getClassName());
   }
 
   // This will return the underlying exception after unwrapping
