@@ -91,7 +91,7 @@ class TestPipelineSyncTask {
   }
 
   @Test
-  void keepsRunningAfterFailedSync() throws Exception {
+  void testKeepsRunningAfterFailedSync() throws Exception {
     StorageContainerServiceProvider scmClient = mock(StorageContainerServiceProvider.class);
     AtomicReference<Thread> taskThread = new AtomicReference<>();
     when(scmClient.getPipelines()).thenAnswer(invocation -> {
