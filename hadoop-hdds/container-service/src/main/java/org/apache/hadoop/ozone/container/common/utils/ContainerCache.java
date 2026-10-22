@@ -21,6 +21,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.collections4.MapIterator;
@@ -81,9 +83,10 @@ public final class ContainerCache extends LRUMap {
   }
 
   /**
-   * Closes all the db instances and resets the cache.
+   * Closes and removes all the db instances that are not in use.
    */
   public void shutdownCache() {
+    List<String> inUse = new ArrayList<>();
     lock.lock();
     try {
       // iterate the cache and close each db
@@ -91,13 +94,18 @@ public final class ContainerCache extends LRUMap {
       while (iterator.hasNext()) {
         iterator.next();
         ReferenceCountedDB db = (ReferenceCountedDB) iterator.getValue();
-        Preconditions.checkArgument(cleanupDb(db), "refCount: %s",
-            db.getReferenceCount());
+        if (cleanupDb(db)) {
+          iterator.remove();
+        } else {
+          // Still referenced: leave it open for its user; it is closed once released and evicted or removed.
+          inUse.add(db.getContainerDBPath() + " refCount=" + db.getReferenceCount());
+        }
       }
-      // reset the cache
-      cache.clear();
     } finally {
       lock.unlock();
+    }
+    if (!inUse.isEmpty()) {
+      LOG.warn("Not closing {} container DB(s) still in use: {}", inUse.size(), inUse);
     }
   }
 
