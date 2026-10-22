@@ -20,9 +20,13 @@ package org.apache.hadoop.hdds.scm.server;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.getInternalState;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DB_DIRS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.CONTAINER_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REGISTRATION_CONT_REPORT;
 import static org.apache.hadoop.hdds.scm.events.SCMEvents.NODE_REPORT;
+import static org.apache.ozone.test.MetricsAsserts.assertGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -39,6 +43,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.OptionalLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
@@ -77,6 +82,7 @@ class TestSCMDatanodeProtocolServer {
   private Path tempDir;
 
   private SCMDatanodeProtocolServer server;
+  private OzoneConfiguration serverConf;
   private StorageContainerManager scm;
   private ScmVersionManager versionManager;
   private NodeManager nodeManager;
@@ -85,10 +91,10 @@ class TestSCMDatanodeProtocolServer {
 
   @BeforeEach
   void setup() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_DB_DIRS, tempDir.toString());
+    serverConf = new OzoneConfiguration();
+    serverConf.set(OZONE_SCM_DB_DIRS, tempDir.toString());
     scm = mock(StorageContainerManager.class);
-    SCMStorageConfig storage = new SCMStorageConfig(conf);
+    SCMStorageConfig storage = new SCMStorageConfig(serverConf);
     storage.setScmId("scm");
     storage.setApparentVersion(HDDSVersion.STREAM_PUTBLOCK_WITHOUT_RAFT.serialize());
     storage.initialize();
@@ -105,7 +111,7 @@ class TestSCMDatanodeProtocolServer {
     when(nodeManager.isNodeRegistered(any())).thenReturn(true);
     when(nodeManager.register(any(), any(), any(), any())).thenReturn(
         new RegisteredCommand(SCMRegisteredResponseProto.ErrorCode.success, datanode, "cluster"));
-    server = new SCMDatanodeProtocolServer(conf, scm, publisher, SCMContext.emptyContext());
+    server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, SCMContext.emptyContext());
   }
 
   @AfterEach
@@ -119,7 +125,25 @@ class TestSCMDatanodeProtocolServer {
   }
 
   @Test
-  void testLeaseRequestsWaitForFinalization() throws Exception {
+  void testRateLimitCanBeDisabledAtStartup() throws Exception {
+    server.stop();
+    serverConf.setBoolean(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, false);
+    serverConf.setInt(OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES, 1);
+    server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, SCMContext.emptyContext());
+    versionManager.finalizeUpgrade();
+    SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
+
+    assertTrue(server.sendHeartbeat(request).hasFullContainerReportLease());
+    assertTrue(server.sendHeartbeat(request.toBuilder()
+        .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails().getProtoBufMessage()).build())
+        .hasFullContainerReportLease());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testLeaseRequestsWaitForFinalization(boolean rateLimitEnabled) throws Exception {
+    server.reconfigureFCRRateLimit(Boolean.toString(rateLimitEnabled));
     SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
         .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
 
@@ -128,6 +152,56 @@ class TestSCMDatanodeProtocolServer {
     versionManager.finalizeUpgrade();
 
     assertTrue(server.sendHeartbeat(request).hasFullContainerReportLease());
+  }
+
+  @Test
+  void testBypassStillWaitsForLeaderReadiness() throws Exception {
+    server.stop();
+    serverConf.setBoolean(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, false);
+    SCMContext context = mock(SCMContext.class);
+    when(context.isLeader()).thenReturn(true);
+    when(context.getTermOfLeaderIfReady()).thenReturn(OptionalLong.empty());
+    server = new SCMDatanodeProtocolServer(serverConf, scm, publisher, context);
+    versionManager.finalizeUpgrade();
+    SCMHeartbeatRequestProto request = SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanode.getProtoBufMessage()).setRequestFullContainerReportLease(true).build();
+
+    assertFalse(server.sendHeartbeat(request).hasFullContainerReportLease());
+    when(context.getTermOfLeaderIfReady()).thenReturn(OptionalLong.of(7L));
+    when(context.getTermOfLeader()).thenReturn(7L);
+    assertEquals(7L, server.sendHeartbeat(request).getFullContainerReportLease().getTerm());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "flase", "0", "truefalse"})
+  void testMalformedRateLimitSettingRejectedAtStartup(String value) {
+    server.stop();
+    serverConf.set(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, value);
+
+    assertThrows(IllegalArgumentException.class,
+        () -> new SCMDatanodeProtocolServer(serverConf, scm, publisher, SCMContext.emptyContext()));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "flase", "0", "truefalse"})
+  void testMalformedReconfigurationKeepsRateLimitMode(String value) {
+    String source = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+    for (boolean enabled : new boolean[] {true, false}) {
+      server.reconfigureFCRRateLimit(Boolean.toString(enabled));
+
+      assertThrows(IllegalArgumentException.class, () -> server.reconfigureFCRRateLimit(value));
+      assertGauge("FCRRateLimitEnabled", enabled ? 1 : 0, getMetrics(source));
+    }
+  }
+
+  @Test
+  void testReconfigurationCanRestoreDefaultRateLimit() {
+    String source = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+    assertGauge("FCRRateLimitEnabled", 1, getMetrics(source));
+    assertEquals("false", server.reconfigureFCRRateLimit(" FALSE "));
+    assertGauge("FCRRateLimitEnabled", 0, getMetrics(source));
+    assertEquals("true", server.reconfigureFCRRateLimit(null));
+    assertGauge("FCRRateLimitEnabled", 1, getMetrics(source));
   }
 
   @Test

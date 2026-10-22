@@ -34,6 +34,8 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_READ_T
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_READ_THREADPOOL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_LEASE_DURATION_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES;
@@ -158,9 +160,11 @@ public class SCMDatanodeProtocolServer implements
     this.scm = scm;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
+    boolean rateLimitEnabled = parseFCRRateLimitEnabled(conf.get(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED));
     this.fcrLeaseMetrics = scmContext == null
         ? null : SCMFullContainerReportLeaseMetrics.create();
     this.fcrLeaseManager = createFCRLeaseManager(conf);
+    this.fcrLeaseManager.setRateLimitEnabled(rateLimitEnabled);
 
     heartbeatDispatcher = new SCMDatanodeHeartbeatDispatcher(
         scm.getScmNodeManager(), eventPublisher);
@@ -402,6 +406,23 @@ public class SCMDatanodeProtocolServer implements
             .toLong(TimeUnit.MILLISECONDS), TimeUnit.MILLISECONDS);
     return new SCMFullContainerReportLeaseManager(maxLeases, leaseDurationMs,
         Time::monotonicNow, fcrLeaseMetrics);
+  }
+
+  String reconfigureFCRRateLimit(String newValue) {
+    boolean enabled = parseFCRRateLimitEnabled(newValue);
+    fcrLeaseManager.setRateLimitEnabled(enabled);
+    return Boolean.toString(enabled);
+  }
+
+  private static boolean parseFCRRateLimitEnabled(String value) {
+    if (value == null) {
+      return OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT;
+    }
+    String trimmed = value.trim();
+    if (!"true".equalsIgnoreCase(trimmed) && !"false".equalsIgnoreCase(trimmed)) {
+      throw new IllegalArgumentException(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED + " must be true or false");
+    }
+    return Boolean.parseBoolean(trimmed);
   }
 
   void removeDatanode(DatanodeDetails datanode) {

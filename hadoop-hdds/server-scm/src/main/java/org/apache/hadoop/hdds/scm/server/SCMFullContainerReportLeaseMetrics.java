@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -41,6 +42,8 @@ public final class SCMFullContainerReportLeaseMetrics {
   private @Metric MutableCounterLong numFCRReportsRejectedInvalidLease;
   private @Metric MutableCounterLong numFCRReportsProcessedWithLease;
   private @Metric MutableGaugeLong numFCRLeasesOutstanding;
+  @Metric({"FCRRateLimitEnabled", "Whether FCR rate limiting is enabled (1 enabled, 0 disabled)"})
+  private MutableGaugeInt fcrRateLimitEnabled;
 
   private SCMFullContainerReportLeaseMetrics() {
   }
@@ -82,6 +85,10 @@ public final class SCMFullContainerReportLeaseMetrics {
 
   public void setNumFCRLeasesOutstanding(long count) {
     numFCRLeasesOutstanding.set(count);
+  }
+
+  public void setFCRRateLimitEnabled(boolean enabled) {
+    fcrRateLimitEnabled.set(enabled ? 1 : 0);
   }
 
   public long getNumFCRLeaseRequests() {

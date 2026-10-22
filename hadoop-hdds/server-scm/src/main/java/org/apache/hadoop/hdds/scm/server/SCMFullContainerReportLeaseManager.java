@@ -37,6 +37,8 @@ public class SCMFullContainerReportLeaseManager {
   private final Map<String, Lease> pendingLeases = new HashMap<>();
   private final Map<String, Long> deferredRegistrationReports = new HashMap<>();
   private long nextDeferredRegistrationId;
+  // Guarded by this, together with pendingLeases.
+  private boolean rateLimitEnabled = true;
 
   public SCMFullContainerReportLeaseManager(int maxOutstandingLeases,
       long leaseExpiryMs, LongSupplier clock,
@@ -53,6 +55,19 @@ public class SCMFullContainerReportLeaseManager {
     this.leaseExpiryMs = leaseExpiryMs;
     this.clock = clock;
     this.metrics = metrics;
+    if (metrics != null) {
+      metrics.setFCRRateLimitEnabled(rateLimitEnabled);
+    }
+  }
+
+  /**
+   * Changes the capacity limit for new leases while preserving outstanding leases and report validation.
+   */
+  public synchronized void setRateLimitEnabled(boolean enabled) {
+    rateLimitEnabled = enabled;
+    if (metrics != null) {
+      metrics.setFCRRateLimitEnabled(enabled);
+    }
   }
 
   public synchronized OptionalLong requestLease(
@@ -70,7 +85,7 @@ public class SCMFullContainerReportLeaseManager {
     }
     pendingLeases.remove(datanodeId);
 
-    if (pendingLeases.size() >= maxOutstandingLeases) {
+    if (rateLimitEnabled && pendingLeases.size() >= maxOutstandingLeases) {
       incrementLeasesRejected();
       updateOutstandingLeaseMetric();
       return OptionalLong.empty();

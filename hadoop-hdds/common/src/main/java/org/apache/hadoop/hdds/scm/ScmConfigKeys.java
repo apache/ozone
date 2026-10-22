@@ -130,6 +130,10 @@ public final class ScmConfigKeys {
 
   public static final int OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT = 4096;
 
+  public static final String OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED =
+      "ozone.scm.full.container.report.rate.limit.enabled";
+  public static final boolean OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED_DEFAULT = true;
+
   public static final String OZONE_SCM_MAX_FULL_CONTAINER_REPORT_LEASES =
       "ozone.scm.max.full.container.report.leases";
   public static final int

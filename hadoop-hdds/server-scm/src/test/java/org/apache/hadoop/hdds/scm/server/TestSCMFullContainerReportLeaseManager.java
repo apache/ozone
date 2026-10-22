@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.ozone.test.MetricsAsserts.assertGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
@@ -72,6 +74,102 @@ class TestSCMFullContainerReportLeaseManager {
 
     long secondLeaseAfterRelease = requireLease(leaseManager, secondDn, 7L);
     assertThat(secondLeaseAfterRelease).isNotZero();
+  }
+
+  @Test
+  void shouldPreserveOutstandingReportsWhenRateLimitingChanges() {
+    SCMFullContainerReportLeaseManager leaseManager =
+        new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
+    DatanodeDetails firstDn = randomDatanodeDetails();
+    DatanodeDetails secondDn = randomDatanodeDetails();
+    DatanodeDetails thirdDn = randomDatanodeDetails();
+    DatanodeDetails nextDn = randomDatanodeDetails();
+    long firstLease = requireLease(leaseManager, firstDn, 7L);
+    SCMFullContainerReportLeaseManager.LeaseClaim firstClaim = requireClaim(leaseManager, firstDn, 7L, firstLease);
+    assertThat(firstClaim.startProcessing()).isTrue();
+    assertThat(leaseManager.requestLease(secondDn, 7L)).isEmpty();
+
+    leaseManager.setRateLimitEnabled(false);
+    long secondLease = requireLease(leaseManager, secondDn, 7L);
+    long thirdLease = requireLease(leaseManager, thirdDn, 7L);
+    leaseManager.setRateLimitEnabled(true);
+
+    assertThat(leaseManager.requestLease(nextDn, 7L)).isEmpty();
+    SCMFullContainerReportLeaseManager.LeaseClaim secondClaim = requireClaim(leaseManager, secondDn, 7L, secondLease);
+    SCMFullContainerReportLeaseManager.LeaseClaim thirdClaim = requireClaim(leaseManager, thirdDn, 7L, thirdLease);
+    firstClaim.complete(true);
+    assertThat(leaseManager.requestLease(nextDn, 7L)).isEmpty();
+    secondClaim.complete(false);
+    assertThat(leaseManager.requestLease(nextDn, 7L)).isEmpty();
+    thirdClaim.complete(true);
+    assertThat(leaseManager.requestLease(nextDn, 7L)).isPresent();
+  }
+
+  @Test
+  void shouldRejectDuplicateReportsWhenRateLimitingIsDisabled() {
+    SCMFullContainerReportLeaseManager leaseManager =
+        new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, null);
+    leaseManager.setRateLimitEnabled(false);
+    DatanodeDetails datanode = randomDatanodeDetails();
+    long lease = requireLease(leaseManager, datanode, 7L);
+    SCMFullContainerReportLeaseManager.LeaseClaim claim = requireClaim(leaseManager, datanode, 7L, lease);
+
+    assertThat(leaseManager.requestLease(datanode, 7L)).isEmpty();
+    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, lease)).isEmpty();
+    assertThat(claim.startProcessing()).isTrue();
+    assertThat(leaseManager.requestLease(datanode, 7L)).isEmpty();
+    claim.complete(true);
+    assertThat(leaseManager.requestLease(datanode, 7L)).isPresent();
+  }
+
+  @Test
+  void shouldValidateLeasesWhenRateLimitingIsDisabled() {
+    AtomicLong now = new AtomicLong();
+    SCMFullContainerReportLeaseManager leaseManager =
+        new SCMFullContainerReportLeaseManager(1, 100L, now::get, null);
+    leaseManager.setRateLimitEnabled(false);
+    DatanodeDetails datanode = randomDatanodeDetails();
+    long lease = requireLease(leaseManager, datanode, 7L);
+
+    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, 0L)).isEmpty();
+    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, lease == 1L ? 2L : 1L)).isEmpty();
+    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(8L), 7L, lease)).isEmpty();
+    assertThat(leaseManager.claimLease(datanode, OptionalLong.empty(), 7L, lease)).isEmpty();
+    now.set(100L);
+    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(7L), 7L, lease)).isEmpty();
+
+    long newLease = requireLease(leaseManager, datanode, 8L);
+    assertThat(leaseManager.claimLease(datanode, OptionalLong.of(8L), 8L, newLease)).isPresent();
+  }
+
+  @Test
+  void shouldReportRateLimitModeAndOutstandingLeases() {
+    SCMFullContainerReportLeaseMetrics metrics = SCMFullContainerReportLeaseMetrics.create();
+    String source = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+    try {
+      SCMFullContainerReportLeaseManager leaseManager =
+          new SCMFullContainerReportLeaseManager(1, 5_000L, () -> 0L, metrics);
+      assertGauge("FCRRateLimitEnabled", 1, getMetrics(source));
+      DatanodeDetails firstDn = randomDatanodeDetails();
+      DatanodeDetails secondDn = randomDatanodeDetails();
+      long firstLease = requireLease(leaseManager, firstDn, 7L);
+      leaseManager.setRateLimitEnabled(false);
+      long secondLease = requireLease(leaseManager, secondDn, 7L);
+
+      assertGauge("FCRRateLimitEnabled", 0, getMetrics(source));
+      assertGauge("NumFCRLeasesOutstanding", 2L, getMetrics(source));
+      leaseManager.setRateLimitEnabled(true);
+      assertGauge("FCRRateLimitEnabled", 1, getMetrics(source));
+      assertGauge("NumFCRLeasesOutstanding", 2L, getMetrics(source));
+      requireClaim(leaseManager, firstDn, 7L, firstLease).complete(true);
+      requireClaim(leaseManager, secondDn, 7L, secondLease).complete(false);
+      assertGauge("NumFCRLeasesOutstanding", 0L, getMetrics(source));
+      assertThat(metrics.getNumFCRLeaseRequests()).isEqualTo(2L);
+      assertThat(metrics.getNumFCRLeasesGranted()).isEqualTo(2L);
+      assertThat(metrics.getNumFCRReportsProcessedWithLease()).isEqualTo(1L);
+    } finally {
+      metrics.unregister();
+    }
   }
 
   @Test

@@ -17,9 +17,14 @@
 
 package org.apache.hadoop.ozone.reconfig;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
+import static org.apache.ozone.test.MetricsAsserts.assertGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableSet;
 import java.time.Duration;
@@ -32,6 +37,7 @@ import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
+import org.apache.hadoop.hdds.scm.server.SCMFullContainerReportLeaseMetrics;
 import org.apache.hadoop.hdds.tracing.TracingConfig;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +58,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
         .add(OZONE_ADMINISTRATORS)
         .add(OZONE_READONLY_ADMINISTRATORS)
         .add(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL)
+        .add(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED)
         .addAll(new ReplicationManagerConfiguration()
             .reconfigurableProperties())
         .addAll(new WritableECContainerProviderConfig()
@@ -61,6 +68,36 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
         .build();
 
     assertProperties(getSubject(), expected);
+  }
+
+  @Test
+  void fullContainerReportRateLimit() throws ReconfigurationException {
+    String source = SCMFullContainerReportLeaseMetrics.class.getSimpleName();
+    try {
+      for (boolean enabled : new boolean[] {false, true}) {
+        String value = Boolean.toString(enabled);
+        getSubject().reconfigureProperty(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, value);
+
+        assertEquals(value, cluster().getStorageContainerManager().getConfiguration()
+            .get(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED));
+        assertGauge("FCRRateLimitEnabled", enabled ? 1 : 0, getMetrics(source));
+        for (String invalid : new String[] {"flase", "0", ""}) {
+          assertThrows(ReconfigurationException.class,
+              () -> getSubject().reconfigureProperty(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, invalid));
+          assertEquals(value, cluster().getStorageContainerManager().getConfiguration()
+              .get(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED));
+          assertGauge("FCRRateLimitEnabled", enabled ? 1 : 0, getMetrics(source));
+        }
+      }
+      getSubject().reconfigureProperty(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, "false");
+      getSubject().reconfigureProperty(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, null);
+
+      assertTrue(cluster().getStorageContainerManager().getConfiguration()
+          .getBoolean(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, true));
+      assertGauge("FCRRateLimitEnabled", 1, getMetrics(source));
+    } finally {
+      getSubject().reconfigureProperty(OZONE_SCM_FULL_CONTAINER_REPORT_RATE_LIMIT_ENABLED, null);
+    }
   }
 
   @Test

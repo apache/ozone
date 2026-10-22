@@ -168,12 +168,30 @@
       response of ListContainer request.</description>
   </property>
   <property>
+    <name>ozone.scm.full.container.report.rate.limit.enabled</name>
+    <value>true</value>
+    <tag>OZONE, SCM, CONTAINER</tag>
+    <description>Whether SCM limits the number of outstanding full container
+      report leases. Set to false only as an emergency measure to bypass the
+      capacity limit; lease validation and upgrade finalization requirements
+      still apply. Disabling this protection can cause excessive SCM memory
+      usage or an out-of-memory failure. This property can be reconfigured
+      without restarting SCM and applies independently to each SCM, including
+      outside SafeMode. Reconfigure all relevant SCMs for consistent HA behavior.
+      Re-enabling the limit preserves existing leases and blocks new grants
+      until outstanding leases fall below the configured maximum.
+      FCRRateLimitEnabled in SCMFullContainerReportLeaseMetrics reports the
+      current setting as 1 (enabled) or 0 (disabled).</description>
+  </property>
+  <property>
     <name>ozone.scm.max.full.container.report.leases</name>
     <value>10</value>
     <tag>OZONE, SCM, CONTAINER</tag>
     <description>The max number of outstanding full container report leases
-      SCM can grant to datanodes. Full container report rate limiting requires
-      HDDS finalization on SCM and datanodes.</description>
+      SCM can grant to datanodes when
+      ozone.scm.full.container.report.rate.limit.enabled is true.
+      Full container report rate limiting requires HDDS finalization on SCM
+      and datanodes.</description>
   </property>
   <property>
     <name>ozone.scm.full.container.report.lease.duration</name>
