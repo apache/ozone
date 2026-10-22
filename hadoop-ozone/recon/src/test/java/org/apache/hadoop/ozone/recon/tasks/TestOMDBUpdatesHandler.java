@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -86,6 +87,16 @@ public class TestOMDBUpdatesHandler {
     OzoneConfiguration reconConfiguration = createNewTestPath("reconConfig");
     reconOmMetadataManager = new OmMetadataManagerImpl(reconConfiguration,
         null);
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconOmMetadataManager != null) {
+      reconOmMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
   }
 
   @Test

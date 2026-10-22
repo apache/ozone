@@ -108,6 +108,7 @@ public class TestOzoneManagerServiceProviderImpl {
   private OzoneManagerProtocol ozoneManagerProtocol;
   private ReconContext reconContext;
   private File omSnapshotDbParentDir;
+  private final List<OMMetadataManager> omMetadataManagersToStop = new ArrayList<>();
 
   @BeforeEach
   public void setUp(@TempDir File dirReconSnapDB, @TempDir File dirReconDB)
@@ -125,7 +126,10 @@ public class TestOzoneManagerServiceProviderImpl {
   }
 
   @AfterEach
-  public void tearDown() {
+  public void tearDown() throws Exception {
+    for (int i = omMetadataManagersToStop.size() - 1; i >= 0; i--) {
+      omMetadataManagersToStop.get(i).stop();
+    }
     if (configuration != null) {
       configuration.clear();
     }
@@ -449,7 +453,7 @@ public class TestOzoneManagerServiceProviderImpl {
     OMMetadataManager omMetadataManager =
         initializeNewOmMetadataManager(dirOmMetadata);
     ReconOMMetadataManager reconOMMetadataManager =
-        getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata);
+        stopAfterTest(getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata));
     DBStore omDbStore = spy(reconOMMetadataManager.getStore());
     ReconOMMetadataManager spiedReconOMMetadataManager = spy(reconOMMetadataManager);
     doReturn(omDbStore).when(spiedReconOMMetadataManager).getStore();
@@ -530,7 +534,7 @@ public class TestOzoneManagerServiceProviderImpl {
     withLimitConfiguration.setLong(RECON_OM_DELTA_UPDATE_LAG_THRESHOLD, 1);
     OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
         new OzoneManagerServiceProviderImpl(withLimitConfiguration,
-            getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata),
+            stopAfterTest(getTestReconOmMetadataManager(omMetadataManager, dirReconMetadata)),
             getMockTaskController(), new ReconUtils(),
             getMockOzoneManagerClientWith4Updates(dbUpdatesWrapper[0],
                 dbUpdatesWrapper[1], dbUpdatesWrapper[2], dbUpdatesWrapper[3]),
@@ -580,7 +584,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     // Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
-        initializeEmptyOmMetadataManager(dirOmMetadata), dirReconMetadata);
+        stopAfterTest(initializeEmptyOmMetadataManager(dirOmMetadata)), dirReconMetadata);
 
     ReconTaskController reconTaskControllerMock = getMockTaskController();
     when(reconTaskControllerMock.reInitializeTasks(omMetadataManager, null)).thenReturn(true);
@@ -615,7 +619,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     // Non-Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(dirOmMetadata), dirReconMetadata);
+        stopAfterTest(initializeNewOmMetadataManager(dirOmMetadata)), dirReconMetadata);
 
     ReconTaskController reconTaskControllerMock = getMockTaskController();
     doNothing().when(reconTaskControllerMock)
@@ -684,7 +688,7 @@ public class TestOzoneManagerServiceProviderImpl {
 
     // Non-Empty OM DB to start with.
     ReconOMMetadataManager omMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(dirOmMetadata), dirReconMetadata);
+        stopAfterTest(initializeNewOmMetadataManager(dirOmMetadata)), dirReconMetadata);
 
     ReconTaskController reconTaskControllerMock = getMockTaskController();
     when(reconTaskControllerMock.reInitializeTasks(omMetadataManager, null)).thenReturn(true);
@@ -899,6 +903,11 @@ public class TestOzoneManagerServiceProviderImpl {
     response = serviceProvider.triggerTaskRebuild();
     assertEquals(OMDBReprocessResponse.Status.RETRY, response.getStatus());
     verify(noDbController, never()).queueReInitializationEvent(any());
+  }
+
+  private <T extends OMMetadataManager> T stopAfterTest(T omMetadataManager) {
+    omMetadataManagersToStop.add(omMetadataManager);
+    return omMetadataManager;
   }
 
   private BucketLayout getBucketLayout() {

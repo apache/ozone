@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStorageReport;
@@ -63,7 +64,10 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -77,6 +81,11 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
 
   @TempDir
   private Path temporaryFolder;
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+  private ReconStorageContainerManagerFacade reconScm;
+  private ReconDBProvider reconDBProvider;
+  private ReconReplicaHistoryDBProvider replicaHistoryDBProvider;
   private ClusterStateEndpoint clusterStateEndpoint;
   private ReconContainerManager reconContainerManager;
   private Pipeline pipeline;
@@ -93,9 +102,9 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
 
   @BeforeEach
   public void setUp() throws Exception {
-    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    omMetadataManager = initializeNewOmMetadataManager(
+        Files.createDirectory(temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     ReconTestInjector reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
@@ -114,6 +123,9 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
             .build();
     OzoneStorageContainerManager ozoneStorageContainerManager =
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    reconScm = (ReconStorageContainerManagerFacade) ozoneStorageContainerManager;
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
+    replicaHistoryDBProvider = reconTestInjector.getInstance(ReconReplicaHistoryDBProvider.class);
     reconContainerManager = (ReconContainerManager)
         ozoneStorageContainerManager.getContainerManager();
     ReconPipelineManager reconPipelineManager = (ReconPipelineManager)
@@ -129,6 +141,25 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
     reconPipelineManager.addPipeline(pipeline);
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconScm != null) {
+      reconScm.stop();
+    }
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (replicaHistoryDBProvider != null) {
+      replicaHistoryDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
+    }
   }
 
   @Test

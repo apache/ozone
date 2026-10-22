@@ -52,6 +52,8 @@ import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.junit.jupiter.api.AfterAll;
 
 /**
  * Abstract Class created to handle common objects and methods.
@@ -117,6 +119,7 @@ public abstract class AbstractNSSummaryTaskTest {
   private OMMetadataManager omMetadataManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
+  private ReconDBProvider reconDBProvider;
 
   // Helper Methods
   protected void commonSetup(File tmpDir, OMConfigParameter configParameter) throws Exception {
@@ -142,6 +145,7 @@ public abstract class AbstractNSSummaryTaskTest {
             .build();
 
     setReconNamespaceSummaryManager(reconTestInjector.getInstance(ReconNamespaceSummaryManager.class));
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     assertNull(getReconNamespaceSummaryManager().getNSSummary(BUCKET_ONE_OBJECT_ID));
 
     if (!configParameter.legacyPopulate && !configParameter.isFSO && !configParameter.isOBS) {
@@ -152,6 +156,19 @@ public abstract class AbstractNSSummaryTaskTest {
       populateOMDB(configParameter.layout, true);
     } else {
       populateOMDB(configParameter.layout, false);
+    }
+  }
+
+  @AfterAll
+  public void commonTeardown() throws Exception {
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
     }
   }
 

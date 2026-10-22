@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.JsonTestUtils;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.server.JsonUtils;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.EntityMetaData;
 import org.apache.hadoop.ozone.recon.api.types.EntityReadAccessHeatMapResponse;
@@ -41,7 +42,10 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconReplicaHistoryDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -58,12 +62,17 @@ public class TestHeatMapInfo {
   private boolean isSetupDone = false;
   private String auditRespStr;
   private HeatMapUtil heatMapUtil;
+  private OMMetadataManager omMetadataManager;
+  private ReconOMMetadataManager reconOMMetadataManager;
+  private ReconStorageContainerManagerFacade reconScm;
+  private ReconDBProvider reconDBProvider;
+  private ReconReplicaHistoryDBProvider replicaHistoryDBProvider;
 
   @SuppressWarnings("checkstyle:methodlength")
   private void initializeInjector() throws Exception {
-    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    omMetadataManager = initializeNewOmMetadataManager(Files.createDirectory(
+        temporaryFolder.resolve("JunitOmDBDir")).toFile());
+    reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
 
     ReconTestInjector reconTestInjector =
@@ -80,6 +89,10 @@ public class TestHeatMapInfo {
                 mock(StorageContainerServiceProviderImpl.class))
             .build();
     heatMapUtil = reconTestInjector.getInstance(HeatMapUtil.class);
+    // HeatMapUtil already provisioned these singletons, so this does not open new DBs.
+    reconScm = (ReconStorageContainerManagerFacade) reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
+    replicaHistoryDBProvider = reconTestInjector.getInstance(ReconReplicaHistoryDBProvider.class);
     auditRespStr = "{\n" +
         "  \"responseHeader\": {\n" +
         "    \"zkConnected\": true,\n" +
@@ -732,6 +745,25 @@ public class TestHeatMapInfo {
     if (!isSetupDone) {
       initializeInjector();
       isSetupDone = true;
+    }
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (reconScm != null) {
+      reconScm.stop();
+    }
+    if (replicaHistoryDBProvider != null) {
+      replicaHistoryDBProvider.close();
+    }
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
+    }
+    if (reconOMMetadataManager != null) {
+      reconOMMetadataManager.stop();
+    }
+    if (omMetadataManager != null) {
+      omMetadataManager.stop();
     }
   }
 

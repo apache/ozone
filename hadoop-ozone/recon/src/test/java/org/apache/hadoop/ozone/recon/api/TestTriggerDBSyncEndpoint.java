@@ -17,147 +17,38 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
-import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyBoolean;
-import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import javax.ws.rs.core.Response;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
-import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.helpers.DBUpdates;
-import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.recon.MetricsServiceProviderFactory;
-import org.apache.hadoop.ozone.recon.ReconContext;
-import org.apache.hadoop.ozone.recon.ReconTestInjector;
-import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.ScmDbSnapshotCancelResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.ScmDbSnapshotStatusResponse;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.ScmDbSnapshotSyncPhase;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.ScmDbSnapshotSyncStatus;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.ScmDbSnapshotTriggerResponse;
-import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
-import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
-import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
-import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test class for OMSyncEndpoint.
  */
 public class TestTriggerDBSyncEndpoint {
 
-  @TempDir
-  private Path temporaryFolder;
-  private ReconTestInjector reconTestInjector;
-
-  @BeforeEach
-  public void setUp() throws IOException, AuthenticationException {
-    OzoneConfiguration configuration = new OzoneConfiguration();
-    configuration.set(OZONE_RECON_OM_SNAPSHOT_DB_DIR,
-        Files.createDirectory(temporaryFolder.resolve("OmSnapshotDB"))
-            .toFile().getAbsolutePath());
-    configuration.set(OZONE_RECON_DB_DIR,
-        Files.createDirectory(temporaryFolder.resolve("ReconDb"))
-            .toFile().getAbsolutePath());
-    configuration.set(OZONE_OM_ADDRESS_KEY, "localhost:9862");
-    OzoneManagerProtocol ozoneManagerProtocol
-        = mock(OzoneManagerProtocol.class);
-    when(ozoneManagerProtocol.getDBUpdates(any(OzoneManagerProtocolProtos
-        .DBUpdatesRequest.class))).thenReturn(new DBUpdates());
-
-    OMMetadataManager omMetadataManager =
-        initializeNewOmMetadataManager(Files.createDirectory(
-            temporaryFolder.resolve("OnMetadata")).toFile());
-    ReconOMMetadataManager reconOMMetadataManager
-        = getTestReconOmMetadataManager(omMetadataManager,
-        Files.createDirectory(
-            temporaryFolder.resolve("OmMetadataTest")).toFile());
-
-
-    ReconUtils reconUtilsMock = mock(ReconUtils.class);
-
-    ReconTaskStatusDao reconTaskStatusDaoMock = mock(ReconTaskStatusDao.class);
-    ReconTaskStatusUpdaterManager taskStatusUpdaterManagerMock = mock(ReconTaskStatusUpdaterManager.class);
-    when(taskStatusUpdaterManagerMock.getTaskStatusUpdater(anyString())).thenReturn(new ReconTaskStatusUpdater(
-        reconTaskStatusDaoMock, "dummyTaskManager"));
-
-    DBCheckpoint checkpoint = omMetadataManager.getStore()
-        .getCheckpoint(true);
-    File tarFile = createTarFile(checkpoint.getCheckpointLocation());
-    HttpURLConnection httpURLConnectionMock = mock(HttpURLConnection.class);
-    try (InputStream inputStream = Files.newInputStream(tarFile.toPath())) {
-      when(httpURLConnectionMock.getInputStream()).thenReturn(inputStream);
-    }
-    when(reconUtilsMock.makeHttpCall(any(), anyString(), anyBoolean()))
-        .thenReturn(httpURLConnectionMock);
-    when(reconUtilsMock.getReconDbDir(any(), anyString())).thenCallRealMethod();
-    when(reconUtilsMock.getReconNodeDetails(
-        any(OzoneConfiguration.class))).thenReturn(
-        ReconTestUtils.getReconNodeDetails());
-
-    ReconTaskController reconTaskController = mock(ReconTaskController.class);
-    OzoneManagerServiceProviderImpl ozoneManagerServiceProvider =
-        new OzoneManagerServiceProviderImpl(configuration,
-            reconOMMetadataManager, reconTaskController,
-            reconUtilsMock, ozoneManagerProtocol, new ReconContext(configuration, reconUtilsMock),
-            taskStatusUpdaterManagerMock);
-    ozoneManagerServiceProvider.start();
-
-    reconTestInjector =
-        new ReconTestInjector.Builder(temporaryFolder.toFile())
-            .withReconSqlDb()
-            .withReconOm(reconOMMetadataManager)
-            .withOmServiceProvider(ozoneManagerServiceProvider)
-            .addBinding(StorageContainerServiceProvider.class,
-                mock(StorageContainerServiceProviderImpl.class))
-            .addBinding(OzoneStorageContainerManager.class,
-                mock(ReconStorageContainerManagerFacade.class))
-            .withContainerDB()
-            .addBinding(NodeEndpoint.class)
-            .addBinding(MetricsServiceProviderFactory.class)
-            .addBinding(ReconUtils.class, reconUtilsMock)
-            .addBinding(StorageContainerLocationInternalInterface.class,
-                mock(StorageContainerLocationInternalInterface.class))
-            .build();
-  }
-
   @Test
   public void testTriggerDBSyncEndpointWithOM() {
-    TriggerDBSyncEndpoint triggerDBSyncEndpoint
-        = reconTestInjector.getInstance(TriggerDBSyncEndpoint.class);
+    OzoneManagerServiceProviderImpl omProvider = mock(OzoneManagerServiceProviderImpl.class);
+    when(omProvider.triggerSyncDataFromOMImmediately()).thenReturn(true);
+    TriggerDBSyncEndpoint triggerDBSyncEndpoint =
+        new TriggerDBSyncEndpoint(omProvider, mock(ReconStorageContainerManagerFacade.class));
     Response response = triggerDBSyncEndpoint.triggerOMDBSync();
     assertEquals(200, response.getStatus());
     assertEquals(true, response.getEntity());
+    verify(omProvider).triggerSyncDataFromOMImmediately();
   }
 
   @Test
