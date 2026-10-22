@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSuccee
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_RANGE;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
@@ -335,6 +336,22 @@ public class TestObjectGet {
         response.getHeaderString("Content-Range"));
 
     assertNull(response.getHeaderString(TAG_COUNT_HEADER));
+  }
+
+  @Test
+  public void getUnsatisfiableOrMalformedRange() throws IOException, OS3Exception {
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=10-");
+    assertErrorResponse(INVALID_RANGE, () -> get(rest, BUCKET_NAME, KEY_NAME));
+
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=-0");
+    assertErrorResponse(INVALID_RANGE, () -> get(rest, BUCKET_NAME, KEY_NAME));
+
+    // A range with neither a start nor a suffix length is ignored.
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=-");
+    Response response = get(rest, BUCKET_NAME, KEY_NAME);
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    assertEquals(String.valueOf(CONTENT.length()), response.getHeaderString("Content-Length"));
+    assertNull(response.getHeaderString("Content-Range"));
   }
 
   @Test
