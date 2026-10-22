@@ -834,19 +834,19 @@ message BucketInfo {
     optional uint64 snapshotUsedNamespace = 22;
     repeated hadoop.hdds.KeyValue tags = 23;
     optional bool objectLockEnabled = 24 [default = false];
-    optional RetentionConfig defaultRetention = 25;
+    optional BucketRetention defaultRetention = 25;
 }
 
-message RetentionConfig {
+message BucketRetention {
     required RetentionMode retentionMode = 1;
     optional Rule rule = 2;
     optional EventHold eventHold = 3;
 }
 
-message Retention {
+message KeyRetention {
     required RetentionMode retentionMode = 1;
-    // UTC ISO-8601 timestamp.
-    optional string retentionDate = 2;
+    // Epoch milliseconds; the minimum date while the event hold is ON.
+    optional uint64 retentionDate = 2;
     optional EventHold eventHold = 3;
 }
 
@@ -1276,7 +1276,7 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
-    optional Retention retention = 23;
+    optional KeyRetention retention = 23;
     optional bool legalHold = 24 [default = false];
 }
 
@@ -1297,7 +1297,7 @@ message KeyInfoProtoLight {
   optional uint64 parentID = 16;
   optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
   optional bool isFile = 19;
-  optional Retention retention = 23;
+  optional KeyRetention retention = 23;
   optional bool legalHold = 24 [default = false];
 }
 

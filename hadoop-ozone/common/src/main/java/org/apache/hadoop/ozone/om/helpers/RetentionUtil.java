@@ -35,6 +35,25 @@ public final class RetentionUtil {
     }
   }
 
+  public static void validateEventHoldRule(Rule rule) {
+    validateRule(rule);
+    switch (rule.getTimeUnit()) {
+    case DAYS:
+      if (rule.getDuration() <= 36_500) {
+        return;
+      }
+      break;
+    case YEARS:
+      if (rule.getDuration() <= 100) {
+        return;
+      }
+      break;
+    default:
+      throw new IllegalArgumentException("Unsupported retention time unit: " + rule.getTimeUnit());
+    }
+    throw new IllegalArgumentException("Event hold duration must not exceed 36,500 days or 100 years");
+  }
+
   /**
    * Calculate an expiration time in epoch milliseconds from an explicit start time.
    * Event hold release and selection of the applicable rule are the caller's responsibility.

@@ -19,17 +19,17 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.FieldDescriptor;
-import java.time.DateTimeException;
 import java.time.Instant;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRetention;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfoProtoLight;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Rule;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TimeUnit;
@@ -45,13 +45,14 @@ class TestRetention {
     FieldDescriptor retention = key.findFieldByName("retention");
     assertNotNull(retention);
     assertEquals(23, retention.getNumber());
-    assertEquals("Retention", retention.getMessageType().getName());
+    assertEquals("KeyRetention", retention.getMessageType().getName());
+    assertEquals(FieldDescriptor.Type.UINT64, retention.getMessageType().findFieldByName("retentionDate").getType());
     assertEquals(24, key.findFieldByName("legalHold").getNumber());
     assertEquals(key.findFieldByName("retention").getNumber(),
         KeyInfoProtoLight.getDescriptor().findFieldByName("retention").getNumber());
-    assertNotNull(RetentionConfig.getDescriptor().findFieldByName("retentionMode"));
-    assertEquals(2, RetentionConfig.getDescriptor().findFieldByName("rule").getNumber());
-    assertEquals(3, RetentionConfig.getDescriptor().findFieldByName("eventHold").getNumber());
+    assertNotNull(BucketRetention.getDescriptor().findFieldByName("retentionMode"));
+    assertEquals(2, BucketRetention.getDescriptor().findFieldByName("rule").getNumber());
+    assertEquals(3, BucketRetention.getDescriptor().findFieldByName("eventHold").getNumber());
     assertEquals(1, Rule.getDescriptor().findFieldByName("timeUnit").getNumber());
     assertEquals(2, Rule.getDescriptor().findFieldByName("duration").getNumber());
   }
@@ -59,12 +60,12 @@ class TestRetention {
   @Test
   void preservesOptionalRules() {
     Rule rule = rule(TimeUnit.DAYS, 30);
-    for (RetentionConfig proto : new RetentionConfig[]{
-        RetentionConfig.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).build(),
-        RetentionConfig.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).setRule(rule).build(),
-        RetentionConfig.newBuilder().setRetentionMode(RetentionMode.COMPLIANCE)
+    for (BucketRetention proto : new BucketRetention[]{
+        BucketRetention.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).build(),
+        BucketRetention.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).setRule(rule).build(),
+        BucketRetention.newBuilder().setRetentionMode(RetentionMode.COMPLIANCE)
             .setEventHold(EventHold.newBuilder().setEnabled(true).setRule(rule)).build(),
-        RetentionConfig.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).setRule(rule)
+        BucketRetention.newBuilder().setRetentionMode(RetentionMode.GOVERNANCE).setRule(rule)
             .setEventHold(EventHold.newBuilder().setEnabled(false).setRule(rule)).build()}) {
       Retention retention = Retention.fromProto(proto);
       assertEquals(proto, retention.toProto());
@@ -87,13 +88,39 @@ class TestRetention {
       assertEquals(retention.getRetentionDate() != null, retention.toProto().hasRetentionDate());
     }
     ObjectRetention retention = new ObjectRetention(RetentionMode.GOVERNANCE, date, null);
-    assertEquals("2027-01-15T08:00:00.123Z", retention.toProto().getRetentionDate());
-    assertEquals(retention, ObjectRetention.fromProto(retention.toProto().toBuilder()
-        .setRetentionDate("2027-01-15T09:00:00.123+01:00").build()));
-    assertThrows(DateTimeException.class, () -> ObjectRetention.fromProto(retention.toProto().toBuilder()
-        .setRetentionDate("invalid").build()));
+    assertEquals(date, retention.toProto().getRetentionDate());
     assertThrows(NullPointerException.class, () -> new ObjectRetention(null, date, null));
     assertThrows(NullPointerException.class, () -> new Retention(null, null, null));
+  }
+
+  @Test
+  void comparesEachBucketRetentionField() {
+    Rule days = rule(TimeUnit.DAYS, 30);
+    EventHold hold = EventHold.newBuilder().setEnabled(true).setRule(days).build();
+    Retention retention = new Retention(RetentionMode.GOVERNANCE, days, hold);
+    assertEquals(retention, new Retention(RetentionMode.GOVERNANCE, days, hold));
+    assertNotEquals(retention, new Retention(RetentionMode.COMPLIANCE, days, hold));
+    assertNotEquals(retention, new Retention(RetentionMode.GOVERNANCE, rule(TimeUnit.DAYS, 31), hold));
+    assertNotEquals(retention, new Retention(RetentionMode.GOVERNANCE, days, null));
+  }
+
+  @Test
+  void validatesEventHoldDurationBounds() {
+    for (TimeUnit unit : TimeUnit.values()) {
+      long maximum = unit == TimeUnit.DAYS ? 36_500 : 100;
+      Rule valid = rule(unit, maximum);
+      Rule invalid = rule(unit, maximum + 1);
+      RetentionUtil.validateEventHoldRule(rule(unit, 1));
+      RetentionUtil.validateEventHoldRule(valid);
+      assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateEventHoldRule(invalid));
+      assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateEventHoldRule(rule(unit, 0)));
+      assertThrows(IllegalArgumentException.class, () -> RetentionUtil.validateEventHoldRule(rule(unit, -1)));
+      EventHold hold = EventHold.newBuilder().setEnabled(true).setRule(invalid).build();
+      assertThrows(IllegalArgumentException.class, () -> new Retention(RetentionMode.GOVERNANCE, null, hold));
+      assertThrows(IllegalArgumentException.class, () -> new ObjectRetention(RetentionMode.GOVERNANCE, null, hold));
+      RetentionUtil.validateRule(invalid);
+      new Retention(RetentionMode.GOVERNANCE, invalid, null);
+    }
   }
 
   @Test

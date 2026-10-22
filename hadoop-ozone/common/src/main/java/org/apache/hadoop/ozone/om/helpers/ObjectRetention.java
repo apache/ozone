@@ -17,10 +17,9 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.time.Instant;
 import java.util.Objects;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Retention;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyRetention;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 
 /**
@@ -34,6 +33,9 @@ public final class ObjectRetention {
   public ObjectRetention(RetentionMode retentionMode, Long retentionDate, EventHold eventHold) {
     this.retentionMode = Objects.requireNonNull(retentionMode, "retention mode is null");
     this.retentionDate = retentionDate;
+    if (eventHold != null) {
+      RetentionUtil.validateEventHoldRule(eventHold.getRule());
+    }
     this.eventHold = eventHold;
   }
 
@@ -49,17 +51,17 @@ public final class ObjectRetention {
     return eventHold;
   }
 
-  public static ObjectRetention fromProto(Retention proto) {
+  public static ObjectRetention fromProto(KeyRetention proto) {
     Objects.requireNonNull(proto, "retention is null");
     return new ObjectRetention(proto.getRetentionMode(),
-        proto.hasRetentionDate() ? Instant.parse(proto.getRetentionDate()).toEpochMilli() : null,
+        proto.hasRetentionDate() ? proto.getRetentionDate() : null,
         proto.hasEventHold() ? proto.getEventHold() : null);
   }
 
-  public Retention toProto() {
-    Retention.Builder builder = Retention.newBuilder().setRetentionMode(retentionMode);
+  public KeyRetention toProto() {
+    KeyRetention.Builder builder = KeyRetention.newBuilder().setRetentionMode(retentionMode);
     if (retentionDate != null) {
-      builder.setRetentionDate(Instant.ofEpochMilli(retentionDate).toString());
+      builder.setRetentionDate(retentionDate);
     }
     if (eventHold != null) {
       builder.setEventHold(eventHold);

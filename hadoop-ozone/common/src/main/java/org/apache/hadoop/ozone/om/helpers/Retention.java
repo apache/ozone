@@ -17,9 +17,10 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import com.google.protobuf.TextFormat;
 import java.util.Objects;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRetention;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.EventHold;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionConfig;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RetentionMode;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Rule;
 
@@ -34,6 +35,9 @@ public final class Retention {
   public Retention(RetentionMode retentionMode, Rule rule, EventHold eventHold) {
     this.retentionMode = Objects.requireNonNull(retentionMode, "retention mode is null");
     this.rule = rule;
+    if (eventHold != null) {
+      RetentionUtil.validateEventHoldRule(eventHold.getRule());
+    }
     this.eventHold = eventHold;
   }
 
@@ -49,14 +53,14 @@ public final class Retention {
     return eventHold;
   }
 
-  public static Retention fromProto(RetentionConfig proto) {
+  public static Retention fromProto(BucketRetention proto) {
     Objects.requireNonNull(proto, "retention config is null");
     return new Retention(proto.getRetentionMode(), proto.hasRule() ? proto.getRule() : null,
         proto.hasEventHold() ? proto.getEventHold() : null);
   }
 
-  public RetentionConfig toProto() {
-    RetentionConfig.Builder builder = RetentionConfig.newBuilder().setRetentionMode(retentionMode);
+  public BucketRetention toProto() {
+    BucketRetention.Builder builder = BucketRetention.newBuilder().setRetentionMode(retentionMode);
     if (rule != null) {
       builder.setRule(rule);
     }
@@ -77,6 +81,11 @@ public final class Retention {
     Retention that = (Retention) obj;
     return retentionMode == that.retentionMode && Objects.equals(rule, that.rule) &&
         Objects.equals(eventHold, that.eventHold);
+  }
+
+  @Override
+  public String toString() {
+    return "Retention{" + TextFormat.shortDebugString(toProto()) + '}';
   }
 
   @Override
