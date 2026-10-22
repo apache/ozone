@@ -513,11 +513,11 @@ public class KeyValueHandler extends Handler {
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } finally {
+      containerIdLock.unlock();
       if (!created) {
         // Release the space reserved when the volume was chosen, also on unchecked exceptions.
         newContainerData.releaseCommitSpace();
       }
-      containerIdLock.unlock();
     }
 
     if (created) {
