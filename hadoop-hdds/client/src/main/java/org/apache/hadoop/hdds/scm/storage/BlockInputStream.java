@@ -34,15 +34,12 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChunkInfo;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetBlockResponseProto;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.XceiverClientShortCircuit;
 import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi.Validator;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
@@ -61,9 +58,6 @@ import org.slf4j.LoggerFactory;
 public class BlockInputStream extends BlockExtendedInputStream {
 
   public static final Logger LOG = LoggerFactory.getLogger(BlockInputStream.class);
-
-  private static final List<Validator> VALIDATORS =
-      ContainerProtocolCalls.toValidatorList((request, response) -> validate(response));
 
   private final BlockID blockID;
   private long length;
@@ -162,7 +156,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
       try {
         blockData = getBlockData();
         chunks = blockData.getChunksList();
-        if (blockInfo != null && blockInfo.isUnderConstruction()) {
+        if (blockInfo.isUnderConstruction()) {
           // use the block length from DN if block is under construction.
           length = blockData.getSize();
           LOG.debug("Updated block length to {} for block {}", length, blockID);
@@ -258,7 +252,7 @@ public class BlockInputStream extends BlockExtendedInputStream {
         acquireClient();
       }
     }
-    return getBlockDataUsingGRPCClient();
+    return getBlockDataUsingGRPCClient(xceiverClientGrpc, pipelineRef.get(), tokenRef.get());
   }
 
   @VisibleForTesting
@@ -296,44 +290,6 @@ public class BlockInputStream extends BlockExtendedInputStream {
       }
     }
     return response.getBlockData();
-  }
-
-  @VisibleForTesting
-  protected BlockData getBlockDataUsingGRPCClient() throws IOException {
-    final Pipeline pipeline = pipelineRef.get();
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Initializing BlockInputStream for get key to access block {}",
-          blockID);
-    }
-
-    GetBlockResponseProto response = ContainerProtocolCalls.getBlock(
-        xceiverClientGrpc, VALIDATORS, blockID, tokenRef.get(), pipeline);
-    return response.getBlockData();
-  }
-
-  private static void validate(ContainerCommandResponseProto response)
-      throws IOException {
-    if (!response.hasGetBlock()) {
-      throw new IllegalArgumentException("Not GetBlock: response=" + response);
-    }
-    final GetBlockResponseProto b = response.getGetBlock();
-    final long blockLength = b.getBlockData().getSize();
-    final List<ChunkInfo> chunks = b.getBlockData().getChunksList();
-    for (int i = 0; i < chunks.size(); i++) {
-      final ChunkInfo c = chunks.get(i);
-      // HDDS-10682 caused an empty chunk to get written to the end of some EC blocks. Due to this
-      // validation, these blocks will not be readable. In the EC case, the empty chunk is always
-      // the last chunk and the offset is the block length. We can safely ignore this case and not fail.
-      if (c.getLen() <= 0 && i == chunks.size() - 1 && c.getOffset() == blockLength) {
-        DatanodeBlockID blockID = b.getBlockData().getBlockID();
-        LOG.warn("The last chunk is empty for container/block {}/{} with an offset of the block length. " +
-            "Likely due to HDDS-10682. This is safe to ignore.", blockID.getContainerID(), blockID.getLocalID());
-      } else if (c.getLen() <= 0) {
-        throw new IOException("Failed to get chunkInfo["
-            + i + "]: len == " + c.getLen());
-      }
-    }
   }
 
   private void acquireClient() throws IOException {

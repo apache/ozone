@@ -95,7 +95,7 @@ public class TestContainerExportManager {
   @Test
   public void testRejectMissingFilters() {
     assertThrows(IllegalArgumentException.class, () ->
-        exportManager.submitJob(ContainerID.valueOf(0), null, null));
+        submit(ContainerID.valueOf(0), null, null));
   }
 
   @Test
@@ -103,7 +103,7 @@ public class TestContainerExportManager {
     exportManager.shutdown();
     exportManager = newExportManager(TEST_PART_SIZE, TEST_BATCH_SIZE, () -> false);
     SCMException e = assertThrows(SCMException.class, () ->
-        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
+        submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
     assertEquals(SCMException.ResultCodes.SCM_NOT_LEADER, e.getResult());
   }
 
@@ -111,7 +111,7 @@ public class TestContainerExportManager {
   public void testRejectSubmitAfterShutdown() {
     exportManager.shutdown();
     IOException e = assertThrows(IOException.class, () ->
-        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
+        submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING));
     assertTrue(e.getMessage().contains("shut down"));
   }
 
@@ -140,11 +140,10 @@ public class TestContainerExportManager {
           return Collections.emptyList();
         });
 
-    ExportJob first = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING);
+    ExportJob first = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
     assertNotNull(first);
     IOException e = assertThrows(IOException.class, () ->
-        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
+        submit(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
     assertTrue(e.getMessage().contains("already running"));
   }
 
@@ -177,19 +176,19 @@ public class TestContainerExportManager {
           return Collections.emptyList();
         });
 
-    ExportJob first = exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob first = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
     assertTrue(archivingStarted.await(30, TimeUnit.SECONDS));
     assertFalse(exportManager.getExportStatus(first.getId()).isDone());
 
     IOException e = assertThrows(IOException.class, () ->
-        exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
+        submit(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
     assertTrue(e.getMessage().contains("already running"));
 
     releaseArchiving.countDown();
     ExportJob.Status status = waitForDone(first.getId());
     assertNull(status.getException());
     assertTrue(archiveFile(first).exists());
-    assertNotNull(exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
+    assertNotNull(submit(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY));
   }
 
   @Test
@@ -198,7 +197,7 @@ public class TestContainerExportManager {
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = exportManager.submitJob(null, null, ContainerHealthState.MISSING);
+    ExportJob job = submit(null, null, ContainerHealthState.MISSING);
     assertNotNull(job);
     waitForDone(job.getId());
 
@@ -215,8 +214,7 @@ public class TestContainerExportManager {
         eq(ContainerID.valueOf(7)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = exportManager.submitJob(ContainerID.valueOf(5), null,
-        ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(5), null, ContainerHealthState.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -236,7 +234,7 @@ public class TestContainerExportManager {
         eq(ContainerID.valueOf(2)), anyInt(), eq(LifeCycleState.OPEN), isNull()))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), LifeCycleState.OPEN, null);
+    ExportJob job = submit(ContainerID.valueOf(0), LifeCycleState.OPEN, null);
     assertNotNull(job);
     waitForDone(job.getId());
 
@@ -250,8 +248,7 @@ public class TestContainerExportManager {
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -272,8 +269,7 @@ public class TestContainerExportManager {
         eq(ContainerID.valueOf(5)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -302,8 +298,7 @@ public class TestContainerExportManager {
         eq(ContainerID.valueOf(8)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -319,7 +314,7 @@ public class TestContainerExportManager {
       extractGzTar(archive, extractDir);
       List<Path> parts;
       try (Stream<Path> stream = Files.list(extractDir)) {
-        parts = stream.sorted().collect(Collectors.toList());
+        parts = stream.sorted().toList();
       }
       assertEquals(3, parts.size());
       assertTrue(parts.get(0).getFileName().toString().endsWith("part001.txt"));
@@ -345,7 +340,7 @@ public class TestContainerExportManager {
   public void testLeadershipLostWhileArchivingLeavesNoArchive() throws Exception {
     ExportFileManager fileManager = new ExportFileManager(tempDir.getAbsolutePath());
     ExportJob job = new ExportJob(ExportScope.of(null, ContainerHealthState.MISSING),
-        ContainerID.valueOf(0), TEST_BATCH_SIZE, TEST_PART_SIZE);
+        ContainerID.valueOf(0), new ExportSizing(0, TEST_BATCH_SIZE, TEST_PART_SIZE, TEST_BATCH_SIZE, TEST_PART_SIZE));
     fileManager.createJobDirectory(job.getId());
     try (OutputStream out = fileManager.newPartOutputStream(job.getId(), job.partFileName(1))) {
       job.writeMetadataHeader(out, 1, ContainerID.valueOf(1));
@@ -382,7 +377,7 @@ public class TestContainerExportManager {
           return Collections.emptyList();
         });
 
-    ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
     assertTrue(workerBusy.await(30, TimeUnit.SECONDS));
 
     // Returns after the 5s timeout while the worker is still running.
@@ -418,12 +413,10 @@ public class TestContainerExportManager {
         eq(ContainerID.valueOf(11)), anyInt(), isNull(), eq(ContainerHealthState.EMPTY)))
         .thenReturn(Collections.emptyList());
 
-    ExportJob first = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING);
+    ExportJob first = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
     waitForDone(first.getId());
 
-    ExportJob second = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.EMPTY);
+    ExportJob second = submit(ContainerID.valueOf(0), null, ContainerHealthState.EMPTY);
     assertNotNull(second);
     ExportJob.Status status = waitForDone(second.getId());
     assertNull(status.getException());
@@ -443,8 +436,7 @@ public class TestContainerExportManager {
           return ids(1);
         });
 
-    ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -458,8 +450,7 @@ public class TestContainerExportManager {
         eq(ContainerID.valueOf(0)), anyInt(), isNull(), eq(ContainerHealthState.MISSING)))
         .thenThrow(new RuntimeException("container listing failed"));
 
-    ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
     assertNotNull(job);
 
     ExportJob.Status status = waitForDone(job.getId());
@@ -477,14 +468,18 @@ public class TestContainerExportManager {
           return Collections.emptyList();
         });
 
-    ExportJob job = exportManager.submitJob(ContainerID.valueOf(0), null,
-        ContainerHealthState.MISSING);
+    ExportJob job = submit(ContainerID.valueOf(0), null, ContainerHealthState.MISSING);
     assertNotNull(job);
 
     exportManager.shutdown();
     ExportJob.Status status = waitForDone(job.getId());
     assertNotNull(status.getException());
     exportManager = null;
+  }
+  
+  private ExportJob submit(ContainerID start, LifeCycleState lifeCycle, ContainerHealthState health)
+      throws IOException {
+    return exportManager.submitJob(start, lifeCycle, health, 0, 0, 0);
   }
 
   private File archiveFile(ExportJob job) {
