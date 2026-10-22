@@ -505,11 +505,9 @@ public class OzoneManagerServiceProviderImpl
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(
           ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-      // Do not wipe the candidate dir here. The shared RDBSnapshotProvider's
-      // checkLeaderConsistency() manages it on the next attempt: kept for the
-      // same leader (so a future batched/chunked transfer can resume the parts
-      // already received), reset on a leader change. It only holds fully
-      // extracted files, see ReconRDBSnapshotProvider#untarContentsOfTarball.
+      // Clear the candidate dir, as the OM follower does after a failed download, so a partly extracted file
+      // is never reported to the leader as already received on the next attempt.
+      reconSnapshotProvider.init();
       return null;
     }
   }
