@@ -36,7 +36,7 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,13 +48,13 @@ public class ScmTopologyClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(ScmTopologyClient.class);
 
-  private final ScmBlockLocationProtocol scmBlockLocationProtocol;
+  private final ScmBlockLocationInternalInterface scmBlockLocationProtocol;
   private final AtomicReference<NetworkTopology> cache =
       new AtomicReference<>();
   private ScheduledExecutorService executorService;
 
   public ScmTopologyClient(
-      ScmBlockLocationProtocol scmBlockLocationProtocol) {
+      ScmBlockLocationInternalInterface scmBlockLocationProtocol) {
     this.scmBlockLocationProtocol = scmBlockLocationProtocol;
   }
 

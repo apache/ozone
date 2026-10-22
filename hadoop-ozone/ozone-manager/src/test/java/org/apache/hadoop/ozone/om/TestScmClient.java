@@ -52,7 +52,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,7 +77,7 @@ public class TestScmClient {
 
   @BeforeEach
   public void setUp() {
-    ScmBlockLocationProtocol scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
+    ScmBlockLocationInternalInterface scmBlockLocationProtocol = mock(ScmBlockLocationInternalInterface.class);
     containerLocationProtocol = mock(StorageContainerLocationInternalInterface.class);
     OzoneConfiguration conf = new OzoneConfiguration();
     scmClient = new ScmClient(scmBlockLocationProtocol,
@@ -227,7 +227,7 @@ public class TestScmClient {
         mock(SCMFailoverProxyProviderBase.class);
     SCMFailoverProxyProviderBase<?> containerProvider =
         mock(SCMFailoverProxyProviderBase.class);
-    ScmClient client = new ScmClient(mock(ScmBlockLocationProtocol.class),
+    ScmClient client = new ScmClient(mock(ScmBlockLocationInternalInterface.class),
         mock(StorageContainerLocationInternalInterface.class), blockProvider,
         containerProvider, new OzoneConfiguration());
 

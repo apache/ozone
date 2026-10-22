@@ -50,7 +50,7 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -113,7 +113,7 @@ public class OMKeyRequestTests {
 
   protected ScmClient scmClient;
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
-  protected ScmBlockLocationProtocol scmBlockLocationProtocol;
+  protected ScmBlockLocationInternalInterface scmBlockLocationProtocol;
   protected StorageContainerLocationInternalInterface scmContainerLocationProtocol;
   protected OMPerformanceMetrics perfMetrics;
   protected DeletingServiceMetrics delMetrics;
@@ -173,7 +173,7 @@ public class OMKeyRequestTests {
 
     scmClient = mock(ScmClient.class);
     ozoneBlockTokenSecretManager = mock(OzoneBlockTokenSecretManager.class);
-    scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
+    scmBlockLocationProtocol = mock(ScmBlockLocationInternalInterface.class);
     perfMetrics = mock(OMPerformanceMetrics.class);
     keyManager = new KeyManagerImpl(ozoneManager, scmClient, ozoneConfiguration,
         perfMetrics);

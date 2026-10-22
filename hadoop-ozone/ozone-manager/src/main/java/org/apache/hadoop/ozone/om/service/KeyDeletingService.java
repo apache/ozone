@@ -47,7 +47,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
@@ -91,7 +91,7 @@ import org.slf4j.LoggerFactory;
 public class KeyDeletingService extends AbstractKeyDeletingService {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
-  private final ScmBlockLocationProtocol scmClient;
+  private final ScmBlockLocationInternalInterface scmClient;
 
   private int keyLimitPerTask;
   private final long scmFollowerLagThrottleThreshold;
@@ -108,7 +108,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   private final DeletionStats snapshotDeletionStats = new DeletionStats();
 
   public KeyDeletingService(OzoneManager ozoneManager,
-      ScmBlockLocationProtocol scmClient, long serviceInterval,
+      ScmBlockLocationInternalInterface scmClient, long serviceInterval,
       long serviceTimeout, ConfigurationSource conf, int keyDeletionCorePoolSize,
       boolean deepCleanSnapshots) {
     super(KeyDeletingService.class.getSimpleName(), serviceInterval,

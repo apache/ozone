@@ -206,7 +206,7 @@ import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
@@ -691,7 +691,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // verifies that the SCM info in the OM Version file is correct.
     final SCMBlockLocationFailoverProxyProvider scmBlockProxyProvider =
         new SCMBlockLocationFailoverProxyProvider(configuration);
-    final ScmBlockLocationProtocol scmBlockClient =
+    final ScmBlockLocationInternalInterface scmBlockClient =
         HAUtils.getScmBlockClient(configuration, scmBlockProxyProvider);
     scmTopologyClient = new ScmTopologyClient(scmBlockClient);
     this.scmClient = new ScmClient(scmBlockClient, scmContainerClient,

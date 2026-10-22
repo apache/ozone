@@ -97,7 +97,7 @@ import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslator
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
@@ -181,7 +181,7 @@ class TestSecureOzoneCluster extends KerberosTests {
   private File tempDir;
   private OzoneConfiguration conf;
   private StorageContainerManager scm;
-  private ScmBlockLocationProtocol scmBlockClient;
+  private ScmBlockLocationInternalInterface scmBlockClient;
   private OzoneManager om;
   private HddsProtos.OzoneManagerDetailsProto omInfo;
   private String clusterId;

@@ -109,7 +109,7 @@ import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SecretKeyProtocolFailoverProxyProvider;
@@ -640,7 +640,7 @@ public final class HddsServerUtil {
   /**
    * Create a scm block client, used by putKey() and getKey().
    *
-   * @return {@link ScmBlockLocationProtocol}
+   * @return {@link ScmBlockLocationInternalInterface}
    * @throws IOException
    */
   public static SCMSecurityProtocolClientSideTranslatorPB getScmSecurityClient(

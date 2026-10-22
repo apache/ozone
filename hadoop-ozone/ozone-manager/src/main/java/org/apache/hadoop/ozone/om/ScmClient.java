@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMFailoverProxyProviderBase;
 import org.apache.hadoop.ozone.util.CacheMetrics;
@@ -55,7 +55,7 @@ import org.apache.hadoop.ozone.util.CacheMetrics;
  */
 public class ScmClient {
 
-  private final ScmBlockLocationProtocol blockClient;
+  private final ScmBlockLocationInternalInterface blockClient;
   private final StorageContainerLocationInternalInterface containerClient;
   private final SCMFailoverProxyProviderBase<?> blockProxyProvider;
   private final SCMFailoverProxyProviderBase<?> containerProxyProvider;
@@ -63,13 +63,13 @@ public class ScmClient {
   private final CacheMetrics containerCacheMetrics;
   private final CacheMetrics datanodeDetailsCacheMetrics;
 
-  ScmClient(ScmBlockLocationProtocol blockClient,
+  ScmClient(ScmBlockLocationInternalInterface blockClient,
             StorageContainerLocationInternalInterface containerClient,
             OzoneConfiguration configuration) {
     this(blockClient, containerClient, null, null, configuration);
   }
 
-  ScmClient(ScmBlockLocationProtocol blockClient,
+  ScmClient(ScmBlockLocationInternalInterface blockClient,
             StorageContainerLocationInternalInterface containerClient,
             SCMFailoverProxyProviderBase<?> blockProxyProvider,
             SCMFailoverProxyProviderBase<?> containerProxyProvider,
@@ -184,7 +184,7 @@ public class ScmClient {
     return containerProxyProvider;
   }
 
-  public ScmBlockLocationProtocol getBlockClient() {
+  public ScmBlockLocationInternalInterface getBlockClient() {
     return this.blockClient;
   }
 

@@ -64,7 +64,7 @@ import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.Node;
 import org.apache.hadoop.hdds.scm.net.NodeImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolPB;
@@ -97,7 +97,7 @@ import org.slf4j.LoggerFactory;
  * blocks from the SCM.
  */
 public class SCMBlockProtocolServer implements
-    ScmBlockLocationProtocol, Auditor {
+    ScmBlockLocationInternalInterface, Auditor {
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMBlockProtocolServer.class);
 

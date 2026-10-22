@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
-import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -50,7 +50,7 @@ public final class OmTestManagers {
   private final VolumeManager volumeManager;
   private final BucketManager bucketManager;
   private final PrefixManager prefixManager;
-  private final ScmBlockLocationProtocol scmBlockClient;
+  private final ScmBlockLocationInternalInterface scmBlockClient;
   private final OzoneClient rpcClient;
 
   public OzoneManager getOzoneManager() {
@@ -81,7 +81,7 @@ public final class OmTestManagers {
     return keyManager;
   }
 
-  public ScmBlockLocationProtocol getScmBlockClient() {
+  public ScmBlockLocationInternalInterface getScmBlockClient() {
     return scmBlockClient;
   }
 
@@ -95,7 +95,7 @@ public final class OmTestManagers {
   }
 
   public OmTestManagers(OzoneConfiguration conf,
-                        ScmBlockLocationProtocol blockClient,
+                        ScmBlockLocationInternalInterface blockClient,
                         StorageContainerLocationInternalInterface containerClient)
       throws AuthenticationException, IOException, InterruptedException, TimeoutException {
     if (containerClient == null) {
