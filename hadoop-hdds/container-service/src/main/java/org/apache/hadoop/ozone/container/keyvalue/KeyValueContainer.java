@@ -480,11 +480,18 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   }
 
   /**
-   *
+   * Applies {@code update} to the in-memory container data and persists it to the .container file.
    * Must be invoked with the writeLock held.
+   * <p>
+   * The rollback only covers a failed write of the .container file: {@code update} is a {@link Runnable}, so it
+   * cannot throw a {@link StorageContainerException}, and only {@code updateContainerFile} can. When the write
+   * fails, the in-memory change has already been applied, so the previous state is restored to match the file on
+   * disk, unless the container became UNHEALTHY in the meantime. Leaving OPEN releases the space reserved for the
+   * container, and restoring OPEN does not reserve it again, so the reservation
+   * is restored explicitly.
    *
-   * @param update
-   * @throws StorageContainerException
+   * @param update the change to apply to the in-memory container data
+   * @throws StorageContainerException if the .container file cannot be written
    */
   private void updateContainerData(Runnable update)
       throws StorageContainerException {
