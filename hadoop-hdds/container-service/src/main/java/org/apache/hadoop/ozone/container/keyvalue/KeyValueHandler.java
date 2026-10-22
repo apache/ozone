@@ -511,10 +511,13 @@ public class KeyValueHandler extends Handler {
         LOG.debug("Container already exists. container Id {}", containerID);
       }
     } catch (StorageContainerException ex) {
-      newContainerData.releaseCommitSpace();
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } finally {
       containerIdLock.unlock();
+      if (!created) {
+        // Release the space reserved when the volume was chosen, also on unchecked exceptions.
+        newContainerData.releaseCommitSpace();
+      }
     }
 
     if (created) {
