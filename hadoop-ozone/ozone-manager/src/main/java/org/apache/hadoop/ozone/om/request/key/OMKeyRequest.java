@@ -156,7 +156,9 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected KeyArgs resolveBucketAndCheckKeyAcls(KeyArgs keyArgs,
       OzoneManager ozoneManager, IAccessAuthorizer.ACLType aclType)
       throws IOException {
-    toOzoneAcls(keyArgs.getAclsList());
+    if (!ozoneManager.getConfig().ignoreClientACLs()) {
+      toOzoneAcls(keyArgs.getAclsList());
+    }
     KeyArgs resolvedArgs = resolveBucketLink(ozoneManager, keyArgs);
     // check Acl
     checkKeyAcls(ozoneManager, resolvedArgs.getVolumeName(),

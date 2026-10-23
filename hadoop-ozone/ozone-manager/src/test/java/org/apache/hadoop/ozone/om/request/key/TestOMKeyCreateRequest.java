@@ -642,14 +642,23 @@ public class TestOMKeyCreateRequest extends OMKeyRequestTests {
     }
   }
 
-  @Test
-  public void testRejectInvalidAcl() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testInvalidAcl(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
     when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(false, false));
     addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
 
     for (OzoneAclInfo acl : OMRequestTestUtils.invalidAcls()) {
       OMRequest.Builder request = createKeyRequest(false, 0).toBuilder();
       request.getCreateKeyRequestBuilder().getKeyArgsBuilder().addAcls(acl);
+      if (ignoreClientACLs) {
+        OMRequest modifiedRequest = doPreExecute(request.build());
+        OMClientResponse response =
+            getOMKeyCreateRequest(modifiedRequest).validateAndUpdateCache(ozoneManager, 100L);
+        assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+        continue;
+      }
       OMException e = assertThrows(OMException.class,
           () -> getOMKeyCreateRequest(request.build()).preExecute(ozoneManager));
       assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
