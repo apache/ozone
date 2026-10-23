@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.states.datanode;
 
 import static org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates.SHUTDOWN;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -30,11 +31,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
@@ -47,6 +50,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManage
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.util.Time;
@@ -104,6 +108,38 @@ public class TestRunningDatanodeState {
     assertThat(endTime - startTime).isLessThan(500);
 
     executorService.shutdown();
+  }
+
+  @Test
+  void testPassiveEndpointUsesReconHeartbeatFrequency() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    StateContext context = mock(StateContext.class);
+    DatanodeStateMachine datanode = mock(DatanodeStateMachine.class);
+    when(context.getParent()).thenReturn(datanode);
+    when(datanode.getVersionManager()).thenReturn(mock(DatanodeVersionManager.class));
+    when(context.getHeartbeatFrequency()).thenReturn(1000L);
+    when(context.getReconHeartbeatFrequency()).thenReturn(100L);
+
+    EndpointStateMachine endpoint = mock(EndpointStateMachine.class);
+    when(endpoint.getState()).thenReturn(EndPointStates.HEARTBEAT);
+    when(endpoint.isPassive()).thenReturn(true);
+    ExecutorService endpointExecutor = mock(ExecutorService.class);
+    when(endpoint.getExecutorService()).thenReturn(endpointExecutor);
+    Future<EndPointStates> endpointFuture = mock(Future.class);
+    when(endpointExecutor.submit(any(Callable.class))).thenReturn(endpointFuture);
+    when(endpointFuture.get(100L, TimeUnit.MILLISECONDS)).thenReturn(EndPointStates.HEARTBEAT);
+
+    SCMConnectionManager connectionManager = mock(SCMConnectionManager.class);
+    when(connectionManager.getValues()).thenReturn(Collections.singletonList(endpoint));
+    RunningDatanodeState state = new RunningDatanodeState(conf, connectionManager, context);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      state.execute(executor);
+      assertThat(state.await(1, TimeUnit.SECONDS)).isEqualTo(DatanodeStates.RUNNING);
+      verify(endpointFuture).get(100L, TimeUnit.MILLISECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @ParameterizedTest
