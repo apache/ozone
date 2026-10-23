@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -94,9 +95,9 @@ public class StaleRecoveringContainerScrubbingService
         con.writeLock();
         try {
           // The container may have left RECOVERING after this task was scheduled.
-          if (con.getContainerState() != RECOVERING) {
-            LOG.debug("Skipping stale recovering scrub for container {} - state is {}",
-                containerID, con.getContainerState());
+          State state = con.getContainerState();
+          if (state != RECOVERING) {
+            LOG.debug("Skipping stale recovering scrub for container {} - state is {}", containerID, state);
             return new BackgroundTaskResult.EmptyTaskResult();
           }
           con.markContainerUnhealthy();
