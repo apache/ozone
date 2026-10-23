@@ -60,7 +60,7 @@ import org.apache.hadoop.hdds.scm.server.SCMClientProtocolServer;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ozone.DataTestUtil;
+import org.apache.hadoop.ozone.DataTestServerUtil;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -124,7 +124,7 @@ public class TestScmSafeMode {
 
   @Test
   void testSafeModeOperations() throws Exception {
-    DataTestUtil.createKeys(cluster, 100);
+    DataTestServerUtil.createKeys(cluster, 100);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000);
@@ -204,7 +204,7 @@ public class TestScmSafeMode {
     cluster = builder.build();
     cluster.waitForClusterToBeReady();
     final StorageContainerManager scm = cluster.getStorageContainerManager();
-    DataTestUtil.createKeys(cluster, 100);
+    DataTestServerUtil.createKeys(cluster, 100);
     GenericTestUtils.waitFor(() -> scm.getContainerManager().getContainers().size() >= 3,
         100, 1000 * 30);
 
@@ -233,7 +233,7 @@ public class TestScmSafeMode {
     assertFalse(cluster.getStorageContainerManager().isInSafeMode());
 
     // Test2: Test safe mode  when containers are there in system.
-    DataTestUtil.createKeys(cluster, 100 * 2);
+    DataTestServerUtil.createKeys(cluster, 100 * 2);
     final List<ContainerInfo> containers = cluster
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000 * 30);
@@ -304,7 +304,7 @@ public class TestScmSafeMode {
     cluster.waitTobeOutOfSafeMode();
     assertFalse(scm.isInSafeMode());
 
-    DataTestUtil.createKeys(cluster, 10);
+    DataTestServerUtil.createKeys(cluster, 10);
     SCMClientProtocolServer clientProtocolServer = cluster
         .getStorageContainerManager().getClientProtocolServer();
     assertFalse((scm.getClientProtocolServer()).getSafeModeStatus());

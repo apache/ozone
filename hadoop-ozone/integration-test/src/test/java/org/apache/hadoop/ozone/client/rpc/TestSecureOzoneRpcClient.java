@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.client.rpc;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
-import static org.apache.hadoop.ozone.DataTestUtil.cleanupDeletedTable;
+import static org.apache.hadoop.ozone.DataTestServerUtil.cleanupDeletedTable;
 import static org.apache.hadoop.ozone.OzoneConsts.FORCE_LEASE_RECOVERY_ENV;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;

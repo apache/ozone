@@ -35,7 +35,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.ozone.DataTestUtil;
+import org.apache.hadoop.ozone.DataTestServerUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -137,7 +137,7 @@ public abstract class TestSCMContainerManagerMetrics implements NonHATests.TestC
     OzoneTestUtils.closeAllContainers(scm.getEventQueue(), scm);
 
     // Create key should create container on DN.
-    DataTestUtil.createKeys(cluster(), 1);
+    DataTestServerUtil.createKeys(cluster(), 1);
 
     GenericTestUtils.waitFor(() -> {
       final MetricsRecordBuilder scmMetrics =

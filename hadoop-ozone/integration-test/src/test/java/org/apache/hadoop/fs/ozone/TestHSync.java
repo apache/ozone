@@ -19,8 +19,8 @@ package org.apache.hadoop.fs.ozone;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
-import static org.apache.hadoop.ozone.DataTestUtil.cleanupDeletedTable;
-import static org.apache.hadoop.ozone.DataTestUtil.cleanupOpenKeyTable;
+import static org.apache.hadoop.ozone.DataTestServerUtil.cleanupDeletedTable;
+import static org.apache.hadoop.ozone.DataTestServerUtil.cleanupOpenKeyTable;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED;
