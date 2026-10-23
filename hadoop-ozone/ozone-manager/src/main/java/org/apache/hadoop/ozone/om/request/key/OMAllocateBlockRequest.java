@@ -28,7 +28,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -95,7 +97,7 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
         : ExcludeList.getFromProtoBuf(allocateBlockRequest.getExcludeList());
 
     // TODO: Here we are allocating block with out any check for key exist in
-    //  open table or not and also with out any authorization checks.
+    //  open table or not when the request carries a storage policy.
     //  Assumption here is that allocateBlocks with out openKey will be less.
     //  There is a chance some one can misuse this api to flood allocateBlock
     //  calls. But currently allocateBlock is internally called from
@@ -105,14 +107,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     UserInfo userInfo = getUserIfNotExists(ozoneManager);
     ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
         keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
-    // To allocate atleast one block passing requested size and scmBlockSize
-    // as same value. When allocating block requested size is same as
-    // scmBlockSize.
     final OmBucketInfo bucketInfo = ozoneManager
         .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
-    final List<OmKeyLocationInfo> omKeyLocationInfoList = allocateBlock(repConfig, excludeList,
-        ozoneManager.getScmBlockSize(), keyArgs.getSortDatanodes(), userInfo, ozoneManager,
-        getStoragePolicy(bucketInfo, keyArgs), getAllowFallbackStoragePolicy(bucketInfo));
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =
@@ -121,6 +117,16 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     KeyArgs resolvedKeyArgs =
         resolveBucketAndCheckOpenKeyAcls(newKeyArgs.build(), ozoneManager,
             ACLType.WRITE, allocateBlockRequest.getClientID());
+
+    final StoragePolicy storagePolicy = resolveStoragePolicy(ozoneManager, bucketInfo, resolvedKeyArgs,
+        allocateBlockRequest.getClientID());
+
+    // To allocate atleast one block passing requested size and scmBlockSize
+    // as same value. When allocating block requested size is same as
+    // scmBlockSize.
+    final List<OmKeyLocationInfo> omKeyLocationInfoList = allocateBlock(repConfig, excludeList,
+        ozoneManager.getScmBlockSize(), keyArgs.getSortDatanodes(), userInfo, ozoneManager,
+        storagePolicy, getAllowFallbackStoragePolicy(bucketInfo));
 
     AllocateBlockRequest.Builder newAllocatedBlockRequest =
         AllocateBlockRequest.newBuilder()
@@ -139,6 +145,32 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     return getOmRequest().toBuilder().setUserInfo(userInfo)
         .setAllocateBlockRequest(newAllocatedBlockRequest).build();
 
+  }
+
+  /**
+   * Picks the storage policy for the block: the one sent by the client, else the one stored on the open key, else
+   * the bucket policy, else the default policy.
+   */
+  private StoragePolicy resolveStoragePolicy(OzoneManager ozoneManager, OmBucketInfo bucketInfo,
+      KeyArgs resolvedKeyArgs, long clientID) throws IOException {
+    if (resolvedKeyArgs.hasStoragePolicy()) {
+      return OzoneStoragePolicy.fromProto(resolvedKeyArgs.getStoragePolicy());
+    }
+    // The client did not send the policy back (older client, or the key was opened without one). Use the policy
+    // stored on the open key, so the bucket policy changing in the meantime does not move the next block to
+    // another tier.
+    final OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    final String openKeyName = getOpenKeyName(resolvedKeyArgs.getVolumeName(), resolvedKeyArgs.getBucketName(),
+        resolvedKeyArgs.getKeyName(), clientID, omMetadataManager);
+    final OmKeyInfo openKeyInfo = getOpenKeyInfo(omMetadataManager, openKeyName, resolvedKeyArgs.getKeyName());
+    if (openKeyInfo == null) {
+      throw new OMException("Open Key not found " + openKeyName, KEY_NOT_FOUND);
+    }
+    if (openKeyInfo.getStoragePolicy() != null) {
+      return openKeyInfo.getStoragePolicy();
+    }
+    // The key was opened before storage policy support was finalized and has no policy.
+    return getStoragePolicy(bucketInfo, resolvedKeyArgs);
   }
 
   @Override
