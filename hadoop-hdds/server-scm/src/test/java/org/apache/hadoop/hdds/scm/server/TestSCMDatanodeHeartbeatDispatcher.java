@@ -147,7 +147,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
   public void testVersionReportProcessedOnlyWhenPresent() throws IOException, NodeNotFoundException {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.isNodeRegistered(any())).thenReturn(true);
-    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceStale());
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
 
     SCMDatanodeHeartbeatDispatcher dispatcher =
         new SCMDatanodeHeartbeatDispatcher(mockNodeManager, mock(EventPublisher.class));
@@ -215,7 +215,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     verify(mockNodeManager, times(1)).addDatanodeCommand(any(DatanodeID.class), any(ReregisterCommand.class));
     verify(mockNodeManager, never()).processHeartbeat(any(), any());
   }
-  
+
   /**
    * Asserts scm informs datanodes to re-register on a restart.
    *
