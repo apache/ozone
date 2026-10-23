@@ -1646,11 +1646,44 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testSubmitInProgressResubmitsFsoOrdered()
+  public void testSubmitInProgressDoesNotResubmitFsoOrdered()
+      throws IOException {
+    String existingJobId = UUID.randomUUID().toString();
+    SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
+    SnapshotDiffJob existing = new SnapshotDiffJob(0L, existingJobId,
+        IN_PROGRESS, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
+        false, false, 0L, null, 0.0, null);
+    SnapshotDiffManager optimizedManager = newSnapshotDiffManagerWithOptimizedEnabled(true);
+    optimizedManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
+
+    SnapshotDiffManager spy = spy(optimizedManager);
+    doReturn(FILE_SYSTEM_OPTIMIZED).when(spy).getBucketLayout(anyString(), anyString(), any());
+
+    SubmitSnapshotDiffResponse response = spy.submitSnapshotDiff(ctx.volumeName, ctx.bucketName,
+        ctx.fromSnapshotName, ctx.toSnapshotName, false, false, true);
+    assertThat(response.getResponse())
+        .contains("Status: IN_PROGRESS")
+        .contains("Please get the report using --get-report option")
+        .doesNotContain("unordered report")
+        .doesNotContain("ordered report");
+
+    SnapshotDiffJob updated = spy.getSnapDiffJobTable().get(ctx.diffJobKey);
+    assertNotNull(updated);
+    assertEquals(existingJobId, updated.getJobId());
+    assertFalse(updated.isOrderedReport());
+    assertEquals(IN_PROGRESS, updated.getStatus());
+
+    verify(spy, never()).generateSnapshotDiffReport(anyString(), anyString(),
+        anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyBoolean(),
+        anyBoolean());
+  }
+
+  @Test
+  public void testSubmitQueuedResubmitsFsoOrdered()
       throws Exception {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
-        IN_PROGRESS, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
+        QUEUED, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
         false, false, 0L, null, 0.0, null);
     SnapshotDiffManager optimizedManager = newSnapshotDiffManagerWithOptimizedEnabled(true);
     optimizedManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
@@ -1669,6 +1702,7 @@ public class TestSnapshotDiffManager {
     SnapshotDiffJob updated = spy.getSnapDiffJobTable().get(ctx.diffJobKey);
     assertNotNull(updated);
     assertTrue(updated.isOrderedReport());
+    assertEquals(IN_PROGRESS, updated.getStatus());
     attempt(() -> verify(spy, atLeast(1)).generateSnapshotDiffReport(eq(ctx.diffJobKey),
             anyString(), eq(ctx.volumeName), eq(ctx.bucketName), eq(ctx.fromSnapshotName),
             eq(ctx.toSnapshotName), eq(false), eq(false), eq(true)),

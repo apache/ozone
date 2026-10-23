@@ -701,7 +701,7 @@ public class SnapshotDiffManager implements AutoCloseable, SnapshotDiffManagerMX
     if (prevStatus == FAILED || prevStatus == REJECTED || prevStatus == CANCELLED) {
       createNewJob = true;
       submitJob = true;
-    } else if ((prevStatus == QUEUED || prevStatus == IN_PROGRESS || prevStatus == DONE) &&
+    } else if ((prevStatus == QUEUED || prevStatus == DONE) &&
         isFso && effectiveOrderedReport && !snapDiffJob.isOrderedReport()) {
       createNewJob = true;
       submitJob = true;
