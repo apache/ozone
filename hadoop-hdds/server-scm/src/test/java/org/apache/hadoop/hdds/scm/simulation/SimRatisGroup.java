@@ -18,9 +18,11 @@
 package org.apache.hadoop.hdds.scm.simulation;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -33,7 +35,8 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
  * Members join when they handle CreatePipelineCommand and leave when they handle ClosePipelineCommand. A leader is
  * elected among running members once a majority of the group is up. Client writes and container closes are committed
  * only with a leader and a majority, and are applied to every running member; a member that was down catches up from
- * the committed state when a leader exists again, as log replay would do.
+ * the committed state when a leader exists again, as log replay would do. Only the entries it has not applied yet:
+ * a replica deleted after it applied them does not come back.
  */
 final class SimRatisGroup {
 
@@ -43,6 +46,8 @@ final class SimRatisGroup {
   private final List<Integer> priorities;
   private final Set<DatanodeID> joined = new LinkedHashSet<>();
   private final Map<Long, Committed> committed = new TreeMap<>();
+  /** Index of the last log entry each member applied. */
+  private final Map<DatanodeID, Long> applied = new HashMap<>();
   private DatanodeID leader;
   private SimScheduler.Timer election;
   private long logIndex;
@@ -102,25 +107,30 @@ final class SimRatisGroup {
   }
 
   /**
-   * Commits a client write of the given container.
-   * @return false if the group cannot commit, or the container is not open.
+   * Commits a client write of new blocks to the given container.
+   * @return the local IDs of the new blocks, or null if the group cannot commit or the container is not open.
    */
-  boolean write(long containerId, long bytes, long keys) {
+  List<Long> write(long containerId, long bytes, int blockCount) {
     if (!hasQuorum()) {
-      return false;
+      return null;
     }
     SimReplica leaderReplica = sim.datanode(leader).getReplica(containerId);
     if (leaderReplica != null && leaderReplica.getState() != State.OPEN) {
-      return false;
+      return null;
     }
     Committed c = committed.computeIfAbsent(containerId, k -> new Committed());
     c.bcsid = ++logIndex;
-    c.used += bytes;
-    c.keys += keys;
-    for (SimDatanode dn : runningJoined()) {
-      dn.applyCommitted(id, containerId, c.bcsid, c.used, c.keys, false);
+    c.lastIndex = logIndex;
+    List<Long> written = new ArrayList<>();
+    for (int i = 0; i < blockCount; i++) {
+      c.blocks.put(++c.lastLocalId, bytes / blockCount);
+      written.add(c.lastLocalId);
     }
-    return true;
+    for (SimDatanode dn : runningJoined()) {
+      dn.applyCommitted(id, containerId, c.bcsid, c.blocks, false);
+      applied.put(dn.getId(), logIndex);
+    }
+    return written;
   }
 
   /** Commits a close of the container, when the leader handles the close command. */
@@ -133,8 +143,10 @@ final class SimRatisGroup {
       return c != null;
     }
     c.closed = true;
+    c.lastIndex = ++logIndex;
     for (SimDatanode dn : runningJoined()) {
-      dn.applyCommitted(id, containerId, c.bcsid, c.used, c.keys, true);
+      dn.applyCommitted(id, containerId, c.bcsid, c.blocks, true);
+      applied.put(dn.getId(), logIndex);
     }
     return true;
   }
@@ -144,10 +156,22 @@ final class SimRatisGroup {
   }
 
   private void catchUp(SimDatanode dn) {
+    long appliedIndex = applied.getOrDefault(dn.getId(), 0L);
     for (Map.Entry<Long, Committed> e : committed.entrySet()) {
       Committed c = e.getValue();
-      dn.applyCommitted(id, e.getKey(), c.bcsid, c.used, c.keys, c.closed);
+      if (c.lastIndex > appliedIndex) {
+        sim.record("ratis.catchUp", dn.getName() + " #" + e.getKey() + " " + sim.describe(id) + " from index "
+            + appliedIndex + " to " + c.lastIndex);
+        SimReplica before = dn.getReplica(e.getKey());
+        long blocksBefore = before == null ? -1 : before.getKeys();
+        dn.applyCommitted(id, e.getKey(), c.bcsid, c.blocks, c.closed);
+        SimReplica after = dn.getReplica(e.getKey());
+        if (after != null && after.getKeys() != blocksBefore) {
+          sim.replicaCaughtUp(dn, after);
+        }
+      }
     }
+    applied.put(dn.getId(), logIndex);
   }
 
   private List<SimDatanode> runningJoined() {
@@ -198,8 +222,11 @@ final class SimRatisGroup {
   /** State committed through the group for one container. */
   private static final class Committed {
     private long bcsid;
-    private long used;
-    private long keys;
+    /** Every block written to the container: local ID to bytes. */
+    private final NavigableMap<Long, Long> blocks = new TreeMap<>();
+    private long lastLocalId;
     private boolean closed;
+    /** Index of the last log entry for the container: its last write, or its close. */
+    private long lastIndex;
   }
 }

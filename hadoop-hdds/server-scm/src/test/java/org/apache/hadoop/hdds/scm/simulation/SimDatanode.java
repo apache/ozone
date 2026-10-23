@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.simulation;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -25,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
@@ -34,11 +36,16 @@ import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.IncrementalContainerReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReport;
@@ -52,7 +59,10 @@ import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
+import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
@@ -94,18 +104,14 @@ final class SimDatanode {
   private final DatanodeDetails details;
   private final TreeMap<Long, SimReplica> replicas = new TreeMap<>();
   private final Set<PipelineID> pipelines = new LinkedHashSet<>();
-  private final List<ContainerReplicaProto> pendingIcrs = new ArrayList<>();
-  private final Map<Long, ContainerAction> pendingContainerActions = new LinkedHashMap<>();
+  /** One connection per SCM, in SCM order. */
+  private final Map<SimScm, Endpoint> endpoints = new LinkedHashMap<>();
   private final Map<SCMCommandProto.Type, Integer> queuedCommands = new EnumMap<>(SCMCommandProto.Type.class);
   private final List<SimScheduler.Timer> timers = new ArrayList<>();
   private final Map<String, SimScheduler.Timer> reportTimers = new HashMap<>();
   private final SimScheduler.WakeUp heartbeatNow;
   private boolean running;
   private boolean partitioned;
-  private boolean registered;
-  private boolean containerReportDue;
-  private boolean pipelineReportDue;
-  private boolean nodeReportDue;
   private long generation;
   private long latestTerm;
   private NodeOperationalState persistedOpState = NodeOperationalState.IN_SERVICE;
@@ -167,15 +173,26 @@ final class SimDatanode {
     }
     running = true;
     generation++;
-    registered = false;
+    endpoints().forEach(endpoint -> endpoint.registered = false);
+    for (SimReplica replica : replicas.values()) {
+      if (replica.isRecovering()) {
+        // ContainerReader marks a RECOVERING EC replica UNHEALTHY when the datanode starts.
+        replica.endRecovering(State.UNHEALTHY);
+      }
+      replica.markEmptyIfNoBlocks();
+    }
     SimConfig config = sim.config();
     Random random = sim.random(SimRandom.DATANODE);
     timers.add(sim.scheduler().scheduleEvery(name + ".heartbeat",
         random.nextInt((int) config.getHeartbeatIntervalMs()), config.getHeartbeatIntervalMs(), this::heartbeat));
-    timers.add(sim.scheduler().scheduleEvery(name + ".nodeReport",
-        config.getNodeReportIntervalMs(), config.getNodeReportIntervalMs(), () -> nodeReportDue = true));
-    scheduleReport("containerReport", config.getContainerReportIntervalMs(), () -> containerReportDue = true);
-    scheduleReport("pipelineReport", config.getPipelineReportIntervalMs(), () -> pipelineReportDue = true);
+    timers.add(sim.scheduler().scheduleEvery(name + ".nodeReport", config.getNodeReportIntervalMs(),
+        config.getNodeReportIntervalMs(), () -> endpoints().forEach(endpoint -> endpoint.nodeReportDue = true)));
+    scheduleReport("containerReport", config.getContainerReportIntervalMs(),
+        () -> endpoints().forEach(endpoint -> endpoint.containerReportDue = true));
+    scheduleReport("pipelineReport", config.getPipelineReportIntervalMs(),
+        () -> endpoints().forEach(endpoint -> endpoint.pipelineReportDue = true));
+    scheduleReport("commandStatusReport", config.getCommandStatusReportIntervalMs(),
+        () -> endpoints().forEach(endpoint -> endpoint.commandStatusReportDue = true));
     for (PipelineID id : pipelines) {
       sim.ratisGroup(id).memberUp(this);
     }
@@ -194,23 +211,26 @@ final class SimDatanode {
     reportTimers.clear();
     heartbeatNow.cancel();
     queuedCommands.clear();
-    pendingIcrs.clear();
-    pendingContainerActions.clear();
+    endpoints().forEach(Endpoint::clear);
     for (PipelineID id : pipelines) {
       sim.ratisGroup(id).memberDown(this);
     }
   }
 
-  /** Restarts the process with different ports, like after a configuration change or an upgrade. */
-  void restartWithNewPorts() {
+  /**
+   * Restarts the process with different ports, like after a configuration change or an upgrade.
+   * @param lostWhileDown replicas on a disk that fails while the process is down
+   */
+  void restartWithNewPorts(List<Long> lostWhileDown) {
     stop();
+    lostWhileDown.forEach(replicas::remove);
     for (Port.Name port : new Port.Name[] {Port.Name.STANDALONE, Port.Name.RATIS}) {
       details.setPort(port, details.getPort(port).getValue() + 1);
     }
     start();
   }
 
-  /** Cuts (or restores) the network between this datanode and SCM. */
+  /** Cuts (or restores) the network between this datanode and the SCMs. */
   void setPartitioned(boolean value) {
     partitioned = value;
   }
@@ -220,7 +240,7 @@ final class SimDatanode {
     for (Long id : containerIds) {
       replicas.remove(id);
     }
-    containerReportDue = true;
+    endpoints().forEach(endpoint -> endpoint.containerReportDue = true);
     triggerHeartbeat();
   }
 
@@ -236,10 +256,11 @@ final class SimDatanode {
   // ---- data path ----
 
   /** Applies state committed through the Ratis group of a pipeline, creating the replica if needed. */
-  void applyCommitted(PipelineID pipelineId, long containerId, long bcsid, long used, long keys, boolean closed) {
+  void applyCommitted(PipelineID pipelineId, long containerId, long bcsid, NavigableMap<Long, Long> blocks,
+      boolean closed) {
     SimReplica replica = replicas.get(containerId);
     if (replica == null) {
-      replica = new SimReplica(containerId, getId().toString(), 0, pipelineId, false, State.OPEN);
+      replica = new SimReplica(containerId, getId().toString(), 0, pipelineId, State.OPEN);
       replicas.put(containerId, replica);
       queueIcr(replica.toProto());
     }
@@ -247,27 +268,53 @@ final class SimDatanode {
     if (state != State.OPEN && state != State.CLOSING) {
       return;
     }
-    replica.setData(bcsid, used, keys);
+    replica.applyWrites(bcsid, blocks);
     if (closed) {
       replica.setState(State.CLOSED);
       queueIcr(replica.toProto());
-    } else if (state == State.OPEN && used >= sim.config().getContainerCloseThresholdBytes()) {
+    } else if (state == State.OPEN && replica.getUsed() >= sim.config().getContainerCloseThresholdBytes()) {
+      addContainerAction(containerId, ContainerAction.Reason.CONTAINER_FULL);
+    }
+  }
+
+  /** Whether an EC client could write to this datanode's replica of the container now. */
+  boolean canTakeEcWrite(long containerId, int replicaIndex) {
+    SimReplica replica = replicas.get(containerId);
+    return running && (replica == null
+        || replica.getState() == State.OPEN && replica.getReplicaIndex() == replicaIndex && !replica.isRecovering());
+  }
+
+  /** Applies an EC client write to this datanode's index of the block group, creating the replica if needed. */
+  void applyEcWrite(PipelineID pipelineId, long containerId, int replicaIndex, long bcsid,
+      NavigableMap<Long, Long> blocks) {
+    SimReplica replica = replicas.get(containerId);
+    if (replica == null) {
+      replica = new SimReplica(containerId, getId().toString(), replicaIndex, pipelineId, State.OPEN);
+      replicas.put(containerId, replica);
+      queueIcr(replica.toProto());
+    }
+    replica.applyWrites(bcsid, blocks);
+    if (replica.getUsed() >= sim.config().getContainerCloseThresholdBytes()) {
       addContainerAction(containerId, ContainerAction.Reason.CONTAINER_FULL);
     }
   }
 
   void onBecomeLeader(PipelineID id) {
-    pipelineReportDue = true;
+    endpoints().forEach(endpoint -> endpoint.pipelineReportDue = true);
     triggerHeartbeat();
   }
 
   private void addContainerAction(long containerId, ContainerAction.Reason reason) {
-    if (!pendingContainerActions.containsKey(containerId)) {
-      pendingContainerActions.put(containerId, ContainerAction.newBuilder()
-          .setContainerID(containerId)
-          .setAction(ContainerAction.Action.CLOSE)
-          .setReason(reason)
-          .build());
+    ContainerAction action = ContainerAction.newBuilder()
+        .setContainerID(containerId)
+        .setAction(ContainerAction.Action.CLOSE)
+        .setReason(reason)
+        .build();
+    boolean added = false;
+    for (Endpoint endpoint : endpoints()) {
+      added |= endpoint.containerActions.putIfAbsent(containerId, action) == null;
+    }
+    if (added) {
       triggerHeartbeat();
     }
   }
@@ -287,7 +334,7 @@ final class SimDatanode {
     if (!running) {
       return;
     }
-    pendingIcrs.add(report);
+    endpoints().forEach(endpoint -> endpoint.icrs.add(report));
     triggerHeartbeat();
   }
 
@@ -298,75 +345,105 @@ final class SimDatanode {
     }
   }
 
+  /** Heartbeats to every SCM, like the endpoint tasks of the datanode state machine. */
   private void heartbeat() {
-    if (!running) {
-      return;
+    for (Endpoint endpoint : endpoints()) {
+      if (!running) {
+        return;
+      }
+      if (endpoint.registered) {
+        heartbeat(endpoint);
+      } else {
+        register(endpoint);
+      }
     }
-    if (!registered) {
-      register();
-      return;
-    }
+  }
+
+  private void heartbeat(Endpoint endpoint) {
     SCMHeartbeatRequestProto.Builder hb = SCMHeartbeatRequestProto.newBuilder()
         .setDatanodeDetails(currentDetails().getProtoBufMessage())
         .setDatanodeVersion(UpgradeUtils.defaultVersionProto())
         .setCommandQueueReport(commandQueueReport());
-    if (nodeReportDue) {
+    if (endpoint.nodeReportDue) {
       hb.setNodeReport(nodeReport());
-      nodeReportDue = false;
+      endpoint.nodeReportDue = false;
     }
-    if (containerReportDue) {
+    List<ContainerReplicaProto> discardedIcrs = new ArrayList<>();
+    if (endpoint.containerReportDue) {
       // Building a full report drops the pending incremental reports.
       hb.setContainerReport(containerReport());
-      containerReportDue = false;
-      pendingIcrs.clear();
+      endpoint.containerReportDue = false;
+      discardedIcrs.addAll(endpoint.icrs);
+      endpoint.icrs.clear();
     }
-    List<ContainerReplicaProto> icrs = new ArrayList<>(pendingIcrs);
-    pendingIcrs.clear();
+    List<ContainerReplicaProto> icrs = new ArrayList<>(endpoint.icrs);
+    endpoint.icrs.clear();
     for (ContainerReplicaProto icr : icrs) {
       hb.addIncrementalContainerReport(IncrementalContainerReportProto.newBuilder().addReport(icr));
     }
-    if (!pendingContainerActions.isEmpty()) {
+    if (!endpoint.containerActions.isEmpty()) {
       ContainerActionsProto.Builder actions = ContainerActionsProto.newBuilder();
       List<Long> sent = new ArrayList<>();
-      for (Map.Entry<Long, ContainerAction> e : pendingContainerActions.entrySet()) {
+      for (Map.Entry<Long, ContainerAction> e : endpoint.containerActions.entrySet()) {
         if (sent.size() == MAX_ACTIONS_PER_HEARTBEAT) {
           break;
         }
         actions.addContainerActions(e.getValue());
         sent.add(e.getKey());
       }
-      sent.forEach(pendingContainerActions::remove);
+      sent.forEach(endpoint.containerActions::remove);
       hb.setContainerActions(actions);
     }
-    if (pipelineReportDue) {
+    if (endpoint.pipelineReportDue) {
       hb.setPipelineReports(pipelineReports());
-      pipelineReportDue = false;
+      endpoint.pipelineReportDue = false;
     }
-    if (partitioned) {
-      // The RPC fails: incremental reports are queued again, everything else is lost.
-      pendingIcrs.addAll(0, icrs);
+    List<CommandStatus> statuses = new ArrayList<>();
+    if (endpoint.commandStatusReportDue) {
+      statuses.addAll(endpoint.commandStatuses);
+      endpoint.commandStatuses.clear();
+      endpoint.commandStatusReportDue = false;
+      if (!statuses.isEmpty()) {
+        hb.addCommandStatusReports(CommandStatusReportsProto.newBuilder().addAllCmdStatus(statuses));
+      }
+    }
+    if (partitioned || !endpoint.scm.isReachable()) {
+      // The RPC fails: incremental reports and command statuses are queued again, everything else is lost.
+      endpoint.icrs.addAll(0, icrs);
+      endpoint.commandStatuses.addAll(0, statuses);
+      if (!discardedIcrs.isEmpty()) {
+        sim.reportsLost(this, discardedIcrs);
+      }
       return;
     }
-    SCMHeartbeatResponseProto response = sim.heartbeat(this, hb.build());
+    SCMHeartbeatResponseProto response = sim.heartbeat(this, endpoint.scm, hb.build());
     if (response.hasTerm()) {
       latestTerm = Math.max(latestTerm, response.getTerm());
     }
     for (SCMCommandProto command : response.getCommandsList()) {
-      receive(command);
+      receive(endpoint, command);
     }
   }
 
-  private void register() {
-    if (partitioned) {
+  private void register(Endpoint endpoint) {
+    if (partitioned || !endpoint.scm.isReachable()) {
       return;
     }
-    registered = sim.register(this, currentDetails().getExtendedProtoBufMessage(), nodeReport(), containerReport(),
-        pipelineReports(), UpgradeUtils.defaultVersionProto());
-    if (registered) {
-      nodeReportDue = false;
-      containerReportDue = false;
-      pipelineReportDue = false;
+    endpoint.registered = sim.register(this, endpoint.scm, currentDetails().getExtendedProtoBufMessage(), nodeReport(),
+        containerReport(), pipelineReports(), UpgradeUtils.defaultVersionProto());
+    if (endpoint.registered) {
+      endpoint.nodeReportDue = false;
+      endpoint.containerReportDue = false;
+      endpoint.pipelineReportDue = false;
     }
+  }
+
+  /** The connections to the SCMs, one per SCM. */
+  private Collection<Endpoint> endpoints() {
+    for (SimScm scm : sim.scms()) {
+      endpoints.computeIfAbsent(scm, Endpoint::new);
+    }
+    return endpoints.values();
   }
 
   /** The details a datanode sends over RPC, including its persisted operational state. */
@@ -394,7 +471,10 @@ final class SimDatanode {
   private ContainerReportsProto containerReport() {
     ContainerReportsProto.Builder report = ContainerReportsProto.newBuilder();
     for (SimReplica replica : replicas.values()) {
-      report.addReports(replica.toProto());
+      // Like ContainerSet#getContainerReport, which skips RECOVERING containers.
+      if (!replica.isRecovering()) {
+        report.addReports(replica.toProto());
+      }
     }
     return report.build();
   }
@@ -420,10 +500,10 @@ final class SimDatanode {
 
   // ---- commands ----
 
-  private void receive(SCMCommandProto proto) {
+  private void receive(Endpoint from, SCMCommandProto proto) {
     SCMCommandProto.Type type = proto.getCommandType();
     if (type == SCMCommandProto.Type.reregisterCommand) {
-      registered = false;
+      from.registered = false;
       triggerHeartbeat();
       return;
     }
@@ -471,6 +551,12 @@ final class SimDatanode {
     case setNodeOperationalStateCommand:
       command = SetNodeOperationalStateCommand.getFromProtobuf(proto.getSetNodeOperationalStateCommandProto());
       break;
+    case reconstructECContainersCommand:
+      command = ReconstructECContainersCommand.getFromProtobuf(proto.getReconstructECContainersCommandProto());
+      break;
+    case deleteBlocksCommand:
+      command = DeleteBlocksCommand.getFromProtobuf(proto.getDeleteBlocksCommandProto());
+      break;
     default:
       return null;
     }
@@ -500,6 +586,12 @@ final class SimDatanode {
     case deleteContainerCommand:
       delete((DeleteContainerCommand) command);
       break;
+    case reconstructECContainersCommand:
+      reconstruct((ReconstructECContainersCommand) command);
+      break;
+    case deleteBlocksCommand:
+      deleteBlocks((DeleteBlocksCommand) command);
+      break;
     case setNodeOperationalStateCommand:
       SetNodeOperationalStateCommand op = (SetNodeOperationalStateCommand) command;
       persistedOpState = op.getOpState();
@@ -519,7 +611,7 @@ final class SimDatanode {
     SimRatisGroup group = sim.ratisGroup(id, members, command.getPriorityList());
     if (pipelines.add(id)) {
       // The group starts before a leader is known; report it right away.
-      pipelineReportDue = true;
+      endpoints().forEach(endpoint -> endpoint.pipelineReportDue = true);
       triggerHeartbeat();
       group.join(this);
     }
@@ -598,8 +690,147 @@ final class SimDatanode {
       return;
     }
     sim.checkImport(this, copy, source);
+    copy.markEmptyIfNoBlocks();
     replicas.put(copy.getContainerId(), copy);
     queueIcr(copy.toProto());
+  }
+
+  /**
+   * Coordinates an EC reconstruction like ECReconstructionCoordinator: it creates RECOVERING replicas of the missing
+   * indexes on the targets, rebuilds them from the source indexes, and closes them. If a source or a target fails, it
+   * deletes the replicas it created. If the coordinator itself stops, they stay RECOVERING until they time out.
+   */
+  private void reconstruct(ReconstructECContainersCommand command) {
+    if (command.hasExpired(sim.now())) {
+      sim.count("datanode.reconstruct.expired");
+      return;
+    }
+    long containerId = command.getContainerID();
+    if (command.getSources().size() < command.getEcReplicationConfig().getData()) {
+      sim.violation("SCM asked " + name + " to reconstruct #" + containerId + " from " + command.getSources().size()
+          + " sources, fewer than the " + command.getEcReplicationConfig().getData() + " data indexes");
+      return;
+    }
+    SimReplica template = readSources(command);
+    if (template == null) {
+      sim.count("datanode.reconstruct.sourceUnavailable");
+      return;
+    }
+    byte[] missing = command.getMissingContainerIndexes().toByteArray();
+    List<DatanodeDetails> targetNodes = command.getTargetDatanodes();
+    Map<SimDatanode, SimReplica> created = new LinkedHashMap<>();
+    for (int i = 0; i < targetNodes.size(); i++) {
+      SimDatanode target = sim.datanode(targetNodes.get(i).getID());
+      if (target == null || !target.running || target.replicas.containsKey(containerId)) {
+        // createRecoveringContainer fails, for example with CONTAINER_EXISTS.
+        sim.count("datanode.reconstruct.targetUnavailable");
+        created.forEach((t, replica) -> t.dropReconstructed(replica));
+        return;
+      }
+      SimReplica replica = SimReplica.recovering(containerId, target.getId().toString(), missing[i], template);
+      target.addRecovering(replica);
+      created.put(target, replica);
+    }
+    long expectedGeneration = generation;
+    long ms = sim.config().getReconstructionMs(template.getUsed(), sim.random(SimRandom.DATANODE));
+    sim.scheduler().schedule(name + ".reconstruct #" + containerId, ms, () -> {
+      if (generation != expectedGeneration) {
+        sim.count("datanode.reconstruct.coordinatorStopped");
+        return;
+      }
+      boolean targetsReady = created.entrySet().stream().allMatch(e -> e.getKey().isRecovering(e.getValue()));
+      if (readSources(command) == null || !targetsReady) {
+        sim.count("datanode.reconstruct.failed");
+        created.forEach((t, replica) -> t.dropReconstructed(replica));
+        return;
+      }
+      created.forEach((t, replica) -> t.finishRecovering(replica));
+      sim.recordReconstruction(this, containerId, created.keySet());
+    });
+  }
+
+  /**
+   * The replica with the most data among the reconstruction sources, or null if a source is down or does not hold its
+   * index as a closed replica.
+   */
+  private SimReplica readSources(ReconstructECContainersCommand command) {
+    SimReplica best = null;
+    for (DatanodeDetailsAndReplicaIndex source : command.getSources()) {
+      SimDatanode dn = sim.datanode(source.getDnDetails().getID());
+      SimReplica replica = dn == null || !dn.running ? null : dn.replicas.get(command.getContainerID());
+      if (replica == null || replica.isRecovering() || replica.getReplicaIndex() != source.getReplicaIndex()
+          || replica.getState() != State.CLOSED) {
+        return null;
+      }
+      if (best == null || replica.getKeys() > best.getKeys()) {
+        best = replica;
+      }
+    }
+    return best;
+  }
+
+  /** Holds a replica being rebuilt here, until the coordinator closes it or it times out and becomes UNHEALTHY. */
+  private void addRecovering(SimReplica replica) {
+    replicas.put(replica.getContainerId(), replica);
+    sim.scheduler().schedule(name + ".recoveringTimeout #" + replica.getContainerId(),
+        sim.config().getRecoveringTimeoutMs(), () -> {
+          if (replicas.get(replica.getContainerId()) == replica && replica.isRecovering()) {
+            replica.endRecovering(State.UNHEALTHY);
+            queueIcr(replica.toProto());
+          }
+        });
+  }
+
+  private boolean isRecovering(SimReplica replica) {
+    return running && replicas.get(replica.getContainerId()) == replica && replica.isRecovering();
+  }
+
+  private void finishRecovering(SimReplica replica) {
+    replica.endRecovering(State.CLOSED);
+    queueIcr(replica.toProto());
+  }
+
+  /** Deletes a replica a failed reconstruction created here, like deleteContainerInState(RECOVERING, UNHEALTHY). */
+  private void dropReconstructed(SimReplica replica) {
+    if (!running || replicas.get(replica.getContainerId()) != replica
+        || !replica.isRecovering() && replica.getState() != State.UNHEALTHY) {
+      return;
+    }
+    replicas.remove(replica.getContainerId());
+    if (!replica.isRecovering()) {
+      queueIcr(replica.toProto().toBuilder().setState(State.DELETED).build());
+    }
+  }
+
+  /**
+   * Applies block deletion transactions like DeleteBlocksCommandHandler, and acknowledges them in the next command
+   * status report. A transaction for a container this datanode does not have fails.
+   */
+  private void deleteBlocks(DeleteBlocksCommand command) {
+    ContainerBlocksDeletionACKProto.Builder ack = ContainerBlocksDeletionACKProto.newBuilder()
+        .setDnId(getId().toString());
+    for (DeletedBlocksTransaction tx : command.blocksTobeDeleted()) {
+      SimReplica replica = replicas.get(tx.getContainerID());
+      if (replica != null) {
+        List<Long> removed = replica.applyDeleteTransaction(tx.getTxID(), tx.getLocalIDList());
+        sim.record("deleteBlocks", name + " tx" + tx.getTxID() + " " + replica + " removed " + removed);
+        sim.checkBlockDelete(this, replica, removed);
+        sim.recordDeleteAck(this, tx.getTxID(), replica);
+      } else {
+        sim.record("deleteBlocks", name + " tx" + tx.getTxID() + " #" + tx.getContainerID() + " not found");
+      }
+      ack.addResults(DeleteBlockTransactionResult.newBuilder()
+          .setTxID(tx.getTxID())
+          .setContainerID(tx.getContainerID())
+          .setSuccess(replica != null));
+    }
+    CommandStatus status = CommandStatus.newBuilder()
+        .setCmdId(command.getId())
+        .setStatus(CommandStatus.Status.EXECUTED)
+        .setType(SCMCommandProto.Type.deleteBlocksCommand)
+        .setBlockDeletionAck(ack)
+        .build();
+    endpoints().forEach(endpoint -> endpoint.commandStatuses.add(status));
   }
 
   private void delete(DeleteContainerCommand command) {
@@ -619,6 +850,33 @@ final class SimDatanode {
     replicas.remove(command.getContainerID());
     ContainerReplicaProto deleted = replica.toProto().toBuilder().setState(State.DELETED).build();
     queueIcr(deleted);
+  }
+
+  /**
+   * A connection to one SCM, with what is queued for it, like the per endpoint queues of StateContext: registration,
+   * incremental reports, container actions and command statuses, and which full reports are due.
+   */
+  private static final class Endpoint {
+    private final SimScm scm;
+    private final List<ContainerReplicaProto> icrs = new ArrayList<>();
+    private final List<CommandStatus> commandStatuses = new ArrayList<>();
+    private final Map<Long, ContainerAction> containerActions = new LinkedHashMap<>();
+    private boolean registered;
+    private boolean containerReportDue;
+    private boolean pipelineReportDue;
+    private boolean nodeReportDue;
+    private boolean commandStatusReportDue;
+
+    Endpoint(SimScm scm) {
+      this.scm = scm;
+    }
+
+    /** The process stopped: what was queued is lost. */
+    void clear() {
+      icrs.clear();
+      commandStatuses.clear();
+      containerActions.clear();
+    }
   }
 
   @Override

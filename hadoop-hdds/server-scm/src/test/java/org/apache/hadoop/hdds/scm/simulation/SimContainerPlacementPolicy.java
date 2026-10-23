@@ -62,14 +62,15 @@ public class SimContainerPlacementPolicy implements PlacementPolicy {
     } catch (IOException e) {
       ScmSimulation simulation = ScmSimulation.running();
       if (simulation != null) {
-        simulation.placementFailed(eligible(usedNodes, excludedNodes), nodesRequired, e);
+        simulation.placementFailed(eligible(nodeManager, usedNodes, excludedNodes), nodesRequired, e);
       }
       throw e;
     }
   }
 
   /** Healthy in-service datanodes that are neither used nor excluded. */
-  private List<DatanodeDetails> eligible(List<DatanodeDetails> usedNodes, List<DatanodeDetails> excludedNodes) {
+  static List<DatanodeDetails> eligible(NodeManager nodeManager, List<DatanodeDetails> usedNodes,
+      List<DatanodeDetails> excludedNodes) {
     Set<DatanodeID> unavailable = new HashSet<>();
     for (List<DatanodeDetails> nodes : Arrays.asList(usedNodes, excludedNodes)) {
       if (nodes != null) {

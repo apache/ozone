@@ -23,13 +23,17 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -43,6 +47,8 @@ final class SimConfig {
   private static final long GB = 1L << 30;
 
   private long seed;
+  /** Number of SCMs; more than one runs SCM HA. */
+  private int scmCount = 1;
   private int initialDatanodes = 8;
   private int racks = 3;
   private int maxDatanodes = 12;
@@ -75,12 +81,33 @@ final class SimConfig {
   private long replicaOpScrubIntervalMs = 60_000;
   private long adminMonitorIntervalMs = 30_000;
   private long safeModeExitWaitMs = 10_000;
+  private long safeModeRefreshIntervalMs = 5_000;
   private long containerSizeBytes = GB;
   private long datanodeCapacityBytes = 2048 * GB;
   private long writeIntervalMs = 2_000;
+  /** How often the client deletes the blocks of a key, like OM's key deleting service; 0 turns deletion off. */
+  private long keyDeleteIntervalMs = 3_000;
+  private long blockDeletionIntervalMs = 30_000;
+  private long commandStatusReportIntervalMs = 30_000;
+  private long transactionBufferFlushIntervalMs = 60_000;
+  /** Every how many applied log entries an SCM takes a snapshot, a flush of its DB (Ratis' auto trigger threshold). */
+  private long scmSnapshotThreshold = 1_000;
+  /** Whether an SCM purges its Raft log up to its snapshot, even if other SCMs still need the entries. */
+  private boolean scmLogPurge;
+  /** How many entries an SCM purges at least at a time. */
+  private long scmLogPurgeGap = 1_000_000;
+  /** Known bugs the simulation works around, by Jira key, so that runs can find other ones. */
+  private final Set<String> workarounds = new TreeSet<>();
+  /** Share of client writes that go to EC containers instead of RATIS/THREE ones. */
+  private double ecWriteFraction = 0.3;
+  private ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
+  /** How long a datanode keeps a RECOVERING replica before it marks it UNHEALTHY. */
+  private long recoveringTimeoutMs = 600_000;
   private long faultIntervalMs = 120_000;
   /** Relative weights of chaos faults which differ from their defaults, by fault name. */
   private final Map<String, Integer> faultWeights = new TreeMap<>();
+  /** Containers whose replicas in SCM are traced whenever they change, for debugging. */
+  private final Set<Long> watchedContainers = new TreeSet<>();
 
   SimConfig(long seed) {
     this.seed = seed;
@@ -103,6 +130,12 @@ final class SimConfig {
     conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY, SimContainerPlacementPolicy.class,
         PlacementPolicy.class);
     conf.setLong(SimPipelinePlacementPolicy.SEED_KEY, placementSeed);
+    conf.setClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY, SimEcPlacementPolicy.class,
+        PlacementPolicy.class);
+    conf.setLong(SimEcPlacementPolicy.SEED_KEY, ~placementSeed);
+    ScmConfig scmConfig = conf.getObject(ScmConfig.class);
+    scmConfig.setECPipelineChoosePolicyName(SimPipelineChoosePolicy.class.getName());
+    conf.setFromObject(scmConfig);
     conf.setTimeDuration(HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL, heartbeatIntervalMs, MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, heartbeatProcessIntervalMs, MILLISECONDS);
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL, staleNodeIntervalMs, MILLISECONDS);
@@ -118,7 +151,8 @@ final class SimConfig {
     // Nothing but logging runs on the safe mode log thread; keep it idle.
     conf.setTimeDuration(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, 3650, TimeUnit.DAYS);
     conf.setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, safeModeExitWaitMs, MILLISECONDS);
-    // Validate safe mode rules inline, on the handler that reports progress, instead of a refresh thread.
+    // Validate safe mode rules inline, on the handler that reports progress, and on a timer instead of the refresh
+    // thread.
     conf.setTimeDuration(HddsConfigKeys.HDDS_SCM_SAFEMODE_RULE_REFRESH_INTERVAL, 0, MILLISECONDS);
     conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, Math.min(3, initialDatanodes));
     conf.setStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE, containerSizeBytes, StorageUnit.BYTES);
@@ -151,6 +185,16 @@ final class SimConfig {
     return 500 + random.nextInt(3_000);
   }
 
+  /** How long the SCMs wait for a leader before they elect a new one, and a cut off leader before it steps down. */
+  long getScmElectionTimeoutMs(Random random) {
+    return 1_000 + random.nextInt(4_000);
+  }
+
+  /** Time to rebuild missing EC replicas of the given size from the other indexes, at roughly 50 MB/s. */
+  long getReconstructionMs(long bytes, Random random) {
+    return 2_000 + bytes / 50_000 + random.nextInt(10_000);
+  }
+
   /** Time to push a replica of the given size to another datanode, at roughly 100 MB/s. */
   long getReplicationTransferMs(long bytes, Random random) {
     return 1_000 + bytes / 100_000 + random.nextInt(5_000);
@@ -162,6 +206,15 @@ final class SimConfig {
 
   long getSeed() {
     return seed;
+  }
+
+  int getScmCount() {
+    return scmCount;
+  }
+
+  SimConfig setScmCount(int value) {
+    scmCount = value;
+    return this;
   }
 
   int getInitialDatanodes() {
@@ -322,6 +375,10 @@ final class SimConfig {
     return safeModeExitWaitMs;
   }
 
+  long getSafeModeRefreshIntervalMs() {
+    return safeModeRefreshIntervalMs;
+  }
+
   long getCloseContainerWaitMs() {
     return closeContainerWaitMs;
   }
@@ -336,6 +393,87 @@ final class SimConfig {
 
   long getWriteIntervalMs() {
     return writeIntervalMs;
+  }
+
+  long getKeyDeleteIntervalMs() {
+    return keyDeleteIntervalMs;
+  }
+
+  SimConfig setKeyDeleteIntervalMs(long value) {
+    keyDeleteIntervalMs = value;
+    return this;
+  }
+
+  long getBlockDeletionIntervalMs() {
+    return blockDeletionIntervalMs;
+  }
+
+  long getCommandStatusReportIntervalMs() {
+    return commandStatusReportIntervalMs;
+  }
+
+  long getTransactionBufferFlushIntervalMs() {
+    return transactionBufferFlushIntervalMs;
+  }
+
+  long getScmSnapshotThreshold() {
+    return scmSnapshotThreshold;
+  }
+
+  SimConfig setScmSnapshotThreshold(long value) {
+    scmSnapshotThreshold = value;
+    return this;
+  }
+
+  boolean isScmLogPurge() {
+    return scmLogPurge;
+  }
+
+  long getScmLogPurgeGap() {
+    return scmLogPurgeGap;
+  }
+
+  /** Purges the Raft logs up to the snapshots, as ozone.scm.ha.ratis.log.purge.enabled does, with the given gap. */
+  SimConfig setScmLogPurge(long gap) {
+    scmLogPurge = true;
+    scmLogPurgeGap = gap;
+    return this;
+  }
+
+  boolean hasWorkaround(String jira) {
+    return workarounds.contains(jira);
+  }
+
+  SimConfig addWorkaround(String jira) {
+    workarounds.add(jira);
+    return this;
+  }
+
+  /** Time for an SCM to download the DB checkpoint of the leader. */
+  long getCheckpointDownloadMs(Random random) {
+    return 1_000 + random.nextInt(10_000);
+  }
+
+  double getEcWriteFraction() {
+    return ecWriteFraction;
+  }
+
+  SimConfig setEcWriteFraction(double value) {
+    ecWriteFraction = value;
+    return this;
+  }
+
+  ECReplicationConfig getEcReplicationConfig() {
+    return ecReplicationConfig;
+  }
+
+  SimConfig setEcReplicationConfig(ECReplicationConfig value) {
+    ecReplicationConfig = value;
+    return this;
+  }
+
+  long getRecoveringTimeoutMs() {
+    return recoveringTimeoutMs;
   }
 
   long getFaultIntervalMs() {
@@ -360,10 +498,22 @@ final class SimConfig {
     return this;
   }
 
+  Set<Long> getWatchedContainers() {
+    return watchedContainers;
+  }
+
+  SimConfig watchContainer(long containerId) {
+    watchedContainers.add(containerId);
+    return this;
+  }
+
   @Override
   public String toString() {
-    return "seed=" + seed + ", datanodes=" + initialDatanodes + "/" + maxDatanodes + ", racks=" + racks
+    return "seed=" + seed + (scmCount > 1 ? ", scms=" + scmCount : "") + ", datanodes=" + initialDatanodes + "/"
+        + maxDatanodes + ", racks=" + racks
         + ", chaos=" + chaosDurationMs / 1000 + "s, settle=" + settleDurationMs / 1000 + "s, faults=" + faults
+        + ", ec=" + (ecWriteFraction > 0 ? ecReplicationConfig.getReplication() + "@" + ecWriteFraction : "off")
+        + ", deletes=" + (keyDeleteIntervalMs > 0 ? keyDeleteIntervalMs / 1000.0 + "s" : "off")
         + (faultWeights.isEmpty() ? "" : ", faultWeights=" + faultWeights);
   }
 }

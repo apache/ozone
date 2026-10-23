@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.simulation;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventExecutor;
@@ -38,23 +39,47 @@ import org.apache.hadoop.hdds.server.events.FixedThreadPoolWithAffinityExecutor;
 final class SimEventQueue extends EventQueue {
 
   private final SimScheduler scheduler;
+  private final String lanePrefix;
   private final Function<Object, String> describer;
+  private final List<SimScheduler.Lane> lanes = new ArrayList<>();
   private final List<SimScheduler.Lane> reportLanes = new ArrayList<>();
   private final List<String> handlerFailures = new ArrayList<>();
+  /** Called with each handler and its payload right before the handler runs, and right after. */
+  private final BiConsumer<EventHandler<?>, Object> beforeHandler;
+  private final BiConsumer<EventHandler<?>, Object> afterHandler;
 
-  SimEventQueue(SimScheduler scheduler, Function<Object, String> describer, int reportLaneCount) {
+  /**
+   * @param lanePrefix prefix of the lane names, which tells the SCMs apart in the trace
+   */
+  SimEventQueue(SimScheduler scheduler, String lanePrefix, Function<Object, String> describer, int reportLaneCount,
+      BiConsumer<EventHandler<?>, Object> beforeHandler, BiConsumer<EventHandler<?>, Object> afterHandler) {
     this.scheduler = scheduler;
+    this.lanePrefix = lanePrefix;
     this.describer = describer;
+    this.beforeHandler = beforeHandler;
+    this.afterHandler = afterHandler;
     for (int i = 0; i < reportLaneCount; i++) {
-      reportLanes.add(scheduler.newLane("ContainerReportLane-" + i));
+      reportLanes.add(newLane("ContainerReportLane-" + i));
     }
     setSilent(true);
+  }
+
+  private SimScheduler.Lane newLane(String name) {
+    SimScheduler.Lane lane = scheduler.newLane(lanePrefix + name);
+    lanes.add(lane);
+    return lane;
+  }
+
+  /** Drops the handler lanes and their queued events, as when the SCM process dies. */
+  void removeLanes() {
+    scheduler.removeLanes(lanes);
+    lanes.clear();
   }
 
   @Override
   public <PAYLOAD, EVENT_TYPE extends Event<PAYLOAD>> void addHandler(EVENT_TYPE event, EventHandler<PAYLOAD> handler) {
     String name = getExecutorName(event, handler);
-    SimScheduler.Lane lane = scheduler.newLane(name);
+    SimScheduler.Lane lane = newLane(name);
     super.addHandler(event, new LaneExecutor<>(name, event, payload -> lane), handler);
   }
 
@@ -107,7 +132,9 @@ final class SimEventQueue extends EventQueue {
       laneSelector.apply(payload).add(detail, () -> {
         scheduled++;
         try {
+          beforeHandler.accept(handler, payload);
           handler.onMessage(payload, publisher);
+          afterHandler.accept(handler, payload);
           done++;
         } catch (RuntimeException | AssertionError e) {
           failed++;

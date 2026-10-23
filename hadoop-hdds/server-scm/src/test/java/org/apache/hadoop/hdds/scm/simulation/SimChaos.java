@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.scm.simulation;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +66,10 @@ final class SimChaos {
     sim.scheduler().cancel(timer);
     recoveries.forEach(sim.scheduler()::cancel);
     recoveries.clear();
+    for (SimScm scm : sim.scms()) {
+      healScm(scm);
+      startScm(scm);
+    }
     for (SimDatanode dn : sim.datanodes()) {
       if (dn.isPartitioned()) {
         heal(dn);
@@ -144,6 +150,20 @@ final class SimChaos {
       return restartScm();
     case RESTART_WITH_NEW_PORTS:
       return restartWithNewPorts();
+    case DISK_FAILURE_WHILE_DOWN:
+      return diskFailureWhileDown();
+    case SCM_CRASH:
+      return scmOutage("crash", scm -> stopScm(scm, false), "restart", this::startScm);
+    case SCM_PARTITION:
+      return scmOutage("partition", scm -> scm.setPartitioned(true), "heal", this::healScm);
+    case SCM_STEP_DOWN:
+      if (sim.ratis().getLeader() == null) {
+        return false;
+      }
+      sim.ratis().stepDown();
+      return true;
+    case SCM_BOOTSTRAP:
+      return bootstrapScm();
     default:
       throw new IllegalStateException("Unknown fault " + fault);
     }
@@ -207,7 +227,7 @@ final class SimChaos {
 
   private boolean decommission() {
     SimDatanode dn = pick(inService());
-    if (dn == null || !enoughInServiceLeft()) {
+    if (dn == null || !enoughInServiceLeftWithout(Collections.singletonList(dn))) {
       return false;
     }
     if (!sim.startDecommission(dn)) {
@@ -233,7 +253,7 @@ final class SimChaos {
       return false;
     }
     List<SimDatanode> rack = new ArrayList<>(racks.values()).get(random().nextInt(racks.size()));
-    if (inService().size() - rack.size() < 3 + sim.config().getMaxUnavailableDatanodes()) {
+    if (!enoughInServiceLeftWithout(rack)) {
       return false;
     }
     sim.record("chaos.decommissionRack", rack.get(0).getRack());
@@ -258,7 +278,8 @@ final class SimChaos {
 
   private boolean maintenance() {
     SimDatanode dn = pick(inService());
-    if (dn == null || !enoughInServiceLeft() || unavailableCount() >= sim.config().getMaxUnavailableDatanodes()) {
+    if (dn == null || inService().size() - 1 < 3 + sim.config().getMaxUnavailableDatanodes()
+        || unavailableCount() >= sim.config().getMaxUnavailableDatanodes()) {
       return false;
     }
     if (!sim.startMaintenance(dn)) {
@@ -299,21 +320,105 @@ final class SimChaos {
       return false;
     }
     sim.record("chaos.restartWithNewPorts", dn.getName());
-    dn.restartWithNewPorts();
+    dn.restartWithNewPorts(Collections.emptyList());
     return true;
   }
 
+  /**
+   * A disk fails while the datanode is down, and it comes back with other ports. Only the full report it registers
+   * with tells SCM about the lost replicas.
+   */
+  private boolean diskFailureWhileDown() {
+    SimDatanode dn = pick(available());
+    if (dn == null) {
+      return false;
+    }
+    List<Long> candidates = safeToDamage(dn);
+    if (candidates.isEmpty()) {
+      return false;
+    }
+    Long lost = candidates.get(random().nextInt(candidates.size()));
+    sim.record("chaos.diskFailureWhileDown", dn.getName() + " #" + lost);
+    dn.restartWithNewPorts(Collections.singletonList(lost));
+    return true;
+  }
+
+  /** Restarts an SCM that is up, the leader as likely as any other. */
   private boolean restartScm() {
-    if (sim.now() - lastScmRestart < MIN_SCM_RESTART_INTERVAL_MS) {
+    List<SimScm> running = new ArrayList<>();
+    for (SimScm scm : sim.scms()) {
+      if (scm.isRunning()) {
+        running.add(scm);
+      }
+    }
+    if (running.isEmpty() || sim.now() - lastScmRestart < MIN_SCM_RESTART_INTERVAL_MS) {
       return false;
     }
     lastScmRestart = sim.now();
     try {
-      sim.restartScm();
+      sim.restartScm(running.get(random().nextInt(running.size())));
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }
     return true;
+  }
+
+  /** Adds an SCM to the group, once per run; the leader has to accept it. */
+  private boolean bootstrapScm() {
+    if (sim.scms().size() > sim.config().getScmCount() || !sim.hasReadyLeader()) {
+      return false;
+    }
+    try {
+      sim.bootstrapScm();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    return true;
+  }
+
+  /** Takes an SCM out for a while, keeping a majority of the SCMs up and connected. */
+  private boolean scmOutage(String fault, Consumer<SimScm> apply, String recovery, Consumer<SimScm> recover) {
+    List<SimScm> connected = new ArrayList<>();
+    for (SimScm scm : sim.scms()) {
+      if (scm.isConnected()) {
+        connected.add(scm);
+      }
+    }
+    if (connected.size() - 1 <= sim.scms().size() / 2) {
+      return false;
+    }
+    SimScm scm = connected.get(random().nextInt(connected.size()));
+    sim.record("chaos.scm." + fault, scm.getName() + (scm == sim.ratis().getLeader() ? " (leader)" : ""));
+    apply.accept(scm);
+    recoveries.add(sim.scheduler().schedule("chaos.scm." + recovery + " " + scm.getName(), outageMs(),
+        () -> recover.accept(scm)));
+    return true;
+  }
+
+  private void stopScm(SimScm scm, boolean flush) {
+    try {
+      scm.stop(flush);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private void startScm(SimScm scm) {
+    if (!scm.isRunning()) {
+      sim.record("chaos.scm.restart", scm.getName());
+      try {
+        scm.start();
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }
+  }
+
+  private void healScm(SimScm scm) {
+    if (scm.isRunning() && !scm.isConnected()) {
+      sim.record("chaos.scm.heal", scm.getName());
+      scm.setPartitioned(false);
+    }
   }
 
   private void restart(SimDatanode dn) {
@@ -358,19 +463,41 @@ final class SimChaos {
   private List<Long> safeToDamage(SimDatanode dn) {
     List<Long> result = new ArrayList<>();
     for (SimReplica replica : dn.getReplicas().values()) {
-      if (replica.getState() != State.CLOSED && replica.getState() != State.QUASI_CLOSED) {
+      if (replica.isRecovering() || replica.getState() != State.CLOSED && replica.getState() != State.QUASI_CLOSED) {
         continue;
       }
-      for (SimDatanode other : sim.datanodes()) {
-        SimReplica copy = other == dn ? null : other.getReplica(replica.getContainerId());
-        if (copy != null && (copy.getState() == State.CLOSED || copy.getState() == State.QUASI_CLOSED)
-            && copy.getBcsid() >= replica.getBcsid() && copy.getKeys() >= replica.getKeys()) {
-          result.add(replica.getContainerId());
-          break;
-        }
+      if (replica.isEc() ? ecSurvivesLoss(dn, replica) : hasNewerCopyElsewhere(dn, replica)) {
+        result.add(replica.getContainerId());
       }
     }
     return result;
+  }
+
+  private boolean hasNewerCopyElsewhere(SimDatanode dn, SimReplica replica) {
+    for (SimDatanode other : sim.datanodes()) {
+      SimReplica copy = other == dn ? null : other.getReplica(replica.getContainerId());
+      if (copy != null && (copy.getState() == State.CLOSED || copy.getState() == State.QUASI_CLOSED)
+          && copy.getBcsid() >= replica.getBcsid() && sim.holdsLiveBlocksOf(copy, replica)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * An EC replica can be damaged if another closed copy of its index exists, or if every other index has one, so that
+   * the container can still be rebuilt even if a second index is lost before SCM repairs the first.
+   */
+  private boolean ecSurvivesLoss(SimDatanode dn, SimReplica replica) {
+    Set<Integer> otherIndexes = new HashSet<>();
+    for (SimDatanode other : sim.datanodes()) {
+      SimReplica copy = other == dn ? null : other.getReplica(replica.getContainerId());
+      if (copy != null && !copy.isRecovering() && copy.getState() == State.CLOSED) {
+        otherIndexes.add(copy.getReplicaIndex());
+      }
+    }
+    return otherIndexes.contains(replica.getReplicaIndex())
+        || otherIndexes.size() >= sim.config().getEcReplicationConfig().getRequiredNodes() - 1;
   }
 
   private List<SimDatanode> available() {
@@ -399,9 +526,14 @@ final class SimChaos {
     return status != null && status.isDecommissioned();
   }
 
-  /** Keeps enough in-service datanodes that SCM can re-replicate around outages. */
-  private boolean enoughInServiceLeft() {
-    return inService().size() - 1 >= 3 + sim.config().getMaxUnavailableDatanodes();
+  /**
+   * Whether enough in-service datanodes stay without the given ones for SCM to re-replicate around outages, and to
+   * place an EC block group once every datanode is back.
+   */
+  private boolean enoughInServiceLeftWithout(List<SimDatanode> leaving) {
+    List<SimDatanode> left = inService();
+    left.removeAll(leaving);
+    return left.size() >= 3 + sim.config().getMaxUnavailableDatanodes() && sim.ecPlacementPossibleWithout(leaving);
   }
 
   private int unavailableCount() {
@@ -415,7 +547,8 @@ final class SimChaos {
   }
 
   private int weight(Fault fault) {
-    return sim.config().getFaultWeight(fault.name(), fault.weight);
+    int defaultWeight = fault.haOnly && sim.scms().size() == 1 ? 0 : fault.weight;
+    return sim.config().getFaultWeight(fault.name(), defaultWeight);
   }
 
   private SimDatanode pick(List<SimDatanode> candidates) {
@@ -433,14 +566,29 @@ final class SimChaos {
     MAINTENANCE(1),
     ADD_DATANODE(1),
     RESTART_SCM(1),
-    // Off until HDDS-16630 is fixed: SCMNodeManager#register does not update the network topology when only the ports
-    // change, so the datanode goes missing from it. With this fault on, the simulation can also catch HDDS-16632.
-    RESTART_WITH_NEW_PORTS(0);
+    RESTART_WITH_NEW_PORTS(0),
+    // Off until HDDS-16632 is fixed: when a datanode registers with other ports, SCM empties its container list, so
+    // it never removes the replicas the datanode lost while it was down.
+    DISK_FAILURE_WHILE_DOWN(0),
+    // SCM HA only: an SCM crashes (without flushing its DB) or is cut off for a while, or the leader steps down.
+    SCM_CRASH(1, true),
+    SCM_PARTITION(1, true),
+    SCM_STEP_DOWN(1, true),
+    // SCM HA only, off until HDDS-16896 is fixed: a new SCM joins the group. It builds its container safe mode rules
+    // from its empty DB, so it leaves safe mode before datanodes report most of its containers; the workaround for
+    // HDDS-16896 only counts that.
+    SCM_BOOTSTRAP(0, true);
 
     private final int weight;
+    private final boolean haOnly;
 
     Fault(int weight) {
+      this(weight, false);
+    }
+
+    Fault(int weight, boolean haOnly) {
       this.weight = weight;
+      this.haOnly = haOnly;
     }
   }
 }

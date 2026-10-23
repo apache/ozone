@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.simulation;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
@@ -92,9 +93,9 @@ final class SimScheduler {
     this.maxSlowHandlerMs = maxSlowHandlerMs;
   }
 
-  /** Drops every lane and the tasks queued on them, as when the process running the handlers dies. */
-  void clearLanes() {
-    lanes.clear();
+  /** Drops the given lanes and the tasks queued on them, as when the process running the handlers dies. */
+  void removeLanes(Collection<Lane> remove) {
+    lanes.removeAll(remove);
   }
 
   Lane newLane(String name) {
@@ -272,6 +273,10 @@ final class SimScheduler {
 
     void add(String detail, Runnable action) {
       tasks.addLast(new Task(detail, action));
+    }
+
+    boolean isIdle() {
+      return tasks.isEmpty();
     }
 
     String name() {
