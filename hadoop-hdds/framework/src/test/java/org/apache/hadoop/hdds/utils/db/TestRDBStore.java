@@ -32,12 +32,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -50,6 +55,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.rocksdb.RocksDB;
 import org.rocksdb.Statistics;
 import org.rocksdb.StatsLevel;
+import org.rocksdb.TickerType;
 
 /**
  * RDBStore Tests.
@@ -260,6 +266,47 @@ public class TestRDBStore {
   }
 
   @Test
+  public void testCheckpointAfterManagerClose(@TempDir File cpDir) throws Exception {
+    insertRandomData(rdbStore, 1);
+    RDBCheckpointManager manager = new RDBCheckpointManager(rdbStore.getDb(), "test");
+    manager.close();
+
+    RocksDBCheckpoint checkpoint = manager.createCheckpoint(cpDir.getAbsolutePath());
+    assertNotNull(checkpoint);
+    assertThat(checkpoint.getCheckpointLocation()).exists();
+  }
+
+  @Test
+  public void testCheckpointAfterDbClose(@TempDir File cpDir) throws Exception {
+    RocksDatabase db = rdbStore.getDb();
+    db.close();
+
+    assertThrows(RocksDatabaseException.class, () -> db.createCheckpoint(cpDir.toPath().resolve("cp")));
+  }
+
+  @Test
+  public void testConcurrentCheckpoints(@TempDir File cpRoot) throws Exception {
+    insertRandomData(rdbStore, 1);
+    int threads = 4;
+    ExecutorService executor = Executors.newFixedThreadPool(threads);
+    try {
+      List<Future<DBCheckpoint>> futures = new ArrayList<>();
+      for (int i = 0; i < threads; i++) {
+        File parent = new File(cpRoot, "cp-" + i);
+        assertTrue(parent.mkdirs());
+        futures.add(executor.submit(() -> rdbStore.getCheckpoint(parent.getAbsolutePath(), false)));
+      }
+      for (Future<DBCheckpoint> future : futures) {
+        DBCheckpoint checkpoint = future.get(30, TimeUnit.SECONDS);
+        assertNotNull(checkpoint);
+        assertThat(checkpoint.getCheckpointLocation()).exists();
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
   public void testGetDBUpdatesSince() throws Exception {
     final Table<byte[], byte[]> firstTable = rdbStore.getTable(families.get(1));
     firstTable.put(
@@ -302,6 +349,35 @@ public class TestRDBStore {
     DBUpdatesWrapper dbUpdatesSince = rdbStore.getUpdatesSince(0, 5);
     assertEquals(2, dbUpdatesSince.getData().size());
     assertEquals(2, dbUpdatesSince.getCurrentSequenceNumber());
+  }
+
+  @Test
+  public void testDirectWritesHonorSyncWriteOption(@TempDir File tempDir) throws Exception {
+    final ManagedDBOptions dbOptions = newManagedDBOptions();
+    final Statistics statistics = dbOptions.statistics();
+    final ManagedWriteOptions writeOptions = new ManagedWriteOptions();
+    writeOptions.setSync(true);
+    final Set<TableConfig> tableConfigs = new HashSet<>();
+    tableConfigs.add(new TableConfig(families.get(0), new ManagedColumnFamilyOptions()));
+
+    try (RDBStore store = new RDBStore(tempDir, dbOptions, null, writeOptions, tableConfigs, false, null, false, null,
+        MAX_DB_UPDATES_SIZE_THRESHOLD, true, null, false)) {
+      final RDBTable table = store.getTable(families.get(0));
+      final byte[] key = getBytesUtf16("Key1");
+      final byte[] endKey = getBytesUtf16("Key2");
+
+      long synced = statistics.getTickerCount(TickerType.WAL_FILE_SYNCED);
+      table.put(key, key);
+      assertThat(statistics.getTickerCount(TickerType.WAL_FILE_SYNCED)).isGreaterThan(synced);
+
+      synced = statistics.getTickerCount(TickerType.WAL_FILE_SYNCED);
+      table.delete(key);
+      assertThat(statistics.getTickerCount(TickerType.WAL_FILE_SYNCED)).isGreaterThan(synced);
+
+      synced = statistics.getTickerCount(TickerType.WAL_FILE_SYNCED);
+      table.deleteRange(key, endKey);
+      assertThat(statistics.getTickerCount(TickerType.WAL_FILE_SYNCED)).isGreaterThan(synced);
+    }
   }
 
   @Test

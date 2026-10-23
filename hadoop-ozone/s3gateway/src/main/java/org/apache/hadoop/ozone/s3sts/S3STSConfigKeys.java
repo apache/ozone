@@ -41,7 +41,8 @@ public final class S3STSConfigKeys {
   // Action=AssumeRole&RoleArn=...&RoleSessionName=...&DurationSeconds=...
   // where RoleArn max length is 2048 and max bytes per character in UTF-8 encoding is 12
   // (2048 * 12 = 24576) + other parameters and overheads, so setting to 32 KB
-  // this limit can be adjusted via configuration if needed.
+  // 12 is the worst-case percent-encoded wire size for one code point in application/x-www-form-urlencoded data:
+  // a 4-byte UTF-8 sequence can become four %XX triplets
   public static final int OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE = 32768;
 
   /**

@@ -165,20 +165,20 @@ Get S3 Credentials for Principals, Create Buckets, and Upload Files to Buckets
 
 Create Role-Scoped Tokens for All Three Tenants
     Set Global Variable           ${ROLE_ARN}                   arn:aws:iam::123456789012:role/${TENANT_ONE_ROLE}
-    # Waiting for Ranger policy cache refresh - ${USER_A} needs to be able to assume role
+    # Waiting for Ranger policy cache refresh - each user needs to be able to assume its role
     Wait Until Keyword Succeeds   60s   5s                      Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_A_T1_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_A_T1_PERM_SECRET_KEY}  role_arn=${ROLE_ARN}
     Set Global Variable           ${USER_A_T1_STS_ACCESS_KEY_ID}  ${STS_ACCESS_KEY_ID}
     Set Global Variable           ${USER_A_T1_STS_SECRET_KEY}   ${STS_SECRET_KEY}
     Set Global Variable           ${USER_A_T1_STS_SESSION_TOKEN}  ${STS_SESSION_TOKEN}
 
     Set Global Variable           ${ROLE_ARN}                   arn:aws:iam::123456789012:role/${TENANT_TWO_ROLE}
-    Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_A_T2_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_A_T2_PERM_SECRET_KEY}  role_arn=${ROLE_ARN}
+    Wait Until Keyword Succeeds   60s   5s                      Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_A_T2_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_A_T2_PERM_SECRET_KEY}  role_arn=${ROLE_ARN}
     Set Global Variable           ${USER_A_T2_STS_ACCESS_KEY_ID}  ${STS_ACCESS_KEY_ID}
     Set Global Variable           ${USER_A_T2_STS_SECRET_KEY}   ${STS_SECRET_KEY}
     Set Global Variable           ${USER_A_T2_STS_SESSION_TOKEN}  ${STS_SESSION_TOKEN}
 
     Set Global Variable           ${ROLE_ARN}                   arn:aws:iam::123456789012:role/${TENANT_THREE_ROLE}
-    Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_B_T3_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_B_T3_PERM_SECRET_KEY}  role_arn=${ROLE_ARN}
+    Wait Until Keyword Succeeds   60s   5s                      Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_B_T3_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_B_T3_PERM_SECRET_KEY}  role_arn=${ROLE_ARN}
     Set Global Variable           ${USER_B_T3_STS_ACCESS_KEY_ID}  ${STS_ACCESS_KEY_ID}
     Set Global Variable           ${USER_B_T3_STS_SECRET_KEY}   ${STS_SECRET_KEY}
     Set Global Variable           ${USER_B_T3_STS_SESSION_TOKEN}  ${STS_SESSION_TOKEN}
@@ -188,6 +188,9 @@ Verify Role-Scoped Token Accesses
 
     # This token should be able to read from ${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET} but not ${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}
     # nor ${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}.  Also verify that it can write to ${TENANT_ONE}/${TENANT_ONE_ICEBERG_BUCKET}.
+    # Wait for all role policies to reach the Ranger plugin cache before checking the access matrix.
+    # Reading via ${TENANT_ONE_LINKED_BUCKET} needs the ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET} key policy, which is created last.
+    Wait Until Keyword Succeeds   60s   5s                      Get Object Should Succeed     ${TENANT_ONE_LINKED_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}
     Get Object Should Succeed     ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
     Get Object Should Fail        ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
@@ -207,7 +210,7 @@ Verify Role-Scoped Token Accesses
     # nor ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET} nor ${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}
     # nor ${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}.
     # Also verify that it can write to ${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET}.
-    Get Object Should Succeed     ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+    Wait Until Keyword Succeeds   60s   5s                      Get Object Should Succeed     ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
     Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  AccessDenied
     Get Object Should Fail        ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
@@ -220,7 +223,7 @@ Verify Role-Scoped Token Accesses
     # nor ${TENANT_TWO}/${TENANT_TWO_ICEBERG_BUCKET} nor ${TENANT_TWO}/${TENANT_TWO_ANOTHER_BUCKET}
     # nor ${TENANT_ONE}/${TENANT_ONE_LINKED_BUCKET}.
     # Also verify that it can write to ${TENANT_THREE}/${TENANT_THREE_ICEBERG_BUCKET}.
-    Get Object Should Succeed     ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+    Wait Until Keyword Succeeds   60s   5s                      Get Object Should Succeed     ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
     Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket

@@ -27,22 +27,21 @@ import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.io.InterruptedIOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.List;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io_.retry.RetryProxy;
 import org.apache.hadoop.ipc_.Client.ConnectionId;
 import org.apache.hadoop.ipc_.RPC;
-import org.apache.hadoop.ipc_.RpcInvocationHandler;
 import org.apache.hadoop.ipc_.RpcNoSuchProtocolException;
+import org.apache.hadoop.ipc_.RpcProxy;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
 import org.apache.ratis.protocol.exceptions.ReadException;
 import org.apache.ratis.protocol.exceptions.ReadIndexException;
@@ -76,11 +75,11 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   /** The combined proxy which redirects to other proxies as necessary. */
   private final ProxyInfo<OzoneManagerProtocolPB> combinedProxy;
 
-  /**
-   * Whether reading from follower is enabled. If this is false, all read
-   * requests will still go to OM leader.
-   */
-  private volatile boolean useFollowerRead;
+  /** Whether follower reads are supported by the OM service. */
+  private volatile boolean omServiceSupportsFollowerRead;
+
+  /** Whether eligible reads without an explicit consistency hint use followers. */
+  private final boolean defaultFollowerReadEnabled;
 
   /**
    * The current index of the underlying leader-based proxy provider's omNodesInOrder currently being used.
@@ -97,16 +96,10 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   private final ReadConsistencyHint leaderReadConsistency;
 
   public HadoopRpcOMFollowerReadFailoverProxyProvider(
-      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderProxy
-  ) {
-    this(leaderProxy, ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER, ReadConsistency.DEFAULT, true);
-  }
-
-  public HadoopRpcOMFollowerReadFailoverProxyProvider(
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderProxy,
       ReadConsistency followerReadConsistencyType,
       ReadConsistency leaderReadConsistencyType,
-      boolean useFollowerRead) {
+      boolean defaultFollowerReadEnabled) {
     Preconditions.assertTrue(followerReadConsistencyType.allowFollowerRead(),
         "Invalid follower read consistency " + followerReadConsistencyType);
     Preconditions.assertTrue(!leaderReadConsistencyType.allowFollowerRead(),
@@ -117,11 +110,12 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     final String combinedInfo = "[" + leaderProxy.getOMProxies().stream()
         .map(a -> a.proxyInfo)
         .reduce((a, b) -> a + ", " + b).orElse("") + "]";
-    OzoneManagerProtocolPB wrappedProxy = (OzoneManagerProtocolPB) Proxy.newProxyInstance(
-        FollowerReadInvocationHandler.class.getClassLoader(),
-        new Class<?>[] {OzoneManagerProtocolPB.class}, new FollowerReadInvocationHandler());
-    combinedProxy = new ProxyInfo<>(wrappedProxy, combinedInfo);
-    this.useFollowerRead = useFollowerRead;
+    combinedProxy = new ProxyInfo<>(new FollowerReadProxy(), combinedInfo);
+    // At the start, we don't know whether OM service supports follower read. Therefore, if the client
+    // is configured to use follower read, we should assume that OM service supports follower read and
+    // only sets this to false if there is an evidence otherwise (i.e. OM throws OMNotLeaderException).
+    this.omServiceSupportsFollowerRead = true;
+    this.defaultFollowerReadEnabled = defaultFollowerReadEnabled;
     this.followerReadConsistency = followerReadConsistencyType.getHint();
     this.leaderReadConsistency = leaderReadConsistencyType.getHint();
   }
@@ -138,7 +132,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
 
   @Override
   public void performFailover(OzoneManagerProtocolPB currProxy) {
-    // Since FollowerReadInvocationHandler might user or fallback to leader-based failover logic,
+    // Since FollowerReadProxy might use or fall back to leader-based failover logic,
     // we should delegate the failover logic to the leader's failover.
     leaderProxy.performFailover(currProxy);
   }
@@ -148,34 +142,74 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     // for a few reasons
     // 1. We want to ensure that the retry policy behavior remains the same when we use the leader proxy
     //    (when follower read is disabled or using write request)
-    // 2. The FollowerInvocationHandler is also written so that the thrown exception is handled by the
+    // 2. The FollowerReadProxy is also written so that the thrown exception is handled by the
     //    OMFailoverProxyProviderbase's RetryPolicy
     return leaderProxy.getRetryPolicy(maxFailovers);
   }
 
   /**
-   * Parse the OM request from the request args.
-   *
-   * @return parsed OM request.
+   * Create a client that applies the default consistency hint once, before retries.
+   * <p>
+   * Proxy/provider structure:
+   * <pre>{@code
+   * ReadConsistencyProxy
+   * └── RetryProxy
+   *     └── HadoopRpcOMFollowerReadFailoverProxyProvider
+   *         ├── FollowerReadProxy
+   *         └── HadoopRpcOMFailoverProxyProvider (leaderProxy)
+   * }</pre>
    */
-  private static OMRequest parseOMRequest(Object[] args) throws ServiceException {
-    String error = null;
-    if (args == null) {
-      error = "args == null";
-    } else if (args.length < 2) {
-      error = "args.length == " + args.length + " < 2";
-    } else if (args[1] == null) {
-      error = "args[1] == null";
-    } else if (!(args[1] instanceof OMRequest)) {
-      error = "Non-OMRequest: " + args[1].getClass();
+  public OzoneManagerProtocolPB newProxy(int maxFailovers) {
+    OzoneManagerProtocolPB retryProxy = (OzoneManagerProtocolPB) RetryProxy.create(
+        OzoneManagerProtocolPB.class, this, getRetryPolicy(maxFailovers));
+    return new ReadConsistencyProxy(retryProxy);
+  }
+
+  private class ReadConsistencyProxy implements OzoneManagerProtocolPB, RpcProxy {
+    private final OzoneManagerProtocolPB retryProxy;
+
+    ReadConsistencyProxy(OzoneManagerProtocolPB retryProxy) {
+      this.retryProxy = retryProxy;
     }
-    if (error != null) {
-      // Throws a non-retriable exception to prevent retry and failover
-      // See the HddsUtils#shouldNotFailoverOnRpcException used in
-      // OMFailoverProxyProviderBase#shouldFailover
-      throwServiceException(new RpcNoSuchProtocolException("Failed to parseOMRequest: " + error));
+
+    @Override
+    public OMResponse submitRequest(RpcController controller, OMRequest request) throws ServiceException {
+      return retryProxy.submitRequest(controller, applyReadConsistency(request));
     }
-    return (OMRequest) args[1];
+
+    private OMRequest applyReadConsistency(OMRequest request) throws ServiceException {
+      if (request == null) {
+        // Reject invalid requests before entering the retry loop.
+        throw new ServiceException(new RpcNoSuchProtocolException("OMRequest == null"));
+      }
+      if (!request.hasReadConsistencyHint()) {
+        ReadConsistencyHint hint = omServiceSupportsFollowerRead
+            && defaultFollowerReadEnabled && OmUtils.shouldSendToFollower(request)
+            ? followerReadConsistency
+            : leaderReadConsistency;
+        if (hint != null) {
+          return request.toBuilder().setReadConsistencyHint(hint).build();
+        }
+      }
+      return request;
+    }
+
+    @Override
+    public ConnectionId getConnectionId() {
+      return RPC.getConnectionIdForProxy(retryProxy);
+    }
+
+    @Override
+    public void close() throws IOException {
+      HadoopRpcOMFollowerReadFailoverProxyProvider.this.close();
+    }
+  }
+
+  private static ReadConsistency getReadConsistency(OMRequest omRequest) {
+    return omRequest.hasReadConsistencyHint()
+        ? ReadConsistency.fromProto(omRequest.getReadConsistencyHint()
+            .getReadConsistency())
+        : ReadConsistency.DEFAULT;
   }
 
   @VisibleForTesting
@@ -218,9 +252,24 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     return currentProxy;
   }
 
+  private OMProxyInfo<OzoneManagerProtocolPB> getCurrentProxy(ReadConsistency readConsistency) {
+    OMProxyInfo<OzoneManagerProtocolPB> current = getCurrentProxy();
+    if (readConsistency != ReadConsistency.LOCAL_LEASE) {
+      return current;
+    }
+
+    String leaderNodeId = leaderProxy.getCurrentProxyOMNodeId();
+    for (int i = 0; i < leaderProxy.getOMProxyMap().size(); i++) {
+      if (!current.getNodeId().equals(leaderNodeId)) {
+        return current;
+      }
+      current = changeProxy(current);
+    }
+    return null;
+  }
+
   /**
-   * An InvocationHandler to handle incoming requests. This class's invoke
-   * method contains the primary logic for redirecting to followers.
+   * A protocol implementation that redirects incoming requests to followers.
    * <p>
    * If follower reads are enabled, attempt to send read operations to the
    * current proxy which can be either a leader or follower. If the current
@@ -228,60 +277,44 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
    * <p>
    * Write requests are always forwarded to the leader.
    */
-  private class FollowerReadInvocationHandler implements RpcInvocationHandler {
+  private class FollowerReadProxy implements OzoneManagerProtocolPB, RpcProxy {
 
     @Override
-    public Object invoke(Object proxy, final Method method, final Object[] args)
-        throws Throwable {
+    public OMResponse submitRequest(RpcController controller, OMRequest omRequest) throws ServiceException {
       lastProxy = null;
-      if (method.getDeclaringClass() == Object.class) {
-        // If the method is not a OzoneManagerProtocolPB method (e.g. Object#toString()),
-        // we should invoke the method on the current proxy
-        return method.invoke(this, args);
-      }
-      OMRequest omRequest = parseOMRequest(args);
-
-      // Apply default consistency hint once, before any routing decision.
-      // In the future, we will support per-request hints which allows client (e.g. S3 clients)
-      // to specify a custom request header (e.g. x-ozone-read-consistency) as a consistency hint
-      // for read requests.
-      boolean isFollowerReadEligible = useFollowerRead && OmUtils.shouldSendToFollower(omRequest);
-      if (!omRequest.hasReadConsistencyHint()) {
-        final ReadConsistencyHint defaultReadConsistency = isFollowerReadEligible
-            ? followerReadConsistency : leaderReadConsistency;
-        if (defaultReadConsistency != null) {
-          omRequest = omRequest.toBuilder()
-              .setReadConsistencyHint(defaultReadConsistency)
-              .build();
-          args[1] = omRequest;
-        }
-      }
+      ReadConsistency readConsistency = getReadConsistency(omRequest);
+      boolean isFollowerReadEligible =
+          OMFailoverProxyProviderBase.shouldUseFollowerRead(omRequest,
+              omServiceSupportsFollowerRead, defaultFollowerReadEnabled);
 
       if (isFollowerReadEligible) {
         int failedCount = 0;
-        for (int i = 0; useFollowerRead && i < leaderProxy.getOMProxyMap().size(); i++) {
-          OMProxyInfo<OzoneManagerProtocolPB> current = getCurrentProxy();
-          LOG.debug("Attempting to service {} with cmdType {} using proxy {}",
-              method.getName(), omRequest.getCmdType(), current.proxyInfo);
+        for (int i = 0; i < leaderProxy.getOMProxyMap().size(); i++) {
+          OMProxyInfo<OzoneManagerProtocolPB> current = getCurrentProxy(readConsistency);
+          if (current == null) {
+            break;
+          }
+          LOG.debug("Attempting to service submitRequest with cmdType {} using proxy {}",
+              omRequest.getCmdType(), current.proxyInfo);
           try {
-            final Object retVal = method.invoke(current.getProxy(), args);
+            final OMResponse response = current.getProxy().submitRequest(controller, omRequest);
             lastProxy = current;
-            LOG.debug("Invocation of {} with cmdType {} using {} was successful",
-                method.getName(), omRequest.getCmdType(), current.proxyInfo);
-            return retVal;
-          } catch (InvocationTargetException ite) {
-            LOG.debug("Invocation of {} with cmdType {} using proxy {} failed", method.getName(),
-                omRequest.getCmdType(), current.proxyInfo, ite);
-            if (!(ite.getCause() instanceof Exception)) {
-              throwServiceException(ite.getCause());
+            LOG.debug("Invocation of submitRequest with cmdType {} using {} was successful",
+                omRequest.getCmdType(), current.proxyInfo);
+            return response;
+          } catch (Throwable failure) {
+            LOG.debug("Invocation of submitRequest with cmdType {} using proxy {} failed",
+                omRequest.getCmdType(), current.proxyInfo, failure);
+            if (!(failure instanceof Exception)) {
+              throw toServiceException(failure);
             }
-            Exception e = (Exception) ite.getCause();
+            Exception e = (Exception) failure;
             if (e instanceof InterruptedIOException ||
                 e instanceof InterruptedException) {
               // If interrupted, do not retry.
               LOG.warn("Invocation returned interrupted exception on [{}];",
                   current.proxyInfo, e);
-              throwServiceException(e);
+              throw toServiceException(e);
             }
 
             if (e instanceof ServiceException) {
@@ -292,7 +325,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
                 // the OM follower does not support / disable follower read or something is misconfigured
                 LOG.debug("Encountered OMNotLeaderException from {}. " +
                     "Disable OM follower read and retry OM leader directly.", current.proxyInfo);
-                useFollowerRead = false;
+                omServiceSupportsFollowerRead = false;
                 // Break here instead of throwing exception so that it is not counted
                 // as a failover
                 break;
@@ -305,7 +338,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
                     "Directly throw the exception to trigger retry", current.proxyInfo);
                 // Throw here to trigger retry since we already communicate to the leader
                 // If we break here instead, we will retry the same leader again without waiting
-                throw e;
+                throw toServiceException(e);
               }
 
               ReadIndexException readIndexException = getReadIndexException(e);
@@ -333,7 +366,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
               LOG.debug("Invocation with cmdType {} returned exception on [{}] that cannot be retried; " +
                       "{} failure(s) so far",
                   omRequest.getCmdType(), current.proxyInfo, failedCount, e);
-              throw e;
+              throw toServiceException(e);
             } else {
               failedCount++;
               LOG.warn(
@@ -349,9 +382,9 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
         // be that there is simply no Follower node running at all.
         if (failedCount > 0) {
           // If we get here, it means all followers have failed.
-          LOG.warn("{} nodes have failed for read request {} with cmdType {}."
+          LOG.warn("{} nodes have failed for submitRequest with cmdType {}."
                   + " Falling back to leader.", failedCount,
-              omRequest.getCmdType(), method.getName());
+              omRequest.getCmdType());
         } else {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Read falling back to leader without follower read "
@@ -363,24 +396,23 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
       // Either all followers have failed, follower reads are disabled,
       // or this is a write request. In any case, forward the request to
       // the leader OM.
-      LOG.debug("Using leader-based failoverProxy to service {}", method.getName());
+      LOG.debug("Using leader-based failoverProxy to service submitRequest");
       final OMProxyInfo<OzoneManagerProtocolPB> currentLeaderProxy = leaderProxy.getProxy();
-      Object retVal = null;
       try {
-        retVal = method.invoke(currentLeaderProxy.getProxy(), args);
-      } catch (InvocationTargetException e) {
-        LOG.debug("Exception thrown from leader-based failoverProxy", e.getCause());
+        OMResponse response = currentLeaderProxy.getProxy().submitRequest(controller, omRequest);
+        lastProxy = currentLeaderProxy;
+        return response;
+      } catch (Throwable e) {
+        LOG.debug("Exception thrown from leader-based failoverProxy", e);
         // This exception will be handled by the OMFailoverProxyProviderBase#getRetryPolicy
         // (see getRetryPolicy). This ensures that the leader-only failover should still work.
-        throwServiceException(e.getCause());
+        throw toServiceException(e);
       }
-      lastProxy = currentLeaderProxy;
-      return retVal;
     }
 
     @Override
     public void close() throws IOException {
-
+      // The provider owns the underlying OM proxies.
     }
 
     @Override
@@ -395,7 +427,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
       // visibility hazard, not a tearing one -- but the outcome is the
       // same: a stale proxy whose underlying connection has been
       // stopped is dialed instead of the live replacement.
-      return RPC.getConnectionIdForProxy(useFollowerRead
+      return RPC.getConnectionIdForProxy(omServiceSupportsFollowerRead
           ? getCurrentProxy().getProxy() : leaderProxy.getProxy().getProxy());
     }
   }
@@ -408,8 +440,8 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   }
 
   @VisibleForTesting
-  public boolean isUseFollowerRead() {
-    return useFollowerRead;
+  public boolean isOmServiceSupportsFollowerRead() {
+    return omServiceSupportsFollowerRead;
   }
 
   @VisibleForTesting
@@ -433,15 +465,10 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   }
 
   /**
-   * Throw the passed {@link Throwable} wrapped in {@link ServiceException}.
-   * This is required to prevent {@link java.lang.reflect.UndeclaredThrowableException} to be thrown
-   * since {@link OzoneManagerProtocolPB#submitRequest(RpcController, OMRequest)} only
-   * throws {@link ServiceException}.
-   * @param e exception to wrap in {@link ServiceException}.
-   * @throws ServiceException the exception that wraps the passed throwable.
+   * Preserve ServiceException instances and wrap other failures in the protocol's declared exception type.
    */
-  private static void throwServiceException(Throwable e) throws ServiceException {
-    throw e instanceof ServiceException ? (ServiceException) e : new ServiceException(e);
+  private static ServiceException toServiceException(Throwable e) {
+    return e instanceof ServiceException ? (ServiceException) e : new ServiceException(e);
   }
 
 }

@@ -91,7 +91,7 @@ Docker compose cluster definitions to be used in upgrade testing are defined in 
 
 - Tests that should run for all upgrades, regardless of the version being tested, can be added to *compose/upgrade/\<upgrade-type>/common/callback.sh*.
 
-- Tests that should run only for an upgrade to a specific version can be added to *compose/upgrade/\<upgrade-type>/\<ending-upgrade-version>/callback.sh*.
+- Tests that should run only for an upgrade to a specific version can be added to *compose/upgrade/upgrades/\<upgrade-type>/\<ending-upgrade-version>/callback.sh*.
 
 - Add commands in the callback function when they should be run. Each callback file will have access to the following environment variables:
   - `OZONE_UPGRADE_FROM`: The version of ozone being upgraded from.
@@ -100,6 +100,7 @@ Docker compose cluster definitions to be used in upgrade testing are defined in 
   - `SCM`: The name of the SCM container to run robot tests from.
     - This can be passed as the first argument to `execute_robot_test`.
     - This allows the same tests to work with and without SCM HA.
+  - `CLIENT`: The dedicated client container used to run Robot tests in rolling-upgrade HA.
 
 ### Testing New Versions
 

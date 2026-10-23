@@ -20,20 +20,28 @@ package org.apache.hadoop.ozone;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_RANDOM_PORT;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mockStatic;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -47,16 +55,22 @@ import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.hadoop.metrics2.MetricsSource;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 
 /**
  * Test cases for mini ozone cluster.
@@ -64,10 +78,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
+  private OzoneConfiguration conf;
 
-  @BeforeAll
-  static void setup(@TempDir File testDir) {
+  @BeforeEach
+  void setup(@TempDir File testDir) {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
     conf.setInt(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT, 1);
@@ -80,6 +94,62 @@ public class TestMiniOzoneCluster {
     if (cluster != null) {
       cluster.shutdown();
     }
+  }
+
+  @Test
+  void testSnapshotMetricsAfterOmRestart() throws Exception {
+    cluster = MiniOzoneCluster.newBuilder(conf).withoutDatanodes().build();
+    OmSnapshotInternalMetrics metrics = cluster.getOzoneManager().getOmSnapshotIntMetrics();
+    Field field = OmSnapshotInternalMetrics.class.getDeclaredField("sourceName");
+    field.setAccessible(true);
+    String sourceName = (String) field.get(metrics);
+    assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName));
+    metrics.incNumSnapshotPurges();
+
+    cluster.restartOzoneManager();
+
+    assertNotNull(DefaultMetricsSystem.instance().getSource(sourceName));
+    assertCounter("NumSnapshotPurges", 1L, getMetrics(DefaultMetricsSystem.instance().getSource(sourceName)));
+  }
+
+  @Test
+  void testMetricsSystemShutdownOnLeak() throws Exception {
+    cluster = MiniOzoneCluster.newBuilder(conf).withoutDatanodes().build();
+    String sourceName = "TestMiniOzoneClusterLeakedMetrics";
+    DefaultMetricsSystem.instance().register(sourceName, "Test metrics", (MetricsSource) (collector, all) -> { });
+    try (MockedStatic<DefaultMetricsSystem> metricsSystem =
+        mockStatic(DefaultMetricsSystem.class, CALLS_REAL_METHODS)) {
+      AssertionError error = assertThrows(AssertionError.class, cluster::shutdown);
+      assertThat(error).hasMessageContaining(sourceName);
+      metricsSystem.verify(DefaultMetricsSystem::shutdown);
+    } finally {
+      DefaultMetricsSystem.instance().unregisterSource(sourceName);
+    }
+  }
+
+  @Test
+  void testHAServiceReturnsDefensiveCopy() {
+    List<String> active = new ArrayList<>();
+    active.add("active");
+    List<String> inactive = new ArrayList<>();
+    inactive.add("inactive");
+    MiniOzoneHAClusterImpl.MiniOzoneHAService<String> service =
+        new MiniOzoneHAClusterImpl.MiniOzoneHAService<>("test", active, inactive, "service", id -> id);
+    List<String> snapshot = service.getServices();
+    List<String> expected = new ArrayList<>(snapshot);
+
+    snapshot.clear();
+    assertEquals(expected, service.getServices());
+    for (int i = 0; i < expected.size(); i++) {
+      assertEquals(expected.get(i), service.getServiceByIndex(i));
+      assertEquals(expected.get(i), service.getServiceById(expected.get(i)));
+    }
+
+    service.addInstance("new", true);
+    List<String> beforeRemoval = service.getServices();
+    assertTrue(service.removeInstance("new"));
+    assertTrue(beforeRemoval.contains("new"));
+    assertEquals(expected, service.getServices());
   }
 
   @Test
@@ -109,6 +179,27 @@ public class TestMiniOzoneCluster {
         assertTrue(client.isConnected(pipeline.getFirstNode()));
       }
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testDatanodesStartWithLatestLayoutVersion(boolean withCustomHostnames)
+      throws Exception {
+    MiniOzoneCluster.Builder builder =
+        MiniOzoneCluster.newBuilder(new OzoneConfiguration(conf))
+            .setNumDatanodes(1)
+            .setStartDataNodes(false);
+    if (withCustomHostnames) {
+      builder.setHosts(new String[] {"host0.test"});
+    }
+    cluster = builder.build();
+
+    OzoneConfiguration dnConf = cluster.getHddsDatanodes().get(0).getConf();
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(),
+        new DatanodeStorage(dnConf).getApparentVersion(),
+        "Datanode must start at the latest metadata layout version. A "
+            + "datanode.id file written before the datanode starts makes it "
+            + "come up pre-finalized, as if upgraded from an older install.");
   }
 
   @Test

@@ -146,7 +146,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       @QueryParam("Action") String action,
       @QueryParam("RoleArn") String roleArn,
       @QueryParam("RoleSessionName") String roleSessionName,
-      @QueryParam("DurationSeconds") Integer durationSeconds,
+      @QueryParam("DurationSeconds") String durationSeconds,
       @QueryParam("Version") String version,
       @QueryParam("Policy") String awsIamSessionPolicy) throws OS3Exception {
 
@@ -173,7 +173,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     final String action = formParams.getFirst("Action");
     final String roleArn = formParams.getFirst("RoleArn");
     final String roleSessionName = formParams.getFirst("RoleSessionName");
-    final Integer durationSeconds = parseIntegerOrNull(formParams.getFirst("DurationSeconds"));
+    final String durationSeconds = formParams.getFirst("DurationSeconds");
     final String version = formParams.getFirst("Version");
     final String awsIamSessionPolicy = formParams.getFirst("Policy");
 
@@ -182,7 +182,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   }
 
   private Response handleSTSRequest(Set<String> paramNamesToValidate, String action, String roleArn,
-      String roleSessionName, Integer durationSeconds, String version, String awsIamSessionPolicy) throws OS3Exception {
+      String roleSessionName, String durationSeconds, String version, String awsIamSessionPolicy) throws OS3Exception {
     final String requestId = requestIdentifier.getRequestId();
     // NOTE: invalid, missing or unsupported actions are not added to the audit log
     try {
@@ -219,13 +219,18 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   }
 
   private Response handleAssumeRole(Set<String> paramNamesToValidate, String roleArn, String roleSessionName,
-      Integer durationSeconds, String awsIamSessionPolicy, String version, String requestId) throws OSTSException {
+      String durationSeconds, String awsIamSessionPolicy, String version, String requestId) throws OSTSException {
     final String action = "AssumeRole";
     final Map<String, String> auditParams = getAuditParameters();
+    int duration = S3STSUtils.DEFAULT_DURATION_SECONDS;
+    String durationValidationError = null;
+    try {
+      duration = S3STSUtils.validateDuration(durationSeconds);
+    } catch (OMException e) {
+      durationValidationError = e.getMessage();
+    }
     S3STSUtils.addAssumeRoleAuditParams(
-        auditParams, roleArn, roleSessionName, awsIamSessionPolicy,
-        durationSeconds == null ? S3STSUtils.DEFAULT_DURATION_SECONDS : durationSeconds,
-        requestId);
+        auditParams, roleArn, roleSessionName, awsIamSessionPolicy, duration, requestId);
 
     // Validate parameters
     if (version == null || !version.equals(EXPECTED_VERSION)) {
@@ -247,11 +252,8 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     }
 
     final Set<String> validationErrors = new HashSet<>();
-    int duration = durationSeconds == null ? S3STSUtils.DEFAULT_DURATION_SECONDS : durationSeconds;
-    try {
-      duration = S3STSUtils.validateDuration(durationSeconds);
-    } catch (OMException e) {
-      validationErrors.add(e.getMessage());
+    if (durationValidationError != null) {
+      validationErrors.add(durationValidationError);
     }
 
     try {
@@ -427,18 +429,6 @@ public class S3STSEndpoint extends S3STSEndpointBase {
         || Strings.CI.startsWith(paramName, PROVIDED_CONTEXTS_MEMBER_PREFIX)
         || Strings.CI.startsWith(paramName, TAGS_MEMBER_PREFIX)
         || Strings.CI.startsWith(paramName, TRANSITIVE_TAG_KEYS_MEMBER_PREFIX);
-  }
-
-  private static Integer parseIntegerOrNull(String value) throws OSTSException {
-    if (StringUtils.isBlank(value)) {
-      return null;
-    }
-    try {
-      return Integer.parseInt(value);
-    } catch (NumberFormatException e) {
-      throw new OSTSException(STS_VALIDATION_ERROR)
-          .withMessage("1 validation error detected: Invalid Value: DurationSeconds must be a number");
-    }
   }
 
   private static final class AssumeRoleParamValidationResult {

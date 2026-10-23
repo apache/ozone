@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -112,6 +113,15 @@ public interface ScmBlockLocationProtocol extends Closeable {
       deleteKeyBlocks(List<BlockGroup> keyBlocksInfoList) throws IOException;
 
   /**
+   * Returns the SCM Ratis follower replication lag (in Raft log entries) most
+   * recently reported by SCM on a {@link #deleteKeyBlocks} response, or 0 if no
+   * value has been observed yet.
+   */
+  default long getLastKnownFollowerReplicationLag() {
+    return 0;
+  }
+
+  /**
    * Gets the Clusterid and SCM Id from SCM.
    */
   ScmInfo getScmInfo() throws IOException;
@@ -135,4 +145,27 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @throws IOException
    */
   InnerNode getNetworkTopology() throws IOException;
+
+  /**
+   * Triggers HDDS finalization on SCM. Called by OM when it orchestrates cluster finalization.
+   *
+   * @throws IOException If any error occurs.
+   */
+  void finalizeUpgrade() throws IOException;
+
+  /**
+   * Same as {@link #finalizeUpgrade()}, but SCM skips the peer SCM and datanode software version
+   * checks before finalizing. Use this to finalize when a peer or datanode is intentionally down.
+   *
+   * @throws IOException If any error occurs.
+   */
+  void forceFinalizeUpgrade() throws IOException;
+
+  /**
+   * Queries the current HDDS finalization status from SCM.
+   *
+   * @return the upgrade status of SCM and the datanodes.
+   * @throws IOException If any error occurs.
+   */
+  HddsProtos.UpgradeStatus queryUpgradeStatus() throws IOException;
 }

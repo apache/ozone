@@ -27,6 +27,7 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.audit.S3GAction;
@@ -76,7 +77,13 @@ public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           S3GAction.GENERATE_SECRET, getAuditParameters(), e));
       if (e.getResult() == OMException.ResultCodes.S3_SECRET_ALREADY_EXISTS) {
-        return Response.status(BAD_REQUEST.getStatusCode(), e.getResult().toString()).build();
+        // Jetty 12 no longer emits custom HTTP reason phrases, so convey the
+        // error code in the response body instead of the status line, as a
+        // plain-text entity with an explicit media type.
+        return Response.status(BAD_REQUEST)
+            .type(MediaType.TEXT_PLAIN)
+            .entity(e.getResult().toString())
+            .build();
       } else {
         LOG.error("Can't execute get secret request: ", e);
         return Response.serverError().build();
@@ -113,8 +120,12 @@ public class S3SecretManagementEndpoint extends S3SecretEndpointBase {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           S3GAction.REVOKE_SECRET, getAuditParameters(), e));
       if (e.getResult() == OMException.ResultCodes.S3_SECRET_NOT_FOUND) {
-        return Response.status(NOT_FOUND.getStatusCode(),
-            OMException.ResultCodes.S3_SECRET_NOT_FOUND.toString())
+        // Jetty 12 no longer emits custom HTTP reason phrases, so convey the
+        // error code in the response body instead of the status line, as a
+        // plain-text entity with an explicit media type.
+        return Response.status(NOT_FOUND)
+            .type(MediaType.TEXT_PLAIN)
+            .entity(OMException.ResultCodes.S3_SECRET_NOT_FOUND.toString())
             .build();
       } else {
         LOG.error("Can't execute revoke secret request: ", e);

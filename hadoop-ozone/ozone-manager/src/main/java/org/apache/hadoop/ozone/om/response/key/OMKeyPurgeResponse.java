@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
 import static org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse.createRepeatedOmKeyInfo;
 
@@ -40,7 +38,6 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.request.key.OMKeyPurgeRequest;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotMoveKeyInfos;
@@ -49,7 +46,6 @@ import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 /**
  * Response for {@link OMKeyPurgeRequest} request.
  */
-@CleanupTableInfo(cleanupTables = {DELETED_TABLE, SNAPSHOT_INFO_TABLE})
 public class OMKeyPurgeResponse extends OmKeyResponse {
   private List<OmBucketInfo> bucketInfosToBeUpdated;
   private List<String> purgeKeyList;

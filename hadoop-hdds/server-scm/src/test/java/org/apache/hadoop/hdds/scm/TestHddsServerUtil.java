@@ -21,12 +21,16 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSCMAddressForDatanodes;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.isServiceUser;
+import static org.apache.hadoop.security.UserGroupInformation.createProxyUser;
+import static org.apache.hadoop.security.UserGroupInformation.createRemoteUser;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,10 +39,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -180,6 +186,43 @@ public class TestHddsServerUtil {
     assertEquals(200, addr.getPort());
   }
 
+  /**
+   * Verify that a bind host holding an IPv6 literal, including the wildcard
+   * {@code ::}, yields a usable listener address.
+   */
+  @Test
+  void testBindAddressesAcceptIPv6BindHost() throws Exception {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.OZONE_SCM_CLIENT_BIND_HOST_KEY, "::");
+    conf.set(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_BIND_HOST_KEY, "::");
+    conf.set(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_BIND_HOST_KEY, "::");
+    conf.set(ScmConfigKeys.OZONE_SCM_DATANODE_BIND_HOST_KEY, "2001:db8::1");
+    conf.set(ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY, "2001:db8::1");
+
+    final InetAddress wildcard = InetAddress.getByName("::");
+    final InetAddress literal = InetAddress.getByName("2001:db8::1");
+
+    InetSocketAddress addr = HddsServerUtil.getScmClientBindAddress(conf);
+    assertEquals(wildcard, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getScmBlockClientBindAddress(conf);
+    assertEquals(wildcard, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getScmSecurityInetAddress(conf);
+    assertEquals(wildcard, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getScmDataNodeBindAddress(conf);
+    assertEquals(literal, addr.getAddress());
+    assertEquals(ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT, addr.getPort());
+
+    addr = HddsServerUtil.getReconDataNodeBindAddress(conf);
+    assertEquals(literal, addr.getAddress());
+    assertEquals(ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT, addr.getPort());
+  }
+
   @Test
   void testGetSCMAddresses() {
     final OzoneConfiguration conf = new OzoneConfiguration();
@@ -302,4 +345,16 @@ public class TestHddsServerUtil {
 
   }
 
+  @Test
+  void testIsServiceUser() {
+    UserGroupInformation.setConfiguration(new OzoneConfiguration());
+    String principal = "om/_HOST@EXAMPLE.COM";
+    assertThat(isServiceUser(createRemoteUser("om/host1@EXAMPLE.COM"), principal)).isTrue();
+    for (String user : new String[] {"om@EXAMPLE.COM", "om/host1@OTHER.COM", "om/host1", "alice/om@EXAMPLE.COM"}) {
+      assertThat(isServiceUser(createRemoteUser(user), principal)).as(user).isFalse();
+    }
+    assertThat(isServiceUser(createProxyUser("om/host1@EXAMPLE.COM", createRemoteUser("alice")), principal)).isFalse();
+    // No user matches a principal that is not configured.
+    assertThat(isServiceUser(createRemoteUser("om/host1@EXAMPLE.COM"), "")).isFalse();
+  }
 }

@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatusReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -137,6 +138,32 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     assertEquals(2, eventReceived.get());
 
 
+  }
+
+  @Test
+  public void testVersionReportProcessedOnlyWhenPresent() throws IOException {
+    NodeManager mockNodeManager = mock(NodeManager.class);
+    when(mockNodeManager.isNodeRegistered(any())).thenReturn(true);
+
+    SCMDatanodeHeartbeatDispatcher dispatcher =
+        new SCMDatanodeHeartbeatDispatcher(mockNodeManager, mock(EventPublisher.class));
+
+    DatanodeDetails datanodeDetails = randomDatanodeDetails();
+
+    // Heartbeat without a version report: SCM should not process a version.
+    dispatcher.dispatch(SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
+        .build());
+    verify(mockNodeManager, times(0)).processVersionReport(any(), any());
+
+    // Heartbeat with a version report: SCM should process it.
+    DatanodeVersionProto version = DatanodeVersionProto.newBuilder()
+        .setApparentVersion(1).setSoftwareVersion(1).build();
+    dispatcher.dispatch(SCMHeartbeatRequestProto.newBuilder()
+        .setDatanodeDetails(datanodeDetails.getProtoBufMessage())
+        .setDatanodeVersion(version)
+        .build());
+    verify(mockNodeManager, times(1)).processVersionReport(any(), any());
   }
 
   /**

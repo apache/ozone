@@ -17,22 +17,17 @@
 
 package org.apache.hadoop.ozone.om.response.file;
 
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.OPEN_KEY_TABLE;
-
 import jakarta.annotation.Nonnull;
 import java.util.List;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
  * Response for crate file request.
  */
-@CleanupTableInfo(cleanupTables = {KEY_TABLE, OPEN_KEY_TABLE})
 public class OMFileCreateResponse extends OMKeyCreateResponse {
 
   public OMFileCreateResponse(@Nonnull OMResponse omResponse,

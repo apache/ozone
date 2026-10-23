@@ -54,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
@@ -79,6 +80,9 @@ public class ClientProtocolStub implements ClientProtocol {
   private static final String STUB_KERBEROS_ID = "stub_kerberos_id";
   private static final String STUB_SECRET = "stub_secret";
   private final ObjectStoreStub objectStoreStub;
+  private ReadConsistency readConsistency;
+  private Long localLeaseLogLimit;
+  private Long localLeaseTimeMs;
 
   public ClientProtocolStub(ObjectStoreStub objectStoreStub) {
     this.objectStoreStub = objectStoreStub;
@@ -145,7 +149,7 @@ public class ClientProtocolStub implements ClientProtocol {
     NavigableMap<Integer, Long> partSizes = bucket instanceof OzoneBucketStub
         ? ((OzoneBucketStub) bucket).getCompletedMultipartPartSizes(keyName)
         : Collections.emptyNavigableMap();
-    return new S3HeadObjectAttributes(key, partSizes);
+    return new S3HeadObjectAttributes(key, partSizes, bucket.getBucketLayout());
   }
 
   @Override
@@ -303,6 +307,25 @@ public class ClientProtocolStub implements ClientProtocol {
       boolean derivedKeyPiggyBacking) throws IOException {
     return getBucket(volumeName, bucketName)
         .createKeyIfNotExists(keyName, size, replicationConfig, metadata, tags, derivedKeyPiggyBacking);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneOutputStream createKeyIfNoneMatch(String volumeName, String bucketName, String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName).createKeyIfNoneMatch(keyName, size, excludedETag, replicationConfig,
+        metadata, tags, derivedKeyPiggyBacking);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OzoneDataStreamOutput createStreamKeyIfNoneMatch(String volumeName, String bucketName,
+      String keyName, long size,
+      String excludedETag, ReplicationConfig replicationConfig, Map<String, String> metadata, Map<String, String> tags,
+      boolean derivedKeyPiggyBacking) throws IOException {
+    return getBucket(volumeName, bucketName).createStreamKeyIfNoneMatch(keyName, size, excludedETag, replicationConfig,
+        metadata, tags, derivedKeyPiggyBacking);
   }
 
   @Override
@@ -491,6 +514,20 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void abortS3MultipartUpload(String bucketName, String keyName, String uploadID) throws IOException {
+    objectStoreStub.getS3Volume().getBucket(bucketName).abortMultipartUpload(keyName, uploadID);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OmMultipartUploadCompleteInfo completeMultipartUpload(String volumeName, String bucketName, String keyName,
+      String uploadID, Map<Integer, String> partsMap, Long expectedDataGeneration, String expectedETag,
+      String excludedETag) throws IOException {
+    return getBucket(volumeName, bucketName).completeMultipartUpload(keyName, uploadID, partsMap,
+        expectedDataGeneration, expectedETag, excludedETag);
+  }
+
+  @Override
   public void abortMultipartUpload(String volumeName, String bucketName,
                                    String keyName, String uploadID)
       throws IOException {
@@ -621,7 +658,7 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public OzoneManagerVersion getOmVersion() {
-    return OzoneManagerVersion.CURRENT;
+    return OzoneManagerVersion.SOFTWARE_VERSION;
   }
 
   @Override
@@ -665,6 +702,12 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneInputStream readFile(String volumeName, String bucketName, String keyName,
+      boolean requireFileSystemLayout) throws IOException {
+    return null;
+  }
+
+  @Override
   public OzoneOutputStream createFile(String volumeName, String bucketName,
                                       String keyName, long size,
                                       ReplicationType type,
@@ -702,6 +745,11 @@ public class ClientProtocolStub implements ClientProtocol {
 
   @Override
   public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options) throws IOException {
+    return null;
+  }
+
+  @Override
+  public List<OzoneFileStatus> listStatus(ListStatusLightOptions options) throws IOException {
     return null;
   }
 
@@ -764,13 +812,49 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void setThreadLocalReadConsistency(
+      ReadConsistency newReadConsistency) {
+    this.readConsistency = newReadConsistency;
+    this.localLeaseLogLimit = null;
+    this.localLeaseTimeMs = null;
+  }
+
+  @Override
+  public void setThreadLocalReadConsistency(ReadConsistency newReadConsistency,
+      Long newLocalLeaseLogLimit, Long newLocalLeaseTimeMs) {
+    this.readConsistency = newReadConsistency;
+    this.localLeaseLogLimit = newLocalLeaseLogLimit;
+    this.localLeaseTimeMs = newLocalLeaseTimeMs;
+  }
+
+  @Override
   public S3Auth getThreadLocalS3Auth() {
     return null;
   }
 
   @Override
+  public ReadConsistency getThreadLocalReadConsistency() {
+    return readConsistency;
+  }
+
+  public Long getThreadLocalLocalLeaseLogLimit() {
+    return localLeaseLogLimit;
+  }
+
+  public Long getThreadLocalLocalLeaseTimeMs() {
+    return localLeaseTimeMs;
+  }
+
+  @Override
   public void clearThreadLocalS3Auth() {
 
+  }
+
+  @Override
+  public void clearThreadLocalReadConsistency() {
+    readConsistency = null;
+    localLeaseLogLimit = null;
+    localLeaseTimeMs = null;
   }
 
   @Override

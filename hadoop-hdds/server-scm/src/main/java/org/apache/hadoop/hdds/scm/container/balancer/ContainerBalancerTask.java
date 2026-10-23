@@ -291,6 +291,7 @@ public class ContainerBalancerTask implements Runnable {
       }
 
       IterationResult currentIterationResult = doIteration();
+      selectionCriteria.logExcludedContainersDueToHealth();
       ContainerBalancerTaskIterationStatusInfo iterationStatistic =
           getIterationStatistic(i + 1, currentIterationResult, getCurrentIterationDuration());
       iterationsStatistic.offer(iterationStatistic);
