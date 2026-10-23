@@ -476,18 +476,12 @@ public class StateContext {
   }
 
   @VisibleForTesting
-  List<Message> getAllAvailableReportsUpToLimit(
-      HostAndPort endpoint,
-      int limit) {
+  List<Message> getAllAvailableReportsUpToLimit(HostAndPort endpoint, int limit) {
     return getAllAvailableReportsUpToLimit(endpoint, limit, null);
   }
 
-  List<Message> getAllAvailableReportsUpToLimit(
-      HostAndPort endpoint,
-      int limit,
-      String excludedFullReportType) {
-    List<Message> reports = getFullReports(endpoint, limit,
-        excludedFullReportType);
+  List<Message> getAllAvailableReportsUpToLimit(HostAndPort endpoint, int limit, String excludedFullReportType) {
+    List<Message> reports = getFullReports(endpoint, limit, excludedFullReportType);
     List<Message> incrementalReports = getIncrementalReports(endpoint,
         limit - reports.size()); // get all (MAX_VALUE)
     reports.addAll(incrementalReports);

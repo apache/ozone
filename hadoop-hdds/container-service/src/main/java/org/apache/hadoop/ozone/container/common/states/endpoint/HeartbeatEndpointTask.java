@@ -133,7 +133,9 @@ public class HeartbeatEndpointTask
   public EndpointStateMachine.EndPointStates call() throws Exception {
     rpcEndpoint.lock();
     try {
-      if (sendHeartbeat()) {
+      boolean fcrReadyAfterLeaseGrant = sendHeartbeat();
+      if (fcrReadyAfterLeaseGrant) {
+        // Send one follow-up; further work waits for the next scheduled heartbeat.
         sendHeartbeat();
       }
     } finally {
@@ -143,7 +145,10 @@ public class HeartbeatEndpointTask
   }
 
   /**
-   * Sends a heartbeat and returns whether a granted lease is ready for a pending FCR.
+   * Sends a heartbeat and processes its response.
+   *
+   * @return true if this heartbeat requested a lease, a lease is now cached and an FCR is pending, allowing an
+   *     immediate follow-up heartbeat; false otherwise, including on communication failure
    */
   private boolean sendHeartbeat() {
     SCMHeartbeatRequestProto.Builder requestBuilder = null;
@@ -232,36 +237,16 @@ public class HeartbeatEndpointTask
    * @param requestBuilder builder to which the report has to be added.
    */
   private void addReports(SCMHeartbeatRequestProto.Builder requestBuilder) {
-    boolean fcrReady = context.isFullContainerReportReady(
-        rpcEndpoint.getAddress());
     // Keep FCR snapshots and ICR collection independent of finalization.
     boolean supportsFCRLease = rpcEndpoint.supportsFullContainerReportLease();
-    boolean useFCRLease = context.isFullContainerReportLeaseEnabled(rpcEndpoint);
-    boolean hasFCRLease = rpcEndpoint.hasFullContainerReportLease();
-    if (supportsFCRLease && fcrReady) {
-      if (!useFCRLease || hasFCRLease) {
-        try {
-          ContainerReportsProto report = context.getFullContainerReportDiscardPendingICR(rpcEndpoint.getAddress());
-          if (report != null) {
-            if (useFCRLease) {
-              FullContainerReportLeaseProto lease = rpcEndpoint.takeFullContainerReportLease();
-              report = report.toBuilder().setFullContainerReportLease(lease).build();
-            }
-            requestBuilder.setContainerReport(report);
-          }
-        } catch (IOException | RuntimeException ex) {
-          LOG.warn("Failed to generate full container report for {}. Continuing heartbeat.",
-              rpcEndpoint.getAddress(), ex);
-        }
-      } else {
-        requestBuilder.setRequestFullContainerReportLease(true);
-      }
+    String excludedReportType = null;
+    if (supportsFCRLease) {
+      addFullContainerReport(requestBuilder);
+      // FCR is already set so don't set it again
+      excludedReportType = StateContext.CONTAINER_REPORTS_PROTO_NAME;
     }
 
-    for (Message report :
-        context.getAllAvailableReports(rpcEndpoint.getAddress(),
-            supportsFCRLease ? StateContext.CONTAINER_REPORTS_PROTO_NAME
-                : null)) {
+    for (Message report : context.getAllAvailableReports(rpcEndpoint.getAddress(), excludedReportType)) {
       String reportName = report.getDescriptorForType().getFullName();
       for (Descriptors.FieldDescriptor descriptor :
           SCMHeartbeatRequestProto.getDescriptor().getFields()) {
@@ -275,6 +260,38 @@ public class HeartbeatEndpointTask
           break;
         }
       }
+    }
+  }
+
+  /**
+   * Adds a fresh FCR or requests its lease for an endpoint that supports FCR leases.
+   *
+   * <p>Callers must hold the endpoint lock and invoke this before collecting queued ICRs.
+   *
+   * @param requestBuilder builder to which the report or lease request has to be added
+   */
+  private void addFullContainerReport(SCMHeartbeatRequestProto.Builder requestBuilder) {
+    if (!context.isFullContainerReportReady(rpcEndpoint.getAddress())) {
+      return;
+    }
+    boolean useFCRLease = context.isFullContainerReportLeaseEnabled(rpcEndpoint);
+    if (useFCRLease && !rpcEndpoint.hasFullContainerReportLease()) {
+      requestBuilder.setRequestFullContainerReportLease(true);
+      return;
+    }
+
+    try {
+      ContainerReportsProto report = context.getFullContainerReportDiscardPendingICR(rpcEndpoint.getAddress());
+      if (report == null) {
+        return;
+      }
+      if (useFCRLease) {
+        FullContainerReportLeaseProto lease = rpcEndpoint.takeFullContainerReportLease();
+        report = report.toBuilder().setFullContainerReportLease(lease).build();
+      }
+      requestBuilder.setContainerReport(report);
+    } catch (IOException | RuntimeException ex) {
+      LOG.warn("Failed to generate full container report for {}. Continuing heartbeat.", rpcEndpoint.getAddress(), ex);
     }
   }
 
