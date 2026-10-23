@@ -65,6 +65,8 @@ import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -440,6 +442,46 @@ public class TestHeartbeatEndpointTask {
     // The remainder stays queued and a follow-up heartbeat is scheduled now.
     assertTrue(context.hasPendingReports(TEST_SCM_ENDPOINT));
     verify(datanodeStateMachine).setNextHB(anyLong());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {0, -1})
+  public void testHeartbeatClampsNonPositiveReportLimit(int configuredLimit)
+      throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.setInt(HDDS_CONTAINER_REPORT_MAX_LIMIT, configuredLimit);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine, "");
+
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
+        .forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto) invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .build());
+
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
+    context.addEndpoint(TEST_SCM_ENDPOINT);
+    for (int i = 0; i < 3; i++) {
+      context.addIncrementalReport(
+          IncrementalContainerReportProto.getDefaultInstance());
+    }
+
+    // A non-positive configured limit is clamped to 1, so the heartbeat makes
+    // progress (one ICR) rather than sending nothing (0) or throwing (-1).
+    endpointTask.call();
+    assertEquals(1, argument.getValue().getIncrementalContainerReportCount());
+    assertTrue(context.hasPendingReports(TEST_SCM_ENDPOINT));
   }
 
   @Test

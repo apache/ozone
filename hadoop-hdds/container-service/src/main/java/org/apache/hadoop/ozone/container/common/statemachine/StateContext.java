@@ -393,13 +393,20 @@ public class StateContext {
   }
 
   /**
-   * Returns true if incremental reports are still queued for the endpoint.
+   * Returns true if any reports are still queued for the endpoint.
    */
   public boolean hasPendingReports(HostAndPort endpoint) {
     synchronized (incrementalReportsQueue) {
       List<Message> reportsForEndpoint = incrementalReportsQueue.get(endpoint);
-      return reportsForEndpoint != null && !reportsForEndpoint.isEmpty();
+      if (reportsForEndpoint != null && !reportsForEndpoint.isEmpty()) {
+        return true;
+      }
     }
+    Map<String, AtomicBoolean> fullReports =
+        isFullReportReadyToBeSent.get(endpoint);
+    return fullReports != null && fullReports.entrySet().stream()
+        .anyMatch(report -> report.getValue().get()
+            && type2Reports.get(report.getKey()).get() != null);
   }
 
   /**

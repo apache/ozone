@@ -107,8 +107,8 @@ public class HeartbeatEndpointTask
         HDDS_CONTAINER_ACTION_MAX_LIMIT_DEFAULT);
     this.maxPipelineActionsPerHB = conf.getInt(HDDS_PIPELINE_ACTION_MAX_LIMIT,
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
-    this.maxReportsPerHB = conf.getInt(HDDS_CONTAINER_REPORT_MAX_LIMIT,
-        HDDS_CONTAINER_REPORT_MAX_LIMIT_DEFAULT);
+    this.maxReportsPerHB = Math.max(1, conf.getInt(HDDS_CONTAINER_REPORT_MAX_LIMIT,
+        HDDS_CONTAINER_REPORT_MAX_LIMIT_DEFAULT));
     this.datanodeDetails = context.getParent().getDatanodeDetails();
     this.versionManager = context.getParent().getVersionManager();
 
