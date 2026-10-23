@@ -234,18 +234,31 @@ final class SimScheduler {
     return true;
   }
 
-  /** Runs handler work queued at the current time, without firing timers. */
+  /**
+   * Runs the queued handler work without firing timers. When only lanes held up by a slow handler have work, the clock
+   * moves to the end of the first hold-up.
+   */
   void drainHandlers(long maxSteps) {
     long count = 0;
     while (hasPendingHandlerWork()) {
       if (++count > maxSteps) {
         throw new IllegalStateException("Event handlers did not settle after " + maxSteps + " steps");
       }
+      long now = clock.millis();
+      long nextTime = Long.MAX_VALUE;
       List<Lane> ready = new ArrayList<>();
       for (Lane lane : lanes) {
         if (!lane.tasks.isEmpty()) {
-          ready.add(lane);
+          if (lane.busyUntil <= now) {
+            ready.add(lane);
+          } else {
+            nextTime = Math.min(nextTime, lane.busyUntil);
+          }
         }
+      }
+      if (ready.isEmpty()) {
+        advanceTo(nextTime);
+        continue;
       }
       Lane lane = ready.get(random.nextInt(ready.size()));
       Task task = lane.tasks.pollFirst();

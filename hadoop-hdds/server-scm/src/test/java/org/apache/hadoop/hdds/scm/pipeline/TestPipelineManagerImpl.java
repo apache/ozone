@@ -200,6 +200,7 @@ public class TestPipelineManagerImpl {
 
       assertEquals(id, pipeline.getId());
       assertEquals(testClock.millis(), pipelineManager.getPipeline(id).getCreationTimestamp().toEpochMilli());
+      assertEquals(testClock.instant(), pipelineManager.getPipeline(id).getStateEnterTime());
     } finally {
       buffer.close();
       pipelineManager.close();

@@ -519,14 +519,18 @@ final class SimDatanode {
       if (generation != expectedGeneration) {
         return;
       }
-      queuedCommands.merge(type, -1, Integer::sum);
-      queuedCommands.remove(type, 0);
       if (command.getTerm() < latestTerm) {
         sim.count("datanode.staleTermCommandDropped");
+      } else if (execute(command)) {
         return;
       }
-      execute(command);
+      dequeue(type);
     });
+  }
+
+  private void dequeue(SCMCommandProto.Type type) {
+    queuedCommands.merge(type, -1, Integer::sum);
+    queuedCommands.remove(type, 0);
   }
 
   /** Reads a command from a heartbeat response like HeartbeatEndpointTask; null for commands not simulated. */
@@ -569,7 +573,11 @@ final class SimDatanode {
     return command;
   }
 
-  private void execute(SCMCommand<?> command) {
+  /**
+   * @return true if the command is still running. Like ReplicationSupervisor, a replication or reconstruction stays
+   *     in the command queue report until it ends.
+   */
+  private boolean execute(SCMCommand<?> command) {
     switch (command.getType()) {
     case createPipelineCommand:
       createPipeline((CreatePipelineCommand) command);
@@ -581,14 +589,12 @@ final class SimDatanode {
       closeContainer((CloseContainerCommand) command);
       break;
     case replicateContainerCommand:
-      replicate((ReplicateContainerCommand) command);
-      break;
+      return replicate((ReplicateContainerCommand) command);
     case deleteContainerCommand:
       delete((DeleteContainerCommand) command);
       break;
     case reconstructECContainersCommand:
-      reconstruct((ReconstructECContainersCommand) command);
-      break;
+      return reconstruct((ReconstructECContainersCommand) command);
     case deleteBlocksCommand:
       deleteBlocks((DeleteBlocksCommand) command);
       break;
@@ -600,6 +606,7 @@ final class SimDatanode {
     default:
       throw new IllegalStateException("Not simulated: " + command.getType());
     }
+    return false;
   }
 
   private void createPipeline(CreatePipelineCommand command) {
@@ -661,27 +668,42 @@ final class SimDatanode {
     }
   }
 
-  private void replicate(ReplicateContainerCommand command) {
+  private boolean replicate(ReplicateContainerCommand command) {
     if (command.hasExpired(sim.now())) {
       sim.count("datanode.replicate.expired");
-      return;
+      return false;
     }
     SimReplica source = replicas.get(command.getContainerID());
     if (source == null || !(source.getState() == State.CLOSED || source.getState() == State.QUASI_CLOSED
         || source.getState() == State.UNHEALTHY)) {
       sim.count("datanode.replicate.noSource");
-      return;
+      return false;
     }
     SimDatanode target = sim.datanode(command.getTargetDatanode().getID());
     SimReplica copy = source.importedCopy();
+    long sourceGeneration = generation;
+    long targetGeneration = target.generation;
     long transferMs = sim.config().getReplicationTransferMs(copy.getUsed(), sim.random(SimRandom.DATANODE));
     sim.scheduler().schedule(name + ".push #" + command.getContainerID() + " to " + target.getName(), transferMs,
-        () -> target.importReplica(copy, this));
+        () -> {
+          if (generation != sourceGeneration) {
+            sim.count("datanode.import.sourceStopped");
+            return;
+          }
+          dequeue(SCMCommandProto.Type.replicateContainerCommand);
+          target.importReplica(copy, this, targetGeneration);
+        });
+    return true;
   }
 
-  private void importReplica(SimReplica copy, SimDatanode source) {
+  /** Imports a pushed replica, unless this datanode stopped or restarted since the push started. */
+  private void importReplica(SimReplica copy, SimDatanode source, long expectedGeneration) {
     if (!running) {
       sim.count("datanode.import.targetDown");
+      return;
+    }
+    if (generation != expectedGeneration) {
+      sim.count("datanode.import.targetRestarted");
       return;
     }
     if (replicas.containsKey(copy.getContainerId())) {
@@ -700,21 +722,21 @@ final class SimDatanode {
    * indexes on the targets, rebuilds them from the source indexes, and closes them. If a source or a target fails, it
    * deletes the replicas it created. If the coordinator itself stops, they stay RECOVERING until they time out.
    */
-  private void reconstruct(ReconstructECContainersCommand command) {
+  private boolean reconstruct(ReconstructECContainersCommand command) {
     if (command.hasExpired(sim.now())) {
       sim.count("datanode.reconstruct.expired");
-      return;
+      return false;
     }
     long containerId = command.getContainerID();
     if (command.getSources().size() < command.getEcReplicationConfig().getData()) {
       sim.violation("SCM asked " + name + " to reconstruct #" + containerId + " from " + command.getSources().size()
           + " sources, fewer than the " + command.getEcReplicationConfig().getData() + " data indexes");
-      return;
+      return false;
     }
     SimReplica template = readSources(command);
     if (template == null) {
       sim.count("datanode.reconstruct.sourceUnavailable");
-      return;
+      return false;
     }
     byte[] missing = command.getMissingContainerIndexes().toByteArray();
     List<DatanodeDetails> targetNodes = command.getTargetDatanodes();
@@ -725,7 +747,7 @@ final class SimDatanode {
         // createRecoveringContainer fails, for example with CONTAINER_EXISTS.
         sim.count("datanode.reconstruct.targetUnavailable");
         created.forEach((t, replica) -> t.dropReconstructed(replica));
-        return;
+        return false;
       }
       SimReplica replica = SimReplica.recovering(containerId, target.getId().toString(), missing[i], template);
       target.addRecovering(replica);
@@ -738,6 +760,7 @@ final class SimDatanode {
         sim.count("datanode.reconstruct.coordinatorStopped");
         return;
       }
+      dequeue(SCMCommandProto.Type.reconstructECContainersCommand);
       boolean targetsReady = created.entrySet().stream().allMatch(e -> e.getKey().isRecovering(e.getValue()));
       if (readSources(command) == null || !targetsReady) {
         sim.count("datanode.reconstruct.failed");
@@ -747,6 +770,7 @@ final class SimDatanode {
       created.forEach((t, replica) -> t.finishRecovering(replica));
       sim.recordReconstruction(this, containerId, created.keySet());
     });
+    return true;
   }
 
   /**

@@ -98,9 +98,8 @@ public final class Pipeline {
    * Make sure that you set the value of <i>creationTimestamp</i> properly while
    * creating the new Pipeline object.
    * <br><br>
-   * There is no need to worry about the value of <i>stateEnterTime</i> as it's
-   * set to <i>Instant.now</i> when you crate the Pipeline object as part of
-   * state change.
+   * <i>stateEnterTime</i> defaults to <i>Instant.now</i>. A copy made by {@link #toBuilder()} keeps it, so set it
+   * when the new Pipeline object has a new state.
    */
   private Pipeline(Builder b) {
     id = b.id;
@@ -634,6 +633,7 @@ public final class Pipeline {
       this.nodesInOrder = pipeline.nodesInOrder;
       this.leaderId = pipeline.getLeaderId();
       this.creationTimestamp = pipeline.getCreationTimestamp();
+      this.stateEnterTime = pipeline.getStateEnterTime();
       this.suggestedLeaderId = pipeline.getSuggestedLeaderId();
       if (nodeStatus != null) {
         final ImmutableMap.Builder<DatanodeDetails, Integer> b = ImmutableMap.builder();
@@ -717,7 +717,7 @@ public final class Pipeline {
       return this;
     }
 
-    /** Time the pipeline entered its state; defaults to now. */
+    /** Time the pipeline entered its state; defaults to now, or for a copy to the time of the original. */
     public Builder setStateEnterTime(Instant instant) {
       this.stateEnterTime = instant;
       return this;

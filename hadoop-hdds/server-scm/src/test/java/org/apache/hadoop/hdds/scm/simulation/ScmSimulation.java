@@ -81,6 +81,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
+import org.apache.hadoop.hdds.scm.node.InvalidNodeStateException;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -835,11 +836,17 @@ final class ScmSimulation implements AutoCloseable {
       count("admin." + operation + ".noLeader");
       return false;
     }
+    DatanodeDetails node = nodeManager.getNode(dn.getId());
+    if (node == null) {
+      // SCM does not know the node until it registers, for example after SCM restarted.
+      count("admin." + operation + ".unregistered");
+      return false;
+    }
     try {
-      command.run(nodeManager.getNode(dn.getId()));
+      command.run(node);
       record("admin." + operation, dn.getName());
       return true;
-    } catch (Exception e) {
+    } catch (NodeNotFoundException | InvalidNodeStateException e) {
       count("admin." + operation + ".rejected");
       return false;
     }
@@ -1137,6 +1144,7 @@ final class ScmSimulation implements AutoCloseable {
 
   private void checkConvergenceOnce() {
     scheduler.drainHandlers(1_000_000);
+    collectHandlerFailures();
     checkTopology("after settling, ");
     ReplicationManager rm = scm.getReplicationManager();
     rm.processAll();
@@ -1618,6 +1626,6 @@ final class ScmSimulation implements AutoCloseable {
   /** An admin operation of NodeDecommissionManager on a node. */
   @FunctionalInterface
   private interface AdminCommand {
-    void run(DatanodeDetails node) throws Exception;
+    void run(DatanodeDetails node) throws NodeNotFoundException, InvalidNodeStateException;
   }
 }

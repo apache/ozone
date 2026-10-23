@@ -94,7 +94,7 @@ public final class PipelineStateManagerImpl implements PipelineStateManager {
   @Override
   public void addPipeline(HddsProtos.Pipeline pipelineProto)
       throws DuplicatedPipelineIdException, RocksDatabaseException, CodecException {
-    Pipeline pipeline = Pipeline.getFromProtobuf(pipelineProto);
+    Pipeline pipeline = Pipeline.toBuilder(pipelineProto).setStateEnterTime(clock.instant()).build();
     lock.writeLock().lock();
     try {
       if (pipelineStore != null) {
