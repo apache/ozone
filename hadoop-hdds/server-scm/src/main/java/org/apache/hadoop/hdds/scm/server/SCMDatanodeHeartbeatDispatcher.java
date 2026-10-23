@@ -95,7 +95,20 @@ public final class SCMDatanodeHeartbeatDispatcher {
 
     } else {
 
-      // Process the last known version reported by the datanode only when attached.
+      // Stale and dead nodes must pass a version compatibility check before their heartbeat
+      // timestamp is updated. Without this gate a node that went unhealthy during a rolling
+      // upgrade could resurrect at an incompatible software version. If the check fails, ask
+      // the node to re-register so the full registration fence runs with current version info.
+      if (isUnhealthyWithIncompatibleVersion(datanodeDetails, heartbeat)) {
+        LOG.info("Node {} is not healthy and reported an incompatible version {}. Asking to re-register.",
+            datanodeDetails, heartbeat.getDatanodeVersion());
+        nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
+        return nodeManager.getCommandQueue(datanodeDetails.getID());
+      }
+
+      // Process the version report only after passing the fence check. Calling processVersionReport
+      // for fenced nodes would invoke shouldFenceDatanode a second time via sendFinalizeToDatanodeIfNeeded,
+      // producing duplicate log entries. Version details for fenced nodes are captured above.
       if (heartbeat.hasDatanodeVersion()) {
         LOG.debug("Processing DataNode version report.");
         nodeManager.processVersionReport(datanodeDetails, heartbeat.getDatanodeVersion());
@@ -104,17 +117,6 @@ public final class SCMDatanodeHeartbeatDispatcher {
       CommandQueueReportProto commandQueueReport = null;
       if (heartbeat.hasCommandQueueReport()) {
         commandQueueReport = heartbeat.getCommandQueueReport();
-      }
-
-      // Stale and dead nodes must pass a version compatibility check before their heartbeat
-      // timestamp is updated. Without this gate a node that went unhealthy during a rolling
-      // upgrade could resurrect at an incompatible software version. If the check fails, ask
-      // the node to re-register so the full registration fence runs with current version info.
-      if (isUnhealthyWithIncompatibleVersion(datanodeDetails, heartbeat)) {
-        LOG.info("Node {} is not healthy and reported an incompatible version. Asking to re-register.",
-            datanodeDetails);
-        nodeManager.addDatanodeCommand(datanodeDetails.getID(), new ReregisterCommand());
-        return nodeManager.getCommandQueue(datanodeDetails.getID());
       }
 
       // should we dispatch heartbeat through eventPublisher?
