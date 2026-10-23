@@ -49,8 +49,8 @@ public class SnapshotDiffJob {
   private long totalDiffEntries;
   private String largestEntryKey;
 
-  // Reason tells why the job was FAILED. It should be set only if job status
-  // is FAILED.
+  // Failure explanation when status is FAILED; optimized merge-join DONE jobs also
+  // store the dependency ordering summary here for get-report responses.
   private String reason;
 
   // Represents current sub-status of the job if the job is in IN_PROGRESS state.

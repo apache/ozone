@@ -33,8 +33,8 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -150,6 +150,7 @@ public final class SnapDiffJobStore implements AutoCloseable {
   private long reportIndex;
   private String largestReportKey;
   private boolean reportWriteStarted;
+  private boolean reportDependencyOrdered;
 
   private long newListCount;
   private long oldListCount;
@@ -252,14 +253,6 @@ public final class SnapDiffJobStore implements AutoCloseable {
   public void putOldList(long objectId, byte[] entryValue) throws IOException {
     oldListCount++;
     batchPut(oldListCf, objectIdKeyBuffer(objectId), entryValue);
-  }
-
-  long getNewListCount() {
-    return newListCount;
-  }
-
-  long getOldListCount() {
-    return oldListCount;
   }
 
   long getClassifiedCount(DiffType diffType) {
@@ -600,6 +593,14 @@ public final class SnapDiffJobStore implements AutoCloseable {
     reportWriteStarted = true;
     reportIndex = 0;
     largestReportKey = "";
+    reportDependencyOrdered = false;
+  }
+
+  /**
+   * Whether the last finished report write applied dependency ordering (FSO merge-join).
+   */
+  public boolean isReportDependencyOrdered() {
+    return reportDependencyOrdered;
   }
 
   /**
@@ -640,12 +641,13 @@ public final class SnapDiffJobStore implements AutoCloseable {
   /**
    * Flushes pending report rows and returns the entry count and largest report key.
    */
-  public Pair<Long, String> finishReportWrite() throws IOException {
+  public Pair<Long, String> finishReportWrite(boolean dependencyOrdered) throws IOException {
     if (!reportWriteStarted) {
       throw new IllegalStateException("Snap diff report write not started for job " + jobId);
     }
     flushWrites();
     reportWriteStarted = false;
+    reportDependencyOrdered = dependencyOrdered;
     return Pair.of(reportIndex, largestReportKey);
   }
 

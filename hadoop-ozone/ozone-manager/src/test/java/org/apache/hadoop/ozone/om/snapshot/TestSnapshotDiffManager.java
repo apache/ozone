@@ -25,6 +25,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
@@ -57,6 +59,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.RE
 import static org.apache.ratis.util.JavaUtils.attempt;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -185,6 +188,7 @@ public class TestSnapshotDiffManager {
   private List<ColumnFamilyHandle> columnFamilyHandles;
   private ColumnFamilyHandle snapDiffJobTable;
   private ColumnFamilyHandle snapDiffReportTable;
+  private ColumnFamilyHandle snapDiffPurgedJobTable;
   private SnapshotDiffManager snapshotDiffManager;
   private final List<JobStatus> jobStatuses = Arrays.asList(QUEUED, IN_PROGRESS,
       DONE, REJECTED, FAILED);
@@ -260,7 +264,7 @@ public class TestSnapshotDiffManager {
         new ColumnFamilyDescriptor(
             StringUtils.string2Bytes(SNAP_DIFF_REPORT_TABLE_NAME),
             columnFamilyOptions));
-    ColumnFamilyHandle snapDiffPurgedJobTable = db.get().createColumnFamily(
+    snapDiffPurgedJobTable = db.get().createColumnFamily(
         new ColumnFamilyDescriptor(
             StringUtils.string2Bytes(SNAP_DIFF_PURGED_JOB_TABLE_NAME),
             columnFamilyOptions));
@@ -329,6 +333,9 @@ public class TestSnapshotDiffManager {
     when(configuration.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
         OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT))
         .thenReturn(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT);
+    when(configuration.getBoolean(OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED,
+        OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED_DEFAULT))
+        .thenReturn(OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED_DEFAULT);
 
     for (int i = 0; i < jobStatuses.size(); i++) {
       when(snapshotInfoTable.get(getTableKey(VOLUME_NAME, BUCKET_NAME,
@@ -372,6 +379,14 @@ public class TestSnapshotDiffManager {
         snapDiffJobTable, snapDiffReportTable, snapDiffPurgedJobTable,
         columnFamilyOptions, codecRegistry);
     when(omSnapshotManager.getDiffCleanupServiceInterval()).thenReturn(0L);
+  }
+
+  private SnapshotDiffManager newSnapshotDiffManagerWithOptimizedEnabled(boolean enabled)
+      throws IOException {
+    when(configuration.getBoolean(OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED,
+        OZONE_OM_SNAPSHOT_DIFF_OPTIMIZED_ENABLED_DEFAULT)).thenReturn(enabled);
+    return new SnapshotDiffManager(db, ozoneManager, snapDiffJobTable, snapDiffReportTable,
+        snapDiffPurgedJobTable, columnFamilyOptions, codecRegistry);
   }
 
   private CacheLoader<UUID, OmSnapshot> mockCacheLoader() {
@@ -1600,15 +1615,16 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testSubmitSnapshotDiffDoneResubmitsForFsoWhenRequestingOrderedReport()
+  public void testSubmitDoneResubmitsFsoOrdered()
       throws Exception {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
         DONE, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
         false, false, 1L, null, 0.0, null);
-    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
+    SnapshotDiffManager optimizedManager = newSnapshotDiffManagerWithOptimizedEnabled(true);
+    optimizedManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
 
-    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    SnapshotDiffManager spy = spy(optimizedManager);
     doReturn(FILE_SYSTEM_OPTIMIZED).when(spy).getBucketLayout(anyString(), anyString(), any());
     doNothing().when(spy).generateSnapshotDiffReport(eq(ctx.diffJobKey), anyString(),
         eq(ctx.volumeName), eq(ctx.bucketName), eq(ctx.fromSnapshotName), eq(ctx.toSnapshotName),
@@ -1630,15 +1646,16 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testSubmitSnapshotDiffInProgressResubmitsForFsoWhenRequestingOrderedReport()
+  public void testSubmitInProgressResubmitsFsoOrdered()
       throws Exception {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
         IN_PROGRESS, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
         false, false, 0L, null, 0.0, null);
-    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
+    SnapshotDiffManager optimizedManager = newSnapshotDiffManagerWithOptimizedEnabled(true);
+    optimizedManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
 
-    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    SnapshotDiffManager spy = spy(optimizedManager);
     doReturn(FILE_SYSTEM_OPTIMIZED).when(spy).getBucketLayout(anyString(), anyString(), any());
     doNothing().when(spy).generateSnapshotDiffReport(eq(ctx.diffJobKey), anyString(),
         eq(ctx.volumeName), eq(ctx.bucketName), eq(ctx.fromSnapshotName), eq(ctx.toSnapshotName),
@@ -1659,7 +1676,48 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testSubmitSnapshotDiffDoneDoesNotResubmitForObsWhenRequestingOrderedReport()
+  public void testSubmitPollOmitsDependencyReason() throws IOException {
+    SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
+    SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
+        DONE, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
+        false, false, 1L, null, 0.0, null);
+    existing.setReason("Report is dependency ordered.");
+    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
+
+    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    SubmitSnapshotDiffResponse response = spy.submitSnapshotDiff(ctx.volumeName, ctx.bucketName,
+        ctx.fromSnapshotName, ctx.toSnapshotName, false, false, false);
+
+    assertThat(response.getResponse())
+        .contains("Status: DONE")
+        .contains("Please get the report using --get-report option")
+        .doesNotContain("Report is dependency")
+        .doesNotContain(", reason:");
+  }
+
+  @Test
+  public void testSubmitDoneNoResubmitOptimizedOff()
+      throws IOException {
+    SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
+    SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
+        DONE, ctx.volumeName, ctx.bucketName, ctx.fromSnapshotName, ctx.toSnapshotName,
+        false, false, 1L, null, 0.0, null);
+    snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey, existing);
+
+    SnapshotDiffManager spy = spy(snapshotDiffManager);
+    doReturn(FILE_SYSTEM_OPTIMIZED).when(spy).getBucketLayout(anyString(), anyString(), any());
+
+    SubmitSnapshotDiffResponse response = spy.submitSnapshotDiff(ctx.volumeName, ctx.bucketName,
+        ctx.fromSnapshotName, ctx.toSnapshotName, false, false, true);
+    assertTrue(response.getResponse().contains("Please get the report using --get-report option"));
+
+    verify(spy, never()).generateSnapshotDiffReport(anyString(), anyString(),
+        anyString(), anyString(), anyString(), anyString(), anyBoolean(), anyBoolean(),
+        anyBoolean());
+  }
+
+  @Test
+  public void testSubmitDoneNoResubmitObsOrdered()
       throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
@@ -1680,7 +1738,7 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testSubmitSnapshotDiffDoneDoesNotResubmitWhenReportAlreadyOrdered()
+  public void testSubmitDoneNoResubmitAlreadyOrdered()
       throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
@@ -1749,7 +1807,7 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testUpdateJobStatusToDoneSkipsSupersededJob() throws IOException {
+  public void testUpdateJobStatusToDone() throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     String liveJobId = UUID.randomUUID().toString();
     snapshotDiffManager.getSnapDiffJobTable().put(ctx.diffJobKey,
@@ -1757,13 +1815,48 @@ public class TestSnapshotDiffManager {
             ctx.fromSnapshotName, ctx.toSnapshotName, false, false, 0L, null, 0.0, null));
 
     // A superseded task's publish is ignored, the live job's own publish goes through.
-    snapshotDiffManager.updateJobStatusToDone(ctx.diffJobKey, UUID.randomUUID().toString(), 5L, "staleKey");
+    snapshotDiffManager.updateJobStatusToDone(ctx.diffJobKey, UUID.randomUUID().toString(), 5L, "staleKey", null);
     assertEquals(IN_PROGRESS, snapshotDiffManager.getSnapDiffJobTable().get(ctx.diffJobKey).getStatus());
 
-    snapshotDiffManager.updateJobStatusToDone(ctx.diffJobKey, liveJobId, 5L, "liveKey");
-    SnapshotDiffJob done = snapshotDiffManager.getSnapDiffJobTable().get(ctx.diffJobKey);
-    assertEquals(DONE, done.getStatus());
-    assertEquals("liveKey", done.getLargestEntryKey());
+    snapshotDiffManager.updateJobStatusToDone(ctx.diffJobKey, liveJobId, 5L, "liveKey", null);
+    SnapshotDiffJob legacyDone = snapshotDiffManager.getSnapDiffJobTable().get(ctx.diffJobKey);
+    assertEquals(DONE, legacyDone.getStatus());
+    assertEquals("liveKey", legacyDone.getLargestEntryKey());
+    assertFalse(legacyDone.isOrderedReport());
+    assertTrue(org.apache.commons.lang3.StringUtils.isEmpty(legacyDone.getReason()));
+
+    SnapDiffTestContext legacyCtx = setupRandomSnapDiffTestContext();
+    String legacyJobId = UUID.randomUUID().toString();
+    SnapshotDiffJob legacyJob = new SnapshotDiffJob(0L, legacyJobId, IN_PROGRESS, legacyCtx.volumeName,
+        legacyCtx.bucketName, legacyCtx.fromSnapshotName, legacyCtx.toSnapshotName, false, false,
+        0L, null, 0.0, null);
+    legacyJob.setOrderedReport(true);
+    snapshotDiffManager.getSnapDiffJobTable().put(legacyCtx.diffJobKey, legacyJob);
+    snapshotDiffManager.updateJobStatusToDone(legacyCtx.diffJobKey, legacyJobId, 3L, "legacyKey", null);
+    SnapshotDiffJob legacyPreserved = snapshotDiffManager.getSnapDiffJobTable().get(legacyCtx.diffJobKey);
+    assertTrue(legacyPreserved.isOrderedReport());
+    assertTrue(org.apache.commons.lang3.StringUtils.isEmpty(legacyPreserved.getReason()));
+
+    SnapDiffTestContext optimizedCtx = setupRandomSnapDiffTestContext();
+    String optimizedJobId = UUID.randomUUID().toString();
+    snapshotDiffManager.getSnapDiffJobTable().put(optimizedCtx.diffJobKey,
+        new SnapshotDiffJob(0L, optimizedJobId, IN_PROGRESS, optimizedCtx.volumeName,
+            optimizedCtx.bucketName, optimizedCtx.fromSnapshotName, optimizedCtx.toSnapshotName,
+            false, false, 0L, null, 0.0, null));
+    snapshotDiffManager.updateJobStatusToDone(optimizedCtx.diffJobKey, optimizedJobId, 4L, "optKey", false);
+    SnapshotDiffJob unorderedDone = snapshotDiffManager.getSnapDiffJobTable().get(optimizedCtx.diffJobKey);
+    assertFalse(unorderedDone.isOrderedReport());
+    assertEquals("Report is dependency unordered.", unorderedDone.getReason());
+
+    SnapDiffTestContext orderedCtx = setupRandomSnapDiffTestContext();
+    String orderedJobId = UUID.randomUUID().toString();
+    snapshotDiffManager.getSnapDiffJobTable().put(orderedCtx.diffJobKey,
+        new SnapshotDiffJob(0L, orderedJobId, IN_PROGRESS, orderedCtx.volumeName, orderedCtx.bucketName,
+            orderedCtx.fromSnapshotName, orderedCtx.toSnapshotName, false, false, 0L, null, 0.0, null));
+    snapshotDiffManager.updateJobStatusToDone(orderedCtx.diffJobKey, orderedJobId, 2L, "ordKey", true);
+    SnapshotDiffJob orderedDone = snapshotDiffManager.getSnapDiffJobTable().get(orderedCtx.diffJobKey);
+    assertTrue(orderedDone.isOrderedReport());
+    assertEquals("Report is dependency ordered.", orderedDone.getReason());
   }
 
   @Test
@@ -1809,7 +1902,7 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testGetSnapshotDiffReportReportOnlyReturnsNotFoundWhenNoJob()
+  public void testGetReportNotFoundWhenNoJob()
       throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
 
@@ -1819,7 +1912,7 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testGetSnapshotDiffReportReportOnlyRejectedSuggestsResubmit()
+  public void testGetReportRejected()
       throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
@@ -1833,7 +1926,7 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testGetSnapshotDiffReportReportOnlyFailedSuggestsResubmit()
+  public void testGetReportFailed()
       throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
@@ -1849,7 +1942,7 @@ public class TestSnapshotDiffManager {
   }
 
   @Test
-  public void testGetSnapshotDiffReportReportOnlyCancelledReturnsCancelledStatus()
+  public void testGetReportCancelled()
       throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
@@ -2036,7 +2129,7 @@ public class TestSnapshotDiffManager {
   @EnumSource(value = SnapshotDiffResponse.SubStatus.class,
       names = {"OBJECT_ID_MAP_GEN_OBS", "OBJECT_ID_MAP_GEN_FSO", "OBJECT_ID_MAP_GEN_FSO_DIR",
           "OBJECT_ID_MAP_GEN_FSO_FILE"})
-  public void testGetSnapshotDiffReportReportOnlyInProgressIncludesProgressDetails(
+  public void testGetReportInProgressIncludesProgress(
       SnapshotDiffResponse.SubStatus subStatus) throws IOException {
     SnapDiffTestContext ctx = setupRandomSnapDiffTestContext();
     SnapshotDiffJob existing = new SnapshotDiffJob(0L, UUID.randomUUID().toString(),
