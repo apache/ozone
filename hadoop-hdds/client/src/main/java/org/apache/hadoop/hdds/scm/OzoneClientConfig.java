@@ -380,6 +380,19 @@ public class OzoneClientConfig {
       description = "Timeout for receiving streaming read responses.")
   private Duration streamReadTimeout = Duration.ofSeconds(10);
 
+  @Config(key = "ozone.client.metrics.mode",
+      defaultValue = "AUTO",
+      type = ConfigType.STRING,
+      tags = {ConfigTag.CLIENT},
+      description = "When the client starts the Hadoop metrics system for its metrics. " +
+          "ALWAYS: when the first datanode client is created (the behavior before HDDS-17351). " +
+          "AUTO: only if a metrics sink is configured for the xceiverclientmetrics prefix in " +
+          "hadoop-metrics2-xceiverclientmetrics.properties or hadoop-metrics2.properties. " +
+          "NEVER: never. In all modes the client metrics are registered, so a process that starts the metrics " +
+          "system itself (any Ozone service) publishes them. Starting it takes about 100 ms, which matters for " +
+          "short-lived clients such as YARN containers and CLI commands.")
+  private String metricsMode = MetricsMode.AUTO.name();
+
   @PostConstruct
   public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -635,6 +648,19 @@ public class OzoneClientConfig {
     this.checksumCombineMode = checksumCombineMode;
   }
 
+  public MetricsMode getMetricsMode() {
+    try {
+      return MetricsMode.valueOf(metricsMode);
+    } catch (IllegalArgumentException iae) {
+      LOG.warn("Bad client metrics mode: {}, using {}.", metricsMode, MetricsMode.AUTO);
+      return MetricsMode.AUTO;
+    }
+  }
+
+  public void setMetricsMode(MetricsMode metricsMode) {
+    this.metricsMode = metricsMode.name();
+  }
+
   public void setEcReconstructStripeReadPoolLimit(int poolLimit) {
     this.ecReconstructStripeReadPoolLimit = poolLimit;
   }
@@ -771,6 +797,15 @@ public class OzoneClientConfig {
   public enum ChecksumCombineMode {
     MD5MD5CRC,  // MD5 of block checksums, which are MD5 over chunk CRCs
     COMPOSITE_CRC  // Block/chunk-independent composite CRC
+  }
+
+  /**
+   * When the client starts the Hadoop metrics system, see ozone.client.metrics.mode.
+   */
+  public enum MetricsMode {
+    ALWAYS,
+    AUTO,
+    NEVER
   }
 
   /**
