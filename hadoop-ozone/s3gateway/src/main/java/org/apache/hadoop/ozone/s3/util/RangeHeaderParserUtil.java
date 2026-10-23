@@ -49,16 +49,21 @@ public final class RangeHeaderParserUtil {
     RangeHeader rangeHeader;
     Matcher matcher = RANGE_HEADER_MATCH_PATTERN.matcher(rangeHeaderVal);
     if (matcher.matches()) {
-      if (!matcher.group("start").equals("")) {
-        start = Long.parseLong(matcher.group("start"));
-      } else {
-        noStart = true;
-      }
-      if (!matcher.group("end").equals("")) {
-        end = Long.parseLong(matcher.group("end"));
-      } else {
-        noEnd = true;
-        end = length - 1;
+      try {
+        if (!matcher.group("start").equals("")) {
+          start = Long.parseLong(matcher.group("start"));
+        } else {
+          noStart = true;
+        }
+        if (!matcher.group("end").equals("")) {
+          end = Long.parseLong(matcher.group("end"));
+        } else {
+          noEnd = true;
+          end = length - 1;
+        }
+      } catch (NumberFormatException e) {
+        // A byte position that overflows a long is malformed, so read the full file.
+        return new RangeHeader(0, length - 1, true, false);
       }
       if (noStart && noEnd) {
         // "bytes=-" has neither a first byte nor a suffix length, so it is ignored.
