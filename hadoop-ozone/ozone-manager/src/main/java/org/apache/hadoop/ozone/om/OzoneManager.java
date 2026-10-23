@@ -594,6 +594,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
             .register(OZONE_BLACKLIST_GROUPS, this::reconfOzoneBlacklistGroups)
             .register(OZONE_READ_BLACKLIST_USERS, this::reconfOzoneReadBlacklistUsers)
             .register(OZONE_READ_BLACKLIST_GROUPS, this::reconfOzoneReadBlacklistGroups);
+    KeyLifecycleService.OZONE_KEY_LIFECYCLE_PROPERTIES.forEach(property ->
+        reconfigurationHandler.register(property, newVal -> reconfKeyLifecycleService(property, newVal)));
 
     // Allow dynamic SCM node/address reconfiguration without restarting OM.
     // Address keys use prefix matching to discover new nodes added after startup.
@@ -6254,6 +6256,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private String reconfOzoneThreadNumberDirDeletion(String newVal) {
     Preconditions.checkArgument(Integer.parseInt(newVal) >= 0,
         OZONE_THREAD_NUMBER_DIR_DELETION + " cannot be negative.");
+    return newVal;
+  }
+
+  private String reconfKeyLifecycleService(String property, String newVal) {
+    KeyLifecycleService keyLifecycleService = getKeyManager().getKeyLifecycleService();
+    if (keyLifecycleService == null) {
+      // The new value is picked up from the configuration when the service is started.
+      return newVal;
+    }
+    OzoneConfiguration newConf = new OzoneConfiguration(getConfiguration());
+    if (newVal == null) {
+      newConf.unset(property);
+    } else {
+      newConf.set(property, newVal);
+    }
+    keyLifecycleService.reconfigure(property, newConf);
     return newVal;
   }
 
