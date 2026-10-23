@@ -57,7 +57,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.crypto.Cipher;
 import javax.crypto.CipherInputStream;
@@ -192,6 +191,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.MemoizedSupplier;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1770,7 +1770,7 @@ public class RpcClient implements ClientProtocol {
             .build();
         dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
 
-        blocks.put(dn, createInputStream(dnKeyInfo, Function.identity()));
+        blocks.put(dn, createInputStream(dnKeyInfo, k -> k));
       }
 
       result.put(locationInfo, blocks);
@@ -2490,15 +2490,8 @@ public class RpcClient implements ClientProtocol {
    */
   private OzoneInputStream getInputStreamWithRetryFunction(
       OmKeyInfo keyInfo) throws IOException {
-    return createInputStream(keyInfo, omKeyInfo -> {
-      try {
-        return getKeyInfo(omKeyInfo.getVolumeName(), omKeyInfo.getBucketName(),
-            omKeyInfo.getKeyName(), true);
-      } catch (IOException e) {
-        LOG.error("Unable to lookup key {} on retry.", keyInfo.getKeyName(), e);
-        return null;
-      }
-    });
+    return createInputStream(keyInfo, omKeyInfo -> getKeyInfo(omKeyInfo.getVolumeName(),
+        omKeyInfo.getBucketName(), omKeyInfo.getKeyName(), true));
   }
 
   @Override
@@ -2676,7 +2669,7 @@ public class RpcClient implements ClientProtocol {
   }
 
   private OzoneInputStream createInputStream(
-      OmKeyInfo keyInfo, Function<OmKeyInfo, OmKeyInfo> retryFunction)
+      OmKeyInfo keyInfo, CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunction)
       throws IOException {
     // When Key is not MPU or when Key is MPU and encryption is not enabled
     // Need to revisit for GDP.

@@ -20,43 +20,79 @@ package org.apache.hadoop.ozone.client.io;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.junit.jupiter.api.Test;
 
 /**
- * Test {@link KeyInputStream#getBlockLocationInfo}.
+ * Tests the block location refresh function that {@link KeyInputStream} gives to each block stream.
  */
 public class TestKeyInputStream {
 
-  private static final BlockID BLOCK_ID = new BlockID(1L, 1L);
+  private static final BlockID BLOCK_ID = new BlockID(1, 1);
 
   @Test
-  public void testGetBlockLocationInfoWithNullKeyInfo() {
-    assertNull(KeyInputStream.getBlockLocationInfo(null, BLOCK_ID));
+  public void refreshReturnsNullWhenKeyLookupFails() throws IOException {
+    Function<BlockID, BlockLocationInfo> refresh = getRefreshFunction(keyInfo -> {
+      throw new IOException("lookup failed");
+    });
+
+    assertNull(refresh.apply(BLOCK_ID));
   }
 
   @Test
-  public void testGetBlockLocationInfoWithoutLocationVersions() {
-    OmKeyInfo keyInfo = mock(OmKeyInfo.class);
-    when(keyInfo.getLatestVersionLocations()).thenReturn(null);
+  public void refreshReturnsLocationFromRefreshedKey() throws IOException {
+    OmKeyLocationInfo refreshed = newLocation(BLOCK_ID);
+    Function<BlockID, BlockLocationInfo> refresh = getRefreshFunction(keyInfo -> newKeyInfo(refreshed));
 
-    assertNull(KeyInputStream.getBlockLocationInfo(keyInfo, BLOCK_ID));
+    assertSame(refreshed, refresh.apply(BLOCK_ID));
   }
 
   @Test
-  public void testGetBlockLocationInfoFindsBlock() {
-    OmKeyLocationInfo location = new OmKeyLocationInfo.Builder().setBlockID(BLOCK_ID).build();
-    OmKeyInfo keyInfo = mock(OmKeyInfo.class);
-    when(keyInfo.getLatestVersionLocations())
-        .thenReturn(new OmKeyLocationInfoGroup(0, Collections.singletonList(location)));
+  public void refreshReturnsNullWhenBlockIsNotInRefreshedKey() throws IOException {
+    Function<BlockID, BlockLocationInfo> refresh =
+        getRefreshFunction(keyInfo -> newKeyInfo(newLocation(new BlockID(2, 2))));
 
-    assertSame(location, KeyInputStream.getBlockLocationInfo(keyInfo, BLOCK_ID));
-    assertNull(KeyInputStream.getBlockLocationInfo(keyInfo, new BlockID(2L, 2L)));
+    assertNull(refresh.apply(BLOCK_ID));
+  }
+
+  private static Function<BlockID, BlockLocationInfo> getRefreshFunction(
+      CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunction) throws IOException {
+    AtomicReference<Function<BlockID, BlockLocationInfo>> refresh = new AtomicReference<>();
+    BlockInputStreamFactory factory = (repConfig, blockInfo, pipeline, token, xceiverFactory, refreshFunction,
+    config) -> {
+      refresh.set(refreshFunction);
+      return mock(BlockExtendedInputStream.class);
+    };
+    KeyInputStream.getFromOmKeyInfo(newKeyInfo(newLocation(BLOCK_ID)), null, retryFunction, factory,
+        new OzoneClientConfig()).close();
+    return refresh.get();
+  }
+
+  private static OmKeyLocationInfo newLocation(BlockID blockID) {
+    return new OmKeyLocationInfo.Builder().setBlockID(blockID).build();
+  }
+
+  private static OmKeyInfo newKeyInfo(OmKeyLocationInfo location) {
+    return new OmKeyInfo.Builder()
+        .setVolumeName("vol")
+        .setBucketName("bucket")
+        .setKeyName("key")
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .addOmKeyLocationInfoGroup(new OmKeyLocationInfoGroup(0, Collections.singletonList(location)))
+        .build();
   }
 }
