@@ -62,6 +62,7 @@ public class XceiverClientCreator implements XceiverClientFactory {
     if (clientConfig.isNettyWarmUpEnabled()) {
       NettyWarmUp.start(securityEnabled && conf.getBoolean(HDDS_GRPC_TLS_ENABLED, HDDS_GRPC_TLS_ENABLED_DEFAULT));
     }
+    XceiverClientMetrics.setMetricsMode(clientConfig.getMetricsMode());
     shortCircuitEnabled = clientConfig.isShortCircuitEnabled();
     if (shortCircuitEnabled) {
       domainSocketFactory = DomainSocketFactory.getInstance(conf);
