@@ -59,7 +59,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestSCMDatanodeHeartbeatDispatcher {
 
   @Test
-  public void testNodeReportDispatcher() throws IOException {
+  public void testNodeReportDispatcher() throws IOException, NodeNotFoundException {
 
     AtomicInteger eventReceived = new AtomicInteger();
 
@@ -68,6 +68,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.isNodeRegistered(any()))
         .thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
 
     SCMDatanodeHeartbeatDispatcher dispatcher =
         new SCMDatanodeHeartbeatDispatcher(mockNodeManager,
@@ -95,7 +96,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
   }
 
   @Test
-  public void testContainerReportDispatcher() throws IOException {
+  public void testContainerReportDispatcher() throws IOException, NodeNotFoundException {
 
 
     AtomicInteger eventReceived = new AtomicInteger();
@@ -108,6 +109,7 @@ public class TestSCMDatanodeHeartbeatDispatcher {
     NodeManager mockNodeManager = mock(NodeManager.class);
     when(mockNodeManager.isNodeRegistered(any()))
         .thenReturn(true);
+    when(mockNodeManager.getNodeStatus(any())).thenReturn(NodeStatus.inServiceHealthy());
 
     SCMDatanodeHeartbeatDispatcher dispatcher =
         new SCMDatanodeHeartbeatDispatcher(

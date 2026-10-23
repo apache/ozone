@@ -205,9 +205,6 @@ public final class SCMDatanodeHeartbeatDispatcher {
    */
   private boolean isUnhealthyWithIncompatibleVersion(DatanodeDetails datanodeDetails,
       SCMHeartbeatRequestProto heartbeat) {
-    if (!heartbeat.hasDatanodeVersion()) {
-      return false;
-    }
     try {
       return !nodeManager.getNodeStatus(datanodeDetails).isHealthy()
           && nodeManager.shouldFenceDatanode(datanodeDetails, heartbeat.getDatanodeVersion());
