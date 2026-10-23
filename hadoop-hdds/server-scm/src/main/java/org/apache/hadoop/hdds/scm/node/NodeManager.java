@@ -411,7 +411,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /**
    * Returns true if the datanode should be blocked from joining the cluster due to a version
    * incompatibility with this SCM. See {@code SCMNodeManager.shouldFenceDatanode} for the full
-   * set of conditions. Returns false by default for implementations that do not enforce versioning.
+   * set of conditions. Returns false by default for test implementations that do not enforce versioning.
    */
   default boolean shouldFenceDatanode(DatanodeDetails datanodeDetails,
       DatanodeVersionProto versionReport) {
