@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -58,7 +59,9 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -81,7 +84,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   @Test
   public void testPreExecute() throws Exception {
 
-    doPreExecute(createAllocateBlockRequest());
+    doPreExecute(createAllocateBlockRequest(OzoneStoragePolicy.getDefaultPolicy()));
 
   }
 
@@ -158,7 +161,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   public void testValidateAndUpdateCacheWithVolumeNotFound() throws Exception {
 
     OMRequest modifiedOmRequest =
-        doPreExecute(createAllocateBlockRequest());
+        doPreExecute(createAllocateBlockRequest(OzoneStoragePolicy.getDefaultPolicy()));
 
     OMAllocateBlockRequest omAllocateBlockRequest =
             getOmAllocateBlockRequest(modifiedOmRequest);
@@ -176,7 +179,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   public void testValidateAndUpdateCacheWithBucketNotFound() throws Exception {
 
     OMRequest modifiedOmRequest =
-        doPreExecute(createAllocateBlockRequest());
+        doPreExecute(createAllocateBlockRequest(OzoneStoragePolicy.getDefaultPolicy()));
 
     OMAllocateBlockRequest omAllocateBlockRequest =
             getOmAllocateBlockRequest(modifiedOmRequest);
@@ -198,7 +201,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   public void testValidateAndUpdateCacheWithKeyNotFound() throws Exception {
 
     OMRequest modifiedOmRequest =
-        doPreExecute(createAllocateBlockRequest());
+        doPreExecute(createAllocateBlockRequest(OzoneStoragePolicy.getDefaultPolicy()));
 
     OMAllocateBlockRequest omAllocateBlockRequest =
             getOmAllocateBlockRequest(modifiedOmRequest);
@@ -214,6 +217,80 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
     assertSame(omAllocateBlockResponse.getOMResponse().getStatus(),
         OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND);
 
+  }
+
+  @Test
+  public void testPreExecuteUsesPolicyStoredOnOpenKey() throws Exception {
+    // The bucket policy changed to HOT after the key was opened with COLD.
+    addVolumeAndBucketWithPolicy(OzoneStoragePolicy.HOT, false);
+    addKeyToOpenKeyTable(volumeName, bucketName, OzoneStoragePolicy.COLD);
+
+    // The client does not send the policy back.
+    doPreExecute(createAllocateBlockRequest());
+
+    verifyPolicySentToScm(OzoneStoragePolicy.COLD, false);
+  }
+
+  @Test
+  public void testPreExecuteUsesBucketPolicyWhenOpenKeyHasNoPolicy() throws Exception {
+    // The key was opened before storage policy support was finalized, so it has no policy. The bucket policy applies.
+    addVolumeAndBucketWithPolicy(OzoneStoragePolicy.COLD, false);
+    addKeyToOpenKeyTable(volumeName, bucketName, null);
+
+    doPreExecute(createAllocateBlockRequest());
+
+    verifyPolicySentToScm(OzoneStoragePolicy.COLD, false);
+  }
+
+  @Test
+  public void testPreExecuteUsesDefaultPolicyWhenOpenKeyAndBucketHaveNoPolicy() throws Exception {
+    addVolumeAndBucketWithPolicy(null, true);
+    addKeyToOpenKeyTable(volumeName, bucketName, null);
+
+    doPreExecute(createAllocateBlockRequest());
+
+    verifyPolicySentToScm(OzoneStoragePolicy.getDefaultPolicy(), true);
+  }
+
+  @Test
+  public void testPreExecuteWithKeyNotFound() throws Exception {
+    addVolumeAndBucketWithPolicy(OzoneStoragePolicy.HOT, true);
+
+    OMAllocateBlockRequest request = getOmAllocateBlockRequest(createAllocateBlockRequest());
+
+    assertThatThrownBy(() -> request.preExecute(ozoneManager))
+        .isInstanceOfSatisfying(OMException.class,
+            e -> assertThat(e.getResult()).isEqualTo(OMException.ResultCodes.KEY_NOT_FOUND));
+    verify(scmBlockLocationProtocol, never()).allocateBlock(anyLong(), anyInt(), any(), any(), any(), any(),
+        any(StoragePolicy.class), anyBoolean());
+  }
+
+  @Test
+  public void testPreExecuteUsesPolicySentByClient() throws Exception {
+    // No open key is needed when the client sends the policy; the fallback flag still comes from the bucket.
+    addVolumeAndBucketWithPolicy(OzoneStoragePolicy.HOT, false);
+
+    doPreExecute(createAllocateBlockRequest(OzoneStoragePolicy.COLD));
+
+    verifyPolicySentToScm(OzoneStoragePolicy.COLD, false);
+  }
+
+  private void addVolumeAndBucketWithPolicy(StoragePolicy storagePolicy, boolean allowFallback) throws Exception {
+    OmBucketInfo.Builder bucket = OmBucketInfo.newBuilder().setVolumeName(volumeName).setBucketName(bucketName)
+        .setBucketLayout(getBucketLayout())
+        .setStoragePolicy(storagePolicy).setAllowFallbackStoragePolicy(allowFallback);
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, omMetadataManager, bucket);
+    // OMKeyRequestTests stubs OzoneManager#getBucketInfo with an empty bucket, which preExecute reads.
+    when(ozoneManager.getBucketInfo(volumeName, bucketName)).thenReturn(bucket.build());
+  }
+
+  private void verifyPolicySentToScm(StoragePolicy expectedPolicy, boolean expectedAllowFallback) throws Exception {
+    ArgumentCaptor<StoragePolicy> policy = ArgumentCaptor.forClass(StoragePolicy.class);
+    ArgumentCaptor<Boolean> allowFallback = ArgumentCaptor.forClass(Boolean.class);
+    verify(scmBlockLocationProtocol).allocateBlock(anyLong(), anyInt(), any(), any(), any(), any(),
+        policy.capture(), allowFallback.capture());
+    assertThat(policy.getValue()).isEqualTo(expectedPolicy);
+    assertThat(allowFallback.getValue()).isEqualTo(expectedAllowFallback);
   }
 
   /**
@@ -488,6 +565,7 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
         .setVolumeName(volumeName).setBucketName(bucketName).setKeyName(keyName)
         .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
         .setType(replicationConfig.getReplicationType())
+        .setStoragePolicy(OzoneStoragePolicy.toProto(OzoneStoragePolicy.getDefaultPolicy()))
         .setSortDatanodes(true)
         .build();
     AllocateBlockRequest allocateBlockRequest = AllocateBlockRequest.newBuilder()
@@ -511,13 +589,21 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
   }
 
   protected OMRequest createAllocateBlockRequest() {
+    return createAllocateBlockRequest(null);
+  }
 
-    KeyArgs keyArgs = KeyArgs.newBuilder()
+  /** Creates the request the way a client sends it: without a policy when {@code storagePolicy} is null. */
+  protected OMRequest createAllocateBlockRequest(StoragePolicy storagePolicy) {
+
+    KeyArgs.Builder keyArgsBuilder = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setKeyName(keyName)
         .setFactor(((RatisReplicationConfig) replicationConfig).getReplicationFactor())
-        .setType(replicationConfig.getReplicationType())
-        .build();
+        .setType(replicationConfig.getReplicationType());
+    if (storagePolicy != null) {
+      keyArgsBuilder.setStoragePolicy(OzoneStoragePolicy.toProto(storagePolicy));
+    }
+    KeyArgs keyArgs = keyArgsBuilder.build();
 
     AllocateBlockRequest allocateBlockRequest =
         AllocateBlockRequest.newBuilder().setClientID(clientID)
@@ -532,9 +618,16 @@ public class TestOMAllocateBlockRequest extends OMKeyRequestTests {
 
   protected String addKeyToOpenKeyTable(String volumeName, String bucketName)
           throws Exception {
-    OMRequestTestUtils.addKeyToTable(true, volumeName, bucketName,
-        keyName, clientID, replicationConfig,
-        omMetadataManager);
+    return addKeyToOpenKeyTable(volumeName, bucketName, null);
+  }
+
+  /** Adds the open key with the given stored policy; null leaves it unset, as for a key opened before the upgrade. */
+  protected String addKeyToOpenKeyTable(String volumeName, String bucketName, StoragePolicy storagePolicy)
+          throws Exception {
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, replicationConfig)
+        .setStoragePolicy(storagePolicy)
+        .build();
+    OMRequestTestUtils.addKeyToTable(true, false, omKeyInfo, clientID, 0L, omMetadataManager);
     return "";
   }
 }
