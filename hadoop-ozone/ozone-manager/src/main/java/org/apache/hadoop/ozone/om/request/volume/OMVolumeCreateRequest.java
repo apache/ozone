@@ -89,12 +89,15 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       }
     }
 
-    // Set creation time & set modification time
+    // Set creation time & set modification time. usedNamespace and refCount
+    // are maintained by OM, so a new volume starts with both at 0.
     long initialTime = Time.now();
     VolumeInfo updatedVolumeInfo =
         volumeInfo.toBuilder()
             .setCreationTime(initialTime)
             .setModificationTime(initialTime)
+            .clearUsedNamespace()
+            .clearRefCount()
             .build();
 
     return getOmRequest().toBuilder().setCreateVolumeRequest(

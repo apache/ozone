@@ -183,6 +183,24 @@ public class TestOMVolumeCreateRequest extends OMVolumeRequestTests {
   }
 
   @Test
+  public void testNewVolumeIgnoresRefCountAndUsedNamespaceFromRequest() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    OMRequest.Builder originalRequest = createVolumeRequest(volumeName, "user1", "user1", "world::a").toBuilder();
+    originalRequest.getCreateVolumeRequestBuilder().getVolumeInfoBuilder()
+        .setRefCount(1)
+        .setUsedNamespace(5);
+
+    OMRequest modifiedRequest = new OMVolumeCreateRequest(originalRequest.build()).preExecute(ozoneManager);
+    OMClientResponse omClientResponse =
+        new OMVolumeCreateRequest(modifiedRequest).validateAndUpdateCache(ozoneManager, 1);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omClientResponse.getOMResponse().getStatus());
+
+    OmVolumeArgs omVolumeArgs = omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(volumeName));
+    assertEquals(0, omVolumeArgs.getRefCount());
+    assertEquals(0, omVolumeArgs.getUsedNamespace());
+  }
+
+  @Test
   public void testValidateAndUpdateCacheWithVolumeAlreadyExists()
       throws Exception {
     String volumeName = UUID.randomUUID().toString();
