@@ -172,16 +172,13 @@ public class HeartbeatEndpointTask
       LOG.debug("Sending heartbeat message : {}", request);
       SCMHeartbeatResponseProto response = rpcEndpoint.getEndPoint()
           .sendHeartbeat(request);
-      if (response.getFullContainerReportLeaseRejected()
-          && request.hasContainerReport()
-          && request.getContainerReport().hasFullContainerReportLease()) {
+      if (isFullContainerReportLeaseRejected(request, response)) {
         context.putBackFullContainerReport(rpcEndpoint.getAddress());
       }
       processResponse(response, datanodeDetailsProto);
       rpcEndpoint.setLastSuccessfulHeartbeat(ZonedDateTime.now());
       rpcEndpoint.zeroMissedCount();
-      return request.getRequestFullContainerReportLease() && rpcEndpoint.hasFullContainerReportLease()
-          && context.isFullContainerReportReady(rpcEndpoint.getAddress());
+      return isFullContainerReportReadyAfterLeaseGrant(request);
     } catch (IOException ex) {
       Preconditions.checkState(requestBuilder != null);
       // put back the reports which failed to be sent
@@ -193,6 +190,22 @@ public class HeartbeatEndpointTask
       maybeRefreshScmAddress(ex);
     }
     return false;
+  }
+
+  private static boolean isFullContainerReportLeaseRejected(SCMHeartbeatRequestProto request,
+      SCMHeartbeatResponseProto response) {
+    return response.getFullContainerReportLeaseRejected()
+        && request.hasContainerReport()
+        && request.getContainerReport().hasFullContainerReportLease();
+  }
+
+  /**
+   * Checks whether a pending FCR can follow the lease-request heartbeat after its response has been processed.
+   * Callers must hold the endpoint lock.
+   */
+  private boolean isFullContainerReportReadyAfterLeaseGrant(SCMHeartbeatRequestProto request) {
+    return request.getRequestFullContainerReportLease() && rpcEndpoint.hasFullContainerReportLease()
+        && context.isFullContainerReportReady(rpcEndpoint.getAddress());
   }
 
   /**
