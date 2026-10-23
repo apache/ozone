@@ -189,9 +189,7 @@ public final class SCMHAUtils {
    */
   public static boolean checkRetriableWithNoFailoverException(Exception e) {
     Throwable t = unwrapException(e);
-    // RemoteException cannot be unwrapped to this exception (no String constructor), so also match the class name.
-    return t instanceof RetriableWithNoFailoverException || (t instanceof RemoteException
-        && RetriableWithNoFailoverException.class.getName().equals(((RemoteException) t).getClassName()));
+    return RetriableWithNoFailoverException.class.isInstance(t);
   }
 
   public static Throwable getNotLeaderException(Exception e) {
