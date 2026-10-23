@@ -193,6 +193,15 @@ public class TestOMKeyCreateRequestWithFSO extends TestOMKeyCreateRequest {
   }
 
   @Override
+  protected String getMultipartOpenKey(String uploadID) throws IOException {
+    OmBucketInfo omBucketInfo = omMetadataManager.getBucketTable()
+        .get(omMetadataManager.getBucketKey(volumeName, bucketName));
+    // A top-level key is a child of the bucket.
+    return omMetadataManager.getMultipartKey(omMetadataManager.getVolumeId(volumeName),
+        omBucketInfo.getObjectID(), omBucketInfo.getObjectID(), keyName, uploadID);
+  }
+
+  @Override
   protected String getOzoneKey() throws IOException {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     final long volumeId = omMetadataManager.getVolumeId(volumeName);

@@ -407,7 +407,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
   public static OMRequest disallowSetBucketPropertyWithStoragePolicy(
       OMRequest req, ValidationContext ctx) throws OMException {
     if (!ctx.versionManager()
-        .isAllowed(OMLayoutFeature.BUCKET_STORAGE_POLICY_SUPPORT)) {
+        .isAllowed(OMLayoutFeature.STORAGE_POLICY_SUPPORT)) {
       SetBucketPropertyRequest propReq = req.getSetBucketPropertyRequest();
       if (propReq.hasBucketArgs()
           && (propReq.getBucketArgs().hasStoragePolicy()

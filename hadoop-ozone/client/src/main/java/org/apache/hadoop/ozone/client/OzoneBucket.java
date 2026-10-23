@@ -1043,7 +1043,24 @@ public class OzoneBucket extends WithMetadata {
       ReplicationConfig config, Map<String, String> metadata,
       Map<String, String> tags)
       throws IOException {
-    return proxy.initiateMultipartUpload(volumeName, name, keyName, config, metadata, tags);
+    return initiateMultipartUpload(keyName, config, metadata, tags, null);
+  }
+
+  /**
+   * Initiate multipart upload for a specified key.
+   * @param keyName Name of the key to be created when the multipart upload is completed.
+   * @param config Replication config.
+   * @param metadata Custom key metadata.
+   * @param tags Tags used for S3 object tags.
+   * @param keyStoragePolicy StoragePolicy of the key, or null to inherit the bucket's.
+   * @return OmMultipartInfo
+   * @throws IOException
+   */
+  public OmMultipartInfo initiateMultipartUpload(String keyName,
+      ReplicationConfig config, Map<String, String> metadata,
+      Map<String, String> tags, StoragePolicy keyStoragePolicy)
+      throws IOException {
+    return proxy.initiateMultipartUpload(volumeName, name, keyName, config, metadata, tags, keyStoragePolicy);
   }
 
   /**

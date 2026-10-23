@@ -540,7 +540,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
       final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
-      builder = omKeyInfo.toBuilder();
+      // The blocks are replaced by the multipart blocks, so the key takes the policy of the multipart
+      // key (null if none), not the one copied from the overwritten key.
+      builder = omKeyInfo.toBuilder()
+          .setStoragePolicy(dbOpenKeyInfo.getStoragePolicy());
       if (dbOpenKeyInfo.getMetadata() != null) {
         // make modifiable because ETAG needs to be added
         builder.setMetadata(new LinkedHashMap<>(dbOpenKeyInfo.getMetadata()));

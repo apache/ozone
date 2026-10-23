@@ -26,7 +26,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.hadoop.hdds.client.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StoragePolicy;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -98,8 +100,21 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
 
     generateRequiredEncryptionInfo(keyArgs, newKeyArgs, ozoneManager);
 
-    KeyArgs resolvedArgs = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
-        ozoneManager, ACLType.CREATE);
+    final KeyArgs.Builder resolvedArgsBuilder = resolveBucketAndCheckKeyAcls(newKeyArgs.build(),
+        ozoneManager, ACLType.CREATE).toBuilder();
+
+    // Stamp the policy only once finalized: an OM without storage policy support ignores the field, so stamping it
+    // earlier would make old and new OMs apply this request differently. Clearing also drops a client-sent value.
+    if (ozoneManager.getVersionManager().isAllowed(OMLayoutFeature.STORAGE_POLICY_SUPPORT)) {
+      // Read the bucket the link resolves to straight from the metadata manager. ozoneManager.getBucketInfo would
+      // also require READ on the bucket, which creating an upload does not need.
+      final OmBucketInfo bucketInfo = getBucketInfo(ozoneManager.getMetadataManager(),
+          resolvedArgsBuilder.getVolumeName(), resolvedArgsBuilder.getBucketName());
+      resolvedArgsBuilder.setStoragePolicy(OzoneStoragePolicy.toProto(getStoragePolicy(bucketInfo, keyArgs)));
+    } else {
+      resolvedArgsBuilder.clearStoragePolicy();
+    }
+    final KeyArgs resolvedArgs = resolvedArgsBuilder.build();
     int schemaVersion = resolveMultipartSchemaVersion(ozoneManager);
     MultipartInfoInitiateRequest.Builder requestBuilder =
         multipartInfoInitiateRequest.toBuilder()
@@ -192,11 +207,17 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
                   bucketInfo.getDefaultReplicationConfig() :
                   null, ozoneManager);
 
+      // Absent when the request was logged before STORAGE_POLICY_SUPPORT was finalized, or by an OM that did not
+      // set it; stays null then.
+      final StoragePolicy storagePolicy = keyArgs.hasStoragePolicy()
+          ? OzoneStoragePolicy.fromProto(keyArgs.getStoragePolicy()) : null;
+
       multipartKeyInfo = new OmMultipartKeyInfo.Builder()
           .setUploadID(keyArgs.getMultipartUploadID())
           .setCreationTime(keyArgs.getModificationTime())
           .setReplicationConfig(
               replicationConfig)
+          .setStoragePolicy(storagePolicy)
           .setObjectID(objectID)
           .setUpdateID(transactionLogIndex)
           // Source of truth is the value stamped onto the proto in preExecute
@@ -222,6 +243,7 @@ public class S3InitiateMultipartUploadRequest extends OMKeyRequest {
           .addAllMetadata(KeyValueUtil.getFromProtobuf(keyArgs.getMetadataList()))
           .setOwnerName(keyArgs.getOwnerName())
           .addAllTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
+          .setStoragePolicy(storagePolicy)
           .build();
 
       // Add to cache
