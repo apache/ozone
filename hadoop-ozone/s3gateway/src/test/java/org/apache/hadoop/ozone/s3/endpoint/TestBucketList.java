@@ -836,6 +836,19 @@ public class TestBucketList {
     assertThat(second.isTruncated()).isFalse();
   }
 
+  @Test
+  public void listObjectsV2FiltersCommonPrefixesByStartAfter() throws Exception {
+    setup("dir/a", "dir/b", "file");
+
+    bucketEndpoint.queryParamsForTest().set(QueryParams.DELIMITER, "/");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.START_AFTER, "dir/a");
+    ListObjectResponse result = (ListObjectResponse) bucketEndpoint.get(BUCKET_NAME).getEntity();
+
+    assertThat(result.getCommonPrefixes()).isEmpty();
+    assertThat(result.getContents()).extracting(k -> k.getKey().getName()).containsExactly("file");
+    assertThat(result.isTruncated()).isFalse();
+  }
+
   @ParameterizedTest
   @CsvSource({"p:di, true", "p:dir:, false", "p:dir:a, false"})
   public void listObjectVersionsFiltersCommonPrefixesByKeyMarker(String keyMarker, boolean includeMarkerPrefix)

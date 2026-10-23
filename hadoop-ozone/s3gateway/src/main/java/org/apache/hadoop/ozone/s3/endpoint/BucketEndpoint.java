@@ -201,8 +201,8 @@ public class BucketEndpoint extends BucketOperationHandler {
               if (!dirName.equals(prevDir)) {
                 prevDir = dirName;
                 String commonPrefix = prefix + dirName + delimiter;
-                // ListObjects V1 and ListObjectVersions exclude common prefixes at or before the marker.
-                if (StringUtils.startsWith(marker, commonPrefix)) {
+                // AWS omits common prefixes at or before start-after; startAfter also holds marker and key-marker.
+                if (StringUtils.startsWith(startAfter, commonPrefix)) {
                   continue;
                 }
                 response.addPrefix(EncodingTypeObject.createNullable(commonPrefix, encodingType));
