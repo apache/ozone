@@ -73,7 +73,7 @@ public class TestKeyInputStream {
       CheckedFunction<OmKeyInfo, OmKeyInfo, IOException> retryFunction) throws IOException {
     AtomicReference<Function<BlockID, BlockLocationInfo>> refresh = new AtomicReference<>();
     BlockInputStreamFactory factory = (repConfig, blockInfo, pipeline, token, xceiverFactory, refreshFunction,
-    config) -> {
+        config) -> {
       refresh.set(refreshFunction);
       return mock(BlockExtendedInputStream.class);
     };
