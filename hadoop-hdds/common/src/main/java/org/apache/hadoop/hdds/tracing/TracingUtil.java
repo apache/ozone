@@ -62,6 +62,10 @@ public final class TracingUtil {
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
   private static volatile SdkTracerProvider sdkTracerProvider;
   private static BatchSpanProcessor batchSpanProcessor;
+  // Application-aware mode without an application GlobalOpenTelemetry: the SDK is built for the first span with a
+  // valid parent (initPendingSdk), not at start-up. Set together under the class lock; written before being cleared.
+  private static volatile TracingConfig pendingSdkConfig;
+  private static String pendingSdkServiceName;
   public static final String GLOBAL_TRACER_NAME = "ozone";
 
   private TracingUtil() {
@@ -161,6 +165,8 @@ public final class TracingUtil {
     } finally {
       sdkTracerProvider = null;
       batchSpanProcessor = null;
+      pendingSdkConfig = null;
+      pendingSdkServiceName = null;
       tracer = OpenTelemetry.noop().getTracer("noop");
       tracingEnabled = false;
       applicationAware = false;
@@ -191,9 +197,47 @@ public final class TracingUtil {
       return;
     }
 
+    if (!tracingEnabled) {
+      // Application-aware only: spans are created only under a valid parent, which most client processes never have.
+      // Build Ozone's SDK (exporter, export thread, global registration) when the first such span needs it.
+      pendingSdkServiceName = serviceName;
+      pendingSdkConfig = cfg;
+      return;
+    }
+
     // No app-supplied global — build Ozone's SDK and always register it as the JVM global,
     // so any co-resident library observes the same tracer whenever tracing is valid.
     initOzoneSdk(serviceName, cfg, true);
+  }
+
+  /**
+   * Completes application-aware initialization left pending by {@link #initialize}: adopts an application
+   * GlobalOpenTelemetry registered since then, or builds Ozone's SDK. Called before creating a span with a parent.
+   */
+  private static void initPendingSdk() {
+    if (pendingSdkConfig == null) {
+      return;
+    }
+    synchronized (TracingUtil.class) {
+      final TracingConfig cfg = pendingSdkConfig;
+      if (cfg == null) {
+        return;
+      }
+      try {
+        if (GlobalOpenTelemetry.isSet() && isRealGlobal(GlobalOpenTelemetry.get())) {
+          tracer = GlobalOpenTelemetry.get().getTracer(GLOBAL_TRACER_NAME);
+          LOG.info("Tracing: adopted application GlobalOpenTelemetry");
+        } else {
+          initOzoneSdk(pendingSdkServiceName, cfg, true);
+          LOG.info("Tracing: built Ozone's OpenTelemetry SDK for {}", pendingSdkServiceName);
+        }
+      } catch (RuntimeException e) {
+        LOG.error("Failed to initialize tracing", e);
+      } finally {
+        pendingSdkServiceName = null;
+        pendingSdkConfig = null;
+      }
+    }
   }
 
   private static void initOzoneSdk(String serviceName, TracingConfig cfg, boolean registerGlobal) {
@@ -339,6 +383,7 @@ public final class TracingUtil {
           .startSpan();
     }
 
+    initPendingSdk();
     W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
     Context extract = propagator.extract(Context.current(), encodedParent, new TextExtractor());
     return tracer.spanBuilder(name)
@@ -348,11 +393,11 @@ public final class TracingUtil {
   }
 
   /**
-   * True when the current tracer can actually build spans — an Ozone-owned SDK is configured,
+   * True when the current tracer can actually build spans — an Ozone-owned SDK is configured or pending,
    * or an adopted GlobalOpenTelemetry provides a non-noop tracer.
    */
   private static boolean hasUsableTracer() {
-    if (sdkTracerProvider != null) {
+    if (sdkTracerProvider != null || pendingSdkConfig != null) {
       return true;
     }
     return GlobalOpenTelemetry.isSet() && isRealGlobal(GlobalOpenTelemetry.get());
@@ -587,6 +632,7 @@ public final class TracingUtil {
     Span parentSpan = Span.fromContext(currentContext);
 
     if (parentSpan.getSpanContext().isValid()) {
+      initPendingSdk();
       return tracer.spanBuilder(spanName)
           .setParent(currentContext)
           .setSpanKind(spanKind)
@@ -635,6 +681,7 @@ public final class TracingUtil {
       return createActivatedSpan(spanName);
     }
 
+    initPendingSdk();
     Span span = tracer.spanBuilder(spanName)
         .setParent(remote)
         .setSpanKind(SpanKind.SERVER)
