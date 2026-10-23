@@ -380,6 +380,16 @@ public class OzoneClientConfig {
       description = "Timeout for receiving streaming read responses.")
   private Duration streamReadTimeout = Duration.ofSeconds(10);
 
+  @Config(key = "ozone.client.netty.warmup.enabled",
+      defaultValue = "true",
+      type = ConfigType.BOOLEAN,
+      tags = {ConfigTag.CLIENT},
+      description = "When the client is created, initialize Netty, and netty-tcnative (BoringSSL) if gRPC TLS is " +
+          "enabled, on a background thread, so the first datanode connection does not wait for them. This takes " +
+          "about 0.1 s in a new JVM, so it matters for short-lived clients such as YARN containers and CLI " +
+          "commands. It needs a spare CPU core to help.")
+  private boolean nettyWarmUpEnabled = true;
+
   @PostConstruct
   public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -471,6 +481,14 @@ public class OzoneClientConfig {
 
   public boolean isShortCircuitEnabled() {
     return shortCircuitEnabled;
+  }
+
+  public boolean isNettyWarmUpEnabled() {
+    return nettyWarmUpEnabled;
+  }
+
+  public void setNettyWarmUpEnabled(boolean nettyWarmUpEnabled) {
+    this.nettyWarmUpEnabled = nettyWarmUpEnabled;
   }
 
   public void setShortCircuit(boolean enabled) {
