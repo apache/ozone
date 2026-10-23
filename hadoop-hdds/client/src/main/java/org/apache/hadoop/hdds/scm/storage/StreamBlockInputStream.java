@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.ozone.common.Checksum;
-import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -78,7 +77,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
   private final String name = "stream" + STREAM_ID.getAndIncrement();
   private final BlockID blockID;
-  private final long blockLength;
+  private long blockLength;
+  // The block is under construction, so its length from OM may be stale; fetch it from the datanode once.
+  private boolean needUpdateBlockLength;
   private final int responseDataSize;
   private final long preReadSize;
   private final Duration readTimeout;
@@ -101,13 +102,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final Set<DatanodeID> failedStreamingDatanodes = ConcurrentHashMap.newKeySet();
 
   public StreamBlockInputStream(
-      BlockID blockID, long length, Pipeline pipeline,
+      BlockLocationInfo blockInfo, Pipeline pipeline,
       Token<OzoneBlockTokenIdentifier> token,
       XceiverClientFactory xceiverClientFactory,
       Function<BlockID, BlockLocationInfo> refreshFunction,
       OzoneClientConfig config) throws IOException {
-    this.blockID = blockID;
-    this.blockLength = length;
+    this.blockID = blockInfo.getBlockID();
+    this.blockLength = blockInfo.getLength();
+    this.needUpdateBlockLength = blockInfo.isUnderConstruction();
     pipelineRef.set(setPipeline(pipeline));
     tokenRef.set(token);
     this.xceiverClientFactory = xceiverClientFactory;
@@ -144,7 +146,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!dataAvailableToRead(1, preRead)) {
       return EOF;
     }
-    final int value = readBuffer.getByteBuffer().get();
+    final int value = Byte.toUnsignedInt(readBuffer.getByteBuffer().get());
     advancePosition(1, preRead);
     return value;
   }
@@ -186,13 +188,14 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
    *
    * @param blockOffset the offset within the block to read from.
    * @param dst the buffer to read into.
-   * @return the number of bytes copied into {@code dst}, or -1 if no byte could be read.
+   * @return the number of bytes copied into {@code dst}, or -1 at EOF.
    */
   @Override
   public int readPositioned(long blockOffset, ByteBuffer dst) throws IOException {
     if (!dst.hasRemaining()) {
-      return EOF;
+      return 0;
     }
+    updateBlockLength();
     if (blockOffset < 0 || blockOffset >= blockLength) {
       return EOF;
     }
@@ -232,7 +235,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
     client.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
-        blockID, blockOffset, length, responseDataSize, tokenRef.get(), pipeline), response);
+        blockID, blockOffset, length, responseDataSize, verifyChecksum, tokenRef.get(), pipeline), response);
 
     int copied = 0;
     while (copied < length) {
@@ -271,6 +274,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   private synchronized boolean dataAvailableToRead(int length, boolean preRead) throws IOException {
+    updateBlockLength();
     if (position >= blockLength) {
       return false;
     }
@@ -432,6 +436,26 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     return (XceiverClientGrpc) acquired;
   }
 
+  /**
+   * Use the block length from the datanode if the block is under construction,
+   * since the length from OM may be stale (e.g. the last block of an hsync-ed file).
+   */
+  public synchronized void updateBlockLength() throws IOException {
+    while (needUpdateBlockLength) {
+      try {
+        acquireClient();
+        blockLength = getBlockDataUsingGRPCClient(xceiverClient, pipelineRef.get(), tokenRef.get()).getSize();
+        needUpdateBlockLength = false;
+        retries = 0;
+        LOG.debug("{}: Updated block length to {} for block {}", name, blockLength, blockID);
+      } catch (IOException ioe) {
+        handleExceptions(ioe);
+      } finally {
+        releaseClient();
+      }
+    }
+  }
+
   private synchronized void initialize() throws IOException {
     while (streamingReader == null) {
       try {
@@ -475,7 +499,16 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       throw new IOException("Uninitialized StreamingReadResponse: " + blockID);
     }
     xceiverClient.streamRead(ContainerProtocolCalls.buildReadBlockCommandProto(
-        blockID, requestedLength, length, responseDataSize, tokenRef.get(), pipelineRef.get()), r);
+        blockID, requestedLength, length, responseDataSize, verifyChecksum, tokenRef.get(), pipelineRef.get()), r);
+  }
+
+  /**
+   * A stream killed by a gRPC deadline is a transport failure of the long-lived call, not a data error:
+   * fail over to another datanode the same way as UNAVAILABLE. The classic per-request path is unaffected.
+   */
+  @Override
+  protected boolean isConnectivityIssue(IOException ex) {
+    return super.isConnectivityIssue(ex) || Status.fromThrowable(ex).getCode() == Status.DEADLINE_EXCEEDED.getCode();
   }
 
   private void handleExceptions(IOException cause) throws IOException {
@@ -635,6 +668,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         // checked first, an item delivered by onNext() just before onCompleted()
         // fired would be silently dropped, causing data corruption.
         if (future.isDone()) {
+          // The stream may have failed while waiting above; surface the error instead of returning EOF.
+          checkError();
           return null; // Stream ended, queue is empty
         }
 
@@ -645,7 +680,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
           if (setFailed(e)) {
             throw e;
           }
-          return null;
+          // The stream completed concurrently: re-check for an error or a queued response instead of returning EOF.
+          continue;
         }
       }
     }
@@ -696,8 +732,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       try {
         ByteBuffer data = readBlock.getData().asReadOnlyByteBuffer();
         if (verifyChecksum) {
-          ChecksumData checksumData = ChecksumData.getFromProtoBuf(readBlock.getChecksumData());
-          Checksum.verifyChecksum(data, checksumData, 0);
+          Checksum.validateChecksums(data, readBlock.getOffset(), 0, readBlock.getChunkInfoListList());
         }
         offerToQueue(readBlock);
       } catch (Exception e) {
@@ -709,7 +744,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         LOG.warn("Failed to process block {} response at offset={}, size={}: {}, {}",
             getBlockID().getContainerBlockID(),
             offset, data.size(), StringUtils.bytes2Hex(data.asReadOnlyByteBuffer(), 10),
-            readBlock.getChecksumData(), e);
+            readBlock.getChunkInfoListList(), e);
         if (r != null) {
           r.getRequestObserver().onError(e);
         }
@@ -783,10 +818,8 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
 
     private void offerToQueue(ReadBlockResponseProto item) {
       if (LOG.isTraceEnabled()) {
-        final ContainerProtos.ChecksumData checksumData = item.getChecksumData();
-        LOG.trace("{}: enqueue response offset {}, length {}, numChecksums {}, bytesPerChecksum={}",
-            name, item.getOffset(), item.getData().size(),
-            checksumData.getChecksumsList().size(), checksumData.getBytesPerChecksum());
+        LOG.trace("{}: enqueue response offset {}, length {}, chunks {}",
+            name, item.getOffset(), item.getData().size(), item.getChunkInfoListCount());
       }
       final boolean offered = responseQueue.offer(item);
       Preconditions.assertTrue(offered, () -> "Failed to offer " + item);

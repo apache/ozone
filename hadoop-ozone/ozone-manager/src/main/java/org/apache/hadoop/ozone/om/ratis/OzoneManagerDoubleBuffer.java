@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -45,7 +44,6 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
-import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -529,17 +527,7 @@ public final class OzoneManagerDoubleBuffer {
 
   private void addCleanupEntry(Entry entry, Map<String, List<Long>> cleanupEpochs) {
     OMClientResponse response = entry.getResponse();
-    CleanupTableInfo cleanupTableInfo =
-        response.getClass().getAnnotation(CleanupTableInfo.class);
-    final Iterable<String> cleanupTables;
-    if (cleanupTableInfo == null) {
-      cleanupTables = response.removeCleanupTables();
-    } else if (cleanupTableInfo.cleanupAll()) {
-      cleanupTables = OMDBDefinition.get().getColumnFamilyNames();
-    } else {
-      cleanupTables = Arrays.asList(cleanupTableInfo.cleanupTables());
-    }
-    for (String table : cleanupTables) {
+    for (String table : response.removeCleanupTables()) {
       cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
           .add(entry.getTermIndex().getIndex());
     }

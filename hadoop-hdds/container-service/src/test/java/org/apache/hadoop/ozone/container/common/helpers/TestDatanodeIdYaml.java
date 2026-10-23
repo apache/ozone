@@ -24,12 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.DatanodeStorage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -50,6 +51,9 @@ class TestDatanodeIdYaml {
     DatanodeDetails read = DatanodeIdYaml.readDatanodeIdFile(file);
 
     assertEquals(original, read);
+    // currentVersion is not persisted in datanode.id
+    assertEquals(HDDSVersion.DEFAULT_VERSION, read.getCurrentVersion());
+    read.setCurrentVersion(original.getCurrentVersion());
     assertEquals(original.toDebugString(), read.toDebugString());
   }
 
@@ -60,9 +64,9 @@ class TestDatanodeIdYaml {
     File file = new File(dir, "datanode.yaml");
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize());
     layoutStorage.initialize();
 
     DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
@@ -83,10 +87,10 @@ class TestDatanodeIdYaml {
     File file = new File(dir, "datanode.yaml");
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
         HDDSLayoutFeature.RATIS_DATASTREAM_PORT_IN_DATANODEDETAILS
-            .layoutVersion());
+            .serialize());
     layoutStorage.initialize();
 
     DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
@@ -104,9 +108,9 @@ class TestDatanodeIdYaml {
     File file = new File(dir, "datanode.yaml");
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
-        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.serialize());
     layoutStorage.initialize();
 
     DatanodeIdYaml.createDatanodeIdFile(original, file, conf);
@@ -125,9 +129,9 @@ class TestDatanodeIdYaml {
     File file = new File(dir, "datanode.yaml");
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.toString());
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
+    DatanodeStorage layoutStorage = new DatanodeStorage(conf,
         UUID.randomUUID().toString(),
-        HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS.layoutVersion());
+        HDDSLayoutFeature.WEBUI_PORTS_IN_DATANODEDETAILS.serialize());
     layoutStorage.initialize();
 
     DatanodeIdYaml.createDatanodeIdFile(original, file, conf);

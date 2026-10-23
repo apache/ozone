@@ -89,6 +89,7 @@ message ScmContainerLocationRequest {
   optional GetDeletedBlocksTxnSummaryRequestProto getDeletedBlocksTxnSummaryRequest = 50;
   optional SCMListContainerIDsRequestProto scmListContainerIDsRequest = 51;
   optional SuppressContainerRequestProto suppressContainerRequest = 52;
+  optional GetPeerUpgradeStatusRequestProto getPeerUpgradeStatusRequest = 53;
 }
 
 message ScmContainerLocationResponse {
@@ -149,6 +150,7 @@ message ScmContainerLocationResponse {
   optional GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummaryResponse = 50;
   optional SCMListContainerIDsResponseProto scmListContainerIDsResponse = 51;
   optional SuppressContainerResponseProto suppressContainerResponse = 52;
+  optional GetPeerUpgradeStatusResponseProto getPeerUpgradeStatusResponse = 53;
 
   enum Status {
     OK = 1;
@@ -208,6 +210,7 @@ enum Type {
   GetDeletedBlocksTransactionSummary = 46;
   ListContainerIDs = 47;
   SuppressContainer = 48;
+  GetPeerUpgradeStatus = 49;
 }
 
 /**
@@ -587,6 +590,17 @@ message QueryUpgradeFinalizationProgressRequestProto {
 }
 message QueryUpgradeFinalizationProgressResponseProto {
   required hadoop.hdds.UpgradeFinalizationStatus status = 1;
+}
+
+// Request from an SCM leader to a peer SCM to read its local upgrade status.
+// The resulting status returned currently only contains the SCM's software version to use in pre-finalization
+// safety checks.
+message GetPeerUpgradeStatusRequestProto {
+}
+
+message GetPeerUpgradeStatusResponseProto {
+  // Serialized HDDSVersion.SOFTWARE_VERSION of the responding SCM binary.
+  optional int32 scmSoftwareVersion = 1;
 }
 
 message ContainerTokenSecretProto {

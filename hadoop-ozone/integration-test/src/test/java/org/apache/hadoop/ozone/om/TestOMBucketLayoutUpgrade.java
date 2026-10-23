@@ -17,11 +17,10 @@
 
 package org.apache.hadoop.ozone.om;
 
-import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.APPARENT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -31,17 +30,18 @@ import java.util.EnumSet;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -79,7 +79,7 @@ class TestOMBucketLayoutUpgrade {
   private MiniOzoneHAClusterImpl cluster;
   private OzoneManager ozoneManager;
   private static final String VOLUME_NAME = "vol-" + UUID.randomUUID();
-  private final int fromLayoutVersion = INITIAL_VERSION.layoutVersion();
+  private final ComponentVersion fromVersion = INITIAL_VERSION;
   private OzoneManagerProtocol omClient;
 
   private OzoneClient client;
@@ -87,7 +87,8 @@ class TestOMBucketLayoutUpgrade {
   @BeforeAll
   void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, fromLayoutVersion);
+    conf.setInt(OMStorage.TESTING_INIT_APPARENT_VERSION_KEY, fromVersion.serialize());
+    conf.set(OMConfigKeys.OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL, "10ms");
     String omServiceId = UUID.randomUUID().toString();
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)
@@ -120,10 +121,10 @@ class TestOMBucketLayoutUpgrade {
   @Test
   @Order(PRE_UPGRADE)
   void omLayoutBeforeUpgrade() throws IOException {
-    assertEquals(fromLayoutVersion,
-        ozoneManager.getVersionManager().getMetadataLayoutVersion());
+    assertEquals(fromVersion,
+        ozoneManager.getVersionManager().getApparentVersion());
     assertNull(ozoneManager.getMetadataManager().getMetaTable()
-        .get(LAYOUT_VERSION_KEY));
+        .get(APPARENT_VERSION_KEY));
   }
 
   /**
@@ -151,17 +152,15 @@ class TestOMBucketLayoutUpgrade {
   @Test
   @Order(DURING_UPGRADE)
   void finalizeUpgrade() throws Exception {
-    UpgradeFinalization.StatusAndMessages response =
-        omClient.finalizeUpgrade("finalize-test");
-    System.out.println("Finalization Messages : " + response.msgs());
-
+    omClient.finalizeUpgrade();
     waitForFinalization(omClient);
 
-    final String expectedVersion = String.valueOf(maxLayoutVersion());
+    final String expectedVersion =
+        String.valueOf(OzoneManagerVersion.SOFTWARE_VERSION.serialize());
     LambdaTestUtils.await(30000, 3000,
         () -> expectedVersion.equals(
             ozoneManager.getMetadataManager().getMetaTable()
-                .get(LAYOUT_VERSION_KEY)));
+                .get(APPARENT_VERSION_KEY)));
   }
 
   @Order(POST_UPGRADE)

@@ -43,6 +43,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
 import org.apache.hadoop.security.ssl.SSLFactory;
 import org.eclipse.jetty.server.ServerConnector;
@@ -183,8 +184,9 @@ public class TestHttpServer2SSL {
    * CN=localhost with no SubjectAlternativeName, so the "localhost" name it
    * covers is served, but the 127.0.0.1 IP literal it does not cover -- which,
    * being an IP address, carries no SNI -- would be rejected under that default.
-   * HttpServer2 disables the check to preserve Jetty 9.4 behaviour (which served
-   * such requests with the default certificate), so both are served with 200.
+   * HttpServer2 leaves the check disabled by default to preserve Jetty 9.4
+   * behaviour (which served such requests with the default certificate), so both
+   * are served with 200.
    */
   @Test
   public void testIpLiteralServedWithNonMatchingCertificate() throws Exception {
@@ -199,6 +201,30 @@ public class TestHttpServer2SSL {
       // The IP literal the certificate does not cover is served too: without
       // the host-check opt-out this would fail with a 400 "Invalid SNI".
       assertEquals(HttpURLConnection.HTTP_OK,
+          connectWithFactory(factory, "127.0.0.1", addr));
+    } finally {
+      server.stop();
+    }
+  }
+
+  /**
+   * The mirror of {@link #testIpLiteralServedWithNonMatchingCertificate()}: with
+   * the SNI host check enabled, the same IP literal the CN=localhost test
+   * certificate does not cover is rejected with 400 "Invalid SNI", while the name
+   * it does cover is still served.
+   */
+  @Test
+  public void testIpLiteralRejectedWhenSniHostCheckEnabled() throws Exception {
+    OzoneConfiguration serverConf = new OzoneConfiguration(conf);
+    serverConf.setBoolean(OzoneConfigKeys.OZONE_HTTP_SNI_HOST_CHECK_ENABLED, true);
+    HttpServer2 server = buildServer(serverConf, null, null, null);
+    server.start();
+    try {
+      InetSocketAddress addr = server.getConnectorAddress(0);
+      SSLSocketFactory factory = createSocketFactory(null, null);
+      assertEquals(HttpURLConnection.HTTP_OK,
+          connectWithFactory(factory, "localhost", addr));
+      assertEquals(HttpURLConnection.HTTP_BAD_REQUEST,
           connectWithFactory(factory, "127.0.0.1", addr));
     } finally {
       server.stop();

@@ -298,7 +298,10 @@ public class WritableECContainerProvider
         defaultValue = PIPELINE_PER_VOLUME_FACTOR_DEFAULT_VALUE,
         reconfigurable = true,
         tags = {SCM},
-        description = "TODO"
+        description = "Factor used to calculate the maximum number of open pipelines for each EC replication " +
+            "config, based on the number of healthy volumes in the cluster. The limit is " +
+            "max(factor * total healthy volumes / (data + parity), ozone.scm.ec.pipeline.minimum). " +
+            "Setting it to 0 disables the volume-based limit, so only ozone.scm.ec.pipeline.minimum applies."
     )
     private double pipelinePerVolumeFactor = PIPELINE_PER_VOLUME_FACTOR_DEFAULT;
 

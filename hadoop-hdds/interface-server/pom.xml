@@ -68,45 +68,49 @@
         </configuration>
       </plugin>
       <plugin>
-        <groupId>org.xolstice.maven.plugins</groupId>
+        <groupId>io.github.ascopes</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
         <executions>
           <execution>
             <id>compile-proto-for-ratis</id>
             <goals>
-              <goal>compile</goal>
-              <goal>test-compile</goal>
-              <goal>compile-custom</goal>
-              <goal>test-compile-custom</goal>
+              <goal>generate</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${ratis-thirdparty.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <protoc kind="binary-maven">
+                <version>${ratis-thirdparty.protobuf.version}</version>
+              </protoc>
               <includes>
                 <include>InterSCMProtocol.proto</include>
                 <include>SCMUpdateProtocol.proto</include>
                 <include>SCMRatisProtocol.proto</include>
               </includes>
+              <incrementalCompilation>false</incrementalCompilation>
               <outputDirectory>target/generated-sources/proto-java-for-ratis</outputDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
-              <pluginId>grpc-java</pluginId>
-              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${ratis-thirdparty.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+              <plugins>
+                <plugin kind="binary-maven">
+                  <groupId>io.grpc</groupId>
+                  <artifactId>protoc-gen-grpc-java</artifactId>
+                  <version>${ratis-thirdparty.grpc.version}</version>
+                </plugin>
+              </plugins>
             </configuration>
           </execution>
           <execution>
             <id>compile-proto-${protobuf.version}</id>
             <goals>
-              <goal>compile</goal>
-              <goal>test-compile</goal>
+              <goal>generate</goal>
             </goals>
             <configuration>
-              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <protoc kind="binary-maven">
+                <version>${protobuf.version}</version>
+              </protoc>
               <excludes>
                 <exclude>InterSCMProtocol.proto</exclude>
                 <exclude>SCMUpdateProtocol.proto</exclude>
                 <exclude>SCMRatisProtocol.proto</exclude>
               </excludes>
               <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf.version}</outputDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
             </configuration>
           </execution>
         </executions>

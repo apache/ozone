@@ -27,7 +27,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIM
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY;
-import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toLayoutVersionProto;
+import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.toVersionProto;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.Descriptors;
@@ -37,31 +37,33 @@ import java.time.ZonedDateTime;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandQueueReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerActionsProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DatanodeVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineAction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineActionsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.ConnectionFailureUtils;
 import org.apache.hadoop.hdfs.util.EnumCounters;
+import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.helpers.DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ClosePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.CreatePipelineCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
-import org.apache.hadoop.ozone.protocol.commands.FinalizeNewLayoutVersionCommand;
+import org.apache.hadoop.ozone.protocol.commands.FinalizeVersionCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
@@ -79,12 +81,14 @@ public class HeartbeatEndpointTask
     implements Callable<EndpointStateMachine.EndPointStates> {
   private static final Logger LOG = LoggerFactory.getLogger(HeartbeatEndpointTask.class);
   private final EndpointStateMachine rpcEndpoint;
-  private DatanodeDetailsProto datanodeDetailsProto;
+  private final DatanodeDetails datanodeDetails;
   private StateContext context;
   private int maxContainerActionsPerHB;
   private int maxPipelineActionsPerHB;
   private int maxReportsPerHB;
-  private HDDSLayoutVersionManager layoutVersionManager;
+  private final DatanodeVersionManager versionManager;
+  // Test-only override for the version this datanode advertises to clients; null in production.
+  private final HDDSVersion testCurrentVersion;
   private final boolean resolveOnFailureEnabled;
   private final int refreshThreshold;
 
@@ -94,11 +98,9 @@ public class HeartbeatEndpointTask
    * @param rpcEndpoint rpc Endpoint
    * @param conf Config.
    * @param context State context
-   * @param versionManager Layout version Manager
    */
   public HeartbeatEndpointTask(EndpointStateMachine rpcEndpoint,
-                               ConfigurationSource conf, StateContext context,
-                               HDDSLayoutVersionManager versionManager) {
+                               ConfigurationSource conf, StateContext context) {
     this.rpcEndpoint = rpcEndpoint;
     this.context = context;
     this.maxContainerActionsPerHB = conf.getInt(HDDS_CONTAINER_ACTION_MAX_LIMIT,
@@ -107,34 +109,21 @@ public class HeartbeatEndpointTask
         HDDS_PIPELINE_ACTION_MAX_LIMIT_DEFAULT);
     this.maxReportsPerHB = conf.getInt(HDDS_CONTAINER_REPORT_MAX_LIMIT,
         HDDS_CONTAINER_REPORT_MAX_LIMIT_DEFAULT);
-    if (versionManager != null) {
-      this.layoutVersionManager = versionManager;
+    this.datanodeDetails = context.getParent().getDatanodeDetails();
+    this.versionManager = context.getParent().getVersionManager();
+
+    if (conf.isConfigured(HddsDatanodeService.TESTING_DATANODE_VERSION_CURRENT)) {
+      int configuredVersion = conf.getInt(HddsDatanodeService.TESTING_DATANODE_VERSION_CURRENT,
+          HDDSVersion.SOFTWARE_VERSION.serialize());
+      testCurrentVersion = HDDSVersion.deserialize(configuredVersion);
     } else {
-      this.layoutVersionManager = context.getParent().getLayoutVersionManager();
+      testCurrentVersion = null;
     }
+
     this.resolveOnFailureEnabled = conf.getBoolean(OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_KEY,
         OZONE_CLIENT_FAILOVER_RESOLVE_NEEDED_DEFAULT);
     this.refreshThreshold = Math.max(1, conf.getInt(HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD,
         HDDS_HEARTBEAT_ADDRESS_REFRESH_MISSED_COUNT_THRESHOLD_DEFAULT));
-  }
-
-  /**
-   * Get the container Node ID proto.
-   *
-   * @return ContainerNodeIDProto
-   */
-  public DatanodeDetailsProto getDatanodeDetailsProto() {
-    return datanodeDetailsProto;
-  }
-
-  /**
-   * Set container node ID proto.
-   *
-   * @param datanodeDetailsProto - the node id.
-   */
-  public void setDatanodeDetailsProto(DatanodeDetailsProto
-      datanodeDetailsProto) {
-    this.datanodeDetailsProto = datanodeDetailsProto;
   }
 
   /**
@@ -148,15 +137,17 @@ public class HeartbeatEndpointTask
     rpcEndpoint.lock();
     SCMHeartbeatRequestProto.Builder requestBuilder = null;
     try {
-      Preconditions.checkState(this.datanodeDetailsProto != null);
+      DatanodeVersionProto versionInfo = toVersionProto(
+          versionManager.getApparentVersion(),
+          versionManager.getSoftwareVersion());
 
-      LayoutVersionProto layoutinfo = toLayoutVersionProto(
-          layoutVersionManager.getMetadataLayoutVersion(),
-          layoutVersionManager.getSoftwareLayoutVersion());
+      datanodeDetails.setCurrentVersion(
+          testCurrentVersion != null ? testCurrentVersion : versionManager.getVersionForClient());
+      DatanodeDetailsProto datanodeDetailsProto = datanodeDetails.getProtoBufMessage();
 
       requestBuilder = SCMHeartbeatRequestProto.newBuilder()
           .setDatanodeDetails(datanodeDetailsProto)
-          .setDataNodeLayoutVersion(layoutinfo);
+          .setDatanodeVersion(versionInfo);
       addReports(requestBuilder);
       addContainerActions(requestBuilder);
       addPipelineActions(requestBuilder);
@@ -312,9 +303,9 @@ public class HeartbeatEndpointTask
    * @param response - SCMHeartbeat response.
    */
   private void processResponse(SCMHeartbeatResponseProto response,
-      final DatanodeDetailsProto datanodeDetails) {
+      final DatanodeDetailsProto datanodeDetailsProto) {
     Preconditions.checkState(response.getDatanodeUUID()
-            .equalsIgnoreCase(datanodeDetails.getUuid()),
+            .equalsIgnoreCase(datanodeDetailsProto.getUuid()),
         "Unexpected datanode ID in the response.");
     if (response.hasTerm()) {
       context.updateTermOfLeaderSCM(response.getTerm());
@@ -410,16 +401,13 @@ public class HeartbeatEndpointTask
         processCommonCommand(commandResponseProto,
             setNodeOperationalStateCommand);
         break;
-      case finalizeNewLayoutVersionCommand:
-        FinalizeNewLayoutVersionCommand finalizeNewLayoutVersionCommand =
-            FinalizeNewLayoutVersionCommand.getFromProtobuf(
-                commandResponseProto.getFinalizeNewLayoutVersionCommandProto());
+      case finalizeNewDatanodeVersionCommand:
+        FinalizeVersionCommand finalizeVersionCommand =
+            FinalizeVersionCommand.getFromProtobuf(commandResponseProto.getFinalizeNewDatanodeVersionCommandProto());
         if (LOG.isDebugEnabled()) {
-          LOG.debug("Received SCM finalize command {}",
-              finalizeNewLayoutVersionCommand.getId());
+          LOG.debug("Received SCM finalize command {}", finalizeVersionCommand.getId());
         }
-        processCommonCommand(commandResponseProto,
-            finalizeNewLayoutVersionCommand);
+        processCommonCommand(commandResponseProto, finalizeVersionCommand);
         break;
       case refreshVolumeUsageInfo:
         RefreshVolumeUsageCommand refreshVolumeUsageCommand =
@@ -483,9 +471,7 @@ public class HeartbeatEndpointTask
   public static class Builder {
     private EndpointStateMachine endPointStateMachine;
     private ConfigurationSource conf;
-    private DatanodeDetails datanodeDetails;
     private StateContext context;
-    private HDDSLayoutVersionManager versionManager;
 
     /**
      * Constructs the builder class.
@@ -505,17 +491,6 @@ public class HeartbeatEndpointTask
     }
 
     /**
-     * Sets the LayoutVersionManager.
-     *
-     * @param lvm config
-     * @return Builder
-     */
-    public Builder setLayoutVersionManager(HDDSLayoutVersionManager lvm) {
-      this.versionManager = lvm;
-      return this;
-    }
-
-    /**
      * Sets the Config.
      *
      * @param config - config
@@ -523,17 +498,6 @@ public class HeartbeatEndpointTask
      */
     public Builder setConfig(ConfigurationSource config) {
       this.conf = config;
-      return this;
-    }
-
-    /**
-     * Sets the NodeID.
-     *
-     * @param dnDetails - NodeID proto
-     * @return Builder
-     */
-    public Builder setDatanodeDetails(DatanodeDetails dnDetails) {
-      this.datanodeDetails = dnDetails;
       return this;
     }
 
@@ -560,16 +524,8 @@ public class HeartbeatEndpointTask
             " construct HeartbeatEndpointTask task");
       }
 
-      if (datanodeDetails == null) {
-        LOG.error("No datanode specified.");
-        throw new IllegalArgumentException("A valid Node ID is needed to " +
-            "construct HeartbeatEndpointTask task");
-      }
-
-      HeartbeatEndpointTask task = new HeartbeatEndpointTask(this
-          .endPointStateMachine, this.conf, this.context, this.versionManager);
-      task.setDatanodeDetailsProto(datanodeDetails.getProtoBufMessage());
-      return task;
+      return new HeartbeatEndpointTask(this
+          .endPointStateMachine, this.conf, this.context);
     }
   }
 }

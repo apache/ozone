@@ -21,7 +21,6 @@ import static java.util.Collections.emptyList;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_MAX_LIMIT;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconcileContainerCommand;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type.reconstructECContainersCommand;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -39,6 +38,7 @@ import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -54,12 +54,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.scm.net.HostAndPort;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
@@ -100,7 +101,7 @@ public class TestHeartbeatEndpointTask {
 
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachine =
-        mock(DatanodeStateMachine.class);
+        mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -139,7 +140,7 @@ public class TestHeartbeatEndpointTask {
                 .build());
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -173,7 +174,7 @@ public class TestHeartbeatEndpointTask {
                 .build());
 
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -197,7 +198,7 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testheartbeatWithNodeReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -232,7 +233,7 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testheartbeatWithContainerReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -268,7 +269,7 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testheartbeatWithCommandStatusReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -305,7 +306,7 @@ public class TestHeartbeatEndpointTask {
   @Test
   public void testheartbeatWithContainerActions() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -342,7 +343,7 @@ public class TestHeartbeatEndpointTask {
   public void testheartbeatWithAllReports() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachine =
-        mock(DatanodeStateMachine.class);
+        mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -403,7 +404,7 @@ public class TestHeartbeatEndpointTask {
   public void testHeartbeatCapsReportsAndSchedulesFollowup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setInt(HDDS_CONTAINER_REPORT_MAX_LIMIT, 2);
-    DatanodeStateMachine datanodeStateMachine = mock(DatanodeStateMachine.class);
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
     StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
         datanodeStateMachine, "");
 
@@ -441,6 +442,94 @@ public class TestHeartbeatEndpointTask {
     verify(datanodeStateMachine).setNextHB(anyLong());
   }
 
+  @Test
+  public void testDatanodeCurrentVersionPassThrough() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine, "");
+
+    // Set the expected versions to return.
+    DatanodeVersionManager versionManager = datanodeStateMachine.getVersionManager();
+    when(versionManager.getVersionForClient())
+        .thenReturn(HDDSVersion.DEFAULT_VERSION)
+        .thenReturn(HDDSVersion.ZDU)
+        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
+
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
+        .forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto)invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .build());
+
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
+
+    // Assert the expected versions were returned.
+    endpointTask.call();
+    assertEquals(HDDSVersion.DEFAULT_VERSION.serialize(),
+        argument.getValue().getDatanodeDetails().getCurrentVersion());
+    endpointTask.call();
+    assertEquals(HDDSVersion.ZDU.serialize(),
+        argument.getValue().getDatanodeDetails().getCurrentVersion());
+    endpointTask.call();
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(),
+        argument.getValue().getDatanodeDetails().getCurrentVersion());
+  }
+
+  @Test
+  public void testDatanodeApparentVersionPassThrough() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
+    StateContext context = new StateContext(conf, DatanodeStates.RUNNING,
+        datanodeStateMachine, "");
+
+    // Set the expected versions to return.
+    DatanodeVersionManager versionManager = datanodeStateMachine.getVersionManager();
+    when(versionManager.getApparentVersion())
+        .thenReturn(HDDSLayoutFeature.INITIAL_VERSION)
+        .thenReturn(HDDSVersion.ZDU)
+        .thenReturn(HDDSVersion.SOFTWARE_VERSION);
+
+    when(datanodeStateMachine.getQueuedCommandCount())
+        .thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
+
+    StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
+        mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
+    ArgumentCaptor<SCMHeartbeatRequestProto> argument = ArgumentCaptor
+        .forClass(SCMHeartbeatRequestProto.class);
+    when(scm.sendHeartbeat(argument.capture()))
+        .thenAnswer(invocation ->
+            SCMHeartbeatResponseProto.newBuilder()
+                .setDatanodeUUID(
+                    ((SCMHeartbeatRequestProto)invocation.getArgument(0))
+                        .getDatanodeDetails().getUuid())
+                .build());
+
+    HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(
+        conf, context, scm);
+
+    // Assert the expected versions were returned.
+    endpointTask.call();
+    assertEquals(HDDSLayoutFeature.INITIAL_VERSION.serialize(),
+        argument.getValue().getDatanodeVersion().getApparentVersion());
+    endpointTask.call();
+    assertEquals(HDDSVersion.ZDU.serialize(),
+        argument.getValue().getDatanodeVersion().getApparentVersion());
+    endpointTask.call();
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(),
+        argument.getValue().getDatanodeVersion().getApparentVersion());
+  }
+
   /**
    * Creates HeartbeatEndpointTask with the given conf, context and
    * StorageContainerManager client side proxy.
@@ -455,28 +544,31 @@ public class TestHeartbeatEndpointTask {
       ConfigurationSource conf,
       StateContext context,
       StorageContainerDatanodeProtocolClientSideTranslatorPB proxy) {
+    EndpointStateMachine endpointStateMachine = mock(EndpointStateMachine.class);
+    when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
+    when(endpointStateMachine.getAddress())
+        .thenReturn(TEST_SCM_ENDPOINT);
+    return HeartbeatEndpointTask.newBuilder()
+        .setConfig(conf)
+        .setContext(context)
+        .setEndpointStateMachine(endpointStateMachine)
+        .build();
+  }
+
+  private DatanodeStateMachine mockDatanodeStateMachine() {
     DatanodeDetails datanodeDetails = DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
         .setHostName("localhost")
         .setIpAddress("127.0.0.1")
         .build();
-    EndpointStateMachine endpointStateMachine = mock(EndpointStateMachine.class);
-    when(endpointStateMachine.getEndPoint()).thenReturn(proxy);
-    when(endpointStateMachine.getAddress())
-        .thenReturn(TEST_SCM_ENDPOINT);
-    HDDSLayoutVersionManager layoutVersionManager =
-        mock(HDDSLayoutVersionManager.class);
-    when(layoutVersionManager.getSoftwareLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    when(layoutVersionManager.getMetadataLayoutVersion())
-        .thenReturn(maxLayoutVersion());
-    return HeartbeatEndpointTask.newBuilder()
-        .setConfig(conf)
-        .setDatanodeDetails(datanodeDetails)
-        .setContext(context)
-        .setLayoutVersionManager(layoutVersionManager)
-        .setEndpointStateMachine(endpointStateMachine)
-        .build();
+    DatanodeVersionManager versionManager = mock(DatanodeVersionManager.class);
+    when(versionManager.getSoftwareVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getApparentVersion()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    when(versionManager.getVersionForClient()).thenReturn(HDDSVersion.SOFTWARE_VERSION);
+    DatanodeStateMachine mockDSM = mock(DatanodeStateMachine.class);
+    when(mockDSM.getDatanodeDetails()).thenReturn(datanodeDetails);
+    when(mockDSM.getVersionManager()).thenReturn(versionManager);
+    return mockDSM;
   }
 
   private ContainerAction getContainerAction() {

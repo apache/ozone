@@ -135,7 +135,8 @@ share/ozone/lib/jersey-media-jaxb.jar
 share/ozone/lib/jersey-media-json-jackson.jar
 share/ozone/lib/jersey-server.jar
 share/ozone/lib/jettison.jar
-share/ozone/lib/jetty-ee.jar
+share/ozone/lib/jetty-annotations.jar
+share/ozone/lib/jetty-ee-webapp.jar
 share/ozone/lib/jetty-ee8-annotations.jar
 share/ozone/lib/jetty-ee8-cdi.jar
 share/ozone/lib/jetty-ee8-nested.jar

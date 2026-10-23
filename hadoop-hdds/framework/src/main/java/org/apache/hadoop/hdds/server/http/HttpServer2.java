@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.servlet.Filter;
@@ -221,7 +222,7 @@ public final class HttpServer2 implements FilterContainer {
   // gets stored.
   public static final String CONF_CONTEXT_ATTRIBUTE = "hadoop.conf";
   private static final String ADMINS_ACL = "admins.acl";
-  private static final String SPNEGO_FILTER = "SpnegoFilter";
+  static final String SPNEGO_FILTER = "SpnegoFilter";
   private static final String NO_CACHE_FILTER = "NoCacheFilter";
 
   private static final String BIND_ADDRESS = "bind.address";
@@ -265,6 +266,7 @@ public final class HttpServer2 implements FilterContainer {
   public static class Builder {
     private ArrayList<URI> endpoints = Lists.newArrayList();
     private String name;
+    private String metricsSourceId;
     private MutableConfigurationSource conf;
     private ConfigurationSource sslConf;
     private String[] pathSpecs;
@@ -302,6 +304,11 @@ public final class HttpServer2 implements FilterContainer {
 
     public Builder setName(String serverName) {
       this.name = serverName;
+      return this;
+    }
+
+    public Builder setMetricsSourceId(String sourceId) {
+      this.metricsSourceId = sourceId;
       return this;
     }
 
@@ -626,8 +633,13 @@ public final class HttpServer2 implements FilterContainer {
       // IP literal (which send no SNI) or to localhost/VIP/alias names absent
       // from the keystore certificate. Jetty 9.4 only ran that check when the
       // client's SNI matched a certificate, so such requests were served with
-      // the default certificate. Disable the check to preserve that behaviour.
-      httpConfig.addCustomizer(new SecureRequestCustomizer(false));
+      // the default certificate. The check is off by default to preserve that
+      // behaviour, and opt-in for deployments whose certificate covers every
+      // name clients use.
+      boolean sniHostCheck = conf.getBoolean(
+          OzoneConfigKeys.OZONE_HTTP_SNI_HOST_CHECK_ENABLED,
+          OzoneConfigKeys.OZONE_HTTP_SNI_HOST_CHECK_ENABLED_DEFAULT);
+      httpConfig.addCustomizer(new SecureRequestCustomizer(sniHostCheck));
       ServerConnector conn = createHttpChannelConnector(server, httpConfig);
 
       SslContextFactory.Server sslContextFactory =
@@ -725,7 +737,8 @@ public final class HttpServer2 implements FilterContainer {
       threadPool.setMaxThreads(maxThreads);
     }
 
-    metrics = HttpServer2Metrics.create(threadPool, builder.name);
+    metrics = HttpServer2Metrics.create(threadPool, builder.name,
+        builder.metricsSourceId == null ? builder.name + '-' + UUID.randomUUID() : builder.metricsSourceId);
     SessionHandler handler = webAppContext.getSessionHandler();
     handler.setHttpOnly(true);
     handler.getSessionCookieConfig().setSecure(true);
@@ -780,6 +793,9 @@ public final class HttpServer2 implements FilterContainer {
       AccessControlList adminsAcl, final String appDir) {
     WebAppContext ctx = new WebAppContext();
     ctx.setDefaultsDescriptor(null);
+    // S3 Gateway starts Weld through its web.xml listener; other services do not use CDI.
+    ctx.setAttribute("org.eclipse.jetty.containerInitializerExclusionPattern",
+        "org.jboss.weld.environment.servlet.EnhancedListener");
     ServletHolder holder = new ServletHolder(new DefaultServlet());
     Map<String, String> params = ImmutableMap.<String, String>builder()
         .put("acceptRanges", "true")
@@ -1508,11 +1524,12 @@ public final class HttpServer2 implements FilterContainer {
       // clear & stop webAppContext attributes to avoid memory leaks.
       webAppContext.clearAttributes();
       webAppContext.stop();
-      metrics.unRegister();
     } catch (Exception e) {
       LOG.error("Error while stopping web app context for webapp "
           + webAppContext.getDisplayName(), e);
       exception = addMultiException(exception, e);
+    } finally {
+      metrics.unRegister();
     }
 
     try {

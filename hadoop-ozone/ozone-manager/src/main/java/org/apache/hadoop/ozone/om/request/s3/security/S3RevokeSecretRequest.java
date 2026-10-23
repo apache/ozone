@@ -55,7 +55,7 @@ public class S3RevokeSecretRequest extends OMClientRequest {
         omRequest.getRevokeS3SecretRequest();
     final String accessId = s3RevokeSecretRequest.getKerberosID();
     final UserGroupInformation ugi =
-        S3SecretRequestHelper.getOrCreateUgi(accessId);
+        S3SecretRequestHelper.getOrCreateUgi(ozoneManager, accessId);
     // Permission check
     S3SecretRequestHelper.checkAccessIdSecretOpPermission(
         ozoneManager, ugi, accessId);

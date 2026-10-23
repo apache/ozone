@@ -91,13 +91,21 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends OzoneManager
    */
   @Test
   void oneOMDown() throws Exception {
-    changeFollowerReadInitialProxy(1);
+    OzoneManager currentLeader = getCluster().getOMLeader();
+    OzoneManager stoppedOM = getCluster().getOzoneManagersList().stream()
+        .filter(om -> om != currentLeader).findFirst().get();
+    changeFollowerReadInitialProxy(stoppedOM.getOMNodeId());
 
-    getCluster().stopOzoneManager(1);
+    getCluster().stopOzoneManager(stoppedOM.getOMNodeId());
     waitForLeaderToBeReady();
 
     createVolumeTest(true);
     createKeyTest(true);
+
+    OzoneManager newLeader = getCluster().transferOMLeadershipToAnotherNode(currentLeader);
+    assertNotEquals(currentLeader, newLeader);
+    assertNotEquals(stoppedOM, newLeader);
+    assertTrue(newLeader.isRunning());
   }
 
   /**
@@ -212,13 +220,14 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends OzoneManager
     ObjectStore objectStore = getObjectStore();
     HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider =
         OmTestUtil.getFailoverProxyProvider(objectStore);
-    String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     createVolumeTest(true);
+    String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     // On stopping the current OM Proxy, the next connection attempt should
     // failover to a another OM proxy.
     getCluster().stopOzoneManager(firstProxyNodeId);
+    waitForLeaderToBeReady();
 
     // Next request to the proxy provider should result in a failover
     createVolumeTest(true);
