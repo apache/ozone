@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.statemachine.background;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
+
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -89,7 +91,18 @@ public class StaleRecoveringContainerScrubbingService
       }
       Container con = containerSet.getContainer(containerID);
       if (null != con) {
-        con.markContainerUnhealthy();
+        con.writeLock();
+        try {
+          // The container may have left RECOVERING after this task was scheduled.
+          if (con.getContainerState() != RECOVERING) {
+            LOG.debug("Skipping stale recovering scrub for container {} - state is {}",
+                containerID, con.getContainerState());
+            return new BackgroundTaskResult.EmptyTaskResult();
+          }
+          con.markContainerUnhealthy();
+        } finally {
+          con.writeUnlock();
+        }
         LOG.info("Stale recovering container {} marked UNHEALTHY", containerID);
       }
       return new BackgroundTaskResult.EmptyTaskResult();
