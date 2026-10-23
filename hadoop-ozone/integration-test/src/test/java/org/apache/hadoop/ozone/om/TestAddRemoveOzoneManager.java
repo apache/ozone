@@ -222,7 +222,8 @@ public class TestAddRemoveOzoneManager {
    */
   @Test
   public void testBootstrap() throws Exception {
-    setupCluster(1);
+    // With admin authorization on, the new OMs are admitted as the user that runs the OMs.
+    setupCluster(1, true);
     OzoneManager oldOM = cluster.getOzoneManager();
 
     // 1. Add 2 new OMs to an existing 1 node OM cluster.

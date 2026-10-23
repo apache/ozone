@@ -454,18 +454,26 @@ public class SnapshotChainManager {
 
       @Override
       public UUID next() {
-        try {
-          UUID prevSnapshotId = currentSnapshotId;
-          if (reverse && hasPreviousGlobalSnapshot(currentSnapshotId) ||
-              !reverse && hasNextGlobalSnapshot(currentSnapshotId)) {
-            currentSnapshotId =
-                reverse ? previousGlobalSnapshot(currentSnapshotId) : nextGlobalSnapshot(currentSnapshotId);
-          } else {
-            currentSnapshotId = null;
+        // Hold the same lock as deleteSnapshot so that the chain cannot change while advancing.
+        synchronized (SnapshotChainManager.this) {
+          try {
+            UUID prevSnapshotId = currentSnapshotId;
+            if (prevSnapshotId == null) {
+              throw new NoSuchElementException("No more snapshots in the snapshot chain.");
+            }
+            // The snapshot may have been purged since the iterator moved to it, in which case the walk ends here.
+            if (globalSnapshotChain.containsKey(prevSnapshotId) &&
+                (reverse && hasPreviousGlobalSnapshot(prevSnapshotId) ||
+                !reverse && hasNextGlobalSnapshot(prevSnapshotId))) {
+              currentSnapshotId =
+                  reverse ? previousGlobalSnapshot(prevSnapshotId) : nextGlobalSnapshot(prevSnapshotId);
+            } else {
+              currentSnapshotId = null;
+            }
+            return prevSnapshotId;
+          } catch (IOException e) {
+            throw new UncheckedIOException("Error while getting next snapshot for " + currentSnapshotId, e);
           }
-          return prevSnapshotId;
-        } catch (IOException e) {
-          throw new UncheckedIOException("Error while getting next snapshot for " + currentSnapshotId, e);
         }
       }
     };

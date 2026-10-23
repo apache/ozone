@@ -51,6 +51,13 @@ public class KeyMetadata {
   @XmlElement(name = "StorageClass")
   private String storageClass;
 
+  // VersionId and IsLatest are only set in ListObjectVersions responses
+  @XmlElement(name = "VersionId")
+  private String versionId;
+
+  @XmlElement(name = "IsLatest")
+  private Boolean isLatest;
+
   public EncodingTypeObject getKey() {
     return key;
   }
@@ -97,5 +104,21 @@ public class KeyMetadata {
 
   public void setStorageClass(String storageClass) {
     this.storageClass = storageClass;
+  }
+
+  public String getVersionId() {
+    return versionId;
+  }
+
+  public void setVersionId(String versionId) {
+    this.versionId = versionId;
+  }
+
+  public Boolean getIsLatest() {
+    return isLatest;
+  }
+
+  public void setIsLatest(Boolean latest) {
+    this.isLatest = latest;
   }
 }
