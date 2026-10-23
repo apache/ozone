@@ -72,7 +72,9 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     // Verify resource name
     OmUtils.validateVolumeName(volumeInfo.getVolume(),
         ozoneManager.isStrictS3());
-    toOzoneAcls(volumeInfo.getVolumeAclsList());
+    if (!ozoneManager.getConfig().ignoreClientACLs()) {
+      toOzoneAcls(volumeInfo.getVolumeAclsList());
+    }
 
     // ACL check during preExecute
     if (ozoneManager.getAclsEnabled()) {
@@ -132,14 +134,15 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     final OmVolumeArgs omVolumeArgs;
     Map<String, String> auditMap = null;
     try {
-      List<OzoneAcl> clientAcls = toOzoneAcls(volumeInfo.getVolumeAclsList());
       // when you create a volume, we set both Object ID and update ID.
       // The Object ID will never change, but update
       // ID will be set to transactionID each time we update the object.
       OmVolumeArgs.Builder builder = OmVolumeArgs.builderFromProtobuf(volumeInfo.toBuilder().clearVolumeAcls().build())
           .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
           .setUpdateID(transactionLogIndex);
-      builder.acls().set(clientAcls);
+      if (!ozoneManager.getConfig().ignoreClientACLs()) {
+        builder.acls().set(toOzoneAcls(volumeInfo.getVolumeAclsList()));
+      }
 
       auditMap = builder.toAuditMap();
       // acquire lock.

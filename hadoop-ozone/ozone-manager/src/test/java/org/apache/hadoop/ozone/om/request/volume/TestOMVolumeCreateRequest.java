@@ -312,12 +312,22 @@ public class TestOMVolumeCreateRequest extends OMVolumeRequestTests {
     }
   }
 
-  @Test
-  public void testRejectInvalidAcl() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testInvalidAcl(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
     for (OzoneAclInfo acl : OMRequestTestUtils.invalidAcls()) {
       String volumeName = UUID.randomUUID().toString();
       OMRequest.Builder request = OMRequestTestUtils.createVolumeRequest(volumeName, "user1", "user1").toBuilder();
       request.getCreateVolumeRequestBuilder().getVolumeInfoBuilder().addVolumeAcls(acl);
+      if (ignoreClientACLs) {
+        OMRequest modifiedRequest = new OMVolumeCreateRequest(request.build()).preExecute(ozoneManager);
+        OMClientResponse response =
+            new OMVolumeCreateRequest(modifiedRequest).validateAndUpdateCache(ozoneManager, 1);
+        assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+        assertNotNull(omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(volumeName)));
+        continue;
+      }
       OMException e = assertThrows(OMException.class,
           () -> new OMVolumeCreateRequest(request.build()).preExecute(ozoneManager));
       assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
