@@ -116,6 +116,7 @@ import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import software.amazon.awssdk.core.ResponseBytes;
@@ -134,6 +135,7 @@ import software.amazon.awssdk.services.s3.model.AbortIncompleteMultipartUpload;
 import software.amazon.awssdk.services.s3.model.AbortMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.Bucket;
 import software.amazon.awssdk.services.s3.model.BucketLifecycleConfiguration;
+import software.amazon.awssdk.services.s3.model.CommonPrefix;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadRequest;
 import software.amazon.awssdk.services.s3.model.CompleteMultipartUploadResponse;
 import software.amazon.awssdk.services.s3.model.CompletedMultipartUpload;
@@ -1725,6 +1727,51 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertNotNull(trueResponse.contents().get(0).owner());
     assertNotNull(trueResponse.contents().get(0).owner().displayName());
     assertEquals(S3Owner.DEFAULT_S3OWNER_ID, trueResponse.contents().get(0).owner().id());
+  }
+
+  /**
+   * StartAfter (and the V1 Marker) sorts before Prefix on a different branch, and the bucket has keys
+   * between them that do not match Prefix. AWS returns every key and common prefix that matches Prefix
+   * and sorts after StartAfter.
+   */
+  @ParameterizedTest
+  @EnumSource(value = BucketLayout.class, names = {"OBJECT_STORE", "FILE_SYSTEM_OPTIMIZED"})
+  public void testListObjectsStartAfterBeforePrefix(BucketLayout layout) throws Exception {
+    final String bucketName = getBucketName("start-after");
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ozoneClient.getObjectStore().getS3Volume().createBucket(bucketName,
+          BucketArgs.newBuilder().setBucketLayout(layout).build());
+    }
+    for (String key : Arrays.asList("dir1/dir2/file1", "dir1/file2", "dir1bh/file1", "dir1bha/file1", "dir2/file1")) {
+      s3Client.putObject(b -> b.bucket(bucketName).key(key), RequestBody.fromString("x"));
+    }
+    final String prefix = "dir1bh";
+    final String startAfter = "dir1/dir2/file1";
+
+    ListObjectsV2Response v2WithDelimiter = s3Client.listObjectsV2(b -> b.bucket(bucketName)
+        .prefix(prefix).delimiter("/").startAfter(startAfter));
+    assertThat(v2WithDelimiter.commonPrefixes()).extracting(CommonPrefix::prefix)
+        .containsExactly("dir1bh/", "dir1bha/");
+    assertThat(v2WithDelimiter.contents()).isEmpty();
+
+    ListObjectsResponse v1WithDelimiter = s3Client.listObjects(b -> b.bucket(bucketName)
+        .prefix(prefix).delimiter("/").marker(startAfter));
+    assertThat(v1WithDelimiter.commonPrefixes()).extracting(CommonPrefix::prefix)
+        .containsExactly("dir1bh/", "dir1bha/");
+
+    // A non-delimited FSO listing of a Prefix that is also a directory lists only that directory,
+    // so the result is compared with the listing without StartAfter.
+    ListObjectsV2Response v2WithoutStartAfter = s3Client.listObjectsV2(b -> b.bucket(bucketName).prefix(prefix));
+    assertThat(v2WithoutStartAfter.contents()).isNotEmpty();
+    ListObjectsV2Response v2WithoutDelimiter = s3Client.listObjectsV2(b -> b.bucket(bucketName)
+        .prefix(prefix).startAfter(startAfter));
+    assertEquals(v2WithoutStartAfter.contents(), v2WithoutDelimiter.contents());
+
+    // StartAfter sorts after every key matching Prefix.
+    ListObjectsV2Response v2AfterPrefix = s3Client.listObjectsV2(b -> b.bucket(bucketName)
+        .prefix(prefix).delimiter("/").startAfter("dir1bi"));
+    assertThat(v2AfterPrefix.commonPrefixes()).isEmpty();
+    assertThat(v2AfterPrefix.contents()).isEmpty();
   }
 
   private void testListObjectsMany(boolean isListV2) throws Exception {

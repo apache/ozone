@@ -1108,7 +1108,10 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     String seekKey;
     boolean skipStartKey = false;
-    if (StringUtils.isNotBlank(startKey)) {
+    // Every key matching keyPrefix sorts after a startKey that sorts before keyPrefix,
+    // so seek to keyPrefix; seeking to startKey would stop at the first non-matching key.
+    if (StringUtils.isNotBlank(startKey)
+        && (StringUtils.isEmpty(keyPrefix) || startKey.compareTo(keyPrefix) >= 0)) {
       // Seek to the specified key.
       seekKey = getOzoneKey(volumeName, bucketName, startKey);
       skipStartKey = true;
