@@ -38,11 +38,6 @@ public final class SnapDiffProgressHelper {
     progress.accept(sliceStart + width * Math.min(1.0, Math.max(0.0, completedFraction)));
   }
 
-  static void reportEveryTenPercent(DoubleConsumer progress, long processedUnits, long totalUnits,
-      TenPercentCheckpoint checkpoint) {
-    reportEveryTenPercentInSlice(progress, 0.0, 1.0, processedUnits, totalUnits, checkpoint);
-  }
-
   static void reportEveryTenPercentInSlice(DoubleConsumer progress, double sliceStart, double sliceEnd,
       long processedUnits, long totalUnits, TenPercentCheckpoint checkpoint) {
     if (progress == null) {
@@ -50,16 +45,13 @@ public final class SnapDiffProgressHelper {
     }
     long denominator = Math.max(1L, totalUnits);
     double fraction = (double) processedUnits / denominator;
-    while (fraction >= checkpoint.nextCheckpoint) {
+    while (checkpoint.nextCheckpoint <= 1.0 && fraction >= checkpoint.nextCheckpoint) {
       reportSlice(progress, sliceStart, sliceEnd, checkpoint.nextCheckpoint);
       checkpoint.nextCheckpoint += TEN_PCT_STEP;
-    }
-    if (processedUnits >= totalUnits) {
-      reportSlice(progress, sliceStart, sliceEnd, 1.0);
     }
   }
 
   static final class TenPercentCheckpoint {
-    double nextCheckpoint = TEN_PCT_STEP;
+    private double nextCheckpoint = TEN_PCT_STEP;
   }
 }

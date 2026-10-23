@@ -103,6 +103,9 @@ class TestSnapshotDiffResponse {
     SnapshotDiffResponse unordered = new SnapshotDiffResponse(createReport(), JobStatus.DONE, 0L,
         "Report is dependency unordered.");
     assertTrue(unordered.toString().contains("Report is dependency unordered."));
+
+    SnapshotDiffResponse nullOrdered = new SnapshotDiffResponse(createReport(), JobStatus.DONE, 0L);
+    assertFalse(nullOrdered.toString().contains("Report is"));
   }
 
   @Test

@@ -34,8 +34,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -263,40 +266,98 @@ class TestFullDiffSequentialReader {
 
   @Test
   void testFsoDirectoryEdgesPopulated() throws Exception {
+    long gate = 50L;
     Table<byte[], byte[]> toTable = InMemoryTestTable.forRawBytes();
-    putDir(toTable, "d100", dirInfo("parent", 100L, BUCKET_OBJECT_ID, 60L));
-    putDir(toTable, "d101", dirInfo("left", 101L, 100L, 60L));
-    putDir(toTable, "d102", dirInfo("right", 102L, 100L, 60L));
+    putDir(toTable, "d1", dirInfo("create", 1L, BUCKET_OBJECT_ID, 60L));
+    putDir(toTable, "d2", dirInfo("modify", 2L, BUCKET_OBJECT_ID, 70L, metadata("ver", "to")));
+    putDir(toTable, "d3", dirInfo("newname", 3L, BUCKET_OBJECT_ID, 70L));
+    putDir(toTable, "d5", dirInfo("unchanged", 5L, BUCKET_OBJECT_ID, 10L));
 
     Table<byte[], byte[]> fromTable = InMemoryTestTable.forRawBytes();
-    putDir(fromTable, "d100", dirInfo("parent", 100L, BUCKET_OBJECT_ID, 10L));
-    putDir(fromTable, "d101", dirInfo("left", 101L, 100L, 10L));
-    putDir(fromTable, "d102", dirInfo("right", 102L, 100L, 10L));
+    putDir(fromTable, "d2", dirInfo("modify", 2L, BUCKET_OBJECT_ID, 10L, metadata("ver", "from")));
+    putDir(fromTable, "d3", dirInfo("oldname", 3L, BUCKET_OBJECT_ID, 10L));
+    putDir(fromTable, "d4", dirInfo("deleted", 4L, BUCKET_OBJECT_ID, 10L));
+    putDir(fromTable, "d5", dirInfo("unchanged", 5L, BUCKET_OBJECT_ID, 10L));
 
-    SnapDiffJobStore store = spy(newStore(true));
-    try (SnapDiffJobStore ignored = store) {
-      scanDirectoryTables(new FullDiffSequentialReader(store, 50L), fromTable, toTable, null);
-      store.flushWrites();
+    try (SnapDiffJobStore store = newStore(true)) {
+      scanDirectoryTables(new FullDiffSequentialReader(store, gate), fromTable, toTable, null);
 
-      verify(store).putToEdge(BUCKET_OBJECT_ID, 100L, nameBytes("parent"));
-      verify(store).putToEdge(100L, 101L, nameBytes("left"));
-      verify(store).putToEdge(100L, 102L, nameBytes("right"));
-      verify(store).putFromEdge(BUCKET_OBJECT_ID, 100L, nameBytes("parent"));
-      verify(store).putFromEdge(100L, 101L, nameBytes("left"));
-      verify(store).putFromEdge(100L, 102L, nameBytes("right"));
+      assertTrue(isNewListCandidate(store, 1L));
+      assertTrue(isNewListCandidate(store, 2L));
+      assertTrue(isNewListCandidate(store, 3L));
+      assertFalse(hasNewListEntry(store, 4L));
+      assertTrue(hasNewListEntry(store, 5L));
+      assertFalse(isNewListCandidate(store, 5L));
+
+      assertNull(store.getOldList(1L));
+      assertNotNull(store.getOldList(2L));
+      assertNotNull(store.getOldList(3L));
+      assertNotNull(store.getOldList(4L));
+      assertNotNull(store.getOldList(5L));
+      assertEquals(0, store.getDiffCandidateCount());
+
+      EntryValue createVal = EntryValue.fromBytes(store.getNewList(1L));
+      assertTrue(createVal.isDir());
+      assertEquals("create", createVal.getName());
+      assertEquals(BUCKET_OBJECT_ID, createVal.getParentId());
+
+      EntryValue newRenameVal = EntryValue.fromBytes(store.getNewList(3L));
+      EntryValue oldRenameVal = EntryValue.fromBytes(store.getOldList(3L));
+      assertTrue(newRenameVal.isDir());
+      assertTrue(oldRenameVal.isDir());
+      assertEquals("newname", newRenameVal.getName());
+      assertEquals("oldname", oldRenameVal.getName());
+      assertArrayEquals(newRenameVal.getSignature(), oldRenameVal.getSignature());
+
+      EntryValue newModify = EntryValue.fromBytes(store.getNewList(2L));
+      EntryValue oldModify = EntryValue.fromBytes(store.getOldList(2L));
+      assertFalse(Arrays.equals(newModify.getSignature(), oldModify.getSignature()));
+
+
+      assertFromEdge(store, 1L, null, null);
+      assertFromEdge(store, 2L, BUCKET_OBJECT_ID, "modify");
+      assertFromEdge(store, 3L, BUCKET_OBJECT_ID, "oldname");
+      assertFromEdge(store, 4L, BUCKET_OBJECT_ID, "deleted");
+
+      assertToEdge(store, 1L, BUCKET_OBJECT_ID, "create");
+      assertToEdge(store, 2L, BUCKET_OBJECT_ID, "modify");
+      assertToEdge(store, 3L, BUCKET_OBJECT_ID, "newname");
+      assertToEdge(store, 4L, null, null);
+    }
+  }
+
+  private static void assertFromEdge(SnapDiffJobStore store, long objectId, Long parentId, String name)
+      throws IOException {
+    assertEdge(store.multiGetFromEdgeValues(Collections.singletonList(objectId)).get(0), parentId, name);
+  }
+
+  private static void assertToEdge(SnapDiffJobStore store, long objectId, Long parentId, String name)
+      throws IOException {
+    assertEdge(store.multiGetToEdgeValues(Collections.singletonList(objectId)).get(0), parentId, name);
+  }
+
+  private static void assertEdge(byte[] value, Long parentId, String name) {
+    if (parentId == null) {
+      assertNull(value);
+      return;
+    }
+    assertNotNull(value);
+    assertEquals(parentId.longValue(), SnapDiffJobStore.decodeEdgeLinkParentId(value));
+    if (name != null) {
+      assertEquals(name, SnapDiffJobStore.decodeEdgeLinkName(value));
     }
   }
 
   private static void scanFileTables(FullDiffSequentialReader reader,
       Table<byte[], byte[]> fromTable, Table<byte[], byte[]> toTable, byte[] keyPrefix)
-      throws IOException, RocksDatabaseException {
+      throws IOException {
     reader.scanFileTables(fromTable, toTable, keyPrefix, null,
         estimatedKeys(toTable), estimatedKeys(fromTable));
   }
 
   private static void scanDirectoryTables(FullDiffSequentialReader reader,
       Table<byte[], byte[]> fromTable, Table<byte[], byte[]> toTable, byte[] keyPrefix)
-      throws IOException, RocksDatabaseException {
+      throws IOException {
     reader.scanDirectoryTables(fromTable, toTable, keyPrefix, null,
         estimatedKeys(toTable), estimatedKeys(fromTable));
   }
@@ -351,11 +412,25 @@ class TestFullDiffSequentialReader {
   }
 
   private static OmDirectoryInfo dirInfo(String name, long objectId, long parentId, long updateId) {
-    return OmDirectoryInfo.newBuilder()
+    return dirInfo(name, objectId, parentId, updateId, Collections.emptyMap());
+  }
+
+  private static OmDirectoryInfo dirInfo(String name, long objectId, long parentId, long updateId,
+      Map<String, String> metadata) {
+    OmDirectoryInfo.Builder builder = OmDirectoryInfo.newBuilder()
         .setName(name)
         .setObjectID(objectId)
         .setParentObjectID(parentId)
-        .setUpdateID(updateId)
-        .build();
+        .setUpdateID(updateId);
+    if (!metadata.isEmpty()) {
+      builder.addAllMetadata(metadata);
+    }
+    return builder.build();
+  }
+
+  private static Map<String, String> metadata(String key, String value) {
+    Map<String, String> map = new LinkedHashMap<>();
+    map.put(key, value);
+    return map;
   }
 }

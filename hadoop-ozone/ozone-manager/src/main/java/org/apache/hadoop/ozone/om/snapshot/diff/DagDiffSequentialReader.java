@@ -115,6 +115,7 @@ public class DagDiffSequentialReader {
    * @param fromDirectoryTable raw {@code fromSnapshot.directoryTable}
    * @param toDirectoryTable   raw {@code toSnapshot.directoryTable}
    */
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public void scanDirectoryTables(byte[] keyPrefix, Collection<Path> deltaSstFiles,
       Table<byte[], byte[]> fromDirectoryTable, Table<byte[], byte[]> toDirectoryTable,
       DoubleConsumer progress, long estimatedDeltaKeys, long estimatedFromDirectoryKeys,
@@ -159,8 +160,8 @@ public class DagDiffSequentialReader {
       while (entries.hasNext()) {
         MergedKeyValue entry = entries.next();
         processedDeltaKeys++;
-        SnapDiffProgressHelper.reportEveryTenPercent(progress, processedDeltaKeys,
-            estimatedDeltaKeys, checkpoint);
+        SnapDiffProgressHelper.reportEveryTenPercentInSlice(
+            progress, 0.0, 1.0, processedDeltaKeys, estimatedDeltaKeys, checkpoint);
         lookupBatch.add(entry.getUserKey());
         if (!entry.isTombstone()) {
           byte[] value = entry.getValue();
