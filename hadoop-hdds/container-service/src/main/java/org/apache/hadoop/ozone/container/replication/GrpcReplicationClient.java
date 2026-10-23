@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServi
 import org.apache.hadoop.hdds.protocol.datanode.proto.IntraDatanodeProtocolServiceGrpc.IntraDatanodeProtocolServiceStub;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.tracing.GrpcClientInterceptor;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.grpc.ManagedChannel;
 import org.apache.ratis.thirdparty.io.grpc.netty.GrpcSslContexts;
@@ -76,7 +77,7 @@ public class GrpcReplicationClient implements AutoCloseable {
       }
       channelBuilder.sslContext(sslContextBuilder.build());
     }
-    channel = channelBuilder.build();
+    channel = channelBuilder.intercept(new GrpcClientInterceptor()).build();
     client = IntraDatanodeProtocolServiceGrpc.newStub(channel);
     debugString = getClass().getSimpleName()
         + "{" + host + ":" + port + "}"

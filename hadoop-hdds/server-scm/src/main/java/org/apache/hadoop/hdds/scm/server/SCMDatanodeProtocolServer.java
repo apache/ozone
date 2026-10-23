@@ -364,6 +364,9 @@ public class SCMDatanodeProtocolServer implements
     // The default deadline is 0, which means no deadline. Individual commands
     // may have a deadline set.
     builder.setDeadlineMsSinceEpoch(cmd.getDeadline());
+    if (!cmd.getTraceID().isEmpty()) {
+      builder.setTraceID(cmd.getTraceID());
+    }
 
     switch (cmd.getType()) {
     case reregisterCommand:

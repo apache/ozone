@@ -22,6 +22,9 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.isMaintenance;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -49,6 +52,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
@@ -534,7 +538,8 @@ public final class ReplicationSupervisor {
     @Override
     public void run() {
       final long startTime = Time.monotonicNow();
-      try {
+      Span span = TracingUtil.importAndCreateSpan(task.getMetricName(), task.getTraceID());
+      try (Scope ignored = span.makeCurrent()) {
         requestCounter.get(task.getMetricName()).incrementAndGet();
 
         final long now = clock.millis();
@@ -559,6 +564,7 @@ public final class ReplicationSupervisor {
         task.setStatus(Status.IN_PROGRESS);
         task.runTask();
         if (task.getStatus() == Status.FAILED) {
+          span.setStatus(StatusCode.ERROR);
           LOG.warn("Failed {}", this);
           failureCounter.get(task.getMetricName()).incrementAndGet();
         } else if (task.getStatus() == Status.DONE) {
@@ -569,6 +575,7 @@ public final class ReplicationSupervisor {
           skippedCounter.get(task.getMetricName()).incrementAndGet();
         }
       } catch (Exception e) {
+        span.recordException(e).setStatus(StatusCode.ERROR);
         task.setStatus(Status.FAILED);
         LOG.warn("Failed {}", this, e);
         failureCounter.get(task.getMetricName()).incrementAndGet();
@@ -577,6 +584,7 @@ public final class ReplicationSupervisor {
         opsLatencyMs.get(task.getMetricName()).add(Time.monotonicNow() - startTime);
         inFlight.remove(task);
         decrementTaskCounter(task);
+        span.end();
       }
     }
 

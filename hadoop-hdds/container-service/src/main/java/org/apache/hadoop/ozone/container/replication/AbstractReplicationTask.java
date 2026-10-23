@@ -23,6 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 /**
  * Abstract class to capture common variables and methods for different types
@@ -41,6 +42,9 @@ public abstract class AbstractReplicationTask {
   private final long term;
 
   private ReplicationCommandPriority priority = NORMAL;
+
+  // Trace of the command that created this task, so the task continues it when it runs on another thread.
+  private final String traceID = TracingUtil.exportCurrentSpan();
 
   protected AbstractReplicationTask(long containerID,
       long deadlineMsSinceEpoch, long term) {
@@ -78,6 +82,10 @@ public abstract class AbstractReplicationTask {
 
   public long getTerm() {
     return term;
+  }
+
+  public String getTraceID() {
+    return traceID;
   }
 
   /**

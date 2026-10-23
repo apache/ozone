@@ -18,14 +18,19 @@
 package org.apache.hadoop.hdds.scm;
 
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
 
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.junit.jupiter.api.Test;
@@ -52,5 +57,25 @@ public class TestSCMDatanodeProtocolServer {
         .Type.replicateContainerCommand, proto.getCommandType());
     assertEquals(5L, proto.getTerm());
     assertEquals(1234L, proto.getDeadlineMsSinceEpoch());
+  }
+
+  @Test
+  public void testTracing() throws IOException, TimeoutException {
+    OzoneStorageContainerManager scm = mock(OzoneStorageContainerManager.class);
+
+    try (TestSpanCollector spans = TestSpanCollector.install("TestSCMDatanodeProtocolServer")) {
+      Span span = TracingUtil.createInternalSpan("ReplicationManager");
+      ReplicateContainerCommand command;
+      try (Scope ignored = span.makeCurrent()) {
+        command = ContainerTestUtils.getReplicateContainerCommand(1, randomDatanodeDetails());
+      } finally {
+        span.end();
+      }
+
+      StorageContainerDatanodeProtocolProtos.SCMCommandProto proto =
+          SCMDatanodeProtocolServer.getCommandResponse(command, scm);
+
+      assertThat(proto.getTraceID()).contains(span.getSpanContext().getTraceId());
+    }
   }
 }

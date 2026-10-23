@@ -26,7 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.UnsafeByteOperations;
@@ -61,6 +63,7 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.upgrade.DatanodeVersionManager;
 import org.apache.hadoop.ozone.protocol.commands.ReconcileContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -498,15 +501,24 @@ public class TestHeartbeatEndpointTask {
    */
   @Test
   public void testTracing() throws Exception {
+    String traceID = "traceparent=00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01;";
+    ReconcileContainerCommand cmd = new ReconcileContainerCommand(1, new HashSet<>());
     StorageContainerDatanodeProtocolClientSideTranslatorPB scm =
         mock(StorageContainerDatanodeProtocolClientSideTranslatorPB.class);
     when(scm.sendHeartbeat(any())).thenAnswer(invocation ->
         SCMHeartbeatResponseProto.newBuilder()
             .setDatanodeUUID(((SCMHeartbeatRequestProto) invocation.getArgument(0)).getDatanodeDetails().getUuid())
+            .addCommands(SCMCommandProto.newBuilder()
+                .setCommandType(reconcileContainerCommand)
+                .setReconcileContainerCommandProto(cmd.getProto())
+                .setTraceID(traceID)
+                .build())
             .build());
     OzoneConfiguration conf = new OzoneConfiguration();
     DatanodeStateMachine datanodeStateMachine = mockDatanodeStateMachine();
-    StateContext context = new StateContext(conf, DatanodeStates.RUNNING, datanodeStateMachine, "");
+    StateContext context = spy(new StateContext(conf, DatanodeStates.RUNNING, datanodeStateMachine, ""));
+    ArgumentCaptor<SCMCommand<?>> queued = ArgumentCaptor.forClass(SCMCommand.class);
+    doNothing().when(context).addCommand(queued.capture());
     when(datanodeStateMachine.getQueuedCommandCount()).thenReturn(new EnumCounters<>(SCMCommandProto.Type.class));
     HeartbeatEndpointTask endpointTask = getHeartbeatEndpointTask(conf, context, scm);
 
@@ -515,6 +527,7 @@ public class TestHeartbeatEndpointTask {
 
       assertThat(spans.named("HeartbeatEndpointTask")).hasSize(1)
           .allSatisfy(span -> assertThat(span.getSpanContext().isValid()).isTrue());
+      assertThat(queued.getValue().getTraceID()).isEqualTo(traceID);
     }
   }
 

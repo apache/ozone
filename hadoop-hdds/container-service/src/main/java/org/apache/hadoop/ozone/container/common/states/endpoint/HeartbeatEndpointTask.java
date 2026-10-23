@@ -441,6 +441,7 @@ public class HeartbeatEndpointTask
     if (response.hasDeadlineMsSinceEpoch()) {
       cmd.setDeadline(response.getDeadlineMsSinceEpoch());
     }
+    cmd.setTraceID(response.getTraceID());
     context.addCommand(cmd);
   }
 

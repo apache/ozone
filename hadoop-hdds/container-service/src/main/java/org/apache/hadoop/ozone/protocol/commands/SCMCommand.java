@@ -21,6 +21,7 @@ import com.google.protobuf.Message;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.server.events.IdentifiableEventPayload;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 
 /**
  * A class that acts as the base class to convert between Java and SCM
@@ -38,6 +39,9 @@ public abstract class SCMCommand<T extends Message> implements
   private String encodedToken = "";
 
   private long deadlineMsSinceEpoch = 0;
+
+  // Trace of the SCM operation that created this command, captured here because the command is sent later.
+  private String traceID = TracingUtil.exportCurrentSpan();
 
   SCMCommand() {
     this.id = HddsIdFactory.getLongId();
@@ -89,6 +93,14 @@ public abstract class SCMCommand<T extends Message> implements
 
   public void setEncodedToken(String encodedToken) {
     this.encodedToken = encodedToken;
+  }
+
+  public String getTraceID() {
+    return traceID;
+  }
+
+  public void setTraceID(String traceID) {
+    this.traceID = traceID;
   }
 
   /**

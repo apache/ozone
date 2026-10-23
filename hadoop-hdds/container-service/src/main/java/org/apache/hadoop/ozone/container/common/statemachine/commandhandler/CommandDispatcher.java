@@ -19,12 +19,17 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.SpanKind;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
@@ -96,10 +101,14 @@ public final class CommandDispatcher {
     CommandHandler handler = handlerMap.get(command.getType());
     if (handler != null) {
       commandHandlerMetrics.increaseCommandCount(command.getType());
-      try {
+      Span span = TracingUtil.importAndCreateSpan(command.getType().name(), command.getTraceID(), SpanKind.CONSUMER);
+      try (Scope ignored = span.makeCurrent()) {
         handler.handle(command, container, context, connectionManager);
       } catch (Exception ex) {
+        span.recordException(ex).setStatus(StatusCode.ERROR);
         LOG.error("Exception while handle command, ", ex);
+      } finally {
+        span.end();
       }
     } else {
       LOG.error("Unknown SCM Command queued. There is no handler for this " +

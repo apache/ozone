@@ -24,6 +24,9 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.api.trace.StatusCode;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,6 +48,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
@@ -184,6 +188,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     private StateContext context;
     private OzoneContainer container;
     private SCMConnectionManager connectionManager;
+    private final String traceID = TracingUtil.exportCurrentSpan();
 
     public DeleteCmdInfo(DeleteBlocksCommand command, OzoneContainer container,
         StateContext context, SCMConnectionManager connectionManager) {
@@ -191,6 +196,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       this.context = context;
       this.container = container;
       this.connectionManager = connectionManager;
+    }
+
+    public String getTraceID() {
+      return traceID;
     }
 
     public DeleteBlocksCommand getCmd() {
@@ -253,13 +262,18 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       while (true) {
         while (!deleteCommandQueues.isEmpty()) {
           DeleteCmdInfo cmd = deleteCommandQueues.poll();
-          try {
+          Span span = TracingUtil.importAndCreateSpan("DeleteBlocksCommandHandler", cmd.getTraceID());
+          try (Scope ignored = span.makeCurrent()) {
             processCmd(cmd);
           } catch (Error e) {
+            span.recordException(e).setStatus(StatusCode.ERROR);
             ExitUtils.terminate(1,
                 "Fatal error while processing delete blocks command", e, LOG);
           } catch (Throwable e) {
+            span.recordException(e).setStatus(StatusCode.ERROR);
             LOG.error("taskProcess failed.", e);
+          } finally {
+            span.end();
           }
         }
 

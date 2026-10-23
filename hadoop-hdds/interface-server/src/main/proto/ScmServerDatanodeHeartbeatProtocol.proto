@@ -368,6 +368,8 @@ message SCMCommandProto {
   optional int64 term = 15;
   optional string encodedToken = 16;
   optional int64 deadlineMsSinceEpoch = 17;
+  // W3C trace context of the SCM operation that created this command.
+  optional string traceID = 18;
 }
 
 /**

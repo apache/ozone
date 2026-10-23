@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -29,6 +30,7 @@ import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.tracing.TestSpanCollector;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
@@ -141,5 +143,30 @@ public class TestReplicateContainerCommandHandler {
     ReplicationTask task = captor.getValue();
     assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE,
         task.getApparentVersion());
+  }
+
+  @Test
+  public void testTracing() {
+    ArgumentCaptor<ReplicationTask> captor = captureSubmittedTask();
+    String traceId = "4bf92f3577b34da6a3ce929d0e0e4736";
+    ReplicateContainerCommand cmd = ContainerTestUtils.getReplicateContainerCommand(
+        1, MockDatanodeDetails.randomDatanodeDetails());
+    cmd.setTraceID("traceparent=00-" + traceId + "-00f067aa0ba902b7-01;");
+    CommandDispatcher dispatcher = new CommandDispatcher.Builder()
+        .addHandler(new ReplicateContainerCommandHandler(supervisor, pushReplicator))
+        .setContainer(ozoneContainer)
+        .setContext(stateContext)
+        .setConnectionManager(connectionManager)
+        .build();
+
+    try (TestSpanCollector spans = TestSpanCollector.install("TestReplicateContainerCommandHandler")) {
+      dispatcher.handle(cmd);
+
+      assertThat(spans.named(SCMCommandProto.Type.replicateContainerCommand.name())).hasSize(1)
+          .allSatisfy(span -> assertThat(span.getSpanContext().getTraceId()).isEqualTo(traceId));
+      assertThat(captor.getValue().getTraceID()).contains(traceId);
+    } finally {
+      dispatcher.stop();
+    }
   }
 }
