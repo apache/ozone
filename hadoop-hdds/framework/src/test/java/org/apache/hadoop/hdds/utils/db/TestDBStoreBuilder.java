@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -148,7 +149,7 @@ public class TestDBStoreBuilder {
     conf.setDouble("hadoop.hdds.db.rocksdb.compaction.deletion.ratio", ratio);
     IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
         () -> DBStoreBuilder.newBuilder(conf).setName("deletions.db").setPath(tempDir).build());
-    assertTrue(exception.getMessage().contains("hadoop.hdds.db.rocksdb.compaction.deletion.ratio"));
+    assertThat(exception).hasMessageContaining("hadoop.hdds.db.rocksdb.compaction.deletion.ratio");
   }
 
   private static void writeThenDelete(RDBStore store, Table<byte[], byte[]> table) throws Exception {
