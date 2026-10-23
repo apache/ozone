@@ -402,7 +402,7 @@ public class TestRpcClient {
 
       ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
       client.createKey("vol1", "bucket1", "key1", 0, replication, Collections.emptyMap()).close();
-      assertEquals(Collections.singletonList("alice"), owners);
+      assertThat(owners).containsExactly("alice");
     } finally {
       client.clearThreadLocalS3Auth();
       client.close();
