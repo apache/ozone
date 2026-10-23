@@ -330,7 +330,8 @@ public class TestStaleRecoveringContainerScrubbingService {
     } finally {
       container.writeUnlock();
     }
-    scrubber.join();
+    scrubber.join(10000);
+    assertFalse(scrubber.isAlive());
     assertNull(error.get());
     assertEquals(CLOSING, container.getContainerState());
   }
