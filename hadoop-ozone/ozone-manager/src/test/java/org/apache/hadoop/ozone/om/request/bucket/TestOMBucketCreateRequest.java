@@ -414,11 +414,21 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
     }
   }
 
-  @Test
-  public void testRejectInvalidAcl() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testInvalidAcl(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
     for (OzoneAclInfo acl : OMRequestTestUtils.invalidAcls()) {
       String volumeName = UUID.randomUUID().toString();
       String bucketName = UUID.randomUUID().toString();
+      if (ignoreClientACLs) {
+        OMBucketCreateRequest request = doPreExecute(newBucketInfoBuilder(bucketName, volumeName).addAcls(acl));
+        request.setUGI(UserGroupInformation.getCurrentUser());
+        OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 1);
+        assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+        assertNotNull(omMetadataManager.getBucketTable().get(omMetadataManager.getBucketKey(volumeName, bucketName)));
+        continue;
+      }
       OMException e = assertThrows(OMException.class,
           () -> doPreExecute(newBucketInfoBuilder(bucketName, volumeName).addAcls(acl)));
       assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
