@@ -164,7 +164,8 @@ public class CertificateCodec {
   }
 
   public static X509Certificate readX509Certificate(InputStream input) throws CertificateException {
-    final Certificate cert = getCertFactory().generateCertificate(input);
+    // The JDK's X.509 factory: a client reading CA certificates must not need the BouncyCastle provider.
+    final Certificate cert = CertificateFactory.getInstance("X.509").generateCertificate(input);
     if (cert instanceof X509Certificate) {
       return (X509Certificate) cert;
     }
@@ -184,6 +185,8 @@ public class CertificateCodec {
   }
 
   public static CertificateFactory getCertFactory() throws CertificateException {
+    // BouncyCastle, for the "PEM" cert path encoding only it supports
+    SecurityConfig.initSecurityProvider("BC");
     try {
       return CertificateFactory.getInstance("X.509", "BC");
     } catch (NoSuchProviderException e) {
