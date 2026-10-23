@@ -132,13 +132,14 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
     final OmVolumeArgs omVolumeArgs;
     Map<String, String> auditMap = null;
     try {
-      toOzoneAcls(volumeInfo.getVolumeAclsList());
+      List<OzoneAcl> clientAcls = toOzoneAcls(volumeInfo.getVolumeAclsList());
       // when you create a volume, we set both Object ID and update ID.
       // The Object ID will never change, but update
       // ID will be set to transactionID each time we update the object.
-      OmVolumeArgs.Builder builder = OmVolumeArgs.builderFromProtobuf(volumeInfo)
+      OmVolumeArgs.Builder builder = OmVolumeArgs.builderFromProtobuf(volumeInfo.toBuilder().clearVolumeAcls().build())
           .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
           .setUpdateID(transactionLogIndex);
+      builder.acls().set(clientAcls);
 
       auditMap = builder.toAuditMap();
       // acquire lock.
