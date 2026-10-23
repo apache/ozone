@@ -17,10 +17,17 @@
 
 package org.apache.hadoop.hdds.scm.cli;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.util.Time;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -42,50 +49,58 @@ public class SafeModeWaitSubcommand implements Callable<Void> {
       names = { "-t", "--timeout"})
   private long timeoutSeconds;
 
-  private long startTestTime;
-
   @Mixin
   private ScmOption scmOption;
 
   @Override
   public Void call() throws Exception {
-    startTestTime = Time.monotonicNow();
-
-    while (getRemainingTimeInSec() > 0) {
-      try (ScmClient scmClient = scmOption.createScmClient()) {
-        long remainingTime;
-        do {
-          if (!scmClient.inSafeMode()) {
-            System.out.println("SCM is out of safe mode.");
-            return null;
-          }
-
-          remainingTime = getRemainingTimeInSec();
-
-          if (remainingTime > 0) {
-            System.out.printf(
-                "SCM is in safe mode. Will retry in 1 sec. Remaining time "
-                    + "(sec): %s%n",
-                remainingTime);
-            Thread.sleep(1000);
-          } else {
-            System.out.println("SCM is in safe mode. No more retries.");
-          }
-        } while (remainingTime > 0);
-      } catch (InterruptedException ex) {
-        System.out.printf(
-            "SCM is not available (yet?). Error is %s. Will retry in 1 sec. "
-                + "Remaining time (sec): %s%n",
-            ex.getMessage(), getRemainingTimeInSec());
-        Thread.sleep(1000);
-        Thread.currentThread().interrupt();
-      }
+    try (ScmClient scmClient = scmOption.createScmClient()) {
+      execute(scmClient);
     }
-    throw new TimeoutException(
-        "Safe mode is not ended within the timeout period.");
+    return null;
   }
 
-  private long getRemainingTimeInSec() {
-    return timeoutSeconds - (Time.monotonicNow() - startTestTime) / 1000;
+  @VisibleForTesting
+  void execute(ScmClient scmClient) throws Exception {
+    final long deadline = Time.monotonicNow() + TimeUnit.SECONDS.toMillis(timeoutSeconds);
+    // Call SCM in another thread, so that the timeout also applies to a call that is still retrying.
+    final ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
+      Thread thread = new Thread(runnable, "SafeModeWait");
+      thread.setDaemon(true);
+      return thread;
+    });
+    Throwable lastError = null;
+    try {
+      for (long remaining = deadline - Time.monotonicNow(); remaining > 0; remaining = deadline - Time.monotonicNow()) {
+        final Future<Boolean> inSafeMode = executor.submit(scmClient::inSafeMode);
+        try {
+          if (!inSafeMode.get(remaining, TimeUnit.MILLISECONDS)) {
+            System.out.println("SCM is out of safe mode.");
+            return;
+          }
+          System.out.printf("SCM is in safe mode. Will retry in 1 sec. Remaining time (sec): %s%n",
+              getRemainingTimeInSec(deadline));
+        } catch (ExecutionException e) {
+          if (e.getCause() instanceof AccessControlException) {
+            throw (AccessControlException) e.getCause();
+          }
+          lastError = e.getCause();
+          System.out.printf("SCM is not available (yet?). Error is %s. Will retry in 1 sec. Remaining time (sec): %s%n",
+              lastError, getRemainingTimeInSec(deadline));
+        } catch (TimeoutException e) {
+          break;
+        }
+        Thread.sleep(Math.max(0, Math.min(1000, deadline - Time.monotonicNow())));
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+    final TimeoutException timeout = new TimeoutException("Safe mode is not ended within the timeout period.");
+    timeout.initCause(lastError);
+    throw timeout;
+  }
+
+  private static long getRemainingTimeInSec(long deadline) {
+    return TimeUnit.MILLISECONDS.toSeconds(Math.max(0, deadline - Time.monotonicNow()));
   }
 }

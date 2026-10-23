@@ -22,12 +22,25 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODE_ID_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
+import com.google.protobuf.ServiceException;
+import java.io.IOException;
+import java.net.ConnectException;
 import java.util.Collection;
+import javax.security.sasl.SaslException;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.ratis.ServerNotLeaderException;
+import org.apache.hadoop.hdds.scm.ha.RetriableWithFailOverException;
+import org.apache.hadoop.hdds.scm.ha.RetriableWithNoFailoverException;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
+import org.apache.hadoop.ipc_.RemoteException;
+import org.apache.hadoop.ipc_.RetriableException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests for {@code SCMHAUtils}.
@@ -50,5 +63,41 @@ class TestSCMHAUtils {
 
     assertEquals(2, nodesWithoutSelf.size());
     assertThat(nodesWithoutSelf).doesNotContain(selfId);
+  }
+
+  @ParameterizedTest
+  @ValueSource(classes = {IOException.class, IllegalArgumentException.class})
+  void failsOnOtherServerException(Class<?> serverException) {
+    assertEquals(RetryDecision.FAIL, getRetryDecision(fromServer(serverException)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(classes = {ServerNotLeaderException.class, RetriableWithFailOverException.class,
+      RetriableException.class, org.apache.hadoop.ipc.RetriableException.class, SaslException.class})
+  void failsOverOnRetriableServerException(Class<?> serverException) {
+    assertEquals(RetryDecision.FAILOVER_AND_RETRY, getRetryDecision(fromServer(serverException)));
+  }
+
+  @Test
+  void retriesOnRetriableWithNoFailoverServerException() {
+    assertNotEquals(RetryDecision.FAIL, getRetryDecision(fromServer(RetriableWithNoFailoverException.class)));
+  }
+
+  @Test
+  void failsOnRemoteException() {
+    assertEquals(RetryDecision.FAIL, getRetryDecision(new RemoteException(IOException.class.getName(), "error")));
+  }
+
+  @Test
+  void failsOverOnConnectionFailure() {
+    assertEquals(RetryDecision.FAILOVER_AND_RETRY, getRetryDecision(new ConnectException("Connection refused")));
+  }
+
+  private static Exception fromServer(Class<?> serverException) {
+    return new ServiceException(new RemoteException(serverException.getName(), "server error"));
+  }
+
+  private static RetryDecision getRetryDecision(Exception e) {
+    return SCMHAUtils.getRetryAction(0, 0, e, 15, 2000).action;
   }
 }
