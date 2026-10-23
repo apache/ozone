@@ -32,7 +32,6 @@ import static org.mockito.Mockito.verify;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -364,10 +363,6 @@ class TestFullDiffSequentialReader {
 
   private static long estimatedKeys(Table<byte[], byte[]> table) throws RocksDatabaseException {
     return Math.max(1L, table.getEstimatedKeyCount());
-  }
-
-  private static byte[] nameBytes(String name) {
-    return name.getBytes(StandardCharsets.UTF_8);
   }
 
   private static boolean hasNewListEntry(SnapDiffJobStore store, long objectId) throws IOException {
