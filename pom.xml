@@ -111,7 +111,7 @@
     <jersey.version>1.19.4</jersey.version>
     <jersey2.version>2.48</jersey2.version>
     <jetty.version>12.1.14</jetty.version>
-    <jgrapht.version>1.4.0</jgrapht.version>
+    <jgrapht.version>1.5.0</jgrapht.version>
     <jgraphx.version>3.9.12</jgraphx.version>
     <jline.version>3.30.17</jline.version>
     <jnr-constants.version>0.11.2</jnr-constants.version>
