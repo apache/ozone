@@ -202,6 +202,18 @@ class TestObjectPut {
     assertThat(keyDetails.getTags()).isEmpty();
   }
 
+  @ParameterizedTest
+  @NullAndEmptySource
+  @ValueSource(strings = {"abc", "99999999999999999999", "0", "37"})
+  void testNonStreamingPutIgnoresDecodedContentLength(String decodedLength) throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn(decodedLength);
+
+    assertSucceeds(() -> putObject(CONTENT));
+
+    assertThat(assertKeyContent(bucket, KEY_NAME, CONTENT).getDataSize()).isEqualTo(CONTENT.length());
+  }
+
   @Test
   public void testPutObjectWithTags() throws Exception {
     when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
@@ -1156,6 +1168,18 @@ class TestObjectPut {
     // THEN
     OzoneKeyDetails key = fsoBucket.getKey(path);
     assertThat(key.isFile()).as("directory").isFalse();
+  }
+
+  @Test
+  void testNonStreamingPutWithDecodedLengthZeroDoesNotCreateDirectory() throws Exception {
+    String path = "dir/";
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(UNSIGNED_PAYLOAD);
+    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER)).thenReturn("0");
+
+    assertSucceeds(() -> putObject(FSO_BUCKET_NAME, path));
+
+    OzoneKeyDetails key = assertKeyContent(fsoBucket, path, CONTENT);
+    assertThat(key.isFile()).isTrue();
   }
 
   @Test
