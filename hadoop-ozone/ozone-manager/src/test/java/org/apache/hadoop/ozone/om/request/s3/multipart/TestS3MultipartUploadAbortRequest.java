@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +30,7 @@ import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -56,6 +59,16 @@ public class TestS3MultipartUploadAbortRequest extends S3MultipartRequestTests {
 
     doPreExecuteAbortMPU(volumeName, bucketName, keyName,
         UUID.randomUUID().toString());
+  }
+
+  @Test
+  public void testPreExecuteWithInvalidUploadId() {
+    OMRequest omRequest = OMRequestTestUtils.createAbortMPURequest(UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(), UUID.randomUUID().toString(), "invalid/" + UUID.randomUUID());
+
+    OMException e = assertThrows(OMException.class,
+        () -> getS3MultipartUploadAbortReq(omRequest).preExecute(ozoneManager));
+    assertEquals(NO_SUCH_MULTIPART_UPLOAD_ERROR, e.getResult());
   }
 
   @ParameterizedTest

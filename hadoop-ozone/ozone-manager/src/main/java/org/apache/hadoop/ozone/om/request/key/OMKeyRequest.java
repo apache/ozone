@@ -25,13 +25,13 @@ import static org.apache.hadoop.ozone.OzoneConsts.OBJECT_ID_RECLAIM_BLOCKS;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_PART;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.util.Time.monotonicNow;
 
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -613,7 +614,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   protected OmKeyInfo.Builder dirKeyInfoBuilderNoACL(String keyName, KeyArgs keyArgs, long objectId,
-      ReplicationConfig serverDefaultReplConfig) {
+      ReplicationConfig serverDefaultReplConfig) throws OMException {
     String dirName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
     OmKeyInfo.Builder keyInfoBuilder =
@@ -631,12 +632,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .getFactor() != HddsProtos.ReplicationFactor.ZERO && keyArgs
         .getType() != HddsProtos.ReplicationType.EC) {
       // Factor available and not an EC replication config.
-      keyInfoBuilder.setReplicationConfig(ReplicationConfig
-          .fromProtoTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()));
+      keyInfoBuilder.setReplicationConfig(OzoneConfigUtil
+          .toReplicationConfig(keyArgs.getType(), keyArgs.getFactor(), null));
     } else if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
       // Found EC type
-      keyInfoBuilder.setReplicationConfig(
-          new ECReplicationConfig(keyArgs.getEcReplicationConfig()));
+      keyInfoBuilder.setReplicationConfig(OzoneConfigUtil
+          .toReplicationConfig(keyArgs.getType(), keyArgs.getFactor(), keyArgs.getEcReplicationConfig()));
     } else {
       // default type
       keyInfoBuilder.setReplicationConfig(serverDefaultReplConfig);
@@ -1131,8 +1132,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
           @Nonnull long transactionLogIndex, long objectID,
           OmConfig configuration) throws IOException {
 
-    Preconditions.checkArgument(args.getMultipartNumber() > 0,
-            "PartNumber Should be greater than zero");
+    validatePartNumber(args.getMultipartNumber());
     // When key is multipart upload part key, we should take replication
     // type and replication factor from original key which has done
     // initiate multipart upload. If we have not found any such, we throw
@@ -1168,6 +1168,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
     return createFileInfo(args, locations, partKeyInfo.getReplicationConfig(),
             size, encInfo, prefixManager, omBucketInfo, omPathInfo,
             transactionLogIndex, objectID, configuration);
+  }
+
+  protected static void validatePartNumber(int partNumber) throws OMException {
+    if (partNumber <= 0) {
+      throw new OMException("Part number should be greater than zero, but was " + partNumber, INVALID_PART);
+    }
   }
 
   /**

@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_INTERNAL_ERROR;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
@@ -627,6 +628,32 @@ public class TestKeyValueHandler {
     }
   }
 
+  @Test
+  public void testDeleteRecoveringContainer() throws IOException {
+    HandlerWithVolumeSet handlerCtx = createKeyValueHandler(tempDir);
+    KeyValueHandler keyValueHandler = handlerCtx.getHandler();
+    ContainerSet containerSet = handlerCtx.getContainerSet();
+    try {
+      ContainerCommandRequestProto.Builder request = createContainerRequest(DATANODE_UUID, DUMMY_CONTAINER_ID)
+          .toBuilder();
+      request.getCreateContainerBuilder().setState(State.RECOVERING);
+      assertThat(keyValueHandler.handleCreateContainer(request.build(), null).getResult())
+          .isEqualTo(ContainerProtos.Result.SUCCESS);
+      Container<?> container = containerSet.getContainer(DUMMY_CONTAINER_ID);
+      assertThat(container).isNotNull();
+      assertThat(container.getContainerState()).isEqualTo(State.RECOVERING);
+      assertThat(containerSet.getRecoveringContainerMap()).containsKey(DUMMY_CONTAINER_ID);
+
+      keyValueHandler.deleteContainer(container, true);
+
+      assertThat(containerSet.getContainer(DUMMY_CONTAINER_ID)).isNull();
+      assertThat(containerSet.getRecoveringContainerMap()).doesNotContainKey(DUMMY_CONTAINER_ID);
+    } finally {
+      keyValueHandler.stop();
+      handlerCtx.getVolumeSet().getVolumesList().forEach(StorageVolume::shutdown);
+    }
+  }
+
   /**
    * Tests that deleting a container decrements the cached used space of its volume.
    */
@@ -976,6 +1003,48 @@ public class TestKeyValueHandler {
     } finally {
       FileUtils.deleteDirectory(tempDir.toFile());
     }
+  }
+
+  @Test
+  public void testCreateContainerReleasesSpaceOnUncheckedFailure() throws Exception {
+    final long containerID = 1L;
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(tempDir);
+    HddsVolume hddsVolume = (HddsVolume) handlerWithVolume.getVolumeSet().getVolumesList().get(0);
+    hddsVolume.setDbParentDir(null);
+    String datanodeId = handlerWithVolume.getHandler().getDatanodeId();
+
+    ContainerCommandResponseProto response = handlerWithVolume.getHandler().handle(
+        createContainerRequest(datanodeId, containerID), null, null);
+
+    assertEquals(CONTAINER_INTERNAL_ERROR, response.getResult());
+    assertThat(response.getMessage()).contains("dbParentDir == null");
+    assertEquals(0, hddsVolume.getCommittedBytes());
+    assertNull(handlerWithVolume.getContainerSet().getContainer(containerID));
+  }
+
+  @Test
+  public void testCreateContainerKeepsSpaceOfCreatedContainer() throws Exception {
+    final long containerID = 1L;
+    HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(tempDir);
+    HddsVolume hddsVolume = (HddsVolume) handlerWithVolume.getVolumeSet().getVolumesList().get(0);
+    String datanodeId = handlerWithVolume.getHandler().getDatanodeId();
+    KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+
+    ContainerCommandResponseProto response =
+        kvHandler.handleCreateContainer(createContainerRequest(datanodeId, containerID), null);
+    assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+    KeyValueContainer container =
+        (KeyValueContainer) handlerWithVolume.getContainerSet().getContainer(containerID);
+    assertNotNull(container);
+    assertEquals(maxContainerSize, hddsVolume.getCommittedBytes());
+    assertTrue(container.getContainerData().isCommittedSpace());
+
+    long committedAfterFirst = hddsVolume.getCommittedBytes();
+    ContainerCommandResponseProto response2 =
+        kvHandler.handleCreateContainer(createContainerRequest(datanodeId, containerID), null);
+    assertEquals(ContainerProtos.Result.SUCCESS, response2.getResult());
+    assertEquals(committedAfterFirst, hddsVolume.getCommittedBytes());
+    assertTrue(container.getContainerData().isCommittedSpace());
   }
 
   private static ContainerCommandRequestProto createContainerRequest(
