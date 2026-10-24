@@ -27,9 +27,15 @@ import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Scope;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
+import io.opentelemetry.sdk.common.CompletableResultCode;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.data.SpanData;
 import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor;
 import io.opentelemetry.sdk.trace.export.SpanExporter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.junit.jupiter.api.AfterEach;
@@ -197,6 +203,105 @@ public class TestTracingInitModes {
     TracingUtil.reconfigureTracing("reconfig", newConf.getObject(TracingConfig.class));
     assertTrue(TracingUtil.isTracingActive(newConf),
         "After reconfigure to enabled, tracing must be active");
+  }
+
+  /** Like {@link #config}, with a sampler that drops every span, so an Ozone-built SDK exports nothing. */
+  private static MutableConfigurationSource configDroppingSpans(boolean enabled, boolean applicationAware) {
+    MutableConfigurationSource conf = config(enabled, applicationAware);
+    conf.set("ozone.tracing.sampler", "0");
+    return conf;
+  }
+
+  /** app-aware, no app tracer, no parent span: Ozone's SDK is not built, but tracing stays active. */
+  @Test
+  public void testApplicationAwareDefersSdkWithoutParentSpan() {
+    MutableConfigurationSource conf = configDroppingSpans(false, true);
+    TracingUtil.initTracing("app-aware-lazy", conf);
+
+    assertTrue(TracingUtil.isTracingActive(conf));
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("root")) {
+      assertFalse(Span.current().getSpanContext().isValid(),
+          "Application-aware mode must NOT manufacture a root span");
+    }
+    assertFalse(TracingUtil.importAndCreateSpan("no-parent", "").getSpanContext().isValid());
+    assertFalse(GlobalOpenTelemetry.isSet(), "Ozone's SDK must not be built or registered without a parent span");
+  }
+
+  /** app-aware, no app tracer: the first span with a valid parent builds Ozone's SDK and continues the trace. */
+  @Test
+  public void testApplicationAwareBuildsSdkForFirstParentSpan() {
+    MutableConfigurationSource conf = configDroppingSpans(false, true);
+    TracingUtil.initTracing("app-aware-lazy", conf);
+    assertFalse(GlobalOpenTelemetry.isSet());
+
+    SdkTracerProvider appProvider = noExportTracerProvider();
+    Span appSpan = appProvider.get("app").spanBuilder("app-root").startSpan();
+    try (Scope ignored = appSpan.makeCurrent();
+         TracingUtil.TraceCloseable ignoredChild = TracingUtil.createActivatedSpan("child")) {
+      assertTrue(Span.current().getSpanContext().isValid(), "A child span should be created under the parent");
+      assertEquals(appSpan.getSpanContext().getTraceId(), Span.current().getSpanContext().getTraceId());
+    } finally {
+      appSpan.end();
+      appProvider.shutdown();
+    }
+    assertTrue(GlobalOpenTelemetry.isSet(), "Ozone's SDK should be built and registered for the first parent span");
+  }
+
+  /** app-aware: a GlobalOpenTelemetry the application registers after Ozone's init is adopted, not replaced. */
+  @Test
+  public void testApplicationAwareAdoptsGlobalRegisteredAfterInit() {
+    MutableConfigurationSource conf = configDroppingSpans(false, true);
+    TracingUtil.initTracing("app-aware-lazy", conf);
+
+    List<SpanData> exported = Collections.synchronizedList(new ArrayList<>());
+    SdkTracerProvider appProvider = SdkTracerProvider.builder()
+        .addSpanProcessor(SimpleSpanProcessor.create(new RecordingExporter(exported))).build();
+    OpenTelemetrySdk appSdk = OpenTelemetrySdk.builder().setTracerProvider(appProvider).build();
+    GlobalOpenTelemetry.set(appSdk);
+
+    Span appSpan = appProvider.get("app").spanBuilder("app-root").startSpan();
+    try (Scope ignored = appSpan.makeCurrent();
+         TracingUtil.TraceCloseable ignoredChild = TracingUtil.createActivatedSpan("child")) {
+      assertTrue(Span.current().getSpanContext().isValid());
+    } finally {
+      appSpan.end();
+    }
+    assertTrue(exported.stream().anyMatch(s -> s.getName().equals("child")),
+        "The child span should go to the application's SDK: " + exported);
+    appProvider.shutdown();
+  }
+
+  /** Enabled: Ozone's SDK is built at init, as before, so root spans can start at once. */
+  @Test
+  public void testEnabledModeBuildsSdkEagerly() {
+    MutableConfigurationSource conf = configDroppingSpans(true, true);
+    TracingUtil.initTracing("enabled-eager", conf);
+    assertTrue(GlobalOpenTelemetry.isSet(), "Enabled tracing should build and register Ozone's SDK at init");
+  }
+
+  /** Collects exported spans in memory. */
+  private static final class RecordingExporter implements SpanExporter {
+    private final List<SpanData> spans;
+
+    RecordingExporter(List<SpanData> spans) {
+      this.spans = spans;
+    }
+
+    @Override
+    public CompletableResultCode export(Collection<SpanData> batch) {
+      spans.addAll(batch);
+      return CompletableResultCode.ofSuccess();
+    }
+
+    @Override
+    public CompletableResultCode flush() {
+      return CompletableResultCode.ofSuccess();
+    }
+
+    @Override
+    public CompletableResultCode shutdown() {
+      return CompletableResultCode.ofSuccess();
+    }
   }
 
   /** OpenTelemetry.noop() is a singleton — used to detect a real app global. */
