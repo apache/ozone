@@ -410,8 +410,8 @@ public class TestSCMNodeManager {
 
   /**
    * A datanode can register again with new ports just when the health check marks it DEAD and removes it from the
-   * network topology. Whichever of the two starts first, the other one has to wait for it, and the datanode ends up
-   * HEALTHY and in the topology with its new ports.
+   * network topology. Whichever of the two starts first, the other one can run in the middle of it, and the datanode
+   * still ends up HEALTHY and in the topology with its new ports.
    */
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
@@ -444,14 +444,14 @@ public class TestSCMNodeManager {
           blocked.countDown();
           unblock.await();
           return invocation.callRealMethod();
-        }).when(clusterMap).remove(any());
+        }).doCallRealMethod().when(clusterMap).remove(any());
       } else {
         doAnswer(invocation -> {
           final Object result = invocation.callRealMethod();
           blocked.countDown();
           unblock.await();
           return result;
-        }).when(clusterMap).update(any(), any());
+        }).doCallRealMethod().when(clusterMap).update(any(), any());
       }
       final Runnable healthCheck = nodeStateManager::checkNodesHealth;
       final Runnable registration = () -> registerNode(nodeManager, datanodeWithoutDatastream(uuid)
@@ -459,11 +459,10 @@ public class TestSCMNodeManager {
 
       final Future<?> first = executor.submit(removalFirst ? healthCheck : registration);
       assertTrue(blocked.await(10, SECONDS));
-      final Future<?> second = executor.submit(removalFirst ? registration : healthCheck);
-      assertThrows(TimeoutException.class, () -> second.get(200, MILLISECONDS));
+      // The other operation runs to the end in the middle of the first one.
+      executor.submit(removalFirst ? registration : healthCheck).get(10, SECONDS);
       unblock.countDown();
       first.get(10, SECONDS);
-      second.get(10, SECONDS);
 
       final DatanodeDetails stored = nodeManager.getNode(dnId);
       assertEquals(HddsProtos.NodeState.HEALTHY, nodeManager.getNodeStatus(stored).getHealth());
