@@ -263,7 +263,7 @@ public class TestNodeStateManager {
     nsm.addNode(dn, defaultVersionProto());
     String path = dn.getNetworkFullPath();
 
-    // Re-registering with a new version or new ports replaces the DatanodeInfo with a copy that has no parent.
+    // Re-registering with a new version or new ports replaces the node with a new object that has no parent yet.
     DatanodeDetails reregistered = new DatanodeDetails(dn);
     reregistered.setParent(null);
     nsm.updateNode(reregistered, defaultVersionProto());

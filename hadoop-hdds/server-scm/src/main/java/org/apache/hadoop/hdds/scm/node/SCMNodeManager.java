@@ -473,7 +473,7 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
         if (updateDnsToDnIdMap(oldNode.getHostName(), oldNode.getIpAddress(),
             hostName, ipAddress, dnId)) {
           LOG.info("Updating datanode from {} to {}", oldNode, datanodeDetails);
-          DatanodeDetails dn = updateNodeAndTopology(oldNode, datanodeDetails, dnVersionInfo);
+          DatanodeDetails dn = updateNodeAndTopology(datanodeDetails, dnVersionInfo);
           processNodeReport(datanodeDetails, nodeReport);
           LOG.info("Updated datanode to: {}", dn);
           scmNodeEventPublisher.fireEvent(SCMEvents.NODE_ADDRESS_UPDATE, dn);
@@ -481,12 +481,12 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
           LOG.info("Update the version for registered datanode {}, " +
               "oldVersion = {}, newVersion = {}.",
               datanodeDetails, oldNode.getVersion(), datanodeDetails.getVersion());
-          updateNodeAndTopology(oldNode, datanodeDetails, dnVersionInfo);
+          updateNodeAndTopology(datanodeDetails, dnVersionInfo);
         } else if (oldNode.portsChanged(datanodeDetails)) {
           // Refresh the stored node when its port set changes
           LOG.info("Updating ports for registered datanode {}: {} -> {}",
               datanodeDetails, oldNode.getPorts(), datanodeDetails.getPorts());
-          updateNodeAndTopology(oldNode, datanodeDetails, dnVersionInfo);
+          updateNodeAndTopology(datanodeDetails, dnVersionInfo);
         }
       } catch (NodeNotFoundException e) {
         LOG.error("Cannot find datanode {} from nodeStateManager",
@@ -502,17 +502,12 @@ public class SCMNodeManager implements NodeManager, ContainerReplicaPendingOpsSu
 
   /**
    * Replaces the record of an already registered datanode, in both the node state and the network
-   * topology. The topology has to be updated first: {@link NetworkTopology#update} sets the parent on
-   * the new node, and {@link NodeStateManager#updateNode} only picks it up because the stored
-   * {@link DatanodeInfo} is copied from that node afterwards. Updating the node state alone would
-   * leave the stale record in the topology and the stored node without a parent.
+   * topology.
    *
    * @return the refreshed node as held by the node state manager
    */
-  private DatanodeDetails updateNodeAndTopology(DatanodeInfo oldNode,
-      DatanodeDetails datanodeDetails, DatanodeVersionProto dnVersionInfo)
+  private DatanodeDetails updateNodeAndTopology(DatanodeDetails datanodeDetails, DatanodeVersionProto dnVersionInfo)
       throws NodeNotFoundException {
-    clusterMap.update(oldNode, datanodeDetails);
     nodeStateManager.updateNode(datanodeDetails, dnVersionInfo);
     final DatanodeDetails dn = nodeStateManager.getNode(datanodeDetails);
     Preconditions.checkState(dn.getParent() != null);

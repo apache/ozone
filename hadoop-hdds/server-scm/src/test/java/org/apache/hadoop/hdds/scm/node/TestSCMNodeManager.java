@@ -51,8 +51,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -65,6 +67,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -400,6 +406,72 @@ public class TestSCMNodeManager {
   private static DatanodeDetails nodeInTopology(NetworkTopology clusterMap,
       DatanodeDetails node) {
     return (DatanodeDetails) clusterMap.getNode(node.getNetworkFullPath());
+  }
+
+  /**
+   * A datanode can register again with new ports just when the health check marks it DEAD and removes it from the
+   * network topology. Whichever of the two starts first, the other one can run in the middle of it, and the datanode
+   * still ends up HEALTHY and in the topology with its new ports.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testRegisterWhileMarkedDeadKeepsNodeInTopology(boolean removalFirst) throws Exception {
+    final OzoneConfiguration conf = new OzoneConfiguration();
+    final SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
+    when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
+    final NetworkTopology clusterMap = spy(new NetworkTopologyImpl(conf));
+    final CountDownLatch blocked = new CountDownLatch(1);
+    final CountDownLatch unblock = new CountDownLatch(1);
+    final ExecutorService executor = Executors.newFixedThreadPool(2);
+    try (SCMNodeManager nodeManager = new SCMNodeManager(conf, scmStorageConfig, mock(EventPublisher.class),
+        clusterMap, SCMContext.emptyContext(), mockVersionManager())) {
+      nodeManager.pauseHealthCheck();
+      final UUID uuid = UUID.randomUUID();
+      final DatanodeID dnId = datanodeWithoutDatastream(uuid).build().getID();
+      registerNode(nodeManager, datanodeWithoutDatastream(uuid).build());
+
+      // The heartbeat is old enough for the node to become STALE now, and DEAD at the next health check.
+      nodeManager.getNode(dnId).updateLastHeartbeatTime(
+          Time.monotonicNow() - HddsServerUtil.getDeadNodeInterval(conf) - 1000);
+      final NodeStateManager nodeStateManager = nodeManager.getNodeStateManager();
+      nodeStateManager.checkNodesHealth();
+      assertEquals(STALE, nodeManager.getNodeStatus(nodeManager.getNode(dnId)).getHealth());
+
+      // Stop the first operation halfway through its topology change: the health check just before it removes the
+      // node, the registration just after it has put the node with the new ports in.
+      if (removalFirst) {
+        doAnswer(invocation -> {
+          blocked.countDown();
+          unblock.await();
+          return invocation.callRealMethod();
+        }).doCallRealMethod().when(clusterMap).remove(any());
+      } else {
+        doAnswer(invocation -> {
+          final Object result = invocation.callRealMethod();
+          blocked.countDown();
+          unblock.await();
+          return result;
+        }).doCallRealMethod().when(clusterMap).update(any(), any());
+      }
+      final Runnable healthCheck = nodeStateManager::checkNodesHealth;
+      final Runnable registration = () -> registerNode(nodeManager, datanodeWithoutDatastream(uuid)
+          .addPort(DatanodeDetails.newPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM, 9855)).build());
+
+      final Future<?> first = executor.submit(removalFirst ? healthCheck : registration);
+      assertTrue(blocked.await(10, SECONDS));
+      // The other operation runs to the end in the middle of the first one.
+      executor.submit(removalFirst ? registration : healthCheck).get(10, SECONDS);
+      unblock.countDown();
+      first.get(10, SECONDS);
+
+      final DatanodeDetails stored = nodeManager.getNode(dnId);
+      assertEquals(HddsProtos.NodeState.HEALTHY, nodeManager.getNodeStatus(stored).getHealth());
+      assertEquals(1, clusterMap.getNumOfLeafNode(""));
+      assertTrue(nodeInTopology(clusterMap, stored).hasPort(DatanodeDetails.Port.Name.RATIS_DATASTREAM));
+    } finally {
+      unblock.countDown();
+      executor.shutdownNow();
+    }
   }
 
   /**
