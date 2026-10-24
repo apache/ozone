@@ -155,17 +155,20 @@ public abstract class FileSizeCountTaskHelper {
     // Divide threshold by worker count so each worker flushes independently
     final long perWorkerThreshold = Math.max(1, fileSizeCountFlushThreshold / maxWorkers);
 
-    // Map thread IDs to worker-specific maps for lockless updates
-    Map<Long, Map<FileSizeCountKey, Long>> allMap = new ConcurrentHashMap<>();
+    // Registry of worker-specific maps for the final flush
+    Map<Thread, Map<FileSizeCountKey, Long>> allMap = new ConcurrentHashMap<>();
+    ThreadLocal<Map<FileSizeCountKey, Long>> workerMaps = ThreadLocal.withInitial(() -> {
+      Map<FileSizeCountKey, Long> workerMap = new HashMap<>();
+      allMap.put(Thread.currentThread(), workerMap);
+      return workerMap;
+    });
 
     // Lock for coordinating DB flush operations only
     Object flushLock = new Object();
 
     // Lambda executed by workers for each key
     Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
-      // Get or create this worker's private map using thread ID
-      Map<FileSizeCountKey, Long> workerFileSizeCountMap = allMap.computeIfAbsent(
-          Thread.currentThread().getId(), k -> new HashMap<>());
+      Map<FileSizeCountKey, Long> workerFileSizeCountMap = workerMaps.get();
 
       // Update worker's private map without locks
       handlePutKeyEvent(kv.getValue(), workerFileSizeCountMap);
@@ -187,6 +190,10 @@ public abstract class FileSizeCountTaskHelper {
     } catch (Exception ex) {
       LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ex);
       return false;
+    } finally {
+      // The small-table fallback runs the per-key operation on this (reused
+      // Recon pool) thread, so clear the per-worker ThreadLocal here.
+      workerMaps.remove();
     }
     
     // Final flush: Write remaining entries from all worker maps to DB
