@@ -679,6 +679,15 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Deletes an S3 key, resolving its volume on OM.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @param expectedETag Required ETag, or null for an unconditional delete.
+   * @throws IOException
+   */
+  void deleteS3Key(String bucketName, String keyName, String expectedETag) throws IOException;
+
+  /**
    * Deletes keys through the list.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

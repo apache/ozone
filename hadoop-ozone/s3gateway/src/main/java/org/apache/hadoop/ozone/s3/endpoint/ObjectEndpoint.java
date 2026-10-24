@@ -736,14 +736,13 @@ public class ObjectEndpoint extends ObjectOperationHandler {
     S3ConditionalRequest.DeleteCondition deleteCondition = null;
 
     try {
-      OzoneVolume volume = context.getVolume();
       deleteCondition = S3ConditionalRequest.parseDeleteCondition(getHeaders(), keyPath);
 
-      if (!deleteCondition.hasIfMatch()) {
-        getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false);
-      } else {
-        getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false,
+      if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
+        getClientProtocol().deleteKey(context.getVolume().getName(), context.getBucketName(), keyPath, false,
             deleteCondition.getExpectedETag());
+      } else {
+        getClientProtocol().deleteS3Key(context.getBucketName(), keyPath, deleteCondition.getExpectedETag());
       }
 
       getMetrics().updateDeleteKeySuccessStats(startNanos);

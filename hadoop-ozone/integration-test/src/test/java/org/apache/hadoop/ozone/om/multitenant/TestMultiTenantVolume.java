@@ -162,6 +162,8 @@ public class TestMultiTenantVolume {
     assertEquals(s3VolumeName,
         store.getS3Bucket(bucketName).getVolumeName());
 
+    assertS3KeyDeletion(store, store.getS3Bucket(bucketName), bucketName);
+
     // Delete bucket.
     store.deleteS3Bucket(bucketName);
     assertS3BucketNotFound(store, bucketName);
@@ -182,6 +184,7 @@ public class TestMultiTenantVolume {
     store.createS3Bucket(BUCKET_NAME);
     OzoneBucket bucket = store.getS3Bucket(BUCKET_NAME);
     assertEquals(TENANT_ID, bucket.getVolumeName());
+    assertS3KeyDeletion(store, bucket, BUCKET_NAME);
 
     // A different user should not see bucket, since they will be directed to
     // the s3 volume.
@@ -211,6 +214,8 @@ public class TestMultiTenantVolume {
     exception = assertThrows(OMException.class, () -> sourceBucket.abortMultipartUpload(keyName, linkUploadID));
     assertEquals(OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR, exception.getResult());
 
+    assertS3KeyDeletion(store, sourceBucket, linkBucketName);
+
     store.deleteS3Bucket(linkBucketName);
     sourceVolume.deleteBucket(sourceBucketName);
     store.deleteVolume(sourceVolumeName);
@@ -222,6 +227,16 @@ public class TestMultiTenantVolume {
     store.tenantRevokeUserAccessId(ACCESS_ID);
     store.deleteTenant(TENANT_ID);
     store.deleteVolume(TENANT_ID);
+  }
+
+  private void assertS3KeyDeletion(ObjectStore store, OzoneBucket bucket, String s3BucketName) throws Exception {
+    String keyName = "delete-key";
+    bucket.createKey(keyName, 0).close();
+
+    store.getClientProxy().deleteS3Key(s3BucketName, keyName, null);
+
+    OMException exception = assertThrows(OMException.class, () -> bucket.getKey(keyName));
+    assertThat(exception.getResult()).isEqualTo(OMException.ResultCodes.KEY_NOT_FOUND);
   }
 
   /**

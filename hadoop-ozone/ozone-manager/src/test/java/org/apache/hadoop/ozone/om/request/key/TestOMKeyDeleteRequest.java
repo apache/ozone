@@ -17,11 +17,15 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -29,6 +33,9 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -44,6 +51,34 @@ import org.junit.jupiter.params.provider.ValueSource;
  * Tests OmKeyDelete request.
  */
 public class TestOMKeyDeleteRequest extends OMKeyRequestTests {
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testS3VolumeContextBeforeLayoutSelection(boolean assumeS3Context) throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    String ozoneKey = addKeyToTable();
+    String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
+    omMetadataManager.getBucketTable().getCacheValue(new CacheKey<>(bucketKey)).getCacheValue().incrUsedNamespace(1L);
+    when(ozoneManager.getS3VolumeContext()).thenReturn(new S3VolumeContext(
+        OmVolumeArgs.newBuilder().setVolume(volumeName).setOwnerName("owner").setAdminName("admin").build(), "owner"));
+    OMRequest original = createDeleteKeyRequest();
+    original = original.toBuilder().setAssumeS3Context(assumeS3Context).setDeleteKeyRequest(
+        original.getDeleteKeyRequest().toBuilder().setKeyArgs(original.getDeleteKeyRequest().getKeyArgs().toBuilder()
+            .setVolumeName(assumeS3Context ? "s3v" : volumeName))).build();
+
+    OMKeyDeleteRequest resolved =
+        (OMKeyDeleteRequest) OzoneManagerRatisUtils.createClientRequest(original, ozoneManager);
+    assertThat(resolved.getBucketLayout()).isEqualTo(getBucketLayout());
+    OMRequest replicated = resolved.preExecute(ozoneManager).toBuilder().clearAssumeS3Context().build();
+    assertThat(replicated.getDeleteKeyRequest().getKeyArgs().getVolumeName()).isEqualTo(volumeName);
+    OMKeyDeleteRequest replayed =
+        (OMKeyDeleteRequest) OzoneManagerRatisUtils.createClientRequest(replicated, ozoneManager);
+    assertThat(replayed.getBucketLayout()).isEqualTo(getBucketLayout());
+    assertThat(replayed.validateAndUpdateCache(ozoneManager, 100L).getOMResponse().getStatus())
+        .isEqualTo(OzoneManagerProtocolProtos.Status.OK);
+    assertThat(omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)).isNull();
+    verify(ozoneManager, times(assumeS3Context ? 1 : 0)).getS3VolumeContext();
+  }
 
   @ParameterizedTest
   @ValueSource(strings = {"keyName", "a/b/keyName", "a/.snapshot/keyName", "a.snapshot/b/keyName"})

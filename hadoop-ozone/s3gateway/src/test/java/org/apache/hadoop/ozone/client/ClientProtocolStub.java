@@ -386,6 +386,11 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public void deleteS3Key(String bucketName, String keyName, String expectedETag) throws IOException {
+    ((OzoneBucketStub) objectStoreStub.getS3Bucket(bucketName)).deleteKey(keyName, expectedETag);
+  }
+
+  @Override
   public void deleteKey(String volumeName, String bucketName, String keyName,
                         boolean recursive) throws IOException {
     getBucket(volumeName, bucketName).deleteKey(keyName);
