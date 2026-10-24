@@ -32,6 +32,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.ozone.OzoneFsShell;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -126,7 +127,8 @@ public class TestOzoneSnapshotRestore {
 
   @AfterAll
   public void tearDown() throws Exception {
-    IOUtils.closeQuietly(client);
+    // Snapshot restore commands cache filesystems; release their clients before the cluster's leak check.
+    IOUtils.closeQuietly(client, FileSystem::closeAll);
     if (cluster != null) {
       cluster.shutdown();
     }

@@ -223,11 +223,11 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
 
   @AfterAll
   void teardown() {
-    IOUtils.closeQuietly(client);
+    // Tests cache filesystems for several UGIs; release their clients before the cluster's leak check.
+    IOUtils.closeQuietly(client, FileSystem::closeAll);
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   @AfterEach

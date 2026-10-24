@@ -2215,6 +2215,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.om.client.metrics.percentiles.intervals.seconds</name>
+    <value>60</value>
+    <tag>OM, CLIENT, PERFORMANCE</tag>
+    <description>
+      Comma-separated positive, distinct rollover intervals in seconds for OM client latency percentiles.
+      An empty value disables percentiles. Invalid values use the default interval of 60 seconds.
+      The first active RpcClient in a process supplies the intervals until the last client closes.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.save.metrics.interval</name>
     <value>5m</value>
     <tag>OZONE, OM</tag>

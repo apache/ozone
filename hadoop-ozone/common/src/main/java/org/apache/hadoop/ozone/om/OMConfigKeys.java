@@ -174,6 +174,9 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL =
       "ozone.om.save.metrics.interval";
   public static final String OZONE_OM_METRICS_SAVE_INTERVAL_DEFAULT = "5m";
+  public static final String OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
+      "ozone.om.client.metrics.percentiles.intervals.seconds";
+  public static final int OZONE_OM_CLIENT_METRICS_PERCENTILES_INTERVALS_SECONDS_DEFAULT = 60;
   public static final String OZONE_OM_SNAPSHOT_ROCKSDB_METRICS_ENABLED =
       "ozone.om.snapshot.rocksdb.metrics.enabled";
   public static final boolean
