@@ -34,7 +34,6 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -42,7 +41,6 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -128,7 +126,7 @@ public class TestS3LifecycleConfigurationDelete {
       assertThat(response.getStatus()).isEqualTo(HTTP_NO_CONTENT);
     }
 
-    verify(proxy).getBucketDetails("volume1", "bucket1");
+    verify(proxy).getS3BucketDetails("bucket1");
     verify(proxy).deleteLifecycleConfiguration("volume1", "bucket1");
   }
 
@@ -194,20 +192,19 @@ public class TestS3LifecycleConfigurationDelete {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn(expectedOwner);
     BucketEndpoint endpoint = newProtocolEndpoint(proxy, headers);
-    when(proxy.getBucketDetails("volume1", "bucket1")).thenThrow(new OMException("Lookup failed", code));
+    when(proxy.getS3BucketDetails("bucket1")).thenThrow(new OMException("Lookup failed", code));
     assertErrorResponse(expected, () -> endpoint.delete("bucket1"));
     verify(proxy, never()).deleteLifecycleConfiguration("volume1", "bucket1");
   }
 
   private BucketEndpoint newProtocolEndpoint(ClientProtocol proxy, HttpHeaders requestHeaders) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    OzoneVolume volume = OzoneVolume.newBuilder(conf, proxy)
-        .setName("volume1").setAcls(Collections.emptyList()).build();
     OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
         .setVolumeName("volume1").setName("bucket1").setOwner("owner").build();
-    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    when(proxy.getS3BucketDetails("bucket1")).thenReturn(bucket);
     ObjectStore store = mock(ObjectStore.class);
-    when(store.getS3Volume()).thenReturn(volume);
+    // The bucket lookup resolves the volume, so no separate S3 volume lookup is expected.
+    when(store.getS3Volume()).thenThrow(new AssertionError("Unexpected S3 volume lookup"));
     when(store.getClientProxy()).thenReturn(proxy);
     OzoneClient client = mock(OzoneClient.class);
     when(client.getObjectStore()).thenReturn(store);

@@ -59,11 +59,18 @@ class S3RequestContext {
 
   OzoneBucket getBucket(String name) throws IOException {
     if (bucket == null) {
-      bucket = getVolume().getBucket(name);
+      bucket = endpoint.getClientProtocol().getS3BucketDetails(name);
     } else {
       Preconditions.assertEquals(bucket.getName(), name, "Multiple buckets in one request are not supported");
     }
     return bucket;
+  }
+
+  /**
+   * Returns the S3 volume name, reusing the bucket already looked up in this request to avoid another call.
+   */
+  String getVolumeName() throws IOException {
+    return bucket != null ? bucket.getVolumeName() : getVolume().getName();
   }
 
   S3GAction getAction() {

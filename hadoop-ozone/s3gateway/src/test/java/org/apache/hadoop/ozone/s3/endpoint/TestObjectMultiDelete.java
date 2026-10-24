@@ -47,7 +47,6 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
@@ -274,12 +273,12 @@ public class TestObjectMultiDelete {
 
     OzoneClient client = mock(OzoneClient.class);
     ObjectStore objectStore = mock(ObjectStore.class);
-    OzoneVolume volume = mock(OzoneVolume.class);
+    ClientProtocol clientProtocol = mock(ClientProtocol.class);
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getConfiguration()).thenReturn(conf);
-    when(objectStore.getClientProxy()).thenReturn(mock(ClientProtocol.class));
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
+    when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getClientProxy()).thenReturn(clientProtocol);
+    when(clientProtocol.getS3BucketDetails(anyString())).thenReturn(bucket);
 
     return EndpointBuilder.newBucketEndpointBuilder()
         .setBase(new BucketEndpoint() {

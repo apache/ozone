@@ -140,7 +140,7 @@ public class TestListParts {
       assertThat(result.getPartList()).hasSize(1);
       assertThat(result.getPartList().get(0).getETag()).isEqualTo("etag4");
     }
-    verify(proxy, times(bucketLookups)).getBucketDetails("volume1", "bucket1");
+    verify(proxy, times(bucketLookups)).getS3BucketDetails("bucket1");
     verify(proxy).listParts("volume1", "bucket1", "key1", "upload1", 3, 2);
   }
 
@@ -197,7 +197,7 @@ public class TestListParts {
         .setName("volume1").setAcls(Collections.emptyList()).build();
     OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
         .setVolumeName("volume1").setName("bucket1").setOwner("owner").build();
-    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    when(proxy.getS3BucketDetails("bucket1")).thenReturn(bucket);
     ObjectStore objectStore = mock(ObjectStore.class);
     when(objectStore.getS3Volume()).thenReturn(volume);
     when(objectStore.getClientProxy()).thenReturn(proxy);

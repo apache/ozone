@@ -343,6 +343,16 @@ public interface ClientProtocol {
       throws IOException;
 
   /**
+   * Returns Bucket Information for a bucket in the S3 volume resolved from the current S3 context
+   * (the thread-local S3Auth), and updates the S3Auth user principal with the one returned by OM.
+   * @param bucketName Name of the Bucket.
+   * @return OzoneBucket
+   * @throws IOException
+   */
+  OzoneBucket getS3BucketDetails(String bucketName)
+      throws IOException;
+
+  /**
    * Returns the List of Buckets in the Volume that matches the bucketPrefix,
    * size of the returned list depends on maxListResult. The caller has to make
    * multiple calls to read all volumes.

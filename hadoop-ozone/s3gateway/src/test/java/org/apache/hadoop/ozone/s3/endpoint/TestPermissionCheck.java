@@ -84,7 +84,7 @@ public class TestPermissionCheck {
   private HttpHeaders headers;
 
   @BeforeEach
-  public void setup() {
+  public void setup() throws IOException {
     conf = new OzoneConfiguration();
     conf.set(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
         OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
@@ -103,6 +103,8 @@ public class TestPermissionCheck {
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getClientProxy()).thenReturn(clientProtocol);
+    when(clientProtocol.getS3BucketDetails(anyString())).thenReturn(bucket);
+    when(bucket.getVolumeName()).thenReturn("s3Volume");
   }
 
   /**
@@ -123,8 +125,7 @@ public class TestPermissionCheck {
    */
   @Test
   public void testGetBucket() throws IOException {
-    doThrow(exception).when(volume).getBucket(anyString());
-    when(objectStore.getS3Volume()).thenReturn(volume);
+    doThrow(exception).when(clientProtocol).getS3BucketDetails(anyString());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
@@ -150,7 +151,6 @@ public class TestPermissionCheck {
   public void testDeleteBucket() throws IOException {
     doThrow(exception).when(volume).deleteBucket(anyString());
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
@@ -174,8 +174,6 @@ public class TestPermissionCheck {
   @Test
   public void testListKey() throws IOException {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).listKeys(anyString(), isNull(),
         anyBoolean());
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
@@ -188,8 +186,6 @@ public class TestPermissionCheck {
   @Test
   public void testDeleteKeys() throws IOException, OS3Exception {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     final Map<String, ErrorInfo> deleteErrors = Collections.singletonMap(
         "deleteKeyName", new ErrorInfo("ACCESS_DENIED", "ACL check failed"));
     when(bucket.deleteKeys(any(), anyBoolean())).thenReturn(deleteErrors);
@@ -209,8 +205,6 @@ public class TestPermissionCheck {
   public void testDeleteKeysTranslatesContainedOMFailures(ResultCodes resultCode, S3ErrorTable expectedError)
       throws IOException {
     when(objectStore.getVolume(anyString())).thenReturn(volume);
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(new IOException("DeleteObjects failed", new OMException("OM failure", resultCode)))
         .when(bucket).deleteKeys(any(), anyBoolean());
 
@@ -228,8 +222,6 @@ public class TestPermissionCheck {
 
   @Test
   public void testGetAcl() throws Exception {
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).getAcls();
 
     when(headers.getHeaderString(S3Acl.GRANT_READ))
@@ -246,7 +238,6 @@ public class TestPermissionCheck {
   @Test
   public void testSetAcl() throws Exception {
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).setAcl(any());
 
     when(headers.getHeaderString(S3Acl.GRANT_READ))
@@ -267,7 +258,6 @@ public class TestPermissionCheck {
   public void testGetKey() throws IOException {
     when(client.getProxy()).thenReturn(clientProtocol);
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(clientProtocol)
         .getS3KeyDetails(anyString(), anyString());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -281,8 +271,6 @@ public class TestPermissionCheck {
 
   @Test
   public void testPutKey() throws IOException {
-    when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket("bucketName")).thenReturn(bucket);
     doThrow(exception).when(clientProtocol).createKey(
             anyString(), anyString(), anyString(), anyLong(), any(), anyMap(), anyMap(), anyBoolean());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -297,7 +285,6 @@ public class TestPermissionCheck {
   @Test
   public void testDeleteKey() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
         anyString(), anyBoolean());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -311,9 +298,7 @@ public class TestPermissionCheck {
 
   @Test
   public void testMultiUploadKey() throws IOException {
-    when(objectStore.getS3Volume()).thenReturn(volume);
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
-    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(bucket).initiateMultipartUpload(anyString(), any(), anyMap(), anyMap());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)

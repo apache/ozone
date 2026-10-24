@@ -71,6 +71,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketDeletedBytes;
+import org.apache.hadoop.ozone.om.helpers.BucketInfoWithS3Context;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.DBUpdates;
 import org.apache.hadoop.ozone.om.helpers.KeyInfoWithVolumeContext;
@@ -236,8 +237,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setListVolumeResponse(listVolumeResponse);
         break;
       case InfoBucket:
-        InfoBucketResponse infoBucketResponse = infoBucket(
-            request.getInfoBucketRequest());
+        InfoBucketResponse infoBucketResponse = infoBucket(request, responseBuilder);
         responseBuilder.setInfoBucketResponse(infoBucketResponse);
         break;
       case ListBuckets:
@@ -683,13 +683,18 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  private InfoBucketResponse infoBucket(InfoBucketRequest request)
+  private InfoBucketResponse infoBucket(OMRequest request, OMResponse.Builder responseBuilder)
       throws IOException {
+    InfoBucketRequest infoBucketRequest = request.getInfoBucketRequest();
     InfoBucketResponse.Builder resp =
         InfoBucketResponse.newBuilder();
-    OmBucketInfo omBucketInfo = impl.getBucketInfo(
-        request.getVolumeName(), request.getBucketName());
-    resp.setBucketInfo(omBucketInfo.getProtobuf());
+    boolean assumeS3Context = request.hasAssumeS3Context() && request.getAssumeS3Context();
+    BucketInfoWithS3Context context = impl.getBucketInfo(
+        infoBucketRequest.getVolumeName(), infoBucketRequest.getBucketName(), assumeS3Context);
+    resp.setBucketInfo(context.getBucketInfo().getProtobuf());
+    if (assumeS3Context) {
+      context.getUserPrincipal().ifPresent(responseBuilder::setUserPrincipal);
+    }
 
     return resp.build();
   }

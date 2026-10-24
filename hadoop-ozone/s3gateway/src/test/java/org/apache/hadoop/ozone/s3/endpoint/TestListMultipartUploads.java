@@ -67,7 +67,7 @@ public class TestListMultipartUploads {
         .setName("volume1").setAcls(Collections.emptyList()).build();
     OzoneBucket bucket = OzoneBucket.newBuilder(conf, proxy)
         .setVolumeName("volume1").setName("bucket1").setOwner("owner").build();
-    when(proxy.getBucketDetails("volume1", "bucket1")).thenReturn(bucket);
+    when(proxy.getS3BucketDetails("bucket1")).thenReturn(bucket);
     ObjectStore objectStore = mock(ObjectStore.class);
     when(objectStore.getS3Volume()).thenReturn(volume);
     when(objectStore.getClientProxy()).thenReturn(proxy);
@@ -105,7 +105,7 @@ public class TestListMultipartUploads {
       assertThat(result.getUploads()).hasSize(1);
       assertThat(result.getUploads().get(0).getKey()).isEqualTo("prefix/key");
     }
-    verify(proxy, times(bucketLookups)).getBucketDetails("volume1", "bucket1");
+    verify(proxy, times(bucketLookups)).getS3BucketDetails("bucket1");
     verify(proxy).listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous", "previous-upload", 2);
   }
 
@@ -115,7 +115,7 @@ public class TestListMultipartUploads {
 
     assertErrorResponse(S3ErrorTable.BUCKET_OWNER_MISMATCH, () -> endpoint.get("bucket1"));
 
-    verify(proxy).getBucketDetails("volume1", "bucket1");
+    verify(proxy).getS3BucketDetails("bucket1");
     verify(proxy, never()).listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous",
         "previous-upload", 2);
   }
@@ -130,7 +130,7 @@ public class TestListMultipartUploads {
 
     assertErrorResponse(expectedError, () -> endpoint.get("bucket1"));
 
-    verify(proxy, never()).getBucketDetails("volume1", "bucket1");
+    verify(proxy, never()).getS3BucketDetails("bucket1");
     verify(proxy).listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous", "previous-upload", 2);
   }
 
@@ -147,7 +147,7 @@ public class TestListMultipartUploads {
       assertThat(result.getUploads()).isEmpty();
       assertThat(result.isTruncated()).isFalse();
     }
-    verify(proxy, never()).getBucketDetails("volume1", "bucket1");
+    verify(proxy, never()).getS3BucketDetails("bucket1");
     verify(proxy).listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous",
         "previous-upload", forwarded);
   }
@@ -159,7 +159,7 @@ public class TestListMultipartUploads {
 
     assertErrorResponse(S3ErrorTable.INVALID_ARGUMENT, () -> endpoint.get("bucket1"));
 
-    verify(proxy, never()).getBucketDetails("volume1", "bucket1");
+    verify(proxy, never()).getS3BucketDetails("bucket1");
     verify(proxy, never()).listMultipartUploads("volume1", "bucket1", "prefix/", "prefix/previous", "previous-upload",
         maxUploads);
   }

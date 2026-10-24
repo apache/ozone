@@ -499,6 +499,7 @@ message OMResponse {
   optional StartFinalizeUpgradeResponse      startFinalizeUpgradeResponse  = 159;
   optional QueryUpgradeStatusResponse        queryUpgradeStatusResponse    = 160;
   optional CompleteFinalizeUpgradeResponse   completeFinalizeUpgradeResponse = 161;
+  optional string userPrincipal = 162;
 }
 
 enum Status {

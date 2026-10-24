@@ -38,6 +38,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.AfterEach;
@@ -264,9 +265,11 @@ public class TestBucketAclHandler {
     BucketEndpoint endpoint = mock(BucketEndpoint.class);
     OzoneVolume volume = mock(OzoneVolume.class);
     when(endpoint.getVolume()).thenReturn(volume);
-    when(volume.getBucket(BUCKET_NAME))
+    ClientProtocol clientProtocol = mock(ClientProtocol.class);
+    when(endpoint.getClientProtocol()).thenReturn(clientProtocol);
+    when(clientProtocol.getS3BucketDetails(BUCKET_NAME))
         .thenAnswer(any -> client.getObjectStore().getS3Bucket(BUCKET_NAME));
-    when(volume.getBucket("nonexistent-bucket"))
+    when(clientProtocol.getS3BucketDetails("nonexistent-bucket"))
         .thenThrow(new OMException("", OMException.ResultCodes.BUCKET_NOT_FOUND));
     return new S3RequestContext(endpoint, null);
   }
