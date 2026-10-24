@@ -1726,9 +1726,24 @@ public class KeyValueHandler extends Handler {
   public void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
       Collection<DatanodeDetails> peers) throws IOException {
     long containerID = container.getContainerData().getContainerID();
+    // DiskBalancer holds the read lock while it moves a container, so this waits for a move in progress and
+    // returns the replica it left in the container set. DiskBalancer checks the mark under that read lock and
+    // leaves the container where it is until reconciliation ends.
+    Container<?> lockedContainer = containerSet.getContainerWithWriteLock(containerID);
+    if (lockedContainer == null) {
+      // null means container locking retries exhausted ;
+      // container not-found throws StorageContainerException.
+      LOG.warn("Exceeded {} attempts locking live container {}; skipping reconcileContainer.",
+          ContainerSet.maxContainerMapSwapRetries(), containerID);
+      return;
+    }
+    ContainerData containerData = lockedContainer.getContainerData();
+    containerData.reconciliationStarted();
+    lockedContainer.writeUnlock();
     try {
-      reconcileContainerInternal(dnClient, container, peers);
+      reconcileContainerInternal(dnClient, lockedContainer, peers);
     } finally {
+      containerData.reconciliationFinished();
       // Trigger on demand scanner after reconciliation
       containerSet.scanContainerWithoutGap(containerID,
           "Container reconciliation");
