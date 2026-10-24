@@ -39,6 +39,7 @@ import java.nio.channels.WritableByteChannel;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -46,6 +47,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.BlockData;
@@ -168,6 +170,62 @@ public class TestKeyValueStreamDataChannel {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
+  public void testDrainBuffersUpToLength(boolean commitPutBlockOnClose) throws Exception {
+    File tempFile = File.createTempFile("test-kv-drain-length-" + commitPutBlockOnClose, ".tmp");
+    tempFile.deleteOnExit();
+    AtomicReference<ContainerCommandRequestProto> processed = new AtomicReference<>();
+    List<KeyValueStreamDataChannel> released = new ArrayList<>();
+    KeyValueStreamDataChannel channel = newChannel(tempFile, commitPutBlockOnClose, processed, released::add);
+    final byte[] data1 = RandomUtils.secure().randomBytes(50);
+    final byte[] data2 = RandomUtils.secure().randomBytes(30);
+    final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
+        PUT_BLOCK_PROTO, null).getContent().asReadOnlyByteBuffer();
+    final ByteBuffer protoLengthBuf = getProtoLength(putBlockBuf, PUT_BLOCK_REQUEST_LENGTH_MAX);
+
+    write(channel, data1);
+    write(channel, data2);
+    assertEquals(0, tempFile.length());
+    // whole buffers are written until the block file has the given length
+    channel.drainBuffers(data1.length - 10);
+    assertEquals(data1.length, tempFile.length());
+    channel.drainBuffers(data1.length);
+    assertEquals(data1.length, tempFile.length());
+
+    // the PutBlock request at the end of the stream is not written
+    write(channel, putBlockBuf.duplicate());
+    write(channel, protoLengthBuf.duplicate());
+    channel.drainBuffers(data1.length + data2.length);
+    assertEquals(data1.length + data2.length, tempFile.length());
+
+    channel.close();
+    assertEquals(Collections.singletonList(channel), released);
+    // draining a closed channel is a no-op
+    channel.drainBuffers(data1.length + data2.length);
+    assertEquals(commitPutBlockOnClose ? PUT_BLOCK_PROTO : null, processed.get());
+    final byte[] expected = new byte[data1.length + data2.length];
+    System.arraycopy(data1, 0, expected, 0, data1.length);
+    System.arraycopy(data2, 0, expected, data1.length, data2.length);
+    assertArrayEquals(expected, Files.readAllBytes(tempFile.toPath()));
+  }
+
+  @Test
+  public void testDrainBuffersAfterCleanUp() throws Exception {
+    File tempFile = File.createTempFile("test-kv-drain-cleanup", ".tmp");
+    tempFile.deleteOnExit();
+    List<KeyValueStreamDataChannel> released = new ArrayList<>();
+    KeyValueStreamDataChannel channel = newChannel(tempFile, false, new AtomicReference<>(), released::add);
+    final byte[] data = RandomUtils.secure().randomBytes(50);
+    write(channel, data);
+
+    assertFalse(channel.cleanUp());
+    assertEquals(Collections.singletonList(channel), released);
+    // cleanUp has dropped the buffered data
+    channel.drainBuffers(data.length);
+    assertEquals(0, tempFile.length());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
   public void testPollAll(boolean allowEmpty) {
     final Buffers buffers = new Buffers(PUT_BLOCK_REQUEST_LENGTH_MAX);
     final byte[] data = RandomUtils.secure().randomBytes(50);
@@ -248,7 +306,7 @@ public class TestKeyValueStreamDataChannel {
     when(mockContainerData.getVolume()).thenReturn(mockVolume);
     ContainerMetrics mockMetrics = mock(ContainerMetrics.class);
     KeyValueStreamDataChannel writeChannel =
-        new KeyValueStreamDataChannel(tempFile, mockContainerData, null, mockMetrics);
+        new KeyValueStreamDataChannel(tempFile, mockContainerData, null, mockMetrics, c -> { });
     assertThrows(StorageContainerException.class,
         () -> writeChannel.assertSpaceAvailability(1));
     final ByteBuffer putBlockBuf = ContainerCommandRequestMessage.toMessage(
@@ -483,6 +541,13 @@ public class TestKeyValueStreamDataChannel {
   private static KeyValueStreamDataChannel newChannel(
       File tempFile, boolean commitPutBlockOnClose,
       AtomicReference<ContainerCommandRequestProto> processed) throws Exception {
+    return newChannel(tempFile, commitPutBlockOnClose, processed, c -> { });
+  }
+
+  private static KeyValueStreamDataChannel newChannel(
+      File tempFile, boolean commitPutBlockOnClose,
+      AtomicReference<ContainerCommandRequestProto> processed,
+      Consumer<KeyValueStreamDataChannel> onClose) throws Exception {
     HddsVolume mockVolume = mock(HddsVolume.class);
     when(mockVolume.getStorageID()).thenReturn("storageId");
     when(mockVolume.getCurrentUsage()).thenReturn(new SpaceUsageSource.Fixed(1000L, 1000L, 0L));
@@ -492,7 +557,7 @@ public class TestKeyValueStreamDataChannel {
     ContainerMetrics mockMetrics = mock(ContainerMetrics.class);
     CheckedConsumer<ContainerCommandRequestProto, IOException> putBlock =
         commitPutBlockOnClose ? processed::set : null;
-    return new KeyValueStreamDataChannel(tempFile, mockContainerData, putBlock, mockMetrics);
+    return new KeyValueStreamDataChannel(tempFile, mockContainerData, putBlock, mockMetrics, onClose);
   }
 
   private static void write(KeyValueStreamDataChannel channel, byte[] data)
