@@ -154,7 +154,7 @@ public final class ChunkUtils {
       bytesWritten = writer.applyAsLong(data);
     } catch (UncheckedIOException e) {
       if (!(e.getCause() instanceof InterruptedIOException)) {
-        onFailure(volume);
+        onFailure(volume, e);
       }
       throw wrapInStorageContainerException(e.getCause());
     }
@@ -228,7 +228,7 @@ public final class ChunkUtils {
          FileChannel channel = open(path, READ_OPTIONS, NO_ATTRIBUTES)) {
       bytesRead = readMethod.apply(channel);
     } catch (Exception e) {
-      onFailure(volume);
+      onFailure(volume, e);
       throw wrapInStorageContainerException(e);
     }
 

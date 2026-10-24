@@ -164,6 +164,25 @@ public class TestBackgroundContainerDataScanner extends
   }
 
   @Test
+  public void testDiskIOErrorRecordedOnVolume() throws Exception {
+    IOException diskIOError = new IOException("Input/output error");
+    DataScanResult result = DataScanResult.fromErrors(Collections.singletonList(
+        new ContainerScanError(FailureType.CORRUPT_CHUNK, new File(""), diskIOError)), new ContainerMerkleTreeWriter());
+    when(corruptData.scanData(any(DataTransferThrottler.class), any(Canceler.class))).thenReturn(result);
+
+    scanner.runIteration();
+    verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
+    verify(vol, times(1)).recordDataPathIOError(diskIOError);
+  }
+
+  @Test
+  public void testCorruptionNotRecordedAsDiskIOError() throws Exception {
+    scanner.runIteration();
+    verifyContainerMarkedUnhealthy(corruptData, atLeastOnce());
+    verify(vol, never()).recordDataPathIOError(any());
+  }
+
+  @Test
   public void testScanTimestampUpdated() throws Exception {
     scanner.runIteration();
     // Open containers should not be scanned.
