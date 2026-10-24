@@ -328,17 +328,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-cli-debug</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-cli-other</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-cli-repair</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
