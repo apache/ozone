@@ -5122,6 +5122,16 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.diff.optimized.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      When true, snapshot diff jobs use the optimized merge-join pipeline instead
+      of the legacy object-id map diff path.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.secret.key.file.name</name>
     <value>secret_keys.json</value>
     <tag>SCM, SECURITY</tag>

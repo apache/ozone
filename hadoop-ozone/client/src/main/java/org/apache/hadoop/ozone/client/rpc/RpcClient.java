@@ -1094,14 +1094,15 @@ public class RpcClient implements ClientProtocol {
                                                        String fromSnapshot,
                                                        String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     Preconditions.checkArgument(StringUtils.isNotBlank(volumeName),
         "volume can't be null or empty.");
     Preconditions.checkArgument(StringUtils.isNotBlank(bucketName),
         "bucket can't be null or empty.");
     return ozoneManagerClient.submitSnapshotDiff(volumeName, bucketName,
-        fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff);
+        fromSnapshot, toSnapshot, forceFullDiff, disableNativeDiff, orderedReport);
   }
 
   @Override

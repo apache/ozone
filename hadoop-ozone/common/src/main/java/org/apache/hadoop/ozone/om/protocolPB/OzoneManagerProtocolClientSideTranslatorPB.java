@@ -1567,7 +1567,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                                        String fromSnapshot,
                                                        String toSnapshot,
                                                        boolean forceFullDiff,
-                                                       boolean disableNativeDiff)
+                                                       boolean disableNativeDiff,
+                                                       boolean orderedReport)
       throws IOException {
     final OzoneManagerProtocolProtos.SubmitSnapshotDiffRequest.Builder
         requestBuilder =
@@ -1577,7 +1578,8 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
             .setFromSnapshot(fromSnapshot)
             .setToSnapshot(toSnapshot)
             .setForceFullDiff(forceFullDiff)
-            .setDisableNativeDiff(disableNativeDiff);
+            .setDisableNativeDiff(disableNativeDiff)
+            .setOrdered(orderedReport);
 
     final OMRequest omRequest = createOMRequest(Type.SubmitSnapshotDiff)
         .setSubmitSnapshotDiffRequest(requestBuilder)
