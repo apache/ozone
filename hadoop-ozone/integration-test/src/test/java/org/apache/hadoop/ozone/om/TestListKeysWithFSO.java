@@ -27,6 +27,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -503,6 +505,29 @@ public abstract class TestListKeysWithFSO implements NonHATests.TestCase {
     expectedKeys =
         getExpectedKeyShallowList(keyPrefix, startKey, legacyOzoneBucket);
     checkKeyShallowList(keyPrefix, startKey, expectedKeys, fsoOzoneBucket);
+  }
+
+  @Test
+  void testShallowListKeysAtBucketRoot() throws Exception {
+    OzoneBucket bucket = DataTestUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    checkKeyShallowList("", null, Collections.emptyList(), bucket);
+    bucket.createDirectory("a");
+    checkKeyShallowList("", null, Collections.singletonList("a/"), bucket);
+
+    List<String> files = Arrays.asList("b0", "b1", "b2", "b3", "b4");
+    createAndAssertKeys(bucket, files);
+    List<String> expected = new ArrayList<>();
+    expected.add("a/");
+    expected.addAll(files);
+    checkKeyShallowList("", null, expected, bucket);
+    checkKeyShallowList("", "", expected, bucket);
+
+    createAndAssertKeys(bucket, Collections.singletonList("b5"));
+    expected.add("b5");
+    checkKeyShallowList("", null, expected, bucket);
+    checkKeyShallowList("", "", expected, bucket);
+    checkKeyShallowList("", "b2", Arrays.asList("b3", "b4", "b5"), bucket);
+    checkKeyShallowList("b", null, Arrays.asList("b0", "b1", "b2", "b3", "b4", "b5"), bucket);
   }
 
   @Test
