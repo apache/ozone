@@ -2331,6 +2331,31 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testGetAndHeadObjectWithPartNumberAndRange(@TempDir Path tempDir) throws Exception {
+    String bucketName = getBucketName();
+    String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+    File partFile = tempDir.resolve("part").toFile();
+    createFile(partFile, 10);
+    multipartUpload(bucketName, keyName, partFile, 10, Collections.emptyMap(), Collections.emptyList());
+
+    HeadObjectResponse headResponse = s3Client.headObject(b -> b.bucket(bucketName).key(keyName).partNumber(1));
+    assertThat(headResponse.contentLength()).isEqualTo(10);
+
+    S3Exception getException = assertThrows(S3Exception.class, () -> s3Client.getObjectAsBytes(b -> b
+        .bucket(bucketName).key(keyName).partNumber(1).range("bytes=0-4")));
+    assertThat(getException.statusCode()).isEqualTo(SC_BAD_REQUEST);
+    assertThat(getException.awsErrorDetails().errorCode()).isEqualTo(S3ErrorTable.INVALID_REQUEST.getCode());
+    assertThat(getException.awsErrorDetails().errorMessage())
+        .isEqualTo("Cannot specify both Range header and partNumber query parameter");
+
+    S3Exception headException = assertThrows(S3Exception.class, () -> s3Client.headObject(b -> b
+        .bucket(bucketName).key(keyName).partNumber(1).range("bytes=0-4")));
+    // HEAD errors have no body, so only the status code is available.
+    assertThat(headException.statusCode()).isEqualTo(SC_BAD_REQUEST);
+  }
+
+  @Test
   public void testGetNotExistedPart(@TempDir Path tempDir) throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();

@@ -26,6 +26,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.get;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_RANGE;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_URI;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
@@ -38,6 +39,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -66,6 +68,7 @@ import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
@@ -117,11 +120,39 @@ public class TestObjectGet {
     assertSucceeds(() -> put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT));
   }
 
-  @Test
-  public void testGetWithNegativePartNumber() throws Exception {
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(strings = "bytes=0-4")
+  public void testGetWithNegativePartNumber(String range) throws Exception {
     rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, -1);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
     assertErrorResponse(INVALID_ARGUMENT,
         () -> get(rest, BUCKET_NAME, KEY_NAME));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"bytes=0-4", "bytes=100-200", "bytes=abc", ""})
+  public void testGetWithPartNumberAndRange(String range) {
+    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 1);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn(range);
+    long failureBefore = rest.getMetrics().getGetKeyFailure();
+
+    OS3Exception exception = assertErrorResponse(INVALID_REQUEST, () -> get(rest, BUCKET_NAME, KEY_NAME));
+
+    assertThat(exception.getErrorMessage())
+        .isEqualTo("Cannot specify both Range header and partNumber query parameter");
+    assertThat(rest.getMetrics().getGetKeyFailure() - failureBefore).isEqualTo(1);
+  }
+
+  @Test
+  public void testGetWithZeroPartNumberAndRange() throws Exception {
+    rest.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, 0);
+    when(headers.getHeaderString(RANGE_HEADER)).thenReturn("bytes=0-4");
+
+    try (Response response = get(rest, BUCKET_NAME, KEY_NAME)) {
+      assertThat(response.getStatus()).isEqualTo(Response.Status.PARTIAL_CONTENT.getStatusCode());
+      assertThat(response.getHeaderString(HttpHeaders.CONTENT_LENGTH)).isEqualTo("5");
+    }
   }
 
   @Test

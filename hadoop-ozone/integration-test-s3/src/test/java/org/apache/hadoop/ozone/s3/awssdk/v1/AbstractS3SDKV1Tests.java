@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.createFile;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.getOmKeyModificationTime;
 import static org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils.getOmPartModificationTime;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,6 +59,7 @@ import com.amazonaws.services.s3.model.GetBucketAccelerateConfigurationRequest;
 import com.amazonaws.services.s3.model.GetBucketLifecycleConfigurationRequest;
 import com.amazonaws.services.s3.model.GetBucketTaggingConfigurationRequest;
 import com.amazonaws.services.s3.model.GetObjectAclRequest;
+import com.amazonaws.services.s3.model.GetObjectMetadataRequest;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.GetObjectTaggingRequest;
 import com.amazonaws.services.s3.model.GetObjectTaggingResult;
@@ -2206,6 +2208,33 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     assertEquals(allPartContentLength / 3, partThreeContentLength);
 
     assertEquals(allPartContentLength, (partOneContentLength + partTwoContentLength + partThreeContentLength));
+  }
+
+  @Test
+  public void testGetAndHeadObjectWithPartNumberAndRange(@TempDir Path tempDir) throws Exception {
+    String bucketName = getBucketName();
+    String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+    File partFile = tempDir.resolve("part").toFile();
+    createFile(partFile, 10);
+    multipartUpload(bucketName, keyName, partFile, 10, null, null, null);
+
+    GetObjectMetadataRequest headRequest = new GetObjectMetadataRequest(bucketName, keyName).withPartNumber(1);
+    assertThat(s3Client.getObjectMetadata(headRequest).getContentLength()).isEqualTo(10);
+
+    GetObjectRequest getRequest = new GetObjectRequest(bucketName, keyName).withPartNumber(1).withRange(0, 4);
+    AmazonServiceException getException = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObject(getRequest).close());
+    assertThat(getException.getStatusCode()).isEqualTo(400);
+    assertThat(getException.getErrorCode()).isEqualTo(S3ErrorTable.INVALID_REQUEST.getCode());
+    assertThat(getException.getErrorMessage())
+        .isEqualTo("Cannot specify both Range header and partNumber query parameter");
+
+    headRequest.putCustomRequestHeader(RANGE_HEADER, "bytes=0-4");
+    AmazonServiceException headException = assertThrows(AmazonServiceException.class,
+        () -> s3Client.getObjectMetadata(headRequest));
+    // HEAD errors have no body, so only the status code is available.
+    assertThat(headException.getStatusCode()).isEqualTo(400);
   }
 
   @Test
