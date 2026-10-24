@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.ha;
 
+import jakarta.annotation.Nonnull;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
@@ -131,7 +132,7 @@ public abstract class FollowerReadFailoverProxyProviderBase {
    *
    * @param nodeId the expected current node.
    */
-  protected synchronized void changeFollowerReadNodeId(String nodeId) {
+  protected synchronized void changeFollowerReadNodeId(@Nonnull String nodeId) {
     if (nodeId.equals(getCurrentFollowerReadNodeId())) {
       currentIndex = (currentIndex + 1) % getOMNodeCount();
       LOG.debug("Changed follower read OM node from {} to {}", nodeId, getCurrentFollowerReadNodeId());
