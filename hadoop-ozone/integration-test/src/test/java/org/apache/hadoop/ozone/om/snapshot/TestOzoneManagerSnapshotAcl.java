@@ -65,6 +65,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -480,9 +481,10 @@ public class TestOzoneManagerSnapshotAcl {
   /**
    * Verifies that bucket owner can: create, rename and delete snapshots.
    * Verifies that non bucket owner can not create, rename and delete.
-   * Verifies that user with bucket read permissions can: list snapshots, get snapshot info,
+   * Verifies that user with bucket read and list permissions can: list snapshots, get snapshot info,
    * snapshot diff, list snapshot diff jobs and cancel snapshot diff jobs.
    * Verifies that user with no permissions cannot do any of the above.
+   * Verifies that user with only bucket read, or only bucket list, permission cannot run snapshot diff.
    *
    * @param bucketLayout
    * @throws Exception
@@ -543,6 +545,8 @@ public class TestOzoneManagerSnapshotAcl {
               snapshot1, snapshot2, null, 0, false, false);
     objectStore2.listSnapshotDiffJobs(volumeName, bucketName, "", true, null);
     objectStore2.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
+    objectStore2.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2, false, false);
+    objectStore2.getClientProxy().listStatus(volumeName, bucketName, "", false, "", 10);
 
     // user3 has no ACL permissions, should not be able to list the snapshots, get snapshot info,
     // snapshot diff, list snapshot diff jobs and cancel snapshot diff jobs.
@@ -569,6 +573,44 @@ public class TestOzoneManagerSnapshotAcl {
         () -> objectStore3.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2));
     assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
 
+    // user3 with bucket READ only: reads by name are allowed, snapshot diff and listings are denied.
+    final OzoneObj volumeObj = OzoneObjInfo.Builder.newBuilder().setResType(OzoneObj.ResourceType.VOLUME)
+        .setStoreType(OzoneObj.StoreType.OZONE).setVolumeName(volumeName).build();
+    final OzoneObj bucketObj = OzoneObjInfo.Builder.newBuilder().setResType(OzoneObj.ResourceType.BUCKET)
+        .setStoreType(OzoneObj.StoreType.OZONE).setVolumeName(volumeName).setBucketName(bucketName).build();
+    final OzoneAcl user3Read = OzoneAcl.parseAcl("user:" + USER3 + ":r");
+    final OzoneAcl user3List = OzoneAcl.parseAcl("user:" + USER3 + ":l");
+    objectStore.addAcl(volumeObj, user3Read);
+    objectStore.addAcl(bucketObj, user3Read);
+    objectStore3.getVolume(volumeName).getBucket(bucketName);
+    objectStore3.getSnapshotInfo(volumeName, bucketName, snapshot1);
+    objectStore3.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
+    assertPermissionDenied(() -> objectStore3.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+        null, 0, false, false));
+    assertPermissionDenied(() -> objectStore3.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+        false, false));
+    assertPermissionDenied(() -> objectStore3.getClientProxy().listStatus(volumeName, bucketName, "", false, "", 10));
+    assertPermissionDenied(() -> objectStore3.listSnapshot(volumeName, bucketName, null, null).hasNext());
+    assertPermissionDenied(() -> objectStore3.listSnapshotDiffJobs(volumeName, bucketName, "", true, null));
+
+    // user3 with bucket LIST only: listing snapshots and diff jobs is allowed, everything else is denied.
+    objectStore.removeAcl(bucketObj, user3Read);
+    objectStore.addAcl(bucketObj, user3List);
+    objectStore3.listSnapshot(volumeName, bucketName, null, null).hasNext();
+    objectStore3.listSnapshotDiffJobs(volumeName, bucketName, "", true, null);
+    assertPermissionDenied(() -> objectStore3.getVolume(volumeName).getBucket(bucketName));
+    assertPermissionDenied(() -> objectStore3.getSnapshotInfo(volumeName, bucketName, snapshot1));
+    assertPermissionDenied(() -> objectStore3.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2));
+    assertPermissionDenied(() -> objectStore3.snapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+        null, 0, false, false));
+    assertPermissionDenied(() -> objectStore3.submitSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2,
+        false, false));
+    assertPermissionDenied(() -> objectStore3.getClientProxy().listStatus(volumeName, bucketName, "", false, "", 10));
+  }
+
+  private static void assertPermissionDenied(Executable executable) {
+    final OMException ex = assertThrows(OMException.class, executable);
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, ex.getResult());
   }
 
   private void setup(BucketLayout bucketLayout)
