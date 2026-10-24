@@ -131,6 +131,7 @@ import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
+import org.apache.hadoop.ozone.om.OmClientMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
@@ -238,6 +239,7 @@ public class RpcClient implements ClientProtocol {
   private final MemoizedSupplier<ExecutorService> ecReconstructExecutor;
   private final MemoizedSupplier<ExecutorService> ecParallelReadExecutor;
   private final ContainerClientMetrics.Handle clientMetricsHandle;
+  private final OmClientMetrics.Handle omClientMetricsHandle;
   private final ContainerClientMetrics clientMetrics;
   private final MemoizedSupplier<ExecutorService> writeExecutor;
   private volatile OzoneFsServerDefaults serverDefaults;
@@ -359,6 +361,9 @@ public class RpcClient implements ClientProtocol {
         OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS,
         OZONE_CLIENT_SERVER_DEFAULTS_VALIDITY_PERIOD_MS_DEFAULT,
         TimeUnit.MILLISECONDS);
+    // Acquire last so a failed client constructor cannot retain an OM metrics reference.
+    this.omClientMetricsHandle = OmClientMetrics.acquireHandle(conf);
+    ozoneManagerProtocolClientSideTranslatorPB.setOmClientMetrics(omClientMetricsHandle.metrics());
   }
 
   public XceiverClientFactory getXceiverClientManager() {
@@ -2135,7 +2140,8 @@ public class RpcClient implements ClientProtocol {
           keyProviderCache.invalidateAll();
           keyProviderCache.cleanUp();
         },
-        clientMetricsHandle);
+        clientMetricsHandle,
+        omClientMetricsHandle);
   }
 
   private static void shutdownExecutor(
