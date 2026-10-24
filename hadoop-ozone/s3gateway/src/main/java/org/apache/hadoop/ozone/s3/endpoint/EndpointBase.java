@@ -886,6 +886,15 @@ public abstract class EndpointBase {
    */
   protected S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(
       InputStream body, long contentLength, String amzDecodedLength, String keyPath) throws OS3Exception {
+    return getS3ChunkInputStreamInfo(body, contentLength, amzDecodedLength, keyPath, true);
+  }
+
+  /**
+   * Same as {@link #getS3ChunkInputStreamInfo(InputStream, long, String, String)}. Pass {@code opensKey = false}
+   * when no key is opened for the payload, which then needs no derived key from OM.
+   */
+  protected S3ChunkInputStreamInfo getS3ChunkInputStreamInfo(InputStream body, long contentLength,
+      String amzDecodedLength, String keyPath, boolean opensKey) throws OS3Exception {
     final String amzContentSha256Header = validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
     final S3ContentSha256Type payloadType = S3ContentSha256Type.fromHeaderValue(amzContentSha256Header);
     final InputStream chunkInputStream;
@@ -893,7 +902,8 @@ public abstract class EndpointBase {
     if (payloadType.isStreaming()) {
       validateMultiChunksUpload(getHeaders(), amzDecodedLength, keyPath);
       if (payloadType.isUnsigned()) {
-        chunkInputStream = new UnsignedChunksInputStream(body);
+        chunkInputStream = new UnsignedChunksInputStream(body, keyPath,
+            TrailerHeader.fromHeader(getHeaders().getHeaderString(X_AMZ_TRAILER), keyPath));
       } else {
         TrailerHeader trailerHeader = payloadType == S3ContentSha256Type.STREAMING_AWS4_HMAC_SHA256_PAYLOAD_TRAILER
             ? TrailerHeader.fromHeader(getHeaders().getHeaderString(X_AMZ_TRAILER), keyPath) : TrailerHeader.NONE;
@@ -921,7 +931,7 @@ public abstract class EndpointBase {
     // Header auth only: for a presigned (query) request the payload hash is not part of the signed
     // canonical request, so its seed signature cannot start the chunk signature chain.
     boolean verifyChunkSignature = signatureInfo.isSignPayload() && payloadType.isHmacSignedStreaming();
-    if (verifyChunkSignature && OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())
+    if (opensKey && verifyChunkSignature && OzoneSecurityUtil.isSecurityEnabled(getOzoneConfiguration())
         && !OzoneManagerVersion.S3_DERIVED_KEY.isSupportedBy(getClientProtocol().getOmVersion())) {
       OS3Exception ex = newError(S3ErrorTable.NOT_IMPLEMENTED, keyPath);
       ex.setErrorMessage("The connected Ozone Manager does not support signed chunk verification.");
