@@ -280,9 +280,9 @@ public class SCMStateMachine extends BaseStateMachine {
         .getLeaderInfo().getId().getAddress();
     Optional<SCMNodeDetails> leaderDetails =
         scm.getSCMHANodeDetails().getPeerNodeDetails().stream()
-            .filter(p -> p.getRatisHostPortStr().equals(leaderAddress))
+            .filter(p -> p.isRatisAddress(leaderAddress))
             .findFirst();
-    Preconditions.checkState(leaderDetails.isPresent());
+    Preconditions.checkState(leaderDetails.isPresent(), "No SCM peer matches leader address %s", leaderAddress);
     final String leaderNodeId = leaderDetails.get().getNodeId();
     LOG.info("Received install snapshot notification from SCM leader: {} with "
         + "term index: {}", leaderAddress, firstTermIndexInLog);

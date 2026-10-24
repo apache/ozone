@@ -1037,7 +1037,7 @@ public class SCMClientProtocolServer implements
         continue;
       }
       for (RaftPeer peer : group.getPeers()) {
-        if (node.getRatisHostPortStr().equals(peer.getAddress())) {
+        if (node.isRatisAddress(peer.getAddress())) {
           return peer.getId();
         }
       }
