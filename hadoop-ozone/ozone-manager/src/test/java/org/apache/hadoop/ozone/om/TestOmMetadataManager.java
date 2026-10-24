@@ -53,6 +53,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -789,6 +790,61 @@ public class TestOmMetadataManager {
       assertEquals(clientID, keySession.getId());
       assertEquals(0, keySession.getOpenVersion());
     }
+  }
+
+  /**
+   * The open key of a multipart upload ends with the upload ID, not a client ID.
+   * listOpenFiles lists it with client ID 0 next to the other open keys, whether or not it carries the
+   * isMultipartKey flag (rows written before HDDS-9017 do not), while the open key of a part being written,
+   * which has the flag, keeps its client ID.
+   */
+  @ParameterizedTest
+  @EnumSource
+  public void testListOpenFilesWithMultipartUpload(BucketLayout bucketLayout) throws Exception {
+    final long clientID = 1000L;
+    final long partClientID = 2000L;
+    String volumeName = "volume-lof-mpu";
+    String bucketName = "bucket-" + bucketLayout.name().toLowerCase();
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, bucketLayout);
+
+    OmKeyInfo openKey = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "key0",
+        RatisReplicationConfig.getInstance(ONE)).build();
+    OmKeyInfo uploadKey = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "key1",
+        RatisReplicationConfig.getInstance(ONE)).build();
+    OmKeyInfo partKey = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, "key1",
+        RatisReplicationConfig.getInstance(ONE), new OmKeyLocationInfoGroup(0L, new ArrayList<>(), true)).build();
+    String uploadId = OMMultipartUploadUtils.getMultipartUploadId();
+    String dbPrefix;
+    if (bucketLayout.isFileSystemOptimized()) {
+      OMRequestTestUtils.addFileToKeyTable(true, false, openKey.getFileName(), openKey, clientID, 0L,
+          omMetadataManager);
+      OMRequestTestUtils.addMultipartKeyToOpenFileTable(false, uploadKey.getFileName(), uploadKey, uploadId, 0L,
+          omMetadataManager);
+      OMRequestTestUtils.addFileToKeyTable(true, false, partKey.getFileName(), partKey, partClientID, 0L,
+          omMetadataManager);
+      dbPrefix = omMetadataManager.getOzoneKeyFSO(volumeName, bucketName, "");
+    } else {
+      OMRequestTestUtils.addKeyToTable(true, false, openKey, clientID, 0L, omMetadataManager);
+      OMRequestTestUtils.addMultipartKeyToOpenKeyTable(false, uploadKey, uploadId, 0L, omMetadataManager);
+      OMRequestTestUtils.addKeyToTable(true, false, partKey, partClientID, 0L, omMetadataManager);
+      dbPrefix = omMetadataManager.getOzoneKey(volumeName, bucketName, "");
+    }
+
+    ListOpenFilesResult res = omMetadataManager.listOpenFiles(bucketLayout, 100, dbPrefix, false, dbPrefix);
+    assertThat(res.getTotalOpenKeyCount()).isEqualTo(3);
+    assertThat(res.hasMore()).isFalse();
+    assertThat(res.getOpenKeys())
+        .extracting(s -> s.getKeyInfo().getKeyName(), OpenKeySession::getId)
+        .containsExactlyInAnyOrder(tuple("key0", clientID), tuple("key1", partClientID), tuple("key1", 0L));
+
+    // Page through it: the continuation token of the first page is the open key before the upload
+    res = omMetadataManager.listOpenFiles(bucketLayout, 1, dbPrefix, false, dbPrefix);
+    assertThat(res.hasMore()).isTrue();
+    res = omMetadataManager.listOpenFiles(bucketLayout, 2, dbPrefix, true, res.getContinuationToken());
+    assertThat(res.hasMore()).isFalse();
+    assertThat(res.getOpenKeys())
+        .extracting(s -> s.getKeyInfo().getKeyName(), OpenKeySession::getId)
+        .containsExactlyInAnyOrder(tuple("key1", partClientID), tuple("key1", 0L));
   }
 
   private static BucketLayout getDefaultBucketLayout() {
