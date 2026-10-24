@@ -55,7 +55,9 @@ public class XceiverClientCreator implements XceiverClientFactory {
     if (securityEnabled) {
       Objects.requireNonNull(trustManager, "trustManager == null");
     }
-    shortCircuitEnabled = conf.getObject(OzoneClientConfig.class).isShortCircuitEnabled();
+    final OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+    XceiverClientMetrics.setMetricsMode(clientConfig.getMetricsMode());
+    shortCircuitEnabled = clientConfig.isShortCircuitEnabled();
     if (shortCircuitEnabled) {
       domainSocketFactory = DomainSocketFactory.getInstance(conf);
     }
