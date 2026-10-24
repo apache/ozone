@@ -23,38 +23,27 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOU
 import static org.apache.ozone.test.OzoneTestBase.uniqueObjectName;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
-import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Scanner;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.StorageType;
-import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 
 /**
- * Utility class with helper methods for creating and managing test data in integration tests.
+ * Utility class with helper methods for creating and managing test data in tests.
  */
 public final class DataTestUtil {
 
@@ -252,68 +241,5 @@ public final class DataTestUtil {
     throw new IllegalStateException(
         "Could not create unique volume/bucket " + "in " + attempts
             + " attempts");
-  }
-
-  public static Map<String, OmKeyInfo> createKeys(MiniOzoneCluster cluster, int numOfKeys)
-      throws Exception {
-    Map<String, OmKeyInfo> keyLocationMap = Maps.newHashMap();
-
-    try (OzoneClient client = cluster.newClient()) {
-      OzoneBucket bucket = createVolumeAndBucket(client);
-      for (int i = 0; i < numOfKeys; i++) {
-        String keyName = RandomStringUtils.secure().nextAlphabetic(5) + i;
-        createKey(bucket, keyName, ReplicationConfig
-            .fromTypeAndFactor(ReplicationType.RATIS, ReplicationFactor.ONE),
-            RandomStringUtils.secure().nextAlphabetic(5).getBytes(UTF_8));
-        keyLocationMap.put(keyName, lookupOmKeyInfo(cluster, bucket, keyName));
-      }
-    }
-    return keyLocationMap;
-  }
-
-  public static void cleanupDeletedTable(OzoneManager ozoneManager) throws IOException {
-    Table<String, RepeatedOmKeyInfo> deletedTable = ozoneManager.getMetadataManager().getDeletedTable();
-    List<String> nameList = new ArrayList<>();
-    try (Table.KeyValueIterator<String, RepeatedOmKeyInfo> keyIter = deletedTable.iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, RepeatedOmKeyInfo> kv = keyIter.next();
-        nameList.add(kv.getKey());
-      }
-    }
-    nameList.forEach(k -> {
-      try {
-        deletedTable.delete(k);
-      } catch (IOException e) {
-        // do nothing
-      }
-    });
-  }
-
-  public static void cleanupOpenKeyTable(OzoneManager ozoneManager, BucketLayout bucketLayout) throws IOException {
-    Table<String, OmKeyInfo> openKeyTable = ozoneManager.getMetadataManager().getOpenKeyTable(bucketLayout);
-    List<String> nameList = new ArrayList<>();
-    try (Table.KeyValueIterator<String, OmKeyInfo> keyIter = openKeyTable.iterator()) {
-      while (keyIter.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> kv = keyIter.next();
-        nameList.add(kv.getKey());
-      }
-    }
-    nameList.forEach(k -> {
-      try {
-        openKeyTable.delete(k);
-      } catch (IOException e) {
-        // do nothing
-      }
-    });
-  }
-
-  private static OmKeyInfo lookupOmKeyInfo(MiniOzoneCluster cluster,
-      OzoneBucket bucket, String key) throws IOException {
-    OmKeyArgs arg = new OmKeyArgs.Builder()
-        .setVolumeName(bucket.getVolumeName())
-        .setBucketName(bucket.getName())
-        .setKeyName(key)
-        .build();
-    return cluster.getOzoneManager().lookupKey(arg);
   }
 }

@@ -43,23 +43,38 @@ public final class RangeHeaderParserUtil {
     long start = 0;
     long end = 0;
     boolean noStart = false;
+    boolean noEnd = false;
     boolean readFull = false;
     boolean inValidRange = false;
     RangeHeader rangeHeader;
     Matcher matcher = RANGE_HEADER_MATCH_PATTERN.matcher(rangeHeaderVal);
     if (matcher.matches()) {
-      if (!matcher.group("start").equals("")) {
-        start = Long.parseLong(matcher.group("start"));
-      } else {
-        noStart = true;
+      try {
+        if (!matcher.group("start").equals("")) {
+          start = Long.parseLong(matcher.group("start"));
+        } else {
+          noStart = true;
+        }
+        if (!matcher.group("end").equals("")) {
+          end = Long.parseLong(matcher.group("end"));
+        } else {
+          noEnd = true;
+          end = length - 1;
+        }
+      } catch (NumberFormatException e) {
+        // A byte position that overflows a long is malformed, so read the full file.
+        return new RangeHeader(0, length - 1, true, false);
       }
-      if (!matcher.group("end").equals("")) {
-        end = Long.parseLong(matcher.group("end"));
-      } else {
+      if (noStart && noEnd) {
+        // "bytes=-" has neither a first byte nor a suffix length, so it is ignored.
+        start = 0;
         end = length - 1;
-      }
-      if (noStart) {
-        if (end < length) {
+        readFull = true;
+      } else if (noStart) {
+        if (end == 0 || length == 0) {
+          // A zero suffix length, or any suffix of an empty object, selects no bytes.
+          inValidRange = true;
+        } else if (end < length) {
           start = length - end;
         } else {
           start = 0;
@@ -68,7 +83,7 @@ public final class RangeHeaderParserUtil {
       } else {
         if (start >= length)  {
           readFull = true;
-          if (end >= length) {
+          if (end >= length || noEnd) {
             inValidRange = true;
           } else {
             start = 0;
