@@ -34,6 +34,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.common.BekInfoUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
@@ -88,6 +89,10 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     BucketArgs bucketArgs =
         getOmRequest().getSetBucketPropertyRequest().getBucketArgs();
 
+    if (bucketArgs.hasDefaultReplicationConfig()) {
+      OzoneConfigUtil.toDefaultReplicationConfig(bucketArgs.getDefaultReplicationConfig());
+    }
+
     if (bucketArgs.hasBekInfo()) {
       KeyProviderCryptoExtension kmsProvider = ozoneManager.getKmsProvider();
       BucketArgs.Builder bucketArgsBuilder =
@@ -117,7 +122,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     omMetrics.incNumBucketUpdates();
 
     BucketArgs bucketArgs = setBucketPropertyRequest.getBucketArgs();
-    OmBucketArgs omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
+    OmBucketArgs omBucketArgs = null;
 
     String volumeName = bucketArgs.getVolumeName();
     String bucketName = bucketArgs.getBucketName();
@@ -132,6 +137,12 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
+      // Parse here, so that an invalid replication config fails the request
+      if (bucketArgs.hasDefaultReplicationConfig()) {
+        OzoneConfigUtil.toDefaultReplicationConfig(bucketArgs.getDefaultReplicationConfig());
+      }
+      omBucketArgs = OmBucketArgs.getFromProtobuf(bucketArgs);
+
       // check Acl
       if (ozoneManager.getAclsEnabled()) {
         checkAclPermission(ozoneManager, volumeName, bucketName);
@@ -233,7 +244,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     // Performing audit logging outside of the lock.
     markForAudit(auditLogger, buildAuditMessage(OMAction.UPDATE_BUCKET,
-        omBucketArgs.toAuditMap(), exception, userInfo));
+        omBucketArgs == null ? null : omBucketArgs.toAuditMap(), exception, userInfo));
 
     // return response.
     if (success) {
