@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -548,6 +549,31 @@ public class TestOMDirectoryCreateRequest {
       assertFalse(keyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
     } else {
       assertTrue(keyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    }
+  }
+
+  @Test
+  public void testRejectInvalidAcl() throws Exception {
+    String volumeName = "vol1";
+    String bucketName = "bucket1";
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager);
+
+    for (OzoneAclInfo acl : OMRequestTestUtils.invalidAcls()) {
+      OMRequest.Builder request = createDirectoryRequest(volumeName, bucketName, genRandomKeyName()).toBuilder();
+      request.getCreateDirectoryRequestBuilder().getKeyArgsBuilder().addAcls(acl);
+      OMException e = assertThrows(OMException.class,
+          () -> new OMDirectoryCreateRequest(request.build(), getBucketLayout()).preExecute(ozoneManager));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+
+      OMRequest validRequest = createDirectoryRequest(volumeName, bucketName, genRandomKeyName());
+      OMRequest.Builder modifiedRequest =
+          new OMDirectoryCreateRequest(validRequest, getBucketLayout()).preExecute(ozoneManager).toBuilder();
+      modifiedRequest.getCreateDirectoryRequestBuilder().getKeyArgsBuilder().addAcls(acl);
+      OMDirectoryCreateRequest omDirectoryCreateRequest =
+          new OMDirectoryCreateRequest(modifiedRequest.build(), getBucketLayout());
+      omDirectoryCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
+      OMClientResponse response = omDirectoryCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+      assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST, response.getOMResponse().getStatus());
     }
   }
 

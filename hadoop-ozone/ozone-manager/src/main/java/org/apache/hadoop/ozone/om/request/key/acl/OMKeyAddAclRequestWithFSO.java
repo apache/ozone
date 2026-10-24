@@ -55,6 +55,7 @@ public class OMKeyAddAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   @Override
   public OzoneManagerProtocolProtos.OMRequest preExecute(
       OzoneManager ozoneManager) throws IOException {
+    checkAclRights(ozoneAcls);
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.AddAclRequest.Builder addAclRequestBuilder =
         getOmRequest().getAddAclRequest().toBuilder()

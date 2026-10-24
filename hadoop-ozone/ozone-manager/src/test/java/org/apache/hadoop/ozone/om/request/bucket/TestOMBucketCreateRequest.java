@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -410,6 +411,35 @@ public class TestOMBucketCreateRequest extends BucketRequestTests {
       assertFalse(aclList.contains(OzoneAcl.parseAcl(acl)));
     } else {
       assertTrue(aclList.contains(OzoneAcl.parseAcl(acl)));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testInvalidAcl(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
+    for (OzoneAclInfo acl : OMRequestTestUtils.invalidAcls()) {
+      String volumeName = UUID.randomUUID().toString();
+      String bucketName = UUID.randomUUID().toString();
+      if (ignoreClientACLs) {
+        OMBucketCreateRequest request = doPreExecute(newBucketInfoBuilder(bucketName, volumeName).addAcls(acl));
+        request.setUGI(UserGroupInformation.getCurrentUser());
+        OMClientResponse response = request.validateAndUpdateCache(ozoneManager, 1);
+        assertEquals(OzoneManagerProtocolProtos.Status.OK, response.getOMResponse().getStatus());
+        assertNotNull(omMetadataManager.getBucketTable().get(omMetadataManager.getBucketKey(volumeName, bucketName)));
+        continue;
+      }
+      OMException e = assertThrows(OMException.class,
+          () -> doPreExecute(newBucketInfoBuilder(bucketName, volumeName).addAcls(acl)));
+      assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+
+      OMRequest.Builder modifiedRequest = doPreExecute(volumeName, bucketName).getOmRequest().toBuilder();
+      modifiedRequest.getCreateBucketRequestBuilder().getBucketInfoBuilder().addAcls(acl);
+      OMBucketCreateRequest omBucketCreateRequest = new OMBucketCreateRequest(modifiedRequest.build());
+      omBucketCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
+      OMClientResponse response = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1);
+      assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST, response.getOMResponse().getStatus());
+      assertNull(omMetadataManager.getBucketTable().get(omMetadataManager.getBucketKey(volumeName, bucketName)));
     }
   }
 
