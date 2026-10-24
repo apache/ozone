@@ -61,7 +61,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils.getBlockMapKey;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -92,7 +91,6 @@ import java.util.NavigableMap;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -200,8 +198,6 @@ public class KeyValueHandler extends Handler {
   private final Striped<Lock> containerCreationLocks;
   private final ContainerChecksumTreeManager checksumManager;
   private static FaultInjector injector;
-  // map temporarily carries the RandomAccessFile for short-circuit read requests
-  private final Map<String, RandomAccessFile> blockFileMap = new ConcurrentHashMap<>();
   private OzoneContainer ozoneContainer;
   private final Clock clock;
   // Not final so tests can substitute a stubbed factory to drive reconcileChunksPerBlock without a live peer.
@@ -351,7 +347,7 @@ public class KeyValueHandler extends Handler {
     case PutBlock:
       return handler.handlePutBlock(request, kvContainer, dispatcherContext);
     case GetBlock:
-      return handler.handleGetBlock(request, kvContainer);
+      return handler.handleGetBlock(request, kvContainer, dispatcherContext);
     case DeleteBlock:
       return handler.handleDeleteBlock(request, kvContainer);
     case ListBlock:
@@ -838,7 +834,7 @@ public class KeyValueHandler extends Handler {
    * Handle Get Block operation. Calls BlockManager to process the request.
    */
   ContainerCommandResponseProto handleGetBlock(
-      ContainerCommandRequestProto request, KeyValueContainer kvContainer) {
+      ContainerCommandRequestProto request, KeyValueContainer kvContainer, DispatcherContext dispatcherContext) {
 
     if (!request.hasGetBlock()) {
       if (LOG.isDebugEnabled()) {
@@ -855,15 +851,16 @@ public class KeyValueHandler extends Handler {
       BlockID blockID = BlockID.getFromProtobuf(getBlock.getBlockID());
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       responseData = blockManager.getBlock(kvContainer, blockID).getProtoBufMessage();
-      if (getBlock.hasRequestShortCircuitAccess() && getBlock.getRequestShortCircuitAccess()) {
+      // only the domain socket path can pass the opened file on, other transports get the block data only
+      if (getBlock.hasRequestShortCircuitAccess() && getBlock.getRequestShortCircuitAccess()
+          && DispatcherContext.op(dispatcherContext) == DispatcherContext.Op.HANDLE_SHORT_CIRCUIT_READ) {
         boolean domainSocketServerEnabled = ozoneContainer != null
             && ozoneContainer.getReadDomainSocketChannel() != null
             && ozoneContainer.getReadDomainSocketChannel().isStarted();
         if (domainSocketServerEnabled) {
           RandomAccessFile file = chunkManager.getShortCircuitFd(kvContainer, blockID);
           Preconditions.checkState(file != null);
-          String mapKey = getBlockMapKey(request);
-          blockFileMap.put(mapKey, file);
+          dispatcherContext.setShortCircuitBlockFile(file);
           shortCircuitGranted = true;
         }
       }
@@ -881,20 +878,6 @@ public class KeyValueHandler extends Handler {
     }
 
     return getBlockDataResponse(request, responseData, shortCircuitGranted);
-  }
-
-  @Override
-  public RandomAccessFile getBlockFile(ContainerCommandRequestProto request) throws IOException {
-    if (request.getCmdType() != Type.GetBlock) {
-      throw new StorageContainerException("Request type mismatch, expected " +  Type.GetBlock +
-          ", received " + request.getCmdType(), ContainerProtos.Result.MALFORMED_REQUEST);
-    }
-    String mapKey = getBlockMapKey(request);
-    RandomAccessFile file = blockFileMap.remove(mapKey);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("File removed from blockFileMap for {}", mapKey);
-    }
-    return file;
   }
 
   /**
