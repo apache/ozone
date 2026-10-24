@@ -34,6 +34,11 @@ public class DatanodeEntry {
     this.info = info;
   }
 
+  DatanodeEntry(DatanodeInfo info, Set<ContainerID> containers) {
+    this(info);
+    this.containers.addAll(containers);
+  }
+
   public DatanodeInfo getInfo() {
     return info;
   }

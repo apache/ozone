@@ -118,8 +118,27 @@ public class TestStringToSignProducer {
         signatureBase, "String to sign is invalid");
   }
 
-  @Test
-  public void testUrlEncodeInCanonicalRequest() {
+  private static Stream<Arguments> testUrlEncodeInCanonicalRequestInput() {
+    return Stream.of(
+        arguments("/bucket/a+b*c~d/foo bar", "/bucket/a%2Bb%2Ac~d/foo%20bar"),
+        arguments("", ""),
+        arguments("/", "/"),
+        arguments("//", "//"),
+        arguments("/bucket/", "/bucket/"),
+        arguments("//bucket/key", "//bucket/key"),
+        arguments("/bucket//key/", "/bucket//key/"),
+        arguments("/bucket/a/.././b", "/bucket/a/.././b"),
+        arguments("bucket/key", "bucket/key"),
+        // A literal %2F in the decoded path corresponds to %252F in the wire path.
+        arguments("/bucket/a%2Fb", "/bucket/a%252Fb"),
+        arguments("/bucket/雪/😀", "/bucket/%E9%9B%AA/%F0%9F%98%80"),
+        arguments("/bucket/?#", "/bucket/%3F%23")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("testUrlEncodeInCanonicalRequestInput")
+  public void testUrlEncodeInCanonicalRequest(String uri, String expectedCanonicalUri) {
     final Map<String, String> headers = new HashMap<>();
     headers.put("host", "example.com");
     headers.put("x-amz-content-sha256", UNSIGNED_PAYLOAD);
@@ -129,12 +148,12 @@ public class TestStringToSignProducer {
     queryParams.put("q+1*2~3", "v 4*5~6");
 
     final String canonicalRequest = StringToSignProducer.buildCanonicalRequest(
-        "GET", "/bucket/a+b*c~d/foo bar", "host;x-amz-content-sha256;x-amz-date",
+        "GET", uri, "host;x-amz-content-sha256;x-amz-date",
         headers, queryParams, UNSIGNED_PAYLOAD);
 
     assertEquals(
         "GET\n"
-            + "/bucket/a%2Bb%2Ac~d/foo%20bar\n"
+            + expectedCanonicalUri + "\n"
             + "q%2B1%2A2~3=v%204%2A5~6\n"
             + "host:example.com\n"
             + "x-amz-content-sha256:" + UNSIGNED_PAYLOAD + "\n"

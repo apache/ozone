@@ -34,6 +34,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -90,6 +92,10 @@ class TestReconStorageContainerManagerFacade {
 
     ReconStorageContainerManagerFacade reconScm =
         injector.getInstance(ReconStorageContainerManagerFacade.class);
+    ReconContainerManager containerManager = (ReconContainerManager) reconScm.getContainerManager();
+    DatanodeID historyDatanode = DatanodeID.randomID();
+    containerManager.upsertContainerHistory(1L, historyDatanode, 10L, 20L,
+        "CLOSED", ContainerChecksums.of(1234L, 0L));
     metricsToUnregister.add(getContainerSyncMetrics(reconScm));
     OzoneConfiguration conf = injector.getInstance(OzoneConfiguration.class);
     File checkpointDir =
@@ -113,6 +119,8 @@ class TestReconStorageContainerManagerFacade {
         reconScm.getScmDBStore().getDbLocation().getCanonicalFile());
     assertTrue(canonicalReconScmDb.exists());
     assertFalse(checkpointDir.exists());
+    assertEquals(1, containerManager.getAllContainerHistory(1L).size());
+    assertEquals(historyDatanode.toString(), containerManager.getAllContainerHistory(1L).get(0).getDatanodeUuid());
   }
 
   @Test

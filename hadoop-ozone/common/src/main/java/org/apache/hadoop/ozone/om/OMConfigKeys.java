@@ -114,6 +114,18 @@ public final class OMConfigKeys {
   public static final int OZONE_SNAPSHOT_KEY_DELETING_LIMIT_PER_TASK_DEFAULT
       = 20000;
 
+  public static final String
+      OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD =
+      "ozone.om.key.deleting.scm.follower.lag.throttle.threshold";
+  public static final int
+      OZONE_KEY_DELETING_SCM_FOLLOWER_LAG_THROTTLE_THRESHOLD_DEFAULT = 100000;
+
+  public static final String
+      OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK =
+      "ozone.om.key.deleting.scm.lag.throttled.limit.per.task";
+  public static final int
+      OZONE_KEY_DELETING_SCM_LAG_THROTTLED_LIMIT_PER_TASK_DEFAULT = 1000;
+
   public static final String OZONE_OM_OPEN_KEY_CLEANUP_SERVICE_INTERVAL =
       "ozone.om.open.key.cleanup.service.interval";
   public static final String
@@ -707,9 +719,9 @@ public final class OMConfigKeys {
   public static final String
       OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB
       = "ozone.om.snapshot.diff.max.in.memory.entries.per.job";
-  public static final long
+  public static final int
       OZONE_OM_SNAPSHOT_DIFF_MAX_IN_MEMORY_ENTRIES_PER_JOB_DEFAULT
-      = 1_000_000L;
+      = 1_000_000;
 
   public static final String OZONE_OM_UPGRADE_QUOTA_RECALCULATE_ENABLE
       = "ozone.om.upgrade.quota.recalculate.enabled";
@@ -794,6 +806,10 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_EVENTS_MAX_LIMIT =
       "ozone.om.ratis.events.max.limit";
   public static final int OZONE_OM_RATIS_EVENTS_MAX_LIMIT_DEFAULT = 100;
+
+  public static final String OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL =
+      "ozone.om.upgrade.finalization.check.interval";
+  public static final String OZONE_OM_UPGRADE_FINALIZATION_CHECK_INTERVAL_DEFAULT = "1m";
 
   /**
    * Never constructed.

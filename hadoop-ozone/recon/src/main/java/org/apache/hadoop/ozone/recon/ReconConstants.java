@@ -26,6 +26,8 @@ public final class ReconConstants {
 
   public static final String RECON_CONTAINER_KEY_DB = "recon-container-key.db";
 
+  public static final String RECON_REPLICA_HISTORY_DB = "recon-container-replica-history.db";
+
   public static final String CONTAINER_COUNT_KEY = "containerCount";
 
   public static final String RECON_OM_SNAPSHOT_DB = "om.snapshot.db";
