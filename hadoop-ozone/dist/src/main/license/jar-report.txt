@@ -40,7 +40,6 @@ share/ozone/lib/commons-validator.jar
 share/ozone/lib/converter-jackson.jar
 share/ozone/lib/curator-client.jar
 share/ozone/lib/curator-framework.jar
-share/ozone/lib/derby.jar
 share/ozone/lib/disruptor.jar
 share/ozone/lib/dnsjava.jar
 share/ozone/lib/error_prone_annotations.jar

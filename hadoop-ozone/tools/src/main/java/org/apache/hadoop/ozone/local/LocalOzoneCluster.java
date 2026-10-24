@@ -748,7 +748,7 @@ public final class LocalOzoneCluster implements LocalOzoneRuntime {
     conf.setIfUnset(OZONE_RECON_SCM_DB_DIR, reconDir.toString());
 
     ReconSqlDbConfig dbConfig = conf.getObject(ReconSqlDbConfig.class);
-    dbConfig.setJdbcUrl("jdbc:derby:" + reconDir.resolve("ozone_recon_derby.db"));
+    dbConfig.setJdbcUrl("jdbc:sqlite:" + reconDir.resolve("ozone_recon_sqlite.db"));
     conf.setFromObject(dbConfig);
 
     int reconHttpPort = reservePort(portAllocator, persistedPorts, RECON_HTTP_PORT_KEY, config.getReconPort());

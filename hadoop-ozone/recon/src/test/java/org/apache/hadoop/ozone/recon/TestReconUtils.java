@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.recon.ReconUtils.createTarFile;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -75,6 +77,35 @@ public class TestReconUtils {
     File file = new ReconUtils().getReconDbDir(configuration,
         "TEST_DB_DIR");
     assertEquals(temporaryFolder.toString(), file.getAbsolutePath());
+  }
+
+  @Test
+  public void testSqlDbJdbcUrlResolvesReconDbDirPlaceholder() {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    // ozone.recon.db.dir is not set, so the placeholder falls back to ozone.metadata.dirs.
+    configuration.set(OZONE_METADATA_DIRS, temporaryFolder.toString());
+    configuration.set("ozone.recon.sql.db.jdbc.url", "jdbc:sqlite:${ozone.recon.db.dir}/ozone_recon_sqlite.db");
+
+    DataSourceConfiguration dataSourceConfiguration =
+        new ReconControllerModule(null).getDataSourceConfiguration(configuration);
+
+    assertEquals("jdbc:sqlite:" + temporaryFolder + "/ozone_recon_sqlite.db", dataSourceConfiguration.getJdbcUrl());
+  }
+
+  @Test
+  public void testSqlDbDerbyConfigFallsBackToSqlite() {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    configuration.set(OZONE_METADATA_DIRS, temporaryFolder.toString());
+    configuration.set("ozone.recon.sql.db.driver", "org.apache.derby.jdbc.EmbeddedDriver");
+    configuration.set("ozone.recon.sql.db.jdbc.url", "jdbc:derby:/old/ozone_recon_derby.db");
+    configuration.set("ozone.recon.sql.db.jooq.dialect", "DERBY");
+
+    DataSourceConfiguration dataSourceConfiguration =
+        new ReconControllerModule(null).getDataSourceConfiguration(configuration);
+
+    assertEquals(ReconSqlDbConfig.DEFAULT_DRIVER_CLASS, dataSourceConfiguration.getDriverClass());
+    assertEquals("jdbc:sqlite:" + temporaryFolder + "/ozone_recon_sqlite.db", dataSourceConfiguration.getJdbcUrl());
+    assertEquals(ReconSqlDbConfig.DEFAULT_SQL_DB_DIALECT, dataSourceConfiguration.getSqlDialect());
   }
 
   @Test

@@ -234,12 +234,23 @@ public class ReconControllerModule extends AbstractModule {
     ReconSqlDbConfig sqlDbConfig =
         ozoneConfiguration.getObject(ReconSqlDbConfig.class);
 
-    if (StringUtils.contains(sqlDbConfig.getJdbcUrl(), OZONE_RECON_DB_DIR)) {
+    if (StringUtils.startsWith(sqlDbConfig.getJdbcUrl(), "jdbc:derby:")) {
+      LOG.warn("Derby is no longer supported for the Recon SQL DB. Ignoring the configured {} and using the SQLite "
+          + "defaults.", sqlDbConfig.getJdbcUrl());
+      sqlDbConfig.setDriverClass(ReconSqlDbConfig.DEFAULT_DRIVER_CLASS);
+      sqlDbConfig.setJdbcUrl(ReconSqlDbConfig.DEFAULT_JDBC_URL);
+      sqlDbConfig.setSqlDbDialect(ReconSqlDbConfig.DEFAULT_SQL_DB_DIALECT);
+    }
+
+    // ${ozone.recon.db.dir} is left unresolved when the key is not set, so resolve it with the same fallback
+    // (ozone.metadata.dirs) as the other Recon DBs.
+    String reconDbDirPlaceholder = "${" + OZONE_RECON_DB_DIR + "}";
+    if (StringUtils.contains(sqlDbConfig.getJdbcUrl(), reconDbDirPlaceholder)) {
       ReconUtils reconUtils = new ReconUtils();
       File reconDbDir =
           reconUtils.getReconDbDir(ozoneConfiguration, OZONE_RECON_DB_DIR);
-      sqlDbConfig.setJdbcUrl(
-          "jdbc:derby:" + reconDbDir.getPath() + "/ozone_recon_derby.db");
+      sqlDbConfig.setJdbcUrl(StringUtils.replace(sqlDbConfig.getJdbcUrl(), reconDbDirPlaceholder,
+          reconDbDir.getPath()));
     }
 
     return new DataSourceConfiguration() {

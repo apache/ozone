@@ -44,6 +44,15 @@ public class ReconSchemaManager {
 
   @VisibleForTesting
   public void createReconSchema() {
+    createReconSchema(ReconVersion.SOFTWARE_VERSION);
+  }
+
+  /**
+   * Create the Recon SQL tables.
+   *
+   * @param freshInstallVersion version recorded when the SQL DB is new
+   */
+  public void createReconSchema(ReconVersion freshInstallVersion) {
     try {
       // Initialize the schema version table first
       reconSchemaDefinitions.stream()
@@ -51,7 +60,7 @@ public class ReconSchemaManager {
           .findFirst()
           .ifPresent(schemaDefinition -> {
             SchemaVersionTableDefinition schemaVersionTable = (SchemaVersionTableDefinition) schemaDefinition;
-            schemaVersionTable.setSoftwareVersion(ReconVersion.SOFTWARE_VERSION.serialize());
+            schemaVersionTable.setSoftwareVersion(freshInstallVersion.serialize());
             try {
               schemaVersionTable.initializeSchema();
             } catch (SQLException e) {
