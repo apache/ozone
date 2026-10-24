@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -33,6 +35,8 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.metrics2.MetricsSystem;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.om.VolumeUtilizationMetrics.VolumeMetricsInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.junit.jupiter.api.Test;
@@ -81,7 +85,8 @@ public class TestVolumeUtilizationMetrics {
     MetricsCollector metricsCollector = mock(MetricsCollector.class);
     when(metricsCollector.addRecord(anyString())).thenReturn(mb);
 
-    VolumeUtilizationMetrics volumeMetrics = new VolumeUtilizationMetrics(omMetadataManager);
+    VolumeUtilizationMetrics volumeMetrics = new VolumeUtilizationMetrics(
+        omMetadataManager, "service1", "om1");
     volumeMetrics.getMetrics(metricsCollector, true);
 
     verify(mb, times(1)).tag(VolumeMetricsInfo.VolumeName, VOLUME_NAME_1);
@@ -93,6 +98,34 @@ public class TestVolumeUtilizationMetrics {
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeQuotaBytes, QUOTA_IN_BYTES_2);
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeQuotaNamespace, QUOTA_IN_NAMESPACE_2);
     verify(mb, times(1)).addGauge(VolumeMetricsInfo.VolumeUsedNamespace, USED_NAMESPACE_2);
+  }
+
+  @Test
+  void testUnregisterWithMultipleInstances() {
+    MetricsSystem metricsSystem = DefaultMetricsSystem.initialize("TestVolumeUtilizationMetrics");
+    String firstName = VolumeUtilizationMetrics.class.getSimpleName() + "-service1-om1";
+    String secondName = VolumeUtilizationMetrics.class.getSimpleName() + "-service1-om2";
+    boolean miniClusterMode = DefaultMetricsSystem.inMiniClusterMode();
+    DefaultMetricsSystem.setMiniClusterMode(true);
+    try {
+      VolumeUtilizationMetrics first =
+          VolumeUtilizationMetrics.create(mock(OMMetadataManager.class), "service1", "om1");
+      VolumeUtilizationMetrics second =
+          VolumeUtilizationMetrics.create(mock(OMMetadataManager.class), "service1", "om2");
+      assertSame(first, metricsSystem.getSource(firstName));
+      assertSame(second, metricsSystem.getSource(secondName));
+
+      second.unRegister();
+      assertNull(metricsSystem.getSource(secondName));
+      assertSame(first, metricsSystem.getSource(firstName));
+      first.unRegister();
+      assertNull(metricsSystem.getSource(firstName));
+    } finally {
+      metricsSystem.unregisterSource(firstName);
+      metricsSystem.unregisterSource(secondName);
+      DefaultMetricsSystem.shutdown();
+      DefaultMetricsSystem.setMiniClusterMode(miniClusterMode);
+    }
   }
 
   private static Map.Entry<CacheKey<String>, CacheValue<OmVolumeArgs>> createMockEntry(

@@ -30,23 +30,13 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMRegisteredResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
-import org.apache.hadoop.hdds.scm.ScmConfig;
-import org.apache.hadoop.security.KerberosInfo;
 
 /**
  * The protocol spoken between datanodes and SCM. For specifics please the
  * Protoc file that defines this protocol.
  */
-@KerberosInfo(
-    serverPrincipal = ScmConfig.ConfigStrings.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public interface StorageContainerDatanodeProtocol {
-
-  @SuppressWarnings("checkstyle:ConstantName")
-  /**
-   * Version 1: Initial version.
-   */
-  long versionID = 1L;
 
   /**
    * Returns SCM version.

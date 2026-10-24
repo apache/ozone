@@ -81,7 +81,7 @@ public class NodeStateMap {
   }
 
   /**
-   * Update the given datanode.
+   * Update the given datanode. The datanode keeps its containers.
    *
    * @return the existing {@link DatanodeInfo}.
    */
@@ -90,11 +90,9 @@ public class NodeStateMap {
     final DatanodeInfo oldInfo;
     lock.writeLock().lock();
     try {
-      oldInfo = getNodeInfo(id);
-      if (oldInfo == null) {
-        throw new NodeNotFoundException(id);
-      }
-      nodeMap.put(id, new DatanodeEntry(datanode));
+      final DatanodeEntry oldEntry = getExisting(id);
+      oldInfo = oldEntry.getInfo();
+      nodeMap.put(id, new DatanodeEntry(datanode, oldEntry.copyContainers()));
     } finally {
       lock.writeLock().unlock();
     }
@@ -322,13 +320,11 @@ public class NodeStateMap {
    */
   @Override
   public String toString() {
-    // TODO - fix this method to include the commented out values
     StringBuilder builder = new StringBuilder();
     builder.append("Total number of nodes: ").append(getTotalNodeCount());
-   // for (NodeState state : NodeState.values()) {
-   //   builder.append("Number of nodes in ").append(state).append(" state: ")
-   //       .append(getNodeCount(state));
-   // }
+    for (NodeState state : NodeState.values()) {
+      builder.append(", ").append(state).append(": ").append(getNodeCount(null, state));
+    }
     return builder.toString();
   }
 

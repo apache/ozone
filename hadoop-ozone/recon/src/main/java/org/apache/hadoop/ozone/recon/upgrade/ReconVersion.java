@@ -43,6 +43,7 @@ public enum ReconVersion implements ComponentVersion {
   REPLICATED_SIZE_OF_FILES(4, "Adds replicatedSizeOfFiles to NSSummary"),
   UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX(5,
       "Adds idx_state_container_id index on UNHEALTHY_CONTAINERS for upgrades"),
+  REPLICA_HISTORY_DB(6, "Stores container replica history in separate recon-container-replica-history.db"),
 
   UNKNOWN_VERSION(-1, "Used when a version cannot be deserialized to any version recognized by this"
       + " component, which may indicate it came from a component in a newer version");

@@ -59,7 +59,9 @@ class TestSafeMode {
   static void setup() {
     OzoneConfiguration conf = new OzoneConfiguration();
     clusterProvider = new MiniOzoneClusterProvider(
-        MiniOzoneCluster.newBuilder(conf), 2);
+        // Clusters overlap via MiniOzoneClusterProvider, so the metrics leak
+        // assertion would see a concurrent cluster's sources.
+        MiniOzoneCluster.newBuilder(conf).setMetricsLeakAssertEnabled(false), 2);
   }
 
   @BeforeEach

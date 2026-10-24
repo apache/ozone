@@ -21,6 +21,8 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.NET_TOPOLOGY_NO
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_LEVEL;
 import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -39,6 +41,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -77,7 +80,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocolServerSideTranslatorPB;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.ScmVersionManager;
@@ -87,17 +90,22 @@ import org.apache.hadoop.net.StaticMapping;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.security.AccessControlException;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.MockedStatic;
 
 /**
  * Test class for @{@link SCMBlockProtocolServer}.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestSCMBlockProtocolServer {
   private OzoneConfiguration config;
   private SCMBlockProtocolServer server;
@@ -180,9 +188,10 @@ public class TestSCMBlockProtocolServer {
     }
   }
 
-  @BeforeEach
+  @BeforeAll
   void setUp(@TempDir File dir) throws Exception {
     config = SCMTestUtils.getConf(dir);
+    config.set(SCMBlockProtocolServer.OM_KERBEROS_PRINCIPAL_KEY, "om/_HOST@EXAMPLE.COM");
     config.set(NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
         StaticMapping.class.getName());
     List<DatanodeDetails> datanodes = new ArrayList<>(NODE_COUNT);
@@ -212,7 +221,7 @@ public class TestSCMBlockProtocolServer {
     service = new ScmBlockLocationProtocolServerSideTranslatorPB(server, scm, mock(ProtocolMessageMetrics.class));
   }
 
-  @AfterEach
+  @AfterAll
   public void tearDown() throws Exception {
     if (scm != null) {
       scm.stop();
@@ -322,6 +331,41 @@ public class TestSCMBlockProtocolServer {
   }
 
   @Test
+  void allocateAndDeleteBlocksAreDeniedForOtherUsers() {
+    for (String user : new String[] {"alice", "alice/om@EXAMPLE.COM", "dn/host1@EXAMPLE.COM", "om@EXAMPLE.COM",
+        "om/host1@OTHER.COM"}) {
+      UserGroupInformation ugi = UserGroupInformation.createRemoteUser(user);
+      assertThatThrownBy(() -> ugi.doAs((PrivilegedExceptionAction<?>) this::allocateBlock))
+          .isInstanceOf(AccessControlException.class)
+          .hasMessageContaining(SCMBlockProtocolServer.OM_KERBEROS_PRINCIPAL_KEY);
+      assertThatThrownBy(() -> ugi.doAs((PrivilegedExceptionAction<?>) () ->
+          server.deleteKeyBlocks(Collections.emptyList())))
+          .isInstanceOf(AccessControlException.class);
+    }
+  }
+
+  @Test
+  void allocateAndDeleteBlocksAreAllowedForOm() throws Exception {
+    UserGroupInformation om = UserGroupInformation.createRemoteUser("om/host1@EXAMPLE.COM");
+    assertThat(om.doAs((PrivilegedExceptionAction<List<AllocatedBlock>>) this::allocateBlock)).hasSize(1);
+    assertThat(om.doAs((PrivilegedExceptionAction<List<DeleteBlockGroupResult>>) () ->
+        server.deleteKeyBlocks(Collections.emptyList()))).isEmpty();
+  }
+
+  @Test
+  void allocateBlockIsDeniedForProxyUserOfOm() {
+    UserGroupInformation proxy = UserGroupInformation.createProxyUser("om/host1@EXAMPLE.COM",
+        UserGroupInformation.createRemoteUser("alice"));
+    assertThatThrownBy(() -> proxy.doAs((PrivilegedExceptionAction<?>) this::allocateBlock))
+        .isInstanceOf(AccessControlException.class);
+  }
+
+  private List<AllocatedBlock> allocateBlock() throws IOException {
+    return server.allocateBlock(128 * MB, 1, RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "o",
+        new ExcludeList(), null);
+  }
+
+  @Test
   void testAllocateBlockWithClientMachine() throws IOException {
     final DatanodeDetails clientDatanode = nodeManager.getAllNodes().get(0);
     final String clientAddress = clientDatanode.getIpAddress();
@@ -375,7 +419,7 @@ public class TestSCMBlockProtocolServer {
   @Test
   public void testFinalizeProceedsWhenAllPeersMatch() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
+    StorageContainerLocationInternalInterface matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
 
     try (SCMBlockProtocolServer testServer =
              buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
@@ -389,8 +433,8 @@ public class TestSCMBlockProtocolServer {
   @Test
   public void testFinalizeRejectsOlderPeerUnlessForced() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
-    StorageContainerLocationProtocol older = peerClient(HDDSVersion.DEFAULT_VERSION);
+    StorageContainerLocationInternalInterface matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
+    StorageContainerLocationInternalInterface older = peerClient(HDDSVersion.DEFAULT_VERSION);
 
     try (SCMBlockProtocolServer testServer =
              buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
@@ -408,9 +452,9 @@ public class TestSCMBlockProtocolServer {
   @Test
   public void testFinalizeRejectsUnknownFuturePeerUnlessForced() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    StorageContainerLocationProtocol matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
+    StorageContainerLocationInternalInterface matching = peerClient(HDDSVersion.SOFTWARE_VERSION);
     // A version not recognized by this binary deserializes to UNKNOWN_VERSION in the client translator.
-    StorageContainerLocationProtocol unknown = peerClient(HDDSVersion.UNKNOWN_VERSION);
+    StorageContainerLocationInternalInterface unknown = peerClient(HDDSVersion.UNKNOWN_VERSION);
 
     try (SCMBlockProtocolServer testServer =
              buildTestServer(finalizationManager, Arrays.asList(peerNode("scm2"), peerNode("scm3")));
@@ -429,7 +473,7 @@ public class TestSCMBlockProtocolServer {
   @Test
   public void testFinalizeRejectsUnreachablePeerUnlessForced() throws IOException {
     FinalizationManager finalizationManager = mock(FinalizationManager.class);
-    StorageContainerLocationProtocol unreachable = mock(StorageContainerLocationProtocol.class);
+    StorageContainerLocationInternalInterface unreachable = mock(StorageContainerLocationInternalInterface.class);
     when(unreachable.getPeerUpgradeStatus()).thenThrow(new IOException("connection refused"));
 
     try (SCMBlockProtocolServer testServer =
@@ -547,11 +591,15 @@ public class TestSCMBlockProtocolServer {
   public void testQueryUpgradeStatusInSafemode() {
     // Put SCM into safe mode via the context the server consults.
     scm.getScmContext().updateSafeModeStatus(SafeModeStatus.INITIAL);
-    assertTrue(scm.getScmContext().isInSafeMode());
+    try {
+      assertTrue(scm.getScmContext().isInSafeMode());
 
-    // Querying upgrade status is blocked while SCM is in safe mode.
-    SCMException ex = assertThrows(SCMException.class, () -> server.queryUpgradeStatus());
-    assertEquals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION, ex.getResult());
+      // Querying upgrade status is blocked while SCM is in safe mode.
+      SCMException ex = assertThrows(SCMException.class, () -> server.queryUpgradeStatus());
+      assertEquals(SCMException.ResultCodes.SAFE_MODE_EXCEPTION, ex.getResult());
+    } finally {
+      scm.getScmContext().updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
+    }
   }
 
   private SCMBlockProtocolServer buildTestServer(
@@ -593,8 +641,8 @@ public class TestSCMBlockProtocolServer {
     return mockScm;
   }
 
-  private StorageContainerLocationProtocol peerClient(HDDSVersion version) throws IOException {
-    StorageContainerLocationProtocol client = mock(StorageContainerLocationProtocol.class);
+  private StorageContainerLocationInternalInterface peerClient(HDDSVersion version) throws IOException {
+    StorageContainerLocationInternalInterface client = mock(StorageContainerLocationInternalInterface.class);
     when(client.getPeerUpgradeStatus()).thenReturn(version);
     return client;
   }

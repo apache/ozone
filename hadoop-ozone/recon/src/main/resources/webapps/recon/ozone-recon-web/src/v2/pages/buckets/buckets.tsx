@@ -177,7 +177,8 @@ const Buckets: React.FC<{}> = () => {
         quotaInBytes: bucket.quotaInBytes,
         quotaInNamespace: bucket.quotaInNamespace,
         owner: bucket.owner,
-        acls: bucket.acls
+        acls: bucket.acls,
+        replicationConfigInfo: bucket.replicationConfigInfo
       }));
 
       const volumeBucketMap: Map<string, Set<Bucket>> = getVolumeBucketMap(buckets);

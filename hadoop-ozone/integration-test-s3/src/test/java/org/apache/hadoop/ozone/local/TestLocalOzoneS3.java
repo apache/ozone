@@ -30,9 +30,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.ListBucketsResponse;
 import software.amazon.awssdk.services.s3.model.StorageClass;
 
 /**
@@ -91,5 +94,36 @@ class TestLocalOzoneS3 {
         .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
         .forcePathStyle(true)
         .build();
+  }
+
+  /** Exercises create, list, put and get with explicit SDK credentials. */
+  @Test
+  void awsSdkCanCreateListPutAndGetAgainstLocalRuntime() throws Exception {
+    LocalOzoneClusterConfig config = LocalOzoneClusterConfig.builder(tempDir.resolve("local-ozone-s3-sdk")).build();
+
+    String bucketName = "local-" + UUID.randomUUID().toString().replace("-", "");
+    String keyName = "key-" + UUID.randomUUID().toString().replace("-", "");
+    String payload = "local-ozone-s3";
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // Match the test module's 128 MB containers; production blocks default to 256 MB.
+    ClientConfigForTesting.newBuilder(StorageUnit.MB).applyTo(conf);
+
+    try (LocalOzoneCluster cluster = new LocalOzoneCluster(config, conf)) {
+      cluster.start();
+
+      try (S3Client client = s3Client(cluster.getS3Endpoint(),
+          LocalOzoneClusterConfig.LOCAL_S3_ACCESS_KEY, LocalOzoneClusterConfig.LOCAL_S3_SECRET_KEY)) {
+        client.createBucket(builder -> builder.bucket(bucketName));
+
+        ListBucketsResponse buckets = client.listBuckets();
+        assertTrue(buckets.buckets().stream().anyMatch(bucket -> bucketName.equals(bucket.name())));
+
+        client.putObject(builder -> builder.bucket(bucketName).key(keyName), RequestBody.fromString(payload));
+
+        ResponseBytes<GetObjectResponse> response = client.getObjectAsBytes(
+            builder -> builder.bucket(bucketName).key(keyName));
+        assertEquals(payload, response.asUtf8String());
+      }
+    }
   }
 }
