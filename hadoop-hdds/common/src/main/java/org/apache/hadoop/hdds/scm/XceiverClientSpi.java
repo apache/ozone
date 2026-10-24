@@ -21,8 +21,11 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -157,6 +160,45 @@ public abstract class XceiverClientSpi implements Closeable {
     } catch (ExecutionException e) {
       throw getIOExceptionForSendCommand(request, e);
     }
+  }
+
+  /**
+   * Sends a given command to the given datanode only, without failing over
+   * to the other datanodes in the pipeline.
+   * Implementations which cannot target a specific datanode fall back to
+   * {@link #sendCommand(ContainerCommandRequestProto, List)}.
+   * @param request Request
+   * @param validators functions to validate the response
+   * @param datanode the datanode to send the command to
+   * @return Response to the command
+   */
+  public ContainerCommandResponseProto sendCommand(
+      ContainerCommandRequestProto request,
+      List<Validator> validators,
+      DatanodeDetails datanode)
+      throws IOException {
+    return sendCommand(request, validators);
+  }
+
+  /**
+   * Returns the datanodes of the pipeline in the order they should be tried
+   * for a command on the given block.
+   * @param blockID the block the command operates on
+   * @param cmdType type of the command
+   * @return datanodes of the pipeline, in the order to try
+   */
+  public List<DatanodeDetails> getDatanodesInOrder(
+      ContainerProtos.DatanodeBlockID blockID, ContainerProtos.Type cmdType)
+      throws IOException {
+    final Pipeline pipeline = getPipeline();
+    final List<DatanodeDetails> datanodes = new ArrayList<>(pipeline.size());
+    final Set<DatanodeDetails> excluded = new HashSet<>();
+    while (excluded.size() < pipeline.size()) {
+      final DatanodeDetails d = pipeline.getClosestNode(excluded);
+      datanodes.add(d);
+      excluded.add(d);
+    }
+    return datanodes;
   }
 
   public void initStreamRead(BlockID blockID, StreamingReaderSpi streamObserver) throws IOException {
