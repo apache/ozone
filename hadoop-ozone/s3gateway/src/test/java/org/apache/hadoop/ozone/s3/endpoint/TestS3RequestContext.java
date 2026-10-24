@@ -51,6 +51,19 @@ class TestS3RequestContext {
   }
 
   @Test
+  void returnsResolvedVolumeWithoutLookup() throws IOException {
+    when(volume.getName()).thenReturn("volume1");
+
+    assertThat(context.getResolvedVolumeName()).isNull();
+    verify(endpoint, never()).getVolume();
+
+    context.getBucket("bucket1");
+
+    assertThat(context.getResolvedVolumeName()).isEqualTo("volume1");
+    verify(endpoint).getVolume();
+  }
+
+  @Test
   void reusesBucketWithinRequest() throws IOException {
     assertThat(context.getBucket("bucket1")).isSameAs(bucket);
     assertThat(context.getBucket("bucket1")).isSameAs(bucket);
