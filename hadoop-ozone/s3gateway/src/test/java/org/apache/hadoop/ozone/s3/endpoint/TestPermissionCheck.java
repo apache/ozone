@@ -98,7 +98,7 @@ public class TestPermissionCheck {
     when(client.getConfiguration()).thenReturn(conf);
     headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);

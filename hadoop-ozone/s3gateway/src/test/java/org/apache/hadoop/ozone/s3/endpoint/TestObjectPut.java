@@ -72,6 +72,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -84,6 +85,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.ws.rs.HttpMethod;
@@ -200,6 +202,39 @@ class TestObjectPut {
     assertNotNull(keyDetails.getMetadata());
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
     assertThat(keyDetails.getTags()).isEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRejectMalformedContentSha256BeforeReadingBody(boolean streaming) throws Exception {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("invalid");
+    doReturn(streaming).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    InputStream body = spy(new ByteArrayInputStream(CONTENT.getBytes(StandardCharsets.UTF_8)));
+    when(objectEndpoint.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    when(headers.getHeaderString(HttpHeaders.CONTENT_LENGTH)).thenReturn(String.valueOf(CONTENT.length()));
+
+    assertErrorResponse(INVALID_ARGUMENT, () -> objectEndpoint.put(BUCKET_NAME, KEY_NAME, body));
+
+    verifyNoInteractions(body);
+    assertKeyWasNotCommitted();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, 0", "false, 32", "false, 64", "true, 0", "true, 32", "true, 64"})
+  void testContentSha256(boolean streaming, int uppercaseLength) throws Exception {
+    doReturn(streaming).when(objectEndpoint).isDatastreamEnabled();
+    doReturn(0L).when(objectEndpoint).getDatastreamMinLength();
+    String hash = DatatypeConverter.printHexBinary(
+        MessageDigest.getInstance("SHA-256").digest(CONTENT.getBytes(StandardCharsets.UTF_8))).toLowerCase();
+    hash = hash.substring(0, uppercaseLength).toUpperCase(Locale.ROOT) + hash.substring(uppercaseLength);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(hash);
+    assertSucceeds(() -> putObject(CONTENT));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
+
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(StringUtils.repeat('0', 64));
+    assertErrorResponse(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, () -> putObject(CONTENT));
+    assertKeyContent(bucket, KEY_NAME, CONTENT);
   }
 
   @Test
@@ -485,11 +520,20 @@ class TestObjectPut {
         Arguments.of("STREAMING-AWS4-HMAC-SHA256-PAYLOAD ", SignedChunksInputStream.class, false, false),
         Arguments.of(UNSIGNED_PAYLOAD, ByteArrayInputStream.class, false, false),
         Arguments.of("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-            ByteArrayInputStream.class, true, false),
-        Arguments.of("", ByteArrayInputStream.class, true, false),
-        Arguments.of("not-a-hash", ByteArrayInputStream.class, true, false),
-        Arguments.of("streaming-AWS4-HMAC-SHA256-PAYLOAD", ByteArrayInputStream.class, true, false),
-        Arguments.of(" STREAMING-AWS4-HMAC-SHA256-PAYLOAD", ByteArrayInputStream.class, true, false));
+            ByteArrayInputStream.class, true, false));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"", "not-a-hash", "streaming-AWS4-HMAC-SHA256-PAYLOAD",
+      " STREAMING-AWS4-HMAC-SHA256-PAYLOAD"})
+  void testPayloadClassificationRejectsMalformedHash(String header) {
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn(header);
+    for (boolean headerAuth : new boolean[]{true, false}) {
+      objectEndpoint.setSignatureInfo(signatureInfo(headerAuth));
+      ByteArrayInputStream body = new ByteArrayInputStream(new byte[0]);
+      assertErrorResponse(INVALID_ARGUMENT,
+          () -> objectEndpoint.getS3ChunkInputStreamInfo(body, 99, "37", KEY_NAME));
+    }
   }
 
   @ParameterizedTest
