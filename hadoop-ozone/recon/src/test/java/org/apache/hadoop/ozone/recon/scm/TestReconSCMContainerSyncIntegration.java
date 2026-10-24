@@ -27,6 +27,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.OP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_DELETED_CONTAINER_CHECK_BATCH_SIZE;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,6 +51,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.ha.SCMHADBTransactionBuffer;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.metrics.ReconScmContainerSyncMetrics;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -739,6 +741,102 @@ public class TestReconSCMContainerSyncIntegration
           ContainerID.valueOf(502L)).getState());
       assertEquals(DELETED, getContainerManager().getContainer(
           ContainerID.valueOf(503L)).getState());
+    }
+  }
+
+  // ===========================================================================
+  // Suppressed flag sync
+  // ===========================================================================
+
+  @Nested
+  class SuppressedFlagSyncTests {
+
+    @Test
+    void copiesSuppressedFlagsAcrossPages() throws Exception {
+      seedRecon(1, 4, CLOSED);
+      addSuppressedToRecon(5L);
+      when(mockScm.getListOfSuppressedContainerInfos(eq(ContainerID.valueOf(1L)), anyInt()))
+          .thenReturn(Arrays.asList(suppressed(1L), suppressed(3L)));
+      when(mockScm.getListOfSuppressedContainerInfos(eq(ContainerID.valueOf(4L)), anyInt()))
+          .thenReturn(Collections.singletonList(suppressed(4L)));
+      when(mockScm.getListOfSuppressedContainerInfos(eq(ContainerID.valueOf(5L)), anyInt()))
+          .thenReturn(Collections.emptyList());
+
+      assertTrue(syncHelper.syncWithSCMContainerInfo());
+      assertThat(isSuppressedInRecon(1L)).isTrue();
+      assertThat(isSuppressedInRecon(2L)).isFalse();
+      assertThat(isSuppressedInRecon(3L)).isTrue();
+      assertThat(isSuppressedInRecon(4L)).isTrue();
+      assertThat(isSuppressedInRecon(5L)).isFalse();
+      ((SCMHADBTransactionBuffer) getContainerManager().getSCMHAManager().getDBTransactionBuffer()).flush();
+      assertThat(getContainerTable().get(ContainerID.valueOf(1L)).isSuppressed()).isTrue();
+      assertThat(getContainerTable().get(ContainerID.valueOf(5L)).isSuppressed()).isFalse();
+      verify(mockScm, times(3)).getListOfSuppressedContainerInfos(any(), anyInt());
+    }
+
+    @Test
+    void copiesSuppressedFlagFromScmToExistingContainers() throws Exception {
+      // Recon has containers 1 and 3 unsuppressed and container 2 suppressed.
+      seedRecon(1, 1, CLOSED);
+      addSuppressedToRecon(2L);
+      seedRecon(3, 1, CLOSED);
+
+      // SCM has only container 1 suppressed.
+      when(mockScm.getListOfSuppressedContainerInfos(eq(ContainerID.valueOf(1L)), anyInt()))
+          .thenReturn(Collections.singletonList(suppressed(1L)));
+
+      assertTrue(syncHelper.syncWithSCMContainerInfo());
+      assertThat(isSuppressedInRecon(1L)).isTrue();
+      assertThat(isSuppressedInRecon(2L)).isFalse();
+      assertThat(isSuppressedInRecon(3L)).isFalse();
+
+      // The admin unsuppresses container 1 in SCM.
+      when(mockScm.getListOfSuppressedContainerInfos(eq(ContainerID.valueOf(1L)), anyInt()))
+          .thenReturn(Collections.emptyList());
+
+      assertTrue(syncHelper.syncWithSCMContainerInfo());
+      assertThat(isSuppressedInRecon(1L)).isFalse();
+    }
+
+    @Test
+    void stopsListingWhenScmIgnoresSuppressedFilter() throws Exception {
+      addSuppressedToRecon(1L);
+      seedRecon(2, 1, CLOSED);
+      // An SCM without the filter lists every container, none of them suppressed.
+      when(mockScm.getListOfSuppressedContainerInfos(eq(ContainerID.valueOf(1L)), anyInt()))
+          .thenReturn(Arrays.asList(containerInfo(1L, CLOSED), containerInfo(2L, CLOSED)));
+
+      assertTrue(syncHelper.syncWithSCMContainerInfo());
+      assertThat(isSuppressedInRecon(1L)).isFalse();
+      verify(mockScm, times(1)).getListOfSuppressedContainerInfos(any(), anyInt());
+    }
+
+    @Test
+    void keepsFlagsWhenScmListingFails() throws Exception {
+      addSuppressedToRecon(1L);
+      seedRecon(2, 1, CLOSED);
+      when(mockScm.getListOfSuppressedContainerInfos(eq(ContainerID.valueOf(1L)), anyInt()))
+          .thenReturn(Collections.singletonList(suppressed(2L)));
+      when(mockScm.getListOfSuppressedContainerInfos(eq(ContainerID.valueOf(3L)), anyInt()))
+          .thenThrow(new IOException("SCM unavailable"));
+
+      assertThat(syncHelper.syncWithSCMContainerInfo()).isFalse();
+      assertThat(isSuppressedInRecon(1L)).isTrue();
+      assertThat(isSuppressedInRecon(2L)).isFalse();
+    }
+
+    private ContainerInfo suppressed(long id) {
+      ContainerInfo info = containerInfo(id, CLOSED);
+      info.setSuppressed(true);
+      return info;
+    }
+
+    private void addSuppressedToRecon(long id) throws IOException {
+      getContainerManager().addNewContainer(new ContainerWithPipeline(suppressed(id), null));
+    }
+
+    private boolean isSuppressedInRecon(long id) throws IOException {
+      return getContainerManager().getContainer(ContainerID.valueOf(id)).isSuppressed();
     }
   }
 

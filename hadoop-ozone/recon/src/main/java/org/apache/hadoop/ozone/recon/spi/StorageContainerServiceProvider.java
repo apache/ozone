@@ -127,4 +127,17 @@ public interface StorageContainerServiceProvider {
                                               int count,
                                               HddsProtos.LifeCycleState state)
       throws IOException;
+
+  /**
+   * Returns a page of the containers that SCM has suppressed from the
+   * container report, starting at {@code startContainerID}, in container ID
+   * order.
+   *
+   * @param startContainerID first container ID to return (inclusive)
+   * @param count            maximum number of containers to return (&gt; 0)
+   * @return list of suppressed {@link ContainerInfo} objects
+   * @throws IOException if the SCM RPC call fails
+   */
+  List<ContainerInfo> getListOfSuppressedContainerInfos(ContainerID startContainerID, int count)
+      throws IOException;
 }

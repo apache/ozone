@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.fsck;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -35,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -381,6 +383,32 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
   }
 
   @Test
+  public void testProcessAllFollowsSuppressedFlag() throws Exception {
+    ContainerInfo container = new ContainerInfo.Builder()
+        .setContainerID(1L)
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setNumberOfKeys(10)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE))
+        .setOwner("test")
+        .build();
+    when(containerManager.getContainers()).thenReturn(Collections.singletonList(container));
+    when(containerManager.getContainer(container.containerID())).thenReturn(container);
+    when(containerManager.getContainerReplicas(container.containerID())).thenReturn(Collections.emptySet());
+
+    reconRM.processAll();
+    assertThat(missingContainerIds()).containsExactly(1L);
+
+    // The SCM container sync sets the flag on the container Recon already holds.
+    container.setSuppressed(true);
+    reconRM.processAll();
+    assertThat(missingContainerIds()).isEmpty();
+
+    container.setSuppressed(false);
+    reconRM.processAll();
+    assertThat(missingContainerIds()).containsExactly(1L);
+  }
+
+  @Test
   public void testReconReplicationManagerCreation() {
     // Verify ReconReplicationManager was created successfully
     assertNotNull(reconRM);
@@ -455,6 +483,13 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     schemaManagerV2.insertUnhealthyContainerRecords(new ArrayList<>());
 
     // No assertion needed - just verify no exceptions thrown
+  }
+
+  private List<Long> missingContainerIds() {
+    List<Long> ids = new ArrayList<>();
+    schemaManagerV2.getUnhealthyContainers(UnHealthyContainerStates.MISSING, 0, 0, 100)
+        .forEach(r -> ids.add(r.getContainerId()));
+    return ids;
   }
 
   private ContainerInfo mockContainerInfo(long containerId, long numberOfKeys,

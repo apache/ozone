@@ -207,4 +207,11 @@ public class StorageContainerServiceProviderImpl
     return scmClient.listContainer(
         startContainerID.getId(), count, state).getContainerInfoList();
   }
+
+  @Override
+  public List<ContainerInfo> getListOfSuppressedContainerInfos(
+      ContainerID startContainerID, int count) throws IOException {
+    return scmClient.listContainer(startContainerID.getId(), count, null, null, null, Boolean.TRUE)
+        .getContainerInfoList();
+  }
 }
