@@ -95,7 +95,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
         volumeInfo.toBuilder()
             .setCreationTime(initialTime)
             .setModificationTime(initialTime)
-            // usedNamespace and refCount are maintained by OM, so a new volume starts with both at 0.
+            // reset usedNamespace and refCount to 0 to prevent arbitrary values set in the request by any other client
             .clearUsedNamespace()
             .clearRefCount()
             .build();
