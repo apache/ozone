@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_BIND_HOST_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
+import static org.apache.hadoop.hdds.HddsUtils.getFailoverProxyConfiguration;
 import static org.apache.hadoop.hdds.HddsUtils.processForLogging;
 import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddress;
 import static org.apache.hadoop.hdds.HddsUtils.validateAdvertisedAddressConfig;
@@ -42,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -454,5 +456,22 @@ public class TestHddsUtils {
         () -> validateAdvertisedAddressConfig(conf, OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_NAMES));
 
     assertThat(e.getMessage()).contains(OZONE_SCM_NAMES).contains("0.0.0.0");
+  }
+
+  @Test
+  void testGetFailoverProxyConfiguration() {
+    final String key = CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_KEY;
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    Configuration proxyConf = getFailoverProxyConfiguration(conf);
+    assertThat(proxyConf).isInstanceOf(OzoneConfiguration.class).isNotSameAs(conf);
+    assertEquals(0, proxyConf.getInt(key, -1));
+    // The original configuration is not changed.
+    assertEquals(CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_ON_SOCKET_TIMEOUTS_DEFAULT,
+        conf.getInt(key, -1));
+
+    // An explicitly set value is kept.
+    conf.setInt(key, 3);
+    assertEquals(3, getFailoverProxyConfiguration(conf).getInt(key, -1));
   }
 }
