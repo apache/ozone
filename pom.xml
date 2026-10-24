@@ -194,7 +194,7 @@
     <ratis.version>3.3.1</ratis.version>
     <re2j.version>1.7</re2j.version>
     <reflections.version>0.10.2</reflections.version>
-    <reload4j.version>1.2.26</reload4j.version>
+    <reload4j.version>1.2.27</reload4j.version>
     <restrict-imports.enforcer.version>3.0.1</restrict-imports.enforcer.version>
     <rocksdb.version>10.10.1.1</rocksdb.version>
     <!-- version of org.eclipse.jetty.toolchain:jetty-servlet-api, the javax.servlet 4.0 API for Jetty EE8 -->
