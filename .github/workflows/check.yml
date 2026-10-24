@@ -142,6 +142,7 @@ env:
   OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
   OZONE_VOLUME_OWNER: 1000
   SCRIPT: ${{ inputs.script }}
+  SPLIT: ${{ inputs.split }}
 
 permissions: { }
 
@@ -270,12 +271,24 @@ jobs:
           fi
           hadoop-ozone/dev-support/checks/_summary.sh target/$SCRIPT/summary.txt
 
+      - name: Calculate artifact name
+        id: artifact-name
+        if: ${{ !cancelled() }}
+        run: |
+          if [[ -z "${SPLIT:-}" ]]; then
+            artifact="$SCRIPT"
+          else
+            split=$(echo "$SPLIT" | sed -e 's!/!-!g' -e 's/.sh$//')
+            artifact="${SCRIPT}-${split}"
+          fi
+          echo "ARTIFACT=$artifact" >> $GITHUB_ENV
+
       - name: Archive build results
         id: archive
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ (inputs.split && format('{0}-{1}', inputs.script, inputs.split)) || inputs.script }}
+          name: ${{ env.ARTIFACT }}
           # please keep path as a single item; move to that directory all files needed in the artifact
           path: target/${{ inputs.script }}
         continue-on-error: true
