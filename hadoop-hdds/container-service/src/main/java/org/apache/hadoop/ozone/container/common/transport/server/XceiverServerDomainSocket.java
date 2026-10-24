@@ -24,7 +24,6 @@ import java.nio.channels.AsynchronousCloseException;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -73,15 +72,13 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
   private final ConcurrentHashMap<DomainPeer, Receiver> peersReceiver = new ConcurrentHashMap<>();
   private int readTimeoutMs;
   private int writeTimeoutMs;
-  private final ThreadPoolExecutor readExecutors;
   private FaultInjector injector;
 
   /**
    * Constructs a DomainSocket server class, used to listen for requests from local clients.
    */
   public XceiverServerDomainSocket(DatanodeDetails datanodeDetails, ConfigurationSource conf,
-      ContainerDispatcher dispatcher, ThreadPoolExecutor executor,
-      ContainerMetrics metrics, DomainSocketFactory domainSocketFactory) {
+      ContainerDispatcher dispatcher, ContainerMetrics metrics, DomainSocketFactory domainSocketFactory) {
     Objects.requireNonNull(conf);
     this.port = conf.getInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
         OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
@@ -96,7 +93,6 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
     this.maxXceiverCount = threadCountPerDisk * numberOfDisks * 5;
     this.xceriverCount = new AtomicInteger(0);
     this.dispatcher = dispatcher;
-    this.readExecutors = executor;
     this.metrics = metrics;
     LOG.info("Max allowed {} xceiver", maxXceiverCount);
     this.threadPrefix = datanodeDetails.threadNamePrefix() + XceiverServerDomainSocket.class.getSimpleName();
@@ -218,7 +214,7 @@ public final class XceiverServerDomainSocket implements XceiverServerSpi, Runnab
         if (xceriverCount.get() > maxXceiverCount) {
           throw new IOException("Xceiver count exceeds the limit " + maxXceiverCount);
         }
-        Daemon daemon = new Daemon(Receiver.create(peer, config, this, dispatcher, readExecutors, metrics));
+        Daemon daemon = new Daemon(Receiver.create(peer, config, this, dispatcher, metrics));
         daemon.setName(threadPrefix + "@" + peer.getDomainSocket().toString());
         daemon.start();
       } catch (SocketTimeoutException ignored) {
