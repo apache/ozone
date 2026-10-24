@@ -222,7 +222,6 @@ public class RpcClient implements ClientProtocol {
   private final OzoneManagerClientProtocol ozoneManagerClient;
   private final XceiverClientFactory xceiverClientManager;
   private final UserGroupInformation ugi;
-  private UserGroupInformation s3gUgi;
   private final ClientId clientId = ClientId.randomId();
   private final boolean unsafeByteBufferConversion;
   private Text dtService;
@@ -280,9 +279,6 @@ public class RpcClient implements ClientProtocol {
     this.ozoneManagerClient = TracingUtil.createProxy(
         ozoneManagerProtocolClientSideTranslatorPB,
         OzoneManagerClientProtocol.class, conf);
-    if (getThreadLocalS3Auth() != null) {
-      this.s3gUgi = UserGroupInformation.createRemoteUser(getThreadLocalS3Auth().getUserPrincipal());
-    }
     dtService = omTransport.getDelegationTokenService();
     ServiceInfoEx serviceInfoEx = ozoneManagerClient.getServiceInfo();
     omVersion = getOmVersion(serviceInfoEx);
@@ -754,8 +750,9 @@ public class RpcClient implements ClientProtocol {
     // After HDDS-5881 the user will not be different,
     // as S3G uses single RpcClient. So we should be checking thread-local
     // S3Auth and use it during proxy.
-    if (ozoneManagerClient.getThreadLocalS3Auth() != null) {
-      return s3gUgi;
+    S3Auth s3Auth = ozoneManagerClient.getThreadLocalS3Auth();
+    if (s3Auth != null) {
+      return UserGroupInformation.createRemoteUser(s3Auth.getUserPrincipal());
     }
     return ugi;
   }
@@ -3060,7 +3057,6 @@ public class RpcClient implements ClientProtocol {
   public void setThreadLocalS3Auth(
       S3Auth ozoneSharedSecretAuth) {
     ozoneManagerClient.setThreadLocalS3Auth(ozoneSharedSecretAuth);
-    this.s3gUgi = UserGroupInformation.createRemoteUser(getThreadLocalS3Auth().getUserPrincipal());
   }
 
   @Override

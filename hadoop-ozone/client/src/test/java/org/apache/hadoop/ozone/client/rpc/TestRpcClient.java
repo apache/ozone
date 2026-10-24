@@ -397,6 +397,40 @@ public class TestRpcClient {
     }
   }
 
+  /**
+   * S3 Gateway serves all users with one RpcClient. A request from bob on another thread must not change the owner
+   * of the key that alice creates.
+   */
+  @Test
+  public void testKeyOwnerComesFromS3AuthOfCallingThread() throws Exception {
+    List<String> owners = new ArrayList<>();
+    RpcClient client = createRpcClient(new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        if (request.getCmdType() == Type.CreateKey) {
+          owners.add(request.getCreateKeyRequest().getKeyArgs().getOwnerName());
+        }
+        return super.submitRequest(request);
+      }
+    });
+    try {
+      client.createVolume("vol1");
+      client.createBucket("vol1", "bucket1");
+      client.setThreadLocalS3Auth(new S3Auth("stringToSign", "signature", "alice", "alice"));
+      Thread otherRequest = new Thread(
+          () -> client.setThreadLocalS3Auth(new S3Auth("stringToSign", "signature", "bob", "bob")));
+      otherRequest.start();
+      otherRequest.join();
+
+      ReplicationConfig replication = RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE);
+      client.createKey("vol1", "bucket1", "key1", 0, replication, Collections.emptyMap()).close();
+      assertThat(owners).containsExactly("alice");
+    } finally {
+      client.clearThreadLocalS3Auth();
+      client.close();
+    }
+  }
+
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
       names = {"GET_FILE_STATUS_REJECTS_OBS", "ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
