@@ -24,19 +24,15 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_STORAGE_
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_CHUNKED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.MULTI_CHUNKS_UPLOAD_PREFIX;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_UNSIGNED_PAYLOAD_TRAILER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 
-import jakarta.annotation.Nonnull;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
@@ -154,30 +150,6 @@ public final class S3Utils {
             .build());
   }
 
-  public static boolean hasUnsignedPayload(@Nonnull String amzContentSha256Header) {
-    Objects.requireNonNull(amzContentSha256Header);
-    return amzContentSha256Header.equals(UNSIGNED_PAYLOAD) ||
-        amzContentSha256Header.equals(STREAMING_UNSIGNED_PAYLOAD_TRAILER);
-  }
-
-  public static boolean hasMultiChunksPayload(@Nonnull String amzContentSha256Header) {
-    Objects.requireNonNull(amzContentSha256Header);
-    // Multiple chunk uploads
-    // - https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming.html
-    // - https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming-trailers.html
-    // Possible values
-    // - STREAMING-UNSIGNED-PAYLOAD-TRAILER
-    // - STREAMING-AWS4-HMAC-SHA256-PAYLOAD
-    // - STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER
-    // - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD
-    // - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER
-    // Currently since all the multi chunks values have x-amz-content-sha256 header value that starts
-    // with STREAMING, we can use this prefix to differentiates between multi chunks and single chunks upload.
-    // In the future if there are more multi chunks signature algorithms that has the same prefix,
-    // this function will be able to handle detect it.
-    return amzContentSha256Header.startsWith(MULTI_CHUNKS_UPLOAD_PREFIX);
-  }
-
   public static void validateMultiChunksUpload(HttpHeaders headers, String amzDecodedContentLength,
                                                String resource) throws OS3Exception {
     final String contentEncoding = headers.getHeaderString(HttpHeaders.CONTENT_ENCODING);
@@ -218,7 +190,8 @@ public final class S3Utils {
       throw ex;
     }
 
-    if (hasUnsignedPayload(xAmzContentSha256Header) || hasMultiChunksPayload(xAmzContentSha256Header)) {
+    S3ContentSha256Type payloadType = S3ContentSha256Type.fromHeaderValue(xAmzContentSha256Header);
+    if (payloadType.isUnsigned() || payloadType.isStreaming()) {
       return xAmzContentSha256Header;
     }
     if (!xAmzContentSha256Header.matches("[0-9a-fA-F]{64}")) {

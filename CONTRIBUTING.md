@@ -13,7 +13,7 @@ We welcome contributions of:
    * [Newbie Ozone jiras](https://s.apache.org/OzoneNewbieJiras)
    * [All open and unassigned Ozone jiras](https://s.apache.org/OzoneUnassignedJiras)
  * **Documentation Improvements**: You can submit improvements to either:
-     * Ozone website. Instructions are here: [Modifying the Ozone Website](https://cwiki.apache.org/confluence/display/OZONE/Modifying+the+Ozone+Website)
+     * Ozone website and user documentation, in the [apache/ozone-site](https://github.com/apache/ozone-site) repository. Instructions are in its [contribution guide](https://github.com/apache/ozone-site/blob/master/CONTRIBUTING.md).
      * Developer docs. These are markdown files [checked into the Apache Ozone Source tree](https://github.com/apache/ozone/tree/master/hadoop-hdds/docs/content).
  * The [wiki pages](https://cwiki.apache.org/confluence/display/OZONE/Contributing+to+Ozone): Please contact us at dev@ozone.apache.org and we can provide you write access to the wiki.
  * **Testing**: We always need help to improve our testing
@@ -110,6 +110,7 @@ We use GitHub pull requests for contributing changes to the repository. The main
   5. Make your changes locally.
      * For complex changes, committing each logical part is recommended.
      * Start commit messages with the Jira ID, e.g. `HDDS-1234. Fix snapshot purge regression`.
+     * If you include non-trivial content created using generative AI tooling, disclose it in each commit's message as `Co-authored-by: TOOL (MODEL)` (see [ASF Generative Tooling Guidance](https://www.apache.org/legal/generative-tooling.html) for details).  Validate changes proposed by the tools before relying on it.
   6. Push your changes to your fork of Ozone
   7. Wait for the `build-branch` workflow to complete successfully for your commit.
   8. Create a pull request for your changes
@@ -127,12 +128,14 @@ We use GitHub pull requests for contributing changes to the repository. The main
 ### Pull request guidelines
 
 * Keep distinct issues in separate PRs, and avoid unrelated changes, such as reformatting or renaming adjacent code.
+* Submit user-facing documentation changes as a separate PR to [apache/ozone-site](https://github.com/apache/ozone-site), not to this repository. Design docs and configuration descriptions in `ozone-default.xml` stay in this repository.
 * Move build changes, refactoring or cleanup into a follow-up PR when they obscure the functional change.
 * For cleanup, consider compatibility and deprecation before removing public interfaces, and notify the original authors when practical.
 * For test fixes, inspect the failure evidence and address the cause instead of only increasing a timeout.
 * Keep the PR in draft while the implementation is unstable, fork CI is failing, or you are still addressing review comments.
 * CI resources are shared. Do not run CI for obsolete revisions, trigger it only when necessary, and do not rerun unrelated flaky tests that are already fixed on `master`.
-* If you use generative AI tooling, validate its analysis and proposed fixes before relying on them, and keep PR descriptions concise. When it produced non-trivial content, disclose it in the PR description as `Generated-by: TOOL (MODEL)`, see the [ASF Generative Tooling Guidance](https://www.apache.org/legal/generative-tooling.html).
+* Keep PR descriptions concise.
+* If you use generative AI tooling for drafting pull request text, please include `Generated-by: TOOL (MODEL)` in the description.
 
 ## Committer guidelines
 

@@ -23,6 +23,9 @@ with_old_version() {
   execute_robot_test "$SCM" -N "${OUTPUT_NAME}-check-finalization" --include finalized upgrade/non-rolling/check-finalization.robot
   generate old1 "$SCM"
   validate old1 "$SCM"
+  snapshot old1 original "$SCM" --include create-snapshot
+  # The new version replays the WAL of this diff into db.snapdiff SST files, which must stay readable after downgrade
+  snapshot old1 original2 "$SCM" -v FROM_SNAPSHOT:original -v EARLIER_SNAPSHOTS:original
 }
 
 with_this_version_pre_finalized() {
@@ -34,6 +37,8 @@ with_this_version_pre_finalized() {
 
   generate new1 "$SCM"
   validate new1 "$SCM"
+
+  snapshot old1 pre-finalized "$SCM" -v FROM_SNAPSHOT:original2 -v EARLIER_SNAPSHOTS:original,original2
 }
 
 with_old_version_downgraded() {
@@ -47,6 +52,8 @@ with_old_version_downgraded() {
   # HDDS-6261: overwrite the same keys again to trigger the precondition check
   # that exists <= 1.1.0 OM
   generate old1 "$SCM" --exclude create-volume-and-bucket
+
+  snapshot old1 downgraded "$SCM" -v FROM_SNAPSHOT:pre-finalized -v EARLIER_SNAPSHOTS:original,original2,pre-finalized
 }
 
 with_this_version_finalized() {
@@ -57,4 +64,6 @@ with_this_version_finalized() {
 
   generate new2 "$SCM"
   validate new2 "$SCM"
+
+  snapshot old1 finalized "$SCM" -v FROM_SNAPSHOT:downgraded -v EARLIER_SNAPSHOTS:original,original2,pre-finalized,downgraded
 }

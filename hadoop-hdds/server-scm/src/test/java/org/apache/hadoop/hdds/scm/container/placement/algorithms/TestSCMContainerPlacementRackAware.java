@@ -739,6 +739,50 @@ public class TestSCMContainerPlacementRackAware {
   }
 
   @Test
+  public void fallbackToSameRackWhenOtherRackHasOnlyDecommissionedNodes() throws SCMException {
+    setup(2 * NODE_PER_RACK);
+    // All of rack1 is being decommissioned. node5 has a replica that is being decommissioned, so it is excluded,
+    // and nodes 6-9 are already decommissioned.
+    dnInfos.get(5).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONING, HEALTHY));
+    for (int i = 6; i < 10; i++) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    // The other two replicas are on rack0.
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(1)));
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(Arrays.asList(datanodes.get(5)));
+
+    List<DatanodeDetails> datanodeDetails = policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5);
+
+    assertEquals(1, datanodeDetails.size());
+    // rack1 has no usable node, so the new replica has to go to rack0 as well.
+    assertTrue(cluster.isSameParent(datanodes.get(0), datanodeDetails.get(0)));
+    assertThat(usedNodes).doesNotContain(datanodeDetails.get(0));
+    assertEquals(1, metrics.getDatanodeChooseFallbackCount());
+    // Without fallback, there is nowhere to put it.
+    assertThrows(SCMException.class, () -> policyNoFallback.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5));
+  }
+
+  @Test
+  public void fallbackThrowsWhenNoRackHasUsableNode() {
+    setup(2 * NODE_PER_RACK);
+    // Two replicas are on rack0, and every other node is decommissioned.
+    for (int i = 2; i < 2 * NODE_PER_RACK; i++) {
+      dnInfos.get(i).setNodeStatus(NodeStatus.valueOf(DECOMMISSIONED, HEALTHY));
+    }
+    List<DatanodeDetails> usedNodes = new ArrayList<>(Arrays.asList(datanodes.get(0), datanodes.get(1)));
+
+    // The other-racks step and then the any-rack step use up their 3 tries each.
+    SCMException e = assertThrows(SCMException.class, () -> policy.chooseDatanodes(usedNodes, null, null, 1, 0, 5));
+    assertThat(e.getMessage()).startsWith("No writable datanode");
+    assertEquals(6, metrics.getDatanodeChooseAttemptCount());
+
+    // The same when the any-rack step runs out of nodes to try before it uses up its tries.
+    List<DatanodeDetails> excludedNodes = new ArrayList<>(datanodes.subList(2, NODE_PER_RACK));
+    e = assertThrows(SCMException.class, () -> policy.chooseDatanodes(usedNodes, excludedNodes, null, 1, 0, 5));
+    assertThat(e.getMessage()).startsWith("No writable datanode");
+  }
+
+  @Test
   public void chooseSingleNodeRackWithUsedAndExcludeNodes()
       throws SCMException {
     int datanodeCount = 5;

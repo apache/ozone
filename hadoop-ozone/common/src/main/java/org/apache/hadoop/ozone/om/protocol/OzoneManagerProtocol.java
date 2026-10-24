@@ -624,6 +624,15 @@ public interface OzoneManagerProtocol
   }
 
   /**
+   * Abort a multipart upload.
+   * @param assumeS3Context if true, OM resolves the S3 volume and ignores the volume in omKeyArgs.
+   */
+  default void abortMultipartUpload(OmKeyArgs omKeyArgs, boolean assumeS3Context) throws IOException {
+    throw new UnsupportedOperationException("OzoneManager does not require " +
+        "this to be implemented, as write requests use a new approach.");
+  }
+
+  /**
    * Abort multipart upload.
    * @param omKeyArgs
    * @throws IOException

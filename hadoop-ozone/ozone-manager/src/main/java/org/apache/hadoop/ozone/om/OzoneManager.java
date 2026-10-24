@@ -207,7 +207,7 @@ import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationInternalInterface;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -312,6 +312,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OMMultipartUploadUtils;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
 import org.apache.hadoop.ozone.om.service.CompactDBUtil;
@@ -686,7 +687,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Retain SCM proxy providers so OM can dynamically reload nodes/addresses without restarting.
     final SCMContainerLocationFailoverProxyProvider scmContainerProxyProvider =
         new SCMContainerLocationFailoverProxyProvider(configuration, null);
-    final StorageContainerLocationProtocol scmContainerClient =
+    final StorageContainerLocationInternalInterface scmContainerClient =
         HAUtils.getScmContainerClient(configuration, scmContainerProxyProvider);
     // verifies that the SCM info in the OM Version file is correct.
     final SCMBlockLocationFailoverProxyProvider scmBlockProxyProvider =
@@ -767,8 +768,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
 
     metrics = OMMetrics.create(conf);
-
-    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
+    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create(getOMServiceId(),
+        getOMNodeId());
     perfMetrics = OMPerformanceMetrics.register();
     omDeletionMetrics = DeletingServiceMetrics.create();
     // Get admin list
@@ -829,7 +830,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       omState = State.INITIALIZED;
     }
 
-    volumeUtilizationMetrics = VolumeUtilizationMetrics.create(metadataManager);
+    volumeUtilizationMetrics = VolumeUtilizationMetrics.create(metadataManager,
+        getOMServiceId(), getOMNodeId());
     bucketUtilizationMetrics = BucketUtilizationMetrics.create(metadataManager);
     omHostName = HddsUtils.getHostName(conf);
   }
@@ -2129,6 +2131,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
         omRpcAddress));
 
     HddsServerUtil.initializeMetrics(configuration, "OzoneManager");
+    omSnapshotIntMetrics.register();
 
     instantiateServices(false);
 
@@ -2638,6 +2641,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       serviceManager.stop();
       DeletingServiceMetrics.unregister();
       OMPerformanceMetrics.unregister();
+      omSnapshotIntMetrics.unregister();
       RatisDropwizardExports.clear(ratisMetricsMap, ratisReporterList);
       scmClient.close();
       if (certClient != null) {
@@ -4515,6 +4519,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       auditMap.put(OzoneConsts.PART_NUMBER_MARKER,
           Integer.toString(partNumberMarker));
       auditMap.put(OzoneConsts.MAX_PARTS, Integer.toString(maxParts));
+      OMMultipartUploadUtils.validateUploadId(uploadID);
 
       if (getAclsEnabled()) {
         omMetadataReader.checkAcls(
