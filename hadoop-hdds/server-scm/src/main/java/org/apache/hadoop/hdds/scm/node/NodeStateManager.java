@@ -28,6 +28,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -60,9 +61,9 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
-import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopScheduledThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -130,6 +131,11 @@ public class NodeStateManager implements Runnable, Closeable {
   private final long containerRollIntervalMs;
 
   /**
+   * Source of heartbeat and health check timestamps.
+   */
+  private final Clock clock;
+
+  /**
    * The future is used to pause/unpause the scheduled checks.
    */
   private ScheduledFuture<?> healthCheckFuture;
@@ -160,6 +166,18 @@ public class NodeStateManager implements Runnable, Closeable {
                           EventPublisher eventPublisher,
                           NetworkTopology clusterMap,
                           SCMContext scmContext) {
+    this(conf, eventPublisher, clusterMap, scmContext, new SlidingWindow.MonotonicClock());
+  }
+
+  /**
+   * Constructs a NodeStateManager which reads heartbeat and health check timestamps from the given clock.
+   */
+  public NodeStateManager(ConfigurationSource conf,
+                          EventPublisher eventPublisher,
+                          NetworkTopology clusterMap,
+                          SCMContext scmContext,
+                          Clock clock) {
+    this.clock = clock;
     this.nodeStateMap = new NodeStateMap();
     this.node2PipelineMap = new Node2PipelineMap();
     this.eventPublisher = eventPublisher;
@@ -261,7 +279,7 @@ public class NodeStateManager implements Runnable, Closeable {
 
   private DatanodeInfo newDatanodeInfo(DatanodeDetails datanode, DatanodeVersionProto versionInfo) {
     final NodeStatus status = newNodeStatus(datanode);
-    return new DatanodeInfo(datanode, status, versionInfo, containerRollIntervalMs);
+    return new DatanodeInfo(datanode, status, versionInfo, containerRollIntervalMs, clock);
   }
 
   /**
@@ -734,7 +752,7 @@ public class NodeStateManager implements Runnable, Closeable {
      *
      * The Processing starts from current time and looks backwards in time.
      */
-    long processingStartTime = Time.monotonicNow();
+    long processingStartTime = clock.millis();
     // After this time node is considered to be stale.
     long healthyNodeDeadline = processingStartTime - staleNodeIntervalMs;
     // After this time node is considered to be dead.
@@ -783,7 +801,7 @@ public class NodeStateManager implements Runnable, Closeable {
       // the node entry after we got the list of UUIDs.
       LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
     }
-    long processingEndTime = Time.monotonicNow();
+    long processingEndTime = clock.millis();
     //If we have taken too much time for HB processing, log that information.
     if ((processingEndTime - processingStartTime) >
         heartbeatCheckerIntervalMs) {
@@ -811,7 +829,7 @@ public class NodeStateManager implements Runnable, Closeable {
           "thread for Node Manager.");
     }
 
-    lastHealthCheck = Time.monotonicNow();
+    lastHealthCheck = clock.millis();
   }
 
   /**
@@ -822,7 +840,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private boolean shouldSkipCheck() {
 
-    long currentTime = Time.monotonicNow();
+    long currentTime = clock.millis();
     long minInterval = Math.min(staleNodeIntervalMs, deadNodeIntervalMs);
 
     return ((currentTime - lastHealthCheck) >= minInterval);

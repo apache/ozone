@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -41,16 +42,19 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
       LoggerFactory.getLogger(PipelineProvider.class);
   private final NodeManager nodeManager;
   private final PipelineStateManager stateManager;
+  private final Supplier<PipelineID> pipelineIdGenerator;
 
   public PipelineProvider(NodeManager nodeManager,
-      PipelineStateManager stateManager) {
+      PipelineStateManager stateManager, Supplier<PipelineID> pipelineIdGenerator) {
     this.nodeManager = nodeManager;
     this.stateManager = stateManager;
+    this.pipelineIdGenerator = pipelineIdGenerator;
   }
 
   public PipelineProvider() {
     this.nodeManager = null;
     this.stateManager = null;
+    this.pipelineIdGenerator = PipelineID::randomId;
   }
 
   public NodeManager getNodeManager() {
@@ -139,6 +143,11 @@ public abstract class PipelineProvider<REPLICATION_CONFIG
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
     }
     return dns;
+  }
+
+  /** Returns the ID for a new pipeline. */
+  protected PipelineID newPipelineID() {
+    return pipelineIdGenerator.get();
   }
 
   protected Pipeline.Builder newPipelineBuilder(ReplicationConfig replicationConfig, List<DatanodeDetails> nodes) {

@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NavigableSet;
@@ -43,7 +44,6 @@ import org.apache.hadoop.hdds.scm.ha.SequenceIdType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +74,8 @@ public class ContainerManagerImpl implements ContainerManager {
   @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
 
+  private final Clock clock;
+
   /**
    *
    */
@@ -85,7 +87,24 @@ public class ContainerManagerImpl implements ContainerManager {
       final Table<ContainerID, ContainerInfo> containerStore,
       final ContainerReplicaPendingOps containerReplicaPendingOps)
       throws IOException {
+    this(conf, scmHaManager, sequenceIdGen, pipelineManager, containerStore, containerReplicaPendingOps,
+        Clock.systemUTC());
+  }
+
+  /**
+   * Constructs ContainerManagerImpl which records when containers change state using the given clock.
+   */
+  public ContainerManagerImpl(
+      final Configuration conf,
+      final SCMHAManager scmHaManager,
+      final SequenceIdGenerator sequenceIdGen,
+      final PipelineManager pipelineManager,
+      final Table<ContainerID, ContainerInfo> containerStore,
+      final ContainerReplicaPendingOps containerReplicaPendingOps,
+      final Clock clock)
+      throws IOException {
     // Introduce builder for this class?
+    this.clock = clock;
     this.lock = new ReentrantLock();
     this.pipelineManager = pipelineManager;
     this.haManager = scmHaManager;
@@ -97,6 +116,7 @@ public class ContainerManagerImpl implements ContainerManager {
         .setContainerStore(containerStore)
         .setSCMDBTransactionBuffer(scmHaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(containerReplicaPendingOps)
+        .setClock(clock)
         .build();
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
@@ -253,7 +273,7 @@ public class ContainerManagerImpl implements ContainerManager {
         .setPipelineID(pipeline.getId().getProtobuf())
         .setUsedBytes(0)
         .setNumberOfKeys(0)
-        .setStateEnterTime(Time.now())
+        .setStateEnterTime(clock.millis())
         .setOwner(owner)
         .setContainerID(containerID.getId())
         .setReplicationType(pipeline.getType());

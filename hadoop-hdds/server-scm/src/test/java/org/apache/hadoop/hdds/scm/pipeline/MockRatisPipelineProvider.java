@@ -40,7 +40,7 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
       ConfigurationSource conf, EventPublisher eventPublisher,
       boolean autoOpen) {
     super(nodeManager, stateManager,
-        conf, eventPublisher, SCMContext.emptyContext());
+        conf, eventPublisher, SCMContext.emptyContext(), PipelineID::randomId);
     autoOpenPipeline = autoOpen;
   }
 
@@ -48,14 +48,14 @@ public class MockRatisPipelineProvider extends RatisPipelineProvider {
       PipelineStateManager stateManager,
       ConfigurationSource conf) {
     super(nodeManager, stateManager,
-        conf, new EventQueue(), SCMContext.emptyContext());
+        conf, new EventQueue(), SCMContext.emptyContext(), PipelineID::randomId);
   }
 
   public MockRatisPipelineProvider(
       NodeManager nodeManager, PipelineStateManager stateManager,
       ConfigurationSource conf, EventPublisher eventPublisher) {
     super(nodeManager, stateManager,
-        conf, eventPublisher, SCMContext.emptyContext());
+        conf, eventPublisher, SCMContext.emptyContext(), PipelineID::randomId);
     autoOpenPipeline = true;
   }
 

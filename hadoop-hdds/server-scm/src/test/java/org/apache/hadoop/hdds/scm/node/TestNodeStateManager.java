@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.MockClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -412,6 +413,23 @@ public class TestNodeStateManager {
     assertEquals(newHostName, updatedDn.getHostName());
     assertEquals(HddsProtos.NodeOperationalState.IN_SERVICE, updatedDn.getPersistedOpState());
     assertEquals(NodeStatus.inServiceHealthy(), updatedDn.getNodeStatus());
+  }
+
+  @Test
+  public void testHealthCheckReadsInjectedClock() throws Exception {
+    MockClock clock = MockClock.newInstance();
+    NodeStateManager stateManager = new NodeStateManager(conf, eventPublisher, clusterMap, scmContext, clock);
+    try {
+      DatanodeDetails dn = generateDatanode();
+      stateManager.addNode(dn, defaultVersionProto());
+
+      clock.fastForward(HddsServerUtil.getStaleNodeInterval(conf) + 1);
+      stateManager.checkNodesHealth();
+
+      assertEquals(NodeState.STALE, stateManager.getNodeStatus(dn).getHealth());
+    } finally {
+      stateManager.close();
+    }
   }
 
   private DatanodeDetails generateDatanode() {
