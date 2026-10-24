@@ -1739,4 +1739,11 @@ public final class OMRequestTestUtils {
         .build();
   }
 
+  /**
+   * @return an EC replication config with an unknown codec
+   */
+  public static HddsProtos.ECReplicationConfig invalidEcReplicationConfig() {
+    return HddsProtos.ECReplicationConfig.newBuilder().setData(3).setParity(2).setCodec("NO_SUCH_CODEC")
+        .setEcChunkSize(1024 * 1024).build();
+  }
 }

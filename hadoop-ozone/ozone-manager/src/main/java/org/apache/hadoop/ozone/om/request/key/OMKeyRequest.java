@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.OzoneConfigUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -577,7 +578,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   }
 
   protected OmKeyInfo.Builder dirKeyInfoBuilderNoACL(String keyName, KeyArgs keyArgs, long objectId,
-      ReplicationConfig serverDefaultReplConfig) {
+      ReplicationConfig serverDefaultReplConfig) throws OMException {
     String dirName = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
     OmKeyInfo.Builder keyInfoBuilder =
@@ -595,12 +596,12 @@ public abstract class OMKeyRequest extends OMClientRequest {
         .getFactor() != HddsProtos.ReplicationFactor.ZERO && keyArgs
         .getType() != HddsProtos.ReplicationType.EC) {
       // Factor available and not an EC replication config.
-      keyInfoBuilder.setReplicationConfig(ReplicationConfig
-          .fromProtoTypeAndFactor(keyArgs.getType(), keyArgs.getFactor()));
+      keyInfoBuilder.setReplicationConfig(OzoneConfigUtil
+          .toReplicationConfig(keyArgs.getType(), keyArgs.getFactor(), null));
     } else if (keyArgs.getType() == HddsProtos.ReplicationType.EC) {
       // Found EC type
-      keyInfoBuilder.setReplicationConfig(
-          new ECReplicationConfig(keyArgs.getEcReplicationConfig()));
+      keyInfoBuilder.setReplicationConfig(OzoneConfigUtil
+          .toReplicationConfig(keyArgs.getType(), keyArgs.getFactor(), keyArgs.getEcReplicationConfig()));
     } else {
       // default type
       keyInfoBuilder.setReplicationConfig(serverDefaultReplConfig);
