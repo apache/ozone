@@ -1754,6 +1754,15 @@ public interface ClientProtocol {
   void putObjectTagging(String volumeName, String bucketName, String keyName,
                         Map<String, String> tags) throws IOException;
 
+  /**
+   * Sets the tags to an existing S3 key, resolving its volume on OM.
+   * @param bucketName Bucket name.
+   * @param keyName Key name.
+   * @param tags Tags to set on the key.
+   * @throws IOException
+   */
+  void putS3ObjectTagging(String bucketName, String keyName, Map<String, String> tags) throws IOException;
+
 
   /**
    * Removes all the tags from the specified key.

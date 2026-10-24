@@ -2964,6 +2964,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMRequest omRequest = createOMRequest(Type.PutObjectTagging)
         .setPutObjectTaggingRequest(req)
+        .setAssumeS3Context(args.isAssumeS3Context())
         .build();
 
     OMResponse omResponse = submitRequest(omRequest);

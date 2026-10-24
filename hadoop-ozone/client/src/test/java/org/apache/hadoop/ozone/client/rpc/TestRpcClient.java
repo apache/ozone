@@ -427,6 +427,32 @@ public class TestRpcClient {
   }
 
   @ParameterizedTest
+  @EnumSource(value = OzoneManagerVersion.class,
+      names = {"S3_OBJECT_TAGGING_API", "ZDU", "S3_VOLUME_CONTEXT_RESOLUTION"})
+  void testPutS3ObjectTagging(OzoneManagerVersion version) throws Exception {
+    RpcClient client = spy(createRpcClient());
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "omVersion", version, true);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
+          .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(client).getS3VolumeContext();
+      boolean assumeContext = version == OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION;
+
+      client.putS3ObjectTagging("bucket", "key", Collections.singletonMap("tag", "value"));
+
+      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+      verify(om).putObjectTagging(args.capture());
+      verify(client, times(assumeContext ? 0 : 1)).getS3VolumeContext();
+      assertEquals(assumeContext ? "s3v" : "tenant-volume", args.getValue().getVolumeName());
+      assertEquals(assumeContext, args.getValue().isAssumeS3Context());
+      assertEquals(Collections.singletonMap("tag", "value"), args.getValue().getTags());
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class, mode = EnumSource.Mode.EXCLUDE, names = "UNKNOWN_VERSION")
   public void testCreateKeyIfNotExistsRequiresSupportedOmVersion(OzoneManagerVersion version) throws IOException {
     checkCreateKeyIfNotExistsOmVersion(version, false);
