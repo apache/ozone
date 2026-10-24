@@ -37,10 +37,13 @@ public final class SCMHAMetrics implements MetricsSource {
   private final SCMHAMetricsInfo scmHAMetricsInfo = new SCMHAMetricsInfo();
   private final String currNodeId;
   private final String leaderId;
+  private final SCMHADBTransactionBuffer transactionBuffer;
 
-  private SCMHAMetrics(String currNodeId, String leaderId) {
+  private SCMHAMetrics(String currNodeId, String leaderId,
+      SCMHADBTransactionBuffer transactionBuffer) {
     this.currNodeId = currNodeId;
     this.leaderId = leaderId;
+    this.transactionBuffer = transactionBuffer;
   }
 
   /**
@@ -48,7 +51,16 @@ public final class SCMHAMetrics implements MetricsSource {
    * @return SCMHAMetrics
    */
   public static SCMHAMetrics create(String nodeId, String leaderId) {
-    SCMHAMetrics metrics = new SCMHAMetrics(nodeId, leaderId);
+    return create(nodeId, leaderId, null);
+  }
+
+  /**
+   * Creates and returns SCMHAMetrics instance.
+   * @return SCMHAMetrics
+   */
+  public static SCMHAMetrics create(String nodeId, String leaderId,
+      SCMHADBTransactionBuffer transactionBuffer) {
+    SCMHAMetrics metrics = new SCMHAMetrics(nodeId, leaderId, transactionBuffer);
     return DefaultMetricsSystem.instance()
         .register(SOURCE_NAME, "SCM HA metrics", metrics);
   }
@@ -64,13 +76,22 @@ public final class SCMHAMetrics implements MetricsSource {
   public synchronized void getMetrics(MetricsCollector collector, boolean all) {
     // Check current node state (1 leader, 0 follower)
     int state = currNodeId.equals(leaderId) ? 1 : 0;
+    long latestSnapshotIndex = transactionBuffer == null ? -1
+        : transactionBuffer.getLatestSnapshotIndex();
+    long lastSnapshotTimeMs = transactionBuffer == null ? -1
+        : transactionBuffer.getLastSnapshotTimeMs();
     scmHAMetricsInfo.setNodeId(currNodeId);
     scmHAMetricsInfo.setScmHALeaderState(state);
+    scmHAMetricsInfo.setScmHALastTransactionInfoIndex(latestSnapshotIndex);
+    scmHAMetricsInfo.setScmHALastFlushTimeMs(lastSnapshotTimeMs);
 
     MetricsRecordBuilder recordBuilder = collector.addRecord(SOURCE_NAME);
     recordBuilder
         .tag(SCMHAMetricsInfo.NODE_ID, currNodeId)
-        .addGauge(SCMHAMetricsInfo.SCM_MANAGER_HA_LEADER_STATE, state);
+        .addGauge(SCMHAMetricsInfo.SCM_MANAGER_HA_LEADER_STATE, state)
+        .addGauge(SCMHAMetricsInfo.SCM_MANAGER_HA_LAST_TRANSACTION_INFO_INDEX,
+            latestSnapshotIndex)
+        .addGauge(SCMHAMetricsInfo.SCM_MANAGER_HA_LAST_FLUSH_TIME_MS, lastSnapshotTimeMs);
     recordBuilder.endRecord();
   }
 
@@ -84,6 +105,16 @@ public final class SCMHAMetrics implements MetricsSource {
     return scmHAMetricsInfo.getScmHALeaderState();
   }
 
+  @VisibleForTesting
+  public long getSCMHAMetricsInfoLastTransactionInfoIndex() {
+    return scmHAMetricsInfo.getScmHALastTransactionInfoIndex();
+  }
+
+  @VisibleForTesting
+  public long getSCMHAMetricsInfoLastFlushTimeMs() {
+    return scmHAMetricsInfo.getScmHALastFlushTimeMs();
+  }
+
   /**
    * Metrics value holder.
    */
@@ -92,9 +123,17 @@ public final class SCMHAMetrics implements MetricsSource {
     private static final MetricsInfo SCM_MANAGER_HA_LEADER_STATE =
         Interns.info("SCMHALeaderState", "Leader active " +
             "state of SCM node (1 leader, 0 follower");
+    private static final MetricsInfo SCM_MANAGER_HA_LAST_TRANSACTION_INFO_INDEX =
+        Interns.info("SCMHALastTransactionInfoIndex",
+            "Latest flushed transactionInfo index in SCM DB");
+    private static final MetricsInfo SCM_MANAGER_HA_LAST_FLUSH_TIME_MS =
+        Interns.info("SCMHALastFlushTimeMs",
+            "Last SCM DB flush timestamp in milliseconds");
     private static final MetricsInfo NODE_ID = Interns.info("NodeId",
         "SCM node Id");
     private int scmHALeaderState;
+    private long scmHALastTransactionInfoIndex;
+    private long scmHALastFlushTimeMs;
     private String nodeId;
 
     public int getScmHALeaderState() {
@@ -103,6 +142,23 @@ public final class SCMHAMetrics implements MetricsSource {
 
     public void setScmHALeaderState(int scmHALeaderState) {
       this.scmHALeaderState = scmHALeaderState;
+    }
+
+    public long getScmHALastTransactionInfoIndex() {
+      return scmHALastTransactionInfoIndex;
+    }
+
+    public void setScmHALastTransactionInfoIndex(
+        long scmHALastTransactionInfoIndex) {
+      this.scmHALastTransactionInfoIndex = scmHALastTransactionInfoIndex;
+    }
+
+    public long getScmHALastFlushTimeMs() {
+      return scmHALastFlushTimeMs;
+    }
+
+    public void setScmHALastFlushTimeMs(long scmHALastFlushTimeMs) {
+      this.scmHALastFlushTimeMs = scmHALastFlushTimeMs;
     }
 
     public String getNodeId() {

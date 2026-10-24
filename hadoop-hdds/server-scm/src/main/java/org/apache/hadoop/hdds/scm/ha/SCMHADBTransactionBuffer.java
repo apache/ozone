@@ -38,6 +38,10 @@ public interface SCMHADBTransactionBuffer
 
   SnapshotInfo getLatestSnapshot();
 
+  long getLatestSnapshotIndex();
+
+  long getLastSnapshotTimeMs();
+
   void setLatestSnapshot(SnapshotInfo latestSnapshot);
 
   AtomicReference<SnapshotInfo> getLatestSnapshotRef();
