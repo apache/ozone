@@ -1051,7 +1051,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
         kv = openKeyIter.next();
         if (kv != null && kv.getKey().startsWith(dbOpenKeyPrefix)) {
           String dbKey = kv.getKey();
-          // The open key of a multipart upload ends with the upload ID and has no client ID
+          // The open key of a multipart upload ends with the upload ID and has no client ID, so it is listed with
+          // client ID 0, which no real client has
           final boolean isUpload = OMMultipartUploadUtils.getUploadIdFromDbKey(dbKey) != null;
           long clientID = isUpload ? 0 : OMMetadataManager.getClientIDFromOpenKeyDBKey(dbKey);
           OmKeyInfo omKeyInfo = kv.getValue();
