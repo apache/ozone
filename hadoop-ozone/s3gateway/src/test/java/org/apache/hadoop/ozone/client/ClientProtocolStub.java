@@ -382,12 +382,10 @@ public class ClientProtocolStub implements ClientProtocol {
 
   private OzoneBucket getBucket(String volumeName, String bucketName)
       throws IOException {
+    if (volumeName == null) {
+      return objectStoreStub.getS3Bucket(bucketName);
+    }
     return objectStoreStub.getVolume(volumeName).getBucket(bucketName);
-  }
-
-  @Override
-  public void deleteS3Key(String bucketName, String keyName, String expectedETag) throws IOException {
-    ((OzoneBucketStub) objectStoreStub.getS3Bucket(bucketName)).deleteKey(keyName, expectedETag);
   }
 
   @Override

@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.createObjectEndpoint;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.delete;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_OWNER_MISMATCH;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PRECOND_FAILED;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.IF_MATCH_HEADER;
@@ -29,7 +30,9 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -63,7 +66,7 @@ public class TestObjectDelete {
     verify(endpoint.getClient().getObjectStore(), never()).getS3Volume();
     verify(protocol, never()).getS3VolumeContext();
     verify(volume, never()).getBucket(anyString());
-    verify(protocol).deleteS3Key("b1", "key", null);
+    verify(protocol).deleteKey(null, "b1", "key", false, null);
   }
 
   @Test
@@ -81,7 +84,32 @@ public class TestObjectDelete {
 
     verify(endpoint.getClient().getObjectStore()).getS3Volume();
     verify(protocol).deleteKey("s3Volume", "b1", "key", false, null);
-    verify(protocol, never()).deleteS3Key(anyString(), anyString(), any());
+    verify(protocol, never()).deleteKey(isNull(), anyString(), anyString(), anyBoolean(), any());
+  }
+
+  @Test
+  void testDeleteRejectsUnexpectedOwner() throws Exception {
+    OzoneVolume volume = mock(OzoneVolume.class);
+    ClientProtocol protocol = mock(ClientProtocol.class);
+    ObjectEndpoint original = createObjectEndpoint(protocol, volume, "b1");
+    when(volume.getBucket("b1").getOwner()).thenReturn("owner");
+    HttpHeaders headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER)).thenReturn("wrong-owner");
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(original.getClient()).setHeaders(headers).build();
+
+    assertErrorResponse(BUCKET_OWNER_MISMATCH, () -> delete(endpoint, "b1", "key"));
+
+    verify(protocol, never()).deleteKey(any(), anyString(), anyString(), anyBoolean(), any());
+  }
+
+  @Test
+  void testDeleteMissingKey() throws Exception {
+    OzoneClient client = new OzoneClientStub();
+    client.getObjectStore().createS3Bucket("b1");
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder().setClient(client).build();
+
+    assertStatus(HttpStatus.SC_NO_CONTENT, () -> delete(endpoint, "b1", "missing"));
   }
 
   @Test

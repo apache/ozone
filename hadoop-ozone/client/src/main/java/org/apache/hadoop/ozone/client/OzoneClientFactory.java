@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -176,6 +177,9 @@ public final class OzoneClientFactory {
    */
   private static OzoneClient getRpcClient(ClientProtocol clientProtocol,
                                        ConfigurationSource config) {
+    if (config.getBoolean(S3Auth.S3_AUTH_CHECK, false)) {
+      clientProtocol = S3ClientProtocol.create(clientProtocol);
+    }
     return new OzoneClient(config, clientProtocol);
   }
 

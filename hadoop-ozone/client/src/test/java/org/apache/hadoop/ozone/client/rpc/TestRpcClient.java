@@ -32,6 +32,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.hdds.scm.storage.TestClientThreadShutdown;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.client.MockOmTransport;
@@ -428,28 +430,60 @@ public class TestRpcClient {
 
   @ParameterizedTest
   @EnumSource(value = OzoneManagerVersion.class,
-      names = {"S3_OBJECT_TAGGING_API", "ZDU", "S3_VOLUME_CONTEXT_RESOLUTION", "S3_IF_NONE_MATCH_ETAG"})
-  void testDeleteS3Key(OzoneManagerVersion version) throws Exception {
-    RpcClient client = spy(createRpcClient());
+      names = {"S3_VOLUME_CONTEXT_RESOLUTION", "S3_IF_NONE_MATCH_ETAG"})
+  void testDeleteKeyWithS3Context(OzoneManagerVersion version) throws Exception {
+    RpcClient client = createRpcClient(version, true);
     try {
       OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
-      FieldUtils.writeField(client, "omVersion", version, true);
       FieldUtils.writeField(client, "ozoneManagerClient", om, true);
-      doReturn(new S3VolumeContext(OmVolumeArgs.newBuilder().setVolume("tenant-volume")
-          .setOwnerName("owner").setAdminName("admin").build(), "owner")).when(client).getS3VolumeContext();
-      boolean assumeContext = OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION.isSupportedBy(version);
 
-      client.deleteS3Key("bucket", "key", "etag");
+      client.deleteKey(null, "bucket", "key", false, "etag");
 
       ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
       verify(om).deleteKey(args.capture());
-      verify(client, times(assumeContext ? 0 : 1)).getS3VolumeContext();
-      assertThat(args.getValue().getVolumeName()).isEqualTo(assumeContext ? "s3v" : "tenant-volume");
+      assertThat(args.getValue().getVolumeName()).isEqualTo("s3v");
       assertThat(args.getValue().getBucketName()).isEqualTo("bucket");
       assertThat(args.getValue().getKeyName()).isEqualTo("key");
-      assertThat(args.getValue().isAssumeS3Context()).isEqualTo(assumeContext);
+      assertThat(args.getValue().isAssumeS3Context()).isTrue();
       assertThat(args.getValue().getExpectedETag()).isEqualTo("etag");
       assertThat(args.getValue().isRecursive()).isFalse();
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, s3v", "true, s3v", "false, tenant-volume", "true, tenant-volume"})
+  void testDeleteKeyPreservesExplicitVolume(boolean s3Client, String volumeName) throws Exception {
+    RpcClient client = createRpcClient(OzoneManagerVersion.S3_VOLUME_CONTEXT_RESOLUTION, s3Client);
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+
+      client.deleteKey(volumeName, "bucket", "key", true, "etag");
+
+      ArgumentCaptor<OmKeyArgs> args = ArgumentCaptor.forClass(OmKeyArgs.class);
+      verify(om).deleteKey(args.capture());
+      assertThat(args.getValue().getVolumeName()).isEqualTo(volumeName);
+      assertThat(args.getValue().isAssumeS3Context()).isFalse();
+      assertThat(args.getValue().isRecursive()).isTrue();
+      assertThat(args.getValue().getExpectedETag()).isEqualTo("etag");
+    } finally {
+      client.close();
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, S3_VOLUME_CONTEXT_RESOLUTION", "true, ZDU"})
+  void testDeleteKeyRejectsUnsupportedS3Context(boolean s3Client, OzoneManagerVersion version) throws Exception {
+    RpcClient client = createRpcClient(version, s3Client);
+    try {
+      OzoneManagerClientProtocol om = mock(OzoneManagerClientProtocol.class);
+      FieldUtils.writeField(client, "ozoneManagerClient", om, true);
+
+      assertThrows(NullPointerException.class, () -> client.deleteKey(null, "bucket", "key", false));
+
+      verifyNoInteractions(om);
     } finally {
       client.close();
     }
@@ -714,7 +748,30 @@ public class TestRpcClient {
   }
 
   private static RpcClient createRpcClient(OmTransport transport) throws IOException {
+    return createRpcClient(transport, new OzoneConfiguration());
+  }
+
+  private static RpcClient createRpcClient(OzoneManagerVersion version, boolean s3Client) throws IOException {
     OzoneConfiguration config = new OzoneConfiguration();
+    config.setBoolean(S3Auth.S3_AUTH_CHECK, s3Client);
+    config.setBoolean(OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY, false);
+    OmTransport transport = new MockOmTransport() {
+      @Override
+      public OMResponse submitRequest(OMRequest request) throws IOException {
+        OMResponse response = super.submitRequest(request);
+        if (request.getCmdType() == Type.ServiceList) {
+          return response.toBuilder().setServiceListResponse(ServiceListResponse.newBuilder()
+              .addServiceInfo(OzoneManagerProtocolProtos.ServiceInfo.newBuilder()
+                  .setNodeType(HddsProtos.NodeType.OM).setHostname("localhost").setOMVersion(version.serialize())))
+              .build();
+        }
+        return response;
+      }
+    };
+    return createRpcClient(transport, config);
+  }
+
+  private static RpcClient createRpcClient(OmTransport transport, OzoneConfiguration config) throws IOException {
     return new RpcClient(config, null) {
       @Override
       protected OmTransport createOmTransport(String omServiceId) {

@@ -653,7 +653,7 @@ public interface ClientProtocol {
 
   /**
    * Deletes an existing key.
-   * @param volumeName Name of the Volume
+   * @param volumeName Name of the Volume; S3 clients may pass null to resolve it from their S3 context.
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param recursive recursive deletion of all sub path keys if true,
@@ -666,7 +666,7 @@ public interface ClientProtocol {
 
   /**
    * Deletes an existing key if the key's current ETag matches expectedETag.
-   * @param volumeName Name of the Volume
+   * @param volumeName Name of the Volume; S3 clients may pass null to resolve it from their S3 context.
    * @param bucketName Name of the Bucket
    * @param keyName Name of the Key
    * @param recursive recursive deletion of all sub path keys if true,
@@ -677,15 +677,6 @@ public interface ClientProtocol {
   void deleteKey(String volumeName, String bucketName, String keyName,
                  boolean recursive, String expectedETag)
       throws IOException;
-
-  /**
-   * Deletes an S3 key, resolving its volume on OM.
-   * @param bucketName Bucket name.
-   * @param keyName Key name.
-   * @param expectedETag Required ETag, or null for an unconditional delete.
-   * @throws IOException
-   */
-  void deleteS3Key(String bucketName, String keyName, String expectedETag) throws IOException;
 
   /**
    * Deletes keys through the list.

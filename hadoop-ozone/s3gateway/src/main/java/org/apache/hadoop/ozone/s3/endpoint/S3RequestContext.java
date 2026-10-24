@@ -57,6 +57,10 @@ class S3RequestContext {
     return volume;
   }
 
+  String getResolvedVolumeName() {
+    return volume == null ? null : volume.getName();
+  }
+
   OzoneBucket getBucket(String name) throws IOException {
     if (bucket == null) {
       bucket = getVolume().getBucket(name);
