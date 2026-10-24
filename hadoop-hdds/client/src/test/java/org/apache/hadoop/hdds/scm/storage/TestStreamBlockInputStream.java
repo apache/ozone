@@ -85,6 +85,8 @@ import org.apache.ratis.thirdparty.io.grpc.Status;
 import org.apache.ratis.thirdparty.io.grpc.StatusRuntimeException;
 import org.apache.ratis.thirdparty.io.grpc.stub.ClientCallStreamObserver;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 /**
@@ -312,6 +314,72 @@ public class TestStreamBlockInputStream {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testPositionedReadDoesNotWaitForSequentialRead(boolean underConstruction) throws Exception {
+    byte[] data = new byte[100];
+    for (int i = 0; i < data.length; i++) {
+      data[i] = (byte) i;
+    }
+    XceiverClientGrpc client = mock(XceiverClientGrpc.class);
+    Pipeline pipeline = mockStandalonePipeline();
+    // For an under-construction block the length from OM is stale, and the sequential read gets it from the datanode.
+    BlockLocationInfo blockInfo = newBlockInfo(new BlockID(1, 26), underConstruction ? 2 : data.length);
+    blockInfo.setUnderConstruction(underConstruction);
+    stubGetBlock(client, pipeline, data.length);
+    XceiverClientFactory factory = mock(XceiverClientFactory.class);
+    when(factory.acquireClientForReadData(any())).thenReturn(client);
+    Map<StreamingReadResponse, StreamingReaderSpi> readers = new ConcurrentHashMap<>();
+    doAnswer(inv -> {
+      StreamingReaderSpi reader = inv.getArgument(1);
+      StreamingReadResponse response = new StreamingReadResponse(
+          MockDatanodeDetails.randomDatanodeDetails(), mock(ClientCallStreamObserver.class));
+      reader.setStreamingReadResponse(response);
+      readers.put(response, reader);
+      return null;
+    }).when(client).initStreamRead(any(), any(), any());
+    // The first request is the sequential read. It gets no data until the test sends it,
+    // so it waits in poll() and holds the StreamBlockInputStream lock.
+    AtomicReference<StreamingReaderSpi> sequentialReader = new AtomicReference<>();
+    CountDownLatch sequentialReadStarted = new CountDownLatch(1);
+    doAnswer(inv -> {
+      ContainerCommandRequestProto request = inv.getArgument(0);
+      StreamingReaderSpi reader = readers.get(inv.getArgument(1));
+      if (sequentialReader.compareAndSet(null, reader)) {
+        sequentialReadStarted.countDown();
+        return null;
+      }
+      int offset = Math.toIntExact(request.getReadBlock().getOffset());
+      int end = Math.toIntExact(offset + request.getReadBlock().getLength());
+      reader.onNext(buildResponseProto(Arrays.copyOfRange(data, offset, end), offset));
+      reader.onCompleted();
+      return null;
+    }).when(client).streamRead(any(), any());
+    OzoneClientConfig config = newStreamReadConfig();
+    config.setStreamReadTimeout(Duration.ofSeconds(30));
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try (StreamBlockInputStream stream = new StreamBlockInputStream(blockInfo, pipeline, null, factory, NO_REFRESH,
+        config)) {
+      try {
+        byte[] sequential = new byte[10];
+        Future<Integer> sequentialRead = executor.submit(() -> stream.read(sequential, 0, sequential.length));
+        assertTrue(sequentialReadStarted.await(10, TimeUnit.SECONDS));
+
+        ByteBuffer positioned = ByteBuffer.allocate(10);
+        Future<Integer> positionedRead = executor.submit(() -> stream.readPositioned(50, positioned));
+        assertEquals(10, positionedRead.get(10, TimeUnit.SECONDS));
+        assertArrayEquals(Arrays.copyOfRange(data, 50, 60), positioned.array());
+
+        sequentialReader.get().onNext(buildResponseProto(Arrays.copyOfRange(data, 0, 10), 0));
+        assertEquals(10, sequentialRead.get(10, TimeUnit.SECONDS));
+        assertArrayEquals(Arrays.copyOfRange(data, 0, 10), sequential);
+      } finally {
+        executor.shutdownNow();
+      }
+    }
+    verify(client, times(underConstruction ? 1 : 0)).sendCommand(any(ContainerCommandRequestProto.class), any());
+  }
+
   @Test
   public void testReleasesStreamPermitAtBlockEof() throws Exception {
     OzoneClientConfig clientConfig = newStreamReadConfig();
@@ -514,6 +582,11 @@ public class TestStreamBlockInputStream {
 
   private XceiverClientGrpc mockGetBlockClient(byte[] data, Pipeline pipeline) throws Exception {
     XceiverClientGrpc client = mockOffsetAwareStreamingReadClient(data, mock(ClientCallStreamObserver.class));
+    stubGetBlock(client, pipeline, data.length);
+    return client;
+  }
+
+  private static void stubGetBlock(XceiverClientGrpc client, Pipeline pipeline, long blockSize) throws Exception {
     when(client.getPipeline()).thenReturn(pipeline);
     DatanodeDetails datanode = pipeline.getFirstNode();
     when(pipeline.getClosestNode(any())).thenReturn(datanode);
@@ -525,10 +598,9 @@ public class TestStreamBlockInputStream {
           .setGetBlock(ContainerProtos.GetBlockResponseProto.newBuilder()
               .setBlockData(ContainerProtos.BlockData.newBuilder()
                   .setBlockID(request.getGetBlock().getBlockID())
-                  .setSize(data.length)))
+                  .setSize(blockSize)))
           .build();
     });
-    return client;
   }
 
   private static BlockLocationInfo newBlockInfo(BlockID blockID, long length) {

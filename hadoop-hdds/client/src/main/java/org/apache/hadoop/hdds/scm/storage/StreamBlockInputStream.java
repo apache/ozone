@@ -79,15 +79,16 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final BlockID blockID;
   private long blockLength;
   // The block is under construction, so its length from OM may be stale; fetch it from the datanode once.
-  private boolean needUpdateBlockLength;
+  private volatile boolean needUpdateBlockLength;
   private final int responseDataSize;
   private final long preReadSize;
   private final Duration readTimeout;
   private final long readTimeoutNanos;
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
-  private XceiverClientFactory xceiverClientFactory;
+  private final XceiverClientFactory xceiverClientFactory;
   private XceiverClientGrpc xceiverClient;
+  private boolean closed;
 
   private ReadBuffer readBuffer;
   private long position = 0;
@@ -185,6 +186,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   /**
    * Positioned read served by a dedicated one-shot streaming read which never touches the
    * cursor, the pre-read buffer or the sequential reader.
+   * Once the block length is known, it does not take this stream's lock, so it does not wait for a sequential read
+   * in progress. It does not check that this stream is open: {@link MultipartInputStream} checks that before it
+   * calls this method.
    *
    * @param blockOffset the offset within the block to read from.
    * @param dst the buffer to read into.
@@ -195,21 +199,19 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     if (!dst.hasRemaining()) {
       return 0;
     }
-    updateBlockLength();
+    // updateBlockLength() sets blockLength before it clears the volatile flag, so blockLength is safe to read here.
+    if (needUpdateBlockLength) {
+      updateBlockLength();
+    }
     if (blockOffset < 0 || blockOffset >= blockLength) {
       return EOF;
-    }
-    final XceiverClientFactory factory;
-    synchronized (this) {
-      checkOpen();
-      factory = xceiverClientFactory;
     }
     final int length = Math.toIntExact(Math.min(dst.remaining(), blockLength - blockOffset));
     final int startPosition = dst.position();
     int callRetries = 0;
     while (true) {
       final Pipeline pipeline = pipelineRef.get();
-      final XceiverClientGrpc client = acquireGrpcClientForReadData(factory, pipeline);
+      final XceiverClientGrpc client = acquireGrpcClientForReadData(xceiverClientFactory, pipeline);
       final StreamingReader reader = new StreamingReader(client);
       try {
         // On failure initStreamRead releases its own permit, so the reader is closed only after it succeeds.
@@ -223,7 +225,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         dst.position(startPosition);
         handlePreadException(e, reader, blockOffset, callRetries++);
       } finally {
-        factory.releaseClientForReadData(client, false);
+        xceiverClientFactory.releaseClientForReadData(client, false);
       }
     }
   }
@@ -405,7 +407,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   protected synchronized void checkOpen() throws IOException {
-    if (xceiverClientFactory == null) {
+    if (closed) {
       throw new IOException(FSExceptionMessages.STREAM_IS_CLOSED + " Block: " + blockID);
     }
   }
@@ -549,7 +551,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   }
 
   protected synchronized void releaseClient() {
-    if (xceiverClientFactory != null && xceiverClient != null) {
+    if (xceiverClient != null) {
       closeReader("releaseClient");
       xceiverClientFactory.releaseClientForReadData(xceiverClient, false);
       xceiverClient = null;
@@ -559,7 +561,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   @Override
   public synchronized void close() throws IOException {
     releaseClient();
-    xceiverClientFactory = null;
+    closed = true;
   }
 
   private void refreshBlockInfo(IOException cause) throws IOException {
