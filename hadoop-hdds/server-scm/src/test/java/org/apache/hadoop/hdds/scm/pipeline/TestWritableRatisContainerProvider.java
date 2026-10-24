@@ -31,11 +31,14 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -93,6 +96,70 @@ class TestWritableRatisContainerProvider {
     existingPipelines(pipelineWithoutContainer, pipeline);
 
     ContainerInfo container = createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
+
+    assertSame(existingContainer, container);
+    verifyPipelineNotCreated();
+  }
+
+  @RepeatedTest(100)
+  void prefersPipelineOnClientDatanode() throws Exception {
+    Pipeline remotePipeline = MockPipeline.createPipeline(3);
+    pipelineHasContainer(remotePipeline);
+    Pipeline localPipeline = MockPipeline.createPipeline(3);
+    ContainerInfo localContainer = pipelineHasContainer(localPipeline);
+    existingPipelines(remotePipeline, localPipeline);
+
+    DatanodeDetails client = localPipeline.getNodes().get(1);
+    ContainerInfo container =
+        createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, client);
+
+    assertSame(localContainer, container);
+    verifyPipelineNotCreated();
+  }
+
+  @RepeatedTest(100)
+  void prefersPipelineLedByClientDatanode() throws Exception {
+    DatanodeDetails client = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline followerPipeline = MockPipeline.createPipeline(Arrays.asList(client,
+        MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails()));
+    pipelineHasContainer(followerPipeline);
+    Pipeline leaderPipeline = MockPipeline.createPipeline(Arrays.asList(client,
+        MockDatanodeDetails.randomDatanodeDetails(), MockDatanodeDetails.randomDatanodeDetails()))
+        .toBuilder().setLeaderId(client.getID()).build();
+    ContainerInfo leaderContainer = pipelineHasContainer(leaderPipeline);
+    existingPipelines(followerPipeline, leaderPipeline);
+
+    ContainerInfo container =
+        createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, client);
+
+    assertSame(leaderContainer, container);
+    verifyPipelineNotCreated();
+  }
+
+  @Test
+  void fallsBackWhenLocalPipelineHasNoContainer() throws Exception {
+    Pipeline localPipeline = MockPipeline.createPipeline(3);
+    Pipeline remotePipeline = MockPipeline.createPipeline(3);
+    ContainerInfo remoteContainer = pipelineHasContainer(remotePipeline);
+    existingPipelines(localPipeline, remotePipeline);
+
+    DatanodeDetails client = localPipeline.getNodes().get(0);
+    ContainerInfo container =
+        createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, client);
+
+    assertSame(remoteContainer, container);
+    verifyPipelineNotCreated();
+  }
+
+  @Test
+  void fallsBackWhenClientIsNotInAnyPipeline() throws Exception {
+    Pipeline pipeline = MockPipeline.createPipeline(3);
+    ContainerInfo existingContainer = pipelineHasContainer(pipeline);
+    existingPipelines(pipeline);
+
+    DatanodeDetails client = MockDatanodeDetails.randomDatanodeDetails();
+    ContainerInfo container =
+        createSubject().getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION, client);
 
     assertSame(existingContainer, container);
     verifyPipelineNotCreated();

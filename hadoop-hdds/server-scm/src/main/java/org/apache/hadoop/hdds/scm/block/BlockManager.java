@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -44,6 +45,16 @@ public interface BlockManager extends Closeable {
   AllocatedBlock allocateBlock(long size, ReplicationConfig replicationConfig,
       String owner,
       ExcludeList excludeList) throws IOException, TimeoutException;
+
+  /**
+   * Allocates a new block, preferring a Ratis pipeline that contains {@code client}.
+   *
+   * @param client The datanode the writer runs on, or null if unknown.
+   */
+  default AllocatedBlock allocateBlock(long size, ReplicationConfig replicationConfig, String owner,
+      ExcludeList excludeList, DatanodeDetails client) throws IOException, TimeoutException {
+    return allocateBlock(size, replicationConfig, owner, excludeList);
+  }
 
   /**
    * Deletes a list of blocks in an atomic operation. Internally, SCM
