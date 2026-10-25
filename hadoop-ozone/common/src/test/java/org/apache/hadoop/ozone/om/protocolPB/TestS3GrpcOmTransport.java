@@ -45,6 +45,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcOmExceptionUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
@@ -117,11 +118,7 @@ public class TestS3GrpcOmTransport {
                       responseObserver.onCompleted();
                     }
                   } catch (Throwable e) {
-                    IOException ex = new IOException(e.getCause());
-                    responseObserver.onError(io.grpc.Status
-                        .INTERNAL
-                        .withDescription(ex.getMessage())
-                        .asRuntimeException());
+                    responseObserver.onError(GrpcOmExceptionUtils.toStatusRuntimeException(e.getCause()));
                   }
                 }
               }));
@@ -640,8 +637,8 @@ public class TestS3GrpcOmTransport {
           public void submitRequest(OMRequest request, StreamObserver<OMResponse> responseObserver) {
             requests.add(request);
             if (requests.size() <= notReadyCount) {
-              IOException ex = new IOException(new OMLeaderNotReadyException(nodeId + " is not ready"));
-              responseObserver.onError(io.grpc.Status.INTERNAL.withDescription(ex.getMessage()).asRuntimeException());
+              responseObserver.onError(GrpcOmExceptionUtils.toStatusRuntimeException(
+                  new OMLeaderNotReadyException(nodeId + " is not ready")));
               return;
             }
             responseObserver.onNext(newSuccessResponse(nodeId, request));
@@ -677,11 +674,7 @@ public class TestS3GrpcOmTransport {
             try {
               throw createNotLeaderException();
             } catch (Throwable e) {
-              IOException ex = new IOException(e.getCause());
-              responseObserver.onError(io.grpc.Status
-                  .INTERNAL
-                  .withDescription(ex.getMessage())
-                  .asRuntimeException());
+              responseObserver.onError(GrpcOmExceptionUtils.toStatusRuntimeException(e.getCause()));
             }
           }
         })

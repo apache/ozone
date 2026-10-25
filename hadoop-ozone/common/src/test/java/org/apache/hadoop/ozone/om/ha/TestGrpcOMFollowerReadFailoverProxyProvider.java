@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
+import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcOmExceptionUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -161,9 +162,9 @@ public class TestGrpcOMFollowerReadFailoverProxyProvider {
     assertEquals(2, leaderRequests.size());
   }
 
-  @ParameterizedTest
-  @MethodSource("failuresToThrow")
-  void testFailureIsThrown(StatusRuntimeException failure) {
+  @Test
+  void testLeaderNotReadyExceptionIsThrown() {
+    final StatusRuntimeException failure = toServerError(new OMLeaderNotReadyException("leader is not ready"));
     failures.put(nodeIds.get(0), failure);
 
     assertSame(failure, assertThrows(StatusRuntimeException.class, () -> submit(newRequest(Type.ListVolume))));
@@ -173,10 +174,15 @@ public class TestGrpcOMFollowerReadFailoverProxyProvider {
     assertTrue(provider.isOmServiceSupportsFollowerRead());
   }
 
-  static Stream<StatusRuntimeException> failuresToThrow() {
-    return Stream.of(
-        Status.RESOURCE_EXHAUSTED.asRuntimeException(),
-        toServerError(new OMLeaderNotReadyException("leader is not ready")));
+  @Test
+  void testFailureWithoutFailoverIsThrown() {
+    final StatusRuntimeException failure = Status.RESOURCE_EXHAUSTED.asRuntimeException();
+    failures.put(nodeIds.get(0), failure);
+
+    assertSame(failure, assertThrows(StatusRuntimeException.class, () -> submit(newRequest(Type.ListVolume))));
+    assertEquals(1, countNodeRequests());
+    assertEquals(0, leaderRequests.size());
+    assertEquals(nodeIds.get(0), provider.getCurrentFollowerReadNodeId());
   }
 
   private void submit(OMRequest request) throws IOException {
@@ -204,7 +210,7 @@ public class TestGrpcOMFollowerReadFailoverProxyProvider {
 
   /** The error that the OM gRPC server returns for an exception, see OzoneManagerServiceGrpc. */
   private static StatusRuntimeException toServerError(IOException e) {
-    return Status.INTERNAL.withDescription(e.toString()).asRuntimeException();
+    return GrpcOmExceptionUtils.toStatusRuntimeException(e);
   }
 
   private static OMRequest newRequest(Type cmdType) {
