@@ -29,6 +29,7 @@
     <module>cli-debug</module>
     <module>cli-interactive</module>
     <module>cli-local</module>
+    <module>cli-other</module>
     <module>cli-repair</module>
     <module>cli-shell</module>
     <module>client</module>
@@ -55,7 +56,6 @@
     <module>recon-codegen</module>
     <module>s3-secret-store</module>
     <module>s3gateway</module>
-    <module>tools</module>
     <module>vapor</module>
   </modules>
 

@@ -150,7 +150,7 @@ function ozonecmd_case
     ;;
     getconf)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.conf.OzoneGetConf;
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-other"
     ;;
     om)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -199,7 +199,7 @@ function ozonecmd_case
     ;;
     fs)
       OZONE_CLASSNAME=org.apache.hadoop.fs.ozone.OzoneFsShell
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-other"
     ;;
     daemonlog)
       OZONE_CLASSNAME=org.apache.hadoop.hdds.utils.LogLevel
@@ -215,15 +215,15 @@ function ozonecmd_case
     ;;
     version)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.util.OzoneVersionInfo
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-other"
     ;;
     genconf)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.genconf.GenerateOzoneRequiredConfigurations
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-other"
     ;;
     dtutil)
       OZONE_CLASSNAME=org.apache.hadoop.security.token.DtUtilShell
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-other"
     ;;
     interactive)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneInteractiveShell
@@ -244,7 +244,7 @@ function ozonecmd_case
     ;;
     ratis)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneRatis
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-other"
     ;;
     vapor)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Vapor
@@ -295,7 +295,6 @@ function ozone_suppress_shell_log
 {
   if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
       || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-dist" ]] \
-      || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]] \
       || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-iceberg" ]]; then
     if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
         && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then

@@ -1313,6 +1313,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-cli-other</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-cli-repair</artifactId>
         <version>${ozone.version}</version>
       </dependency>
@@ -1448,11 +1453,6 @@
       <dependency>
         <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-s3gateway</artifactId>
-        <version>${ozone.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>ozone-tools</artifactId>
         <version>${ozone.version}</version>
       </dependency>
       <dependency>
