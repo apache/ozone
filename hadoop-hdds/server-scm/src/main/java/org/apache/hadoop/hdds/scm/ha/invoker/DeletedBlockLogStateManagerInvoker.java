@@ -35,10 +35,18 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
         new Class<?>[] {ArrayList.class},
         new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class}
     }),
+    increaseRetryCountOfTransactionInDB(new Class<?>[][] {
+        null,
+        new Class<?>[] {ArrayList.class}
+    }),
     removeTransactionsFromDB(new Class<?>[][] {
         null,
         new Class<?>[] {ArrayList.class},
         new Class<?>[] {ArrayList.class, DeletedBlocksTransactionSummary.class}
+    }),
+    resetRetryCountOfTransactionInDB(new Class<?>[][] {
+        null,
+        new Class<?>[] {ArrayList.class}
     });
 
     private final Class<?>[][] parameterTypes;
@@ -83,6 +91,12 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       }
 
       @Override
+      public void increaseRetryCountOfTransactionInDB(ArrayList arg0) throws IOException {
+        final Object[] args = {arg0};
+        invoker.invokeReplicateDirect(ReplicateMethod.increaseRetryCountOfTransactionInDB, args);
+      }
+
+      @Override
       public void onFlush() {
         invoker.getImpl().onFlush();
       }
@@ -102,6 +116,12 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       public void removeTransactionsFromDB(ArrayList arg0, DeletedBlocksTransactionSummary arg1) throws IOException {
         final Object[] args = {arg0, arg1};
         invoker.invokeReplicateDirect(ReplicateMethod.removeTransactionsFromDB, args);
+      }
+
+      @Override
+      public void resetRetryCountOfTransactionInDB(ArrayList arg0) throws IOException {
+        final Object[] args = {arg0};
+        invoker.invokeReplicateDirect(ReplicateMethod.resetRetryCountOfTransactionInDB, args);
       }
     };
   }
@@ -123,20 +143,30 @@ public class DeletedBlockLogStateManagerInvoker extends ScmInvoker<DeletedBlockL
       returnValue = getImpl().getReadOnlyIterator();
       break;
 
+    case "increaseRetryCountOfTransactionInDB":
+      final ArrayList arg2 = p.length > 0 ? (ArrayList) p[0] : null;
+      getImpl().increaseRetryCountOfTransactionInDB(arg2);
+      return Message.EMPTY;
+
     case "onFlush":
       getImpl().onFlush();
       return Message.EMPTY;
 
     case "reinitialize":
-      final Table arg2 = p.length > 0 ? (Table) p[0] : null;
-      final Table arg3 = p.length > 1 ? (Table) p[1] : null;
-      getImpl().reinitialize(arg2, arg3);
+      final Table arg3 = p.length > 0 ? (Table) p[0] : null;
+      final Table arg4 = p.length > 1 ? (Table) p[1] : null;
+      getImpl().reinitialize(arg3, arg4);
       return Message.EMPTY;
 
     case "removeTransactionsFromDB":
-      final ArrayList arg4 = p.length > 0 ? (ArrayList) p[0] : null;
-      final DeletedBlocksTransactionSummary arg5 = p.length > 1 ? (DeletedBlocksTransactionSummary) p[1] : null;
-      getImpl().removeTransactionsFromDB(arg4, arg5);
+      final ArrayList arg5 = p.length > 0 ? (ArrayList) p[0] : null;
+      final DeletedBlocksTransactionSummary arg6 = p.length > 1 ? (DeletedBlocksTransactionSummary) p[1] : null;
+      getImpl().removeTransactionsFromDB(arg5, arg6);
+      return Message.EMPTY;
+
+    case "resetRetryCountOfTransactionInDB":
+      final ArrayList arg7 = p.length > 0 ? (ArrayList) p[0] : null;
+      getImpl().resetRetryCountOfTransactionInDB(arg7);
       return Message.EMPTY;
 
     default:
